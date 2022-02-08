@@ -55,10 +55,11 @@ extern void func_add_arg(void *rec, const char *name, bool noconvert, bool none,
                          PyObject *def) noexcept;
 
 /// Create a Python function object for the given function record
-extern PyObject *func_init(void *rec, size_t nargs, size_t args_pos,
-                           size_t kwargs_pos, void (*free_captured)(void *),
-                           PyObject *(*impl)(void *, PyObject **, bool *,
-                                             PyObject *) ) noexcept;
+extern PyObject *
+func_init(void *rec, size_t nargs, size_t args_pos, size_t kwargs_pos,
+          void (*free_captured)(void *),
+          PyObject *(*impl)(void *, PyObject **, bool *, PyObject *),
+          const char *descr, const std::type_info **descr_types);
 
 NAMESPACE_END(detail)
 NAMESPACE_END(nanobind)

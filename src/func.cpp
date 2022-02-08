@@ -1,22 +1,12 @@
 #include "smallvec.h"
 #include <cstring>
 
-#if !defined(likely)
-#  if !defined(_MSC_VER)
-#    define likely(x)   __builtin_expect(!!(x), 1)
-#    define unlikely(x) __builtin_expect(!!(x), 0)
-#  else
-#    define unlikely(x) x
-#    define likely(x) x
-#  endif
-#endif
-
 NAMESPACE_BEGIN(nanobind)
 NAMESPACE_BEGIN(detail)
 
 struct arg_record {
     const char *name;
-    bool noconvert;
+    bool convert;
     bool none;
     object def;
 };
@@ -103,13 +93,13 @@ void func_set_docstr(void *rec_, const char *docstr) noexcept {
     rec->docstr = docstr;
 }
 
-void func_add_arg(void *rec_, const char *name, bool noconvert, bool none,
+void func_add_arg(void *rec_, const char *name, bool convert, bool none,
                   PyObject *def) noexcept {
     function_record *rec = (function_record *) rec_;
     if (rec->args.empty() && (rec->flags & (uint32_t) func_flags::is_method))
-        rec->args.push_back(arg_record{ "self", true, false, object() });
+        rec->args.push_back(arg_record{ "self", false, false, object() });
     rec->args.push_back(
-        arg_record{ name, noconvert, none, reinterpret_borrow<object>(def) });
+        arg_record{ name, convert, none, reinterpret_borrow<object>(def) });
 }
 
 static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
@@ -120,69 +110,157 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
     PyObject *parent = nargs_in > 0 ? PyTuple_GET_ITEM(args_in, 0) : nullptr;
 
     smallvec<PyObject *> args;
+    smallvec<const char *> kwargs_consumed;
     smallvec<bool> args_convert;
+    object extra_args, extra_kwargs;
 
-    // Two-pass function resolution, allow implicit conversions only in the 2nd pass
+    /*  The logic below tries to find a suitable overload using two passes
+        of the overload chain (or 1, if there are no overloads). The first pass
+        is strict and permits no implicit conversions, while the second pass
+        allows them.
+
+        The following is done per overload during a pass
+
+        1. Copy positional arguments while checking that named positional
+           arguments weren't *also* specified as kwarg. Substitute missing
+           entries using keyword arguments or default argument values provided
+           in the bindings, if available.
+
+        3. Ensure that either all keyword arguments were "consumed", or that
+           the function takes a kwargs argument to accept unconsumed kwargs.
+
+        4. Any positional arguments still left get put into a tuple (for args),
+           and any leftover kwargs get put into a dict.
+
+        5. Pack everything into a vector; if we have nb::args or nb::kwargs, they are an
+           extra tuple or dict at the end of the positional arguments.
+
+        6. Call the function call dispatcher (function_record::impl)
+
+        If one of these fail, move on to the next overload and keep trying
+        until we get a result other than NB_NEXT_OVERLOAD.
+    */
+
     for (int pass = has_overloads ? 0 : 1; pass < 2; ++pass) {
-        const function_record *func = rec;
-        args.clear();
-        args_convert.clear();
+        const function_record *func_it = rec;
 
-        const bool has_args = func->flags & (uint16_t) func_flags::has_args,
-                   has_kwargs = func->flags & (uint16_t) func_flags::has_kwargs;
+        while (func_it) {
+            // Clear scratch space
+            args.clear();
+            args_convert.clear();
+            kwargs_consumed.clear();
 
-        // Number of function arguments that must be loaded, ignoring *args and **kwargs
-        size_t nargs_normal = func->nargs - has_args - has_kwargs;
+            // Advance the function iterator
+            const function_record *func = func_it;
+            func_it = func_it->next;
 
-        /// Number of positional arguments
-        size_t nargs_pos = func->nargs_pos;
+            const bool has_args = func->flags & (uint16_t) func_flags::has_args,
+                       has_kwargs = func->flags & (uint16_t) func_flags::has_kwargs;
 
-        if (!has_args && nargs_in > nargs_pos)
-            continue; // Too many positional arguments for this overload
+            /// Number of positional arguments
+            size_t nargs_pos = func->nargs_pos;
 
-        if (nargs_in < nargs_pos && func->args.size() < nargs_pos)
-            continue; // Not enough positional arguments given, and not enough defaults to fill in the blanks
+            if (nargs_in > nargs_pos && !has_args)
+                continue; // Too many positional arguments given for this overload
 
-        size_t nargs_to_copy = nargs_pos < nargs_in ? nargs_pos : nargs_in,
-               nargs_copied = 0;
+            if (nargs_in < nargs_pos && func->args.size() < nargs_pos)
+                continue; // Not enough positional arguments, insufficient
+                          // keyword/default arguments to fill in the blanks
 
-        // 1. Copy any positional arguments given.
-        bool bad_arg = false;
-        for (; nargs_copied < nargs_to_copy; ++nargs_copied) {
-            const arg_record *arg_rec = nargs_copied < rec->args.size()
-                                            ? &rec->args[nargs_copied]
-                                            : nullptr;
+            // 1. Copy positional arguments, potentially substitute kwargs/defaults
+            for (size_t i = 0; i < nargs_pos; ++i) {
+                PyObject *arg = nullptr;
+                bool arg_convert = pass == 1;
 
-            if (unlikely(has_kwargs && arg_rec && arg_rec->name)) {
-                PyObject *hit = PyDict_GetItemString(kwargs_in, arg_rec->name);
-                if (hit) {
-                    Py_DECREF(hit);
-                    bad_arg = true;
-                    break;
+                if (i < nargs_in)
+                    arg = PyTuple_GET_ITEM(args_in, i);
+
+                if (!rec->args.empty()) {
+                    const arg_record &arg_rec = rec->args[i];
+
+                    if (kwargs_in && arg_rec.name) {
+                        PyObject *hit = PyDict_GetItemString(kwargs_in, arg_rec.name);
+
+                        if (hit) {
+                            Py_DECREF(hit); // kwargs still holds a reference
+
+                            if (arg) {
+                                // conflict between keyword and positional arg.
+                                break;
+                            } else {
+                                arg = hit;
+                                kwargs_consumed.push_back(arg_rec.name);
+                            }
+                        }
+                    }
+
+                    if (!arg)
+                        arg = arg_rec.def.ptr();
+
+                    if (arg == Py_None && !arg_rec.none)
+                        break;
+
+                    arg_convert &= !arg_rec.convert;
                 }
+
+                if (!arg)
+                    break;
+
+                args.push_back(arg);
+                args_convert.push_back(arg_convert);
             }
 
-            PyObject *arg = PyTuple_GET_ITEM(args_in, nargs_copied);
-            if (unlikely(arg_rec && !arg_rec->none && arg == Py_None)) {
-                bad_arg = true;
-                break;
+            // Skip this overload if positional arguments were unavailable
+            if (args.size() != nargs_pos)
+                continue;
+
+            // Deal with remaining positional arguments
+            if (has_args) {
+                extra_args = reinterpret_steal<object>(PyTuple_New(
+                    nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0));
+
+                for (size_t i = nargs_pos; i < nargs_in; ++i) {
+                    PyObject *o = PyTuple_GET_ITEM(args_in, i);
+                    Py_INCREF(o);
+                    PyTuple_SET_ITEM(extra_args.ptr(), i - nargs_pos, o);
+                }
+
+                args.push_back(extra_args.ptr());
+                args_convert.push_back(false);
             }
 
-            args.push_back(arg);
-            args_convert.push_back(
-                (arg_rec && arg_rec->noconvert) ? false : (pass == 1));
+            // Deal with remaining keyword arguments
+            if (has_kwargs) {
+                if (kwargs_consumed.empty()) {
+                    extra_kwargs = reinterpret_borrow<object>(kwargs_in);
+                } else {
+                    extra_kwargs = reinterpret_steal<object>(PyDict_Copy(kwargs_in));
+                    for (size_t i = 0; i < kwargs_consumed.size(); ++i) {
+                        if (PyDict_DelItemString(extra_kwargs.ptr(),
+                                                 kwargs_consumed[i]) == -1)
+                            fail("nanobind::detail::func_dispatch(): could not "
+                                 "filter kwargs");
+                    }
+                }
+
+                args.push_back(extra_kwargs.ptr());
+                args_convert.push_back(false);
+            } else if (kwargs_in && kwargs_consumed.size() !=
+                                        (size_t) PyDict_GET_SIZE(kwargs_in)) {
+                // Not all keyword arguments were consumed, try next overload
+                continue;
+            }
+
+            // Found a suitable overload, let's try calling it
+            PyObject *result =
+                func->impl((void *) func, args.data(), args_convert.data(), parent);
+
+            // Try another overload if there was a argument conversion issue
+            if (result != NB_NEXT_OVERLOAD)
+                return result;
         }
-
-        if (bad_arg)
-            continue;
-
-        PyObject *result =
-            func->impl((void *) func, args.data(), args_convert.data(), parent);
-        if (result != NB_NEXT_OVERLOAD)
-            return result;
-
-        func++;
     }
+
 
     printf("Could not resolve overload..\n");
 
@@ -192,8 +270,8 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
 
 PyObject *func_init(void *rec_, size_t nargs, size_t args_pos,
                     size_t kwargs_pos, void (*free_capture)(void *),
-                    PyObject *(*impl)(void *, PyObject **, bool *,
-                                      PyObject *) ) noexcept {
+                    PyObject *(*impl)(void *, PyObject **, bool *, PyObject *),
+                    const char *descr, const std::type_info **descr_types) {
     const bool has_args = args_pos != nargs,
           has_kwargs = kwargs_pos != nargs;
 

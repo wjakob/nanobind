@@ -20,8 +20,9 @@ object func_create(Func &&f, Return (*)(Args...), std::index_sequence<Is...>,
     };
 
     // Store the capture object in the function record if there is space
-    constexpr bool is_small = sizeof(capture) <= sizeof(void *) * 3,
-                   is_trivial = std::is_trivially_destructible_v<capture>;
+    constexpr bool is_small    = sizeof(capture) <= sizeof(void *) * 3,
+                   is_trivial  = std::is_trivially_destructible_v<capture>,
+                   is_void_ret = std::is_void_v<Return>;
 
     void *func_rec = func_alloc();
     void (*free_capture)(void *ptr) = nullptr;
@@ -46,36 +47,48 @@ object func_create(Func &&f, Return (*)(Args...), std::index_sequence<Is...>,
         };
     }
 
+    using cast_out =
+        make_caster<std::conditional_t<is_void_ret, std::nullptr_t, Return>>;
+
     auto impl = [](void *func_rec_2, PyObject **args, bool *args_convert,
                    PyObject *parent) -> PyObject * {
         const capture *cap;
         if constexpr (is_small)
             cap = std::launder((capture *) func_rec_2);
         else
-            cap = std::launder((void **) func_rec_2)[0];
+            cap = (capture *) std::launder((void **) func_rec_2)[0];
 
         nb_tuple<make_caster<Args>...> in;
         if ((... || !in.template get<Is>().load(args[Is], args_convert[Is])))
             return NB_NEXT_OVERLOAD;
 
-        if constexpr (std::is_void_v<Return>) {
-            cap->f(in.template get<Is>().
-                   operator typename make_caster<Args>::template cast_op_type<Args>()...);
+        if constexpr (is_void_ret) {
+            cap->f(
+                in.template get<Is>().operator typename make_caster<Args>::
+                    template cast_op_type<Args>()...),
             Py_INCREF(Py_None);
             return Py_None;
         } else {
-            using cast_out = make_caster<Return>;
+            return cast_out::cast(
+                cap->f(
+                    in.template get<Is>().operator typename make_caster<Args>::
+                        template cast_op_type<Args>()...),
+                return_value_policy::move, parent).ptr();
         }
-
-        // return cast_out::cast(capture->f(), return_value_policy::move, parent)
-        //     .ptr();
     };
 
     (detail::func_apply(func_rec, extra), ...);
 
-    return reinterpret_steal<object>(func_init(func_rec, sizeof...(Args),
-                                               args_pos_1, kwargs_pos_1,
-                                               free_capture, impl));
+    static constexpr auto signature = const_name("(") +
+                                      concat(make_caster<Args>::name...) +
+                                      const_name(") -> ") + cast_out::name;
+
+    const std::type_info* types[signature.type_count() + 1];
+    signature.put_types(types);
+
+    return reinterpret_steal<object>(
+        func_init(func_rec, sizeof...(Args), args_pos_1, kwargs_pos_1,
+                  free_capture, impl, signature.text, types));
 }
 
 

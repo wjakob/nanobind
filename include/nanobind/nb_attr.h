@@ -17,13 +17,13 @@ struct name {
 
 struct arg_v;
 struct arg {
-    constexpr explicit arg(const char *name = nullptr) : m_name(name), m_noconvert(false), m_none(false) { }
+    constexpr explicit arg(const char *name = nullptr) : m_name(name), m_convert(true), m_none(false) { }
     template <typename T> arg_v operator=(T &&value) const;
-    arg &noconvert(bool value = true) { m_noconvert = value; return *this; }
+    arg &noconvert(bool value = true) { m_convert = !value; return *this; }
     arg &none(bool value = true) { m_none = value; return *this; }
 
     const char *m_name;
-    bool m_noconvert;
+    bool m_convert;
     bool m_none;
 };
 
@@ -72,11 +72,11 @@ inline void func_apply(void *func_rec, is_method) {
 }
 
 inline void func_apply(void *func_rec, const arg &a) {
-    func_add_arg(func_rec, a.m_name, a.m_noconvert, a.m_none, nullptr);
+    func_add_arg(func_rec, a.m_name, a.m_convert, a.m_none, nullptr);
 }
 
 inline void func_apply(void *func_rec, const arg_v &a) {
-    func_add_arg(func_rec, a.m_name, a.m_noconvert, a.m_none, a.m_value.ptr());
+    func_add_arg(func_rec, a.m_name, a.m_convert, a.m_none, a.m_value.ptr());
 }
 
 NAMESPACE_END(detail)

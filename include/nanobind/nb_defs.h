@@ -1,6 +1,7 @@
 #define NB_STRINGIFY(x) #x
 #define NB_TOSTRING(x) NB_STRINGIFY(x)
 #define NB_CONCAT(first, second) first##second
+#define NB_NEXT_OVERLOAD ((PyObject *) 1) // special failure return code
 
 #if !defined(NAMESPACE_BEGIN)
 #  define NAMESPACE_BEGIN(name) namespace name {
@@ -16,6 +17,10 @@
 #  else
 #    define NB_EXPORT __attribute__ ((visibility("default")))
 #  endif
+#endif
+
+#if defined(__cpp_lib_char8_t) && __cpp_lib_char8_t >= 201811L
+#  define NB_HAS_U8STRING
 #endif
 
 #define NB_MODULE(name, variable)                                              \

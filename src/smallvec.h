@@ -3,6 +3,9 @@
 NAMESPACE_BEGIN(nanobind)
 NAMESPACE_BEGIN(detail)
 
+/* Simple vector class for default/copy/move-constructible objects.
+   Storage remains on the stack when the vectors is smaller than the 'Small'
+   template argument. */
 template <typename T, size_t Small = 6> struct smallvec {
     smallvec() = default;
 
@@ -39,6 +42,10 @@ template <typename T, size_t Small = 6> struct smallvec {
         v.m_capacity = Small;
     }
 
+    void clear() {
+        m_size = 0;
+    }
+
     void push_back(const T &value) {
         if (m_size >= m_capacity)
             expand();
@@ -52,6 +59,7 @@ template <typename T, size_t Small = 6> struct smallvec {
     }
 
     size_t size() const { return m_size; }
+    bool empty() const { return m_size == 0; }
     T *data() { return m_data; }
     const T *data() const { return m_data; }
 

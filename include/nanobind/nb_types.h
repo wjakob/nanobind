@@ -1,5 +1,16 @@
 NAMESPACE_BEGIN(nanobind)
 
+#define NB_OBJECT(Name, Parent, Check)                                         \
+public:                                                                        \
+    Name(handle h, detail::borrow_t) : Parent(h, detail::borrow_t{}) {}        \
+    Name(handle h, detail::steal_t) : Parent(h, detail::steal_t{}) {}          \
+    static bool check_(handle h) { return ((bool) h) && Check(h.ptr()); }
+
+#define NB_OBJECT_DEFAULT(Name, Parent, Check)                                 \
+    NB_OBJECT(Name, Parent, Check)                                             \
+    Name() : Parent() {}
+
+
 namespace detail {
     struct borrow_t { };
     struct steal_t { };
@@ -12,11 +23,12 @@ public:
     handle(handle &&) noexcept = default;
     handle &operator=(const handle &) = default;
     handle &operator=(handle &&) noexcept = default;
-    handle(PyObject *ptr) : m_ptr(ptr) { }
+    handle(const PyObject *ptr) : m_ptr((PyObject *) ptr) { }
 
     const handle& inc_ref() const & { Py_XINCREF(m_ptr); return *this; }
     const handle& dec_ref() const & { Py_XDECREF(m_ptr); return *this; }
-    bool check() const { return m_ptr != nullptr; }
+    operator bool() const { return m_ptr != nullptr; }
+    bool is_none() const { return m_ptr == Py_None; }
     PyObject *ptr() const { return m_ptr; }
 protected:
     PyObject *m_ptr = nullptr;
@@ -75,21 +87,38 @@ inline object none() {
 
 class module_ : public object {
 public:
-    using object::object;
-    using object::operator=;
+    NB_OBJECT(module_, object, PyModule_CheckExact);
 
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
 };
 
 class capsule : public object {
-public:
-    using object::object;
-    using object::operator=;
+    NB_OBJECT_DEFAULT(capsule, object, PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*free)(void *)) {
         m_ptr = detail::capsule_new(ptr, free);
     }
+};
+
+class tuple : public object {
+    NB_OBJECT_DEFAULT(tuple, object, PyTuple_Check)
+};
+
+class dict : public object {
+    NB_OBJECT_DEFAULT(dict, object, PyDict_Check)
+};
+
+class list : public object {
+    NB_OBJECT_DEFAULT(list, object, PyList_Check)
+};
+
+class args : public tuple {
+    NB_OBJECT_DEFAULT(args, tuple, PyTuple_Check)
+};
+
+class kwargs : public dict {
+    NB_OBJECT_DEFAULT(kwargs, dict, PyDict_Check)
 };
 
 using module = module_;

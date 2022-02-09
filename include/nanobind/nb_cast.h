@@ -115,9 +115,10 @@ template <> class type_caster<std::nullptr_t> {
 NAMESPACE_END(detail)
 
 template <typename T>
-object cast(T &&value, return_value_policy policy = return_value_policy::move) {
+object cast(T &&value, return_value_policy policy = return_value_policy::move,
+            handle parent = handle()) {
     detail::make_caster<T> caster;
-    return reinterpret_steal<object>(caster.cast(std::forward<T>(value), policy, nullptr));
+    return steal(caster.cast(std::forward<T>(value), policy, parent));
 }
 
 NAMESPACE_END(nanobind)

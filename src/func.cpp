@@ -1,17 +1,35 @@
 #include "smallvec.h"
+#include "buffer.h"
 #include <cstring>
+#include <tsl/robin_set.h>
 
 NAMESPACE_BEGIN(nanobind)
 NAMESPACE_BEGIN(detail)
 
+extern Buffer buf;
+
+// Forward declaration
+static PyObject *func_dispatch(PyObject *, PyObject *, PyObject *);
+
+/// List of all functions
+struct function_record;
+static tsl::robin_pg_set<function_record *> function_records;
+
+/// Record produced by a nb::arg annotation
 struct arg_record {
     const char *name;
     bool convert;
     bool none;
     object def;
+
+    arg_record() = default;
+    arg_record(const char *name, bool convert, bool none, PyObject *def)
+        : name(name), convert(convert), none(none),
+          def(borrow(def)) { }
+    ~arg_record() { }
 };
 
-/// Internal data structure which holds metadata about a bound function (signature, overloads, etc.)
+/// Nanobind function metadata (signature, overloads, etc.)
 struct function_record {
     /// Storage for the wrapped function pointer and captured data, if any
     void *capture[3] = { };
@@ -27,6 +45,12 @@ struct function_record {
 
     // User-specified documentation string
     const char *docstr = nullptr;
+
+    // Function signature description
+    char *descr = nullptr;
+
+    // Types referenced in fucntion signature description
+    const std::type_info **descr_types = nullptr;
 
     /// Additional flags characterizing this function
     uint16_t flags = 0;
@@ -64,8 +88,11 @@ void func_free(void *rec_) noexcept {
     function_record *rec = (function_record *) rec_;
     if (rec->free_capture)
         rec->free_capture(rec);
+    delete[] rec->descr;
+    delete[] rec->descr_types;
     delete rec->def;
     delete rec;
+    function_records.erase(rec);
 }
 
 void func_set_flag(void *rec_, uint32_t flag) noexcept {
@@ -97,9 +124,85 @@ void func_add_arg(void *rec_, const char *name, bool convert, bool none,
                   PyObject *def) noexcept {
     function_record *rec = (function_record *) rec_;
     if (rec->args.empty() && (rec->flags & (uint32_t) func_flags::is_method))
-        rec->args.push_back(arg_record{ "self", false, false, object() });
+        rec->args.push_back(arg_record{ "self", false, false, nullptr });
     rec->args.push_back(
-        arg_record{ name, convert, none, reinterpret_borrow<object>(def) });
+        arg_record{ name, convert, none, def });
+}
+
+PyObject *func_init(void *rec_, size_t nargs, size_t args_pos,
+                    size_t kwargs_pos, void (*free_capture)(void *),
+                    PyObject *(*impl)(void *, PyObject **, bool *, PyObject *),
+                    const char *descr, const std::type_info **descr_types) {
+    const bool has_args = args_pos != nargs,
+          has_kwargs = kwargs_pos != nargs;
+
+    function_record *rec = (function_record *) rec_;
+    rec->free_capture = free_capture;
+
+    if (!rec->args.empty() && rec->args.size() != nargs) {
+        func_free(rec_);
+        raise("nanobind::detail::func_init(\"%s\"): function declaration does "
+              "not have the expected number of keyword arguments!", rec->name);
+    }
+
+    if (has_kwargs && kwargs_pos + 1 != nargs) {
+        func_free(rec_);
+        raise("nanobind::detail::func_init(\"%s\"): nanobind::kwargs must be "
+              "the last element of the function signature!", rec->name);
+    }
+
+    if (has_args && has_kwargs && args_pos + 1 != kwargs_pos) {
+        func_free(rec_);
+        raise("nanobind::detail::func_init(\"%s\"): if nanobind::args and "
+              "nanobind::kwargs are used, they must be the last elements of "
+              "the function signature (in that order).", rec->name);
+    }
+
+    for (size_t i = 0; ; ++i) {
+        if (!descr[i]) {
+            rec->descr = new char[i + 1];
+            std::memcpy(rec->descr, descr, i + 1);
+            break;
+        }
+    }
+
+    for (size_t i = 0; ; ++i) {
+        if (!descr_types[i]) {
+            rec->descr_types = new const std::type_info*[i + 1];
+            std::memcpy(rec->descr_types, descr_types, i + 1);
+            break;
+        }
+    }
+
+    rec->nargs = (uint16_t) nargs;
+    rec->nargs_pos = (uint16_t) (has_args ? args_pos : nargs - (has_kwargs ? 1 : 0));
+    rec->flags |= (has_args ? (uint32_t) func_flags::has_args : 0) |
+                  (has_kwargs ? (uint32_t) func_flags::has_kwargs : 0);
+    rec->impl = impl;
+
+    rec->def = new PyMethodDef();
+    std::memset(rec->def, 0, sizeof(PyMethodDef));
+
+    rec->def->ml_name = rec->name;
+    rec->def->ml_meth = reinterpret_cast<PyCFunction>(func_dispatch);
+    rec->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
+
+    capsule rec_capsule(rec, func_free);
+
+    handle scope_module;
+    if (rec->scope) {
+        scope_module = getattr(rec->scope, "__module__", handle());
+        if (!(bool) scope_module)
+            scope_module = getattr(rec->scope, "__name__", handle());
+    }
+
+    PyObject *f = PyCFunction_NewEx(rec->def, rec_capsule.ptr(), scope_module.ptr());
+    if (!f)
+        raise("nanobind::detail::func_init(): Could not allocate function object");
+
+    function_records.insert(rec);
+
+    return f;
 }
 
 static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
@@ -216,7 +319,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
 
             // Deal with remaining positional arguments
             if (has_args) {
-                extra_args = reinterpret_steal<object>(PyTuple_New(
+                extra_args = steal(PyTuple_New(
                     nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0));
 
                 for (size_t i = nargs_pos; i < nargs_in; ++i) {
@@ -232,9 +335,9 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             // Deal with remaining keyword arguments
             if (has_kwargs) {
                 if (kwargs_consumed.empty()) {
-                    extra_kwargs = reinterpret_borrow<object>(kwargs_in);
+                    extra_kwargs = borrow(kwargs_in);
                 } else {
-                    extra_kwargs = reinterpret_steal<object>(PyDict_Copy(kwargs_in));
+                    extra_kwargs = steal(PyDict_Copy(kwargs_in));
                     for (size_t i = 0; i < kwargs_consumed.size(); ++i) {
                         if (PyDict_DelItemString(extra_kwargs.ptr(),
                                                  kwargs_consumed[i]) == -1)
@@ -268,62 +371,57 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
     return Py_None;
 }
 
-PyObject *func_init(void *rec_, size_t nargs, size_t args_pos,
-                    size_t kwargs_pos, void (*free_capture)(void *),
-                    PyObject *(*impl)(void *, PyObject **, bool *, PyObject *),
-                    const char *descr, const std::type_info **descr_types) {
-    const bool has_args = args_pos != nargs,
-          has_kwargs = kwargs_pos != nargs;
+void func_make_docstr() {
+    for (function_record *rec: function_records) {
+        buf.clear();
+        size_t arg_index = 0;
+        const bool is_method  = rec->flags & (uint32_t) func_flags::is_method;
+        const std::type_info **descr_type = rec->descr_types;
 
-    function_record *rec = (function_record *) rec_;
-    rec->free_capture = free_capture;
+        for (const char *pc = rec->descr; *pc != '\0'; ++pc) {
+            char c = *pc;
 
-    if (!rec->args.empty() && rec->args.size() != nargs) {
-        func_free(rec_);
-        raise("nanobind::detail::func_init(\"%s\"): function declaration does "
-              "not have the expected number of keyword arguments!", rec->name);
+            switch (c) {
+                case '{':
+                    // Argument name
+                    if (arg_index < rec->args.size() && rec->args[arg_index].name) {
+                        buf.put_dstr(rec->args[arg_index].name);
+                    } else if (is_method && arg_index == 0) {
+                        buf.put("self");
+                    } else {
+                        buf.put("arg");
+                        buf.put_uint32(arg_index - is_method);
+                    }
+                    buf.put(": ");
+                    arg_index++;
+                    break;
+
+                case '}':
+                    // Default argument
+                    if (arg_index < rec->args.size() && rec->args[arg_index].def) {
+                        buf.put(" = ");
+                        buf.put_dstr(str(rec->args[arg_index].def).c_str());
+                    }
+                    break;
+
+                case '%':
+                    if (!*descr_type)
+                        fail("nanobind::detail::func_make_docstr(): missing type!");
+                    descr_type++;
+                    break;
+
+                default:
+                    buf.put(c);
+                    break;
+            }
+        }
+
+        if (arg_index != rec->nargs || *descr_type != nullptr)
+            fail("nanobild::detail::func_make_docstr(): internal error.");
+
+        free((char *) rec->def->ml_doc);
+        rec->def->ml_doc = buf.copy();
     }
-
-    if (has_kwargs && kwargs_pos + 1 != nargs) {
-        func_free(rec_);
-        raise("nanobind::detail::func_init(\"%s\"): nanobind::kwargs must be "
-              "the last element of the function signature!", rec->name);
-    }
-
-    if (has_args && has_kwargs && args_pos + 1 != kwargs_pos) {
-        func_free(rec_);
-        raise("nanobind::detail::func_init(\"%s\"): if nanobind::args and "
-              "nanobind::kwargs are used, they must be the last elements of "
-              "the function signature (in that order).", rec->name);
-    }
-
-    rec->nargs = (uint16_t) nargs;
-    rec->nargs_pos = (uint16_t) (has_args ? args_pos : nargs - (has_kwargs ? 1 : 0));
-    rec->flags |= (has_args ? (uint32_t) func_flags::has_args : 0) |
-                  (has_kwargs ? (uint32_t) func_flags::has_kwargs : 0);
-    rec->impl = impl;
-
-    rec->def = new PyMethodDef();
-    std::memset(rec->def, 0, sizeof(PyMethodDef));
-
-    rec->def->ml_name = rec->name;
-    rec->def->ml_meth = reinterpret_cast<PyCFunction>(func_dispatch);
-    rec->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
-
-    capsule rec_capsule(rec, func_free);
-
-    handle scope_module;
-    if (rec->scope) {
-        scope_module = getattr(rec->scope, "__module__", handle());
-        if (!scope_module)
-            scope_module = getattr(rec->scope, "__name__", handle());
-    }
-
-    PyObject *f = PyCFunction_NewEx(rec->def, rec_capsule.ptr(), scope_module.ptr());
-    if (!f)
-        raise("nanobind::detail::func_init(): Could not allocate function object");
-
-    return f;
 }
 
 NAMESPACE_END(detail)

@@ -80,13 +80,13 @@ object func_create(Func &&f, Return (*)(Args...), std::index_sequence<Is...>,
     (detail::func_apply(func_rec, extra), ...);
 
     static constexpr auto signature = const_name("(") +
-                                      concat(make_caster<Args>::name...) +
+                                      concat(type_descr(make_caster<Args>::name)...) +
                                       const_name(") -> ") + cast_out::name;
 
     const std::type_info* types[signature.type_count() + 1];
     signature.put_types(types);
 
-    return reinterpret_steal<object>(
+    return steal(
         func_init(func_rec, sizeof...(Args), args_pos_1, kwargs_pos_1,
                   free_capture, impl, signature.text, types));
 }

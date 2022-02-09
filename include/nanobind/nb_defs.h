@@ -11,11 +11,25 @@
 #  define NAMESPACE_END(name) }
 #endif
 
-#if !defined(NB_EXPORT)
-#  if defined(_WIN32)
-#    define NB_EXPORT __declspec(dllexport)
+#if defined(_WIN32)
+#  define NB_EXPORT __declspec(dllexport)
+#  define NB_IMPORT __declspec(import)
+#else
+#  define NB_EXPORT __attribute__ ((visibility("default")))
+#  define NB_IMPORT
+#endif
+
+#if defined(NB_SHARED)
+#  if defined(NB_BUILD)
+#    define NB_CORE NB_EXPORT
 #  else
-#    define NB_EXPORT __attribute__ ((visibility("default")))
+#    define NB_CORE NB_IMPORT
+#  endif
+#else
+#  if defined(_WIN32)
+#    define NB_CORE
+#  else
+#    define NB_CORE NB_EXPORT
 #  endif
 #endif
 
@@ -29,11 +43,12 @@
     [[maybe_unused]] static void NB_CONCAT(nanobind_init_,                     \
                                            name)(::nanobind::module_ &);       \
     extern "C" NB_EXPORT PyObject *PyInit_##name() {                           \
-        nanobind::module_ m = nanobind::reinterpret_borrow<nanobind::module_>( \
+        nanobind::module_ m = nanobind::borrow<nanobind::module_>( \
             nanobind::detail::module_new(                                   \
                 NB_TOSTRING(name), &NB_CONCAT(nanobind_module_def_, name)));   \
         try {                                                                  \
             NB_CONCAT(nanobind_init_, name)(m);                                \
+            nanobind::detail::func_make_docstr();                          \
             return m.ptr();                                                    \
         } catch (const std::exception &e) {                                    \
             PyErr_SetString(PyExc_ImportError, e.what());                      \

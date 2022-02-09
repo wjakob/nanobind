@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.17...3.22)
 project(nanobind)
 
+option(NB_SHARED "Should nanobind produce a shared core library?" ON)
+
 # ---------------------------------------------------------------------------
 # Do a release build if nothing was specified
 # ---------------------------------------------------------------------------
@@ -22,10 +24,24 @@ find_package(Python COMPONENTS Interpreter Development)
 # Build a static library containing the non-templated core of nanobind
 # ---------------------------------------------------------------------------
 
-add_library(nanobind-core STATIC
+if (NB_SHARED)
+  set(NB_CORE_LIBRARY_TYPE SHARED)
+else()
+  set(NB_CORE_LIBRARY_TYPE STATIC)
+endif()
+
+add_library(nanobind-core ${NB_CORE_LIBRARY_TYPE}
   src/common.cpp
   src/func.cpp
+  src/error.cpp
 )
+
+if (NB_SHARED)
+  if (APPLE)
+    target_link_options(nanobind-core PRIVATE -undefined dynamic_lookup)
+  endif()
+  target_compile_definitions(nanobind-core PRIVATE -D NB_BUILD)
+endif()
 
 target_compile_features(nanobind-core PRIVATE cxx_std_17)
 
@@ -35,6 +51,7 @@ set_target_properties(nanobind-core PROPERTIES
 
 target_include_directories(nanobind-core PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/ext/robin_map/include
   ${Python_INCLUDE_DIRS})
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,9 @@
+/libnanobind-core.a
+/.ninja_deps
+/.ninja_log
+/CMakeFiles
+/CMakeCache.txt
+/build.ninja
+/cmake_install.cmake
+__pycache__
+build

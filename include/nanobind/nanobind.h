@@ -1,5 +1,7 @@
+#pragma once
+
 #if __cplusplus < 201703L
-#  error NanoBind requires C++17
+#  error The nanobind library requires C++17!
 #endif
 
 #include <cstdint>
@@ -16,6 +18,8 @@
 #include "nb_lib.h"
 #include "nb_types.h"
 #include "nb_descr.h"
+#include "nb_error.h"
 #include "nb_cast.h"
 #include "nb_attr.h"
 #include "nb_func.h"
+#include "nb_compat.h"

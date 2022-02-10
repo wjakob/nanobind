@@ -107,14 +107,14 @@ public:
         return put(buf + i, digits - i);
     }
 
-    char *copy() const {
-        size_t copy_size = size() + 1;
+    char *copy(size_t offset = 0) const {
+        size_t copy_size = size() + 1 - offset;
         char *tmp = (char *) malloc(copy_size);
         if (!tmp) {
             fprintf(stderr, "Buffer::copy(): out of memory (unrecoverable error)!");
             abort();
         }
-        memcpy(tmp, m_start, copy_size);
+        memcpy(tmp, m_start + offset, copy_size);
         return tmp;
     }
 

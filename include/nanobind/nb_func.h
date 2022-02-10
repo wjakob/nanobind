@@ -104,7 +104,7 @@ object func_create(Func &&f, Return (*)(Args...), std::index_sequence<Is...>,
     data.descr_types = descr_types;
     data.nargs = (uint32_t) nargs;
     data.nargs_provided = 0;
-    data.flags = (args_pos_1 < nargs ? (uint32_t) func_flags::has_args : 0) |
+    data.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_args   : 0) |
                  (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_kwargs : 0);
 
     // Fill remaining fields of 'data'
@@ -156,10 +156,7 @@ object cpp_function(Return (Class::*f)(Args...) const, const Extra &...extra) {
 
 template <typename Func, typename... Extra>
 module_ &module_::def(const char *name_, Func &&f, const Extra &...extra) {
-    object func = cpp_function(std::forward<Func>(f), name(name_), scope(*this),
-                               pred(getattr(*this, name_, none())), extra...);
-    if (PyModule_AddObject(m_ptr, name_, func.release().ptr()))
-        detail::fail("module::def(): could not add object!");
+    cpp_function(std::forward<Func>(f), scope(*this), name(name_), extra...);
     return *this;
 }
 

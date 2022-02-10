@@ -195,14 +195,14 @@ PyObject *str_from_obj(PyObject *o) {
 PyObject *str_from_cstr(const char *str) {
     PyObject *result = PyUnicode_FromString(str);
     if (!result)
-        raise("nanobind::str_from_cstr(): conversion error!");
+        raise("nanobind::detail::str_from_cstr(): conversion error!");
     return result;
 }
 
 PyObject *str_from_cstr_and_size(const char *str, size_t size) {
     PyObject *result = PyUnicode_FromStringAndSize(str, (Py_ssize_t) size);
     if (!result)
-        raise("nanobind::str_from_cstr_and_size(): conversion error!");
+        raise("nanobind::detail::str_from_cstr_and_size(): conversion error!");
     return result;
 }
 

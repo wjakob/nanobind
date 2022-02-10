@@ -77,7 +77,7 @@ NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 NB_CORE PyObject *func_init(void *data) noexcept;
 
 /// Generate docstrings for all newly defined functions
-NB_CORE void func_make_docstr();
+NB_CORE void func_finalize() noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(nanobind)

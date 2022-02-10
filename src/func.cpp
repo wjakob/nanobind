@@ -17,6 +17,9 @@ struct func_record : func_data<0> {
     /// Method definition (if first element of overload chain)
     PyMethodDef *def = nullptr;
 
+    /// Function signature in string format
+    char *signature = nullptr;
+
     /// Pointer to next overload
     func_record *next = nullptr;
 };
@@ -28,19 +31,26 @@ void func_free(void *p) noexcept {
     func_record *f = (func_record *) p;
     if (f->free_capture)
         f->free_capture(f->capture);
-    for (size_t i = 0; f->nargs_provided; ++i)
+    for (size_t i = 0; i< f->nargs_provided; ++i)
         Py_XDECREF(f->args[i].value);
     delete[] f->args;
     delete[] f->descr;
     delete[] f->descr_types;
     delete f->def;
+    delete f->next;
+    free(f->signature);
     delete f;
     all_funcs.erase(f);
 }
 
+/**
+ * \brief Wrap a C++ function into a Python function object
+ *
+ * This is an implementation detail of nanobind::cpp_function.
+ */
 PyObject *func_init(void *in_) noexcept {
     func_data<0> *in = std::launder((func_data<0> *) in_);
-    func_record *f = new func_record();
+    func_record *f      = new func_record();
 
     /// Copy temporary data from the caller's stack
     std::memcpy(f, in, sizeof(func_data<0>));
@@ -69,41 +79,104 @@ PyObject *func_init(void *in_) noexcept {
         const bool is_method = f->flags & (uint32_t) func_flags::is_method;
         arg_data *args_in = std::launder((arg_data *) in->args);
 
-        f->args = new arg_data[f->nargs_provided + is_method];
+        f->nargs_provided += is_method;
+        f->args = new arg_data[f->nargs_provided];
 
         if (is_method) // add implicit 'self' argument annotation
             f->args[0] = arg_data{ "self", nullptr, false, false };
 
-        for (size_t i = 0; i < f->nargs_provided; ++i) {
-            f->args[i + is_method] = args_in[i];
+        for (size_t i = is_method; i < f->nargs_provided; ++i) {
+            f->args[i] = args_in[i - is_method];
             Py_XINCREF(f->args[i].value);
         }
     }
 
-    f->def = new PyMethodDef();
-    std::memset(f->def, 0, sizeof(PyMethodDef));
-    f->def->ml_name = f->name;
-    f->def->ml_meth = reinterpret_cast<PyCFunction>(func_dispatch);
-    f->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
+    PyObject *name = nullptr;
+    PyObject *pred = nullptr;
+    func_record *pred_f = nullptr;
 
-    capsule f_capsule(f, func_free);
+    if (f->scope && f->name) {
+        name = PyUnicode_FromString(f->name);
+        if (!name)
+            fail("nb::detail::func_init(\"%s\"): invalid name.", f->name);
 
-    PyObject *scope_name = nullptr;
-    if (f->scope) {
-        scope_name = getattr(f->scope, "__module__", nullptr);
-        if (!scope_name)
-            scope_name = getattr(f->scope, "__name__", nullptr);
+        pred = PyObject_GetAttr(f->scope, name);
+        if (pred) {
+            PyObject *cf = PyInstanceMethod_Check(pred)
+                               ? PyInstanceMethod_GET_FUNCTION(pred)
+                               : pred;
+
+            if (PyCFunction_Check(cf)) {
+                pred_f = (func_record *) PyCapsule_GetPointer(
+                    PyCFunction_GET_SELF(cf), nullptr);
+                if (!pred_f)
+                    fail("nb::detail::func_init(\"%s\"): invalid "
+                         "predecessor.", f->name);
+
+                /* Never append a method to an overload chain of a parent class;
+                   instead, hide the parent's overloads in this case */
+                if (f->scope != pred_f->scope)
+                    pred_f = nullptr;
+            } else {
+                fail("nb::detail::func_init(\"%s\"): cannot overload "
+                     "existing non-function object of the same name!", f->name);
+            }
+        } else {
+            PyErr_Clear();
+        }
     }
 
-    PyObject *r = PyCFunction_NewEx(f->def, f_capsule.ptr(), scope_name);
-    if (!r)
-        fail("nanobind::detail::func_init(\"%s\"): alloc. failed.", f->name);
+    PyObject *result = nullptr;
+    if (!pred_f) {
+        f->def = new PyMethodDef();
+        std::memset(f->def, 0, sizeof(PyMethodDef));
+        f->def->ml_name = f->name;
+        f->def->ml_meth = reinterpret_cast<PyCFunction>(func_dispatch);
+        f->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
 
-    all_funcs.insert(f);
+        capsule f_capsule(f, func_free);
 
-    return r;
+        PyObject *scope_name = nullptr;
+        if (f->scope) {
+            scope_name = getattr(f->scope, "__module__", nullptr);
+            if (!scope_name)
+                scope_name = getattr(f->scope, "__name__", nullptr);
+        }
+
+        result = PyCFunction_NewEx(f->def, f_capsule.ptr(), scope_name);
+        if (!result)
+            fail("nb::detail::func_init(\"%s\"): alloc. failed.", f->name);
+
+        all_funcs.insert(f);
+
+        if (f->scope && name) {
+            int rv = PyObject_SetAttr(f->scope, name, result);
+            if (rv)
+                fail("nb::detail::func_init(\"%s\"): setattr. failed.", f->name);
+        }
+    } else {
+        // Append at the beginning or end of the overload chain
+        if ((f->flags & (uint32_t) func_flags::is_method) !=
+            (pred_f->flags & (uint32_t) func_flags::is_method))
+            fail("nb::detail::func_init(\"%s\"): overloads cannot mix "
+                 "instance/static methods!", f->name);
+
+        // Append to overload chain
+        while (pred_f->next)
+            pred_f = pred_f->next;
+        pred_f->next = f;
+
+        result = pred;
+        Py_INCREF(result);
+    }
+
+    Py_XDECREF(name);
+    Py_XDECREF(pred);
+
+    return result;
 }
 
+/// Dispatch loop that is used to invoke functions created by func_init
 static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
     func_record *fr = (func_record *) PyCapsule_GetPointer(self, nullptr);
 
@@ -240,7 +313,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
                     for (size_t i = 0; i < kwargs_consumed.size(); ++i) {
                         if (PyDict_DelItemString(extra_kwargs.ptr(),
                                                  kwargs_consumed[i]) == -1)
-                            fail("nanobind::detail::func_dispatch(): could not "
+                            fail("nb::detail::func_dispatch(): could not "
                                  "filter kwargs");
                     }
                 }
@@ -268,67 +341,104 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
     return Py_None;
 }
 
-void func_make_docstr() {
+/// Finalize function signatures + docstrings once a module has finished loading
+void func_finalize() noexcept {
     for (func_record *f: all_funcs) {
         buf.clear();
-        size_t arg_index = 0;
-        const bool is_method  = f->flags & (uint32_t) func_flags::is_method;
-        const std::type_info **descr_type = f->descr_types;
 
-        for (const char *pc = f->descr; *pc != '\0'; ++pc) {
-            char c = *pc;
+        PyMethodDef *def = f->def;
 
-            switch (c) {
-                case '{':
-                    // Argument name
-                    if (f->nargs_provided && f->args[arg_index].name) {
-                        buf.put_dstr(f->args[arg_index].name);
-                    } else if (is_method && arg_index == 0) {
-                        buf.put("self");
-                    } else {
-                        buf.put("arg");
-                        buf.put_uint32(arg_index - is_method);
-                    }
-                    buf.put(": ");
-                    break;
-
-                case '}':
-                    // Default argument
-                    if (f->nargs_provided && f->args[arg_index].value) {
-                        PyObject *str = PyObject_Str(f->args[arg_index].value);
-                        if (str) {
-                            Py_ssize_t size = 0;
-                            const char *cstr =
-                                PyUnicode_AsUTF8AndSize(str, &size);
-                            if (cstr) {
-                                buf.put(" = ");
-                                buf.put(cstr, (size_t) size);
-                            }
-                            Py_DECREF(str);
-                        } else {
-                            PyErr_Clear();
-                        }
-                    }
-                    arg_index++;
-                    break;
-
-                case '%':
-                    if (!*descr_type)
-                        fail("nanobind::detail::func_make_docstr(): missing type!");
-                    descr_type++;
-                    break;
-
-                default:
-                    buf.put(c);
-                    break;
-            }
+        if (f->next) {
+            buf.put_dstr(f->name ? f->name : "<anonymous>");
+            buf.put("(*args, **kwargs) -> Any\n"
+                    "Overloaded function.\n\n");
         }
 
-        if (arg_index != f->nargs || *descr_type != nullptr)
-            fail("nanobild::detail::func_make_docstr(): internal error.");
+        size_t overload_index = 0;
 
-        free((char *) f->def->ml_doc);
-        f->def->ml_doc = buf.copy();
+        while (f) {
+            size_t arg_index = 0;
+            const bool is_method  = f->flags & (uint32_t) func_flags::is_method;
+            const std::type_info **descr_type = f->descr_types;
+
+            if (overload_index > 0)
+                buf.put('\n');
+
+            if (overload_index > 0 || f->next) {
+                buf.put_uint32(overload_index + 1);
+                buf.put(". ");
+            }
+
+            size_t signature_offset = buf.size();
+            buf.put_dstr(f->name ? f->name : "<anonymous>");
+
+            for (const char *pc = f->descr; *pc != '\0'; ++pc) {
+                char c = *pc;
+
+                switch (c) {
+                    case '{':
+                        // Argument name
+                        if (f->nargs_provided && f->args[arg_index].name) {
+                            buf.put_dstr(f->args[arg_index].name);
+                        } else if (is_method && arg_index == 0) {
+                            buf.put("self");
+                        } else {
+                            buf.put("arg");
+                            buf.put_uint32(arg_index - is_method);
+                        }
+                        buf.put(": ");
+                        break;
+
+                    case '}':
+                        // Default argument
+                        if (f->nargs_provided && f->args[arg_index].value) {
+                            PyObject *str = PyObject_Str(f->args[arg_index].value);
+                            if (str) {
+                                Py_ssize_t size = 0;
+                                const char *cstr =
+                                    PyUnicode_AsUTF8AndSize(str, &size);
+                                if (cstr) {
+                                    buf.put(" = ");
+                                    buf.put(cstr, (size_t) size);
+                                }
+                                Py_DECREF(str);
+                            } else {
+                                PyErr_Clear();
+                            }
+                        }
+                        arg_index++;
+                        break;
+
+                    case '%':
+                        if (!*descr_type)
+                            fail("nb::detail::func_finalize(): missing type!");
+                        descr_type++;
+                        break;
+
+                    default:
+                        buf.put(c);
+                        break;
+                }
+            }
+
+            if (arg_index != f->nargs || *descr_type != nullptr)
+                fail("nanobind::detail::func_finalize(): arguments inconsistent.");
+
+            free(f->signature);
+            f->signature = buf.copy(signature_offset);
+
+            if (f->doc && f->doc[0] != '\0') {
+                buf.put("\n\n");
+                buf.put_dstr(f->doc);
+                buf.put('\n');
+            }
+
+            f = f->next;
+            overload_index++;
+        }
+
+        free((char *) def->ml_doc);
+        def->ml_doc = buf.copy();
     }
 }
 

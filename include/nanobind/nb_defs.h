@@ -43,12 +43,12 @@
     [[maybe_unused]] static void NB_CONCAT(nanobind_init_,                     \
                                            name)(::nanobind::module_ &);       \
     extern "C" NB_EXPORT PyObject *PyInit_##name() {                           \
-        nanobind::module_ m = nanobind::borrow<nanobind::module_>( \
-            nanobind::detail::module_new(                                   \
+        nanobind::module_ m =                                                  \
+            nanobind::borrow<nanobind::module_>(nanobind::detail::module_new(  \
                 NB_TOSTRING(name), &NB_CONCAT(nanobind_module_def_, name)));   \
         try {                                                                  \
             NB_CONCAT(nanobind_init_, name)(m);                                \
-            nanobind::detail::func_make_docstr();                          \
+            nanobind::detail::func_finalize();                                 \
             return m.ptr();                                                    \
         } catch (const std::exception &e) {                                    \
             PyErr_SetString(PyExc_ImportError, e.what());                      \

@@ -5,11 +5,6 @@ struct scope {
     scope(handle value) : value(value.ptr()) { }
 };
 
-struct pred {
-    PyObject *value;
-    pred(handle value) : value(value.ptr()) { }
-};
-
 struct name {
     const char *value;
     name(const char *value) : value(value) { }
@@ -85,24 +80,21 @@ template <size_t Size> struct func_data {
     // ------- Extra fields -------
 
     const char *name;
-    const char *docstr;
+    const char *doc;
     PyObject *scope;
-    PyObject *pred;
     arg_data args[Size];
 };
 
 template <typename F> void func_extra_init(F &f) {
     f.flags = 0;
     f.name = nullptr;
-    f.docstr = nullptr;
+    f.doc = nullptr;
     f.scope = nullptr;
-    f.pred = nullptr;
 }
 
-template <typename F> void func_extra_apply(F &f, const pred &pred)   { f.pred = pred.value; }
 template <typename F> void func_extra_apply(F &f, const scope &scope) { f.scope = scope.value; }
 template <typename F> void func_extra_apply(F &f, const name &name)   { f.name = name.value; }
-template <typename F> void func_extra_apply(F &f, const char *docstr) { f.docstr = docstr; }
+template <typename F> void func_extra_apply(F &f, const char *doc) { f.doc = doc; }
 
 template <typename F> void func_extra_apply(F &f, is_method) {
     f.flags |= (uint32_t) func_flags::is_method;

@@ -48,7 +48,7 @@ void func_free(void *p) noexcept {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *func_init(void *in_) noexcept {
+PyObject *func_init(void *in_, bool return_handle) noexcept {
     func_data<0> *in = std::launder((func_data<0> *) in_);
     func_record *f      = new func_record();
 
@@ -173,7 +173,12 @@ PyObject *func_init(void *in_) noexcept {
     Py_XDECREF(name);
     Py_XDECREF(pred);
 
-    return result;
+    if (return_handle) {
+        return result;
+    } else {
+        Py_DECREF(result);
+        return nullptr;
+    }
 }
 
 /// Dispatch loop that is used to invoke functions created by func_init

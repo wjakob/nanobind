@@ -16,20 +16,20 @@ template <typename T, typename... Ts> struct nb_tuple<T, Ts...> : nb_tuple<Ts...
     nb_tuple& operator=(nb_tuple &&) = default;
     nb_tuple& operator=(const nb_tuple &) = default;
 
-    nb_tuple(const T& value, const Ts&... ts)
+    NB_INLINE nb_tuple(const T& value, const Ts&... ts)
         : Base(ts...), value(value) { }
 
-    nb_tuple(T&& value, Ts&&... ts)
+    NB_INLINE nb_tuple(T&& value, Ts&&... ts)
         : Base(std::move(ts)...), value(std::move(value)) { }
 
-    template <size_t I> auto& get() {
+    template <size_t I> NB_INLINE auto& get() {
         if constexpr (I == 0)
             return value;
         else
             return Base::template get<I - 1>();
     }
 
-    template <size_t I> const auto& get() const {
+    template <size_t I> NB_INLINE const auto& get() const {
         if constexpr (I == 0)
             return value;
         else

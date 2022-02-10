@@ -12,11 +12,15 @@
 #endif
 
 #if defined(_WIN32)
-#  define NB_EXPORT    __declspec(dllexport)
-#  define NB_IMPORT    __declspec(import)
+#  define NB_EXPORT        __declspec(dllexport)
+#  define NB_IMPORT        __declspec(import)
+#  define NB_INLINE        __forceinline
+#  define NB_INLINE_LAMBDA
 #else
-#  define NB_EXPORT    __attribute__ ((visibility("default")))
+#  define NB_EXPORT        __attribute__ ((visibility("default")))
 #  define NB_IMPORT
+#  define NB_INLINE        inline __attribute__((always_inline))
+#  define NB_INLINE_LAMBDA __attribute__((always_inline))
 #endif
 
 #if defined(__GNUC__)

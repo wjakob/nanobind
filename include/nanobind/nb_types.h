@@ -102,7 +102,7 @@ public:
     handle(handle &&) noexcept = default;
     handle &operator=(const handle &) = default;
     handle &operator=(handle &&) noexcept = default;
-    handle(const PyObject *ptr) : m_ptr((PyObject *) ptr) { }
+    NB_INLINE handle(const PyObject *ptr) : m_ptr((PyObject *) ptr) { }
 
     const handle& inc_ref() const & noexcept { Py_XINCREF(m_ptr); return *this; }
     const handle& dec_ref() const & noexcept { Py_XDECREF(m_ptr); return *this; }
@@ -250,7 +250,7 @@ public:
     accessor(accessor &&) = delete;
 
     template <typename T> accessor& operator=(T &&value) {
-        Policy::set(m_obj, m_key, cast(std::forward<T>(value)));
+        Policy::set(m_obj, m_key, cast((detail::forward_t<T>) value));
         return *this;
     }
 

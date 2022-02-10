@@ -87,6 +87,17 @@ function(nanobind_add_module name)
   if (APPLE)
     target_link_options(${name} PRIVATE -undefined dynamic_lookup)
   endif()
+
+  if(NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
+    if(APPLE)
+      set(NB_STRIP_OPT -x)
+    endif()
+
+    add_custom_command(
+      TARGET ${name}
+      POST_BUILD
+      COMMAND ${CMAKE_STRIP} ${NB_STRIP_OPT} $<TARGET_FILE:${name}>)
+  endif()
 endfunction()
 
 nanobind_add_module(

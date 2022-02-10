@@ -61,5 +61,8 @@ struct analyze_method<Ret (Cls::*)(Args...) const> {
     static constexpr size_t argc = sizeof...(Args);
 };
 
+template <typename T>
+using forward_t = std::conditional_t<std::is_lvalue_reference_v<T>, T, T &&>;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

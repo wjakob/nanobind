@@ -1,10 +1,8 @@
 /// Include Python header, disable linking to pythonX_d.lib on Windows in debug mode
 #if defined(_MSC_VER)
 #  pragma warning(push)
-// C4505: 'PySlice_GetIndicesEx': unreferenced local function has been removed (PyPy only)
-#  pragma warning(disable: 4505)
 #  if defined(_DEBUG) && !defined(Py_DEBUG)
-#    define PYBIND11_DEBUG_MARKER
+#    define NB_DEBUG_MARKER
 #    undef _DEBUG
 #  endif
 #endif
@@ -31,9 +29,9 @@
 #endif
 
 #if defined(_MSC_VER)
-#  if defined(PYBIND11_DEBUG_MARKER)
+#  if defined(NB_DEBUG_MARKER)
 #    define _DEBUG
-#    undef PYBIND11_DEBUG_MARKER
+#    undef NB_DEBUG_MARKER
 #  endif
 #  pragma warning(pop)
 #endif

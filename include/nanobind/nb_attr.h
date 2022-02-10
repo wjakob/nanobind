@@ -2,20 +2,20 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 struct scope {
     PyObject *value;
-    scope(handle value) : value(value.ptr()) { }
+    NB_INLINE scope(handle value) : value(value.ptr()) { }
 };
 
 struct name {
     const char *value;
-    name(const char *value) : value(value) { }
+    NB_INLINE name(const char *value) : value(value) { }
 };
 
 struct arg_v;
 struct arg {
-    constexpr explicit arg(const char *name = nullptr) : name(name), convert_(true), none_(false) { }
-    template <typename T> arg_v operator=(T &&value) const;
-    arg &noconvert(bool value = true) { convert_ = !value; return *this; }
-    arg &none(bool value = true) { none_ = value; return *this; }
+    NB_INLINE constexpr explicit arg(const char *name = nullptr) : name(name), convert_(true), none_(false) { }
+    template <typename T> NB_INLINE arg_v operator=(T &&value) const;
+    NB_INLINE arg &noconvert(bool value = true) { convert_ = !value; return *this; }
+    NB_INLINE arg &none(bool value = true) { none_ = value; return *this; }
 
     const char *name;
     bool convert_;
@@ -24,11 +24,11 @@ struct arg {
 
 struct arg_v : arg {
     object m_value;
-    arg_v(const arg &base, object &&value) : arg(base), m_value(std::move(value)) { }
+    NB_INLINE arg_v(const arg &base, object &&value) : arg(base), m_value(std::move(value)) { }
 };
 
 template <typename T> arg_v arg::operator=(T &&value) const {
-    return arg_v(*this, cast(std::forward<T>(value)));
+    return arg_v(*this, cast((detail::forward_t<T>) value));
 }
 
 struct is_method { };
@@ -85,22 +85,22 @@ template <size_t Size> struct func_data {
     arg_data args[Size];
 };
 
-template <typename F> void func_extra_init(F &f) {
+template <typename F> NB_INLINE void func_extra_init(F &f) {
     f.flags = 0;
     f.name = nullptr;
     f.doc = nullptr;
     f.scope = nullptr;
 }
 
-template <typename F> void func_extra_apply(F &f, const scope &scope) { f.scope = scope.value; }
-template <typename F> void func_extra_apply(F &f, const name &name)   { f.name = name.value; }
-template <typename F> void func_extra_apply(F &f, const char *doc) { f.doc = doc; }
+template <typename F> NB_INLINE void func_extra_apply(F &f, const scope &scope) { f.scope = scope.value; }
+template <typename F> NB_INLINE void func_extra_apply(F &f, const name &name)   { f.name = name.value; }
+template <typename F> NB_INLINE void func_extra_apply(F &f, const char *doc) { f.doc = doc; }
 
-template <typename F> void func_extra_apply(F &f, is_method) {
+template <typename F> NB_INLINE void func_extra_apply(F &f, is_method) {
     f.flags |= (uint32_t) func_flags::is_method;
 }
 
-template <typename F> void func_extra_apply(F &f, const arg &a) {
+template <typename F> NB_INLINE void func_extra_apply(F &f, const arg &a) {
     arg_data &arg = f.args[f.nargs_provided++];
     arg.name = a.name;
     arg.value = nullptr;
@@ -108,7 +108,7 @@ template <typename F> void func_extra_apply(F &f, const arg &a) {
     arg.none = a.none_;
 }
 
-template <typename F> void func_extra_apply(F &f, const arg_v &a) {
+template <typename F> NB_INLINE void func_extra_apply(F &f, const arg_v &a) {
     arg_data &arg = f.args[f.nargs_provided++];
     arg.name = a.name;
     arg.value = a.m_value.ptr();

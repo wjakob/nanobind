@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 // Tiny self-contained tuple to avoid having to import 1000s of LOC from <tuple>
@@ -46,5 +46,5 @@ private:
 
 template <typename... Ts> nb_tuple(Ts &&...) -> nb_tuple<std::decay_t<Ts>...>;
 
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)
 NAMESPACE_END(detail)

@@ -1,6 +1,6 @@
 #include <nanobind/nanobind.h>
 
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 /* Simple vector class for default/copy/move-constructible objects.
@@ -83,4 +83,4 @@ protected:
 };
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

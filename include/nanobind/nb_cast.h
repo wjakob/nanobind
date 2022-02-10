@@ -13,7 +13,7 @@
         operator type &() { return value; }                                    \
         template <typename T2> using cast_op_type = cast_op_type<T2>;
 
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 
 enum class return_value_policy {
     move
@@ -118,4 +118,4 @@ object cast(T &&value, return_value_policy policy = return_value_policy::move,
     return steal(caster.cast(std::forward<T>(value), policy, parent));
 }
 
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

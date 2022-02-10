@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// Macro defining functions/constructors for nanobind::handle subclasses
 #define NB_OBJECT(Name, Parent, Check)                                         \
@@ -303,7 +303,7 @@ template <typename D> accessor<str_attr> api<D>::attr(const char *key) const {
 }
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)
 
 #undef NB_OBJECT
 #undef NB_OBJECT_DEFAULT

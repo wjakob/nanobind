@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <bool... Bs> struct index_1;
@@ -62,4 +62,4 @@ struct analyze_method<Ret (Cls::*)(Args...) const> {
 };
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 struct Buffer {
@@ -92,6 +92,15 @@ public:
             m_start[0] = '\0';
     }
 
+    /// Remove the last 'n' characters
+    void rewind(size_t n) {
+        if (m_cur < m_start + n)
+            m_cur = m_start;
+        else
+            m_cur -= n;
+        *m_cur = '\0';
+    }
+
     /// Append an unsigned 32 bit integer
     void put_uint32(uint32_t value) {
         const int digits = 10;
@@ -150,4 +159,4 @@ private:
 };
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

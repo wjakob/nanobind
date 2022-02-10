@@ -12,11 +12,17 @@
 #endif
 
 #if defined(_WIN32)
-#  define NB_EXPORT __declspec(dllexport)
-#  define NB_IMPORT __declspec(import)
+#  define NB_EXPORT    __declspec(dllexport)
+#  define NB_IMPORT    __declspec(import)
 #else
-#  define NB_EXPORT __attribute__ ((visibility("default")))
+#  define NB_EXPORT    __attribute__ ((visibility("default")))
 #  define NB_IMPORT
+#endif
+
+#if defined(__GNUC__)
+#  define NB_NAMESPACE nanobind __attribute__((visibility("hidden")))
+#else
+#  define NB_NAMESPACE nanobind
 #endif
 
 #if defined(NB_SHARED)

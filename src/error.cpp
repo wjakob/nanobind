@@ -1,7 +1,7 @@
 #include <nanobind/nanobind.h>
 #include "buffer.h"
 
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 Buffer buf(128);
@@ -77,4 +77,7 @@ void python_error::restore() {
                   m_trace.release().ptr());
 }
 
-NAMESPACE_END(nanobind)
+next_overload::next_overload() : std::runtime_error("next_overload") { }
+next_overload::~next_overload() { }
+
+NAMESPACE_END(NB_NAMESPACE)

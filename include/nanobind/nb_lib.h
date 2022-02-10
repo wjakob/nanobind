@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 // ========================================================================
@@ -80,4 +80,4 @@ NB_CORE PyObject *func_init(void *data) noexcept;
 NB_CORE void func_finalize() noexcept;
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

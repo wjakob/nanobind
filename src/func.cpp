@@ -3,7 +3,7 @@
 #include <cstring>
 #include <tsl/robin_set.h>
 
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 // Forward/external declarations
@@ -216,6 +216,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
         until we get a result other than NB_NEXT_OVERLOAD.
     */
 
+    PyObject *result = NB_NEXT_OVERLOAD;
     for (int pass = has_overloads ? 0 : 1; pass < 2; ++pass) {
         const func_record *it = fr;
 
@@ -325,20 +326,80 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
                 // Not all keyword arguments were consumed, try next overload
                 continue;
             }
-            // Found a suitable overload, let's try calling it
-            PyObject *result = f->impl((void *) f->capture, args.data(),
-                                       args_convert.data(), parent);
 
-            // Try another overload if there was a argument conversion issue
+            try {
+                // Found a suitable overload, let's try calling it
+                result = f->impl((void *) f->capture, args.data(),
+                                 args_convert.data(), parent);
+            } catch (python_error &e) {
+                e.restore();
+                return nullptr;
+#if defined(__GLIBCXX__)
+            } catch (abi::__forced_unwind&) {
+                throw;
+#endif
+            } catch (next_overload &) {
+                result = NB_NEXT_OVERLOAD;
+            } catch (...) {
+                fail("Unhandled exception");
+            }
+
+            if (!result) {
+                buf.clear();
+                buf.put("Unable to convert function return value to a Python type! The signature was\n    ");
+                buf.put_dstr(f->signature ? f->signature : "[[ missing signature ]]");
+                PyErr_SetString(PyExc_TypeError, buf.get());
+                return nullptr;
+            }
+
             if (result != NB_NEXT_OVERLOAD)
                 return result;
         }
     }
 
-    printf("Could not resolve overload..\n");
+    buf.clear();
+    buf.put_dstr(fr->name ? fr->name : "<anonymous>");
+    buf.put("(): incompatible function arguments. The following argument types "
+            "are supported:\n");
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    uint32_t ctr = 1;
+    while (fr) {
+        buf.put("    ");
+        buf.put_uint32(ctr++);
+        buf.put(". ");
+        buf.put_dstr(fr->signature ? fr->signature : "[[ missing signature ]]");
+        fr = fr->next;
+        buf.put("\n");
+    }
+
+    buf.put("\nInvoked with types: ");
+    for (size_t i = 0; i < nargs_in; ++i) {
+        PyTypeObject *t = Py_TYPE(PyTuple_GET_ITEM(args_in, i));
+        buf.put_dstr(t->tp_name);
+        if (i + 1 < nargs_in)
+            buf.put(", ");
+    }
+
+    if (kwargs_in) {
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+
+        if (nargs_in)
+            buf.put(", ");
+        buf.put("kwargs = { ");
+        while (PyDict_Next(kwargs_in, &pos, &key, &value)) {
+            const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
+            buf.put_dstr(key_cstr);
+            buf.put(": ");
+            buf.put_dstr(Py_TYPE(value)->tp_name);
+            buf.put(", ");
+        }
+        buf.rewind(2);
+        buf.put(" }");
+    }
+
+    PyErr_SetString(PyExc_TypeError, buf.get());
+    return nullptr;
 }
 
 /// Finalize function signatures + docstrings once a module has finished loading
@@ -443,4 +504,4 @@ void func_finalize() noexcept {
 }
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

@@ -1,6 +1,6 @@
 #include <nanobind/nanobind.h>
 
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 #if defined(__GNUC__)
@@ -207,4 +207,4 @@ PyObject *str_from_cstr_and_size(const char *str, size_t size) {
 }
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

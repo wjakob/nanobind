@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 /// Helper type for concatenating type signatures at compile time
@@ -85,4 +85,4 @@ constexpr descr<N + 2, Ts...> type_descr(const descr<N, Ts...> &descr) {
 }
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

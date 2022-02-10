@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// RAII wrapper that temporarily clears any Python error state
 struct error_scope {
@@ -26,4 +26,10 @@ private:
     object m_type, m_value, m_trace;
 };
 
-NAMESPACE_END(nanobind)
+class NB_EXPORT next_overload : public std::runtime_error {
+public:
+    next_overload();
+    virtual ~next_overload();
+};
+
+NAMESPACE_END(NB_NAMESPACE)

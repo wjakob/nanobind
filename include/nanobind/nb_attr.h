@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 
 struct scope {
     PyObject *value;
@@ -117,4 +117,4 @@ template <typename F> void func_extra_apply(F &f, const arg_v &a) {
 }
 
 NAMESPACE_END(detail)
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

@@ -1,4 +1,4 @@
-NAMESPACE_BEGIN(nanobind)
+NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Func, typename Return, typename... Args, size_t... Is,
@@ -160,4 +160,4 @@ module_ &module_::def(const char *name_, Func &&f, const Extra &...extra) {
     return *this;
 }
 
-NAMESPACE_END(nanobind)
+NAMESPACE_END(NB_NAMESPACE)

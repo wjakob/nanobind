@@ -73,37 +73,8 @@ NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 
 // ========================================================================
 
-/// Create a new handle for a function to be bound
-NB_CORE void *func_alloc() noexcept;
-
-/// Free all memory associated with a function record
-NB_CORE void func_free(void *rec) noexcept;
-
-/// Annotate a function record with the given flag
-NB_CORE void func_set_flag(void *rec, uint32_t flag) noexcept;
-
-/// Set the function name
-NB_CORE void func_set_name(void *rec, const char *name) noexcept;
-
-/// Set the function docstring
-NB_CORE void func_set_docstr(void *rec, const char *docstr) noexcept;
-
-/// Set the function scope
-NB_CORE void func_set_scope(void *rec, PyObject *scope) noexcept;
-
-/// Set the predecessor of a overload chain
-NB_CORE void func_set_pred(void *rec, PyObject *pred) noexcept;
-
-/// Append a named argument
-NB_CORE void func_add_arg(void *rec, const char *name, bool noconvert, bool none,
-                         PyObject *def) noexcept;
-
 /// Create a Python function object for the given function record
-NB_CORE PyObject *
-func_init(void *rec, size_t nargs, size_t args_pos, size_t kwargs_pos,
-          void (*free_captured)(void *),
-          PyObject *(*impl)(void *, PyObject **, bool *, PyObject *),
-          const char *descr, const std::type_info **descr_types);
+NB_CORE PyObject *func_init(void *data) noexcept;
 
 /// Generate docstrings for all newly defined functions
 NB_CORE void func_make_docstr();

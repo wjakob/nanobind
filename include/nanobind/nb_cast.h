@@ -39,18 +39,15 @@ public:
     bool load(handle src, bool convert) {
         Tp value_p;
 
-        if (!src)
+        if (!src.is_valid())
             return false;
 
         if constexpr (std::is_floating_point_v<T>) {
-            if (convert || PyFloat_Check(src.ptr()))
-                value_p = (Tp) PyFloat_AsDouble(src.ptr());
-            else
+            if (!convert && !PyFloat_Check(src.ptr()))
                 return false;
+            value_p = (Tp) PyFloat_AsDouble(src.ptr());
         } else {
-            if (PyFloat_Check(src.ptr()) ||
-                (!convert && !PyLong_Check(src.ptr()) &&
-                 !PyIndex_Check(src.ptr())))
+            if (!convert && !PyLong_Check(src.ptr()))
                 return false;
 
             if constexpr (std::is_unsigned_v<Tp>) {
@@ -62,14 +59,14 @@ public:
                               ? (Tp) PyLong_AsLong(src.ptr())
                               : (Tp) PyLong_AsLongLong(src.ptr());
             }
+
+            if constexpr (sizeof(Tp) != sizeof(T)) {
+                if (value_p != (Tp) (T) value_p)
+                    return false;
+            }
         }
 
-        // Python API reported an error
-        bool py_err = value_p == (Tp) -1 && PyErr_Occurred();
-
-        // Check to see if the conversion is valid
-        if (py_err || (std::is_integral_v<T> && sizeof(Tp) != sizeof(T) &&
-                       value_p != (Tp) (T) value_p)) {
+        if (value_p == Tp(-1) && PyErr_Occurred()) {
             PyErr_Clear();
             return false;
         }

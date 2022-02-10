@@ -19,7 +19,7 @@ template <bool B, bool... Bs> struct index_n<B, Bs...> {
 };
 
 template <bool... Bs> constexpr size_t index_1_v = index_1<Bs...>::value;
-template <bool... Bs> constexpr size_t index_n_v = index_n <Bs...>::value;
+template <bool... Bs> constexpr size_t index_n_v = index_n<Bs...>::value;
 
 /// Helper template to strip away type modifiers
 template <typename T> struct intrinsic_type                       { using type = T; };

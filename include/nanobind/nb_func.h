@@ -5,52 +5,75 @@ template <typename Func, typename Return, typename... Args, size_t... Is,
           typename... Extra>
 object func_create(Func &&f, Return (*)(Args...), std::index_sequence<Is...>,
                    const Extra &...extra) {
+    // Detect locations of nb::args / nb::kwargs (if exists)
     static constexpr size_t
         args_pos_1 = index_1_v<std::is_same_v<std::decay_t<Args>, args>...>,
         kwargs_pos_1 = index_1_v<std::is_same_v<std::decay_t<Args>, kwargs>...>,
         args_pos_n = index_n_v<std::is_same_v<std::decay_t<Args>, args>...>,
-        kwargs_pos_n = index_n_v<std::is_same_v<std::decay_t<Args>, kwargs>...>;
+        kwargs_pos_n = index_n_v<std::is_same_v<std::decay_t<Args>, kwargs>...>,
+        nargs = sizeof...(Args);
 
-    static_assert(
-        args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
-        "Repeated use of nanobind::kwargs/args in function signature!");
+    // Determine the number of nb::arg/nb::arg_v annotations
+    constexpr size_t nargs_provided =
+        ((std::is_same_v<arg, Extra> + std::is_same_v<arg_v, Extra>) + ...);
 
+    /// A few compile-time consistency checks
+    static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
+        "Repeated use of nb::kwargs or nb::args in the function signature!");
+    static_assert(nargs_provided == 0 || nargs_provided == nargs,
+        "The number of nb::arg annotations must match the argument count!");
+    static_assert(kwargs_pos_1 == nargs || kwargs_pos_1 + 1 == nargs,
+        "nb::kwargs must be the last element of the function signature!");
+    static_assert(args_pos_1 == nargs || args_pos_1 + 1 == kwargs_pos_1,
+        "nb::args must follow positional arguments and precede nb::kwargs!");
+
+    // Collect function signature information for the docstring
+    constexpr bool is_void_ret = std::is_void_v<Return>;
+    using cast_out =
+        make_caster<std::conditional_t<is_void_ret, std::nullptr_t, Return>>;
+    constexpr auto descr =
+        const_name("(") + concat(type_descr(make_caster<Args>::name)...) +
+        const_name(") -> ") + cast_out::name;
+    const std::type_info* descr_types[descr.type_count() + 1];
+    descr.put_types(descr_types);
+
+    // The following temporary record will describe the function in detail
+    func_data<nargs_provided> data;
+
+    // Auxiliary data structure to capture the provided function/closure
     struct capture {
         std::remove_reference_t<Func> f;
     };
 
     // Store the capture object in the function record if there is space
-    constexpr bool is_small    = sizeof(capture) <= sizeof(void *) * 3,
-                   is_trivial  = std::is_trivially_destructible_v<capture>,
-                   is_void_ret = std::is_void_v<Return>;
+    constexpr bool is_small    = sizeof(capture) <= sizeof(data.capture),
+                   is_trivial  = std::is_trivially_destructible_v<capture>;
 
-    void *func_rec = func_alloc();
     void (*free_capture)(void *ptr) = nullptr;
 
     if constexpr (is_small) {
-        capture *cap = std::launder((capture *) func_rec);
+        capture *cap = std::launder((capture *) data.capture);
         new (cap) capture{ std::forward<Func>(f) };
 
         if constexpr (!is_trivial) {
-            free_capture = [](void *func_rec_2) {
+            data.free_capture = [](void *func_rec_2) {
                 capture *cap_2 = std::launder((capture *) func_rec_2);
                 cap_2->~capture();
             };
+        } else {
+            data.free_capture = nullptr;
         }
     } else {
-        void **cap = std::launder((void **) func_rec);
+        void **cap = std::launder((void **) data.capture);
         cap[0] = new capture{ std::forward<Func>(f) };
 
-        free_capture = [](void *func_rec_2) {
+        data.free_capture = [](void *func_rec_2) {
             void **cap_2 = std::launder((void **) func_rec_2);
             delete (capture *) cap_2[0];
         };
     }
 
-    using cast_out =
-        make_caster<std::conditional_t<is_void_ret, std::nullptr_t, Return>>;
-
-    auto impl = [](void *func_rec_2, PyObject **args, bool *args_convert,
+    data.impl = [](void *func_rec_2, PyObject **args, bool *args_convert,
                    PyObject *parent) -> PyObject * {
         const capture *cap;
         if constexpr (is_small)
@@ -77,20 +100,19 @@ object func_create(Func &&f, Return (*)(Args...), std::index_sequence<Is...>,
         }
     };
 
-    (detail::func_apply(func_rec, extra), ...);
+    data.descr = descr.text;
+    data.descr_types = descr_types;
+    data.nargs = (uint32_t) nargs;
+    data.nargs_provided = 0;
+    data.flags = (args_pos_1 < nargs ? (uint32_t) func_flags::has_args : 0) |
+                 (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_kwargs : 0);
 
-    static constexpr auto signature = const_name("(") +
-                                      concat(type_descr(make_caster<Args>::name)...) +
-                                      const_name(") -> ") + cast_out::name;
+    // Fill remaining fields of 'data'
+    detail::func_extra_init(data);
+    (detail::func_extra_apply(data, extra), ...);
 
-    const std::type_info* types[signature.type_count() + 1];
-    signature.put_types(types);
-
-    return steal(
-        func_init(func_rec, sizeof...(Args), args_pos_1, kwargs_pos_1,
-                  free_capture, impl, signature.text, types));
+    return steal(func_init((void *) &data));
 }
-
 
 NAMESPACE_END(detail)
 

@@ -1,13 +1,13 @@
 NAMESPACE_BEGIN(nanobind)
 
 struct scope {
-    handle value;
-    scope(handle value) : value(value) { }
+    PyObject *value;
+    scope(handle value) : value(value.ptr()) { }
 };
 
 struct pred {
-    handle value;
-    pred(handle value) : value(value) { }
+    PyObject *value;
+    pred(handle value) : value(value.ptr()) { }
 };
 
 struct name {
@@ -17,14 +17,14 @@ struct name {
 
 struct arg_v;
 struct arg {
-    constexpr explicit arg(const char *name = nullptr) : m_name(name), m_convert(true), m_none(false) { }
+    constexpr explicit arg(const char *name = nullptr) : name(name), convert_(true), none_(false) { }
     template <typename T> arg_v operator=(T &&value) const;
-    arg &noconvert(bool value = true) { m_convert = !value; return *this; }
-    arg &none(bool value = true) { m_none = value; return *this; }
+    arg &noconvert(bool value = true) { convert_ = !value; return *this; }
+    arg &none(bool value = true) { none_ = value; return *this; }
 
-    const char *m_name;
-    bool m_convert;
-    bool m_none;
+    const char *name;
+    bool convert_;
+    bool none_;
 };
 
 struct arg_v : arg {
@@ -45,38 +45,83 @@ NAMESPACE_END(literals)
 NAMESPACE_BEGIN(detail)
 
 enum class func_flags : uint32_t {
-    is_method  = (1 << 0),
-    has_args   = (1 << 1),
-    has_kwargs = (1 << 2)
+    has_args   = (1 << 0),
+    has_kwargs = (1 << 1),
+    is_method  = (1 << 2)
 };
 
+struct arg_data {
+    const char *name;
+    PyObject *value;
+    bool convert;
+    bool none;
+};
 
-inline void func_apply(void *func_rec, const pred &pred) {
-    func_set_pred(func_rec, pred.value.ptr());
+template <size_t Size> struct func_data {
+    // A small amount of space to capture data used by the function/closure
+    void *capture[3];
+
+    // Callback to clean up the 'capture' field
+    void (*free_capture)(void *);
+
+    /// Implementation of the function call
+    PyObject* (*impl) (void *, PyObject**, bool *, PyObject *);
+
+    /// Function signature description
+    const char *descr;
+
+    /// C++ types referenced by 'descr'
+    const std::type_info **descr_types;
+
+    /// Total number of function call arguments
+    uint16_t nargs;
+
+    /// Number of arguments annotated via nb::args
+    uint16_t nargs_provided;
+
+    /// Supplementary flags
+    uint32_t flags;
+
+    // ------- Extra fields -------
+
+    const char *name;
+    const char *docstr;
+    PyObject *scope;
+    PyObject *pred;
+    arg_data args[Size];
+};
+
+template <typename F> void func_extra_init(F &f) {
+    f.flags = 0;
+    f.name = nullptr;
+    f.docstr = nullptr;
+    f.scope = nullptr;
+    f.pred = nullptr;
 }
 
-inline void func_apply(void *func_rec, const scope &scope) {
-    func_set_scope(func_rec, scope.value.ptr());
+template <typename F> void func_extra_apply(F &f, const pred &pred)   { f.pred = pred.value; }
+template <typename F> void func_extra_apply(F &f, const scope &scope) { f.scope = scope.value; }
+template <typename F> void func_extra_apply(F &f, const name &name)   { f.name = name.value; }
+template <typename F> void func_extra_apply(F &f, const char *docstr) { f.docstr = docstr; }
+
+template <typename F> void func_extra_apply(F &f, is_method) {
+    f.flags |= (uint32_t) func_flags::is_method;
 }
 
-inline void func_apply(void *func_rec, const name &name) {
-    func_set_name(func_rec, name.value);
+template <typename F> void func_extra_apply(F &f, const arg &a) {
+    arg_data &arg = f.args[f.nargs_provided++];
+    arg.name = a.name;
+    arg.value = nullptr;
+    arg.convert = a.convert_;
+    arg.none = a.none_;
 }
 
-inline void func_apply(void *func_rec, const char *docstr) {
-    func_set_docstr(func_rec, docstr);
-}
-
-inline void func_apply(void *func_rec, is_method) {
-    func_set_flag(func_rec, (uint32_t) func_flags::is_method);
-}
-
-inline void func_apply(void *func_rec, const arg &a) {
-    func_add_arg(func_rec, a.m_name, a.m_convert, a.m_none, nullptr);
-}
-
-inline void func_apply(void *func_rec, const arg_v &a) {
-    func_add_arg(func_rec, a.m_name, a.m_convert, a.m_none, a.m_value.ptr());
+template <typename F> void func_extra_apply(F &f, const arg_v &a) {
+    arg_data &arg = f.args[f.nargs_provided++];
+    arg.name = a.name;
+    arg.value = a.m_value.ptr();
+    arg.convert = a.convert_;
+    arg.none = a.none_;
 }
 
 NAMESPACE_END(detail)

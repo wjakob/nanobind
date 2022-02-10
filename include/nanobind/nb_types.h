@@ -56,7 +56,8 @@ public:
     accessor<str_attr> attr(const char *key) const;
 
     bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
-    bool is_none() const { return derived().ptr() == Py_None; }
+    bool is_none() const  { return derived().ptr() == Py_None; }
+    bool is_valid() const { return derived().ptr() != nullptr; }
 
     NB_API_COMP(equal,      Py_EQ)
     NB_API_COMP(not_equal,  Py_NE)

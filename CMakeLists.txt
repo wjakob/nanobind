@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.17...3.22)
 project(nanobind)
 
 option(NB_SHARED "Should nanobind produce a shared core library?" ON)
+option(NB_TEST   "Compile nanobind tests?" ON)
 
 # ---------------------------------------------------------------------------
 # Do a release build if nothing was specified
@@ -18,7 +19,10 @@ endif()
 # Find the Python interpreter and development libraries
 # ---------------------------------------------------------------------------
 
-find_package(Python COMPONENTS Interpreter Development)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+if ((Python_VERSION_MAJOR LESS 3) OR ((Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 8)))
+  message(FATAL_ERROR "nanobind requires Python >= 3.8")
+endif()
 
 # ---------------------------------------------------------------------------
 # Build a static library containing the non-templated core of nanobind
@@ -59,6 +63,8 @@ target_include_directories(nanobind-core PRIVATE
 # Define a convenience function for creating nanobind targets
 # ---------------------------------------------------------------------------
 
+SET(NB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 function(nanobind_add_module name)
   if (MSVC)
     set(NB_OPT_SIZE /Os)
@@ -88,7 +94,7 @@ function(nanobind_add_module name)
     ".${Python_SOABI}${NB_SUFFIX}")
 
   target_include_directories(${name} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${NB_SOURCE_DIR}/include
     ${Python_INCLUDE_DIRS})
 
   if (APPLE)
@@ -107,7 +113,6 @@ function(nanobind_add_module name)
   endif()
 endfunction()
 
-nanobind_add_module(
-  nbtest
-  nbtest.cpp
-)
+if (NB_TEST)
+  add_subdirectory(tests)
+endif()

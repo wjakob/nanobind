@@ -18,6 +18,7 @@
 #include "nb_lib.h"
 #include "nb_descr.h"
 #include "nb_types.h"
+#include "nb_accessor.h"
 #include "nb_error.h"
 #include "nb_cast.h"
 #include "nb_attr.h"

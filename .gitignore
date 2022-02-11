@@ -4,9 +4,11 @@
 /nanobind-core.dll
 /.ninja_deps
 /.ninja_log
-/CMakeFiles
-/CMakeCache.txt
+CMakeFiles
+CMakeCache.txt
 /build.ninja
-/cmake_install.cmake
+cmake_install.cmake
+\.DS_Store
 __pycache__
 build
+test_*_ext*

@@ -94,6 +94,20 @@ void python_error_raise() {
 
 // ========================================================================
 
+size_t obj_len(PyObject *o) {
+    Py_ssize_t res = PyObject_Length(o);
+    if (res < 0)
+        python_error_raise();
+    return (size_t) res;
+}
+
+PyObject *obj_repr(PyObject *o) {
+    PyObject *res = PyObject_Repr(o);
+    if (!res)
+        python_error_raise();
+    return res;
+}
+
 bool obj_compare(PyObject *a, PyObject *b, int value) {
     int rv = PyObject_RichCompareBool(a, b, value);
     if (rv == -1)
@@ -102,48 +116,48 @@ bool obj_compare(PyObject *a, PyObject *b, int value) {
 }
 
 PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
-    PyObject *result = op(a);
-    if (!result)
+    PyObject *res = op(a);
+    if (!res)
         python_error_raise();
-    return result;
+    return res;
 }
 
 PyObject *obj_op_2(PyObject *a, PyObject *b, PyObject* (*op)(PyObject*, PyObject*)) {
-    PyObject *result = op(a, b);
-    if (!result)
+    PyObject *res = op(a, b);
+    if (!res)
         python_error_raise();
-    return result;
+    return res;
 }
 
 // ========================================================================
 
 PyObject *getattr(PyObject *obj, const char *key) {
-    PyObject *result = PyObject_GetAttrString(obj, key);
-    if (!result)
+    PyObject *res = PyObject_GetAttrString(obj, key);
+    if (!res)
         python_error_raise();
-    return result;
+    return res;
 }
 
 PyObject *getattr(PyObject *obj, PyObject *key) {
-    PyObject *result = PyObject_GetAttr(obj, key);
-    if (!result)
+    PyObject *res = PyObject_GetAttr(obj, key);
+    if (!res)
         python_error_raise();
-    return result;
+    return res;
 }
 
 PyObject *getattr(PyObject *obj, const char *key, PyObject *def) noexcept {
-    PyObject *result = PyObject_GetAttrString(obj, key);
-    if (result)
-        return result;
+    PyObject *res = PyObject_GetAttrString(obj, key);
+    if (res)
+        return res;
     PyErr_Clear();
     Py_XINCREF(def);
     return def;
 }
 
 PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
-    PyObject *result = PyObject_GetAttr(obj, key);
-    if (result)
-        return result;
+    PyObject *res = PyObject_GetAttr(obj, key);
+    if (res)
+        return res;
     PyErr_Clear();
     Py_XINCREF(def);
     return def;
@@ -153,22 +167,22 @@ void getattr_maybe(PyObject *obj, const char *key, PyObject **out) {
     if (*out)
         return;
 
-    PyObject *result = PyObject_GetAttrString(obj, key);
-    if (!result)
+    PyObject *res = PyObject_GetAttrString(obj, key);
+    if (!res)
         python_error_raise();
 
-    *out = result;
+    *out = res;
 }
 
 void getattr_maybe(PyObject *obj, PyObject *key, PyObject **out) {
     if (*out)
         return;
 
-    PyObject *result = PyObject_GetAttr(obj, key);
-    if (!result)
+    PyObject *res = PyObject_GetAttr(obj, key);
+    if (!res)
         python_error_raise();
 
-    *out = result;
+    *out = res;
 }
 
 void setattr(PyObject *obj, const char *key, PyObject *value) {
@@ -179,6 +193,87 @@ void setattr(PyObject *obj, const char *key, PyObject *value) {
 
 void setattr(PyObject *obj, PyObject *key, PyObject *value) {
     int rv = PyObject_SetAttr(obj, key, value);
+    if (rv)
+        python_error_raise();
+}
+
+// ========================================================================
+
+void getitem_maybe(PyObject *obj, Py_ssize_t key_, PyObject **out) {
+    if (*out)
+        return;
+
+    PyObject *key, *res;
+
+    key = PyLong_FromSsize_t(key_);
+    if (!key)
+        python_error_raise();
+
+    res = PyObject_GetItem(obj, key);
+    Py_DECREF(key);
+
+    if (!res)
+        python_error_raise();
+
+    *out = res;
+}
+
+void getitem_maybe(PyObject *obj, const char *key_, PyObject **out) {
+    if (*out)
+        return;
+
+    PyObject *key, *res;
+
+    key = PyUnicode_FromString(key_);
+    if (!key)
+        python_error_raise();
+
+    res = PyObject_GetItem(obj, key);
+    Py_DECREF(key);
+
+    if (!res)
+        python_error_raise();
+
+    *out = res;
+}
+
+void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out) {
+    if (*out)
+        return;
+
+    PyObject *res = PyObject_GetItem(obj, key);
+    if (!res)
+        python_error_raise();
+
+    *out = res;
+}
+
+void setitem(PyObject *obj, Py_ssize_t key_, PyObject *value) {
+    PyObject *key = PyLong_FromSsize_t(key_);
+    if (!key)
+        python_error_raise();
+
+    int rv = PyObject_SetItem(obj, key, value);
+    Py_DECREF(key);
+
+    if (rv)
+        python_error_raise();
+}
+
+void setitem(PyObject *obj, const char *key_, PyObject *value) {
+    PyObject *key = PyUnicode_FromString(key_);
+    if (!key)
+        python_error_raise();
+
+    int rv = PyObject_SetItem(obj, key, value);
+    Py_DECREF(key);
+
+    if (rv)
+        python_error_raise();
+}
+
+void setitem(PyObject *obj, PyObject *key, PyObject *value) {
+    int rv = PyObject_SetItem(obj, key, value);
     if (rv)
         python_error_raise();
 }

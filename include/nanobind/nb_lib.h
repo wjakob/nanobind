@@ -47,11 +47,29 @@ NB_CORE PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept;
 NB_CORE void getattr_maybe(PyObject *obj, const char *key, PyObject **out);
 NB_CORE void getattr_maybe(PyObject *obj, PyObject *key, PyObject **out);
 
-/// Set an object attribute
+/// Set an object attribute / item
 NB_CORE void setattr(PyObject *obj, const char *key, PyObject *value);
 NB_CORE void setattr(PyObject *obj, PyObject *key, PyObject *value);
 
 // ========================================================================
+
+/// Index into an object or raise an exception. Skip if 'out' is non-null
+NB_CORE void getitem_maybe(PyObject *obj, Py_ssize_t, PyObject **out);
+NB_CORE void getitem_maybe(PyObject *obj, const char *key, PyObject **out);
+NB_CORE void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out);
+
+/// Set an item or raise an exception
+NB_CORE void setitem(PyObject *obj, Py_ssize_t, PyObject *value);
+NB_CORE void setitem(PyObject *obj, const char *key, PyObject *value);
+NB_CORE void setitem(PyObject *obj, PyObject *key, PyObject *value);
+
+// ========================================================================
+
+/// Determine the length of a Python object
+NB_CORE size_t obj_len(PyObject *o);
+
+/// Obtain a string representation of a Python object
+NB_CORE PyObject* obj_repr(PyObject *o);
 
 /// Perform a comparison between Python objects and handle errors
 NB_CORE bool obj_comp(PyObject *a, PyObject *b, int value);

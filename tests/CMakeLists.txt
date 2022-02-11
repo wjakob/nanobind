@@ -1,0 +1,2 @@
+nanobind_add_module(test_functions_ext test_functions.cpp)
+nanobind_add_module(test_classes_ext test_classes.cpp)

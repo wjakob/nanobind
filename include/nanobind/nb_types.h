@@ -4,9 +4,13 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 #define NB_OBJECT(Name, Parent, Check)                                         \
 public:                                                                        \
     static constexpr auto cname = detail::const_name(#Name);                   \
-    Name(handle h, detail::borrow_t) : Parent(h, detail::borrow_t{}) {}        \
-    Name(handle h, detail::steal_t) : Parent(h, detail::steal_t{}) {}          \
-    static bool check_(handle h) { return ((bool) h) && Check(h.ptr()); }
+    NB_INLINE Name(handle h, detail::borrow_t)                                 \
+        : Parent(h, detail::borrow_t{}) {}                                     \
+    NB_INLINE Name(handle h, detail::steal_t)                                  \
+        : Parent(h, detail::steal_t{}) {}                                      \
+    NB_INLINE static bool check_(handle h) {                                   \
+        return ((bool) h) && Check(h.ptr());                                   \
+    }
 
 /// Like NB_OBJECT but allow null-initialization
 #define NB_OBJECT_DEFAULT(Name, Parent, Check)                                 \
@@ -15,17 +19,19 @@ public:                                                                        \
 
 /// Helper macro to create detail::api comparison functions
 #define NB_API_COMP(name, op)                                                  \
-    template <typename T> bool name(const api<T> &o) const {                   \
+    template <typename T> NB_INLINE bool name(const api<T> &o) const {         \
         return detail::obj_comp(derived().ptr(), o.derived().ptr(), op);       \
     }
 
 /// Helper macro to create detail::api unary operators
 #define NB_API_OP_1(name, op)                                                  \
-    auto name() const { return steal(detail::obj_op_1(derived().ptr(), op)); }
+    NB_INLINE auto name() const {                                              \
+        return steal(detail::obj_op_1(derived().ptr(), op));                   \
+    }
 
 /// Helper macro to create detail::api binary operators
 #define NB_API_OP_2(name, op)                                                  \
-    template <typename T> auto name(const api<T> &o) const {                   \
+    template <typename T> NB_INLINE auto name(const api<T> &o) const {         \
         return steal(                                                          \
             detail::obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
     }
@@ -40,8 +46,8 @@ template <typename T = object> T steal(handle h);
 NAMESPACE_BEGIN(detail)
 
 template <typename Policy> class accessor;
-struct str_attr;
-struct obj_attr;
+struct str_attr; struct obj_attr;
+struct str_item; struct obj_item; struct num_item;
 
 struct borrow_t { };
 struct steal_t { };
@@ -50,15 +56,17 @@ class object_t { };
 // Standard operations provided by every nanobind object
 template <typename Derived> class api : public object_t {
 public:
-    // item_accessor operator[](handle key) const;
-    // item_accessor operator[](const char *key) const;
+    NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
+    NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
+    NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
 
     accessor<obj_attr> attr(handle key) const;
     accessor<str_attr> attr(const char *key) const;
 
-    NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
-    NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
-    NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
+    accessor<obj_item> operator[](handle key) const;
+    accessor<str_item> operator[](const char *key) const;
+    template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1>
+    accessor<num_item> operator[](T key) const;
 
     NB_API_COMP(equal,      Py_EQ)
     NB_API_COMP(not_equal,  Py_NE)
@@ -97,6 +105,9 @@ class handle : public detail::api<handle> {
     friend class python_error;
     friend class detail::str_attr;
     friend class detail::obj_attr;
+    friend class detail::str_item;
+    friend class detail::obj_item;
+    friend class detail::num_item;
 public:
     static constexpr auto cname = detail::const_name("handle");
 
@@ -158,6 +169,14 @@ template <typename T> T borrow(handle h) {
 
 template <typename T> T steal(handle h) {
     return { h, detail::steal_t() };
+}
+
+inline bool hasattr(handle obj, const char *key) noexcept {
+    return PyObject_HasAttrString(obj.ptr(), key);
+}
+
+inline bool hasattr(handle obj, handle key) noexcept {
+    return PyObject_HasAttr(obj.ptr(), key.ptr());
 }
 
 inline object getattr(handle obj, const char *key) {
@@ -225,7 +244,8 @@ class tuple : public object {
 };
 
 class dict : public object {
-    NB_OBJECT_DEFAULT(dict, object, PyDict_Check)
+    NB_OBJECT(dict, object, PyDict_Check)
+    dict() : object(PyDict_New(), detail::steal_t()) { }
     size_t size() const { return PyDict_GET_SIZE(m_ptr); }
 };
 
@@ -247,76 +267,19 @@ class kwargs : public dict {
 };
 
 template <typename T>
-bool isinstance(handle obj) noexcept {
+NB_INLINE bool isinstance(handle obj) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(obj);
     else
         detail::fail("isinstance(): unsupported case!");
 }
 
-NAMESPACE_BEGIN(detail)
+NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
+NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
+NB_INLINE size_t len(const tuple &t) { return PyTuple_GET_SIZE(t.ptr()); }
+NB_INLINE size_t len(const list &t) { return PyList_GET_SIZE(t.ptr()); }
+NB_INLINE size_t len(const dict &t) { return PyDict_GET_SIZE(t.ptr()); }
 
-template <typename Policy> class accessor : public api<accessor<Policy>> {
-public:
-    template <typename Key>
-    accessor(handle obj, Key &&key) : m_obj(obj), m_key(std::move(key)) { }
-    accessor(const accessor &) = delete;
-    accessor(accessor &&) = delete;
-
-    template <typename T> accessor& operator=(T &&value) {
-        Policy::set(m_obj, m_key, cast((detail::forward_t<T>) value));
-        return *this;
-    }
-
-    template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
-    operator T() const { return get(); }
-    PyObject *ptr() const { return get().ptr(); }
-
-private:
-    object &get() const {
-        Policy::get(m_obj, m_key, m_cache);
-        return m_cache;
-    }
-
-private:
-    handle m_obj;
-    typename Policy::key_type m_key;
-    mutable object m_cache;
-};
-
-struct str_attr {
-    using key_type = const char *;
-
-    static void get(handle obj, const char *key, object &out) {
-        detail::getattr_maybe(obj.ptr(), key, &out.m_ptr);
-    }
-
-    static void set(handle obj, const char *key, handle val) {
-        setattr(obj, key, val);
-    }
-};
-
-struct obj_attr {
-    using key_type = object;
-
-    static void get(handle obj, handle key, object &out) {
-        detail::getattr_maybe(obj.ptr(), key.ptr(), &out.m_ptr);
-    }
-
-    static void set(handle obj, handle key, handle val) {
-        setattr(obj, key.ptr(), val);
-    }
-};
-
-template <typename D> accessor<obj_attr> api<D>::attr(handle key) const {
-    return { derived(), borrow(key) };
-}
-
-template <typename D> accessor<str_attr> api<D>::attr(const char *key) const {
-    return { derived(), key };
-}
-
-NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 
 #undef NB_API_COMP

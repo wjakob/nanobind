@@ -3,21 +3,19 @@
 namespace nb = nanobind;
 using namespace nb::literals;
 
-NB_MODULE(nbtest, m) {
-    int i = 42;
-
-    auto test_01 = [](int j, int k) -> int { return j - k; };
-
+NB_MODULE(test_functions_ext, m) {
     // Function without inputs/outputs
     m.def("test_01", []() { });
 
-    // Simple binary function
-    m.def("test_02", (int (*)(int, int)) test_01, "j"_a = 8, "k"_a = 1);
+    // Simple binary function (via function pointer)
+    auto test_02 = [](int j, int k) -> int { return j - k; };
+    m.def("test_02", (int (*)(int, int)) test_02, "j"_a = 8, "k"_a = 1);
 
     // Simple binary function with capture object
+    int i = 42;
     m.def("test_03", [i](int j, int k) -> int { return i + j - k; });
 
-    // Large capture object
+    // Large capture object requiring separate storage
     uint64_t k = 10, l = 11, m_ = 12, n = 13, o = 14;
     m.def("test_04", [k, l, m_, n, o]() -> int { return k + l + m_ + n + o; });
 
@@ -37,14 +35,4 @@ NB_MODULE(nbtest, m) {
     m.def("test_07", [](int a, int b, nb::args args, nb::kwargs kwargs) {
         return std::make_pair(args.size(), kwargs.size());
     }, "a"_a, "b"_a, "myargs"_a, "mykwargs"_a);
-
-    struct Struct1 {
-        int i = 5;
-        int value() const { return i; }
-    };
-
-    nb::class_<Struct1>(m, "Struct1")
-        .def("__init__", [](Struct1 &s) { new (&s) Struct1{ }; })
-        .def("__init__", [](Struct1 &s, int i) { new (&s) Struct1{ i }; })
-        .def("value", &Struct1::value);
 }

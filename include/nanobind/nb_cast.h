@@ -205,7 +205,7 @@ public:
     }
 
     static handle cast(const handle &src, return_value_policy /* policy */,
-                       handle /* parent */) {
+                       handle /* parent */) noexcept {
         return src.inc_ref();
     }
 };
@@ -219,4 +219,13 @@ object cast(T &&value, return_value_policy policy = return_value_policy::move,
     return steal(caster.cast(std::forward<T>(value), policy, parent));
 }
 
+NAMESPACE_BEGIN(detail)
+
+template <typename Policy> template <typename T>
+accessor<Policy>& accessor<Policy>::operator=(T &&value) {
+    Policy::set(m_obj, m_key, cast((detail::forward_t<T>) value));
+    return *this;
+}
+
+NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

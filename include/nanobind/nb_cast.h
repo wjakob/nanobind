@@ -1,17 +1,17 @@
 #define NB_TYPE_CASTER(type, descr)                                            \
-    protected:                                                                 \
-        type value;                                                            \
+protected:                                                                     \
+    type value;                                                                \
                                                                                \
-    public:                                                                    \
-        static constexpr auto name = descr;                                    \
-        static handle cast(type *p, return_value_policy policy, handle parent) {  \
-            if (!p)                                                            \
-                return none().release();                                       \
-            return cast(*p, policy, parent);                                   \
-        }                                                                      \
-        operator type *() { return &value; }                                   \
-        operator type &() { return value; }                                    \
-        template <typename T2> using cast_op_type = cast_op_type<T2>;
+public:                                                                        \
+    static constexpr auto cname = descr;                                       \
+    static handle cast(type *p, return_value_policy policy, handle parent) {   \
+        if (!p)                                                                \
+            return none().release();                                           \
+        return cast(*p, policy, parent);                                       \
+    }                                                                          \
+    operator type *() { return &value; }                                       \
+    operator type &() { return value; }                                        \
+    template <typename T_> using cast_op_type = cast_op_type<T_>;
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
@@ -36,7 +36,7 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
     using T1 = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
     using Tp = std::conditional_t<std::is_floating_point_v<T>, double, T1>;
 public:
-    bool load(handle src, bool convert) {
+    bool load(handle src, bool convert) noexcept {
         Tp value_p;
 
         if (!src.is_valid())
@@ -76,7 +76,7 @@ public:
     }
 
     static handle cast(T src, return_value_policy /* policy */,
-                       handle /* parent */) {
+                       handle /* parent */) noexcept {
         if constexpr (std::is_floating_point_v<T>)
             return PyFloat_FromDouble((double) src);
         else if constexpr (std::is_unsigned_v<T> && sizeof(T) <= sizeof(long))
@@ -94,19 +94,92 @@ public:
     NB_TYPE_CASTER(T, const_name<std::is_integral_v<T>>("int", "float"));
 };
 
-template <> class type_caster<std::nullptr_t> {
-    bool load(handle src, bool) {
+template <> struct type_caster<std::nullptr_t> {
+    bool load(handle src, bool) noexcept {
         if (src && src.is_none())
             return true;
         return false;
     }
 
     static handle cast(std::nullptr_t, return_value_policy /* policy */,
-                       handle /* parent */) {
+                       handle /* parent */) noexcept {
         return none().inc_ref();
     }
 
     NB_TYPE_CASTER(std::nullptr_t, const_name("None"));
+};
+
+template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
+    using T = std::pair<T1, T2>;
+    using C1 = make_caster<T1>;
+    using C2 = make_caster<T2>;
+
+    NB_TYPE_CASTER(T, const_name("Tuple[") + concat(C1::cname, C2::cname) +
+                          const_name("]"))
+
+    bool load(handle src, bool convert) noexcept {
+        PyObject *o[2];
+
+        if (!seq_size_fetch(src.ptr(), 2, o))
+            return false;
+
+        C1 c1;
+        C2 c2;
+
+        if (!c1.load(o[0], convert))
+            goto fail;
+        if (!c2.load(o[1], convert))
+            goto fail;
+
+        value.first  = std::move(c1.value);
+        value.second = std::move(c2.value);
+
+        return true;
+
+    fail:
+        Py_DECREF(o[0]);
+        Py_DECREF(o[1]);
+        return false;
+    }
+
+    static handle cast(const T &value, return_value_policy policy,
+                       handle parent) noexcept {
+        object o1 = steal(C1::cast(value.first,  policy, parent));
+        if (!o1.is_valid())
+            return handle();
+
+        object o2 = steal(C2::cast(value.second, policy, parent));
+        if (!o2.is_valid())
+            return handle();
+
+        PyObject *r = PyTuple_New(2);
+        PyTuple_SET_ITEM(r, 0, o1.release().ptr());
+        PyTuple_SET_ITEM(r, 1, o2.release().ptr());
+        return r;
+    }
+};
+
+template <typename T>
+struct type_caster<T, enable_if_t<std::is_base_of_v<handle, T>>> {
+public:
+    NB_TYPE_CASTER(T, T::cname)
+
+    bool load(handle src, bool convert) {
+        if (!isinstance<T>(src))
+            return false;
+
+        if constexpr (std::is_same_v<T, handle>)
+            value = src;
+        else
+            value = borrow<T>(src);
+
+        return true;
+    }
+
+    static handle cast(const handle &src, return_value_policy /* policy */,
+                       handle /* parent */) {
+        return src.inc_ref();
+    }
 };
 
 NAMESPACE_END(detail)

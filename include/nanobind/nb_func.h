@@ -8,10 +8,10 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
                                 const Extra &...extra) {
     // Detect locations of nb::args / nb::kwargs (if exists)
     static constexpr size_t
-        args_pos_1 = index_1_v<std::is_same_v<std::decay_t<Args>, args>...>,
-        kwargs_pos_1 = index_1_v<std::is_same_v<std::decay_t<Args>, kwargs>...>,
-        args_pos_n = index_n_v<std::is_same_v<std::decay_t<Args>, args>...>,
-        kwargs_pos_n = index_n_v<std::is_same_v<std::decay_t<Args>, kwargs>...>,
+        args_pos_1 = index_1_v<std::is_same_v<intrinsic_t<Args>, args>...>,
+        args_pos_n = index_n_v<std::is_same_v<intrinsic_t<Args>, args>...>,
+        kwargs_pos_1 = index_1_v<std::is_same_v<intrinsic_t<Args>, kwargs>...>,
+        kwargs_pos_n = index_n_v<std::is_same_v<intrinsic_t<Args>, kwargs>...>,
         nargs = sizeof...(Args);
 
     // Determine the number of nb::arg/nb::arg_v annotations
@@ -33,8 +33,8 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
     using cast_out =
         make_caster<std::conditional_t<is_void_ret, std::nullptr_t, Return>>;
     constexpr auto descr =
-        const_name("(") + concat(type_descr(make_caster<Args>::name)...) +
-        const_name(") -> ") + cast_out::name;
+        const_name("(") + concat(type_descr(make_caster<Args>::cname)...) +
+        const_name(") -> ") + cast_out::cname;
     const std::type_info* descr_types[descr.type_count() + 1];
     descr.put_types(descr_types);
 

@@ -65,6 +65,11 @@ NB_CORE PyObject *obj_op_2(PyObject *a, PyObject *b,
 
 // ========================================================================
 
+// Check if a sequence type has a given size
+NB_CORE bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept;
+
+// ========================================================================
+
 /// Create a new capsule object
 NB_CORE PyObject *capsule_new(const void *ptr, void (*free)(void *)) noexcept;
 
@@ -78,6 +83,7 @@ NB_CORE PyObject *func_init(void *data, bool return_handle) noexcept;
 
 /// Generate docstrings for all newly defined functions
 NB_CORE void func_finalize() noexcept;
+
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

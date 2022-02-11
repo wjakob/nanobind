@@ -86,7 +86,6 @@ template <size_t Size> struct func_data {
 };
 
 template <typename F> NB_INLINE void func_extra_init(F &f) {
-    f.flags = 0;
     f.name = nullptr;
     f.doc = nullptr;
     f.scope = nullptr;

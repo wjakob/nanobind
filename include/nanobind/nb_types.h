@@ -3,6 +3,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 /// Macro defining functions/constructors for nanobind::handle subclasses
 #define NB_OBJECT(Name, Parent, Check)                                         \
 public:                                                                        \
+    static constexpr auto cname = detail::const_name(#Name);                   \
     Name(handle h, detail::borrow_t) : Parent(h, detail::borrow_t{}) {}        \
     Name(handle h, detail::steal_t) : Parent(h, detail::steal_t{}) {}          \
     static bool check_(handle h) { return ((bool) h) && Check(h.ptr()); }
@@ -97,6 +98,8 @@ class handle : public detail::api<handle> {
     friend class detail::str_attr;
     friend class detail::obj_attr;
 public:
+    static constexpr auto cname = detail::const_name("handle");
+
     handle() = default;
     handle(const handle &) = default;
     handle(handle &&) noexcept = default;
@@ -117,6 +120,8 @@ protected:
 
 class object : public handle {
 public:
+    static constexpr auto cname = detail::const_name("object");
+
     object() = default;
     object(const object &o) : handle(o) { inc_ref(); }
     object(object &&o) noexcept : handle(o) { o.m_ptr = nullptr; }
@@ -216,14 +221,21 @@ class str : public object {
 
 class tuple : public object {
     NB_OBJECT_DEFAULT(tuple, object, PyTuple_Check)
+    size_t size() const { return PyTuple_GET_SIZE(m_ptr); }
 };
 
 class dict : public object {
     NB_OBJECT_DEFAULT(dict, object, PyDict_Check)
+    size_t size() const { return PyDict_GET_SIZE(m_ptr); }
 };
 
 class list : public object {
     NB_OBJECT_DEFAULT(list, object, PyList_Check)
+    size_t size() const { return PyList_GET_SIZE(m_ptr); }
+};
+
+class sequence : public object {
+    NB_OBJECT_DEFAULT(sequence, object, PySequence_Check)
 };
 
 class args : public tuple {
@@ -235,7 +247,7 @@ class kwargs : public dict {
 };
 
 template <typename T>
-bool isinstance(const T &obj) {
+bool isinstance(handle obj) {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(obj);
     else

@@ -50,8 +50,8 @@ void func_free(void *p) noexcept {
  * This is an implementation detail of nanobind::cpp_function.
  */
 PyObject *func_init(void *in_, bool return_handle) noexcept {
-    func_data<0> *in = std::launder((func_data<0> *) in_);
-    func_record *f      = new func_record();
+    func_data<0> *in = (func_data<0> *) in_;
+    func_record *f = new func_record();
 
     /// Copy temporary data from the caller's stack
     std::memcpy(f, in, sizeof(func_data<0>));
@@ -314,7 +314,10 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             // Deal with remaining keyword arguments
             if (has_kwargs) {
                 if (kwargs_consumed.empty()) {
-                    extra_kwargs = borrow(kwargs_in);
+                    if (kwargs_in)
+                        extra_kwargs = borrow(kwargs_in);
+                    else
+                        extra_kwargs = steal(PyDict_New());
                 } else {
                     extra_kwargs = steal(PyDict_Copy(kwargs_in));
                     for (size_t i = 0; i < kwargs_consumed.size(); ++i) {
@@ -368,8 +371,10 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
 
             if (!result) {
                 buf.clear();
-                buf.put("Unable to convert function return value to a Python type! The signature was\n    ");
-                buf.put_dstr(f->signature ? f->signature : "[[ missing signature ]]");
+                buf.put("Unable to convert function return value to a Python "
+                        "type! The signature was\n    ");
+                buf.put_dstr(f->signature ? f->signature
+                                          : "[[ missing signature ]]");
                 PyErr_SetString(PyExc_TypeError, buf.get());
                 return nullptr;
             }
@@ -440,9 +445,13 @@ void func_finalize() noexcept {
         size_t overload_index = 0;
 
         while (f) {
-            size_t arg_index = 0;
-            const bool is_method  = f->flags & (uint32_t) func_flags::is_method;
+            const bool is_method  = f->flags & (uint32_t) func_flags::is_method,
+                       has_args   = f->flags & (uint32_t) func_flags::has_args,
+                       has_kwargs = f->flags & (uint32_t) func_flags::has_kwargs;
+
             const std::type_info **descr_type = f->descr_types;
+
+            size_t arg_index = 0;
 
             if (overload_index > 0)
                 buf.put('\n');
@@ -461,6 +470,26 @@ void func_finalize() noexcept {
                 switch (c) {
                     case '{':
                         // Argument name
+                        if (has_kwargs && arg_index == f->nargs - 1) {
+                            buf.put("**");
+                            if (f->nargs_provided && f->args[arg_index].name)
+                                buf.put_dstr(f->args[arg_index].name);
+                            else
+                                buf.put("kwargs");
+                            pc += 6;
+                            break;
+                        }
+
+                        if (has_args && arg_index == f->nargs - 1 - has_kwargs) {
+                            buf.put("*");
+                            if (f->nargs_provided && f->args[arg_index].name)
+                                buf.put_dstr(f->args[arg_index].name);
+                            else
+                                buf.put("args");
+                            pc += 4;
+                            break;
+                        }
+
                         if (f->nargs_provided && f->args[arg_index].name) {
                             buf.put_dstr(f->args[arg_index].name);
                         } else if (is_method && arg_index == 0) {

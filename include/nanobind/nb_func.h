@@ -112,7 +112,7 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
     detail::func_extra_init(data);
     (detail::func_extra_apply(data, extra), ...);
 
-    return func_init((void *) &data, ReturnHandle);
+    return func_new((void *) &data, ReturnHandle);
 }
 
 NAMESPACE_END(detail)
@@ -150,7 +150,7 @@ NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
         std::make_index_sequence<am::argc>(), extra...);
 }
 
-/// Construct a cpp_function from a class method (non-const, no ref-qualifier)
+/// Construct a cpp_function from a class method (non-const)
 template <typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...), const Extra &...extra) {
     return steal(detail::func_create<true>(
@@ -158,7 +158,7 @@ NB_INLINE object cpp_function(Return (Class::*f)(Args...), const Extra &...extra
             return (c->*f)((detail::forward_t<Args>) args...);
         },
         (Return(*)(Class *, Args...)) nullptr,
-        std::make_index_sequence<sizeof...(Args)>(), extra...));
+        std::make_index_sequence<sizeof...(Args) + 1>(), extra...));
 }
 
 template <typename Return, typename Class, typename... Args, typename... Extra>
@@ -168,10 +168,10 @@ NB_INLINE void cpp_function_def(Return (Class::*f)(Args...), const Extra &...ext
             return (c->*f)((detail::forward_t<Args>) args...);
         },
         (Return(*)(Class *, Args...)) nullptr,
-        std::make_index_sequence<sizeof...(Args)>(), extra...);
+        std::make_index_sequence<sizeof...(Args) + 1>(), extra...);
 }
 
-/// Construct a cpp_function from a class method (const, no ref-qualifier)
+/// Construct a cpp_function from a class method (const)
 template <typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...) const, const Extra &...extra) {
     return steal(detail::func_create<true>(
@@ -179,7 +179,7 @@ NB_INLINE object cpp_function(Return (Class::*f)(Args...) const, const Extra &..
             return (c->*f)((detail::forward_t<Args>) args...);
         },
         (Return(*)(const Class *, Args...)) nullptr,
-        std::make_index_sequence<sizeof...(Args)>(), extra...));
+        std::make_index_sequence<sizeof...(Args) + 1>(), extra...));
 }
 
 template <typename Return, typename Class, typename... Args, typename... Extra>
@@ -189,14 +189,14 @@ NB_INLINE void cpp_function_def(Return (Class::*f)(Args...) const, const Extra &
             return (c->*f)((detail::forward_t<Args>) args...);
         },
         (Return(*)(const Class *, Args...)) nullptr,
-        std::make_index_sequence<sizeof...(Args)>(), extra...);
+        std::make_index_sequence<sizeof...(Args) + 1>(), extra...);
 }
 
 template <typename Func, typename... Extra>
 module_ &module_::def(const char *name_, Func &&f,
                                 const Extra &...extra) {
-    cpp_function_def((detail::forward_t<Func>) f, scope(*this), name(name_),
-                     extra...);
+    cpp_function_def((detail::forward_t<Func>) f, scope(*this),
+                     name(name_), extra...);
     return *this;
 }
 

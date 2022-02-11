@@ -56,9 +56,9 @@ public:
     accessor<obj_attr> attr(handle key) const;
     accessor<str_attr> attr(const char *key) const;
 
-    bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
-    bool is_none() const  { return derived().ptr() == Py_None; }
-    bool is_valid() const { return derived().ptr() != nullptr; }
+    NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
+    NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
+    NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
 
     NB_API_COMP(equal,      Py_EQ)
     NB_API_COMP(not_equal,  Py_NE)
@@ -110,9 +110,9 @@ public:
     const handle& inc_ref() const & noexcept { Py_XINCREF(m_ptr); return *this; }
     const handle& dec_ref() const & noexcept { Py_XDECREF(m_ptr); return *this; }
 
-    operator bool() const { return m_ptr != nullptr; }
-    PyObject *ptr() const { return m_ptr; }
-    bool check_() { return m_ptr != nullptr; }
+    NB_INLINE operator bool() const { return m_ptr != nullptr; }
+    NB_INLINE PyObject *ptr() const { return m_ptr; }
+    NB_INLINE bool check_() { return m_ptr != nullptr; }
 
 protected:
     PyObject *m_ptr = nullptr;
@@ -247,11 +247,11 @@ class kwargs : public dict {
 };
 
 template <typename T>
-bool isinstance(handle obj) {
+bool isinstance(handle obj) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(obj);
     else
-        detail::raise("isinstance(): unsupported case!");
+        detail::fail("isinstance(): unsupported case!");
 }
 
 NAMESPACE_BEGIN(detail)
@@ -319,8 +319,6 @@ template <typename D> accessor<str_attr> api<D>::attr(const char *key) const {
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 
-#undef NB_OBJECT
-#undef NB_OBJECT_DEFAULT
 #undef NB_API_COMP
 #undef NB_API_OP_1
 #undef NB_API_OP_2

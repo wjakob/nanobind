@@ -21,7 +21,7 @@ enum class return_value_policy {
 
 NAMESPACE_BEGIN(detail)
 
-template <typename T, typename SFINAE = int> struct type_caster {};
+template <typename T, typename SFINAE = int> struct type_caster;
 template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
 template <typename T>
@@ -29,6 +29,34 @@ using cast_op_type =
     std::conditional_t<std::is_pointer_v<std::remove_reference_t<T>>,
                        typename std::add_pointer_t<intrinsic_t<T>>,
                        typename std::add_lvalue_reference_t<intrinsic_t<T>>>;
+
+template <typename T, typename SFINAE> struct type_caster {
+    static constexpr auto cname = const_name<T>();
+
+    NB_INLINE bool load(handle src, bool convert) noexcept {
+        return detail::type_get(src.ptr(), &typeid(T), convert, (void **) &value);
+    }
+
+    NB_INLINE static handle cast(const T *p, return_value_policy policy, handle parent) {
+        return nullptr;
+    }
+
+    NB_INLINE static handle cast(const T &p, return_value_policy policy, handle parent) {
+        return nullptr;
+    }
+
+    NB_INLINE static handle cast(const T &&p, return_value_policy policy, handle parent) {
+        return nullptr;
+    }
+
+    operator T*() { return value; }
+    operator T&() { return *value; }
+
+    template <typename T_> using cast_op_type = cast_op_type<T_>;
+
+private:
+    T *value;
+};
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
@@ -164,7 +192,7 @@ struct type_caster<T, enable_if_t<std::is_base_of_v<handle, T>>> {
 public:
     NB_TYPE_CASTER(T, T::cname)
 
-    bool load(handle src, bool convert) {
+    bool load(handle src, bool convert) noexcept {
         if (!isinstance<T>(src))
             return false;
 

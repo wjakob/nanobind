@@ -1,10 +1,22 @@
+#include <nanobind/nanobind.h>
 #include "smallvec.h"
+#include <tsl/robin_map.h>
+#include <typeindex>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+struct instance {
+    PyObject_HEAD
+    PyObject *weakrefs;
+    void *value;
+};
+
 struct internals {
     smallvec<void (*)(std::exception_ptr)> exception_translators;
+    tsl::robin_pg_map<void *, instance *> inst_c2p;
+    tsl::robin_pg_map<std::type_index, type_data *> types_c2p;
+    PyTypeObject *metaclass;
 };
 
 extern internals &get_internals() noexcept;

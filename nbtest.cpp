@@ -37,4 +37,14 @@ NB_MODULE(nbtest, m) {
     m.def("test_07", [](int a, int b, nb::args args, nb::kwargs kwargs) {
         return std::make_pair(args.size(), kwargs.size());
     }, "a"_a, "b"_a, "myargs"_a, "mykwargs"_a);
+
+    struct Struct1 {
+        int i = 5;
+        int value() const { return i; }
+    };
+
+    nb::class_<Struct1>(m, "Struct1")
+        .def("__init__", [](Struct1 &s) { new (&s) Struct1{ }; })
+        .def("__init__", [](Struct1 &s, int i) { new (&s) Struct1{ i }; })
+        .def("value", &Struct1::value);
 }

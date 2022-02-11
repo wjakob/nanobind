@@ -79,11 +79,20 @@ NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 // ========================================================================
 
 /// Create a Python function object for the given function record
-NB_CORE PyObject *func_init(void *data, bool return_handle) noexcept;
+NB_CORE PyObject *func_new(void *data, bool return_handle) noexcept;
 
 /// Generate docstrings for all newly defined functions
 NB_CORE void func_finalize() noexcept;
 
+// ========================================================================
+
+/// Create a Python type object for the given type record
+struct type_data;
+NB_CORE PyObject *type_new(const type_data *c) noexcept;
+
+/// Extract a pointer to a C++ type underlying a Python object, if possible
+NB_CORE bool type_get(PyObject *o, const std::type_info *, bool convert,
+                      void **out) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

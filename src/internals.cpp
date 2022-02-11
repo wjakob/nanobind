@@ -54,6 +54,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+extern void type_free(PyObject *);
+
 static internals *internals_p = nullptr;
 
 void default_exception_translator(std::exception_ptr p) {
@@ -82,28 +84,72 @@ void default_exception_translator(std::exception_ptr p) {
     }
 }
 
-internals &get_internals() noexcept {
-    if (internals_p)
-        return *internals_p;
+static PyTypeObject* metaclass(const char *name) {
+    str name_py(name);
 
-    PyObject *builtins = PyEval_GetBuiltins(),
-             *capsule = PyDict_GetItemString(builtins, NB_INTERNALS_ID);
+    /* Danger zone: from now (and until PyType_Ready), make sure to
+       issue no Python C API calls which could potentially invoke the
+       garbage collector (the GC will call type_traverse(), which will in
+       turn find the newly constructed type in an invalid state) */
+    PyHeapTypeObject *heap_type =
+        (PyHeapTypeObject *) PyType_Type.tp_alloc(&PyType_Type, 0);
+    if (!heap_type)
+        fail("nanobind::detail::metaclass(\"%s\"): alloc. failed!", name);
+
+    heap_type->ht_name = name_py.inc_ref().ptr();
+    heap_type->ht_qualname = name_py.inc_ref().ptr();
+
+    PyTypeObject *type = &heap_type->ht_type;
+    type->tp_name = name;
+    type->tp_base = &PyType_Type;
+    Py_INCREF(type->tp_base);
+
+    type->tp_flags =
+        Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HEAPTYPE;
+
+    // type->tp_call = pybind11_meta_call;
+    // type->tp_setattro = pybind11_meta_setattro;
+    // type->tp_getattro = pybind11_meta_getattro;
+    type->tp_dealloc = type_free;
+
+    if (PyType_Ready(type) < 0)
+        fail("nanobind::detail::metaclass(\"%s\"): PyType_Ready() failed!", name);
+
+    setattr((PyObject *) type, "__module__", str("nb_builtins"));
+
+    return type;
+}
+
+static void make_internals() {
+    internals_p = new internals();
+    internals_p->exception_translators.push_back(default_exception_translator);
+
+    PyObject *capsule = PyCapsule_New(internals_p, nullptr, nullptr);
+    int rv = PyDict_SetItemString(PyEval_GetBuiltins(), NB_INTERNALS_ID, capsule);
+    if (rv || !capsule)
+        fail("nanobind::detail::make_internals(): internal error!");
+    Py_DECREF(capsule);
+
+    internals_p->metaclass = metaclass("nb_type");
+}
+
+static void fetch_internals() {
+    PyObject *capsule =
+        PyDict_GetItemString(PyEval_GetBuiltins(), NB_INTERNALS_ID);
 
     if (capsule) {
         internals_p = (internals *) PyCapsule_GetPointer(capsule, nullptr);
         if (!internals_p)
-            fail("nanobind::detail::get_internals(): internal error (1)!");
-        return *internals_p;
+            fail("nanobind::detail::fetch_internals(): internal error!");
+        return;
     }
 
-    internals_p = new internals();
-    internals_p->exception_translators.push_back(default_exception_translator);
+    make_internals();
+}
 
-    capsule = PyCapsule_New(internals_p, nullptr, nullptr);
-    int rv = PyDict_SetItemString(builtins, NB_INTERNALS_ID, capsule);
-    if (rv || !capsule)
-        fail("nanobind::detail::get_internals(): internal error (2)!");
-
+internals &get_internals() noexcept {
+    if (!internals_p)
+        fetch_internals();
     return *internals_p;
 }
 

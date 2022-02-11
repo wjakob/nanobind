@@ -49,17 +49,18 @@ void func_free(void *p) noexcept {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *func_init(void *in_, bool return_handle) noexcept {
+PyObject *func_new(void *in_, bool return_handle) noexcept {
     func_data<0> *in = (func_data<0> *) in_;
     func_record *f = new func_record();
 
     /// Copy temporary data from the caller's stack
-    std::memcpy(f, in, sizeof(func_data<0>));
+    memcpy(f, in, sizeof(func_data<0>));
+
 
     for (size_t i = 0; ; ++i) {
         if (!f->descr[i]) {
             char *descr = new char[i + 1];
-            std::memcpy(descr, f->descr, (i + 1) * sizeof(char));
+            memcpy(descr, f->descr, (i + 1) * sizeof(char));
             f->descr = descr;
             break;
         }
@@ -69,15 +70,16 @@ PyObject *func_init(void *in_, bool return_handle) noexcept {
         if (!f->descr_types[i]) {
             const std::type_info **descr_types =
                 new const std::type_info *[i + 1];
-            std::memcpy(descr_types, f->descr_types,
+            memcpy(descr_types, f->descr_types,
                         (i + 1) * sizeof(const std::type_info *));
             f->descr_types = descr_types;
             break;
         }
     }
 
+    const bool is_method = f->flags & (uint32_t) func_flags::is_method;
+
     if (f->nargs_provided) {
-        const bool is_method = f->flags & (uint32_t) func_flags::is_method;
         arg_data *args_in = std::launder((arg_data *) in->args);
 
         f->nargs_provided += is_method;
@@ -99,7 +101,7 @@ PyObject *func_init(void *in_, bool return_handle) noexcept {
     if (f->scope && f->name) {
         name = PyUnicode_FromString(f->name);
         if (!name)
-            fail("nb::detail::func_init(\"%s\"): invalid name.", f->name);
+            fail("nb::detail::func_new(\"%s\"): invalid name.", f->name);
 
         pred = PyObject_GetAttr(f->scope, name);
         if (pred) {
@@ -111,15 +113,15 @@ PyObject *func_init(void *in_, bool return_handle) noexcept {
                 pred_f = (func_record *) PyCapsule_GetPointer(
                     PyCFunction_GET_SELF(cf), nullptr);
                 if (!pred_f)
-                    fail("nb::detail::func_init(\"%s\"): invalid "
+                    fail("nb::detail::func_new(\"%s\"): invalid "
                          "predecessor.", f->name);
 
                 /* Never append a method to an overload chain of a parent class;
                    instead, hide the parent's overloads in this case */
                 if (f->scope != pred_f->scope)
                     pred_f = nullptr;
-            } else {
-                fail("nb::detail::func_init(\"%s\"): cannot overload "
+            } else if (f->name[0] != '_') {
+                fail("nb::detail::func_new(\"%s\"): cannot overload "
                      "existing non-function object of the same name!", f->name);
             }
         } else {
@@ -130,7 +132,7 @@ PyObject *func_init(void *in_, bool return_handle) noexcept {
     PyObject *result = nullptr;
     if (!pred_f) {
         f->def = new PyMethodDef();
-        std::memset(f->def, 0, sizeof(PyMethodDef));
+        memset(f->def, 0, sizeof(PyMethodDef));
         f->def->ml_name = f->name;
         f->def->ml_meth = reinterpret_cast<PyCFunction>(func_dispatch);
         f->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
@@ -146,20 +148,30 @@ PyObject *func_init(void *in_, bool return_handle) noexcept {
 
         result = PyCFunction_NewEx(f->def, f_capsule.ptr(), scope_name);
         if (!result)
-            fail("nb::detail::func_init(\"%s\"): alloc. failed.", f->name);
+            fail("nb::detail::func_new(\"%s\"): alloc. failed (1).", f->name);
+
+        Py_XDECREF(scope_name);
+
+        if (is_method) {
+            PyObject *prev = result;
+            result = PyInstanceMethod_New(result);
+            Py_DECREF(prev);
+            if (!result)
+                fail("nb::detail::func_new(\"%s\"): alloc. failed (2).", f->name);
+        }
 
         all_funcs.insert(f);
 
         if (f->scope && name) {
             int rv = PyObject_SetAttr(f->scope, name, result);
             if (rv)
-                fail("nb::detail::func_init(\"%s\"): setattr. failed.", f->name);
+                fail("nb::detail::func_new(\"%s\"): setattr. failed.", f->name);
         }
     } else {
         // Append at the beginning or end of the overload chain
-        if ((f->flags & (uint32_t) func_flags::is_method) !=
-            (pred_f->flags & (uint32_t) func_flags::is_method))
-            fail("nb::detail::func_init(\"%s\"): overloads cannot mix "
+        bool pred_is_method = (pred_f->flags & (uint32_t) func_flags::is_method);
+        if (is_method != pred_is_method)
+            fail("nb::detail::func_new(\"%s\"): overloads cannot mix "
                  "instance/static methods!", f->name);
 
         // Append to overload chain
@@ -182,7 +194,7 @@ PyObject *func_init(void *in_, bool return_handle) noexcept {
     }
 }
 
-/// Dispatch loop that is used to invoke functions created by func_init
+/// Dispatch loop that is used to invoke functions created by func_new
 static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
     func_record *fr = (func_record *) PyCapsule_GetPointer(self, nullptr);
 
@@ -252,7 +264,8 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             // 1. Copy positional arguments, potentially substitute kwargs/defaults
             for (size_t i = 0; i < nargs_pos; ++i) {
                 PyObject *arg = nullptr;
-                bool arg_convert = pass == 1;
+                bool arg_convert  = pass == 1,
+                     arg_none     = false;
 
                 if (i < nargs_in)
                     arg = PyTuple_GET_ITEM(args_in, i);
@@ -279,13 +292,11 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
                     if (!arg)
                         arg = ad.value;
 
-                    if (arg == Py_None && !ad.none)
-                        break;
-
-                    arg_convert &= !ad.convert;
+                    arg_convert &= ad.convert;
+                    arg_none = ad.none;
                 }
 
-                if (!arg)
+                if (!arg || (arg == Py_None && !arg_none))
                     break;
 
                 args.push_back(arg);
@@ -498,7 +509,9 @@ void func_finalize() noexcept {
                             buf.put("arg");
                             buf.put_uint32(arg_index - is_method);
                         }
-                        buf.put(": ");
+
+                        if (!(is_method && arg_index == 0))
+                            buf.put(": ");
                         break;
 
                     case '}':
@@ -524,6 +537,10 @@ void func_finalize() noexcept {
                     case '%':
                         if (!*descr_type)
                             fail("nb::detail::func_finalize(): missing type!");
+
+                        if (!(is_method && arg_index == 0)) {
+                        }
+
                         descr_type++;
                         break;
 

@@ -31,10 +31,11 @@ else()
 endif()
 
 add_library(nanobind-core ${NB_CORE_LIBRARY_TYPE}
+  src/internals.cpp
   src/common.cpp
   src/func.cpp
   src/error.cpp
-  src/internals.cpp
+  src/type.cpp
 )
 
 if (NB_SHARED)
@@ -55,7 +56,7 @@ target_include_directories(nanobind-core PRIVATE
   ${Python_INCLUDE_DIRS})
 
 # ---------------------------------------------------------------------------
-# Define a convenient function for creating nanobind targets
+# Define a convenience function for creating nanobind targets
 # ---------------------------------------------------------------------------
 
 function(nanobind_add_module name)
@@ -77,10 +78,15 @@ function(nanobind_add_module name)
   endif()
 
   add_library(${name} MODULE ${ARGV1})
+
   target_compile_features(${name} PRIVATE cxx_std_17)
   target_compile_options(${name} PRIVATE ${NB_COMPILE_OPTIONS})
+
   target_link_libraries(${name} nanobind-core)
-  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ".${Python_SOABI}${NB_SUFFIX}")
+
+  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX
+    ".${Python_SOABI}${NB_SUFFIX}")
+
   target_include_directories(${name} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${Python_INCLUDE_DIRS})

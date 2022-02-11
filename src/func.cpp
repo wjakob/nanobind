@@ -2,6 +2,7 @@
 #include "buffer.h"
 #include <cstring>
 #include <tsl/robin_set.h>
+#include "internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -346,7 +347,23 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             } catch (next_overload &) {
                 result = NB_NEXT_OVERLOAD;
             } catch (...) {
-                fail("Unhandled exception");
+                auto &translators = get_internals().exception_translators;
+
+                std::exception_ptr exc = std::current_exception();
+                for (size_t i = 0; i < translators.size(); ++i) {
+                    try {
+                        translators[i](exc);
+                        return nullptr;
+                    } catch (...) {
+                        exc = std::current_exception();
+                    }
+                }
+
+                PyErr_SetString(PyExc_SystemError,
+                                "nanobind::detail::func_dispatch(): exception "
+                                "could not be translated!");
+
+                return nullptr;
             }
 
             if (!result) {

@@ -8,7 +8,7 @@ struct error_scope {
 };
 
 /// Wraps a Python error state as a C++ exception
-class NB_EXPORT python_error : public std::runtime_error {
+class NB_EXPORT python_error : public std::exception {
 public:
     python_error();
     python_error(const python_error &);
@@ -22,14 +22,44 @@ public:
     const handle value() const { return m_value; }
     const handle trace() const { return m_trace; }
 
+    virtual const char *what() const noexcept override;
+
 private:
     object m_type, m_value, m_trace;
+    mutable char *m_what = nullptr;
 };
 
-class NB_EXPORT next_overload : public std::runtime_error {
+/// Throw from a bound method to skip to the next overload
+class NB_EXPORT next_overload : public std::exception {
 public:
     next_overload();
     virtual ~next_overload();
 };
+
+// Base interface used to expose common Python exceptions in C++
+class NB_EXPORT builtin_exception : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+    virtual void set_error() const = 0;
+};
+
+#define NB_EXCEPTION(type)                                          \
+    class NB_EXPORT type : public builtin_exception {               \
+    public:                                                         \
+        using builtin_exception::builtin_exception;                 \
+        type();                                                     \
+        void set_error() const override;                            \
+    };
+
+NB_EXCEPTION(stop_iteration)
+NB_EXCEPTION(index_error)
+NB_EXCEPTION(key_error)
+NB_EXCEPTION(value_error)
+NB_EXCEPTION(type_error)
+NB_EXCEPTION(buffer_error)
+NB_EXCEPTION(import_error)
+NB_EXCEPTION(attribute_error)
+
+#undef NB_EXCEPTION
 
 NAMESPACE_END(NB_NAMESPACE)

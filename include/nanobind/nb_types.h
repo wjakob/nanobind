@@ -192,9 +192,11 @@ public:
 class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, PyCapsule_CheckExact)
 
-    capsule(const void *ptr, void (*free)(void *)) {
+    capsule(const void *ptr, void (*free)(void *) = nullptr) {
         m_ptr = detail::capsule_new(ptr, free);
     }
+
+    void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }
 };
 
 class str : public object {

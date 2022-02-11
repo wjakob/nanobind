@@ -6,22 +6,51 @@ NAMESPACE_BEGIN(detail)
 
 Buffer buf(128);
 
-static const char *error_fetch(PyObject **type, PyObject **value,
-                               PyObject **trace) noexcept {
-    PyErr_Fetch(type, value, trace);
+NAMESPACE_END(detail)
+
+python_error::python_error() {
+    PyErr_Fetch(&m_type.m_ptr, &m_value.m_ptr, &m_trace.m_ptr);
+}
+
+python_error::~python_error() {
+    free(m_what);
+}
+
+python_error::python_error(const python_error &e) : std::exception(e) {
+    m_type = e.m_type;
+    m_value = e.m_value;
+    m_trace = e.m_trace;
+    if (e.m_what)
+        m_what = strdup(e.m_what);
+}
+
+python_error::python_error(python_error &&e)
+    : std::exception(std::move(e)) {
+    m_type = std::move(e.m_type);
+    m_value = std::move(e.m_value);
+    m_trace = std::move(e.m_trace);
+    std::swap(m_what, e.m_what);
+}
+
+const char *python_error::what() const noexcept {
+    if (m_what)
+        return m_what;
+
+    using detail::buf;
 
     buf.clear();
-    if (*type) {
-        object name = handle(*type).attr("__name__");
+
+    if (m_type.is_valid()) {
+        object name = m_type.attr("__name__");
         buf.put_dstr(borrow<str>(name).c_str());
         buf.put(": ");
     }
 
-    if (*value)
-        buf.put_dstr(str(*value).c_str());
+    if (m_value.is_valid())
+        buf.put_dstr(str(m_value).c_str());
 
-    if (*trace) {
-        PyTracebackObject *to = (PyTracebackObject *) *trace;
+    if (m_trace.is_valid()) {
+        PyTracebackObject *to = (PyTracebackObject *) m_trace.ptr();
 
         // Get the deepest trace possible
         while (to->tb_next)
@@ -48,36 +77,31 @@ static const char *error_fetch(PyObject **type, PyObject **value,
         }
     }
 
-    return buf.get();
+    m_what = buf.copy();
+    return m_what;
 }
-
-NAMESPACE_END(detail)
-
-python_error::python_error()
-    : std::runtime_error(detail::error_fetch(
-          &m_type.m_ptr, &m_value.m_ptr, &m_trace.m_ptr)) { }
-
-python_error::python_error(const python_error &e) : std::runtime_error(e) {
-    m_type = e.m_type;
-    m_value = e.m_value;
-    m_trace = e.m_trace;
-}
-
-python_error::python_error(python_error &&e)
-    : std::runtime_error(std::move(e)) {
-    m_type = std::move(e.m_type);
-    m_value = std::move(e.m_value);
-    m_trace = std::move(e.m_trace);
-}
-
-python_error::~python_error() { }
 
 void python_error::restore() {
     PyErr_Restore(m_type.release().ptr(), m_value.release().ptr(),
                   m_trace.release().ptr());
 }
 
-next_overload::next_overload() : std::runtime_error("next_overload") { }
+next_overload::next_overload() : std::exception() { }
 next_overload::~next_overload() { }
+
+#define NB_EXCEPTION(name, type)                                               \
+    name::name() : builtin_exception("") { }                                   \
+    void name::set_error() const { PyErr_SetString(type, what()); }
+
+NB_EXCEPTION(stop_iteration, PyExc_StopIteration)
+NB_EXCEPTION(index_error, PyExc_IndexError)
+NB_EXCEPTION(key_error, PyExc_KeyError)
+NB_EXCEPTION(value_error, PyExc_ValueError)
+NB_EXCEPTION(type_error, PyExc_TypeError)
+NB_EXCEPTION(buffer_error, PyExc_BufferError)
+NB_EXCEPTION(import_error, PyExc_ImportError)
+NB_EXCEPTION(attribute_error, PyExc_AttributeError)
+
+#undef NB_EXCEPTION
 
 NAMESPACE_END(NB_NAMESPACE)

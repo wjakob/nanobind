@@ -34,6 +34,7 @@ add_library(nanobind-core ${NB_CORE_LIBRARY_TYPE}
   src/common.cpp
   src/func.cpp
   src/error.cpp
+  src/internals.cpp
 )
 
 if (NB_SHARED)

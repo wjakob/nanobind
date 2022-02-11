@@ -24,4 +24,7 @@ NB_MODULE(nbtest, m) {
     // Overload chain with two docstrings
     m.def("test_05", [](int) -> int { return 1; }, "doc_1");
     m.def("test_05", [](float) -> int { return 2; }, "doc_2");
+
+    /// Function raising an exception
+    m.def("test_06", []() { throw std::runtime_error("oops!"); });
 }

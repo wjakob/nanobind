@@ -3,7 +3,7 @@ NAMESPACE_BEGIN(detail)
 
 template <bool ReturnRef, typename Func, typename Return, typename... Args,
           size_t... Is, typename... Extra>
-NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
+NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                                 std::index_sequence<Is...>,
                                 const Extra &...extra) {
     // Detect locations of nb::args / nb::kwargs (if exists)
@@ -29,9 +29,8 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
         "nb::args must follow positional arguments and precede nb::kwargs!");
 
     // Collect function signature information for the docstring
-    constexpr bool is_void_ret = std::is_void_v<Return>;
-    using cast_out =
-        make_caster<std::conditional_t<is_void_ret, std::nullptr_t, Return>>;
+    using cast_out = make_caster<
+        std::conditional_t<std::is_void_v<Return>, std::nullptr_t, Return>>;
     constexpr auto descr =
         const_name("(") + concat(type_descr(make_caster<Args>::cname)...) +
         const_name(") -> ") + cast_out::cname;
@@ -40,42 +39,42 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
 
     // Auxiliary data structure to capture the provided function/closure
     struct capture {
-        std::remove_reference_t<Func> f;
+        std::remove_reference_t<Func> func;
     };
 
     // The following temporary record will describe the function in detail
-    func_data<nargs_provided> data;
-    data.flags = (args_pos_1   < nargs ? (uint16_t) func_flags::has_var_args     : 0) |
-                 (kwargs_pos_1 < nargs ? (uint16_t) func_flags::has_var_kwargs   : 0) |
-                 (nargs_provided       ? (uint16_t) func_flags::has_args : 0) |
-                 (ReturnRef            ? (uint16_t) func_flags::return_ref   : 0);
+    func_data<nargs_provided> f;
+    f.flags = (args_pos_1   < nargs ? (uint16_t) func_flags::has_var_args   : 0) |
+              (kwargs_pos_1 < nargs ? (uint16_t) func_flags::has_var_kwargs : 0) |
+              (nargs_provided       ? (uint16_t) func_flags::has_args       : 0) |
+              (ReturnRef            ? (uint16_t) func_flags::return_ref     : 0);
 
     // Store captured function inside 'func_data' if there is space. Issues
     // with aliasing are resolved via separate compilation of libnanobind
-    if constexpr (sizeof(capture) <= sizeof(data.capture)) {
-        capture *cap = (capture *) data.capture;
-        new (cap) capture{ (forward_t<Func>) f };
+    if constexpr (sizeof(capture) <= sizeof(f.capture)) {
+        capture *cap = (capture *) f.capture;
+        new (cap) capture{ (forward_t<Func>) func };
 
         if constexpr (!std::is_trivially_destructible_v<capture>) {
-            data.flags |= (uint16_t) func_flags::has_free;
-            data.free = [](void *p) {
+            f.flags |= (uint16_t) func_flags::has_free;
+            f.free = [](void *p) {
                 ((capture *) p)->~capture();
             };
         }
     } else {
-        void **cap = (void **) data.capture;
-        cap[0] = new capture{ (forward_t<Func>) f };
+        void **cap = (void **) f.capture;
+        cap[0] = new capture{ (forward_t<Func>) func };
 
-        data.flags |= (uint16_t) func_flags::has_free;
-        data.free = [](void *p) {
+        f.flags |= (uint16_t) func_flags::has_free;
+        f.free = [](void *p) {
             delete (capture *) ((void **) p)[0];
         };
     }
 
-    data.impl = [](void *p, PyObject **args, bool *args_convert,
-                   PyObject *parent) -> PyObject * {
+    f.impl = [](void *p, PyObject **args, bool *args_convert,
+                rv_policy policy, PyObject *parent) -> PyObject * {
         const capture *cap;
-        if constexpr (sizeof(capture) <= sizeof(data.capture))
+        if constexpr (sizeof(capture) <= sizeof(f.capture))
             cap = (capture *) p;
         else
             cap = (capture *) ((void **) p)[0];
@@ -84,31 +83,31 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
         if ((!in.template get<Is>().load(args[Is], args_convert[Is]) || ...))
             return NB_NEXT_OVERLOAD;
 
-        if constexpr (is_void_ret) {
-            cap->f(
+        if constexpr (std::is_void_v<Return>) {
+            (void) policy; (void) parent;
+            cap->func(
                 in.template get<Is>().operator typename make_caster<Args>::
                     template cast_op_type<Args>()...),
             Py_INCREF(Py_None);
             return Py_None;
         } else {
-            rv_policy policy = rv_policy::automatic;
             return cast_out::cast(
-                cap->f(
+                cap->func(
                     in.template get<Is>().operator typename make_caster<Args>::
                         template cast_op_type<Args>()...),
                 policy, parent).ptr();
         }
     };
 
-    data.descr = descr.text;
-    data.descr_types = descr_types;
-    data.nargs = (uint16_t) nargs;
+    f.descr = descr.text;
+    f.descr_types = descr_types;
+    f.nargs = (uint16_t) nargs;
 
-    // Fill remaining fields of 'data'
+    // Fill remaining fields of 'f'
     size_t arg_index = 0;
-    (detail::func_extra_apply(data, extra, arg_index), ...);
+    (detail::func_extra_apply(f, extra, arg_index), ...);
 
-    return func_new((void *) &data);
+    return func_new((void *) &f);
 }
 
 NAMESPACE_END(detail)

@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <memory>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -6,6 +7,9 @@ using namespace nb::literals;
 static int default_constructed = 0, value_constructed = 0, copy_constructed = 0,
            move_constructed = 0, copy_assigned = 0, move_assigned = 0,
            destructed = 0;
+
+struct Struct;
+std::unique_ptr<Struct> struct_tmp;
 
 struct Struct {
     int i = 5;
@@ -20,21 +24,29 @@ struct Struct {
 
     int value() const { return i; }
 
-    static Struct  create_move() { return Struct(8); }
-    static Struct* create_take() { return new Struct(8); }
+    static Struct* create_take() { return new Struct(10); }
+    static Struct  create_move() { return Struct(11); }
+    static Struct* create_copy() { return struct_tmp.get(); }
+    static Struct* create_reference() { return struct_tmp.get(); }
     Struct &self() { return *this; }
 };
 
 struct alignas(1024) Big { char data[1024]; };
 
 NB_MODULE(test_classes_ext, m) {
+    struct_tmp = std::unique_ptr<Struct>(new Struct(12));
+
     nb::class_<Struct>(m, "Struct")
         .def(nb::init<>())
         .def(nb::init<int>())
         .def("value", &Struct::value)
         .def("self", &Struct::self)
-        .def("none", [](Struct&) -> const Struct * { return nullptr;})
+        .def("none", [](Struct &) -> const Struct * { return nullptr; })
         .def_static("create_move", &Struct::create_move)
+        .def_static("create_reference", &Struct::create_reference,
+                    nb::rv_policy::reference)
+        .def_static("create_copy", &Struct::create_copy,
+                    nb::rv_policy::copy)
         .def_static("create_take", &Struct::create_take);
 
     m.def("stats", []{

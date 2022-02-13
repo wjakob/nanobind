@@ -36,32 +36,43 @@ def test02_instantiate():
     }
 
 
-def test03_factory():
+def test03_rv_policy():
     t.reset()
     s = t.Struct()
     assert s.self() is s
     assert s.none() is None
     del s
-
-    assert t.Struct.create_take().value() == 8
-
     gc.collect()
-
     assert t.stats() == {
         'default_constructed': 1,
+        'value_constructed': 0,
+        'copy_constructed': 0,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 1
+    }
+
+    # ------
+
+    t.reset()
+    assert t.Struct.create_take().value() == 10
+    gc.collect()
+    assert t.stats() == {
+        'default_constructed': 0,
         'value_constructed': 1,
         'copy_constructed': 0,
         'move_constructed': 0,
         'copy_assigned': 0,
         'move_assigned': 0,
-        'destructed': 2
+        'destructed': 1
     }
+
+    # ------
+
     t.reset()
-
-    assert t.Struct.create_move().value() == 8
-
+    assert t.Struct.create_move().value() == 11
     gc.collect()
-
     assert t.stats() == {
         'default_constructed': 0,
         'value_constructed': 1,
@@ -71,3 +82,34 @@ def test03_factory():
         'move_assigned': 0,
         'destructed': 2
     }
+
+    # ------
+
+    t.reset()
+    assert t.Struct.create_reference().value() == 12
+    gc.collect()
+    assert t.stats() == {
+        'default_constructed': 0,
+        'value_constructed': 0,
+        'copy_constructed': 0,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 0
+    }
+
+    # ------
+
+    t.reset()
+    assert t.Struct.create_copy().value() == 12
+    gc.collect()
+    assert t.stats() == {
+        'default_constructed': 0,
+        'value_constructed': 0,
+        'copy_constructed': 1,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 1
+    }
+

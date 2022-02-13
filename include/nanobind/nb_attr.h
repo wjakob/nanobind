@@ -41,26 +41,28 @@ NAMESPACE_END(literals)
 NAMESPACE_BEGIN(detail)
 
 enum class func_flags : uint16_t {
+    /* Low 3 bits reserved for return value policy */
+
     /// Did the user specify a name for this function, or is it anonymous?
-    has_name     = (1 << 0),
+    has_name       = (1 << 4),
     /// Did the user specify a scope where this function should be installed?
-    has_scope    = (1 << 1),
+    has_scope      = (1 << 5),
     /// Did the user specify a docstring?
-    has_doc      = (1 << 2),
+    has_doc        = (1 << 6),
     /// Did the user specify nb::arg/arg_v annotations for all arguments?
-    has_args = (1 << 3),
+    has_args       = (1 << 7),
     /// Does the function signature contain an *args-style argument?
-    has_var_args     = (1 << 4),
+    has_var_args   = (1 << 8),
     /// Does the function signature contain an *kwargs-style argument?
-    has_var_kwargs   = (1 << 5),
+    has_var_kwargs = (1 << 9),
     /// Is this function a class method?
-    is_method    = (1 << 6),
+    is_method      = (1 << 10),
     /// Is this function a static class method?
-    is_static    = (1 << 7),
+    is_static      = (1 << 11),
     /// When the function is GCed, do we need to call func_data::free?
-    has_free     = (1 << 8),
+    has_free       = (1 << 12),
     /// Should the func_new() call return a new reference?
-    return_ref   = (1 << 9)
+    return_ref     = (1 << 13)
 };
 
 struct arg_data {
@@ -78,7 +80,7 @@ template <size_t Size> struct func_data {
     void (*free)(void *);
 
     /// Implementation of the function call
-    PyObject* (*impl) (void *, PyObject**, bool *, PyObject *);
+    PyObject *(*impl)(void *, PyObject **, bool *, rv_policy, PyObject *);
 
     /// Function signature description
     const char *descr;
@@ -119,11 +121,15 @@ NB_INLINE void func_extra_apply(F &f, const char *doc, size_t &) {
 }
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, is_method, size_t &) {
-    f.flags |= (uint32_t) func_flags::is_method;
+    f.flags |= (uint16_t) func_flags::is_method;
 }
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, is_static, size_t &) {
-    f.flags |= (uint32_t) func_flags::is_static;
+    f.flags |= (uint16_t) func_flags::is_static;
+}
+
+template <typename F> NB_INLINE void func_extra_apply(F &f, rv_policy pol, size_t &) {
+    f.flags = (f.flags & ~0b11) | (uint16_t) pol;
 }
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {

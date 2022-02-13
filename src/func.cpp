@@ -387,7 +387,8 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             try {
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, args.data(),
-                                 args_convert.data(), parent);
+                                 args_convert.data(),
+                                 (rv_policy) (f->flags & 0b111), parent);
             } catch (python_error &e) {
                 e.restore();
                 return nullptr;

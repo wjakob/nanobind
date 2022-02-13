@@ -88,16 +88,22 @@ static void inst_dealloc(PyObject *self) {
             operator delete(inst->value, t->align);
     }
 
+
+    // Update hash table that maps from C++ to Python instance
+    auto &inst_c2p = get_internals().inst_c2p;
+    auto it = inst_c2p.find(inst->value);
+    if (it == inst_c2p.end())
+        fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
+             "an unknown instance!", type->tp_name);
+
+    inst_c2p.erase(it);
+
     type->tp_free(self);
     Py_DECREF(type);
 }
 
 void type_free(PyObject *o) {
     PyTypeObject *tp = (PyTypeObject *) o;
-
-    char *name = (char *) tp->tp_name,
-         *doc  = (char *) tp->tp_doc;
-
     type_data *t = get_extra<type_data>(tp);
 
     // Try to find type in data structure
@@ -110,9 +116,6 @@ void type_free(PyObject *o) {
 
     // Free Python type object
     PyType_Type.tp_dealloc(o);
-
-    free(name);
-    free(doc);
 }
 
 PyObject *type_new(const type_data *t) noexcept {
@@ -161,9 +164,9 @@ PyObject *type_new(const type_data *t) noexcept {
 
     PyTypeObject *type = &ht->ht_type;
 
-    type->tp_name = strdup(t->name);
+    type->tp_name = t->name;
     if (has_doc)
-        type->tp_doc = strdup(t->doc);
+        type->tp_doc = t->doc;
 
     type->tp_basicsize = (Py_ssize_t) sizeof(instance);
     type->tp_itemsize = (Py_ssize_t) t->size;
@@ -256,7 +259,7 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
 
     instance *inst = inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
     inst->destruct = rvp != rv_policy::reference;
-    inst->free = !store_in_obj;
+    inst->free = inst->destruct && !store_in_obj;
 
     if (rvp == rv_policy::move) {
         if (t->flags & (uint16_t) type_flags::is_move_constructible) {

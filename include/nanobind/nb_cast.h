@@ -15,44 +15,44 @@ public:                                                                        \
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-/// Approach used to cast a previously unknown C++ instance into a Python object
+// Approach used to cast a previously unknown C++ instance into a Python object
 enum class rv_policy {
     /** This is the default return value policy, which falls back to the policy
         rv_policy::take_ownership when the return value is a pointer.
         Otherwise, it uses return_value::move or return_value::copy for rvalue
         and lvalue references, respectively. See below for a description of what
         all of these different policies do. */
-    automatic,
+    automatic = 0,
 
     /** As above, but use policy rv_policy::reference when the return
         value is a pointer. This is the default conversion policy for function
         arguments when calling Python functions manually from C++ code (i.e. via
         handle::operator()). You probably won't need to use this. */
-    automatic_reference,
+    automatic_reference = 1,
 
     /** Reference an existing object (i.e. do not create a new copy) and take
         ownership. Python will call the destructor and delete operator when the
         object’s reference count reaches zero. Undefined behavior ensues when
         the C++ side does the same.. */
-    take_ownership,
+    take_ownership = 2,
 
     /** Create a new copy of the returned object, which will be owned by
         Python. This policy is comparably safe because the lifetimes of the two
         instances are decoupled. */
-    copy,
+    copy = 3,
 
     /** Use std::move to move the return value contents into a new instance
         that will be owned by Python. This policy is comparably safe because the
         lifetimes of the two instances (move source and destination) are
         decoupled. */
-    move,
+    move = 4,
 
     /** Reference an existing object, but do not take ownership. The C++ side
         is responsible for managing the object’s lifetime and deallocating it
         when it is no longer used. Warning: undefined behavior will ensue when
         the C++ side deletes an object that is still referenced and used by
         Python. */
-    reference,
+    reference = 5,
 
     /** This policy only applies to methods and properties. It references the
         object without taking ownership similar to the above
@@ -64,7 +64,10 @@ enum class rv_policy {
         collected while Python is still using the child. More advanced
         variations of this scheme are also possible using combinations of
         rv_policy::reference and the keep_alive call policy */
-    reference_internal
+    reference_internal = 6
+
+    /* Note to self: nb_func.h assumes that this value fits into 3 bits, at most
+       one more policy can be added. */
 };
 
 NAMESPACE_BEGIN(detail)
@@ -277,9 +280,13 @@ template <typename T, typename SFINAE> struct type_caster {
         return cast_impl(&p, policy, parent);
     }
 
-    NB_INLINE static handle cast(const T &&p, rv_policy /* policy */,
+    NB_INLINE static handle cast(const T &&p, rv_policy policy,
                                  handle parent) noexcept {
-        return cast_impl(&p, rv_policy::move, parent);
+        if (policy == rv_policy::automatic ||
+            policy == rv_policy::automatic_reference)
+            policy = rv_policy::move;
+
+        return cast_impl(&p, policy, parent);
     }
 
     NB_INLINE static handle cast_impl(const T *p, rv_policy policy,

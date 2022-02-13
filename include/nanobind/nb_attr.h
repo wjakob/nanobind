@@ -40,11 +40,27 @@ NAMESPACE_END(literals)
 
 NAMESPACE_BEGIN(detail)
 
-enum class func_flags : uint32_t {
-    has_args   = (1 << 0),
-    has_kwargs = (1 << 1),
-    is_method  = (1 << 2),
-    is_static  = (1 << 3)
+enum class func_flags : uint16_t {
+    /// Did the user specify a name for this function, or is it anonymous?
+    has_name     = (1 << 0),
+    /// Did the user specify a scope where this function should be installed?
+    has_scope    = (1 << 1),
+    /// Did the user specify a docstring?
+    has_doc      = (1 << 2),
+    /// Did the user specify nb::arg/arg_v annotations for all arguments?
+    has_args = (1 << 3),
+    /// Does the function signature contain an *args-style argument?
+    has_var_args     = (1 << 4),
+    /// Does the function signature contain an *kwargs-style argument?
+    has_var_kwargs   = (1 << 5),
+    /// Is this function a class method?
+    is_method    = (1 << 6),
+    /// Is this function a static class method?
+    is_static    = (1 << 7),
+    /// When the function is GCed, do we need to call func_data::free?
+    has_free     = (1 << 8),
+    /// Should the func_new() call return a new reference?
+    return_ref   = (1 << 9)
 };
 
 struct arg_data {
@@ -59,7 +75,7 @@ template <size_t Size> struct func_data {
     void *capture[3];
 
     // Callback to clean up the 'capture' field
-    void (*free_capture)(void *);
+    void (*free)(void *);
 
     /// Implementation of the function call
     PyObject* (*impl) (void *, PyObject**, bool *, PyObject *);
@@ -73,11 +89,8 @@ template <size_t Size> struct func_data {
     /// Total number of function call arguments
     uint16_t nargs;
 
-    /// Number of arguments annotated via nb::args
-    uint16_t nargs_provided;
-
     /// Supplementary flags
-    uint32_t flags;
+    uint16_t flags;
 
     // ------- Extra fields -------
 
@@ -87,34 +100,42 @@ template <size_t Size> struct func_data {
     arg_data args[Size];
 };
 
-template <typename F> NB_INLINE void func_extra_init(F &f) {
-    f.name = nullptr;
-    f.doc = nullptr;
-    f.scope = nullptr;
+template <typename F>
+NB_INLINE void func_extra_apply(F &f, const name &name, size_t &) {
+    f.name = name.value;
+    f.flags |= (uint16_t) func_flags::has_name;
 }
 
-template <typename F> NB_INLINE void func_extra_apply(F &f, const scope &scope) { f.scope = scope.value; }
-template <typename F> NB_INLINE void func_extra_apply(F &f, const name &name)   { f.name = name.value; }
-template <typename F> NB_INLINE void func_extra_apply(F &f, const char *doc) { f.doc = doc; }
+template <typename F>
+NB_INLINE void func_extra_apply(F &f, const scope &scope, size_t &) {
+    f.scope = scope.value;
+    f.flags |= (uint16_t) func_flags::has_scope;
+}
 
-template <typename F> NB_INLINE void func_extra_apply(F &f, is_method) {
+template <typename F>
+NB_INLINE void func_extra_apply(F &f, const char *doc, size_t &) {
+    f.doc = doc;
+    f.flags |= (uint16_t) func_flags::has_doc;
+}
+
+template <typename F> NB_INLINE void func_extra_apply(F &f, is_method, size_t &) {
     f.flags |= (uint32_t) func_flags::is_method;
 }
 
-template <typename F> NB_INLINE void func_extra_apply(F &f, is_static) {
+template <typename F> NB_INLINE void func_extra_apply(F &f, is_static, size_t &) {
     f.flags |= (uint32_t) func_flags::is_static;
 }
 
-template <typename F> NB_INLINE void func_extra_apply(F &f, const arg &a) {
-    arg_data &arg = f.args[f.nargs_provided++];
+template <typename F> NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
+    arg_data &arg = f.args[index++];
     arg.name = a.name;
     arg.value = nullptr;
     arg.convert = a.convert_;
     arg.none = a.none_;
 }
 
-template <typename F> NB_INLINE void func_extra_apply(F &f, const arg_v &a) {
-    arg_data &arg = f.args[f.nargs_provided++];
+template <typename F> NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
+    arg_data &arg = f.args[index++];
     arg.name = a.name;
     arg.value = a.m_value.ptr();
     arg.convert = a.convert_;

@@ -34,10 +34,15 @@ static tsl::robin_pg_set<func_record *> all_funcs;
 
 void func_free(void *p) noexcept {
     func_record *f = (func_record *) p;
-    if (f->free_capture)
-        f->free_capture(f->capture);
-    for (size_t i = 0; i< f->nargs_provided; ++i)
-        Py_XDECREF(f->args[i].value);
+
+    if (f->flags & (uint16_t) func_flags::has_free)
+        f->free(f->capture);
+
+    if (f->flags & (uint16_t) func_flags::has_args) {
+        for (size_t i = 0; i< f->nargs; ++i)
+            Py_XDECREF(f->args[i].value);
+    }
+
     delete[] f->args;
     delete[] f->descr;
     delete[] f->descr_types;
@@ -53,12 +58,22 @@ void func_free(void *p) noexcept {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *func_new(void *in_, bool return_handle) noexcept {
+PyObject *func_new(void *in_) noexcept {
     func_data<0> *in = (func_data<0> *) in_;
     func_record *f = new func_record();
 
     /// Copy temporary data from the caller's stack
     memcpy(f, in, sizeof(func_data<0>));
+
+    const bool has_scope  = f->flags & (uint16_t) func_flags::has_scope,
+               has_name   = f->flags & (uint16_t) func_flags::has_name,
+               has_args   = f->flags & (uint16_t) func_flags::has_args,
+               is_method  = f->flags & (uint16_t) func_flags::is_method,
+               is_static  = f->flags & (uint16_t) func_flags::is_static,
+               return_ref = f->flags & (uint16_t) func_flags::return_ref;
+
+    if (!has_name)
+        f->name = "<anonymous>";
 
     for (size_t i = 0; ; ++i) {
         if (!f->descr[i]) {
@@ -80,19 +95,15 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
         }
     }
 
-    const bool is_method = f->flags & (uint32_t) func_flags::is_method,
-               is_static = f->flags & (uint32_t) func_flags::is_static;
-
-    if (f->nargs_provided) {
+    if (has_args) {
         arg_data *args_in = std::launder((arg_data *) in->args);
 
-        f->nargs_provided += is_method;
-        f->args = new arg_data[f->nargs_provided];
+        f->args = new arg_data[f->nargs + is_method];
 
         if (is_method) // add implicit 'self' argument annotation
             f->args[0] = arg_data{ "self", nullptr, false, false };
 
-        for (size_t i = is_method; i < f->nargs_provided; ++i) {
+        for (size_t i = is_method; i < f->nargs; ++i) {
             f->args[i] = args_in[i - is_method];
             Py_XINCREF(f->args[i].value);
         }
@@ -102,7 +113,7 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
     PyObject *pred = nullptr;
     func_record *pred_f = nullptr;
 
-    if (f->scope && f->name) {
+    if (has_scope && has_name) {
         name = PyUnicode_FromString(f->name);
         if (!name)
             fail("nb::detail::func_new(\"%s\"): invalid name.", f->name);
@@ -137,14 +148,14 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
     if (!pred_f) {
         f->def = new PyMethodDef();
         memset(f->def, 0, sizeof(PyMethodDef));
-        f->def->ml_name = f->name;
+        f->def->ml_name = has_name ? f->name : nullptr;
         f->def->ml_meth = reinterpret_cast<PyCFunction>(func_dispatch);
         f->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
 
         capsule f_capsule(f, func_free);
 
         PyObject *scope_name = nullptr;
-        if (f->scope) {
+        if (has_scope) {
             scope_name = getattr(f->scope, "__module__", nullptr);
             if (!scope_name)
                 scope_name = getattr(f->scope, "__name__", nullptr);
@@ -161,26 +172,28 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
             result = PyInstanceMethod_New(result);
             Py_DECREF(prev);
             if (!result)
-                fail("nb::detail::func_new(\"%s\"): alloc. failed (2).", f->name);
+                fail("nb::detail::func_new(\"%s\"): alloc. failed (2).",
+                     f->name);
         } else if (is_static) {
             PyObject *prev = result;
             result = PyStaticMethod_New(result);
             Py_DECREF(prev);
             if (!result)
-                fail("nb::detail::func_new(\"%s\"): alloc. failed (2).", f->name);
+                fail("nb::detail::func_new(\"%s\"): alloc. failed (2).",
+                     f->name);
         }
 
         all_funcs.insert(f);
 
-        if (f->scope && name) {
+        if (has_scope && name) {
             int rv = PyObject_SetAttr(f->scope, name, result);
             if (rv)
                 fail("nb::detail::func_new(\"%s\"): setattr. failed.", f->name);
         }
     } else {
         // Append at the beginning or end of the overload chain
-        bool pred_is_method = (pred_f->flags & (uint32_t) func_flags::is_method),
-             pred_is_static = (pred_f->flags & (uint32_t) func_flags::is_static);
+        bool pred_is_method = (pred_f->flags & (uint16_t) func_flags::is_method),
+             pred_is_static = (pred_f->flags & (uint16_t) func_flags::is_static);
 
         if (is_method != pred_is_method || is_static != pred_is_static)
             fail("nb::detail::func_new(\"%s\"): overloads cannot mix "
@@ -198,7 +211,7 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
     Py_XDECREF(name);
     Py_XDECREF(pred);
 
-    if (return_handle) {
+    if (return_ref) {
         return result;
     } else {
         Py_DECREF(result);
@@ -211,9 +224,10 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
     func_record *fr = (func_record *) PyCapsule_GetPointer(self, nullptr);
 
     const bool has_overloads = fr->next != nullptr;
+
     const size_t nargs_in = (size_t) PyTuple_GET_SIZE(args_in);
     PyObject *parent = nargs_in > 0 ? PyTuple_GET_ITEM(args_in, 0) : nullptr;
-    bool is_constructor = fr->name && strcmp(fr->name, "__init__") == 0;
+    bool is_constructor = strcmp(fr->name, "__init__") == 0;
 
     if (is_constructor) {
         is_constructor &= parent && strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
@@ -270,16 +284,17 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             const func_record *f = it;
             it = it->next;
 
-            const bool has_args   = f->flags & (uint32_t) func_flags::has_args,
-                       has_kwargs = f->flags & (uint32_t) func_flags::has_kwargs;
+            const bool has_args       = f->flags & (uint16_t) func_flags::has_args,
+                       has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
+                       has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs;
 
             /// Number of positional arguments
-            size_t nargs_pos = f->nargs - has_args - has_kwargs;
+            size_t nargs_pos = f->nargs - has_var_args - has_var_kwargs;
 
-            if (nargs_in > nargs_pos && !has_args)
+            if (nargs_in > nargs_pos && !has_var_args)
                 continue; // Too many positional arguments given for this overload
 
-            if (nargs_in < nargs_pos && f->nargs_provided == 0)
+            if (nargs_in < nargs_pos && !has_args)
                 continue; // Not enough positional arguments, insufficient
                           // keyword/default arguments to fill in the blanks
 
@@ -292,7 +307,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
                 if (i < nargs_in)
                     arg = PyTuple_GET_ITEM(args_in, i);
 
-                if (f->nargs_provided) {
+                if (has_args) {
                     const arg_data &ad = f->args[i];
 
                     if (kwargs_in && ad.name) {
@@ -330,7 +345,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
                 continue;
 
             // Deal with remaining positional arguments
-            if (has_args) {
+            if (has_var_args) {
                 extra_args = steal(PyTuple_New(
                     nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0));
 
@@ -345,7 +360,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
             }
 
             // Deal with remaining keyword arguments
-            if (has_kwargs) {
+            if (has_var_kwargs) {
                 if (kwargs_consumed.empty()) {
                     if (kwargs_in)
                         extra_kwargs = borrow(kwargs_in);
@@ -421,7 +436,7 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
     }
 
     buf.clear();
-    buf.put_dstr(fr->name ? fr->name : "<anonymous>");
+    buf.put_dstr(fr->name);
     buf.put("(): incompatible function arguments. The following argument types "
             "are supported:\n");
 
@@ -475,7 +490,8 @@ void func_finalize() noexcept {
         PyMethodDef *def = f->def;
 
         if (f->next) {
-            buf.put_dstr(f->name ? f->name : "<anonymous>");
+            buf.put_dstr((f->flags & (uint16_t) func_flags::has_name)
+                             ? f->name : "<anonymous>");
             buf.put("(*args, **kwargs) -> Any\n"
                     "Overloaded function.\n\n");
         }
@@ -483,9 +499,11 @@ void func_finalize() noexcept {
         size_t overload_index = 0;
 
         while (f) {
-            const bool is_method  = f->flags & (uint32_t) func_flags::is_method,
-                       has_args   = f->flags & (uint32_t) func_flags::has_args,
-                       has_kwargs = f->flags & (uint32_t) func_flags::has_kwargs;
+            const bool is_method      = f->flags & (uint16_t) func_flags::is_method,
+                       has_args       = f->flags & (uint16_t) func_flags::has_args,
+                       has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
+                       has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs,
+                       has_doc        = f->flags & (uint16_t) func_flags::has_doc;
 
             const std::type_info **descr_type = f->descr_types;
 
@@ -508,9 +526,9 @@ void func_finalize() noexcept {
                 switch (c) {
                     case '{':
                         // Argument name
-                        if (has_kwargs && arg_index == f->nargs - 1) {
+                        if (has_var_kwargs && arg_index == f->nargs - 1) {
                             buf.put("**");
-                            if (f->nargs_provided && f->args[arg_index].name)
+                            if (has_args && f->args[arg_index].name)
                                 buf.put_dstr(f->args[arg_index].name);
                             else
                                 buf.put("kwargs");
@@ -518,9 +536,9 @@ void func_finalize() noexcept {
                             break;
                         }
 
-                        if (has_args && arg_index == f->nargs - 1 - has_kwargs) {
+                        if (has_var_args && arg_index == f->nargs - 1 - has_var_kwargs) {
                             buf.put("*");
-                            if (f->nargs_provided && f->args[arg_index].name)
+                            if (has_args && f->args[arg_index].name)
                                 buf.put_dstr(f->args[arg_index].name);
                             else
                                 buf.put("args");
@@ -528,7 +546,7 @@ void func_finalize() noexcept {
                             break;
                         }
 
-                        if (f->nargs_provided && f->args[arg_index].name) {
+                        if (has_args && f->args[arg_index].name) {
                             buf.put_dstr(f->args[arg_index].name);
                         } else if (is_method && arg_index == 0) {
                             buf.put("self");
@@ -543,7 +561,7 @@ void func_finalize() noexcept {
 
                     case '}':
                         // Default argument
-                        if (f->nargs_provided && f->args[arg_index].value) {
+                        if (has_args && f->args[arg_index].value) {
                             PyObject *str = PyObject_Str(f->args[arg_index].value);
                             if (str) {
                                 Py_ssize_t size = 0;
@@ -595,7 +613,7 @@ void func_finalize() noexcept {
             free(f->signature);
             f->signature = buf.copy(signature_offset);
 
-            if (f->doc && f->doc[0] != '\0') {
+            if (has_doc && f->doc[0] != '\0') {
                 buf.put("\n\n");
                 buf.put_dstr(f->doc);
                 buf.put('\n');

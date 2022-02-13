@@ -1,7 +1,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <bool ReturnHandle, typename Func, typename Return, typename... Args,
+template <bool ReturnRef, typename Func, typename Return, typename... Args,
           size_t... Is, typename... Extra>
 NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
                                 std::index_sequence<Is...>,
@@ -38,46 +38,44 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
     const std::type_info* descr_types[descr.type_count() + 1];
     descr.put_types(descr_types);
 
-    // The following temporary record will describe the function in detail
-    func_data<nargs_provided> data;
-
     // Auxiliary data structure to capture the provided function/closure
     struct capture {
         std::remove_reference_t<Func> f;
     };
 
-    // Store the capture object in the function record if there is space
-    constexpr bool is_small    = sizeof(capture) <= sizeof(data.capture),
-                   is_trivial  = std::is_trivially_destructible_v<capture>;
+    // The following temporary record will describe the function in detail
+    func_data<nargs_provided> data;
+    data.flags = (args_pos_1   < nargs ? (uint16_t) func_flags::has_var_args     : 0) |
+                 (kwargs_pos_1 < nargs ? (uint16_t) func_flags::has_var_kwargs   : 0) |
+                 (nargs_provided       ? (uint16_t) func_flags::has_args : 0) |
+                 (ReturnRef            ? (uint16_t) func_flags::return_ref   : 0);
 
-    void (*free_capture)(void *ptr) = nullptr;
-
-    /* No aliasing or need for std::launder() for 'capture' below. Problematic
-       optimizations are avoided via separate compilation of libnanobind-core */
-    if constexpr (is_small) {
+    // Store captured function inside 'func_data' if there is space. Issues
+    // with aliasing are resolved via separate compilation of libnanobind
+    if constexpr (sizeof(capture) <= sizeof(data.capture)) {
         capture *cap = (capture *) data.capture;
         new (cap) capture{ (forward_t<Func>) f };
 
-        if constexpr (!is_trivial) {
-            data.free_capture = [](void *p) {
+        if constexpr (std::is_trivially_destructible_v<capture>) {
+            data.flags |= (uint16_t) func_flags::has_free;
+            data.free = [](void *p) {
                 ((capture *) p)->~capture();
             };
-        } else {
-            data.free_capture = nullptr;
         }
     } else {
         void **cap = (void **) data.capture;
         cap[0] = new capture{ (forward_t<Func>) f };
 
-        data.free_capture = [](void *p) {
+        data.flags |= (uint16_t) func_flags::has_free;
+        data.free = [](void *p) {
             delete (capture *) ((void **) p)[0];
         };
     }
 
     data.impl = [](void *p, PyObject **args, bool *args_convert,
-                   PyObject *parent) __attribute__((__visibility__("hidden"))) -> PyObject * {
+                   PyObject *parent) -> PyObject * {
         const capture *cap;
-        if constexpr (is_small)
+        if constexpr (sizeof(capture) <= sizeof(data.capture))
             cap = (capture *) p;
         else
             cap = (capture *) ((void **) p)[0];
@@ -104,16 +102,13 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
 
     data.descr = descr.text;
     data.descr_types = descr_types;
-    data.nargs = (uint32_t) nargs;
-    data.nargs_provided = 0;
-    data.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_args   : 0) |
-                 (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_kwargs : 0);
+    data.nargs = (uint16_t) nargs;
 
     // Fill remaining fields of 'data'
-    detail::func_extra_init(data);
-    (detail::func_extra_apply(data, extra), ...);
+    size_t arg_index = 0;
+    (detail::func_extra_apply(data, extra, arg_index), ...);
 
-    return func_new((void *) &data, ReturnHandle);
+    return func_new((void *) &data);
 }
 
 NAMESPACE_END(detail)

@@ -72,8 +72,8 @@ static void inst_dealloc(PyObject *self) {
     type_data *t = get_extra<type_data>(type);
 
     if (inst->destruct) {
-        if (t->destruct) {
-            if (t->destruct != NB_TRIVIAL_DESTRUCT)
+        if (t->flags & (int16_t) type_flags::is_destructible) {
+            if (t->flags & (int16_t) type_flags::has_destruct)
                 t->destruct(inst->value);
         } else {
             fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
@@ -116,13 +116,18 @@ void type_free(PyObject *o) {
 }
 
 PyObject *type_new(const type_data *t) noexcept {
-    if (t->base && t->base_py)
+    const bool has_scope   = t->flags & (uint16_t) type_flags::has_scope,
+               has_doc     = t->flags & (uint16_t) type_flags::has_doc,
+               has_base    = t->flags & (uint16_t) type_flags::has_base,
+               has_base_py = t->flags & (uint16_t) type_flags::has_base_py;
+
+    if (has_base && has_base_py)
         fail("nanobind::detail::type_new(\"%s\"): multiple base types "
              "specified!", t->name);
 
     str name(t->name), qualname = name, fullname = name;
 
-    if (t->scope && !PyModule_Check(t->scope)) {
+    if (has_scope && !PyModule_Check(t->scope)) {
         object scope_qualname = borrow(getattr(t->scope, "__qualname__", nullptr));
         if (scope_qualname.is_valid())
             qualname = steal<str>(PyUnicode_FromFormat(
@@ -130,7 +135,7 @@ PyObject *type_new(const type_data *t) noexcept {
     }
 
     object scope_name;
-    if (t->scope) {
+    if (has_scope) {
         scope_name = getattr(t->scope, "__module__", handle());
         if (!scope_name.is_valid())
             scope_name = getattr(t->scope, "__name__", handle());
@@ -157,7 +162,7 @@ PyObject *type_new(const type_data *t) noexcept {
     PyTypeObject *type = &ht->ht_type;
 
     type->tp_name = strdup(t->name);
-    if (t->doc)
+    if (has_doc)
         type->tp_doc = strdup(t->doc);
 
     type->tp_basicsize = (Py_ssize_t) sizeof(instance);
@@ -182,7 +187,7 @@ PyObject *type_new(const type_data *t) noexcept {
     if (scope_name.is_valid())
         setattr((PyObject *) type, "__module__", scope_name);
 
-    if (t->scope)
+    if (has_scope)
         setattr(t->scope, t->name, (PyObject *) type);
 
     t2->type_py = type;
@@ -254,21 +259,27 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
     inst->free = !store_in_obj;
 
     if (rvp == rv_policy::move) {
-        if (!t->move)
-            fail("nanobind::detail::type_put(\"%s\"): attempted to call "
-                 "nonexistant move constructor!", t->name);
-        else if (t->move == NB_TRIVIAL_MOVE)
-            memcpy(inst->value, value, t->size);
-        else
-            t->move(inst->value, value);
-    } else if (rvp == rv_policy::copy) {
-        if (!t->copy)
-            fail("nanobind::detail::type_put(\"%s\"): attempted to call "
-                 "nonexistant copy constructor!", t->name);
-        else if (t->copy == NB_TRIVIAL_COPY)
-            memcpy(inst->value, value, t->size);
-        else
-            t->copy(inst->value, value);
+        if (t->flags & (uint16_t) type_flags::is_move_constructible) {
+            if (t->flags & (uint16_t) type_flags::has_move)
+                t->move(inst->value, value);
+            else
+                memcpy(inst->value, value, t->size);
+        } else {
+            fail("nanobind::detail::type_put(\"%s\"): attempted to move "
+                 "an instance that is not move-constructible!", t->name);
+        }
+    }
+
+    if (rvp == rv_policy::copy) {
+        if (t->flags & (uint16_t) type_flags::is_copy_constructible) {
+            if (t->flags & (uint16_t) type_flags::has_copy)
+                t->copy(inst->value, value);
+            else
+                memcpy(inst->value, value, t->size);
+        } else {
+            fail("nanobind::detail::type_put(\"%s\"): attempted to copy "
+                 "an instance that is not copy-constructible!", t->name);
+        }
     }
 
     return (PyObject *) inst;

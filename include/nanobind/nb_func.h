@@ -56,7 +56,7 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
         capture *cap = (capture *) data.capture;
         new (cap) capture{ (forward_t<Func>) f };
 
-        if constexpr (std::is_trivially_destructible_v<capture>) {
+        if constexpr (!std::is_trivially_destructible_v<capture>) {
             data.flags |= (uint16_t) func_flags::has_free;
             data.free = [](void *p) {
                 ((capture *) p)->~capture();

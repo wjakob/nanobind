@@ -1,13 +1,23 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-#define NB_TRIVIAL_DESTRUCT ((void (*)(void *)) uintptr_t(1))
-#define NB_TRIVIAL_COPY     ((void (*)(void *, const void *)) uintptr_t(1))
-#define NB_TRIVIAL_MOVE     ((void (*)(void *, void *)) uintptr_t(1))
+enum class type_flags : uint16_t {
+    is_destructible       = (1 << 0),
+    is_copy_constructible = (1 << 1),
+    is_move_constructible = (1 << 2),
+    has_scope             = (1 << 4),
+    has_doc               = (1 << 5),
+    has_base              = (1 << 6),
+    has_base_py           = (1 << 7),
+    has_destruct          = (1 << 8),
+    has_copy              = (1 << 9),
+    has_move              = (1 << 10)
+};
 
 struct type_data {
+    uint16_t flags;
+    uint16_t align;
     uint32_t size;
-    uint32_t align;
     const char *name;
     const char *doc;
     PyObject *scope;
@@ -22,12 +32,14 @@ struct type_data {
 
 template <typename T> NB_INLINE void type_extra_apply(type_data &, const T &) { }
 
-NB_INLINE void type_extra_apply(type_data &d, const handle &h) {
-    d.base_py = (PyTypeObject *) h.ptr();
+NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
+    t.flags |= (uint16_t) type_flags::has_base_py;
+    t.base_py = (PyTypeObject *) h.ptr();
 }
 
-NB_INLINE void type_extra_apply(type_data &d, const char *doc) {
-    d.doc = doc;
+NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
+    t.flags |= (uint16_t) type_flags::has_doc;
+    t.doc = doc;
 }
 
 template <typename... Args> struct init {
@@ -43,9 +55,21 @@ template <typename... Args> struct init {
     }
 };
 
+template <typename T> void wrap_copy(void *dst, const void *src) {
+    new ((T *) dst) T(*(const T *) src);
+}
+
+template <typename T> void wrap_move(void *dst, void *src) {
+    new ((T *) dst) T(std::move(*(T *) src));
+}
+
+template <typename T> void wrap_destruct(void *value) {
+    ((T *) value)->~T();
+}
+
 NAMESPACE_END(detail)
 
-template <typename T, typename Base = T>
+template <typename T, typename Base = void>
 class class_ : public object {
 public:
     NB_OBJECT_DEFAULT(class_, object, PyType_Check);
@@ -53,51 +77,50 @@ public:
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
-        detail::type_data data;
+        detail::type_data d;
 
-        data.size = (uint32_t) sizeof(T);
-        data.align = (uint32_t) alignof(T);
-        data.name = name;
-        data.doc = nullptr;
-        data.scope = scope.ptr();
-        data.type = &typeid(T);
+        d.flags = (uint16_t) detail::type_flags::has_scope;
+        d.align = (uint16_t) alignof(T);
+        d.size = (uint32_t) sizeof(T);
+        d.name = name;
+        d.scope = scope.ptr();
+        d.type = &typeid(T);
 
-        if constexpr (!std::is_same_v<T, Base>)
-            data.base = &typeid(Base);
-        else
-            data.base = nullptr;
+        if constexpr (!std::is_same_v<Base, void>) {
+            d.base = &typeid(Base);
+            d.flags |= (uint16_t) detail::type_flags::has_base;
+        }
 
-        data.type_py = nullptr;
-        data.base_py = nullptr;
+        if constexpr (std::is_copy_constructible_v<T>) {
+            d.flags |= (uint16_t) detail::type_flags::is_copy_constructible;
 
-        if constexpr (std::is_destructible_v<T>)
-            data.destruct = nullptr;
-        if constexpr (std::is_trivially_destructible_v<T>)
-            data.destruct = NB_TRIVIAL_DESTRUCT;
-        else
-            data.destruct = [](void *value) { ((T *) value)->~T(); };
+            if constexpr (!std::is_trivially_copy_constructible_v<T>) {
+                d.flags |= (uint16_t) detail::type_flags::has_copy;
+                d.copy = detail::wrap_copy<T>;
+            }
+        }
 
-        if constexpr (!std::is_copy_constructible_v<T>)
-            data.copy = nullptr;
-        else if constexpr (std::is_trivially_copy_constructible_v<T>)
-            data.copy = NB_TRIVIAL_COPY;
-        else
-            data.copy = [](void *dst, const void *src) {
-                new ((T *) dst) T(*(const T *) src);
-            };
+        if constexpr (std::is_move_constructible_v<T>) {
+            d.flags |= (uint16_t) detail::type_flags::is_move_constructible;
 
-        if constexpr (!std::is_move_constructible_v<T>)
-            data.move = nullptr;
-        else if constexpr (std::is_trivially_move_constructible_v<T>)
-            data.move = NB_TRIVIAL_MOVE;
-        else
-            data.move = [](void *dst, void *src) {
-                new ((T *) dst) T(std::move(*(T *) src));
-            };
+            if constexpr (!std::is_trivially_move_constructible_v<T>) {
+                d.flags |= (uint16_t) detail::type_flags::has_move;
+                d.move = detail::wrap_move<T>;
+            }
+        }
 
-        (detail::type_extra_apply(&data, extra), ...);
+        if constexpr (std::is_destructible_v<T>) {
+            d.flags |= (uint16_t) detail::type_flags::is_destructible;
 
-        m_ptr = detail::type_new(&data);
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                d.flags |= (uint16_t) detail::type_flags::has_destruct;
+                d.destruct = detail::wrap_destruct<T>;
+            }
+        }
+
+        (detail::type_extra_apply(&d, extra), ...);
+
+        m_ptr = detail::type_new(&d);
     }
 
     template <typename Func, typename... Extra>

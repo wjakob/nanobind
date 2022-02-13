@@ -29,12 +29,12 @@ endif()
 # ---------------------------------------------------------------------------
 
 if (NB_SHARED)
-  set(NB_CORE_LIBRARY_TYPE SHARED)
+  set(NB_LIB_TYPE SHARED)
 else()
-  set(NB_CORE_LIBRARY_TYPE STATIC)
+  set(NB_LIB_TYPE STATIC)
 endif()
 
-add_library(nanobind-core ${NB_CORE_LIBRARY_TYPE}
+add_library(nanobind ${NB_LIB_TYPE}
   src/internals.cpp
   src/common.cpp
   src/func.cpp
@@ -44,17 +44,22 @@ add_library(nanobind-core ${NB_CORE_LIBRARY_TYPE}
 
 if (NB_SHARED)
   if (APPLE)
-    target_link_options(nanobind-core PRIVATE -undefined dynamic_lookup)
+    target_link_options(nanobind PRIVATE -undefined dynamic_lookup)
   endif()
-  target_compile_definitions(nanobind-core PRIVATE -D NB_BUILD)
+
+  target_compile_definitions(nanobind PRIVATE -D NB_BUILD)
 endif()
 
-target_compile_features(nanobind-core PRIVATE cxx_std_17)
+if (NOT MSVC)
+  target_compile_options(nanobind PRIVATE -fno-strict-aliasing)
+endif()
 
-set_target_properties(nanobind-core PROPERTIES
+target_compile_features(nanobind PRIVATE cxx_std_17)
+
+set_target_properties(nanobind PROPERTIES
   POSITION_INDEPENDENT_CODE ON)
 
-target_include_directories(nanobind-core PRIVATE
+target_include_directories(nanobind PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ext/robin_map/include
   ${Python_INCLUDE_DIRS})
@@ -83,23 +88,15 @@ function(nanobind_add_module name)
     set(NB_SUFFIX ".pyd")
   endif()
 
-  add_library(${name} MODULE ${ARGV1})
+  set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX}")
+
+  Python_add_library(${name} MODULE ${ARGV1})
 
   target_compile_features(${name} PRIVATE cxx_std_17)
   target_compile_options(${name} PRIVATE ${NB_COMPILE_OPTIONS})
-
-  target_link_libraries(${name} nanobind-core)
-
-  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX
-    ".${Python_SOABI}${NB_SUFFIX}")
-
-  target_include_directories(${name} PRIVATE
-    ${NB_SOURCE_DIR}/include
-    ${Python_INCLUDE_DIRS})
-
-  if (APPLE)
-    target_link_options(${name} PRIVATE -undefined dynamic_lookup)
-  endif()
+  target_link_libraries(${name} PRIVATE nanobind)
+  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ${NB_SUFFIX})
+  target_include_directories(${name} PRIVATE ${NB_SOURCE_DIR}/include)
 
   if(NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
     if(APPLE)

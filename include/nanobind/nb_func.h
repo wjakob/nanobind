@@ -93,11 +93,12 @@ NB_INLINE PyObject *func_create(Func &&f, Return (*)(Args...),
             Py_INCREF(Py_None);
             return Py_None;
         } else {
+            rv_policy policy = rv_policy::automatic;
             return cast_out::cast(
                 cap->f(
                     in.template get<Is>().operator typename make_caster<Args>::
                         template cast_op_type<Args>()...),
-                return_value_policy::move, parent).ptr();
+                policy, parent).ptr();
         }
     };
 

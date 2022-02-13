@@ -1,4 +1,5 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
+enum class rv_policy;
 NAMESPACE_BEGIN(detail)
 
 // ========================================================================
@@ -109,8 +110,12 @@ struct type_data;
 NB_CORE PyObject *type_new(const type_data *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
-NB_CORE bool type_get(PyObject *o, const std::type_info *, bool convert,
+NB_CORE bool type_get(const std::type_info *, PyObject *o, bool convert,
                       void **out) noexcept;
+
+/// Cast a C++ type instance into a Python object
+NB_CORE PyObject *type_put(const std::type_info *cpp_type, void *value,
+                           rv_policy rvp, PyObject *parent) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

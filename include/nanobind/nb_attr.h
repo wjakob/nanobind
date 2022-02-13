@@ -32,6 +32,7 @@ template <typename T> arg_v arg::operator=(T &&value) const {
 }
 
 struct is_method { };
+struct is_static { };
 
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
@@ -42,7 +43,8 @@ NAMESPACE_BEGIN(detail)
 enum class func_flags : uint32_t {
     has_args   = (1 << 0),
     has_kwargs = (1 << 1),
-    is_method  = (1 << 2)
+    is_method  = (1 << 2),
+    is_static  = (1 << 3)
 };
 
 struct arg_data {
@@ -97,6 +99,10 @@ template <typename F> NB_INLINE void func_extra_apply(F &f, const char *doc) { f
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, is_method) {
     f.flags |= (uint32_t) func_flags::is_method;
+}
+
+template <typename F> NB_INLINE void func_extra_apply(F &f, is_static) {
+    f.flags |= (uint32_t) func_flags::is_static;
 }
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, const arg &a) {

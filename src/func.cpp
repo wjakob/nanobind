@@ -1,8 +1,11 @@
 #include "smallvec.h"
 #include "buffer.h"
-#include <cstring>
-#include <tsl/robin_set.h>
 #include "internals.h"
+#include <tsl/robin_set.h>
+
+#if defined(__GNUG__)
+#  include <cxxabi.h>
+#endif
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -10,6 +13,7 @@ NAMESPACE_BEGIN(detail)
 // Forward/external declarations
 extern Buffer buf;
 static PyObject *func_dispatch(PyObject *, PyObject *, PyObject *);
+static char *type_name(const std::type_info *t);
 
 /// Nanobind function metadata (signature, overloads, etc.)
 struct func_record : func_data<0> {
@@ -56,7 +60,6 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
     /// Copy temporary data from the caller's stack
     memcpy(f, in, sizeof(func_data<0>));
 
-
     for (size_t i = 0; ; ++i) {
         if (!f->descr[i]) {
             char *descr = new char[i + 1];
@@ -77,7 +80,8 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
         }
     }
 
-    const bool is_method = f->flags & (uint32_t) func_flags::is_method;
+    const bool is_method = f->flags & (uint32_t) func_flags::is_method,
+               is_static = f->flags & (uint32_t) func_flags::is_static;
 
     if (f->nargs_provided) {
         arg_data *args_in = std::launder((arg_data *) in->args);
@@ -158,6 +162,12 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
             Py_DECREF(prev);
             if (!result)
                 fail("nb::detail::func_new(\"%s\"): alloc. failed (2).", f->name);
+        } else if (is_static) {
+            PyObject *prev = result;
+            result = PyStaticMethod_New(result);
+            Py_DECREF(prev);
+            if (!result)
+                fail("nb::detail::func_new(\"%s\"): alloc. failed (2).", f->name);
         }
 
         all_funcs.insert(f);
@@ -169,8 +179,10 @@ PyObject *func_new(void *in_, bool return_handle) noexcept {
         }
     } else {
         // Append at the beginning or end of the overload chain
-        bool pred_is_method = (pred_f->flags & (uint32_t) func_flags::is_method);
-        if (is_method != pred_is_method)
+        bool pred_is_method = (pred_f->flags & (uint32_t) func_flags::is_method),
+             pred_is_static = (pred_f->flags & (uint32_t) func_flags::is_static);
+
+        if (is_method != pred_is_method || is_static != pred_is_static)
             fail("nb::detail::func_new(\"%s\"): overloads cannot mix "
                  "instance/static methods!", f->name);
 
@@ -201,6 +213,16 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
     const bool has_overloads = fr->next != nullptr;
     const size_t nargs_in = (size_t) PyTuple_GET_SIZE(args_in);
     PyObject *parent = nargs_in > 0 ? PyTuple_GET_ITEM(args_in, 0) : nullptr;
+    bool is_constructor = fr->name && strcmp(fr->name, "__init__") == 0;
+
+    if (is_constructor) {
+        is_constructor &= parent && strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
+
+        if (is_constructor && ((instance *) parent)->destruct) {
+            PyErr_SetString(PyExc_RuntimeError, "Attempted to initialize an object multiple times!");
+            return nullptr;
+        }
+    }
 
     smallvec<PyObject *> args;
     smallvec<const char *> kwargs_consumed;
@@ -390,8 +412,11 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
                 return nullptr;
             }
 
-            if (result != NB_NEXT_OVERLOAD)
+            if (result != NB_NEXT_OVERLOAD) {
+                if (is_constructor)
+                    ((instance *) parent)->destruct = true;
                 return result;
+            }
         }
     }
 
@@ -442,6 +467,8 @@ static PyObject *func_dispatch(PyObject *self, PyObject *args_in, PyObject *kwar
 
 /// Finalize function signatures + docstrings once a module has finished loading
 void func_finalize() noexcept {
+    auto &type_c2p = get_internals().type_c2p;
+
     for (func_record *f: all_funcs) {
         buf.clear();
 
@@ -539,6 +566,18 @@ void func_finalize() noexcept {
                             fail("nb::detail::func_finalize(): missing type!");
 
                         if (!(is_method && arg_index == 0)) {
+                            auto it = type_c2p.find(std::type_index(**descr_type));
+
+                            if (it != type_c2p.end()) {
+                                handle th((PyObject *) it->second->type_py);
+                                buf.put_dstr(((str) th.attr("__module__")).c_str());
+                                buf.put('.');
+                                buf.put_dstr(((str) th.attr("__qualname__")).c_str());
+                            } else {
+                                char *name = type_name(*descr_type);
+                                buf.put_dstr(name);
+                                free(name);
+                            }
                         }
 
                         descr_type++;
@@ -569,6 +608,34 @@ void func_finalize() noexcept {
         free((char *) def->ml_doc);
         def->ml_doc = buf.copy();
     }
+}
+
+/// Excise a substring from 's'
+static void strexc(char *s, const char *sub) {
+    size_t len = strlen(sub);
+    if (len == 0)
+        return;
+
+    char *p = s;
+    while ((p = strstr(p, sub)))
+        memmove(p, p + len, strlen(p + len) + 1);
+}
+
+/// Return a readable string representation of a C++ type
+static char *type_name(const std::type_info *t) {
+    const char *name_in = t->name();
+
+#if defined(__GNUG__)
+    int status = 0;
+    char *name = abi::__cxa_demangle(name_in, nullptr, nullptr, &status);
+#else
+    char *name = strdup(name_in);
+    strexc(name, "class ");
+    strexc(name, "struct ");
+    strexc(name, "enum ");
+#endif
+    strexc(name, "nanobind::");
+    return name;
 }
 
 NAMESPACE_END(detail)

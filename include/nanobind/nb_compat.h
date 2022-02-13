@@ -1,6 +1,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 using error_already_set = python_error;
+using return_value_policy = rv_policy;
 using module = module_;
 
 template <typename T> T reinterpret_borrow(handle h) {

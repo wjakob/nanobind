@@ -11,7 +11,7 @@ public:
     template <typename T> accessor& operator=(T &&value);
 
     template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
-    operator T() const { return get(); }
+    operator T() const { return borrow<T>(ptr()); }
     NB_INLINE PyObject *ptr() const { return get().ptr(); }
 
 private:

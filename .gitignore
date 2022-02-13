@@ -1,7 +1,7 @@
-/libnanobind-core.a
-/libnanobind-core.dylib
-/libnanobind-core.so
-/nanobind-core.dll
+/libnanobind.a
+/libnanobind.dylib
+/libnanobind.so
+/nanobind.dll
 /.ninja_deps
 /.ninja_log
 CMakeFiles

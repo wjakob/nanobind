@@ -19,6 +19,10 @@ struct Struct {
     ~Struct() { destructed++; }
 
     int value() const { return i; }
+
+    static Struct  create_move() { return Struct(8); }
+    static Struct* create_take() { return new Struct(8); }
+    Struct &self() { return *this; }
 };
 
 struct alignas(1024) Big { char data[1024]; };
@@ -27,7 +31,11 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<Struct>(m, "Struct")
         .def(nb::init<>())
         .def(nb::init<int>())
-        .def("value", &Struct::value);
+        .def("value", &Struct::value)
+        .def("self", &Struct::self)
+        .def("none", [](Struct&) -> const Struct * { return nullptr;})
+        .def_static("create_move", &Struct::create_move)
+        .def_static("create_take", &Struct::create_take);
 
     m.def("stats", []{
         nb::dict d;

@@ -25,7 +25,7 @@ struct nb_inst {
 /// Python object representing a bound C++ function
 struct nb_func {
     PyObject_VAR_HEAD
-    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t , PyObject *);
+    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     size_t max_nargs_pos;
 };
 
@@ -35,6 +35,9 @@ struct internals {
 
     /// Base type of all nanobind functions
     PyTypeObject *nb_func;
+
+    /// Base type of all nanobind methods
+    PyTypeObject *nb_meth;
 
     /// Instance pointer -> Python object mapping
     tsl::robin_pg_map<void *, nb_inst *> inst_c2p;

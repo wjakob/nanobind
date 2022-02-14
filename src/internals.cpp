@@ -54,19 +54,21 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-extern void nb_func_dealloc(PyObject *o);
-extern PyObject *nb_func_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in);
+extern void nb_func_dealloc(PyObject *);
+extern PyObject *nb_func_call(PyObject *self, PyObject *, PyObject *);
 extern PyObject *nb_func_get_doc(PyObject *, void *);
 extern PyObject *nb_func_get_name(PyObject *, void *);
+extern PyObject *nb_meth_descr_get(PyObject *, PyObject *, PyObject *);
 
-static PyGetSetDef nb_func_getset[] = {
-    {"__doc__", nb_func_get_doc, nullptr, nullptr},
-    {"__name__", nb_func_get_name, nullptr, nullptr},
     // {"__name__", (getter)meth_get__name__, nullptr, nullptr},
     // {"__qualname__", (getter)meth_get__qualname__, nullptr, nullptr},
     // {"__self__", (getter)meth_get__self__, nullptr, nullptr},
     // {"__text_signature__", (getter)meth_get__text_signature__, nullptr, nullptr},
-    {0}
+
+static PyGetSetDef nb_func_getset[] = {
+    { "__doc__", nb_func_get_doc, nullptr, nullptr },
+    { "__name__", nb_func_get_name, nullptr, nullptr },
+    { 0 }
 };
 
 static PyTypeObject nb_func_type = {
@@ -81,10 +83,25 @@ static PyTypeObject nb_func_type = {
     .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
     .tp_call = PyVectorcall_Call,
     .tp_getset = nb_func_getset,
-    .tp_getattro = PyObject_GenericGetAttr,
-    .tp_free = PyObject_Del
+    .tp_getattro = PyObject_GenericGetAttr
 };
 
+static PyTypeObject nb_meth_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "nb_meth",
+    .tp_doc = "nanobind method object",
+    .tp_basicsize = sizeof(nb_func),
+    .tp_itemsize = sizeof(func_record),
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_VECTORCALL |
+                Py_TPFLAGS_METHOD_DESCRIPTOR,
+    .tp_new = PyType_GenericNew,
+    .tp_dealloc = nb_func_dealloc,
+    .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
+    .tp_call = PyVectorcall_Call,
+    .tp_getset = nb_func_getset,
+    .tp_getattro = PyObject_GenericGetAttr,
+    .tp_descr_get = nb_meth_descr_get
+};
 
 extern void type_free(PyObject *);
 
@@ -161,7 +178,9 @@ static void make_internals() {
 
     internals_p->nb_type = metaclass("nb_type");
     internals_p->nb_func = &nb_func_type;
+    internals_p->nb_meth = &nb_meth_type;
     Py_INCREF(&nb_func_type);
+    Py_INCREF(&nb_meth_type);
 }
 
 static void fetch_internals() {

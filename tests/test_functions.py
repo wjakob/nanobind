@@ -85,8 +85,7 @@ def test10_cpp_call_simple():
 
     with pytest.raises(TypeError) as excinfo:
         t.test_call_1(my_callable)
-    assert str(excinfo.value) == (
-        "my_callable() missing 1 required positional argument: 'b'")
+    assert "my_callable() missing 1 required positional argument: 'b'" in str(excinfo.value)
     assert result == [(1, 2)]
 
 

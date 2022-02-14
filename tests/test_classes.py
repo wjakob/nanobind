@@ -36,7 +36,6 @@ def test02_instantiate():
         'destructed': 2
     }
 
-
 def test03_rv_policy():
     t.reset()
     s = t.Struct()

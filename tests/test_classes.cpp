@@ -56,10 +56,10 @@ NB_MODULE(test_classes_ext, m) {
                     nb::rv_policy::copy)
         .def_static("create_take", &Struct::create_take);
 
-    nb::class_<PairStruct>(m, "PairStruct")
-        .def(nb::init<>())
-        .def_readwrite("s1", &PairStruct::s1)
-        .def_readwrite("s2", &PairStruct::s2);
+    // nb::class_<PairStruct>(m, "PairStruct")
+    //     .def(nb::init<>())
+    //     .def_readwrite("s1", &PairStruct::s1)
+    //     .def_readwrite("s2", &PairStruct::s2);
 
     m.def("stats", []{
         nb::dict d;

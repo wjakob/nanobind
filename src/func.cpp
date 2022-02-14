@@ -14,14 +14,13 @@ static char *type_name(const std::type_info *t);
 static PyObject *nb_func_vectorcall(PyObject *, PyObject *const *, size_t,
                                     PyObject *);
 
-
 /// Fetch the nanobind function record from a 'nb_func' instance
 static func_record *nb_func_get(void *o) {
     return (func_record *) (((char *) o) + sizeof(nb_func));
 }
 
 /// Free a function overload chain
-void nb_func_dealloc(PyObject *self) noexcept {
+void nb_func_dealloc(PyObject *self) {
     Py_ssize_t size = Py_SIZE(self);
 
     if (size) {
@@ -57,7 +56,7 @@ void nb_func_dealloc(PyObject *self) noexcept {
         }
     }
 
-    Py_TYPE(self)->tp_free(self);
+    PyObject_Free(self);
 }
 
 /**
@@ -88,7 +87,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
-            if (Py_IS_TYPE(func_prev, internals.nb_func)) {
+            if (Py_IS_TYPE(func_prev, internals.nb_func) ||
+                Py_IS_TYPE(func_prev, internals.nb_meth)) {
                 func_record *fp = nb_func_get(func_prev);
 
                 uint16_t mask = (uint16_t) func_flags::is_method |
@@ -100,11 +100,11 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
                 /* Never append a method to an overload chain of a parent class;
                    instead, hide the parent's overloads in this case */
-                if (fp->scope != f->scope) {
-                    Py_DECREF(func_prev);
-                    func_prev = nullptr;
-                }
-            } else if (f->name[0] != '_') {
+                if (fp->scope != f->scope)
+                    Py_CLEAR(func_prev);
+            } else if (f->name[0] == '_') {
+                Py_CLEAR(func_prev);
+            } else {
                 fail("nb::detail::nb_func_new(\"%s\"): cannot overload "
                      "existing non-function object of the same name!", f->name);
             }
@@ -115,7 +115,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     // Create a new function and destroy the old one
     Py_ssize_t to_copy = func_prev ? Py_SIZE(func_prev) : 0;
-    nb_func *func = (nb_func *) PyType_GenericAlloc(internals.nb_func, to_copy + 1);
+    nb_func *func = (nb_func *) PyType_GenericAlloc(
+        is_method ? internals.nb_meth : internals.nb_func, to_copy + 1);
     if (!func)
         fail("nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
              has_name ? f->name : "<anonymous>");
@@ -141,6 +142,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         internals.funcs.erase(it);
 
         ((PyVarObject *) func_prev)->ob_size = 0;
+        Py_CLEAR(func_prev);
     }
 
     internals.funcs.insert(func);
@@ -149,7 +151,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
     memcpy(fc, f, sizeof(func_data<0>));
     if (!has_name)
         fc->name = "<anonymous>";
-
 
     char *descr;
     for (size_t i = 0;; ++i) {
@@ -195,7 +196,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
     }
 
     Py_XDECREF(name);
-    Py_XDECREF(func_prev);
 
     if (return_ref) {
         return (PyObject *) func;
@@ -208,7 +208,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
 /// Dispatch loop that is used to invoke functions created by nb_func_new
 PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
                              size_t nargsf, PyObject *kwargs_in) {
-
     const size_t count      = (size_t) Py_SIZE(self),
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
                  nkwargs_in = kwargs_in ? PyTuple_GET_SIZE(kwargs_in) : 0;
@@ -224,7 +223,7 @@ PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
 
         if (is_constructor && ((nb_inst *) parent)->destruct) {
             PyErr_SetString(PyExc_RuntimeError,
-                            "nanobind::detail::nb_func_dispatch(): the __init__ "
+                            "nanobind::detail::nb_func_vectorcall(): the __init__ "
                             "method should only be called once!");
             return nullptr;
         }
@@ -470,6 +469,20 @@ PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
     return nullptr;
 }
 
+PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *type) {
+    func_record *f = nb_func_get(self);
+    if (inst) {
+        /* Return a classic bound method. This should be avoidable
+           in most cases via the 'CALL_METHOD' opcode and vector calls. PyTest
+           rewrites the bytecode in a way that breaks this optimization :-/ */
+        return PyMethod_New(self, inst);
+    } else {
+        Py_INCREF(self);
+        return self;
+    }
+}
+
+
 /// Finalize function signatures + docstrings once a module has finished loading
 void nb_func_finalize() noexcept {
     internals &internals = get_internals();
@@ -590,9 +603,9 @@ void nb_func_finalize() noexcept {
     }
 }
 
-PyObject *nb_func_get_doc(PyObject *o, void *) {
-    func_record *f = nb_func_get(o);
-    size_t count = (size_t) Py_SIZE(o);
+PyObject *nb_func_get_doc(PyObject *self, void *) {
+    func_record *f = nb_func_get(self);
+    size_t count = (size_t) Py_SIZE(self);
 
     buf.clear();
 
@@ -626,8 +639,8 @@ PyObject *nb_func_get_doc(PyObject *o, void *) {
     return PyUnicode_FromString(buf.get());
 }
 
-PyObject *nb_func_get_name(PyObject *o, void *) {
-    func_record *f = nb_func_get(o);
+PyObject *nb_func_get_name(PyObject *self, void *) {
+    func_record *f = nb_func_get(self);
     if (f->flags & (uint16_t) func_flags::has_name) {
         return PyUnicode_FromString(f->name);
     } else {
@@ -635,7 +648,6 @@ PyObject *nb_func_get_name(PyObject *o, void *) {
         return Py_None;
     }
 }
-
 
 /// Excise a substring from 's'
 static void strexc(char *s, const char *sub) {

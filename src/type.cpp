@@ -31,11 +31,11 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 }
 
 // Allocate a new instance with co-located or external storage
-instance *inst_new_impl(PyTypeObject *type, void *value) {
+nb_inst *inst_new_impl(PyTypeObject *type, void *value) {
     PyVarObject *o = (PyVarObject *) PyType_GenericAlloc(type, value ? -1 : 0);
     o->ob_size = 0;
 
-    instance *self = (instance *) o;
+    nb_inst *self = (nb_inst *) o;
     if (value) {
         self->value = value;
     } else {
@@ -63,9 +63,7 @@ PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
 }
 
 static void inst_dealloc(PyObject *self) {
-    instance *inst = (instance *) self;
-    if (inst->weakrefs)
-        PyObject_ClearWeakRefs(self);
+    nb_inst *inst = (nb_inst *) self;
     PyTypeObject *type = Py_TYPE(self);
 
     type_data *t = get_extra<type_data>(type);
@@ -153,7 +151,7 @@ PyObject *type_new(const type_data *t) noexcept {
        turn find the newly constructed type in an invalid state) */
 
     internals &internals = get_internals();
-    PyHeapTypeObject *ht = (PyHeapTypeObject *) alloc_extra(internals.metaclass,
+    PyHeapTypeObject *ht = (PyHeapTypeObject *) alloc_extra(internals.nbtype,
                                                             sizeof(type_data));
     type_data *t2 = get_extra<type_data>(ht);
     memcpy(t2, t, sizeof(type_data));
@@ -167,7 +165,7 @@ PyObject *type_new(const type_data *t) noexcept {
     if (has_doc)
         type->tp_doc = t->doc;
 
-    type->tp_basicsize = (Py_ssize_t) sizeof(instance);
+    type->tp_basicsize = (Py_ssize_t) sizeof(nb_inst);
     type->tp_itemsize = (Py_ssize_t) t->size;
 
     // Potentially insert extra space for alignment
@@ -177,7 +175,6 @@ PyObject *type_new(const type_data *t) noexcept {
     type->tp_init = inst_init;
     type->tp_new = inst_new;
     type->tp_dealloc = inst_dealloc;
-    type->tp_weaklistoffset = offsetof(instance, weakrefs);
     type->tp_as_number = &ht->as_number;
     type->tp_as_sequence = &ht->as_sequence;
     type->tp_as_mapping = &ht->as_mapping;
@@ -215,7 +212,7 @@ bool type_get(const std::type_info *cpp_type, PyObject *o, bool convert,
     PyTypeObject *type = Py_TYPE(o);
 
     // Reject if this object doesn't have the nanobind metaclass
-    if (Py_TYPE(type) != internals.metaclass)
+    if (Py_TYPE(type) != internals.nbtype)
         return false;
 
     // Recover pointer to C++ type_data entry
@@ -223,7 +220,7 @@ bool type_get(const std::type_info *cpp_type, PyObject *o, bool convert,
 
     // Fast path
     if (t->type == cpp_type || *t->type == *cpp_type) {
-        *out = ((instance *) o)->value;
+        *out = ((nb_inst *) o)->value;
         return true;
     } else {
         return false;
@@ -238,7 +235,7 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
         return Py_None;
     }
 
-    // Check if the instance is already registered with nanobind
+    // Check if the nb_inst is already registered with nanobind
     internals &internals = get_internals();
     auto it = internals.inst_c2p.find(value);
     if (it != internals.inst_c2p.end()) {
@@ -258,7 +255,7 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
 
     bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
 
-    instance *inst = inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
+    nb_inst *inst = inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
     inst->destruct = rvp != rv_policy::reference;
     inst->free = inst->destruct && !store_in_obj;
 

@@ -54,6 +54,37 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+extern void nbfunc_dealloc(PyObject *o);
+extern PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in);
+extern PyObject *nbfunc_get_doc(PyObject *, void *);
+extern PyObject *nbfunc_get_name(PyObject *, void *);
+
+static PyGetSetDef nbfunc_getset[] = {
+    {"__doc__", nbfunc_get_doc, nullptr, nullptr},
+    {"__name__", nbfunc_get_name, nullptr, nullptr},
+    // {"__name__", (getter)meth_get__name__, nullptr, nullptr},
+    // {"__qualname__", (getter)meth_get__qualname__, nullptr, nullptr},
+    // {"__self__", (getter)meth_get__self__, nullptr, nullptr},
+    // {"__text_signature__", (getter)meth_get__text_signature__, nullptr, nullptr},
+    {0}
+};
+
+static PyTypeObject nbfunc_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "nbfunc",
+    .tp_doc = "nanobind function object",
+    .tp_basicsize = sizeof(PyVarObject),
+    .tp_itemsize = sizeof(func_record),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_new = PyType_GenericNew,
+    .tp_dealloc = nbfunc_dealloc,
+    .tp_call = nbfunc_call,
+    .tp_getset = nbfunc_getset,
+    .tp_getattro = PyObject_GenericGetAttr,
+    .tp_free = PyObject_Del
+};
+
+
 extern void type_free(PyObject *);
 
 static internals *internals_p = nullptr;
@@ -107,9 +138,6 @@ static PyTypeObject* metaclass(const char *name) {
     type->tp_flags =
         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HEAPTYPE;
 
-    // type->tp_call = pybind11_meta_call;
-    // type->tp_setattro = pybind11_meta_setattro;
-    // type->tp_getattro = pybind11_meta_getattro;
     type->tp_dealloc = type_free;
 
     if (PyType_Ready(type) < 0)
@@ -130,7 +158,9 @@ static void make_internals() {
         fail("nanobind::detail::make_internals(): internal error!");
     Py_DECREF(capsule);
 
-    internals_p->metaclass = metaclass("nb_type");
+    internals_p->nbtype = metaclass("nbtype");
+    internals_p->nbfunc = &nbfunc_type;
+    Py_INCREF(&nbfunc_type);
 }
 
 static void fetch_internals() {

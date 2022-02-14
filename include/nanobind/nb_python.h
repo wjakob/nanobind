@@ -28,6 +28,14 @@
 #  undef copysign
 #endif
 
+#if defined(setter)
+#  undef setter
+#endif
+
+#if defined(getter)
+#  undef getter
+#endif
+
 #if defined(_MSC_VER)
 #  if defined(NB_DEBUG_MARKER)
 #    define _DEBUG

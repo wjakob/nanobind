@@ -23,13 +23,9 @@ struct arg {
 };
 
 struct arg_v : arg {
-    object m_value;
-    NB_INLINE arg_v(const arg &base, object &&value) : arg(base), m_value(std::move(value)) { }
+    object value;
+    NB_INLINE arg_v(const arg &base, object &&value) : arg(base), value(std::move(value)) { }
 };
-
-template <typename T> arg_v arg::operator=(T &&value) const {
-    return arg_v(*this, cast((detail::forward_t<T>) value));
-}
 
 struct is_method { };
 struct is_static { };
@@ -143,7 +139,7 @@ template <typename F> NB_INLINE void func_extra_apply(F &f, const arg &a, size_t
 template <typename F> NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
     arg_data &arg = f.args[index++];
     arg.name = a.name;
-    arg.value = a.m_value.ptr();
+    arg.value = a.value.ptr();
     arg.convert = a.convert_;
     arg.none = a.none_;
 }

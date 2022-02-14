@@ -1,5 +1,4 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
-enum class rv_policy;
 NAMESPACE_BEGIN(detail)
 
 // ========================================================================
@@ -80,11 +79,38 @@ NB_CORE PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*));
 
 /// Perform an unary operation on a Python object with error handling
 NB_CORE PyObject *obj_op_2(PyObject *a, PyObject *b,
-                          PyObject *(*op)(PyObject *, PyObject *));
+                           PyObject *(*op)(PyObject *, PyObject *));
+
+/// Perform a function call
+NB_CORE PyObject *obj_call(PyObject *callable, PyObject *args);
+
+/// Perform a function call with keyword arguments
+NB_CORE PyObject *obj_call_kw(PyObject *callable, PyObject *args,
+                              PyObject *kwargs);
+
 
 // ========================================================================
 
-// Check if a sequence type has a given size
+// Conversion validity check done by nb::make_tuple
+NB_CORE void tuple_check(PyObject *tuple, size_t nargs);
+
+// ========================================================================
+
+// Append a single argument to a function call
+NB_CORE void call_append_arg(PyObject *args, size_t &nargs, PyObject *value);
+
+// Append a variable-length sequence of arguments to a function call
+NB_CORE void call_append_args(PyObject *args, size_t &nargs, PyObject *value);
+
+// Append a single keyword argument to a function call
+NB_CORE void call_append_kwarg(PyObject *kwargs, const char *name, PyObject *value);
+
+// Append a variable-length dictionary of keyword arguments to a function call
+NB_CORE void call_append_kwargs(PyObject *kwargs, PyObject *value);
+
+// ========================================================================
+
+// Check if a sequence type has a given size, and fetch its values in that case
 NB_CORE bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept;
 
 // ========================================================================
@@ -116,6 +142,12 @@ NB_CORE bool type_get(const std::type_info *, PyObject *o, bool convert,
 /// Cast a C++ type instance into a Python object
 NB_CORE PyObject *type_put(const std::type_info *cpp_type, void *value,
                            rv_policy rvp, PyObject *parent) noexcept;
+
+// ========================================================================
+
+// Create and install a Python property object
+NB_CORE void property_install(PyObject *scope, const char *name, bool is_static,
+                              PyObject *getter, PyObject *setter) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

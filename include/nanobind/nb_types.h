@@ -9,7 +9,7 @@ public:                                                                        \
     NB_INLINE Name(handle h, detail::steal_t)                                  \
         : Parent(h, detail::steal_t{}) {}                                      \
     NB_INLINE static bool check_(handle h) {                                   \
-        return ((bool) h) && Check(h.ptr());                                   \
+        return Check(h.ptr());                                                 \
     }
 
 /// Like NB_OBJECT but allow null-initialization
@@ -48,7 +48,7 @@ NAMESPACE_BEGIN(detail)
 template <typename Policy> class accessor;
 struct str_attr; struct obj_attr;
 struct str_item; struct obj_item; struct num_item;
-
+class args_proxy; class kwargs_proxy;
 struct borrow_t { };
 struct steal_t { };
 class object_t { };
@@ -67,6 +67,11 @@ public:
     accessor<str_item> operator[](const char *key) const;
     template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1>
     accessor<num_item> operator[](T key) const;
+    args_proxy operator*() const;
+
+    template <rv_policy policy = rv_policy::automatic_reference,
+              typename... Args>
+    object operator()(Args &&...args) const;
 
     NB_API_COMP(equal,      Py_EQ)
     NB_API_COMP(not_equal,  Py_NE)
@@ -123,7 +128,7 @@ public:
 
     NB_INLINE operator bool() const { return m_ptr != nullptr; }
     NB_INLINE PyObject *ptr() const { return m_ptr; }
-    NB_INLINE bool check_() { return m_ptr != nullptr; }
+    NB_INLINE static bool check_(handle h) { return true; }
 
 protected:
     PyObject *m_ptr = nullptr;
@@ -227,13 +232,13 @@ class str : public object {
     NB_OBJECT_DEFAULT(str, object, PyUnicode_Check)
 
     explicit str(handle h)
-        : object(detail::str_from_obj(h.ptr()), detail::steal_t{}) {}
+        : object(detail::str_from_obj(h.ptr()), detail::steal_t{}) { }
 
     explicit str(const char *c)
-        : object(detail::str_from_cstr(c), detail::steal_t{}) {}
+        : object(detail::str_from_cstr(c), detail::steal_t{}) { }
 
     explicit str(const char *c, size_t n)
-        : object(detail::str_from_cstr_and_size(c, n), detail::steal_t{}) {}
+        : object(detail::str_from_cstr_and_size(c, n), detail::steal_t{}) { }
 
     const char *c_str() { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };

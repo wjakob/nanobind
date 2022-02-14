@@ -66,3 +66,42 @@ def test08_args_kwargs():
     assert t.test_07(a=1, b=2, c=3) == (0, 1)
     assert t.test_07(1, 2, 3, c=4) == (1, 1)
     assert t.test_07(1, 2, 3, 4, c=5, d=5) == (2, 2)
+
+
+def test09_maketuple():
+    assert t.test_tuple() == ("Hello", 123)
+    with pytest.raises(RuntimeError) as excinfo:
+        assert t.test_bad_tuple()
+    assert str(excinfo.value) == (
+        "nanobind::detail::tuple_check(...): conversion of argument 2 failed!")
+
+def test10_cpp_call_simple():
+    result = []
+    def my_callable(a, b):
+        result.append((a, b))
+
+    t.test_call_2(my_callable)
+    assert result == [(1, 2)]
+
+    with pytest.raises(TypeError) as excinfo:
+        t.test_call_1(my_callable)
+    assert str(excinfo.value) == (
+        "my_callable() missing 1 required positional argument: 'b'")
+    assert result == [(1, 2)]
+
+
+def test11_call_complex():
+    result = []
+    def my_callable(*args, **kwargs):
+        result.append((args, kwargs))
+
+    t.test_call_extra(my_callable)
+    assert result == [
+        ((1, 2), {"extra" : 5})
+    ]
+
+    #result.clear()
+    #t.test_call_extra(my_callable, 5, 6, hello="world")
+    #assert result == [
+    #    ((1, 2, 5, 6), {"extra" : 5, "hello": "world"})
+    #]

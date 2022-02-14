@@ -12,6 +12,7 @@ def test01_signature():
 
     assert t.Struct.value.__doc__ == "value(self) -> int"
     assert t.Struct.create_move.__doc__ == "create_move() -> test_classes_ext.Struct"
+    assert t.Struct.set_value.__doc__ == "set_value(self, value: int) -> None"
 
 
 def test02_instantiate():

@@ -122,10 +122,42 @@ PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
     return res;
 }
 
-PyObject *obj_op_2(PyObject *a, PyObject *b, PyObject* (*op)(PyObject*, PyObject*)) {
+PyObject *obj_op_2(PyObject *a, PyObject *b,
+                   PyObject *(*op)(PyObject *, PyObject *) ) {
     PyObject *res = op(a, b);
     if (!res)
         python_error_raise();
+
+    return res;
+}
+
+PyObject *obj_call(PyObject *callable, PyObject *args) {
+    if (!PyGILState_Check()) {
+        Py_DECREF(args);
+        raise("nanobind::detail::obj_call(): PyGILState_Check() failure.");
+    }
+
+    PyObject *res = PyObject_CallObject(callable, args);
+    Py_DECREF(args);
+    if (!res)
+        python_error_raise();
+
+    return res;
+}
+
+PyObject *obj_call_kw(PyObject *callable, PyObject *args, PyObject *kwargs) {
+    if (!PyGILState_Check()) {
+        Py_DECREF(args);
+        Py_XDECREF(kwargs);
+        raise("nanobind::detail::obj_call_kw(): PyGILState_Check() failure.");
+    }
+
+    PyObject *res = PyObject_Call(callable, args, kwargs);
+    Py_DECREF(args);
+    Py_XDECREF(kwargs);
+    if (!res)
+        python_error_raise();
+
     return res;
 }
 
@@ -199,19 +231,11 @@ void setattr(PyObject *obj, PyObject *key, PyObject *value) {
 
 // ========================================================================
 
-void getitem_maybe(PyObject *obj, Py_ssize_t key_, PyObject **out) {
+void getitem_maybe(PyObject *obj, Py_ssize_t key, PyObject **out) {
     if (*out)
         return;
 
-    PyObject *key, *res;
-
-    key = PyLong_FromSsize_t(key_);
-    if (!key)
-        python_error_raise();
-
-    res = PyObject_GetItem(obj, key);
-    Py_DECREF(key);
-
+    PyObject *res = PySequence_GetItem(obj, key);
     if (!res)
         python_error_raise();
 
@@ -248,14 +272,8 @@ void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out) {
     *out = res;
 }
 
-void setitem(PyObject *obj, Py_ssize_t key_, PyObject *value) {
-    PyObject *key = PyLong_FromSsize_t(key_);
-    if (!key)
-        python_error_raise();
-
-    int rv = PyObject_SetItem(obj, key, value);
-    Py_DECREF(key);
-
+void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
+    int rv = PySequence_SetItem(obj, key, value);
     if (rv)
         python_error_raise();
 }
@@ -322,6 +340,101 @@ bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept {
     }
 
     return true;
+}
+
+// ========================================================================
+
+void property_install(PyObject *scope, const char *name, bool is_static,
+                      PyObject *getter, PyObject *setter) noexcept {
+    handle property = (PyObject *) &PyProperty_Type;
+    (void) is_static;
+    PyObject *m = getter ? getter : setter;
+    const char *doc = nullptr;
+
+    if (m) {
+        m = PyInstanceMethod_Check(m) ? PyInstanceMethod_GET_FUNCTION(m) : m;
+        if (PyCFunction_Check(m)) {
+            func_data<0> *f = (func_data<0> *) PyCapsule_GetPointer(
+                PyCFunction_GET_SELF(m), nullptr);
+            if (f->flags & (uint32_t) func_flags::has_doc)
+                doc = f->doc;
+        }
+    }
+
+    handle(scope).attr(name) = property(
+        getter ? handle(getter) : handle(Py_None),
+        setter ? handle(setter) : handle(Py_None),
+        handle(Py_None), // deleter
+        doc
+    );
+}
+
+// ========================================================================
+
+void tuple_check(PyObject *tuple, size_t nargs) {
+    bool valid = true;
+    for (size_t i = 0; i < nargs; ++i) {
+        if (!PyTuple_GET_ITEM(tuple, i))
+            raise("nanobind::detail::tuple_check(...): conversion of argument "
+                  "%zu failed!", i + 1);
+    }
+}
+
+// ========================================================================
+
+void call_append_arg(PyObject *args, size_t &nargs, PyObject *value) {
+    if (!value)
+        raise("nanobind::detail::call_append_arg(...): conversion of argument "
+              "%zu failed!", nargs + 1);
+    PyTuple_SET_ITEM(args, nargs++, value);
+}
+
+void call_append_args(PyObject *args, size_t &nargs, PyObject *value) {
+    Py_ssize_t size = PySequence_Length(value);
+    if (size < 0)
+        python_error_raise();
+
+    for (Py_ssize_t i = 0; i < size; ++i) {
+        PyObject *o = PySequence_GetItem(value, i);
+        if (!o)
+            python_error_raise();
+        PyTuple_SET_ITEM(args, nargs++, o);
+    }
+}
+
+void call_append_kwarg(PyObject *kwargs, const char *name, PyObject *value) {
+    PyObject *key = PyUnicode_FromString(name);
+    if (!key)
+        python_error_raise();
+
+    if (PyDict_Contains(kwargs, key)) {
+        Py_DECREF(key);
+        raise("nanobind::detail::call_append_kwarg(): duplicate keyword "
+              "argument \"%s\"", name);
+    }
+
+    int rv = PyDict_SetItem(kwargs, key, value);
+    Py_DECREF(key);
+
+    if (rv)
+        python_error_raise();
+}
+
+void call_append_kwargs(PyObject *kwargs, PyObject *value) {
+    if (!PyDict_Check(value))
+        raise("nanobind::detail::call_append_kwargs(): expected a dictionary "
+              "argument!");
+
+    PyObject *k, *v;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(value, &pos, &k, &v)) {
+        if (PyDict_Contains(kwargs, k))
+            raise("nanobind::detail::call_append_kwargs(): duplicate argument "
+                  "\"%s\"", PyUnicode_AsUTF8AndSize(k, nullptr));
+        if (PyDict_SetItem(kwargs, k, v))
+            python_error_raise();
+    }
 }
 
 NAMESPACE_END(detail)

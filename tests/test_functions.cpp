@@ -35,4 +35,17 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_07", [](int a, int b, nb::args args, nb::kwargs kwargs) {
         return std::make_pair(args.size(), kwargs.size());
     }, "a"_a, "b"_a, "myargs"_a, "mykwargs"_a);
+
+    /// Test successful/unsuccessful tuple conversion
+    m.def("test_tuple", []() { return nb::make_tuple("Hello", 123); });
+    m.def("test_bad_tuple", []() { struct Foo{}; return nb::make_tuple("Hello", Foo()); });
+
+    /// Perform a Python function call from C++
+    m.def("test_call_1", [](nb::object o) { return o(1); });
+    m.def("test_call_2", [](nb::object o) { return o(1, 2); });
+
+    /// Test expansion of args/kwargs-style arguments
+    m.def("test_call_extra", [](nb::object o, nb::args args, nb::kwargs kwargs) {
+        return o(1, 2, *args, **kwargs, "extra"_a = 5);
+    });
 }

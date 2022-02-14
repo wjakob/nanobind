@@ -23,12 +23,18 @@ struct Struct {
     ~Struct() { destructed++; }
 
     int value() const { return i; }
+    void set_value(int value) { i = value; }
 
     static Struct* create_take() { return new Struct(10); }
     static Struct  create_move() { return Struct(11); }
     static Struct* create_copy() { return struct_tmp.get(); }
     static Struct* create_reference() { return struct_tmp.get(); }
     Struct &self() { return *this; }
+};
+
+struct PairStruct {
+    Struct s1;
+    Struct s2;
 };
 
 struct alignas(1024) Big { char data[1024]; };
@@ -40,6 +46,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>())
         .def(nb::init<int>())
         .def("value", &Struct::value)
+        .def("set_value", &Struct::set_value, "value"_a)
         .def("self", &Struct::self)
         .def("none", [](Struct &) -> const Struct * { return nullptr; })
         .def_static("create_move", &Struct::create_move)
@@ -48,6 +55,11 @@ NB_MODULE(test_classes_ext, m) {
         .def_static("create_copy", &Struct::create_copy,
                     nb::rv_policy::copy)
         .def_static("create_take", &Struct::create_take);
+
+    nb::class_<PairStruct>(m, "PairStruct")
+        .def(nb::init<>())
+        .def_readwrite("s1", &PairStruct::s1)
+        .def_readwrite("s2", &PairStruct::s2);
 
     m.def("stats", []{
         nb::dict d;

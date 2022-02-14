@@ -130,8 +130,15 @@ public:
         return *this;
     }
 
-    template <typename Func, typename... Extra> class_ &
-    def_static(const char *name_, Func &&f, const Extra&... extra) {
+    template <typename... Args, typename... Extra>
+    NB_INLINE class_ &def(detail::init<Args...> init, const Extra &... extra) {
+        init.execute(*this, extra...);
+        return *this;
+    }
+
+    template <typename Func, typename... Extra>
+    NB_INLINE class_ &def_static(const char *name_, Func &&f,
+                                 const Extra &... extra) {
         static_assert(
             !std::is_member_function_pointer_v<Func>,
             "def_static(...) called with a non-static member function pointer");
@@ -140,9 +147,99 @@ public:
         return *this;
     }
 
-    template <typename... Args, typename... Extra>
-    NB_INLINE class_ &def(detail::init<Args...> init, const Extra &...extra) {
-        init.execute(*this, extra...);
+    template <typename Getter, typename Setter, typename... Extra>
+    NB_INLINE class_ &def_property(const char *name_, Getter &&getter,
+                                   Setter &&setter, const Extra &...extra) {
+        object get_p, set_p;
+
+        if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
+            get_p = cpp_function((detail::forward_t<Getter>) getter,
+                                 scope(*this), is_method(),
+                                 rv_policy::reference_internal, extra...);
+
+        if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
+            set_p = cpp_function((detail::forward_t<Setter>) setter,
+                                 scope(*this), is_method(), extra...);
+
+        detail::property_install(m_ptr, name_, false, get_p.release().ptr(),
+                                 set_p.release().ptr());
+        return *this;
+    }
+
+    template <typename Getter, typename Setter, typename... Extra>
+    NB_INLINE class_ &def_property_static(const char *name_, Getter &&getter,
+                                          Setter &&setter,
+                                          const Extra &...extra) {
+        object get_p, set_p;
+
+        if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
+            get_p = cpp_function((detail::forward_t<Getter>) getter,
+                                 scope(*this), rv_policy::reference, extra...);
+
+        if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
+            set_p = cpp_function((detail::forward_t<Setter>) setter,
+                                 scope(*this), extra...);
+
+        detail::property_install(m_ptr, name_, true, get_p.release().ptr(),
+                                 set_p.release().ptr());
+        return *this;
+    }
+
+    template <typename Getter, typename... Extra>
+    NB_INLINE class_ &def_property_readonly(const char *name_, Getter &&getter,
+                                            const Extra &...extra) {
+        return def_property(name_, getter, nullptr, extra...);
+    }
+
+    template <typename Getter, typename... Extra>
+    NB_INLINE class_ &def_property_readonly_static(const char *name_,
+                                                   Getter &&getter,
+                                                   const Extra &...extra) {
+        return def_property_static(name_, getter, nullptr, extra...);
+    }
+
+    template <typename C, typename D, typename... Extra>
+    NB_INLINE class_ &def_readwrite(const char *name, D C::*pm,
+                                    const Extra &...extra) {
+        static_assert(std::is_base_of_v<C, T>,
+                      "def_readwrite() requires a (base) class member!");
+
+        def_property(name,
+            [pm](const T &c) -> const D & { return c.*pm; },
+            [pm](T &c, const D &value) { c.*pm = value; },
+            extra...);
+
+        return *this;
+    }
+
+    template <typename D, typename... Extra>
+    NB_INLINE class_ &def_readwrite_static(const char *name, D *pm,
+                                           const Extra &...extra) {
+        def_property_static(name,
+            [pm](const T &c) -> const D & { return *pm; },
+            [pm](T &c, const D &value) { *pm = value; }, extra...);
+
+        return *this;
+    }
+
+    template <typename C, typename D, typename... Extra>
+    NB_INLINE class_ &def_readonly(const char *name, D C::*pm,
+                                   const Extra &...extra) {
+        static_assert(std::is_base_of_v<C, T>,
+                      "def_readonly() requires a (base) class member!");
+
+        def_property_readonly(name,
+            [pm](const T &c) -> const D & { return c.*pm; }, extra...);
+
+        return *this;
+    }
+
+    template <typename D, typename... Extra>
+    NB_INLINE class_ &def_readonly_static(const char *name, D *pm,
+                                          const Extra &...extra) {
+        def_property_readonly_static(name,
+            [pm](const T &c) -> const D & { return *pm; });
+
         return *this;
     }
 };

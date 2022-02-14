@@ -15,8 +15,7 @@ static PyObject *alloc_extra(PyTypeObject *type, size_t extra) {
         (PyVarObject *) PyType_GenericAlloc(type, (Py_ssize_t) item_count - 1);
     if (!o)
         return nullptr;
-
-    Py_SET_SIZE(o, 0);
+    o->ob_size = 0;
     return (PyObject *) o;
 }
 
@@ -34,7 +33,7 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 // Allocate a new instance with co-located or external storage
 instance *inst_new_impl(PyTypeObject *type, void *value) {
     PyVarObject *o = (PyVarObject *) PyType_GenericAlloc(type, value ? -1 : 0);
-    Py_SET_SIZE(o, 0);
+    o->ob_size = 0;
 
     instance *self = (instance *) o;
     if (value) {
@@ -85,7 +84,7 @@ static void inst_dealloc(PyObject *self) {
         if (t->align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__)
             operator delete(inst->value);
         else
-            operator delete(inst->value, t->align);
+            operator delete(inst->value, std::align_val_t(t->align));
     }
 
 
@@ -246,6 +245,8 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
         PyObject *result = (PyObject *) it->second;
         Py_INCREF(result);
         return result;
+    } else if (rvp == rv_policy::none) {
+        return nullptr;
     }
 
     // Look up the corresponding type
@@ -263,10 +264,16 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
 
     if (rvp == rv_policy::move) {
         if (t->flags & (uint16_t) type_flags::is_move_constructible) {
-            if (t->flags & (uint16_t) type_flags::has_move)
-                t->move(inst->value, value);
-            else
+            if (t->flags & (uint16_t) type_flags::has_move) {
+                try {
+                    t->move(inst->value, value);
+                } catch (...) {
+                    Py_DECREF(inst);
+                    return nullptr;
+                }
+            } else {
                 memcpy(inst->value, value, t->size);
+            }
         } else {
             fail("nanobind::detail::type_put(\"%s\"): attempted to move "
                  "an instance that is not move-constructible!", t->name);
@@ -275,10 +282,16 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
 
     if (rvp == rv_policy::copy) {
         if (t->flags & (uint16_t) type_flags::is_copy_constructible) {
-            if (t->flags & (uint16_t) type_flags::has_copy)
-                t->copy(inst->value, value);
-            else
+            if (t->flags & (uint16_t) type_flags::has_copy) {
+                try {
+                    t->copy(inst->value, value);
+                } catch (...) {
+                    Py_DECREF(inst);
+                    return nullptr;
+                }
+            } else {
                 memcpy(inst->value, value, t->size);
+            }
         } else {
             fail("nanobind::detail::type_put(\"%s\"): attempted to copy "
                  "an instance that is not copy-constructible!", t->name);

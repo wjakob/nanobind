@@ -17,11 +17,13 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
         ((std::is_same_v<arg, Extra> + std::is_same_v<arg_v, Extra>) + ...);
+    constexpr bool is_method_det =
+        (std::is_same_v<is_method, Extra> + ...) != 0;
 
     /// A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
         "Repeated use of nb::kwargs or nb::args in the function signature!");
-    static_assert(nargs_provided == 0 || nargs_provided == nargs,
+    static_assert(nargs_provided == 0 || nargs_provided + is_method_det == nargs,
         "The number of nb::arg annotations must match the argument count!");
     static_assert(kwargs_pos_1 == nargs || kwargs_pos_1 + 1 == nargs,
         "nb::kwargs must be the last element of the function signature!");

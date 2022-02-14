@@ -63,6 +63,7 @@ enum class func_flags : uint16_t {
 
 struct arg_data {
     const char *name;
+    PyObject *name_py;
     PyObject *value;
     bool convert;
     bool none;

@@ -1,5 +1,4 @@
 #include <nanobind/nanobind.h>
-#include "smallvec.h"
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
 #include <typeindex>
@@ -23,12 +22,19 @@ struct nb_inst {
     bool free : 1;
 };
 
+/// Python object representing a bound C++ function
+struct nb_func {
+    PyObject_VAR_HEAD
+    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t , PyObject *);
+    size_t max_nargs_pos;
+};
+
 struct internals {
     /// Base type of all nanobind types
-    PyTypeObject *nbtype;
+    PyTypeObject *nb_type;
 
     /// Base type of all nanobind functions
-    PyTypeObject *nbfunc;
+    PyTypeObject *nb_func;
 
     /// Instance pointer -> Python object mapping
     tsl::robin_pg_map<void *, nb_inst *> inst_c2p;
@@ -37,9 +43,9 @@ struct internals {
     tsl::robin_pg_map<std::type_index, type_data *> type_c2p;
 
     /// List of all functions for docstring generation
-    tsl::robin_pg_set<PyObject *> funcs;
+    tsl::robin_pg_set<nanobind::detail::nb_func *> funcs;
 
-    smallvec<void (*)(std::exception_ptr)> exception_translators;
+    std::vector<void (*)(std::exception_ptr)> exception_translators;
 };
 
 extern internals &get_internals() noexcept;

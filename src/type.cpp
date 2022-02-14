@@ -151,7 +151,7 @@ PyObject *type_new(const type_data *t) noexcept {
        turn find the newly constructed type in an invalid state) */
 
     internals &internals = get_internals();
-    PyHeapTypeObject *ht = (PyHeapTypeObject *) alloc_extra(internals.nbtype,
+    PyHeapTypeObject *ht = (PyHeapTypeObject *) alloc_extra(internals.nb_type,
                                                             sizeof(type_data));
     type_data *t2 = get_extra<type_data>(ht);
     memcpy(t2, t, sizeof(type_data));
@@ -212,7 +212,7 @@ bool type_get(const std::type_info *cpp_type, PyObject *o, bool convert,
     PyTypeObject *type = Py_TYPE(o);
 
     // Reject if this object doesn't have the nanobind metaclass
-    if (Py_TYPE(type) != internals.nbtype)
+    if (Py_TYPE(type) != internals.nb_type)
         return false;
 
     // Recover pointer to C++ type_data entry

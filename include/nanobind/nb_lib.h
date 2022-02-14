@@ -124,10 +124,10 @@ NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 // ========================================================================
 
 /// Create a Python function object for the given function record
-NB_CORE PyObject *nbfunc_new(const void *data) noexcept;
+NB_CORE PyObject *nb_func_new(const void *data) noexcept;
 
 /// Generate docstrings for all newly defined functions
-NB_CORE void nbfunc_finalize() noexcept;
+NB_CORE void nb_func_finalize() noexcept;
 
 // ========================================================================
 

@@ -1,6 +1,5 @@
-#include "smallvec.h"
-#include "buffer.h"
 #include "internals.h"
+#include "buffer.h"
 
 #if defined(__GNUG__)
 #  include <cxxabi.h>
@@ -12,26 +11,29 @@ NAMESPACE_BEGIN(detail)
 // Forward/external declarations
 extern Buffer buf;
 static char *type_name(const std::type_info *t);
+static PyObject *nb_func_vectorcall(PyObject *, PyObject *const *, size_t,
+                                    PyObject *);
 
-/// Fetch the nanobind function record from a 'nbfunc' instance
-static func_record *nbfunc_get(void *o) {
-    return (func_record *) (((char *) o) + sizeof(PyVarObject));
+
+/// Fetch the nanobind function record from a 'nb_func' instance
+static func_record *nb_func_get(void *o) {
+    return (func_record *) (((char *) o) + sizeof(nb_func));
 }
 
 /// Free a function overload chain
-void nbfunc_dealloc(PyObject *self) noexcept {
+void nb_func_dealloc(PyObject *self) noexcept {
     Py_ssize_t size = Py_SIZE(self);
 
     if (size) {
-        func_record *f = nbfunc_get(self);
+        func_record *f = nb_func_get(self);
 
         // Delete from registered function list
         auto &funcs = get_internals().funcs;
-        auto it = funcs.find(self);
+        auto it = funcs.find((nb_func*) self);
         if (it == funcs.end()) {
             const char *name = (f->flags & (uint16_t) func_flags::has_name)
                                    ? f->name : "<anonymous>";
-            fail("nanobind::detail::nbfunc_dealloc(\"%s\"): function not found!",
+            fail("nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
                  name);
         }
         funcs.erase(it);
@@ -41,8 +43,10 @@ void nbfunc_dealloc(PyObject *self) noexcept {
                 f->free(f->capture);
 
             if (f->flags & (uint16_t) func_flags::has_args) {
-                for (size_t i = 0; i< f->nargs; ++i)
+                for (size_t i = 0; i< f->nargs; ++i) {
                     Py_XDECREF(f->args[i].value);
+                    Py_XDECREF(f->args[i].name_py);
+                }
             }
 
             free(f->args);
@@ -61,14 +65,16 @@ void nbfunc_dealloc(PyObject *self) noexcept {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *nbfunc_new(const void *in_) noexcept {
+PyObject *nb_func_new(const void *in_) noexcept {
     func_data<0> *f = (func_data<0> *) in_;
 
-    const bool has_scope  = f->flags & (uint16_t) func_flags::has_scope,
-               has_name   = f->flags & (uint16_t) func_flags::has_name,
-               has_args   = f->flags & (uint16_t) func_flags::has_args,
-               is_method  = f->flags & (uint16_t) func_flags::is_method,
-               return_ref = f->flags & (uint16_t) func_flags::return_ref;
+    const bool has_scope      = f->flags & (uint16_t) func_flags::has_scope,
+               has_name       = f->flags & (uint16_t) func_flags::has_name,
+               has_args       = f->flags & (uint16_t) func_flags::has_args,
+               has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
+               has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs,
+               is_method      = f->flags & (uint16_t) func_flags::is_method,
+               return_ref     = f->flags & (uint16_t) func_flags::return_ref;
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -78,18 +84,18 @@ PyObject *nbfunc_new(const void *in_) noexcept {
     if (has_scope && has_name) {
         name = PyUnicode_FromString(f->name);
         if (!name)
-            fail("nb::detail::nbfunc_new(\"%s\"): invalid name.", f->name);
+            fail("nb::detail::nb_func_new(\"%s\"): invalid name.", f->name);
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
-            if (Py_IS_TYPE(func_prev, internals.nbfunc)) {
-                func_record *fp = nbfunc_get(func_prev);
+            if (Py_IS_TYPE(func_prev, internals.nb_func)) {
+                func_record *fp = nb_func_get(func_prev);
 
                 uint16_t mask = (uint16_t) func_flags::is_method |
                                 (uint16_t) func_flags::is_static;
 
                 if ((fp->flags & mask) != (f->flags & mask))
-                    fail("nb::detail::nbfunc_new(\"%s\"): mismatched static/"
+                    fail("nb::detail::nb_func_new(\"%s\"): mismatched static/"
                          "instance method flags in function overloads!", f->name);
 
                 /* Never append a method to an overload chain of a parent class;
@@ -99,7 +105,7 @@ PyObject *nbfunc_new(const void *in_) noexcept {
                     func_prev = nullptr;
                 }
             } else if (f->name[0] != '_') {
-                fail("nb::detail::nbfunc_new(\"%s\"): cannot overload "
+                fail("nb::detail::nb_func_new(\"%s\"): cannot overload "
                      "existing non-function object of the same name!", f->name);
             }
         } else {
@@ -109,21 +115,28 @@ PyObject *nbfunc_new(const void *in_) noexcept {
 
     // Create a new function and destroy the old one
     Py_ssize_t to_copy = func_prev ? Py_SIZE(func_prev) : 0;
-    PyObject *func = PyType_GenericAlloc(internals.nbfunc, to_copy + 1);
+    nb_func *func = (nb_func *) PyType_GenericAlloc(internals.nb_func, to_copy + 1);
     if (!func)
-        fail("nb::detail::nbfunc_new(\"%s\"): alloc. failed (1).",
+        fail("nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
              has_name ? f->name : "<anonymous>");
 
+    func->vectorcall = nb_func_vectorcall;
+    func->max_nargs_pos = f->nargs - has_var_args - has_var_kwargs;
+
     if (func_prev) {
-        func_record *cur  = nbfunc_get(func),
-                    *prev = nbfunc_get(func_prev);
+        size_t max_nargs_pos_prev = ((nb_func *) func_prev)->max_nargs_pos;
+        if (max_nargs_pos_prev > func->max_nargs_pos)
+            func->max_nargs_pos = max_nargs_pos_prev;
+
+        func_record *cur  = nb_func_get(func),
+                    *prev = nb_func_get(func_prev);
 
         memcpy(cur, prev, sizeof(func_record) * to_copy);
         memset(prev, 0, sizeof(func_record) * to_copy);
 
-        auto it = internals.funcs.find(func_prev);
+        auto it = internals.funcs.find((nb_func *) func_prev);
         if (it == internals.funcs.end())
-            fail("nanobind::detail::nbfunc_new(\"%s\"): previous function not "
+            fail("nanobind::detail::nb_func_new(\"%s\"): previous function not "
                  "found!", has_name ? f->name : "<anonymous>");
         internals.funcs.erase(it);
 
@@ -132,10 +145,11 @@ PyObject *nbfunc_new(const void *in_) noexcept {
 
     internals.funcs.insert(func);
 
-    func_record *fc = nbfunc_get(func) + to_copy;
+    func_record *fc = nb_func_get(func) + to_copy;
     memcpy(fc, f, sizeof(func_data<0>));
     if (!has_name)
         fc->name = "<anonymous>";
+
 
     char *descr;
     for (size_t i = 0;; ++i) {
@@ -162,56 +176,66 @@ PyObject *nbfunc_new(const void *in_) noexcept {
             (arg_data *) malloc(sizeof(arg_data) * (f->nargs + is_method));
 
         if (is_method) // add implicit 'self' argument annotation
-            fc->args[0] = arg_data{ "self", nullptr, false, false };
-
-        for (size_t i = is_method; i < fc->nargs; ++i) {
+            fc->args[0] = arg_data{ "self", nullptr, nullptr, false, false };
+        for (size_t i = is_method; i < fc->nargs; ++i)
             fc->args[i] = args_in[i - is_method];
-            Py_XINCREF(fc->args[i].value);
+
+        for (size_t i = 0; i < fc->nargs; ++i) {
+            arg_data &a = fc->args[i];
+            if (a.name)
+                a.name_py = PyUnicode_InternFromString(a.name);
+            Py_XINCREF(a.value);
         }
     }
 
     if (has_scope && name) {
-        int rv = PyObject_SetAttr(f->scope, name, func);
+        int rv = PyObject_SetAttr(f->scope, name, (PyObject *) func);
         if (rv)
-            fail("nb::detail::nbfunc_new(\"%s\"): setattr. failed.", f->name);
+            fail("nb::detail::nb_func_new(\"%s\"): setattr. failed.", f->name);
     }
 
     Py_XDECREF(name);
     Py_XDECREF(func_prev);
 
     if (return_ref) {
-        return func;
+        return (PyObject *) func;
     } else {
         Py_DECREF(func);
         return nullptr;
     }
 }
 
-/// Dispatch loop that is used to invoke functions created by nbfunc_new
-PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
-    const size_t count = (size_t) Py_SIZE(self),
-                 nargs_in = (size_t) PyTuple_GET_SIZE(args_in);
+/// Dispatch loop that is used to invoke functions created by nb_func_new
+PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
+                             size_t nargsf, PyObject *kwargs_in) {
 
-    func_record *fr = nbfunc_get(self);
+    const size_t count      = (size_t) Py_SIZE(self),
+                 nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
+                 nkwargs_in = kwargs_in ? PyTuple_GET_SIZE(kwargs_in) : 0;
 
-    PyObject *parent = nargs_in > 0 ? PyTuple_GET_ITEM(args_in, 0) : nullptr;
+    func_record *fr = nb_func_get(self);
+
+    PyObject *parent = nargs_in > 0 ? args_in[0] : nullptr;
     bool is_constructor = strcmp(fr->name, "__init__") == 0;
 
     internals &internals = get_internals();
     if (is_constructor) {
-        is_constructor &= parent && Py_TYPE(Py_TYPE(parent)) == internals.nbtype;
+        is_constructor &= parent && Py_TYPE(Py_TYPE(parent)) == internals.nb_type;
 
         if (is_constructor && ((nb_inst *) parent)->destruct) {
             PyErr_SetString(PyExc_RuntimeError,
-                            "nanobind::detail::nbfunc_dispatch(): the __init__ "
+                            "nanobind::detail::nb_func_dispatch(): the __init__ "
                             "method should only be called once!");
             return nullptr;
         }
     }
 
-    smallvec<PyObject *> args;
-    smallvec<const char *> kwargs_consumed;
-    smallvec<bool> args_convert;
+    // Preallocate stack memory for function dispatch
+    size_t max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
+    PyObject **args    = (PyObject **) alloca(max_nargs_pos * sizeof(PyObject *));
+    bool *args_convert = (bool *) alloca(max_nargs_pos * sizeof(bool));
+    bool *kwarg_used   = (bool *) alloca(nkwargs_in * sizeof(bool));
+
     object extra_args, extra_kwargs;
 
     /*  The logic below tries to find a suitable overload using two passes
@@ -243,14 +267,8 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
 
     PyObject *result = NB_NEXT_OVERLOAD;
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
-        for (size_t i = 0; i < count; ++i) {
-            // Clear scratch space
-            args.clear();
-            args_convert.clear();
-            kwargs_consumed.clear();
-
-            // Advance the function iterator
-            const func_record *f = fr + i;
+        for (size_t k = 0; k < count; ++k) {
+            const func_record *f = fr + k;
 
             const bool has_args       = f->flags & (uint16_t) func_flags::has_args,
                        has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
@@ -266,31 +284,38 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
                 continue; // Not enough positional arguments, insufficient
                           // keyword/default arguments to fill in the blanks
 
+            memset(kwarg_used, 0, nkwargs_in * sizeof(bool));
+
             // 1. Copy positional arguments, potentially substitute kwargs/defaults
-            for (size_t i = 0; i < nargs_pos; ++i) {
+            size_t i = 0;
+            for (; i < nargs_pos; ++i) {
                 PyObject *arg = nullptr;
                 bool arg_convert  = pass == 1,
-                     arg_none     = false;
+                     arg_none     = false,
+                     arg_kw       = false;
 
                 if (i < nargs_in)
-                    arg = PyTuple_GET_ITEM(args_in, i);
+                    arg = args_in[i];
 
                 if (has_args) {
                     const arg_data &ad = f->args[i];
 
-                    if (kwargs_in && ad.name) {
-                        PyObject *hit = PyDict_GetItemString(kwargs_in, ad.name);
+                    if (kwargs_in && ad.name_py) {
+                        PyObject *hit = nullptr;
+                        for (size_t j = 0; j < nkwargs_in; ++j) {
+                            PyObject *key = PyTuple_GET_ITEM(kwargs_in, j);
+                            const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
+                            if (key == ad.name_py) {
+                                hit = args_in[nargs_in + j];
+                                kwarg_used[j] = true;
+                                break;
+                            }
+                        }
 
                         if (hit) {
-                            Py_DECREF(hit); // kwargs still holds a reference
-
-                            if (arg) {
-                                // conflict between keyword and positional arg.
-                                break;
-                            } else {
-                                arg = hit;
-                                kwargs_consumed.push_back(ad.name);
-                            }
+                            if (arg)
+                                break; // conflict between keyword and positional arg.
+                            arg = hit;
                         }
                     }
 
@@ -304,12 +329,12 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
                 if (!arg || (arg == Py_None && !arg_none))
                     break;
 
-                args.push_back(arg);
-                args_convert.push_back(arg_convert);
+                args[i] = arg;
+                args_convert[i] = arg_convert;
             }
 
             // Skip this overload if positional arguments were unavailable
-            if (args.size() != nargs_pos)
+            if (i != nargs_pos)
                 continue;
 
             // Deal with remaining positional arguments
@@ -317,45 +342,39 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
                 extra_args = steal(PyTuple_New(
                     nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0));
 
-                for (size_t i = nargs_pos; i < nargs_in; ++i) {
-                    PyObject *o = PyTuple_GET_ITEM(args_in, i);
+                for (size_t j = nargs_pos; j < nargs_in; ++j) {
+                    PyObject *o = args_in[j];
                     Py_INCREF(o);
-                    PyTuple_SET_ITEM(extra_args.ptr(), i - nargs_pos, o);
+                    PyTuple_SET_ITEM(extra_args.ptr(), j - nargs_pos, o);
                 }
 
-                args.push_back(extra_args.ptr());
-                args_convert.push_back(false);
+                args[nargs_pos] = extra_args.ptr();
+                args_convert[nargs_pos] = false;
             }
 
             // Deal with remaining keyword arguments
             if (has_var_kwargs) {
-                if (kwargs_consumed.empty()) {
-                    if (kwargs_in)
-                        extra_kwargs = borrow(kwargs_in);
-                    else
-                        extra_kwargs = steal(PyDict_New());
-                } else {
-                    extra_kwargs = steal(PyDict_Copy(kwargs_in));
-                    for (size_t i = 0; i < kwargs_consumed.size(); ++i) {
-                        if (PyDict_DelItemString(extra_kwargs.ptr(),
-                                                 kwargs_consumed[i]) == -1)
-                            fail("nb::detail::nbfunc_call(): could not "
-                                 "filter kwargs");
-                    }
+                PyObject *dict = PyDict_New();
+                for (size_t j = 0; j < nkwargs_in; ++j) {
+                    PyObject *key   = PyTuple_GET_ITEM(kwargs_in, j);
+                    if (!kwarg_used[j])
+                        PyDict_SetItem(dict, key, args_in[nargs_in + j]);
                 }
 
-                args.push_back(extra_kwargs.ptr());
-                args_convert.push_back(false);
-            } else if (kwargs_in && kwargs_consumed.size() !=
-                                        (size_t) PyDict_GET_SIZE(kwargs_in)) {
-                // Not all keyword arguments were consumed, try next overload
-                continue;
+                extra_kwargs = steal(dict);
+                args[nargs_pos + has_var_args] = dict;
+                args_convert[nargs_pos + has_var_args] = false;
+            } else if (kwargs_in) {
+                bool success = true;
+                for (size_t j = 0; j < nkwargs_in; ++j)
+                    success = kwarg_used[j];
+                if (!success)
+                    continue;
             }
 
             try {
                 // Found a suitable overload, let's try calling it
-                result = f->impl((void *) f->capture, args.data(),
-                                 args_convert.data(),
+                result = f->impl((void *) f->capture, args, args_convert,
                                  (rv_policy) (f->flags & 0b111), parent);
             } catch (python_error &e) {
                 e.restore();
@@ -380,7 +399,7 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
                 }
 
                 PyErr_SetString(PyExc_SystemError,
-                                "nanobind::detail::nbfunc_call(): exception "
+                                "nanobind::detail::nb_func_call(): exception "
                                 "could not be translated!");
 
                 return nullptr;
@@ -419,7 +438,7 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
 
     buf.put("\nInvoked with types: ");
     for (size_t i = 0; i < nargs_in; ++i) {
-        PyTypeObject *t = Py_TYPE(PyTuple_GET_ITEM(args_in, i));
+        PyTypeObject *t = Py_TYPE(args_in[i]);
         buf.put_dstr(t->tp_name);
         if (i + 1 < nargs_in)
             buf.put(", ");
@@ -432,7 +451,11 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
         if (nargs_in)
             buf.put(", ");
         buf.put("kwargs = { ");
-        while (PyDict_Next(kwargs_in, &pos, &key, &value)) {
+
+        for (size_t j = 0; j < nkwargs_in; ++j) {
+            PyObject *key   = PyTuple_GET_ITEM(kwargs_in, j),
+                     *value = args_in[nargs_in + j];
+
             const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
             buf.put_dstr(key_cstr);
             buf.put(": ");
@@ -448,11 +471,11 @@ PyObject *nbfunc_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
 }
 
 /// Finalize function signatures + docstrings once a module has finished loading
-void nbfunc_finalize() noexcept {
+void nb_func_finalize() noexcept {
     internals &internals = get_internals();
 
-    for (PyObject *o: internals.funcs) {
-        func_record *f = nbfunc_get(o);
+    for (nb_func *o: internals.funcs) {
+        func_record *f = nb_func_get(o);
         size_t count = (size_t) Py_SIZE(o);
 
         for (size_t i = 0; i < count; ++i) {
@@ -530,7 +553,7 @@ void nbfunc_finalize() noexcept {
 
                     case '%':
                         if (!*descr_type)
-                            fail("nb::detail::nbfunc_finalize(): missing type!");
+                            fail("nb::detail::nb_func_finalize(): missing type!");
 
                         if (!(is_method && arg_index == 0)) {
                             auto it = internals.type_c2p.find(std::type_index(**descr_type));
@@ -557,7 +580,7 @@ void nbfunc_finalize() noexcept {
             }
 
             if (arg_index != f->nargs || *descr_type != nullptr)
-                fail("nanobind::detail::nbfunc_finalize(): arguments inconsistent.");
+                fail("nanobind::detail::nb_func_finalize(): arguments inconsistent.");
 
             free(f->signature);
             f->signature = buf.copy();
@@ -567,8 +590,8 @@ void nbfunc_finalize() noexcept {
     }
 }
 
-PyObject *nbfunc_get_doc(PyObject *o, void *) {
-    func_record *f = nbfunc_get(o);
+PyObject *nb_func_get_doc(PyObject *o, void *) {
+    func_record *f = nb_func_get(o);
     size_t count = (size_t) Py_SIZE(o);
 
     buf.clear();
@@ -603,8 +626,8 @@ PyObject *nbfunc_get_doc(PyObject *o, void *) {
     return PyUnicode_FromString(buf.get());
 }
 
-PyObject *nbfunc_get_name(PyObject *o, void *) {
-    func_record *f = nbfunc_get(o);
+PyObject *nb_func_get_name(PyObject *o, void *) {
+    func_record *f = nb_func_get(o);
     if (f->flags & (uint16_t) func_flags::has_name) {
         return PyUnicode_FromString(f->name);
     } else {

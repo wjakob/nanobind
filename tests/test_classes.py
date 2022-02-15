@@ -16,6 +16,7 @@ def test01_signature():
 
 
 def test02_instantiate():
+    gc.collect()
     t.reset()
 
     s1 = t.Struct()
@@ -36,7 +37,16 @@ def test02_instantiate():
         'destructed': 2
     }
 
-def test03_rv_policy():
+
+def test03_double_init():
+    s = t.Struct()
+    with pytest.raises(RuntimeError) as excinfo:
+        s.__init__()
+    assert 'the __init__ method should only be called once!' in str(excinfo.value)
+
+
+def test04_rv_policy():
+    gc.collect()
     t.reset()
     s = t.Struct()
     assert s.self() is s
@@ -113,7 +123,8 @@ def test03_rv_policy():
         'destructed': 1
     }
 
-def test04_reference_internal():
+def test05_reference_internal():
+    gc.collect()
     t.reset()
     s = t.PairStruct()
     s2 = s.s2

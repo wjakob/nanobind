@@ -181,6 +181,8 @@ static void make_internals() {
     internals_p->nb_meth = &nb_meth_type;
     Py_INCREF(&nb_func_type);
     Py_INCREF(&nb_meth_type);
+    internals_p->keep_alive = PyDict_New();
+    internals_p->funcs = PySet_New(nullptr);
 }
 
 static void fetch_internals() {

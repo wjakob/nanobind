@@ -113,3 +113,28 @@ def test03_rv_policy():
         'destructed': 1
     }
 
+def test04_reference_internal():
+    t.reset()
+    s = t.PairStruct()
+    s2 = s.s2
+    del s
+    assert t.stats() == {
+        'default_constructed': 2,
+        'value_constructed': 0,
+        'copy_constructed': 0,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 0
+    }
+    assert s2.value() == 5
+    del s2
+    assert t.stats() == {
+        'default_constructed': 2,
+        'value_constructed': 0,
+        'copy_constructed': 0,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 2
+    }

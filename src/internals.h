@@ -18,8 +18,14 @@ struct func_record : func_data<0> {
 struct nb_inst {
     PyObject_HEAD
     void *value;
+    /// Should the destructor be called when this instance is GCed?
     bool destruct : 1;
+
+    /// Should the instance pointer be freed when this instance is GCed?
     bool free : 1;
+
+    /// Does this instance hold reference to others? (via instance->refs)
+    bool clear_keep_alive : 1;
 };
 
 /// Python object representing a bound C++ function
@@ -27,6 +33,14 @@ struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     size_t max_nargs_pos;
+};
+
+struct ptr_hash {
+    size_t operator()(void *p) const {
+        size_t i = (size_t) p;
+        i = (i >> 4) | (i << (8 * sizeof(size_t) - 4));
+        return i;
+    }
 };
 
 struct internals {
@@ -40,18 +54,36 @@ struct internals {
     PyTypeObject *nb_meth;
 
     /// Instance pointer -> Python object mapping
-    tsl::robin_pg_map<void *, nb_inst *> inst_c2p;
+    tsl::robin_pg_map<void *, nb_inst *, ptr_hash> inst_c2p;
 
     /// C++ type -> Python type mapping
     tsl::robin_pg_map<std::type_index, type_data *> type_c2p;
 
-    /// List of all functions for docstring generation
-    tsl::robin_pg_set<nanobind::detail::nb_func *> funcs;
+    /// Python dictionary of sets storing keep_alive references
+    PyObject *keep_alive;
+
+    /// Python set of functions for docstring generation
+    PyObject *funcs;
 
     std::vector<void (*)(std::exception_ptr)> exception_translators;
 };
 
 extern internals &get_internals() noexcept;
+
+/* The following two functions convert between pointers and Python long values
+   that can be used as hash keys. They internally perform rotations to avoid
+   collisions following 'pyhash.c' */
+inline PyObject *ptr_to_key(void *p) {
+    uintptr_t i = (uintptr_t) p;
+    i = (i >> 4) | (i << (8 * sizeof(uintptr_t) - 4));
+    return PyLong_FromSsize_t((Py_ssize_t) i);
+}
+
+inline void *key_to_ptr(PyObject *o) {
+    uintptr_t i = (uintptr_t) PyLong_AsSsize_t(o);
+    i = (i << 4) | (i >> (8 * sizeof(uintptr_t) - 4));
+    return (void *) i;
+}
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

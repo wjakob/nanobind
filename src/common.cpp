@@ -349,7 +349,7 @@ void property_install(PyObject *scope, const char *name, bool is_static,
     handle property = (PyObject *) &PyProperty_Type;
     (void) is_static;
     PyObject *m = getter ? getter : setter;
-    const char *doc = nullptr;
+    object doc = none();
 
     if (m) {
         m = PyInstanceMethod_Check(m) ? PyInstanceMethod_GET_FUNCTION(m) : m;
@@ -357,7 +357,7 @@ void property_install(PyObject *scope, const char *name, bool is_static,
             func_data<0> *f = (func_data<0> *) PyCapsule_GetPointer(
                 PyCFunction_GET_SELF(m), nullptr);
             if (f->flags & (uint32_t) func_flags::has_doc)
-                doc = f->doc;
+                doc = str(f->doc);
         }
     }
 

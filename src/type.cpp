@@ -85,15 +85,33 @@ static void inst_dealloc(PyObject *self) {
             operator delete(inst->value, std::align_val_t(t->align));
     }
 
+    internals &internals = get_internals();
+    if (inst->clear_keep_alive) {
+        PyObject *self_key = ptr_to_key(self),
+                 *set = PyDict_GetItem(internals.keep_alive, self_key);
+
+        int rv = PyDict_DelItem(internals.keep_alive, self_key);
+        if (rv || set == nullptr)
+            fail("nanobind::detail::inst_dealloc(\"%s\"): failure while "
+                 "clearing references!", type->tp_name);
+
+        Py_ssize_t i = 0;
+        PyObject *key;
+        Py_hash_t hash;
+
+        while (_PySet_NextEntry(set, &i, &key, &hash))
+            Py_DECREF((PyObject *) key_to_ptr(key));
+
+        Py_DECREF(set);
+        Py_DECREF(self_key);
+    }
 
     // Update hash table that maps from C++ to Python instance
-    auto &inst_c2p = get_internals().inst_c2p;
-    auto it = inst_c2p.find(inst->value);
-    if (it == inst_c2p.end())
+    auto it = internals.inst_c2p.find(inst->value);
+    if (it == internals.inst_c2p.end())
         fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
              "an unknown instance!", type->tp_name);
-
-    inst_c2p.erase(it);
+    internals.inst_c2p.erase(it);
 
     type->tp_free(self);
     Py_DECREF(type);
@@ -227,6 +245,40 @@ bool type_get(const std::type_info *cpp_type, PyObject *o, bool convert,
     }
 }
 
+void inst_keep_alive(PyObject *nurse, PyObject *patient) {
+    if (!patient)
+        return;
+
+    internals &internals = get_internals();
+    if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
+        fail("inst_keep_alive(): expected a nb_type 'nurse' argument");
+
+    PyObject *nurse_key   = ptr_to_key(nurse),
+             *patient_key = ptr_to_key(patient);
+
+    PyObject *set = PyDict_GetItem(internals.keep_alive, nurse_key);
+    if (!set) {
+        PyErr_Clear();
+        set = PySet_New(nullptr);
+        if (!set)
+            fail("nanobind::detail::inst_keep_alive(): failed (1)!");
+
+        int rv = PyDict_SetItem(internals.keep_alive, nurse_key, set);
+        if (rv)
+            fail("nanobind::detail::inst_keep_alive(): failed (2)!");
+    }
+    int rv = PySet_Add(set, patient_key);
+    if (rv)
+        fail("nanobind::detail::inst_keep_alive(): failed (3)!");
+
+    ((nb_inst *) nurse)->clear_keep_alive = true;
+
+    Py_INCREF(patient);
+    Py_DECREF(nurse_key);
+    Py_DECREF(patient_key);
+    Py_DECREF(set);
+}
+
 PyObject *type_put(const std::type_info *cpp_type, void *value,
                    rv_policy rvp, PyObject *parent) noexcept {
     // Convert nullptr -> None
@@ -256,8 +308,12 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
     bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
 
     nb_inst *inst = inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
-    inst->destruct = rvp != rv_policy::reference;
+    inst->destruct =
+        rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
     inst->free = inst->destruct && !store_in_obj;
+
+    if (rvp == rv_policy::reference_internal)
+        inst_keep_alive((PyObject *) inst, parent);
 
     if (rvp == rv_policy::move) {
         if (t->flags & (uint16_t) type_flags::is_move_constructible) {

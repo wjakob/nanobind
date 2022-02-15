@@ -27,15 +27,15 @@ void nb_func_dealloc(PyObject *self) {
         func_record *f = nb_func_get(self);
 
         // Delete from registered function list
-        auto &funcs = get_internals().funcs;
-        auto it = funcs.find((nb_func*) self);
-        if (it == funcs.end()) {
+        PyObject *self_key = ptr_to_key(self);
+        int rv = PySet_Discard(get_internals().funcs, self_key);
+        Py_DECREF(self_key);
+        if (rv != 1) {
             const char *name = (f->flags & (uint16_t) func_flags::has_name)
                                    ? f->name : "<anonymous>";
             fail("nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
                  name);
         }
-        funcs.erase(it);
 
         for (Py_ssize_t i = 0; i < size; ++i) {
             if (f->flags & (uint16_t) func_flags::has_free)
@@ -135,17 +135,22 @@ PyObject *nb_func_new(const void *in_) noexcept {
         memcpy(cur, prev, sizeof(func_record) * to_copy);
         memset(prev, 0, sizeof(func_record) * to_copy);
 
-        auto it = internals.funcs.find((nb_func *) func_prev);
-        if (it == internals.funcs.end())
-            fail("nanobind::detail::nb_func_new(\"%s\"): previous function not "
-                 "found!", has_name ? f->name : "<anonymous>");
-        internals.funcs.erase(it);
-
         ((PyVarObject *) func_prev)->ob_size = 0;
+
+        PyObject *func_prev_key = ptr_to_key(func_prev);
+        int rv = PySet_Discard(internals.funcs, func_prev_key);
+        if (rv != 1)
+            fail("nanobind::detail::nb_func_new(): internal update failed (1)!");
+
+        Py_CLEAR(func_prev_key);
         Py_CLEAR(func_prev);
     }
 
-    internals.funcs.insert(func);
+    /// Register the function
+    PyObject *func_key = ptr_to_key(func);
+    if (PySet_Add(internals.funcs, func_key))
+        fail("nanobind::detail::nb_func_new(): internal update failed (2)!");
+    Py_DECREF(func_key);
 
     func_record *fc = nb_func_get(func) + to_copy;
     memcpy(fc, f, sizeof(func_data<0>));
@@ -487,7 +492,11 @@ PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *type) {
 void nb_func_finalize() noexcept {
     internals &internals = get_internals();
 
-    for (nb_func *o: internals.funcs) {
+    Py_ssize_t i = 0;
+    PyObject *key;
+    Py_hash_t hash;
+    while (_PySet_NextEntry(internals.funcs, &i, &key, &hash)) {
+        void *o = key_to_ptr(key);
         func_record *f = nb_func_get(o);
         size_t count = (size_t) Py_SIZE(o);
 

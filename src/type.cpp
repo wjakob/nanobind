@@ -251,32 +251,45 @@ void inst_keep_alive(PyObject *nurse, PyObject *patient) {
 
     internals &internals = get_internals();
     if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
-        fail("inst_keep_alive(): expected a nb_type 'nurse' argument");
+        raise("inst_keep_alive(): expected a nb_type 'nurse' argument");
 
     PyObject *nurse_key   = ptr_to_key(nurse),
              *patient_key = ptr_to_key(patient);
 
-    PyObject *set = PyDict_GetItem(internals.keep_alive, nurse_key);
-    if (!set) {
+    PyObject *nurse_set = PyDict_GetItem(internals.keep_alive, nurse_key);
+    int rv;
+
+    if (!nurse_set) {
         PyErr_Clear();
-        set = PySet_New(nullptr);
-        if (!set)
-            fail("nanobind::detail::inst_keep_alive(): failed (1)!");
+        nurse_set = PySet_New(nullptr);
+        if (!nurse_set)
+            goto error;
 
-        int rv = PyDict_SetItem(internals.keep_alive, nurse_key, set);
+        rv = PyDict_SetItem(internals.keep_alive, nurse_key, nurse_set);
         if (rv)
-            fail("nanobind::detail::inst_keep_alive(): failed (2)!");
+            goto error;
     }
-    int rv = PySet_Add(set, patient_key);
-    if (rv)
-        fail("nanobind::detail::inst_keep_alive(): failed (3)!");
 
-    ((nb_inst *) nurse)->clear_keep_alive = true;
+    rv = PySet_Contains(nurse_set, patient_key);
+    if (rv == 0) {
+        int rv = PySet_Add(nurse_set, patient_key);
+        if (rv)
+            goto error;
 
-    Py_INCREF(patient);
+        Py_INCREF(patient);
+        ((nb_inst *) nurse)->clear_keep_alive = true;
+    } else if (rv < 0) {
+        goto error;
+    }
+
     Py_DECREF(nurse_key);
     Py_DECREF(patient_key);
-    Py_DECREF(set);
+    Py_DECREF(nurse_set);
+
+    return;
+
+error:
+    fail("nanobind::detail::inst_keep_alive(): internal error!");
 }
 
 PyObject *type_put(const std::type_info *cpp_type, void *value,

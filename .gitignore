@@ -11,4 +11,5 @@ cmake_install.cmake
 \.DS_Store
 __pycache__
 build
+bench
 test_*_ext*

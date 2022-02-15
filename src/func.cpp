@@ -502,9 +502,14 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
     const size_t count      = (size_t) Py_SIZE(self),
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf);
 
+    bool *args_convert = (bool *) alloca(nargs_in * sizeof(bool));
     func_record *fr = nb_func_get(self);
     PyObject *parent = nullptr;
     bool is_constructor = false;
+    PyObject *result = NB_NEXT_OVERLOAD;
+
+    if (kwargs_in)
+        goto error;
 
     if (nargs_in > 0) {
         parent = args_in[0];
@@ -522,9 +527,6 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
         }
     }
 
-    bool *args_convert = (bool *) alloca(nargs_in * sizeof(bool));
-
-    PyObject *result = NB_NEXT_OVERLOAD;
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
         memset(args_convert, pass, nargs_in * sizeof(bool));
 
@@ -559,6 +561,7 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
         }
     }
 
+error:
     return nb_func_error_overload(self, args_in, nargs_in, kwargs_in);
 }
 

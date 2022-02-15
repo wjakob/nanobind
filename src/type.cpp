@@ -36,11 +36,12 @@ nb_inst *inst_new_impl(PyTypeObject *type, void *value) {
     o->ob_size = 0;
 
     nb_inst *self = (nb_inst *) o;
+    const type_data *t = get_extra<type_data>(type);
     if (value) {
         self->value = value;
     } else {
         // Re-align address
-        uintptr_t align = get_extra<type_data>(type)->align,
+        uintptr_t align = t->align,
                   offset = (uintptr_t) get_extra<void>(self);
 
         offset = (offset + align - 1) / align * align;
@@ -48,8 +49,8 @@ nb_inst *inst_new_impl(PyTypeObject *type, void *value) {
     }
 
     // Update hash table that maps from C++ to Python instance
-    auto [it, success] =
-        get_internals().inst_c2p.try_emplace(self->value, self);
+    auto [it, success] = get_internals().inst_c2p.try_emplace(
+        std::pair<void *, std::type_index>(self->value, *t->type), self);
 
     if (!success)
         fail("nanobind::detail::inst_new(): duplicate object!");
@@ -107,7 +108,8 @@ static void inst_dealloc(PyObject *self) {
     }
 
     // Update hash table that maps from C++ to Python instance
-    auto it = internals.inst_c2p.find(inst->value);
+    auto it = internals.inst_c2p.find(
+        std::pair<void *, std::type_index>(inst->value, *t->type));
     if (it == internals.inst_c2p.end())
         fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
              "an unknown instance!", type->tp_name);
@@ -302,7 +304,8 @@ PyObject *type_put(const std::type_info *cpp_type, void *value,
 
     // Check if the nb_inst is already registered with nanobind
     internals &internals = get_internals();
-    auto it = internals.inst_c2p.find(value);
+    auto it = internals.inst_c2p.find(
+        std::pair<void *, std::type_index>(value, *cpp_type));
     if (it != internals.inst_c2p.end()) {
         PyObject *result = (PyObject *) it->second;
         Py_INCREF(result);

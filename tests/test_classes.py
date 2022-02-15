@@ -127,6 +127,7 @@ def test05_reference_internal():
     gc.collect()
     t.reset()
     s = t.PairStruct()
+    s1 = s.s1
     s2 = s.s2
     del s
     assert t.stats() == {
@@ -140,6 +141,22 @@ def test05_reference_internal():
     }
     assert s2.value() == 5
     del s2
+    gc.collect()
+
+    assert t.stats() == {
+        'default_constructed': 2,
+        'value_constructed': 0,
+        'copy_constructed': 0,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 0
+    }
+
+    assert s1.value() == 5
+    del s1
+    gc.collect()
+
     assert t.stats() == {
         'default_constructed': 2,
         'value_constructed': 0,
@@ -149,3 +166,4 @@ def test05_reference_internal():
         'move_assigned': 0,
         'destructed': 2
     }
+

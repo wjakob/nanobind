@@ -99,8 +99,8 @@ def test11_call_complex():
         ((1, 2), {"extra" : 5})
     ]
 
-    #result.clear()
-    #t.test_call_extra(my_callable, 5, 6, hello="world")
-    #assert result == [
-    #    ((1, 2, 5, 6), {"extra" : 5, "hello": "world"})
-    #]
+    result.clear()
+    t.test_call_extra(my_callable, 5, 6, hello="world")
+    assert result == [
+      ((1, 2, 5, 6), {"extra" : 5, "hello": "world"})
+    ]

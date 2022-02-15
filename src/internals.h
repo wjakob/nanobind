@@ -37,10 +37,11 @@ struct nb_func {
 };
 
 struct ptr_hash {
-    size_t operator()(void *p) const {
-        size_t i = (size_t) p;
-        i = (i >> 4) | (i << (8 * sizeof(size_t) - 4));
-        return i;
+    NB_INLINE size_t operator()(const std::pair<void *, std::type_index> &value) const {
+        size_t hash_1 = (size_t) value.first;
+        hash_1 = (hash_1 >> 4) | (hash_1 << (8 * sizeof(size_t) - 4));
+        size_t hash_2 = value.second.hash_code();
+        return hash_1 + hash_2 * 3;
     }
 };
 
@@ -55,7 +56,7 @@ struct internals {
     PyTypeObject *nb_meth;
 
     /// Instance pointer -> Python object mapping
-    tsl::robin_pg_map<void *, nb_inst *, ptr_hash> inst_c2p;
+    tsl::robin_pg_map<std::pair<void *, std::type_index>, nb_inst *, ptr_hash> inst_c2p;
 
     /// C++ type -> Python type mapping
     tsl::robin_pg_map<std::type_index, type_data *> type_c2p;

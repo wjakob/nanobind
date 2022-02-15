@@ -27,12 +27,12 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_06", []() { throw std::runtime_error("oops!"); });
 
     /// Function taking some positional/keyword args and nb::[kw]args
-    m.def("test_07", [](int a, int b, nb::args args, nb::kwargs kwargs) {
+    m.def("test_07", [](int, int, nb::args args, nb::kwargs kwargs) {
         return std::make_pair(args.size(), kwargs.size());
     });
 
     /// As above, but with nb::arg annotations
-    m.def("test_07", [](int a, int b, nb::args args, nb::kwargs kwargs) {
+    m.def("test_07", [](int, int, nb::args args, nb::kwargs kwargs) {
         return std::make_pair(args.size(), kwargs.size());
     }, "a"_a, "b"_a, "myargs"_a, "mykwargs"_a);
 

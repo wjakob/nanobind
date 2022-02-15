@@ -16,11 +16,13 @@
 #  define NB_IMPORT        __declspec(import)
 #  define NB_INLINE        __forceinline
 #  define NB_INLINE_LAMBDA
+#  define NB_NOINLINE      __declspec(noinline)
 #else
 #  define NB_EXPORT        __attribute__ ((visibility("default")))
 #  define NB_IMPORT
 #  define NB_INLINE        inline __attribute__((always_inline))
 #  define NB_INLINE_LAMBDA __attribute__((always_inline))
+#  define NB_NOINLINE      __attribute__((noinline))
 #endif
 
 #if defined(__GNUC__)

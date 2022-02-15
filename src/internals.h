@@ -32,7 +32,8 @@ struct nb_inst {
 struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
-    size_t max_nargs_pos;
+    uint32_t max_nargs_pos;
+    bool is_complex;
 };
 
 struct ptr_hash {

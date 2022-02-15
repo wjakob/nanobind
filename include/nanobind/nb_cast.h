@@ -199,7 +199,7 @@ struct type_caster<T, enable_if_t<std::is_base_of_v<handle, T>>> {
 public:
     NB_TYPE_CASTER(T, T::cname)
 
-    bool load(handle src, bool convert) noexcept {
+    bool load(handle src, bool) noexcept {
         if (!isinstance<T>(src))
             return false;
 

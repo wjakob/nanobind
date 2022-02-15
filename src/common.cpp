@@ -372,7 +372,6 @@ void property_install(PyObject *scope, const char *name, bool is_static,
 // ========================================================================
 
 void tuple_check(PyObject *tuple, size_t nargs) {
-    bool valid = true;
     for (size_t i = 0; i < nargs; ++i) {
         if (!PyTuple_GET_ITEM(tuple, i))
             raise("nanobind::detail::tuple_check(...): conversion of argument "

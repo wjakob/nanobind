@@ -143,7 +143,7 @@ public:
             !std::is_member_function_pointer_v<Func>,
             "def_static(...) called with a non-static member function pointer");
         cpp_function_def((detail::forward_t<Func>) f, scope(*this), name(name_),
-                         is_static(), extra...);
+                         extra...);
         return *this;
     }
 
@@ -216,8 +216,8 @@ public:
     NB_INLINE class_ &def_readwrite_static(const char *name, D *pm,
                                            const Extra &...extra) {
         def_property_static(name,
-            [pm](const T &c) -> const D & { return *pm; },
-            [pm](T &c, const D &value) { *pm = value; }, extra...);
+            [pm]() -> const D & { return *pm; },
+            [pm](const D &value) { *pm = value; }, extra...);
 
         return *this;
     }
@@ -238,7 +238,7 @@ public:
     NB_INLINE class_ &def_readonly_static(const char *name, D *pm,
                                           const Extra &...extra) {
         def_property_readonly_static(name,
-            [pm](const T &c) -> const D & { return *pm; });
+            [pm]() -> const D & { return *pm; }, extra...);
 
         return *this;
     }

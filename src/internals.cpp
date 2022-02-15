@@ -66,9 +66,9 @@ extern PyObject *nb_meth_descr_get(PyObject *, PyObject *, PyObject *);
     // {"__text_signature__", (getter)meth_get__text_signature__, nullptr, nullptr},
 
 static PyGetSetDef nb_func_getset[] = {
-    { "__doc__", nb_func_get_doc, nullptr, nullptr },
-    { "__name__", nb_func_get_name, nullptr, nullptr },
-    { 0 }
+    { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
+    { "__name__", nb_func_get_name, nullptr, nullptr, nullptr },
+    { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
 static PyTypeObject nb_func_type = {

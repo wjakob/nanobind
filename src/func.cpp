@@ -11,8 +11,10 @@ NAMESPACE_BEGIN(detail)
 // Forward/external declarations
 extern Buffer buf;
 static char *type_name(const std::type_info *t);
-static PyObject *nb_func_vectorcall(PyObject *, PyObject *const *, size_t,
-                                    PyObject *);
+static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
+                                           size_t, PyObject *);
+static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
+                                            size_t, PyObject *);
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 static func_record *nb_func_get(void *o) {
@@ -91,10 +93,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
                 Py_IS_TYPE(func_prev, internals.nb_meth)) {
                 func_record *fp = nb_func_get(func_prev);
 
-                uint16_t mask = (uint16_t) func_flags::is_method |
-                                (uint16_t) func_flags::is_static;
-
-                if ((fp->flags & mask) != (f->flags & mask))
+                if ((fp->flags & (uint16_t) func_flags::is_method) !=
+                    (f ->flags & (uint16_t) func_flags::is_method))
                     fail("nb::detail::nb_func_new(\"%s\"): mismatched static/"
                          "instance method flags in function overloads!", f->name);
 
@@ -121,13 +121,13 @@ PyObject *nb_func_new(const void *in_) noexcept {
         fail("nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
              has_name ? f->name : "<anonymous>");
 
-    func->vectorcall = nb_func_vectorcall;
     func->max_nargs_pos = f->nargs - has_var_args - has_var_kwargs;
+    func->is_complex = has_args || has_var_args || has_var_kwargs;
 
     if (func_prev) {
-        size_t max_nargs_pos_prev = ((nb_func *) func_prev)->max_nargs_pos;
-        if (max_nargs_pos_prev > func->max_nargs_pos)
-            func->max_nargs_pos = max_nargs_pos_prev;
+        func->is_complex |= ((nb_func *) func_prev)->is_complex;
+        func->max_nargs_pos = std::max(func->max_nargs_pos,
+                                       ((nb_func *) func_prev)->max_nargs_pos);
 
         func_record *cur  = nb_func_get(func),
                     *prev = nb_func_get(func_prev);
@@ -146,6 +146,9 @@ PyObject *nb_func_new(const void *in_) noexcept {
         Py_CLEAR(func_prev);
     }
 
+    func->vectorcall = func->is_complex ? nb_func_vectorcall_complex
+                                        : nb_func_vectorcall_simple;
+
     /// Register the function
     PyObject *func_key = ptr_to_key(func);
     if (PySet_Add(internals.funcs, func_key))
@@ -154,10 +157,14 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     func_record *fc = nb_func_get(func) + to_copy;
     memcpy(fc, f, sizeof(func_data<0>));
-    if (!has_name)
+    if (has_name) {
+        fc->flags |= strcmp(fc->name, "__init__") == 0
+                         ? (uint16_t) func_flags::is_constructor
+                         : (uint16_t) 0;
+    } else {
         fc->name = "<anonymous>";
+    }
 
-    char *descr;
     for (size_t i = 0;; ++i) {
         if (!f->descr[i]) {
             fc->descr = (char *) malloc(sizeof(char) * (i + 1));
@@ -210,27 +217,115 @@ PyObject *nb_func_new(const void *in_) noexcept {
     }
 }
 
+/// Used by nb_func_vectorcall: generate an error when overload resolution fails
+static NB_NOINLINE PyObject *
+nb_func_error_overload(PyObject *self, PyObject *const *args_in,
+                         size_t nargs_in, PyObject *kwargs_in) noexcept {
+    const size_t count = (size_t) Py_SIZE(self);
+    func_record *f = nb_func_get(self);
+
+    buf.clear();
+    buf.put_dstr(f->name);
+    buf.put("(): incompatible function arguments. The following argument types "
+            "are supported:\n");
+
+    for (size_t i = 0; i < count; ++i) {
+        buf.put("    ");
+        buf.put_uint32(i + 1);
+        buf.put(". ");
+        buf.put_dstr(f[i].signature ? f[i].signature : "[[ missing signature ]]");
+        buf.put("\n");
+    }
+
+    buf.put("\nInvoked with types: ");
+    for (size_t i = 0; i < nargs_in; ++i) {
+        PyTypeObject *t = Py_TYPE(args_in[i]);
+        buf.put_dstr(t->tp_name);
+        if (i + 1 < nargs_in)
+            buf.put(", ");
+    }
+
+    if (kwargs_in) {
+        if (nargs_in)
+            buf.put(", ");
+        buf.put("kwargs = { ");
+
+        size_t nkwargs_in = (ssize_t) PyTuple_GET_SIZE(kwargs_in);
+        for (size_t j = 0; j < nkwargs_in; ++j) {
+            PyObject *key   = PyTuple_GET_ITEM(kwargs_in, j),
+                     *value = args_in[nargs_in + j];
+
+            const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
+            buf.put_dstr(key_cstr);
+            buf.put(": ");
+            buf.put_dstr(Py_TYPE(value)->tp_name);
+            buf.put(", ");
+        }
+        buf.rewind(2);
+        buf.put(" }");
+    }
+
+    PyErr_SetString(PyExc_TypeError, buf.get());
+    return nullptr;
+}
+
+/// Used by nb_func_vectorcall: generate an error when result conversion fails
+static NB_NOINLINE PyObject *nb_func_error_noconvert(const func_record *f) noexcept {
+    buf.clear();
+    buf.put("Unable to convert function return value to a Python "
+            "type! The signature was\n    ");
+    buf.put_dstr(f->signature ? f->signature
+                              : "[[ missing signature ]]");
+    PyErr_SetString(PyExc_TypeError, buf.get());
+    return nullptr;
+}
+
+/// Used by nb_func_vectorcall: convert a C++ exception into a Python error
+static NB_NOINLINE PyObject *nb_func_error_except() {
+    std::exception_ptr e = std::current_exception();
+    for (auto const &et : get_internals().exception_translators) {
+        try {
+            et(e);
+            return nullptr;
+        } catch (...) {
+            e = std::current_exception();
+#if defined(__GLIBCXX__)
+        } catch (abi::__forced_unwind&) {
+            throw;
+#endif
+        }
+    }
+
+    PyErr_SetString(PyExc_SystemError,
+                    "nanobind::detail::nb_func_error_except(): exception "
+                    "could not be translated!");
+
+    return nullptr;
+}
+
 /// Dispatch loop that is used to invoke functions created by nb_func_new
-PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
-                             size_t nargsf, PyObject *kwargs_in) {
+PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
+                                     size_t nargsf, PyObject *kwargs_in) {
     const size_t count      = (size_t) Py_SIZE(self),
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
-                 nkwargs_in = kwargs_in ? PyTuple_GET_SIZE(kwargs_in) : 0;
+                 nkwargs_in = kwargs_in ? (size_t) PyTuple_GET_SIZE(kwargs_in) : 0;
 
     func_record *fr = nb_func_get(self);
+    PyObject *parent = nullptr;
+    bool is_constructor = false;
 
-    PyObject *parent = nargs_in > 0 ? args_in[0] : nullptr;
-    bool is_constructor = strcmp(fr->name, "__init__") == 0;
+    if (nargs_in > 0) {
+        parent = args_in[0];
+        if (fr->flags & (uint16_t) func_flags::is_constructor) {
+            is_constructor =
+                strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
 
-    internals &internals = get_internals();
-    if (is_constructor) {
-        is_constructor &= parent && Py_TYPE(Py_TYPE(parent)) == internals.nb_type;
-
-        if (is_constructor && ((nb_inst *) parent)->destruct) {
-            PyErr_SetString(PyExc_RuntimeError,
-                            "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                            "method should only be called once!");
-            return nullptr;
+            if (is_constructor && ((nb_inst *) parent)->destruct) {
+                PyErr_SetString(PyExc_RuntimeError,
+                                "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                                "method should only be called once!");
+                return nullptr;
+            }
         }
     }
 
@@ -295,8 +390,7 @@ PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
             for (; i < nargs_pos; ++i) {
                 PyObject *arg = nullptr;
                 bool arg_convert  = pass == 1,
-                     arg_none     = false,
-                     arg_kw       = false;
+                     arg_none     = false;
 
                 if (i < nargs_in)
                     arg = args_in[i];
@@ -308,7 +402,6 @@ PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
                         PyObject *hit = nullptr;
                         for (size_t j = 0; j < nkwargs_in; ++j) {
                             PyObject *key = PyTuple_GET_ITEM(kwargs_in, j);
-                            const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
                             if (key == ad.name_py) {
                                 hit = args_in[nargs_in + j];
                                 kwarg_used[j] = true;
@@ -380,44 +473,17 @@ PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, args, args_convert,
                                  (rv_policy) (f->flags & 0b111), parent);
+            } catch (next_overload &) {
+                result = NB_NEXT_OVERLOAD;
             } catch (python_error &e) {
                 e.restore();
                 return nullptr;
-#if defined(__GLIBCXX__)
-            } catch (abi::__forced_unwind&) {
-                throw;
-#endif
-            } catch (next_overload &) {
-                result = NB_NEXT_OVERLOAD;
             } catch (...) {
-                auto &translators = internals.exception_translators;
-
-                std::exception_ptr exc = std::current_exception();
-                for (size_t i = 0; i < translators.size(); ++i) {
-                    try {
-                        translators[i](exc);
-                        return nullptr;
-                    } catch (...) {
-                        exc = std::current_exception();
-                    }
-                }
-
-                PyErr_SetString(PyExc_SystemError,
-                                "nanobind::detail::nb_func_call(): exception "
-                                "could not be translated!");
-
-                return nullptr;
+                return nb_func_error_except();
             }
 
-            if (!result) {
-                buf.clear();
-                buf.put("Unable to convert function return value to a Python "
-                        "type! The signature was\n    ");
-                buf.put_dstr(f->signature ? f->signature
-                                          : "[[ missing signature ]]");
-                PyErr_SetString(PyExc_TypeError, buf.get());
-                return nullptr;
-            }
+            if (!result)
+                return nb_func_error_noconvert(f);
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor)
@@ -427,55 +493,76 @@ PyObject *nb_func_vectorcall(PyObject *self, PyObject *const *args_in,
         }
     }
 
-    buf.clear();
-    buf.put_dstr(fr->name);
-    buf.put("(): incompatible function arguments. The following argument types "
-            "are supported:\n");
-
-    for (size_t i = 0; i < count; ++i) {
-        buf.put("    ");
-        buf.put_uint32(i + 1);
-        buf.put(". ");
-        buf.put_dstr(fr[i].signature ? fr[i].signature : "[[ missing signature ]]");
-        buf.put("\n");
-    }
-
-    buf.put("\nInvoked with types: ");
-    for (size_t i = 0; i < nargs_in; ++i) {
-        PyTypeObject *t = Py_TYPE(args_in[i]);
-        buf.put_dstr(t->tp_name);
-        if (i + 1 < nargs_in)
-            buf.put(", ");
-    }
-
-    if (kwargs_in) {
-        PyObject *key, *value;
-        Py_ssize_t pos = 0;
-
-        if (nargs_in)
-            buf.put(", ");
-        buf.put("kwargs = { ");
-
-        for (size_t j = 0; j < nkwargs_in; ++j) {
-            PyObject *key   = PyTuple_GET_ITEM(kwargs_in, j),
-                     *value = args_in[nargs_in + j];
-
-            const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
-            buf.put_dstr(key_cstr);
-            buf.put(": ");
-            buf.put_dstr(Py_TYPE(value)->tp_name);
-            buf.put(", ");
-        }
-        buf.rewind(2);
-        buf.put(" }");
-    }
-
-    PyErr_SetString(PyExc_TypeError, buf.get());
-    return nullptr;
+    return nb_func_error_overload(self, args_in, nargs_in, kwargs_in);
 }
 
-PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *type) {
-    func_record *f = nb_func_get(self);
+/// Simplified nb_func_vectorcall variant for functions w/o keyword arguments
+PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
+                                    size_t nargsf, PyObject *kwargs_in) {
+    const size_t count      = (size_t) Py_SIZE(self),
+                 nargs_in   = (size_t) PyVectorcall_NARGS(nargsf);
+
+    func_record *fr = nb_func_get(self);
+    PyObject *parent = nullptr;
+    bool is_constructor = false;
+
+    if (nargs_in > 0) {
+        parent = args_in[0];
+
+        if (fr->flags & (uint16_t) func_flags::is_constructor) {
+            is_constructor =
+                strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
+
+            if (is_constructor && ((nb_inst *) parent)->destruct) {
+                PyErr_SetString(PyExc_RuntimeError,
+                                "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                                "method should only be called once!");
+                return nullptr;
+            }
+        }
+    }
+
+    bool *args_convert = (bool *) alloca(nargs_in * sizeof(bool));
+
+    PyObject *result = NB_NEXT_OVERLOAD;
+    for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
+        memset(args_convert, pass, nargs_in * sizeof(bool));
+
+        for (size_t k = 0; k < count; ++k) {
+            const func_record *f = fr + k;
+
+            if (nargs_in != f->nargs)
+                continue;
+
+            try {
+                // Found a suitable overload, let's try calling it
+                result = f->impl((void *) f->capture, (PyObject **) args_in,
+                                 args_convert, (rv_policy) (f->flags & 0b111),
+                                 parent);
+            } catch (next_overload &) {
+                result = NB_NEXT_OVERLOAD;
+            } catch (python_error &e) {
+                e.restore();
+                return nullptr;
+            } catch (...) {
+                return nb_func_error_except();
+            }
+
+            if (!result)
+                return nb_func_error_noconvert(f);
+
+            if (result != NB_NEXT_OVERLOAD) {
+                if (is_constructor)
+                    ((nb_inst *) parent)->destruct = true;
+                return result;
+            }
+        }
+    }
+
+    return nb_func_error_overload(self, args_in, nargs_in, kwargs_in);
+}
+
+PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     if (inst) {
         /* Return a classic bound method. This should be avoidable
            in most cases via the 'CALL_METHOD' opcode and vector calls. PyTest
@@ -506,8 +593,7 @@ void nb_func_finalize() noexcept {
             const bool is_method      = f->flags & (uint16_t) func_flags::is_method,
                        has_args       = f->flags & (uint16_t) func_flags::has_args,
                        has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
-                       has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs,
-                       has_doc        = f->flags & (uint16_t) func_flags::has_doc;
+                       has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs;
 
             const std::type_info **descr_type = f->descr_types;
 

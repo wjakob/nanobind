@@ -108,11 +108,11 @@ NAMESPACE_END(detail)
 
 class handle : public detail::api<handle> {
     friend class python_error;
-    friend class detail::str_attr;
-    friend class detail::obj_attr;
-    friend class detail::str_item;
-    friend class detail::obj_item;
-    friend class detail::num_item;
+    friend struct detail::str_attr;
+    friend struct detail::obj_attr;
+    friend struct detail::str_item;
+    friend struct detail::obj_item;
+    friend struct detail::num_item;
 public:
     static constexpr auto cname = detail::const_name("handle");
 
@@ -128,7 +128,7 @@ public:
 
     NB_INLINE operator bool() const { return m_ptr != nullptr; }
     NB_INLINE PyObject *ptr() const { return m_ptr; }
-    NB_INLINE static bool check_(handle h) { return true; }
+    NB_INLINE static bool check_(handle) { return true; }
 
 protected:
     PyObject *m_ptr = nullptr;

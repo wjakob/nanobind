@@ -219,7 +219,7 @@ PyObject *type_new(const type_data *t) noexcept {
     return (PyObject *) type;
 }
 
-bool type_get(const std::type_info *cpp_type, PyObject *o, bool convert,
+bool type_get(const std::type_info *cpp_type, PyObject *o, bool ,
               void **out) noexcept {
     if (o == nullptr || o == Py_None) {
         *out = nullptr;

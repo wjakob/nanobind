@@ -28,7 +28,6 @@ struct arg_v : arg {
 };
 
 struct is_method { };
-struct is_static { };
 
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
@@ -53,8 +52,8 @@ enum class func_flags : uint16_t {
     has_var_kwargs = (1 << 9),
     /// Is this function a class method?
     is_method      = (1 << 10),
-    /// Is this function a static class method?
-    is_static      = (1 << 11),
+    /// Is this function a method called __init__? (automatically generated)
+    is_constructor = (1 << 11),
     /// When the function is GCed, do we need to call func_data::free?
     has_free       = (1 << 12),
     /// Should the func_new() call return a new reference?
@@ -119,10 +118,6 @@ NB_INLINE void func_extra_apply(F &f, const char *doc, size_t &) {
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, is_method, size_t &) {
     f.flags |= (uint16_t) func_flags::is_method;
-}
-
-template <typename F> NB_INLINE void func_extra_apply(F &f, is_static, size_t &) {
-    f.flags |= (uint16_t) func_flags::is_static;
 }
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, rv_policy pol, size_t &) {

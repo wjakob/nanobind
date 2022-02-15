@@ -70,6 +70,23 @@ target_include_directories(nanobind PRIVATE
 
 SET(NB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Strip unnecessary sections of the binary on Linux/macOS
+function(nanobind_strip name)
+  if (CMAKE_STRIP AND NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
+    if(APPLE)
+      set(NB_STRIP_OPT -x)
+    endif()
+
+    add_custom_command(
+      TARGET ${name}
+      POST_BUILD
+      COMMAND ${CMAKE_STRIP} ${NB_STRIP_OPT} $<TARGET_FILE:${name}>)
+  endif()
+endfunction()
+
+
+nanobind_strip(nanobind)
+
 function(nanobind_add_module name)
   if (MSVC)
     set(NB_OPT_SIZE /Os)
@@ -97,17 +114,7 @@ function(nanobind_add_module name)
   target_link_libraries(${name} PRIVATE nanobind)
   set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ${NB_SUFFIX})
   target_include_directories(${name} PRIVATE ${NB_SOURCE_DIR}/include)
-
-  if(NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
-    if(APPLE)
-      set(NB_STRIP_OPT -x)
-    endif()
-
-    add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND ${CMAKE_STRIP} ${NB_STRIP_OPT} $<TARGET_FILE:${name}>)
-  endif()
+  nanobind_strip(${name})
 endfunction()
 
 if (NB_TEST)

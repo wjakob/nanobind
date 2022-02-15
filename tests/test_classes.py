@@ -167,3 +167,16 @@ def test05_reference_internal():
         'destructed': 2
     }
 
+
+def test06_big():
+    x = [t.Big() for i in range(1024)]
+    x = [t.BigAligned() for i in range(1024)]
+
+
+def test07_inheritance():
+    dog = t.Dog('woof')
+    cat = t.Cat('meow')
+    assert isinstance(dog, t.Animal) and isinstance(dog, t.Dog)
+    assert isinstance(cat, t.Animal) and isinstance(cat, t.Cat)
+    assert t.go(dog) == 'Dog says woof'
+    assert t.go(cat) == 'Cat says meow'

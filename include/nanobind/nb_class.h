@@ -30,8 +30,6 @@ struct type_data {
     void (*move)(void *, void *);
 };
 
-template <typename T> NB_INLINE void type_extra_apply(type_data &, const T &) { }
-
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
     t.flags |= (uint16_t) type_flags::has_base_py;
     t.base_py = (PyTypeObject *) h.ptr();
@@ -118,7 +116,7 @@ public:
             }
         }
 
-        (detail::type_extra_apply(&d, extra), ...);
+        (detail::type_extra_apply(d, extra), ...);
 
         m_ptr = detail::type_new(&d);
     }

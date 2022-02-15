@@ -10,7 +10,6 @@ NAMESPACE_BEGIN(detail)
 
 // Forward/external declarations
 extern Buffer buf;
-static char *type_name(const std::type_info *t);
 static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *);
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
@@ -759,7 +758,7 @@ static void strexc(char *s, const char *sub) {
 }
 
 /// Return a readable string representation of a C++ type
-static char *type_name(const std::type_info *t) {
+char *type_name(const std::type_info *t) {
     const char *name_in = t->name();
 
 #if defined(__GNUG__)

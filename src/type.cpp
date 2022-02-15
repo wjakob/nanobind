@@ -141,10 +141,6 @@ PyObject *type_new(const type_data *t) noexcept {
                has_base    = t->flags & (uint16_t) type_flags::has_base,
                has_base_py = t->flags & (uint16_t) type_flags::has_base_py;
 
-    if (has_base && has_base_py)
-        fail("nanobind::detail::type_new(\"%s\"): multiple base types "
-             "specified!", t->name);
-
     str name(t->name), qualname = name, fullname = name;
 
     if (has_scope && !PyModule_Check(t->scope)) {
@@ -179,6 +175,20 @@ PyObject *type_new(const type_data *t) noexcept {
     ht->ht_name = name.release().ptr();
     ht->ht_qualname = qualname.release().ptr();
 
+    PyTypeObject *base = nullptr;
+    if (has_base_py) {
+        if (has_base)
+            fail("nanobind::detail::type_new(\"%s\"): multiple base types "
+                 "specified!", t->name);
+        base = t->base_py;
+    } else if (has_base) {
+        auto it = internals.type_c2p.find(std::type_index(*t->base));
+        if (it == internals.type_c2p.end())
+            fail("nanobind::detail::type_new(\"%s\"): base type "
+                 "\"%s\" not found!", t->name, type_name(t->base));
+        base = it->second->type_py;
+    }
+
     PyTypeObject *type = &ht->ht_type;
 
     type->tp_name = t->name;
@@ -192,6 +202,7 @@ PyObject *type_new(const type_data *t) noexcept {
     if (t->align > sizeof(void *))
         type->tp_itemsize += (Py_ssize_t) (t->align - sizeof(void *));
 
+    type->tp_base = base;
     type->tp_init = inst_init;
     type->tp_new = inst_new;
     type->tp_dealloc = inst_dealloc;
@@ -238,8 +249,7 @@ bool type_get(const std::type_info *cpp_type, PyObject *o, bool ,
     // Recover pointer to C++ type_data entry
     type_data *t = get_extra<type_data>(type);
 
-    // Fast path
-    if (t->type == cpp_type || *t->type == *cpp_type) {
+    if (t->type == cpp_type || *t->type == *cpp_type || PyType_IsSubtype(type, t->type_py)) {
         *out = ((nb_inst *) o)->value;
         return true;
     } else {

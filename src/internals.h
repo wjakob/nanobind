@@ -17,6 +17,7 @@ struct func_record : func_data<0> {
 /// Python object representing an instance of a bound C++ type
 struct nb_inst {
     PyObject_HEAD
+
     void *value;
     /// Should the destructor be called when this instance is GCed?
     bool destruct : 1;
@@ -24,7 +25,7 @@ struct nb_inst {
     /// Should the instance pointer be freed when this instance is GCed?
     bool free : 1;
 
-    /// Does this instance hold reference to others? (via instance->refs)
+    /// Does this instance hold reference to others? (via internals.keep_alive)
     bool clear_keep_alive : 1;
 };
 
@@ -41,7 +42,7 @@ struct ptr_hash {
         size_t hash_1 = (size_t) value.first;
         hash_1 = (hash_1 >> 4) | (hash_1 << (8 * sizeof(size_t) - 4));
         size_t hash_2 = value.second.hash_code();
-        return hash_1 + hash_2 * 3;
+        return hash_1 ^ hash_2;
     }
 };
 
@@ -71,6 +72,7 @@ struct internals {
 };
 
 extern internals &get_internals() noexcept;
+extern char *type_name(const std::type_info *t);
 
 /* The following two functions convert between pointers and Python long values
    that can be used as hash keys. They internally perform rotations to avoid

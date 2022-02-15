@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 #include <memory>
 
 namespace nb = nanobind;
@@ -37,7 +38,18 @@ struct PairStruct {
     Struct s2;
 };
 
-struct alignas(1024) Big { char data[1024]; };
+struct Big {
+    char data[1024];
+    Big() { memset(data, 0xFF, 1024); }
+};
+struct alignas(1024) BigAligned {
+    char data[1024];
+    BigAligned() {
+        if (((uintptr_t) data) % 1024)
+            throw std::runtime_error("data is not aligned!");
+        memset(data, 0xFF, 1024);
+    }
+};
 
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::unique_ptr<Struct>(new Struct(12));
@@ -85,4 +97,38 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<Big>(m, "Big")
         .def(nb::init<>());
+
+    nb::class_<BigAligned>(m, "BigAligned")
+        .def(nb::init<>());
+
+    struct Animal {
+        virtual std::string type() const = 0;
+        virtual const std::string &what() const = 0;
+        virtual ~Animal() = default;
+    };
+
+    struct Dog : Animal {
+        Dog(const std::string &s) : s(s) { }
+        std::string type() const override { return "Dog"; }
+        const std::string &what() const override { return s; }
+        std::string s;
+    };
+
+    struct Cat : Animal {
+        Cat(const std::string &s) : s(s) { }
+        std::string type() const override { return "Cat"; }
+        const std::string &what() const override { return s; }
+        std::string s;
+    };
+
+    auto animal = nb::class_<Animal>(m, "Animal");
+    nb::class_<Dog, Animal>(m, "Dog")
+        .def(nb::init<const std::string &>());
+
+    nb::class_<Cat>(m, "Cat", animal)
+        .def(nb::init<const std::string &>());
+
+    m.def("go", [](Animal *a) {
+        return a->type() + " says " + a->what();
+    });
 }

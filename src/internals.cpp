@@ -147,14 +147,26 @@ void default_exception_translator(std::exception_ptr p) {
 static void internals_cleanup() {
     auto &inst_c2p = internals_p->inst_c2p;
     auto &type_c2p = internals_p->type_c2p;
+    bool leak = false;
 
-    if (!inst_c2p.empty())
+    if (!inst_c2p.empty()) {
         fprintf(stderr, "nanobind: leaked %zu instances!\n", inst_c2p.size());
+        leak = true;
+    }
 
     if (!type_c2p.empty()) {
         fprintf(stderr, "nanobind: leaked %zu types!\n", type_c2p.size());
         for (const auto &kv : type_c2p)
             fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
+        leak = true;
+    }
+
+    if (!leak) {
+        delete internals_p;
+        internals_p = nullptr;
+    } else {
+        fprintf(stderr, "nanobind: this is likely caused by a reference "
+                        "counting issue in the binding code.\n");
     }
 }
 

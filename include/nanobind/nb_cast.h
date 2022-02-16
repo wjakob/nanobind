@@ -300,9 +300,9 @@ template <typename T> arg_v arg::operator=(T &&value) const {
     return arg_v(*this, cast((detail::forward_t<T>) value));
 }
 
-template <typename Policy> template <typename T>
-detail::accessor<Policy>& detail::accessor<Policy>::operator=(T &&value) {
-    Policy::set(m_obj, m_key, cast((detail::forward_t<T>) value));
+template <typename Impl> template <typename T>
+detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
+    Impl::set(m_base, m_key, cast((detail::forward_t<T>) value));
     return *this;
 }
 

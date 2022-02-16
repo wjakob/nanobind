@@ -88,6 +88,12 @@ NB_CORE PyObject *obj_call(PyObject *callable, PyObject *args);
 NB_CORE PyObject *obj_call_kw(PyObject *callable, PyObject *args,
                               PyObject *kwargs);
 
+#if PY_VERSION_HEX >= 0x03090000
+// Perform a faster vector function call
+NB_CORE PyObject *obj_vectorcall(PyObject *base, PyObject *const *args,
+                                 size_t nargsf, PyObject *kwnames,
+                                 bool method_call);
+#endif
 
 // ========================================================================
 

@@ -45,7 +45,7 @@ template <typename T = object> T steal(handle h);
 
 NAMESPACE_BEGIN(detail)
 
-template <typename Policy> class accessor;
+template <typename Impl> class accessor;
 struct str_attr; struct obj_attr;
 struct str_item; struct obj_item; struct num_item;
 class args_proxy; class kwargs_proxy;

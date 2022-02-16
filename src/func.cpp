@@ -15,11 +15,6 @@ static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *);
 
-/// Fetch the nanobind function record from a 'nb_func' instance
-static func_record *nb_func_get(void *o) {
-    return (func_record *) (((char *) o) + sizeof(nb_func));
-}
-
 /// Free a function overload chain
 void nb_func_dealloc(PyObject *self) {
     Py_ssize_t size = Py_SIZE(self);

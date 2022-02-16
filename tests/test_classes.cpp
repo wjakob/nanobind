@@ -131,4 +131,12 @@ NB_MODULE(test_classes_ext, m) {
     m.def("go", [](Animal *a) {
         return a->type() + " says " + a->what();
     });
+
+    m.def("call_function", [](nb::handle h) {
+        return h(1, 2, "hello", true, 4);
+    });
+
+    m.def("call_method", [](nb::handle h) {
+        return h.attr("f")(1, 2, "hello", true, 4);
+    });
 }

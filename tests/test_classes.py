@@ -44,7 +44,6 @@ def test03_double_init():
         s.__init__()
     assert 'the __init__ method should only be called once!' in str(excinfo.value)
 
-
 def test04_rv_policy():
     gc.collect()
     t.reset()
@@ -180,3 +179,21 @@ def test07_inheritance():
     assert isinstance(cat, t.Animal) and isinstance(cat, t.Cat)
     assert t.go(dog) == 'Dog says woof'
     assert t.go(cat) == 'Cat says meow'
+
+
+def test08_vectorcall():
+    out = []
+
+    def f(a, b, c, d, e):
+        out.append((a, b, c, d, e))
+
+    class my_class:
+        def f(self, a, b, c, d, e):
+            self.out = ((a, b, c, d, e))
+
+    t.call_function(f)
+
+    i = my_class()
+    t.call_method(i)
+    assert out == [(1, 2, "hello", True, 4)]
+    assert i.out == (1, 2, "hello", True, 4)

@@ -75,9 +75,42 @@ object api<Derived>::operator()(Args &&...args) const {
         return steal(obj_call_kw(derived().ptr(), args_py.release().ptr(),
                                  kwargs_py.release().ptr()));
     } else {
+#if PY_VERSION_HEX < 0x03090000
         // Simple call using only positional arguments
         tuple args_py = make_tuple<policy>((forward_t<Args>) args...);
         return steal(obj_call(derived().ptr(), args_py.release().ptr()));
+#else
+        /// More efficient version of the above using a vector call
+        PyObject *args_py[sizeof...(Args) + 1],
+                 **args_ptr = nullptr,
+                 *base = nullptr;
+        size_t nargs = 0;
+
+        ((args_py[1 + nargs++] =
+              detail::make_caster<Args>::cast((detail::forward_t<Args>) args,
+                                              policy, nullptr).ptr()),
+         ...);
+
+        static constexpr bool method_call =
+            std::is_same_v<Derived, accessor<obj_attr>> ||
+            std::is_same_v<Derived, accessor<str_attr>>;
+
+        if constexpr (method_call) {
+            base = derived().key().release().ptr();
+            args_py[0] = derived().base().inc_ref().ptr();
+            args_ptr = args_py;
+            nargs++;
+        } else {
+            base = derived().inc_ref().ptr();
+            args_py[0] = nullptr;
+            args_ptr = args_py + 1;
+        }
+
+        nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;
+
+        return steal(
+            obj_vectorcall(base, args_ptr, nargs, nullptr, method_call));
+#endif
     }
 }
 

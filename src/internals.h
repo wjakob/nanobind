@@ -95,6 +95,12 @@ inline void *key_to_ptr(PyObject *o) {
     return (void *) i;
 }
 
+/// Fetch the nanobind function record from a 'nb_func' instance
+inline func_record *nb_func_get(void *o) {
+    return (func_record *) (((char *) o) + sizeof(nb_func));
+}
+
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 

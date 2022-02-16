@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include "internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -161,6 +162,47 @@ PyObject *obj_call_kw(PyObject *callable, PyObject *args, PyObject *kwargs) {
 
     return res;
 }
+
+#if PY_VERSION_HEX >= 0x03090000
+
+PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
+                         PyObject *kwnames, bool method_call) {
+    const char *error = nullptr;
+    PyObject *res = nullptr;
+
+    size_t nargs_total =
+        PyVectorcall_NARGS(nargsf) + (kwnames ? PyTuple_GET_SIZE(kwnames) : 0);
+
+    if (!PyGILState_Check()) {
+        error = "nanobind::detail::obj_vectorcall(): PyGILState_Check() failure." ;
+        goto end;
+    }
+
+    for (size_t i = 0; i < nargs_total; ++i) {
+        if (!args[i]) {
+            error = "nanobind::detail::obj_vectorcall(): argument conversion failure." ;
+            goto end;
+        }
+    }
+
+    res = (method_call ? PyObject_VectorcallMethod
+                       : PyObject_Vectorcall)(base, args, nargsf, kwnames);
+
+end:
+    for (size_t i = 0; i < nargs_total; ++i)
+        Py_XDECREF(args[i]);
+    Py_XDECREF(kwnames);
+    Py_DECREF(base);
+
+    if (error)
+        raise("%s", error);
+    else if (!res)
+        python_error_raise();
+
+    return res;
+}
+
+#endif
 
 // ========================================================================
 
@@ -334,6 +376,7 @@ bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept {
         out[i] = PySequence_GetItem(seq, (Py_ssize_t) i);
 
         if (!out[i]) {
+            PyErr_Clear();
             for (size_t j = 0; j < i; ++j)
                 Py_DECREF(out[j]);
             return false;
@@ -351,15 +394,13 @@ void property_install(PyObject *scope, const char *name, bool is_static,
     (void) is_static;
     PyObject *m = getter ? getter : setter;
     object doc = none();
+    const internals &internals = internals_get();
 
-    if (m) {
-        m = PyInstanceMethod_Check(m) ? PyInstanceMethod_GET_FUNCTION(m) : m;
-        if (PyCFunction_Check(m)) {
-            func_data<0> *f = (func_data<0> *) PyCapsule_GetPointer(
-                PyCFunction_GET_SELF(m), nullptr);
-            if (f->flags & (uint32_t) func_flags::has_doc)
-                doc = str(f->doc);
-        }
+    if (m && (Py_IS_TYPE(m, internals.nb_func) ||
+              Py_IS_TYPE(m, internals.nb_meth))) {
+        func_record *f = nb_func_get(m);
+        if (f->flags & (uint32_t) func_flags::has_doc)
+            doc = str(f->doc);
     }
 
     handle(scope).attr(name) = property(
@@ -403,7 +444,7 @@ void call_append_args(PyObject *args, size_t &nargs, PyObject *value) {
 }
 
 void call_append_kwarg(PyObject *kwargs, const char *name, PyObject *value) {
-    PyObject *key = PyUnicode_FromString(name);
+    PyObject *key = PyUnicode_InternFromString(name);
     if (!key)
         python_error_raise();
 

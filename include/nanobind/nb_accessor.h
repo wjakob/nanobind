@@ -1,10 +1,10 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename Policy> class accessor : public api<accessor<Policy>> {
+template <typename Impl> class accessor : public api<accessor<Impl>> {
 public:
     template <typename Key>
-    accessor(handle obj, Key &&key) : m_obj(obj), m_key(std::move(key)) { }
+    accessor(handle obj, Key &&key) : m_base(obj), m_key(std::move(key)) { }
     accessor(const accessor &) = delete;
     accessor(accessor &&) = delete;
 
@@ -13,16 +13,18 @@ public:
     template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
     operator T() const { return borrow<T>(ptr()); }
     NB_INLINE PyObject *ptr() const { return get().ptr(); }
+    NB_INLINE handle base() const { return m_base; }
+    NB_INLINE object key() const { return Impl::key(m_key); }
 
 private:
     object &get() const {
-        Policy::get(m_obj, m_key, m_cache);
+        Impl::get(m_base, m_key, m_cache);
         return m_cache;
     }
 
 private:
-    handle m_obj;
-    typename Policy::key_type m_key;
+    handle m_base;
+    typename Impl::key_type m_key;
     mutable object m_cache;
 };
 
@@ -36,6 +38,10 @@ struct str_attr {
     NB_INLINE static void set(handle obj, const char *key, handle val) {
         setattr(obj.ptr(), key, val.ptr());
     }
+
+    NB_INLINE static object key(const char *key) {
+        return steal(PyUnicode_InternFromString(key));
+    }
 };
 
 struct obj_attr {
@@ -47,6 +53,10 @@ struct obj_attr {
 
     NB_INLINE static void set(handle obj, handle key, handle val) {
         setattr(obj.ptr(), key.ptr(), val.ptr());
+    }
+
+    NB_INLINE static object key(handle key) {
+        return borrow(key);
     }
 };
 
@@ -60,6 +70,10 @@ struct str_item {
     NB_INLINE static void set(handle obj, const char *key, handle val) {
         setitem(obj.ptr(), key, val.ptr());
     }
+
+    NB_INLINE static object key(const char *key) {
+        return steal(PyUnicode_InternFromString(key));
+    }
 };
 
 struct obj_item {
@@ -72,6 +86,10 @@ struct obj_item {
     NB_INLINE static void set(handle obj, handle key, handle val) {
         setitem(obj.ptr(), key.ptr(), val.ptr());
     }
+
+    NB_INLINE static object key(handle key) {
+        return borrow(key);
+    }
 };
 
 struct num_item {
@@ -83,6 +101,10 @@ struct num_item {
 
     NB_INLINE static void set(handle obj, Py_ssize_t key, handle val) {
         setitem(obj.ptr(), key, val.ptr());
+    }
+
+    NB_INLINE static object key(Py_ssize_t key) {
+        return steal(PyLong_FromSsize_t(key));
     }
 };
 

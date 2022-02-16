@@ -18,6 +18,12 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 nb_inst *inst_new_impl(nb_type *type, void *value) {
     nb_inst *self =
         (nb_inst *) PyType_GenericAlloc((PyTypeObject *) type, value ? -1 : 0);
+    printf("Allocating: %s\n", type->ht.ht_type.tp_name);
+
+    // Walk back in inheritance chain to find the last original C++ type
+    while (!type->t.type)
+        type = (nb_type *) type->ht.ht_type.tp_base;
+    printf(" ->allocating: %s\n", type->t.name);
 
     if (value) {
         self->value = value;
@@ -49,6 +55,12 @@ static void inst_dealloc(PyObject *self) {
     nb_inst *inst = (nb_inst *) self;
     nb_type *type = (nb_type *) Py_TYPE(self);
 
+    while (!type->t.type) {
+        printf("Yes, here..\n");
+        type = (nb_type *) type->ht.ht_type.tp_base;
+    }
+    printf("Deleting %s\n", type->t.name);
+
     if (inst->destruct) {
         if (type->t.flags & (int16_t) type_flags::is_destructible) {
             if (type->t.flags & (int16_t) type_flags::has_destruct)
@@ -69,22 +81,16 @@ static void inst_dealloc(PyObject *self) {
 
     internals &internals = internals_get();
     if (inst->clear_keep_alive) {
-        PyObject *self_key = ptr_to_key(self),
-                 *set = PyDict_GetItem(internals.keep_alive, self_key);
+        auto it = internals.keep_alive.find(self);
+        if (it == internals.keep_alive.end())
+            fail("nanobind::detail::inst_dealloc(\"%s\"): inconsistent keep_alive information",
+                 type->ht.ht_type.tp_name);
 
-        Py_ssize_t i = 0;
-        PyObject *key;
-        Py_hash_t hash;
+        tsl_ptr_set ref_set = std::move(it.value());
+        internals.keep_alive.erase(it);
 
-        while (_PySet_NextEntry(set, &i, &key, &hash))
-            Py_DECREF((PyObject *) key_to_ptr(key));
-
-        int rv = PyDict_DelItem(internals.keep_alive, self_key);
-        if (rv || set == nullptr)
-            fail("nanobind::detail::inst_dealloc(\"%s\"): failure while "
-                 "clearing references!", type->ht.ht_type.tp_name);
-
-        Py_DECREF(self_key);
+        for (void *v: ref_set)
+            Py_DECREF((PyObject *) v);
     }
 
     // Update hash table that maps from C++ to Python instance
@@ -102,13 +108,15 @@ static void inst_dealloc(PyObject *self) {
 void nb_type_dealloc(PyObject *o) {
     nb_type *nbt = (nb_type *) o;
 
-    // Try to find type in data structure
-    internals &internals = internals_get();
-    auto it = internals.type_c2p.find(std::type_index(*nbt->t.type));
-    if (it == internals.type_c2p.end())
-        fail("nanobind::detail::nb_type_dealloc(\"%s\"): could not find type!",
-             ((PyTypeObject *) o)->tp_name);
-    internals.type_c2p.erase(it);
+    if (nbt->t.type) {
+        // Try to find type in data structure
+        internals &internals = internals_get();
+        auto it = internals.type_c2p.find(std::type_index(*nbt->t.type));
+        if (it == internals.type_c2p.end())
+            fail("nanobind::detail::nb_type_dealloc(\"%s\"): could not find type!",
+                 ((PyTypeObject *) o)->tp_name);
+        internals.type_c2p.erase(it);
+    }
 
     PyType_Type.tp_dealloc(o);
 }
@@ -246,44 +254,13 @@ void inst_keep_alive(PyObject *nurse, PyObject *patient) {
     if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
         raise("inst_keep_alive(): expected a nb_type 'nurse' argument");
 
-    PyObject *nurse_key   = ptr_to_key(nurse),
-             *patient_key = ptr_to_key(patient);
+    tsl_ptr_set &keep_alive = internals.keep_alive[nurse];
 
-    PyObject *nurse_set = PyDict_GetItem(internals.keep_alive, nurse_key);
-    int rv;
-
-    if (!nurse_set) {
-        PyErr_Clear();
-        nurse_set = PySet_New(nullptr);
-        if (!nurse_set)
-            goto error;
-
-        rv = PyDict_SetItem(internals.keep_alive, nurse_key, nurse_set);
-        if (rv)
-            goto error;
-
-        Py_DECREF(nurse_set);
-    }
-
-    rv = PySet_Contains(nurse_set, patient_key);
-    if (rv == 0) {
-        int rv = PySet_Add(nurse_set, patient_key);
-        if (rv)
-            goto error;
-
+    auto [it, success] = keep_alive.insert(patient);
+    if (success) {
         Py_INCREF(patient);
         ((nb_inst *) nurse)->clear_keep_alive = true;
-    } else if (rv < 0) {
-        goto error;
     }
-
-    Py_DECREF(nurse_key);
-    Py_DECREF(patient_key);
-
-    return;
-
-error:
-    fail("nanobind::detail::inst_keep_alive(): internal error!");
 }
 
 PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
@@ -294,7 +271,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
         return Py_None;
     }
 
-    // Check if the nb_inst is already registered with nanobind
+    // Check if the instance is already registered with nanobind
     internals &internals = internals_get();
     auto it = internals.inst_c2p.find(
         std::pair<void *, std::type_index>(value, *cpp_type));

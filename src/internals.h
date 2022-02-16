@@ -44,13 +44,25 @@ struct nb_func {
 };
 
 struct ptr_hash {
-    NB_INLINE size_t operator()(const std::pair<void *, std::type_index> &value) const {
-        size_t hash_1 = (size_t) value.first;
-        hash_1 = (hash_1 >> 4) | (hash_1 << (8 * sizeof(size_t) - 4));
-        size_t hash_2 = value.second.hash_code();
-        return hash_1 ^ hash_2;
+    size_t operator()(const void *p) const {
+        uintptr_t v = (uintptr_t) p;
+        // fmix64 from MurmurHash by Austin Appleby (public domain)
+        v ^= v >> 33;
+        v *= (uintptr_t) 0xff51afd7ed558ccdull;
+        v ^= v >> 33;
+        v *= (uintptr_t) 0xc4ceb9fe1a85ec53ull;
+        v ^= v >> 33;
+        return (size_t) v;
     }
 };
+
+struct ptr_type_hash {
+    NB_INLINE size_t operator()(const std::pair<const void *, std::type_index> &value) const {
+        return ptr_hash()(value.first) ^ value.second.hash_code();
+    }
+};
+
+using tsl_ptr_set = tsl::robin_set<void *, ptr_hash>;
 
 struct internals {
     /// Base type of all nanobind types
@@ -63,16 +75,16 @@ struct internals {
     PyTypeObject *nb_meth;
 
     /// Instance pointer -> Python object mapping
-    tsl::robin_pg_map<std::pair<void *, std::type_index>, nb_inst *, ptr_hash> inst_c2p;
+    tsl::robin_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash> inst_c2p;
 
     /// C++ type -> Python type mapping
-    tsl::robin_pg_map<std::type_index, type_data *> type_c2p;
+    tsl::robin_map<std::type_index, type_data *> type_c2p;
 
     /// Python dictionary of sets storing keep_alive references
-    PyObject *keep_alive;
+    tsl::robin_map<void *, tsl_ptr_set, ptr_hash> keep_alive;
 
     /// Python set of functions for docstring generation
-    PyObject *funcs;
+    tsl_ptr_set funcs;
 
     std::vector<void (*)(std::exception_ptr)> exception_translators;
 };

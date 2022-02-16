@@ -8,10 +8,12 @@ def test01_capture():
     assert t.test_03(5, 3) == 44
     assert t.test_04() == 60
 
+
 def test02_default_args():
     # Default arguments
     assert t.test_02() == 7
     assert t.test_02(7) == 6
+
 
 def test03_kwargs():
     # Basic use of keyword arguments
@@ -19,9 +21,11 @@ def test03_kwargs():
     assert t.test_02(3, k=5) == -2
     assert t.test_02(k=5, j=3) == -2
 
+
 def test04_overloads():
     assert t.test_05(0) == 1
     assert t.test_05(0.0) == 2
+
 
 def test05_signature():
     assert t.test_01.__doc__ == 'test_01() -> None'
@@ -55,10 +59,12 @@ def test06_signature_error():
         "    2. test_05(arg0: float) -> int\n\n"
         "Invoked with types: str, kwargs = { y: int }")
 
+
 def test07_raises():
     with pytest.raises(RuntimeError) as excinfo:
         t.test_06()
     assert str(excinfo.value) == "oops!"
+
 
 def test08_args_kwargs():
     assert t.test_07(1, 2) == (0, 0)
@@ -74,6 +80,7 @@ def test09_maketuple():
         assert t.test_bad_tuple()
     assert str(excinfo.value) == (
         "nanobind::detail::tuple_check(...): conversion of argument 2 failed!")
+
 
 def test10_cpp_call_simple():
     result = []

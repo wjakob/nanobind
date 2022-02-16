@@ -145,19 +145,34 @@ void default_exception_translator(std::exception_ptr p) {
 }
 
 static void internals_cleanup() {
-    auto &inst_c2p = internals_p->inst_c2p;
-    auto &type_c2p = internals_p->type_c2p;
     bool leak = false;
 
-    if (!inst_c2p.empty()) {
-        fprintf(stderr, "nanobind: leaked %zu instances!\n", inst_c2p.size());
+    if (!internals_p->inst_c2p.empty()) {
+        fprintf(stderr, "nanobind: leaked %zu instances!\n",
+                internals_p->inst_c2p.size());
         leak = true;
     }
 
-    if (!type_c2p.empty()) {
-        fprintf(stderr, "nanobind: leaked %zu types!\n", type_c2p.size());
-        for (const auto &kv : type_c2p)
+    if (!internals_p->keep_alive.empty()) {
+        fprintf(stderr, "nanobind: leaked %zu keep_alive records!\n",
+                internals_p->keep_alive.size());
+        leak = true;
+    }
+
+    if (!internals_p->type_c2p.empty()) {
+        fprintf(stderr, "nanobind: leaked %zu types!\n",
+                internals_p->type_c2p.size());
+        for (const auto &kv : internals_p->type_c2p)
             fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
+        leak = true;
+    }
+
+    if (!internals_p->funcs.empty()) {
+        fprintf(stderr, "nanobind: leaked %zu functions!\n",
+                internals_p->funcs.size());
+        for (void *f : internals_p->funcs)
+            fprintf(stderr, " - leaked function \"%s\"\n",
+                    nb_func_get(f)->name);
         leak = true;
     }
 
@@ -202,8 +217,6 @@ static void internals_make() {
     internals_p->nb_type = &nb_type;
     internals_p->nb_func = &nb_func_type;
     internals_p->nb_meth = &nb_meth_type;
-    internals_p->keep_alive = PyDict_New();
-    internals_p->funcs = PySet_New(nullptr);
 }
 
 static void internals_fetch() {

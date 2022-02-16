@@ -17,23 +17,23 @@ static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
 
 /// Free a function overload chain
 void nb_func_dealloc(PyObject *self) {
-    Py_ssize_t size = Py_SIZE(self);
+    size_t size = (size_t) Py_SIZE(self);
 
     if (size) {
         func_record *f = nb_func_get(self);
 
         // Delete from registered function list
-        PyObject *self_key = ptr_to_key(self);
-        int rv = PySet_Discard(internals_get().funcs, self_key);
-        Py_DECREF(self_key);
-        if (rv != 1) {
+        auto &funcs = internals_get().funcs;
+        auto it = funcs.find(self);
+        if (it == funcs.end()) {
             const char *name = (f->flags & (uint16_t) func_flags::has_name)
                                    ? f->name : "<anonymous>";
             fail("nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
                  name);
         }
+        funcs.erase(it);
 
-        for (Py_ssize_t i = 0; i < size; ++i) {
+        for (size_t i = 0; i < size; ++i) {
             if (f->flags & (uint16_t) func_flags::has_free)
                 f->free(f->capture);
 
@@ -131,23 +131,19 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
-        PyObject *func_prev_key = ptr_to_key(func_prev);
-        int rv = PySet_Discard(internals.funcs, func_prev_key);
-        if (rv != 1)
+        auto it = internals.funcs.find(func_prev);
+        if (it == internals.funcs.end())
             fail("nanobind::detail::nb_func_new(): internal update failed (1)!");
-
-        Py_CLEAR(func_prev_key);
-        Py_CLEAR(func_prev);
+        internals.funcs.erase(it);
     }
 
     func->vectorcall = func->is_complex ? nb_func_vectorcall_complex
                                         : nb_func_vectorcall_simple;
 
-    /// Register the function
-    PyObject *func_key = ptr_to_key(func);
-    if (PySet_Add(internals.funcs, func_key))
+    // Register the function
+    auto [it, success] = internals.funcs.insert(func);
+    if (!success)
         fail("nanobind::detail::nb_func_new(): internal update failed (2)!");
-    Py_DECREF(func_key);
 
     func_record *fc = nb_func_get(func) + to_copy;
     memcpy(fc, f, sizeof(func_data<0>));
@@ -576,11 +572,7 @@ PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 void nb_func_finalize() noexcept {
     internals &internals = internals_get();
 
-    Py_ssize_t i = 0;
-    PyObject *key;
-    Py_hash_t hash;
-    while (_PySet_NextEntry(internals.funcs, &i, &key, &hash)) {
-        void *o = key_to_ptr(key);
+    for (void *o : internals.funcs) {
         func_record *f = nb_func_get(o);
         size_t count = (size_t) Py_SIZE(o);
 

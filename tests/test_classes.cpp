@@ -40,14 +40,14 @@ struct PairStruct {
 
 struct Big {
     char data[1024];
-    Big() { memset(data, 0xFF, 1024); }
+    Big() { memset(data, 0xff, 1024); }
 };
 struct alignas(1024) BigAligned {
     char data[1024];
     BigAligned() {
         if (((uintptr_t) data) % 1024)
             throw std::runtime_error("data is not aligned!");
-        memset(data, 0xFF, 1024);
+        memset(data, 0xff, 1024);
     }
 };
 

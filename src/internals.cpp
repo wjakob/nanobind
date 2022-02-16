@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <structmember.h>
 #include "internals.h"
 
 /// Tracks the ABI of nanobind
@@ -55,6 +56,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 extern void nb_func_dealloc(PyObject *);
+extern void nb_type_dealloc(PyObject *o);
 extern PyObject *nb_func_call(PyObject *self, PyObject *, PyObject *);
 extern PyObject *nb_func_get_doc(PyObject *, void *);
 extern PyObject *nb_func_get_name(PyObject *, void *);
@@ -69,6 +71,15 @@ static PyGetSetDef nb_func_getset[] = {
     { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
     { "__name__", nb_func_get_name, nullptr, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+static PyTypeObject nb_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "nb_type",
+    .tp_doc = "nanobind metaclass",
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_dealloc = nb_type_dealloc,
+    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data)
 };
 
 static PyTypeObject nb_func_type = {
@@ -103,7 +114,7 @@ static PyTypeObject nb_meth_type = {
     .tp_descr_get = nb_meth_descr_get
 };
 
-extern void type_free(PyObject *);
+extern void type_dealloc(PyObject *);
 
 static internals *internals_p = nullptr;
 
@@ -133,75 +144,73 @@ void default_exception_translator(std::exception_ptr p) {
     }
 }
 
-static PyTypeObject* metaclass(const char *name) {
-    str name_py(name);
+static void internals_cleanup() {
+    auto &inst_c2p = internals_p->inst_c2p;
+    auto &type_c2p = internals_p->type_c2p;
 
-    /* Danger zone: from now (and until PyType_Ready), make sure to
-       issue no Python C API calls which could potentially invoke the
-       garbage collector (the GC will call type_traverse(), which will in
-       turn find the newly constructed type in an invalid state) */
-    PyHeapTypeObject *heap_type =
-        (PyHeapTypeObject *) PyType_Type.tp_alloc(&PyType_Type, 0);
-    if (!heap_type)
-        fail("nanobind::detail::metaclass(\"%s\"): alloc. failed!", name);
+    if (!inst_c2p.empty())
+        fprintf(stderr, "nanobind: leaked %zu instances!\n", inst_c2p.size());
 
-    heap_type->ht_name = name_py.inc_ref().ptr();
-    heap_type->ht_qualname = name_py.inc_ref().ptr();
-
-    PyTypeObject *type = &heap_type->ht_type;
-    type->tp_name = name;
-    type->tp_base = &PyType_Type;
-    Py_INCREF(type->tp_base);
-
-    type->tp_flags =
-        Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HEAPTYPE;
-
-    type->tp_dealloc = type_free;
-
-    if (PyType_Ready(type) < 0)
-        fail("nanobind::detail::metaclass(\"%s\"): PyType_Ready() failed!", name);
-
-    setattr((PyObject *) type, "__module__", str("nb_builtins"));
-
-    return type;
+    if (!type_c2p.empty()) {
+        fprintf(stderr, "nanobind: leaked %zu types!\n", type_c2p.size());
+        for (const auto &kv : type_c2p)
+            fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
+    }
 }
 
-static void make_internals() {
+static void internals_make() {
     internals_p = new internals();
     internals_p->exception_translators.push_back(default_exception_translator);
 
     PyObject *capsule = PyCapsule_New(internals_p, nullptr, nullptr);
     int rv = PyDict_SetItemString(PyEval_GetBuiltins(), NB_INTERNALS_ID, capsule);
     if (rv || !capsule)
-        fail("nanobind::detail::make_internals(): internal error!");
+        fail("nanobind::detail::internals_make(): could not install internals "
+             "data structure!");
     Py_DECREF(capsule);
 
-    internals_p->nb_type = metaclass("nb_type");
+    nb_type.tp_base = &PyType_Type;
+    if (PyType_Ready(&nb_type) < 0 || PyType_Ready(&nb_func_type) < 0 ||
+        PyType_Ready(&nb_meth_type) < 0)
+        fail("nanobind::detail::internals_make(): type initialization failed!");
+
+    if ((nb_type.tp_flags & Py_TPFLAGS_HEAPTYPE) != 0 ||
+        nb_type.tp_basicsize != sizeof(PyHeapTypeObject) + sizeof(type_data) ||
+        nb_type.tp_itemsize != sizeof(PyMemberDef))
+        fail("nanobind::detail::internals_make(): initialized type invalid!");
+
+    if (Py_AtExit(internals_cleanup))
+        fprintf(stderr,
+                "Warning: could not install the nanobind cleanup handler! This "
+                "is needed to check for reference leaks and release remaining "
+                "resources at interpreter shutdown (e.g., to avoid leaks being "
+                "reported by tools like 'valgrind'). If you are a user of a "
+                "python extension library, you can ignore this warning.");
+
+    internals_p->nb_type = &nb_type;
     internals_p->nb_func = &nb_func_type;
     internals_p->nb_meth = &nb_meth_type;
-    Py_INCREF(&nb_func_type);
-    Py_INCREF(&nb_meth_type);
     internals_p->keep_alive = PyDict_New();
     internals_p->funcs = PySet_New(nullptr);
 }
 
-static void fetch_internals() {
+static void internals_fetch() {
     PyObject *capsule =
         PyDict_GetItemString(PyEval_GetBuiltins(), NB_INTERNALS_ID);
 
     if (capsule) {
         internals_p = (internals *) PyCapsule_GetPointer(capsule, nullptr);
         if (!internals_p)
-            fail("nanobind::detail::fetch_internals(): internal error!");
+            fail("nanobind::detail::internals_fetch(): internal error!");
         return;
     }
 
-    make_internals();
+    internals_make();
 }
 
-internals &get_internals() noexcept {
+internals &internals_get() noexcept {
     if (!internals_p)
-        fetch_internals();
+        internals_fetch();
     return *internals_p;
 }
 

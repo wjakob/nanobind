@@ -29,7 +29,7 @@ void nb_func_dealloc(PyObject *self) {
 
         // Delete from registered function list
         PyObject *self_key = ptr_to_key(self);
-        int rv = PySet_Discard(get_internals().funcs, self_key);
+        int rv = PySet_Discard(internals_get().funcs, self_key);
         Py_DECREF(self_key);
         if (rv != 1) {
             const char *name = (f->flags & (uint16_t) func_flags::has_name)
@@ -78,7 +78,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
-    internals &internals = get_internals();
+    internals &internals = internals_get();
 
     // Check for previous overloads
     if (has_scope && has_name) {
@@ -282,7 +282,7 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(const func_record *f) noexc
 /// Used by nb_func_vectorcall: convert a C++ exception into a Python error
 static NB_NOINLINE PyObject *nb_func_error_except() {
     std::exception_ptr e = std::current_exception();
-    for (auto const &et : get_internals().exception_translators) {
+    for (auto const &et : internals_get().exception_translators) {
         try {
             et(e);
             return nullptr;
@@ -579,7 +579,7 @@ PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 
 /// Finalize function signatures + docstrings once a module has finished loading
 void nb_func_finalize() noexcept {
-    internals &internals = get_internals();
+    internals &internals = internals_get();
 
     Py_ssize_t i = 0;
     PyObject *key;

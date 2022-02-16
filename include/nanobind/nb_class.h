@@ -118,7 +118,7 @@ public:
 
         (detail::type_extra_apply(d, extra), ...);
 
-        m_ptr = detail::type_new(&d);
+        m_ptr = detail::nb_type_new(&d);
     }
 
     template <typename Func, typename... Extra>

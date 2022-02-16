@@ -14,6 +14,12 @@ struct func_record : func_data<0> {
     char *signature;
 };
 
+/// Python object representing a bound C++ type
+struct nb_type {
+    PyHeapTypeObject ht;
+    type_data t;
+};
+
 /// Python object representing an instance of a bound C++ type
 struct nb_inst {
     PyObject_HEAD
@@ -71,7 +77,7 @@ struct internals {
     std::vector<void (*)(std::exception_ptr)> exception_translators;
 };
 
-extern internals &get_internals() noexcept;
+extern internals &internals_get() noexcept;
 extern char *type_name(const std::type_info *t);
 
 /* The following two functions convert between pointers and Python long values

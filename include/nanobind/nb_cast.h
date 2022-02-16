@@ -221,7 +221,7 @@ template <typename T, typename SFINAE> struct type_caster {
     static constexpr auto cname = const_name<T>();
 
     NB_INLINE bool load(handle src, bool convert) noexcept {
-        return detail::type_get(&typeid(T), src.ptr(), convert, (void **) &value);
+        return detail::nb_type_get(&typeid(T), src.ptr(), convert, (void **) &value);
     }
 
     NB_INLINE static handle cast(const T *p, rv_policy policy,
@@ -254,7 +254,7 @@ template <typename T, typename SFINAE> struct type_caster {
 
     NB_INLINE static handle cast_impl(const T *p, rv_policy policy,
                                       handle parent) noexcept {
-        return detail::type_put(&typeid(T), (void *) p, policy, parent.ptr());
+        return detail::nb_type_put(&typeid(T), (void *) p, policy, parent.ptr());
     }
 
     operator T*() { return value; }

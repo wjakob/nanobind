@@ -396,8 +396,8 @@ void property_install(PyObject *scope, const char *name, bool is_static,
     object doc = none();
     const internals &internals = internals_get();
 
-    if (m && (Py_IS_TYPE(m, internals.nb_func) ||
-              Py_IS_TYPE(m, internals.nb_meth))) {
+    if (m && (Py_TYPE(m) == internals.nb_func ||
+              Py_TYPE(m) == internals.nb_meth)) {
         func_record *f = nb_func_get(m);
         if (f->flags & (uint32_t) func_flags::has_doc)
             doc = str(f->doc);

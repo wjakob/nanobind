@@ -83,8 +83,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
-            if (Py_IS_TYPE(func_prev, internals.nb_func) ||
-                Py_IS_TYPE(func_prev, internals.nb_meth)) {
+            if (Py_TYPE(func_prev) == internals.nb_func ||
+                Py_TYPE(func_prev) == internals.nb_meth) {
                 func_record *fp = nb_func_get(func_prev);
 
                 if ((fp->flags & (uint16_t) func_flags::is_method) !=
@@ -277,12 +277,12 @@ static NB_NOINLINE PyObject *nb_func_error_except() {
         try {
             et(e);
             return nullptr;
-        } catch (...) {
-            e = std::current_exception();
 #if defined(__GLIBCXX__)
         } catch (abi::__forced_unwind&) {
             throw;
 #endif
+        } catch (...) {
+            e = std::current_exception();
         }
     }
 
@@ -595,7 +595,7 @@ void nb_func_finalize() noexcept {
                 switch (c) {
                     case '{':
                         // Argument name
-                        if (has_var_kwargs && arg_index == f->nargs - 1) {
+                        if (has_var_kwargs && arg_index + 1 == (size_t) f->nargs) {
                             buf.put("**");
                             if (has_args && f->args[arg_index].name)
                                 buf.put_dstr(f->args[arg_index].name);
@@ -605,7 +605,7 @@ void nb_func_finalize() noexcept {
                             break;
                         }
 
-                        if (has_var_args && arg_index == f->nargs - 1 - has_var_kwargs) {
+                        if (has_var_args && arg_index + 1 + has_var_kwargs == (size_t) f->nargs) {
                             buf.put("*");
                             if (has_args && f->args[arg_index].name)
                                 buf.put_dstr(f->args[arg_index].name);

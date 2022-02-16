@@ -43,3 +43,8 @@
 #  endif
 #  pragma warning(pop)
 #endif
+
+#if PY_VERSION_HEX < 0x03080000
+#  error The nanobind library requires Python 3.8 (or newer)
+#endif
+

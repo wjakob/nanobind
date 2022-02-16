@@ -21,8 +21,12 @@
 #  define NB_EXPORT        __attribute__ ((visibility("default")))
 #  define NB_IMPORT
 #  define NB_INLINE        inline __attribute__((always_inline))
-#  define NB_INLINE_LAMBDA __attribute__((always_inline))
 #  define NB_NOINLINE      __attribute__((noinline))
+#if defined(__clang__)
+#    define NB_INLINE_LAMBDA __attribute__((always_inline))
+#else
+#    define NB_INLINE_LAMBDA
+#endif
 #endif
 
 #if defined(__GNUC__)
@@ -47,6 +51,12 @@
 
 #if defined(__cpp_lib_char8_t) && __cpp_lib_char8_t >= 201811L
 #  define NB_HAS_U8STRING
+#endif
+
+#if PY_VERSION_HEX < 0x03090000
+#  define NB_VECTORCALL _Py_TPFLAGS_HAVE_VECTORCALL
+#else
+#  define NB_VECTORCALL Py_TPFLAGS_HAVE_VECTORCALL
 #endif
 
 #define NB_MODULE(name, variable)                                              \

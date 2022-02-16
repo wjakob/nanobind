@@ -2,6 +2,10 @@
 #include <structmember.h>
 #include "internals.h"
 
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
 #    define NB_INTERNALS_VERSION 1
@@ -76,42 +80,42 @@ static PyGetSetDef nb_func_getset[] = {
 static PyTypeObject nb_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_type",
-    .tp_doc = "nanobind metaclass",
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
     .tp_dealloc = nb_type_dealloc,
-    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data)
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc = "nanobind metaclass"
 };
 
 static PyTypeObject nb_func_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_func",
-    .tp_doc = "nanobind function object",
     .tp_basicsize = sizeof(nb_func),
     .tp_itemsize = sizeof(func_record),
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_VECTORCALL,
-    .tp_new = PyType_GenericNew,
     .tp_dealloc = nb_func_dealloc,
     .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
     .tp_call = PyVectorcall_Call,
+    .tp_getattro = PyObject_GenericGetAttr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | NB_VECTORCALL,
+    .tp_doc = "nanobind function object",
     .tp_getset = nb_func_getset,
-    .tp_getattro = PyObject_GenericGetAttr
+    .tp_new = PyType_GenericNew
 };
 
 static PyTypeObject nb_meth_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_meth",
-    .tp_doc = "nanobind method object",
     .tp_basicsize = sizeof(nb_func),
     .tp_itemsize = sizeof(func_record),
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_VECTORCALL |
-                Py_TPFLAGS_METHOD_DESCRIPTOR,
-    .tp_new = PyType_GenericNew,
     .tp_dealloc = nb_func_dealloc,
     .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
     .tp_call = PyVectorcall_Call,
-    .tp_getset = nb_func_getset,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_descr_get = nb_meth_descr_get
+    .tp_flags = Py_TPFLAGS_DEFAULT | NB_VECTORCALL |
+                Py_TPFLAGS_METHOD_DESCRIPTOR,
+    .tp_doc = "nanobind method object",
+    .tp_getset = nb_func_getset,
+    .tp_descr_get = nb_meth_descr_get,
+    .tp_new = PyType_GenericNew
 };
 
 extern void type_dealloc(PyObject *);

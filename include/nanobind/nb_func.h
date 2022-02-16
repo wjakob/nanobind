@@ -82,6 +82,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             cap = (capture *) ((void **) p)[0];
 
         nb_tuple<make_caster<Args>...> in;
+        (void) in;
         if ((!in.template get<Is>().load(args[Is], args_convert[Is]) || ...))
             return NB_NEXT_OVERLOAD;
 

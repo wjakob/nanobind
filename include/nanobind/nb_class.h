@@ -69,7 +69,7 @@ template <typename... Args> struct init {
         cl.def(
             "__init__",
             [](Value *v, Args... args) {
-                new ((Value *) v) Value((forward_t<Args>) args...);
+                new ((Value *) v) Value{ (forward_t<Args>) args... };
             },
             extra...);
     }

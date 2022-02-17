@@ -343,21 +343,37 @@ PyObject *str_from_cstr_and_size(const char *str, size_t size) {
 // ========================================================================
 
 bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept {
-    Py_ssize_t rv = PySequence_Size(seq);
-    if (rv == -1)
-        PyErr_Clear();
-
-    if (rv != (Py_ssize_t) size)
-        return false;
-
-    for (size_t i = 0; i < size; ++i) {
-        out[i] = PySequence_GetItem(seq, (Py_ssize_t) i);
-
-        if (!out[i]) {
-            PyErr_Clear();
-            for (size_t j = 0; j < i; ++j)
-                Py_DECREF(out[j]);
+    if (PyTuple_CheckExact(seq)) {
+        if (PyTuple_GET_SIZE(seq) != (Py_ssize_t) size)
             return false;
+        for (size_t i = 0; i < size; ++i) {
+            out[i] = PyTuple_GET_ITEM(seq, (Py_ssize_t) i);
+            Py_INCREF(out[i]);
+        }
+    } else if (PyList_CheckExact(seq)) {
+        if (PyList_GET_SIZE(seq) != (Py_ssize_t) size)
+            return false;
+        for (size_t i = 0; i < size; ++i) {
+            out[i] = PyList_GET_ITEM(seq, (Py_ssize_t) i);
+            Py_INCREF(out[i]);
+        }
+    } else {
+        Py_ssize_t rv = PySequence_Size(seq);
+        if (rv == -1)
+            PyErr_Clear();
+
+        if (rv != (Py_ssize_t) size)
+            return false;
+
+        for (size_t i = 0; i < size; ++i) {
+            out[i] = PySequence_GetItem(seq, (Py_ssize_t) i);
+
+            if (!out[i]) {
+                PyErr_Clear();
+                for (size_t j = 0; j < i; ++j)
+                    Py_DECREF(out[j]);
+                return false;
+            }
         }
     }
 

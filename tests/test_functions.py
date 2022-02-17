@@ -111,3 +111,13 @@ def test11_call_complex():
     assert result == [
       ((1, 2, 5, 6), {"extra" : 5, "hello": "world"})
     ]
+
+
+def test12_list_tuple_manipulation():
+    li = [1, 5, 6, 7]
+    t.test_list(li)
+    assert li == [1, 5, 123, 7, 19]
+
+    tu = (1, 5, 6, 7)
+    assert t.test_tuple(tu) == 19
+    assert tu == (1, 5, 6, 7)

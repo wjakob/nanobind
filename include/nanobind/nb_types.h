@@ -48,6 +48,7 @@ NAMESPACE_BEGIN(detail)
 template <typename Impl> class accessor;
 struct str_attr; struct obj_attr;
 struct str_item; struct obj_item; struct num_item;
+struct num_item_list; struct num_item_tuple;
 class args_proxy; class kwargs_proxy;
 struct borrow_t { };
 struct steal_t { };
@@ -247,17 +248,24 @@ class str : public object {
 class tuple : public object {
     NB_OBJECT_DEFAULT(tuple, object, PyTuple_Check)
     size_t size() const { return PyTuple_GET_SIZE(m_ptr); }
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
+    detail::accessor<detail::num_item_tuple> operator[](T key) const;
+};
+
+class list : public object {
+    NB_OBJECT_DEFAULT(list, object, PyList_Check)
+    size_t size() const { return PyList_GET_SIZE(m_ptr); }
+
+    template <typename T> void append(T &&value);
+
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
+    detail::accessor<detail::num_item_list> operator[](T key) const;
 };
 
 class dict : public object {
     NB_OBJECT(dict, object, PyDict_Check)
     dict() : object(PyDict_New(), detail::steal_t()) { }
     size_t size() const { return PyDict_GET_SIZE(m_ptr); }
-};
-
-class list : public object {
-    NB_OBJECT_DEFAULT(list, object, PyList_Check)
-    size_t size() const { return PyList_GET_SIZE(m_ptr); }
 };
 
 class sequence : public object {

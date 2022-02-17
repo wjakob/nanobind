@@ -70,10 +70,6 @@ struct str_item {
     NB_INLINE static void set(handle obj, const char *key, handle val) {
         setitem(obj.ptr(), key, val.ptr());
     }
-
-    NB_INLINE static object key(const char *key) {
-        return steal(PyUnicode_InternFromString(key));
-    }
 };
 
 struct obj_item {
@@ -86,25 +82,44 @@ struct obj_item {
     NB_INLINE static void set(handle obj, handle key, handle val) {
         setitem(obj.ptr(), key.ptr(), val.ptr());
     }
-
-    NB_INLINE static object key(handle key) {
-        return borrow(key);
-    }
 };
 
 struct num_item {
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(handle obj, Py_ssize_t key, object &out) {
-        detail::getitem_maybe(obj.ptr(), key, &out.m_ptr);
+    NB_INLINE static void get(handle obj, Py_ssize_t index, object &out) {
+        detail::getitem_maybe(obj.ptr(), index, &out.m_ptr);
     }
 
-    NB_INLINE static void set(handle obj, Py_ssize_t key, handle val) {
-        setitem(obj.ptr(), key, val.ptr());
+    NB_INLINE static void set(handle obj, Py_ssize_t index, handle val) {
+        setitem(obj.ptr(), index, val.ptr());
+    }
+};
+
+struct num_item_list {
+    using key_type = Py_ssize_t;
+
+    NB_INLINE static void get(handle obj, Py_ssize_t index, object &out) {
+        out = borrow(PyList_GET_ITEM(obj.ptr(), index));
     }
 
-    NB_INLINE static object key(Py_ssize_t key) {
-        return steal(PyLong_FromSsize_t(key));
+    NB_INLINE static void set(handle obj, Py_ssize_t index, handle val) {
+        PyObject *old = PyList_GET_ITEM(obj.ptr(), index);
+        Py_INCREF(val.ptr());
+        PyList_SET_ITEM(obj.ptr(), index, val.ptr());
+        Py_DECREF(old);
+    }
+};
+
+struct num_item_tuple {
+    using key_type = Py_ssize_t;
+
+    NB_INLINE static void get(handle obj, Py_ssize_t index, object &out) {
+        out = borrow(PyTuple_GET_ITEM(obj.ptr(), index));
+    }
+
+    template <typename...Ts> static void set(Ts...) {
+        static_assert(false_v<Ts...>, "tuples are immutable!");
     }
 };
 
@@ -126,9 +141,20 @@ template <typename D> accessor<str_item> api<D>::operator[](const char *key) con
 
 template <typename D>
 template <typename T, enable_if_t<std::is_arithmetic_v<T>>>
-accessor<num_item> api<D>::operator[](T key) const {
-    return { derived(), (Py_ssize_t) key };
+accessor<num_item> api<D>::operator[](T index) const {
+    return { derived(), (Py_ssize_t) index };
 }
 
 NAMESPACE_END(detail)
+
+template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>>>
+detail::accessor<detail::num_item_list> list::operator[](T index) const {
+    return { derived(), (Py_ssize_t) index };
+}
+
+template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>>>
+detail::accessor<detail::num_item_tuple> tuple::operator[](T index) const {
+    return { derived(), (Py_ssize_t) index };
+}
+
 NAMESPACE_END(NB_NAMESPACE)

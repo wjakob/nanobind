@@ -64,5 +64,7 @@ struct analyze_method<Ret (Cls::*)(Args...) const> {
 template <typename T>
 using forward_t = std::conditional_t<std::is_lvalue_reference_v<T>, T, T &&>;
 
+template <typename...> inline constexpr bool false_v = false;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

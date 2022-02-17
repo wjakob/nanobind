@@ -48,4 +48,21 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_call_extra", [](nb::object o, nb::args args, nb::kwargs kwargs) {
         return o(1, 2, *args, **kwargs, "extra"_a = 5);
     });
+
+    /// Test list manipulation
+    m.def("test_list", [](nb::list l) {
+        int result = 0;
+        for (size_t i = 0; i < l.size(); ++i)
+            result += nb::cast<int>(l[i]);
+        l[2] = 123;
+        l.append(result);
+    });
+
+    /// Test tuple manipulation
+    m.def("test_tuple", [](nb::tuple l) {
+        int result = 0;
+        for (size_t i = 0; i < l.size(); ++i)
+            result += nb::cast<int>(l[i]);
+        return result;
+    });
 }

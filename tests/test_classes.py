@@ -201,6 +201,8 @@ def test08_method_vectorcall():
 
 
 def test09_trampoline():
+    gc.collect()
+    t.reset()
     for i in range(10):
         class Dachshund(t.Animal):
             def __init__(self):
@@ -227,6 +229,20 @@ def test09_trampoline():
     assert t.go(ga) == 'Animal says goo'
     assert t.void_ret(ga) is None
     assert a == 1
+
+    del ga
+    del d
+    gc.collect()
+
+    assert t.stats() == {
+        'default_constructed': 11,
+        'value_constructed': 0,
+        'copy_constructed': 0,
+        'move_constructed': 0,
+        'copy_assigned': 0,
+        'move_assigned': 0,
+        'destructed': 11
+    }
 
 
 def test10_trampoline_failures():

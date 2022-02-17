@@ -356,7 +356,8 @@ template <typename T> arg_v arg::operator=(T &&value) const {
 
 template <typename Impl> template <typename T>
 detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
-    Impl::set(m_base, m_key, cast((detail::forward_t<T>) value));
+    object result = cast((detail::forward_t<T>) value);
+    Impl::set(m_base, m_key, result.ptr());
     return *this;
 }
 

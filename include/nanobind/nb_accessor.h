@@ -4,118 +4,128 @@ NAMESPACE_BEGIN(detail)
 template <typename Impl> class accessor : public api<accessor<Impl>> {
 public:
     template <typename Key>
-    accessor(handle obj, Key &&key) : m_base(obj), m_key(std::move(key)) { }
+    accessor(handle obj, Key &&key)
+        : m_base(obj.ptr()), m_cache(nullptr), m_key(std::move(key)) { }
     accessor(const accessor &) = delete;
     accessor(accessor &&) = delete;
+    ~accessor() {
+        if constexpr (Impl::cache_dec_ref)
+            Py_XDECREF(m_cache);
+    }
 
     template <typename T> accessor& operator=(T &&value);
 
     template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
     operator T() const { return borrow<T>(ptr()); }
-    NB_INLINE PyObject *ptr() const { return get().ptr(); }
-    NB_INLINE handle base() const { return m_base; }
-    NB_INLINE object key() const { return Impl::key(m_key); }
-
-private:
-    object &get() const {
-        Impl::get(m_base, m_key, m_cache);
+    NB_INLINE PyObject *ptr() const {
+        Impl::get(m_base, m_key, &m_cache);
         return m_cache;
     }
+    NB_INLINE handle base() const { return m_base; }
+    NB_INLINE object key() const { return steal(Impl::key(m_key)); }
 
 private:
-    handle m_base;
+    PyObject *m_base;
+    mutable PyObject *m_cache;
     typename Impl::key_type m_key;
-    mutable object m_cache;
 };
 
 struct str_attr {
+    static constexpr bool cache_dec_ref = true;
     using key_type = const char *;
 
-    NB_INLINE static void get(handle obj, const char *key, object &out) {
-        detail::getattr_maybe(obj.ptr(), key, &out.m_ptr);
+    NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
+        detail::getattr_maybe(obj, key, cache);
     }
 
-    NB_INLINE static void set(handle obj, const char *key, handle val) {
-        setattr(obj.ptr(), key, val.ptr());
+    NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
+        setattr(obj, key, v);
     }
 
-    NB_INLINE static object key(const char *key) {
-        return steal(PyUnicode_InternFromString(key));
+    NB_INLINE static PyObject *key(const char *key) {
+        return PyUnicode_InternFromString(key);
     }
 };
 
 struct obj_attr {
-    using key_type = object;
+    static constexpr bool cache_dec_ref = true;
+    using key_type = handle;
 
-    NB_INLINE static void get(handle obj, handle key, object &out) {
-        detail::getattr_maybe(obj.ptr(), key.ptr(), &out.m_ptr);
+    NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
+        detail::getattr_maybe(obj, key.ptr(), cache);
     }
 
-    NB_INLINE static void set(handle obj, handle key, handle val) {
-        setattr(obj.ptr(), key.ptr(), val.ptr());
+    NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
+        setattr(obj, key.ptr(), v);
     }
 
-    NB_INLINE static object key(handle key) {
-        return borrow(key);
+    NB_INLINE static PyObject *key(handle key) {
+        Py_INCREF(key.ptr());
+        return key.ptr();
     }
 };
 
 struct str_item {
+    static constexpr bool cache_dec_ref = true;
     using key_type = const char *;
 
-    NB_INLINE static void get(handle obj, const char *key, object &out) {
-        detail::getitem_maybe(obj.ptr(), key, &out.m_ptr);
+    NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
+        detail::getitem_maybe(obj, key, cache);
     }
 
-    NB_INLINE static void set(handle obj, const char *key, handle val) {
-        setitem(obj.ptr(), key, val.ptr());
+    NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
+        setitem(obj, key, v);
     }
 };
 
 struct obj_item {
-    using key_type = object;
+    static constexpr bool cache_dec_ref = true;
+    using key_type = handle;
 
-    NB_INLINE static void get(handle obj, handle key, object &out) {
-        detail::getitem_maybe(obj.ptr(), key.ptr(), &out.m_ptr);
+    NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
+        detail::getitem_maybe(obj, key.ptr(), cache);
     }
 
-    NB_INLINE static void set(handle obj, handle key, handle val) {
-        setitem(obj.ptr(), key.ptr(), val.ptr());
+    NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
+        setitem(obj, key.ptr(), v);
     }
 };
 
 struct num_item {
+    static constexpr bool cache_dec_ref = true;
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(handle obj, Py_ssize_t index, object &out) {
-        detail::getitem_maybe(obj.ptr(), index, &out.m_ptr);
+    NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
+        detail::getitem_maybe(obj, index, cache);
     }
 
-    NB_INLINE static void set(handle obj, Py_ssize_t index, handle val) {
-        setitem(obj.ptr(), index, val.ptr());
+    NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
+        setitem(obj, index, v);
     }
 };
 
 struct num_item_list {
+    static constexpr bool cache_dec_ref = false;
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(handle obj, Py_ssize_t index, object &out) {
-        out = borrow(PyList_GET_ITEM(obj.ptr(), index));
+    NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
+        *cache = PyList_GET_ITEM(obj, index);
     }
 
-    NB_INLINE static void set(handle obj, Py_ssize_t index, handle val) {
-        PyObject *old = PyList_GET_ITEM(obj.ptr(), index);
-        Py_INCREF(val.ptr());
-        PyList_SET_ITEM(obj.ptr(), index, val.ptr());
+    NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
+        PyObject *old = PyList_GET_ITEM(obj, index);
+        Py_INCREF(v);
+        PyList_SET_ITEM(obj, index, v);
         Py_DECREF(old);
     }
 };
 
 struct num_item_tuple {
+    static constexpr bool cache_dec_ref = false;
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(handle obj, Py_ssize_t index, object &out) {
-        out = borrow(PyTuple_GET_ITEM(obj.ptr(), index));
+    NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
+        *cache = PyTuple_GET_ITEM(obj, index);
     }
 
     template <typename...Ts> static void set(Ts...) {

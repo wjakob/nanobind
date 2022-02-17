@@ -4,13 +4,14 @@ protected:                                                                     \
                                                                                \
 public:                                                                        \
     static constexpr auto cname = descr;                                       \
-    static handle cast(type *p, rv_policy policy, handle parent) {   \
+    static handle cast(type *p, rv_policy policy, handle parent) {             \
         if (!p)                                                                \
             return none().release();                                           \
         return cast(*p, policy, parent);                                       \
     }                                                                          \
     operator type *() { return &value; }                                       \
     operator type &() { return value; }                                        \
+    static constexpr bool is_class = false;                                    \
     template <typename T_> using cast_op_type = cast_op_type<T_>;
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -205,7 +206,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
 };
 
 template <typename T>
-struct type_caster<T, enable_if_t<std::is_base_of_v<handle, T>>> {
+struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
 public:
     NB_TYPE_CASTER(T, T::cname)
 
@@ -229,9 +230,11 @@ public:
 
 template <typename T, typename SFINAE> struct type_caster {
     static constexpr auto cname = const_name<T>();
+    static constexpr bool is_class = true;
 
     NB_INLINE bool load(handle src, uint8_t flags) noexcept {
-        return detail::nb_type_get(&typeid(T), src.ptr(), flags, (void **) &value);
+        return detail::nb_type_get(&typeid(T), src.ptr(), flags,
+                                   (void **) &value);
     }
 
     NB_INLINE static handle cast(const T *p, rv_policy policy,
@@ -264,7 +267,8 @@ template <typename T, typename SFINAE> struct type_caster {
 
     NB_INLINE static handle cast_impl(const T *p, rv_policy policy,
                                       handle parent) noexcept {
-        return detail::nb_type_put(&typeid(T), (void *) p, policy, parent.ptr());
+        return detail::nb_type_put(&typeid(T), (void *) p, policy,
+                                   parent.ptr());
     }
 
     operator T*() { return value; }
@@ -276,13 +280,53 @@ private:
     T *value;
 };
 
+template <typename T> NB_INLINE rv_policy policy(rv_policy policy) {
+    if constexpr (std::is_pointer_v<T>) {
+        if (policy == rv_policy::automatic)
+            policy = rv_policy::take_ownership;
+        else if (policy == rv_policy::automatic_reference)
+            policy = rv_policy::reference;
+    } else if constexpr (std::is_reference_v<T>) {
+        if (policy == rv_policy::automatic ||
+            policy == rv_policy::automatic_reference)
+            policy = rv_policy::copy;
+    } else {
+        if (policy == rv_policy::automatic ||
+            policy == rv_policy::automatic_reference)
+            policy = rv_policy::move;
+    }
+    return policy;
+}
+
 NAMESPACE_END(detail)
 
+template <typename T, typename Derived> T cast(const detail::api<Derived> &value) {
+    if constexpr (std::is_same_v<T, void>) {
+        return;
+    } else {
+        using Ti     = detail::intrinsic_t<T>;
+        using Caster = detail::make_caster<Ti>;
+
+        Caster caster;
+        if (!caster.load(value.derived().ptr(), (uint8_t) detail::cast_flags::convert))
+            detail::raise("nanobind::cast(...): conversion failed!");
+
+        static_assert(
+            !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::is_class,
+            "nanobind::cast(): cannot return a reference to a temporary.");
+
+        if constexpr (std::is_pointer_v<T>)
+            return caster.operator Ti*();
+        else
+            return caster.operator Ti&();
+    }
+}
+
 template <typename T>
-object cast(T &&value, rv_policy policy = rv_policy::move,
+object cast(T &&value, rv_policy policy = rv_policy::automatic_reference,
             handle parent = handle()) {
     handle h = detail::make_caster<T>::cast((detail::forward_t<T>) value,
-                                            policy, parent);
+                                            detail::policy<T>(policy), parent);
     if (!h.is_valid())
         detail::raise("nanobind::cast(...): conversion failed!");
     return steal(h);
@@ -295,10 +339,10 @@ tuple make_tuple(Args &&...args) {
     size_t nargs = 0;
     PyObject *o = result.ptr();
 
-    (PyTuple_SET_ITEM(o, nargs++,
-                      detail::make_caster<Args>::cast(
-                          (detail::forward_t<Args>) args, policy, nullptr)
-                          .ptr()),
+    (PyTuple_SET_ITEM(
+         o, nargs++,
+         detail::make_caster<Args>::cast((detail::forward_t<Args>) args,
+                                         detail::policy<Args>(policy), nullptr).ptr()),
      ...);
 
     detail::tuple_check(o, sizeof...(Args));

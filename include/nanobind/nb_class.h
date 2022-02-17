@@ -65,11 +65,11 @@ NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
 template <typename... Args> struct init {
     template <typename Class, typename... Extra>
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
-        using Value = typename Class::Value;
+        using Value = typename Class::Alias;
         cl.def(
             "__init__",
             [](Value *v, Args... args) {
-                new (v) Value((forward_t<Args>) args...);
+                new ((Value *) v) Value((forward_t<Args>) args...);
             },
             extra...);
     }
@@ -83,30 +83,58 @@ template <typename T> void wrap_move(void *dst, void *src) {
     new ((T *) dst) T(std::move(*(T *) src));
 }
 
-template <typename T> void wrap_destruct(void *value) {
+template <typename T> void wrap_destruct(void *value) noexcept {
     ((T *) value)->~T();
 }
 
+template <typename, template <typename, typename> typename, typename...>
+struct extract;
+
+template <typename T, template <typename, typename> typename Pred>
+struct extract<T, Pred> {
+    using type = T;
+};
+
+template <typename T, template <typename, typename> typename Pred,
+          typename Tv, typename... Ts>
+struct extract<T, Pred, Tv, Ts...> {
+    using type = std::conditional_t<
+        Pred<T, Tv>::value,
+        Tv,
+        typename extract<T, Pred, Ts...>::type
+    >;
+};
+
+template <typename T, typename Arg> using is_alias = std::is_base_of<T, Arg>;
+template <typename T, typename Arg> using is_base = std::is_base_of<Arg, T>;
+
 NAMESPACE_END(detail)
 
-template <typename T, typename Base = void>
+template <typename T, typename... Ts>
 class class_ : public object {
 public:
     NB_OBJECT_DEFAULT(class_, object, PyType_Check);
     using Value = T;
+    using Base  = typename detail::extract<T, detail::is_base,  Ts...>::type;
+    using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;
+
+    static_assert(
+        sizeof...(Ts) == !std::is_same_v<Base, T> + !std::is_same_v<Alias, T>,
+        "nanobind::class_<> was invoked with extra arguments that could not be handled"
+    );
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
         detail::type_data d;
 
         d.flags = (uint16_t) detail::type_flags::has_scope;
-        d.align = (uint16_t) alignof(T);
-        d.size = (uint32_t) sizeof(T);
+        d.align = (uint16_t) alignof(Alias);
+        d.size = (uint32_t) sizeof(Alias);
         d.name = name;
         d.scope = scope.ptr();
         d.type = &typeid(T);
 
-        if constexpr (!std::is_same_v<Base, void>) {
+        if constexpr (!std::is_same_v<Base, T>) {
             d.base = &typeid(Base);
             d.flags |= (uint16_t) detail::type_flags::has_base;
         }

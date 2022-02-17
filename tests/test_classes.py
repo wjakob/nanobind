@@ -200,8 +200,8 @@ def test08_method_vectorcall():
     assert i.out == (1, 2, "hello", True, 4)
 
 
-def test09_inheritance_py():
-    for i in range(1024):
+def test09_trampoline():
+    for i in range(10):
         class Dachshund(t.Animal):
             def __init__(self):
                 super().__init__()
@@ -211,4 +211,50 @@ def test09_inheritance_py():
                 return "yap"
 
         d = Dachshund()
-        assert t.go(d) == 'Dachshund says yap'
+        for i in range(10):
+            assert t.go(d) == 'Dachshund says yap'
+
+    a = 0
+    class GenericAnimal(t.Animal):
+        def what(self):
+            return "goo"
+
+        def void_ret(self):
+            nonlocal a
+            a += 1
+
+    ga = GenericAnimal()
+    assert t.go(ga) == 'Animal says goo'
+    assert t.void_ret(ga) is None
+    assert a == 1
+
+
+def test10_trampoline_failures():
+    class Incomplete(t.Animal):
+        def __init__(self):
+            super().__init__()
+
+        def void_ret(self):
+            raise TypeError("propagating an exception")
+
+    d = Incomplete()
+    with pytest.raises(RuntimeError) as excinfo:
+        t.go(d)
+    assert ('nanobind::detail::get_trampoline(\'Incomplete::what()\'): tried '
+            'to call a pure virtual function!' in str(excinfo.value))
+
+    with pytest.raises(TypeError) as excinfo:
+        t.void_ret(d)
+    assert 'propagating an exception' in str(excinfo.value)
+
+    class Incomplete2(t.Animal):
+        def __init__(self):
+            pass # Missing call to super().__init__()
+        def name(self):
+            return "a"
+        def what(self):
+            return "b"
+
+    with pytest.raises(TypeError) as excinfo:
+        t.go(Incomplete2())
+    assert 'incompatible function arguments' in str(excinfo.value)

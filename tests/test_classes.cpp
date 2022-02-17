@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/trampoline.h>
 #include <nanobind/stl/string.h>
 #include <memory>
 
@@ -102,11 +103,34 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>());
 
     struct Animal {
-        Animal() : value("???") { }
         virtual ~Animal() = default;
-        virtual std::string name() const { return value; };
-        virtual std::string what() const { return value; };
-        std::string value;
+        virtual std::string name() const { return "Animal"; }
+        virtual std::string what() const = 0;
+        virtual void void_ret() { }
+    };
+
+    struct PyAnimal : Animal {
+        NB_TRAMPOLINE(Animal, 3);
+
+        PyAnimal() {
+            default_constructed++;
+        }
+
+        ~PyAnimal() {
+            destructed++;
+        }
+
+        std::string name() const override {
+            NB_OVERRIDE(std::string, Animal, name);
+        }
+
+        std::string what() const override {
+            NB_OVERRIDE_PURE(std::string, Animal, what);
+        }
+
+        void void_ret() override {
+            NB_OVERRIDE(void, Animal, void_ret);
+        }
     };
 
     struct Dog : Animal {
@@ -123,7 +147,7 @@ NB_MODULE(test_classes_ext, m) {
         std::string s;
     };
 
-    auto animal = nb::class_<Animal>(m, "Animal")
+    auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
         .def(nb::init<>())
         .def("what", &Animal::what)
         .def("name", &Animal::name);
@@ -137,6 +161,8 @@ NB_MODULE(test_classes_ext, m) {
     m.def("go", [](Animal *a) {
         return a->name() + " says " + a->what();
     });
+
+    m.def("void_ret", [](Animal *a) { a->void_ret(); });
 
     m.def("call_function", [](nb::handle h) {
         return h(1, 2, "hello", true, 4);

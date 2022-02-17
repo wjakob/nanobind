@@ -49,11 +49,33 @@ else()
 endif()
 
 add_library(nanobind ${NB_LIB_TYPE}
+  include/nanobind/nanobind.h
+  include/nanobind/nb_attr.h
+  include/nanobind/nb_cast.h
+  include/nanobind/nb_compat.h
+  include/nanobind/nb_descr.h
+  include/nanobind/nb_error.h
+  include/nanobind/nb_lib.h
+  include/nanobind/nb_python.h
+  include/nanobind/nb_tuple.h
+  include/nanobind/nb_accessor.h
+  include/nanobind/nb_call.h
+  include/nanobind/nb_class.h
+  include/nanobind/nb_defs.h
+  include/nanobind/nb_enums.h
+  include/nanobind/nb_func.h
+  include/nanobind/nb_misc.h
+  include/nanobind/nb_traits.h
+  include/nanobind/nb_types.h
+  include/nanobind/trampoline.h
+  include/nanobind/stl/string.h
+
   src/internals.cpp
   src/common.cpp
   src/nb_func.cpp
   src/nb_type.cpp
   src/error.cpp
+  src/trampoline.cpp
 )
 
 if (NB_SHARED)

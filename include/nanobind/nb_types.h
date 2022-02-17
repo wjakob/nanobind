@@ -51,11 +51,14 @@ struct str_item; struct obj_item; struct num_item;
 class args_proxy; class kwargs_proxy;
 struct borrow_t { };
 struct steal_t { };
-class object_t { };
+class api_tag { };
 
 // Standard operations provided by every nanobind object
-template <typename Derived> class api : public object_t {
+template <typename Derived> class api : public api_tag {
 public:
+    Derived &derived() { return static_cast<Derived &>(*this); }
+    const Derived &derived() const { return static_cast<const Derived &>(*this); }
+
     NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
     NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
@@ -99,9 +102,6 @@ public:
     NB_API_OP_2(operator<<=,PyNumber_InPlaceLshift)
     NB_API_OP_2(operator>>, PyNumber_Rshift)
     NB_API_OP_2(operator>>=,PyNumber_InPlaceRshift)
-
-private:
-    const Derived &derived() const { return static_cast<const Derived &>(*this); }
 };
 
 NAMESPACE_END(detail)

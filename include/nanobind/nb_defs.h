@@ -56,7 +56,7 @@
 #if PY_VERSION_HEX < 0x03090000
 #  define NB_VECTORCALL _Py_TPFLAGS_HAVE_VECTORCALL
 #else
-#  define NB_VECTORCALL Py_TPFLAGS_HAVE_VECTORCALL
+#  define NB_VECTORCALL  Py_TPFLAGS_HAVE_VECTORCALL
 #endif
 
 #define NB_MODULE(name, variable)                                              \

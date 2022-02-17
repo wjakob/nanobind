@@ -73,7 +73,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         };
     }
 
-    f.impl = [](void *p, PyObject **args, bool *args_convert,
+    f.impl = [](void *p, PyObject **args, uint8_t *args_flags,
                 rv_policy policy, PyObject *parent) -> PyObject * {
         const capture *cap;
         if constexpr (sizeof(capture) <= sizeof(f.capture))
@@ -83,7 +83,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         nb_tuple<make_caster<Args>...> in;
         (void) in;
-        if ((!in.template get<Is>().load(args[Is], args_convert[Is]) || ...))
+        if ((!in.template get<Is>().load(args[Is], args_flags[Is]) || ...))
             return NB_NEXT_OVERLOAD;
 
         if constexpr (std::is_void_v<Return>) {

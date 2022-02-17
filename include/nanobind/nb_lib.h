@@ -142,8 +142,8 @@ struct type_data;
 NB_CORE PyObject *nb_type_new(const type_data *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
-NB_CORE bool nb_type_get(const std::type_info *, PyObject *o, bool convert,
-                      void **out) noexcept;
+NB_CORE bool nb_type_get(const std::type_info *, PyObject *o, uint8_t flags,
+                         void **out) noexcept;
 
 /// Cast a C++ type instance into a Python object
 NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,

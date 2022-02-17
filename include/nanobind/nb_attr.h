@@ -18,7 +18,7 @@ struct arg {
     NB_INLINE arg &none(bool value = true) { none_ = value; return *this; }
 
     const char *name;
-    bool convert_;
+    uint8_t convert_;
     bool none_;
 };
 
@@ -76,7 +76,7 @@ template <size_t Size> struct func_data {
     void (*free)(void *);
 
     /// Implementation of the function call
-    PyObject *(*impl)(void *, PyObject **, bool *, rv_policy, PyObject *);
+    PyObject *(*impl)(void *, PyObject **, uint8_t *, rv_policy, PyObject *);
 
     /// Function signature description
     const char *descr;

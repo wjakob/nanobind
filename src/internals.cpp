@@ -60,16 +60,12 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 extern void nb_func_dealloc(PyObject *);
+extern int nb_type_init (PyObject *, PyObject *, PyObject *);
 extern void nb_type_dealloc(PyObject *o);
 extern PyObject *nb_func_call(PyObject *self, PyObject *, PyObject *);
 extern PyObject *nb_func_get_doc(PyObject *, void *);
 extern PyObject *nb_func_get_name(PyObject *, void *);
 extern PyObject *nb_meth_descr_get(PyObject *, PyObject *, PyObject *);
-
-    // {"__name__", (getter)meth_get__name__, nullptr, nullptr},
-    // {"__qualname__", (getter)meth_get__qualname__, nullptr, nullptr},
-    // {"__self__", (getter)meth_get__self__, nullptr, nullptr},
-    // {"__text_signature__", (getter)meth_get__text_signature__, nullptr, nullptr},
 
 static PyGetSetDef nb_func_getset[] = {
     { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
@@ -81,6 +77,7 @@ static PyTypeObject nb_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_type",
     .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
+    .tp_init = nb_type_init,
     .tp_dealloc = nb_type_dealloc,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_doc = "nanobind metaclass"

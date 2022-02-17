@@ -102,28 +102,31 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>());
 
     struct Animal {
-        Animal(const std::string &s) : s(s) { }
+        Animal() : value("???") { }
         virtual ~Animal() = default;
-        virtual std::string type() const { return "???"; };
-        std::string what() const { return s; }
-        std::string s;
+        virtual std::string name() const { return value; };
+        virtual std::string what() const { return value; };
+        std::string value;
     };
 
     struct Dog : Animal {
-        Dog(const std::string &s) : Animal(s) { }
-        std::string type() const override { return "Dog"; }
+        Dog(const std::string &s) : s(s) { }
+        std::string name() const override { return "Dog"; }
+        std::string what() const override { return s; }
         std::string s;
     };
 
     struct Cat : Animal {
-        Cat(const std::string &s) : Animal(s) { }
-        std::string type() const override { return "Cat"; }
+        Cat(const std::string &s) : s(s) { }
+        std::string name() const override { return "Cat"; }
+        std::string what() const override { return s; }
+        std::string s;
     };
 
     auto animal = nb::class_<Animal>(m, "Animal")
-        .def(nb::init<const std::string &>())
+        .def(nb::init<>())
         .def("what", &Animal::what)
-        .def("type", &Animal::type);
+        .def("name", &Animal::name);
 
     nb::class_<Dog, Animal>(m, "Dog")
         .def(nb::init<const std::string &>());
@@ -132,7 +135,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<const std::string &>());
 
     m.def("go", [](Animal *a) {
-        return a->type() + " says " + a->what();
+        return a->name() + " says " + a->what();
     });
 
     m.def("call_function", [](nb::handle h) {

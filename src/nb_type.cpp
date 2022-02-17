@@ -14,57 +14,83 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
     return -1;
 }
 
-// Allocate a new instance with co-located or external storage
-nb_inst *inst_new_impl(nb_type *type, void *value) {
-    nb_inst *self =
-        (nb_inst *) PyType_GenericAlloc((PyTypeObject *) type, value ? -1 : 0);
-    printf("Allocating: %s\n", type->ht.ht_type.tp_name);
+static void *inst_data(nb_inst *self) {
+    void *ptr = (void *) ((uintptr_t) self + self->offset);
+    return self->internal ? ptr : *(void **) ptr;
+}
 
-    // Walk back in inheritance chain to find the last original C++ type
-    while (!type->t.type)
-        type = (nb_type *) type->ht.ht_type.tp_base;
-    printf(" ->allocating: %s\n", type->t.name);
+// Allocate a new instance with internal or external storage
+PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
+    const type_data *t = &((nb_type *) tp)->t;
+    const bool has_gc = tp->tp_flags & Py_TPFLAGS_HAVE_GC;
+
+    size_t gc_head = has_gc ? sizeof(uintptr_t) * 2 : 0,
+           basicsize_plus_gc = (size_t) tp->tp_basicsize + gc_head,
+           align = (size_t) t->align;
+
+    size_t size = basicsize_plus_gc;
+    if (value) {
+        // External: only allocate space for a pointer
+        size += sizeof(void *);
+    } else {
+        // Internal: allocate space for the object and padding for alignment
+        size += t->size;
+        if (align > sizeof(void *))
+            size += align - sizeof(void *);
+    }
+
+    uint8_t *alloc = (uint8_t *) PyObject_Malloc(size);
+    if (!alloc)
+        return PyErr_NoMemory();
+
+    // Clear only the initial part of the object (GC head, nb_inst contents)
+    // memset(alloc, 0, basicsize_plus_gc);
+    memset(alloc, 0, size);
+
+    // Initialize the Python object and register it with the GC if needed
+    PyObject *o = (PyObject *) (alloc + gc_head);
+    PyObject_Init(o, tp);
+    if (has_gc)
+        PyObject_GC_Track(o);
+
+    nb_inst *self = (nb_inst *) o;
+    uint8_t *data = alloc + basicsize_plus_gc;
 
     if (value) {
-        self->value = value;
+        *(void **) data = value;
     } else {
-        // Re-align address
-        uintptr_t align = type->t.align,
-                  offset = (uintptr_t) get_data<void>(self);
-
-        offset = (offset + align - 1) / align * align;
-        self->value = (void *) offset;
+        data = (uint8_t *) ((((uintptr_t) data) + align - 1) / align * align);
+        self->internal = true;
+        value = data;
     }
+
+    self->offset = (uintptr_t) data - (uintptr_t) o;
 
     // Update hash table that maps from C++ to Python instance
     auto [it, success] = internals_get().inst_c2p.try_emplace(
-        std::pair<void *, std::type_index>(self->value, *type->t.type), self);
+        std::pair<void *, std::type_index>(value, *t->type),
+        self);
 
     if (!success)
         fail("nanobind::detail::inst_new(): duplicate object!");
 
-    return self;
+    return (PyObject *) self;
 }
 
 // Allocate a new instance with co-located storage
 PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
-    return (PyObject *) inst_new_impl((nb_type *) type, nullptr);
+    return (PyObject *) inst_new_impl(type, nullptr);
 }
 
 static void inst_dealloc(PyObject *self) {
-    nb_inst *inst = (nb_inst *) self;
     nb_type *type = (nb_type *) Py_TYPE(self);
-
-    while (!type->t.type) {
-        printf("Yes, here..\n");
-        type = (nb_type *) type->ht.ht_type.tp_base;
-    }
-    printf("Deleting %s\n", type->t.name);
+    nb_inst *inst = (nb_inst *) self;
+    void *p = inst_data(inst);
 
     if (inst->destruct) {
         if (type->t.flags & (int16_t) type_flags::is_destructible) {
             if (type->t.flags & (int16_t) type_flags::has_destruct)
-                type->t.destruct(inst->value);
+                type->t.destruct(p);
         } else {
             fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
                  "the destructor of a non-destructible type!",
@@ -74,9 +100,9 @@ static void inst_dealloc(PyObject *self) {
 
     if (inst->free) {
         if (type->t.align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__)
-            operator delete(inst->value);
+            operator delete(p);
         else
-            operator delete(inst->value, std::align_val_t(type->t.align));
+            operator delete(p, std::align_val_t(type->t.align));
     }
 
     internals &internals = internals_get();
@@ -95,7 +121,7 @@ static void inst_dealloc(PyObject *self) {
 
     // Update hash table that maps from C++ to Python instance
     auto it = internals.inst_c2p.find(
-        std::pair<void *, std::type_index>(inst->value, *type->t.type));
+        std::pair<void *, std::type_index>(p, *type->t.type));
     if (it == internals.inst_c2p.end())
         fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
              "an unknown instance!", type->ht.ht_type.tp_name);
@@ -108,7 +134,7 @@ static void inst_dealloc(PyObject *self) {
 void nb_type_dealloc(PyObject *o) {
     nb_type *nbt = (nb_type *) o;
 
-    if (nbt->t.type) {
+    if ((nbt->t.flags & (uint16_t) type_flags::is_python_type) == 0) {
         // Try to find type in data structure
         internals &internals = internals_get();
         auto it = internals.type_c2p.find(std::type_index(*nbt->t.type));
@@ -121,6 +147,25 @@ void nb_type_dealloc(PyObject *o) {
     PyType_Type.tp_dealloc(o);
 }
 
+/// Called when a C++ type is extended from within Python
+int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
+    if (PyTuple_GET_SIZE(args) != 3)
+        return -1;
+
+    int rv = PyType_Type.tp_init(self, args, kwds);
+    if (rv)
+        return rv;
+
+    nb_type *type = (nb_type *) self;
+    nb_type *parent = (nb_type *) type->ht.ht_type.tp_base;
+
+    type->t = parent->t;
+    type->t.flags |= (uint32_t) type_flags::is_python_type;
+
+    return 0;
+}
+
+/// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_data *t) noexcept {
     const bool has_scope   = t->flags & (uint16_t) type_flags::has_scope,
                has_doc     = t->flags & (uint16_t) type_flags::has_doc,
@@ -177,19 +222,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     }
 
     type->tp_name = t->name;
-    if (has_doc)
-        type->tp_doc = t->doc;
-
     type->tp_basicsize = (Py_ssize_t) sizeof(nb_inst);
-    type->tp_itemsize = (Py_ssize_t) t->size;
 
-    // Potentially insert extra space for alignment
-    if (t->align > sizeof(void *))
-        type->tp_itemsize += (Py_ssize_t) (t->align - sizeof(void *));
-
-    type->tp_base = base;
-    type->tp_init = inst_init;
-    type->tp_new = inst_new;
     type->tp_dealloc = inst_dealloc;
     type->tp_as_async = &nbt->ht.as_async;
     type->tp_as_number = &nbt->ht.as_number;
@@ -197,6 +231,11 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     type->tp_as_mapping = &nbt->ht.as_mapping;
     type->tp_flags |=
         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE | Py_TPFLAGS_BASETYPE;
+    if (has_doc)
+        type->tp_doc = t->doc;
+    type->tp_base = base;
+    type->tp_init = inst_init;
+    type->tp_new = inst_new;
 
     if (PyType_Ready(type) < 0)
         fail("nanobind::detail::nb_type_new(\"%s\"): PyType_Ready() failed!", t->name);
@@ -221,8 +260,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     return (PyObject *) type;
 }
 
-bool nb_type_get(const std::type_info *cpp_type, PyObject *o, bool ,
-              void **out) noexcept {
+bool nb_type_get(const std::type_info *cpp_type, PyObject *o, uint8_t flags,
+                 void **out) noexcept {
     if (o == nullptr || o == Py_None) {
         *out = nullptr;
         return o != nullptr;
@@ -239,7 +278,14 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *o, bool ,
 
     if (nbt->t.type == cpp_type || *nbt->t.type == *cpp_type ||
         PyType_IsSubtype(type, nbt->t.type_py)) {
-        *out = ((nb_inst *) o)->value;
+        nb_inst *inst = (nb_inst *) o;
+        if (!inst->ready && (flags & (uint8_t) cast_flags::construct) == 0) {
+            fprintf(stderr,
+                   "nb_type_get(): attempted to access an uninitialized instance "
+                   "of type '%s'!\n", nbt->t.name);
+            return false;
+        }
+        *out = inst_data(inst);
         return true;
     } else {
         return false;
@@ -264,7 +310,7 @@ void inst_keep_alive(PyObject *nurse, PyObject *patient) {
 }
 
 PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
-                   rv_policy rvp, PyObject *parent) noexcept {
+                      rv_policy rvp, PyObject *parent) noexcept {
     // Convert nullptr -> None
     if (!value) {
         Py_INCREF(Py_None);
@@ -293,25 +339,24 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
 
     nb_inst *inst =
-        inst_new_impl((nb_type *) t->type_py, store_in_obj ? nullptr : value);
-    inst->destruct =
-        rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
+        (nb_inst *) inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
+    if (!inst)
+        return nullptr;
+
     inst->free = inst->destruct && !store_in_obj;
 
-    if (rvp == rv_policy::reference_internal)
-        inst_keep_alive((PyObject *) inst, parent);
-
+    void *new_value = inst_data(inst);
     if (rvp == rv_policy::move) {
         if (t->flags & (uint16_t) type_flags::is_move_constructible) {
             if (t->flags & (uint16_t) type_flags::has_move) {
                 try {
-                    t->move(inst->value, value);
+                    t->move(new_value, value);
                 } catch (...) {
                     Py_DECREF(inst);
                     return nullptr;
                 }
             } else {
-                memcpy(inst->value, value, t->size);
+                memcpy(new_value, value, t->size);
             }
         } else {
             fail("nanobind::detail::nb_type_put(\"%s\"): attempted to move "
@@ -323,19 +368,26 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
         if (t->flags & (uint16_t) type_flags::is_copy_constructible) {
             if (t->flags & (uint16_t) type_flags::has_copy) {
                 try {
-                    t->copy(inst->value, value);
+                    t->copy(new_value, value);
                 } catch (...) {
                     Py_DECREF(inst);
                     return nullptr;
                 }
             } else {
-                memcpy(inst->value, value, t->size);
+                memcpy(new_value, value, t->size);
             }
         } else {
             fail("nanobind::detail::nb_type_put(\"%s\"): attempted to copy "
                  "an instance that is not copy-constructible!", t->name);
         }
     }
+
+    inst->ready = true;
+    inst->destruct =
+        rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
+
+    if (rvp == rv_policy::reference_internal)
+        inst_keep_alive((PyObject *) inst, parent);
 
     return (PyObject *) inst;
 }

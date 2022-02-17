@@ -21,10 +21,18 @@ struct nb_type {
 };
 
 /// Python object representing an instance of a bound C++ type
-struct nb_inst {
+struct nb_inst { // usually: 24 bytes
     PyObject_HEAD
 
-    void *value;
+    /// Offset to the actual instance data
+    uint32_t offset;
+
+    /// Is the instance data stored within the Python object?
+    bool internal : 1;
+
+    /// Is the instance properly initialized?
+    bool ready : 1;
+
     /// Should the destructor be called when this instance is GCed?
     bool destruct : 1;
 
@@ -35,12 +43,14 @@ struct nb_inst {
     bool clear_keep_alive : 1;
 };
 
+static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(void *));
+
 /// Python object representing a bound C++ function
 struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs_pos;
-    bool is_complex;
+    bool complex_call;
 };
 
 struct ptr_hash {

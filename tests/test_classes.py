@@ -42,7 +42,7 @@ def test03_double_init():
     s = t.Struct()
     with pytest.raises(RuntimeError) as excinfo:
         s.__init__()
-    assert 'the __init__ method should only be called once!' in str(excinfo.value)
+    assert 'the __init__ method should not be called on an initialized object!' in str(excinfo.value)
 
 
 def test04_rv_policy():
@@ -201,18 +201,14 @@ def test08_method_vectorcall():
 
 
 def test09_inheritance_py():
-    class Dachshund(t.Animal):
-        def __init__(self):
-            pass
-            #  print("in init()")
-            #  super().__init__()
-            #  print("after init()")
-        def type(self):
-            print('in type()')
-            return "Dachshund"
-        def what(self):
-            print('in what()')
-            return "yap"
+    for i in range(1024):
+        class Dachshund(t.Animal):
+            def __init__(self):
+                super().__init__()
+            def name(self):
+                return "Dachshund"
+            def what(self):
+                return "yap"
 
-    d = Dachshund()
-    #  assert t.go(d) == 'Dachshund says yap'
+        d = Dachshund()
+        assert t.go(d) == 'Dachshund says yap'

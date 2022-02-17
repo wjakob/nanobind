@@ -17,6 +17,14 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 NAMESPACE_BEGIN(detail)
 
+enum cast_flags : uint8_t {
+    // Enable implicit conversions (impl. assumes this is 1, don't reorder..)
+    convert = (1 << 0),
+
+    // Passed to the 'self' argument in a constructor call (__init__)
+    construct = (1 << 1)
+};
+
 template <typename T, typename SFINAE = int> struct type_caster;
 template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
@@ -32,11 +40,13 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
     using T1 = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
     using Tp = std::conditional_t<std::is_floating_point_v<T>, double, T1>;
 public:
-    bool load(handle src, bool convert) noexcept {
+    bool load(handle src, uint8_t flags) noexcept {
         Tp value_p;
 
         if (!src.is_valid())
             return false;
+
+        const bool convert = flags & (uint8_t) cast_flags::convert;
 
         if constexpr (std::is_floating_point_v<T>) {
             if (!convert && !PyFloat_Check(src.ptr()))
@@ -152,7 +162,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     NB_TYPE_CASTER(T, const_name("Tuple[") + concat(C1::cname, C2::cname) +
                           const_name("]"))
 
-    bool load(handle src, bool convert) noexcept {
+    bool load(handle src, uint8_t flags) noexcept {
         PyObject *o[2];
 
         if (!seq_size_fetch(src.ptr(), 2, o))
@@ -161,9 +171,9 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         C1 c1;
         C2 c2;
 
-        if (!c1.load(o[0], convert))
+        if (!c1.load(o[0], flags & (uint8_t) cast_flags::convert))
             goto fail;
-        if (!c2.load(o[1], convert))
+        if (!c2.load(o[1], flags & (uint8_t) cast_flags::convert))
             goto fail;
 
         value.first  = std::move(c1.value);
@@ -220,8 +230,8 @@ public:
 template <typename T, typename SFINAE> struct type_caster {
     static constexpr auto cname = const_name<T>();
 
-    NB_INLINE bool load(handle src, bool convert) noexcept {
-        return detail::nb_type_get(&typeid(T), src.ptr(), convert, (void **) &value);
+    NB_INLINE bool load(handle src, uint8_t flags) noexcept {
+        return detail::nb_type_get(&typeid(T), src.ptr(), flags, (void **) &value);
     }
 
     NB_INLINE static handle cast(const T *p, rv_policy policy,

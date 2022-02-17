@@ -116,10 +116,10 @@ PyObject *nb_func_new(const void *in_) noexcept {
              has_name ? f->name : "<anonymous>");
 
     func->max_nargs_pos = f->nargs - has_var_args - has_var_kwargs;
-    func->is_complex = has_args || has_var_args || has_var_kwargs;
+    func->complex_call = has_args || has_var_args || has_var_kwargs;
 
     if (func_prev) {
-        func->is_complex |= ((nb_func *) func_prev)->is_complex;
+        func->complex_call |= ((nb_func *) func_prev)->complex_call;
         func->max_nargs_pos = std::max(func->max_nargs_pos,
                                        ((nb_func *) func_prev)->max_nargs_pos);
 
@@ -137,7 +137,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         internals.funcs.erase(it);
     }
 
-    func->vectorcall = func->is_complex ? nb_func_vectorcall_complex
+    func->vectorcall = func->complex_call ? nb_func_vectorcall_complex
                                         : nb_func_vectorcall_simple;
 
     // Register the function
@@ -310,10 +310,10 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
             is_constructor =
                 strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
 
-            if (is_constructor && ((nb_inst *) parent)->destruct) {
+            if (is_constructor && ((nb_inst *) parent)->ready) {
                 PyErr_SetString(PyExc_RuntimeError,
                                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                                "method should only be called once!");
+                                "method should not be called on an initialized object!");
                 return nullptr;
             }
         }
@@ -322,7 +322,7 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
     // Preallocate stack memory for function dispatch
     size_t max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
     PyObject **args    = (PyObject **) alloca(max_nargs_pos * sizeof(PyObject *));
-    bool *args_convert = (bool *) alloca(max_nargs_pos * sizeof(bool));
+    uint8_t *args_flags = (uint8_t *) alloca(max_nargs_pos * sizeof(uint8_t));
     bool *kwarg_used   = (bool *) alloca(nkwargs_in * sizeof(bool));
 
     object extra_args, extra_kwargs;
@@ -356,6 +356,9 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
 
     PyObject *result = NB_NEXT_OVERLOAD;
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
+        if (is_constructor)
+            args_flags[0] = (uint8_t) cast_flags::construct;
+
         for (size_t k = 0; k < count; ++k) {
             const func_record *f = fr + k;
 
@@ -417,7 +420,7 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
                     break;
 
                 args[i] = arg;
-                args_convert[i] = arg_convert;
+                args_flags[i] = arg_convert ? (uint8_t) cast_flags::convert : 0;
             }
 
             // Skip this overload if positional arguments were unavailable
@@ -436,7 +439,7 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
                 }
 
                 args[nargs_pos] = extra_args.ptr();
-                args_convert[nargs_pos] = false;
+                args_flags[nargs_pos] = 0;
             }
 
             // Deal with remaining keyword arguments
@@ -450,7 +453,7 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
 
                 extra_kwargs = steal(dict);
                 args[nargs_pos + has_var_args] = dict;
-                args_convert[nargs_pos + has_var_args] = false;
+                args_flags[nargs_pos + has_var_args] = 0;
             } else if (kwargs_in) {
                 bool success = true;
                 for (size_t j = 0; j < nkwargs_in; ++j)
@@ -461,7 +464,7 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
 
             try {
                 // Found a suitable overload, let's try calling it
-                result = f->impl((void *) f->capture, args, args_convert,
+                result = f->impl((void *) f->capture, args, args_flags,
                                  (rv_policy) (f->flags & 0b111), parent);
             } catch (next_overload &) {
                 result = NB_NEXT_OVERLOAD;
@@ -476,8 +479,11 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
                 return nb_func_error_noconvert(f);
 
             if (result != NB_NEXT_OVERLOAD) {
-                if (is_constructor)
-                    ((nb_inst *) parent)->destruct = true;
+                if (is_constructor) {
+                    nb_inst *self = (nb_inst *) parent;
+                    self->destruct = true;
+                    self->ready = true;
+                }
                 return result;
             }
         }
@@ -492,7 +498,7 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
     const size_t count      = (size_t) Py_SIZE(self),
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf);
 
-    bool *args_convert = (bool *) alloca(nargs_in * sizeof(bool));
+    uint8_t *args_flags = (uint8_t *) alloca(nargs_in * sizeof(bool));
     func_record *fr = nb_func_get(self);
     PyObject *parent = nullptr;
     bool is_constructor = false;
@@ -508,17 +514,19 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
             is_constructor =
                 strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
 
-            if (is_constructor && ((nb_inst *) parent)->destruct) {
+            if (is_constructor && ((nb_inst *) parent)->ready) {
                 PyErr_SetString(PyExc_RuntimeError,
                                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                                "method should only be called once!");
+                                "method should not be called on an initialized object!");
                 return nullptr;
             }
         }
     }
 
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
-        memset(args_convert, pass, nargs_in * sizeof(bool));
+        memset(args_flags, pass, nargs_in * sizeof(bool));
+        if (is_constructor)
+            args_flags[0] = (uint8_t) cast_flags::construct;
 
         for (size_t k = 0; k < count; ++k) {
             const func_record *f = fr + k;
@@ -529,7 +537,7 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
             try {
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, (PyObject **) args_in,
-                                 args_convert, (rv_policy) (f->flags & 0b111),
+                                 args_flags, (rv_policy) (f->flags & 0b111),
                                  parent);
             } catch (next_overload &) {
                 result = NB_NEXT_OVERLOAD;
@@ -544,8 +552,11 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
                 return nb_func_error_noconvert(f);
 
             if (result != NB_NEXT_OVERLOAD) {
-                if (is_constructor)
-                    ((nb_inst *) parent)->destruct = true;
+                if (is_constructor) {
+                    nb_inst *self = (nb_inst *) parent;
+                    self->destruct = true;
+                    self->ready = true;
+                }
                 return result;
             }
         }

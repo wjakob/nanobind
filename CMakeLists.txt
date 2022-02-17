@@ -51,9 +51,9 @@ endif()
 add_library(nanobind ${NB_LIB_TYPE}
   src/internals.cpp
   src/common.cpp
-  src/func.cpp
+  src/nb_func.cpp
+  src/nb_type.cpp
   src/error.cpp
-  src/type.cpp
 )
 
 if (NB_SHARED)

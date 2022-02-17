@@ -2,16 +2,38 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 enum class type_flags : uint16_t {
+    /// Does the type provide a C++ destructor?
     is_destructible       = (1 << 0),
+
+    /// Does the type provide a C++ copy constructor?
     is_copy_constructible = (1 << 1),
+
+    /// Does the type provide a C++ move constructor?
     is_move_constructible = (1 << 2),
-    has_scope             = (1 << 4),
-    has_doc               = (1 << 5),
-    has_base              = (1 << 6),
-    has_base_py           = (1 << 7),
-    has_destruct          = (1 << 8),
-    has_copy              = (1 << 9),
-    has_move              = (1 << 10)
+
+    /// Is this a python type that extends a bound C++ type?
+    is_python_type        = (1 << 4),
+
+    /// Is the 'scope' field of the type_data struture set?
+    has_scope             = (1 << 5),
+
+    /// Is the 'doc' field of the type_data struture set?
+    has_doc               = (1 << 6),
+
+    /// Is the 'base' field of the type_data struture set?
+    has_base              = (1 << 7),
+
+    /// Is the 'base_py' field of the type_data struture set?
+    has_base_py           = (1 << 8),
+
+    /// Is the 'destruct' field of the type_data struture set?
+    has_destruct          = (1 << 9),
+
+    /// Is the 'copy' field of the type_data struture set?
+    has_copy              = (1 << 10),
+
+    /// Is the 'move' field of the type_data struture set?
+    has_move              = (1 << 11)
 };
 
 struct type_data {

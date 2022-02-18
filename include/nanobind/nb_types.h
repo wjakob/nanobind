@@ -62,6 +62,7 @@ public:
     NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
     NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
+    NB_INLINE operator handle();
 
     accessor<obj_attr> attr(handle key) const;
     accessor<str_attr> attr(const char *key) const;
@@ -168,11 +169,11 @@ public:
     }
 };
 
-template <typename T> T borrow(handle h) {
+template <typename T> NB_INLINE T borrow(handle h) {
     return { h, detail::borrow_t() };
 }
 
-template <typename T> T steal(handle h) {
+template <typename T> NB_INLINE T steal(handle h) {
     return { h, detail::steal_t() };
 }
 
@@ -285,6 +286,12 @@ NB_INLINE size_t len(const tuple &t) { return PyTuple_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &t) { return PyList_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const dict &t) { return PyDict_GET_SIZE(t.ptr()); }
 
+
+NAMESPACE_BEGIN(detail)
+template <typename Derived> NB_INLINE api<Derived>::operator handle() {
+    return derived().ptr();
+}
+NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 
 #undef NB_API_COMP

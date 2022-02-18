@@ -81,19 +81,10 @@ NB_CORE PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*));
 NB_CORE PyObject *obj_op_2(PyObject *a, PyObject *b,
                            PyObject *(*op)(PyObject *, PyObject *));
 
-/// Perform a function call
-NB_CORE PyObject *obj_call(PyObject *callable, PyObject *args);
-
-/// Perform a function call with keyword arguments
-NB_CORE PyObject *obj_call_kw(PyObject *callable, PyObject *args,
-                              PyObject *kwargs);
-
-#if PY_VERSION_HEX >= 0x03090000
-// Perform a faster vector function call
+// Perform a vector function call
 NB_CORE PyObject *obj_vectorcall(PyObject *base, PyObject *const *args,
                                  size_t nargsf, PyObject *kwnames,
                                  bool method_call);
-#endif
 
 // ========================================================================
 

@@ -77,10 +77,10 @@ static PyTypeObject nb_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_type",
     .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
-    .tp_init = nb_type_init,
     .tp_dealloc = nb_type_dealloc,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .tp_doc = "nanobind metaclass"
+    .tp_doc = "nanobind metaclass",
+    .tp_init = nb_type_init
 };
 
 static PyTypeObject nb_func_type = {
@@ -92,7 +92,7 @@ static PyTypeObject nb_func_type = {
     .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
     .tp_call = PyVectorcall_Call,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = Py_TPFLAGS_DEFAULT | NB_VECTORCALL,
+    .tp_flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL,
     .tp_doc = "nanobind function object",
     .tp_getset = nb_func_getset,
     .tp_new = PyType_GenericNew
@@ -107,7 +107,7 @@ static PyTypeObject nb_meth_type = {
     .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
     .tp_call = PyVectorcall_Call,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = Py_TPFLAGS_DEFAULT | NB_VECTORCALL |
+    .tp_flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL |
                 Py_TPFLAGS_METHOD_DESCRIPTOR,
     .tp_doc = "nanobind method object",
     .tp_getset = nb_func_getset,

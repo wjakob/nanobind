@@ -19,71 +19,97 @@ args_proxy api<Derived>::operator*() const {
 
 /// Implementation detail of api<T>::operator() (call operator)
 template <typename T>
-NB_INLINE void call_prepare(size_t &nargs, bool &needs_kwargs, const T &value) {
+NB_INLINE void call_prepare(size_t &nargs, size_t &nkwargs, const T &value) {
     using D = std::decay_t<T>;
 
     if constexpr (std::is_same_v<D, arg_v>) {
-        needs_kwargs = true;
+        nkwargs++;
     } else if constexpr (std::is_same_v<D, args_proxy>) {
         nargs += len(value);
     } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
-        needs_kwargs = true;
+        nkwargs += len(value);
     } else {
         nargs += 1;
     }
-    (void) nargs; (void) needs_kwargs; (void) value;
+
+    (void) nargs; (void) nkwargs; (void) value;
 }
 
 /// Implementation detail of api<T>::operator() (call operator)
 template <rv_policy policy, typename T>
-NB_INLINE void call_append(PyObject *args, PyObject *kwargs, size_t &nargs, T &&value) {
+NB_INLINE void call_append(PyObject **args, PyObject *kwnames, size_t &args_i,
+                           size_t &kwargs_i, const size_t kwargs_offset, T &&value) {
     using D = std::decay_t<T>;
 
     if constexpr (std::is_same_v<D, arg_v>) {
-        call_append_kwarg(kwargs, value.name, value.value.ptr());
+        printf("Case A\n");
+        args[kwargs_i + kwargs_offset] = value.value.inc_ref().ptr();
+        PyTuple_SET_ITEM(kwnames, kwargs_i++,
+                         PyUnicode_InternFromString(value.name));
     } else if constexpr (std::is_same_v<D, args_proxy>) {
-        call_append_args(args, nargs, value.ptr());
+        printf("Case B\n");
+        for (size_t i = 0, l = len(value); i < l; ++i)
+            args[args_i++] = borrow(value[i]).release().ptr();
     } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
-        call_append_kwargs(kwargs, value.ptr());
+        printf("Case C\n");
+        PyObject *key, *entry;
+        Py_ssize_t pos = 0;
+
+        while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {
+            Py_INCREF(key); Py_INCREF(entry);
+            args[kwargs_i + kwargs_offset] = entry;
+            PyTuple_SET_ITEM(kwnames, kwargs_i++, key);
+        }
     } else {
-        call_append_arg(
-            args, nargs,
-            make_caster<T>::cast((forward_t<T>) value, policy, nullptr).ptr());
+        printf("Case D\n");
+        args[args_i++] =
+            make_caster<T>::cast((forward_t<T>) value, policy, nullptr).ptr();
     }
-    (void) args; (void) kwargs; (void) nargs;
+    (void) args; (void) kwnames; (void) args_i; (void) kwargs_i; (void) kwargs_offset;
 }
 
 template <typename Derived>
 template <rv_policy policy, typename... Args>
 object api<Derived>::operator()(Args &&...args) const {
+    static constexpr bool method_call =
+        std::is_same_v<Derived, accessor<obj_attr>> ||
+        std::is_same_v<Derived, accessor<str_attr>>;
+
     if constexpr (((std::is_same_v<Args, arg_v> ||
                     std::is_same_v<Args, args_proxy> ||
                     std::is_same_v<Args, kwargs_proxy>) || ...)) {
-        size_t nargs = 0;
-        bool needs_kwargs = false;
-
-        (call_prepare(nargs, needs_kwargs, (const Args &) args), ...);
-
-        tuple args_py = steal<tuple>(PyTuple_New((Py_ssize_t) nargs));
-        dict kwargs_py = steal<dict>(needs_kwargs ? PyDict_New() : nullptr);
-
-        nargs = 0;
-        PyObject *args_o = args_py.ptr(), *kwargs_o = kwargs_py.ptr();
-        (call_append<policy>(args_o, kwargs_o, nargs, (forward_t<Args>) args), ...);
-
         // Complex call with keyword arguments, *args/**kwargs expansion, etc.
-        return steal(obj_call_kw(derived().ptr(), args_py.release().ptr(),
-                                 kwargs_py.release().ptr()));
+        size_t nargs = 0, nkwargs = 0;
+
+        (call_prepare(nargs, nkwargs, (const Args &) args), ...);
+
+        PyObject **args_py = (PyObject **) alloca(nargs + nkwargs + 1);
+        PyObject *kwnames = nkwargs ? PyTuple_New((Py_ssize_t) nkwargs) : nullptr;
+
+        size_t args_i = 0, kwargs_i = 0;
+        (call_append<policy>(args_py + 1, kwnames, args_i, kwargs_i, nargs,
+                             (forward_t<Args>) args), ...);
+
+        printf("%zu %zu %zu %zu\n", nargs, nkwargs, args_i, kwargs_i);
+        PyObject *base, **args_ptr;
+        if constexpr (method_call) {
+            base = derived().key().release().ptr();
+            args_py[0] = derived().base().inc_ref().ptr();
+            args_ptr = args_py;
+            nargs++;
+        } else {
+            base = derived().inc_ref().ptr();
+            args_py[0] = nullptr;
+            args_ptr = args_py + 1;
+        }
+
+        nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;
+
+        return steal(
+            obj_vectorcall(base, args_ptr, nargs, kwnames, method_call));
     } else {
-#if PY_VERSION_HEX < 0x03090000
-        // Simple call using only positional arguments
-        tuple args_py = make_tuple<policy>((forward_t<Args>) args...);
-        return steal(obj_call(derived().ptr(), args_py.release().ptr()));
-#else
-        /// More efficient version of the above using a vector call
-        PyObject *args_py[sizeof...(Args) + 1],
-                 **args_ptr = nullptr,
-                 *base = nullptr;
+        // Simple version with only positional arguments
+        PyObject *args_py[sizeof...(Args) + 1];
         size_t nargs = 0;
 
         ((args_py[1 + nargs++] =
@@ -91,10 +117,7 @@ object api<Derived>::operator()(Args &&...args) const {
                                               policy, nullptr).ptr()),
          ...);
 
-        static constexpr bool method_call =
-            std::is_same_v<Derived, accessor<obj_attr>> ||
-            std::is_same_v<Derived, accessor<str_attr>>;
-
+        PyObject **args_ptr, *base;
         if constexpr (method_call) {
             base = derived().key().release().ptr();
             args_py[0] = derived().base().inc_ref().ptr();
@@ -110,7 +133,6 @@ object api<Derived>::operator()(Args &&...args) const {
 
         return steal(
             obj_vectorcall(base, args_ptr, nargs, nullptr, method_call));
-#endif
     }
 }
 

@@ -133,37 +133,17 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
     return res;
 }
 
-PyObject *obj_call(PyObject *callable, PyObject *args) {
-    if (!PyGILState_Check()) {
-        Py_DECREF(args);
-        raise("nanobind::detail::obj_call(): PyGILState_Check() failure.");
-    }
-
-    PyObject *res = PyObject_CallObject(callable, args);
-    Py_DECREF(args);
-    if (!res)
-        python_error_raise();
-
-    return res;
+#if PY_VERSION_HEX < 0x03090000
+PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
+                               size_t nargsf, PyObject *kwnames) {
+    PyObject *obj = PyObject_GetAttr(args[0], name);
+    if (!obj)
+        return obj;
+    PyObject *result = NB_VECTORCALL(obj, args + 1, nargsf - 1, kwnames);
+    Py_DECREF(obj);
+    return result;
 }
-
-PyObject *obj_call_kw(PyObject *callable, PyObject *args, PyObject *kwargs) {
-    if (!PyGILState_Check()) {
-        Py_DECREF(args);
-        Py_XDECREF(kwargs);
-        raise("nanobind::detail::obj_call_kw(): PyGILState_Check() failure.");
-    }
-
-    PyObject *res = PyObject_Call(callable, args, kwargs);
-    Py_DECREF(args);
-    Py_XDECREF(kwargs);
-    if (!res)
-        python_error_raise();
-
-    return res;
-}
-
-#if PY_VERSION_HEX >= 0x03090000
+#endif
 
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
@@ -185,8 +165,8 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
         }
     }
 
-    res = (method_call ? PyObject_VectorcallMethod
-                       : PyObject_Vectorcall)(base, args, nargsf, kwnames);
+    res = (method_call ? NB_VECTORCALL_METHOD
+                       : NB_VECTORCALL)(base, args, nargsf, kwnames);
 
 end:
     for (size_t i = 0; i < nargs_total; ++i)
@@ -201,8 +181,6 @@ end:
 
     return res;
 }
-
-#endif
 
 // ========================================================================
 
@@ -418,63 +396,6 @@ void tuple_check(PyObject *tuple, size_t nargs) {
         if (!PyTuple_GET_ITEM(tuple, i))
             raise("nanobind::detail::tuple_check(...): conversion of argument "
                   "%zu failed!", i + 1);
-    }
-}
-
-// ========================================================================
-
-void call_append_arg(PyObject *args, size_t &nargs, PyObject *value) {
-    if (!value)
-        raise("nanobind::detail::call_append_arg(...): conversion of argument "
-              "%zu failed!", nargs + 1);
-    PyTuple_SET_ITEM(args, nargs++, value);
-}
-
-void call_append_args(PyObject *args, size_t &nargs, PyObject *value) {
-    Py_ssize_t size = PySequence_Length(value);
-    if (size < 0)
-        python_error_raise();
-
-    for (Py_ssize_t i = 0; i < size; ++i) {
-        PyObject *o = PySequence_GetItem(value, i);
-        if (!o)
-            python_error_raise();
-        PyTuple_SET_ITEM(args, nargs++, o);
-    }
-}
-
-void call_append_kwarg(PyObject *kwargs, const char *name, PyObject *value) {
-    PyObject *key = PyUnicode_InternFromString(name);
-    if (!key)
-        python_error_raise();
-
-    if (PyDict_Contains(kwargs, key)) {
-        Py_DECREF(key);
-        raise("nanobind::detail::call_append_kwarg(): duplicate keyword "
-              "argument \"%s\"", name);
-    }
-
-    int rv = PyDict_SetItem(kwargs, key, value);
-    Py_DECREF(key);
-
-    if (rv)
-        python_error_raise();
-}
-
-void call_append_kwargs(PyObject *kwargs, PyObject *value) {
-    if (!PyDict_Check(value))
-        raise("nanobind::detail::call_append_kwargs(): expected a dictionary "
-              "argument!");
-
-    PyObject *k, *v;
-    Py_ssize_t pos = 0;
-
-    while (PyDict_Next(value, &pos, &k, &v)) {
-        if (PyDict_Contains(kwargs, k))
-            raise("nanobind::detail::call_append_kwargs(): duplicate argument "
-                  "\"%s\"", PyUnicode_AsUTF8AndSize(k, nullptr));
-        if (PyDict_SetItem(kwargs, k, v))
-            python_error_raise();
     }
 }
 

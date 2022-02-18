@@ -8,25 +8,32 @@ void implicitly_convertible(const std::type_info *src,
                             const std::type_info *dst) noexcept {
     internals &internals = internals_get();
 
-    auto it1 = internals.type_c2p.find(std::type_index(*src));
-    auto it2 = internals.type_c2p.find(std::type_index(*dst));
+    auto it = internals.type_c2p.find(std::type_index(*dst));
+    if (it == internals.type_c2p.end())
+        fail("nanobind::detail::implicitly_convertible(src=%s, dst=%s): "
+             "destination type unknown!", type_name(src),
+             type_name(dst));
 
-    bool src_unknown = it1 == internals.type_c2p.end(),
-         dst_unknown = it2 == internals.type_c2p.end();
+    type_data *t = it->second;
 
-    if (src_unknown || dst_unknown) {
-        char *src_name = type_name(src),
-             *dst_name = type_name(dst);
-
-        const char *message =
-            src_unknown
-                ? (dst_unknown ? "both types unknown" : "source type unknown")
-                : "destination type unknown";
-
-        fail("nanobind::detail::implicitly_convertible(src=%s, dst=%s): %s!",
-             src_name, dst_name, message);
+    size_t size = 0;
+    if (t->flags & (uint16_t) type_flags::has_implicit_conversions) {
+        while (t->implicit && t->implicit[size])
+            size++;
+    } else {
+        t->implicit = nullptr;
+        t->implicit_py = nullptr;
+        t->flags |= (uint16_t) type_flags::has_implicit_conversions;
     }
 
+    const std::type_info **data = (const std::type_info **) malloc(
+        sizeof(const std::type_info *) * (size + 2));
+
+    memcpy(data, t->implicit, size);
+    data[size] = src;
+    data[size + 1] = nullptr;
+    free(t->implicit);
+    t->implicit = data;
 }
 
 NAMESPACE_END(detail)

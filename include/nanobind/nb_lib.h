@@ -151,10 +151,5 @@ NB_CORE void property_install(PyObject *scope, const char *name, bool is_static,
 NB_CORE PyObject *get_override(void *ptr, const std::type_info *type,
                                const char *name, bool pure);
 
-// ========================================================================
-
-NB_CORE void implicitly_convertible(const std::type_info *src,
-                                    const std::type_info *dst) noexcept;
-
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

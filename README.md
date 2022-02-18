@@ -1,28 +1,29 @@
 # nanobind — Seamless operability between C++17 and Python
 
-_nanobind_ is a small binding library that exposes C++ types in Python and
-vice versa. It is reminiscent of
-_[Boost.Python](http://www.boost.org/doc/libs/1_58_0/libs/python/doc)_ and
+_nanobind_ is a small binding library that exposes C++ types in Python and vice
+versa. It is reminiscent of
+_[Boost.Python](https://www.boost.org/doc/libs/1_64_0/libs/python/doc/html)_ and
 _[pybind11](http://github.com/pybind/pybind11)_ and uses near-identical syntax.
 
 ## Why _yet another_ binding library?
 
-I started the _[pybind11](http://github.com/pybind/pybind11)_ project in back in
-2015 to improve the efficiency of C++/Python bindings. Thanks to many amazing
-contributions by others, _pybind11_ has become a core dependency of software
-across the world including flagship projects like PyTorch, Tensorflow, etc. The
-repository is cloned more than 100.000 times _per day_. Many extensions and
-generalizations were added by users and core developers over the years to
-address use cases of this diverse audience. However, all of this success also
-came with _costs_: the complexity of the library grew tremendously, causing
-overheads on binary size, compilation time, and runtime performance.
+I started the _[pybind11](http://github.com/pybind/pybind11)_ project in back
+in 2015 to improve the efficiency of C++/Python bindings. Thanks to many
+amazing contributions by others, _pybind11_ has become a core dependency of
+software across the world including flagship projects like PyTorch and
+Tensorflow; every day, the repository is cloned more than 100.000 times. Many
+extensions and generalizations were added by users and core developers over the
+years to address use cases of this diverse audience. However, all of this
+success also came with _costs_: the complexity of the library grew
+tremendously, causing overheads on binary size, compilation time, and runtime
+performance.
 
 Ironically, the situation feels just like 2015: bindings are once again slow to
-compile with existing tools (_Boost.Python_, _pybind11_), and a new C++
-standard has come along with the potential to dramatically simplify things. It
-seems I need to do this one more time..
+compile with existing tools (_Boost.Python_, _pybind11_), and the conditions
+(C++17, Python 3.8+) are ripe for drastic simplifications. It seems that
+another round of this cycle is needed..
 
-## Talk is cheap, show me the numbers.
+## Performance numbers
 
 TBD
 
@@ -67,7 +68,7 @@ long-standing performance issues with _pybind11_:
 - _nanobind_ internally replaces `std::unordered_map` with a more efficient hash
   table ([tsl::robin_map](https://github.com/Tessil/robin-map), which is
   included as a git submodule).
-- function calls from/to Python are realized using [vector
+- function calls from/to Python are realized using [PEP 590 vector
   calls](https://www.python.org/dev/peps/pep-0590), which gives a nice speed
   boost. The main function dispatch loop no longer allocates heap memory.
 - _pybind11_ was designed as a header-only library, which is generally a good
@@ -75,10 +76,14 @@ long-standing performance issues with _pybind11_:
   downside of this is that a large amount of redundant code has to be compiled
   in each binding file (e.g., the function dispatch loop and all of the related
   internal data structures). _nanobind_ compiles a separate shared or static
-  support library `libnanobind.so` and links it against the binding code to
+  support library (`libnanobind`) and links it against the binding code to
   avoid redundant compilation. When using the CMake ``nanobind_add_module()``
-  function, this all happens automatically.
-
+  function, this all happens transparently.
+- ``#include <pybind11/pybind11.h>`` pulls in a large portion of the STL (about
+  2.1 MiB of headers with Clang and libc++). _nanobind_ minimizes STL usage to
+  avoid this problem. Type casters even for for basic types like
+  ``std::string`` require an explicit include directive (e.g. `#include
+  <nanobind/stl/string.h>`).
 
 ### Dependencies
 
@@ -91,3 +96,33 @@ nanobind depends on very recent versions of everything:
   version 3.8.
 - **CMake 3.17+**: Recent CMake versions include important improvements to
   `FindPython` that this project depends on.
+
+### Syntactic differences
+
+_nanobind_ mostly follows the _pybind11_ syntax, hence the [pybind11
+documentation](https://pybind11.readthedocs.io/en/stable) is a useful resource.
+There are, however, a few important differences:
+
+- _nanobind_ uses a different namespace. You can declare ``namespace py =
+  nanobind;`` to port existing code. New code should use the ``namespace nb =
+  nanobind;`` shorthand alias.
+
+- Macros of the form ``PYBIND11_*`` (e.g., ``PYBIND11_OVERRIDE(..)``) were
+  renamed to ``NB_*`` (e.g., ``NB_OVERRIDE(..)``).
+
+- In _pybind11_, implicit type conversions were specified using a follow-up
+  function call. In _nanobind_, they are specified along with the constructor:
+
+  Before:
+  ```cpp
+  py::class_<MyType>(m, "MyType")
+      .def(py::init<MyOtherType>());
+
+  py::implicitly_convertible<MyOtherType, MyType>();
+  ```
+
+  After:
+  ```cpp
+  nb::class_<MyType>(m, "MyType")
+      .def(nb::init_implicit<MyOtherType>());
+  ```

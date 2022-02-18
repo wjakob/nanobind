@@ -127,6 +127,8 @@ inline func_record *nb_func_get(void *o) {
     return (func_record *) (((char *) o) + sizeof(nb_func));
 }
 
+extern void implicitly_convertible(const std::type_info *src,
+                                   const std::type_info *dst) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

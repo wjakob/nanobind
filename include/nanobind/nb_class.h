@@ -53,6 +53,8 @@ struct type_data {
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *);
+    const std::type_info **implicit;
+    bool (**implicit_py)(PyObject *);
 };
 
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
@@ -76,6 +78,24 @@ template <typename... Args> struct init {
                 new ((Alias *) v) Alias{ (forward_t<Args>) args... };
             },
             extra...);
+    }
+};
+
+template <typename Arg> struct init_implicit {
+    template <typename Class, typename... Extra>
+    NB_INLINE static void execute(Class &cl, const Extra&... extra) {
+        using Value = typename Class::Value;
+        using Alias = typename Class::Alias;
+
+        cl.def(
+            "__init__",
+            [](Value *v, Arg arg) {
+                new ((Alias *) v) Alias{ (forward_t<Arg>) arg };
+            }, is_implicit(), extra...);
+
+        if constexpr (!make_caster<Arg>::is_class) {
+            printf("Unhandled case.. %s\n", typeid(Arg).name());
+        }
     }
 };
 
@@ -184,6 +204,13 @@ public:
 
     template <typename... Args, typename... Extra>
     NB_INLINE class_ &def(detail::init<Args...> init, const Extra &... extra) {
+        init.execute(*this, extra...);
+        return *this;
+    }
+
+    template <typename... Args, typename... Extra>
+    NB_INLINE class_ &def(detail::init_implicit<Args...> init,
+                          const Extra &... extra) {
         init.execute(*this, extra...);
         return *this;
     }
@@ -297,5 +324,6 @@ public:
 };
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }
+template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { return { }; }
 
 NAMESPACE_END(NB_NAMESPACE)

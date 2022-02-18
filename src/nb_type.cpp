@@ -162,6 +162,11 @@ void nb_type_dealloc(PyObject *o) {
         internals.type_c2p.erase(it);
     }
 
+    if (nbt->t.flags & (uint16_t) type_flags::has_implicit_conversions) {
+        free(nbt->t.implicit);
+        free(nbt->t.implicit_py);
+    }
+
     PyType_Type.tp_dealloc(o);
 }
 
@@ -178,7 +183,8 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     nb_type *parent = (nb_type *) type->ht.ht_type.tp_base;
 
     type->t = parent->t;
-    type->t.flags |= (uint32_t) type_flags::is_python_type;
+    type->t.flags |=  (uint16_t) type_flags::is_python_type;
+    type->t.flags &= ~(uint16_t) type_flags::has_implicit_conversions;
 
     return 0;
 }
@@ -300,12 +306,15 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *o, uint8_t flags,
         return false;
 
     nb_type *nbt = (nb_type *) type;
+    type_data *dst_type = nullptr;
     bool valid = nbt->t.type == cpp_type || *nbt->t.type == *cpp_type;
 
     if (!valid) {
         auto it = internals.type_c2p.find(std::type_index(*cpp_type));
-        if (it != internals.type_c2p.end())
-            valid = PyType_IsSubtype(type, it->second->type_py);
+        if (it != internals.type_c2p.end()) {
+            dst_type = it->second;
+            valid = PyType_IsSubtype(type, dst_type->type_py);
+        }
     }
 
     if (valid) {
@@ -321,6 +330,10 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *o, uint8_t flags,
         *out = inst_data(inst);
 
         return true;
+    } else if ((flags & (uint16_t) cast_flags::convert) && dst_type &&
+               (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions)) {
+        printf("Trying..\n");
+        return false;
     } else {
         return false;
     }

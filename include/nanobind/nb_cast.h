@@ -361,8 +361,7 @@ detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
     return *this;
 }
 
-template <typename T>
-void list::append(T &&value) {
+template <typename T> void list::append(T &&value) {
     object o = nanobind::cast(value);
     if (PyList_Append(m_ptr, o.ptr()))
         detail::python_error_raise();

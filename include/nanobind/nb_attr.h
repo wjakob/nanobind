@@ -28,6 +28,7 @@ struct arg_v : arg {
 };
 
 struct is_method { };
+struct is_implicit { };
 
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
@@ -54,10 +55,12 @@ enum class func_flags : uint16_t {
     is_method      = (1 << 10),
     /// Is this function a method called __init__? (automatically generated)
     is_constructor = (1 << 11),
+    /// Can this constructor be used to perform an implicit conversion?
+    is_implicit    = (1 << 12),
     /// When the function is GCed, do we need to call func_data::free?
-    has_free       = (1 << 12),
+    has_free       = (1 << 13),
     /// Should the func_new() call return a new reference?
-    return_ref     = (1 << 13)
+    return_ref     = (1 << 14)
 };
 
 struct arg_data {
@@ -118,6 +121,10 @@ NB_INLINE void func_extra_apply(F &f, const char *doc, size_t &) {
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, is_method, size_t &) {
     f.flags |= (uint16_t) func_flags::is_method;
+}
+
+template <typename F> NB_INLINE void func_extra_apply(F &f, is_implicit, size_t &) {
+    f.flags |= (uint16_t) func_flags::is_implicit;
 }
 
 template <typename F> NB_INLINE void func_extra_apply(F &f, rv_policy pol, size_t &) {

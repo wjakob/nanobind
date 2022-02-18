@@ -68,6 +68,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
                has_args       = f->flags & (uint16_t) func_flags::has_args,
                has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
                has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs,
+               is_implicit    = f->flags & (uint16_t) func_flags::is_implicit,
                is_method      = f->flags & (uint16_t) func_flags::is_method,
                return_ref     = f->flags & (uint16_t) func_flags::return_ref;
 
@@ -153,6 +154,18 @@ PyObject *nb_func_new(const void *in_) noexcept {
                          : (uint16_t) 0;
     } else {
         fc->name = "<anonymous>";
+    }
+
+    if (is_implicit) {
+        if (!(fc->flags & (uint16_t) func_flags::is_constructor))
+            fail("nb::detail::nb_func_new(\"%s\"): nanobind::is_implicit() "
+                 "should only be specified for constructors.", f->name);
+        if (f->nargs != 2)
+            fail("nb::detail::nb_func_new(\"%s\"): implicit constructors "
+                 "should only have one argument.", f->name);
+
+        if (f->descr_types[1])
+            implicitly_convertible(f->descr_types[1], f->descr_types[0]);
     }
 
     for (size_t i = 0;; ++i) {

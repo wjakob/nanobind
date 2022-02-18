@@ -204,13 +204,10 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<int>());
 
     nb::class_<D>(m, "D")
-        .def(nb::init<const A &>())
-        .def(nb::init<const B *>())
-        .def(nb::init<int>())
+        .def(nb::init_implicit<const A &>())
+        .def(nb::init_implicit<const B *>())
+        .def(nb::init_implicit<int>())
         .def_readwrite("value", &D::value);
-
-    nb::implicitly_convertible<A, D>();
-    nb::implicitly_convertible<B, D>();
 
     m.def("get_d", [](const D &d) { return d.value; });
 }

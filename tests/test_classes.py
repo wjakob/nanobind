@@ -277,7 +277,19 @@ def test10_trampoline_failures():
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
-def test11_implicitly_convertible():
+def test11_large_pointers():
+    for i in range(1, 10):
+        c = t.i2p(i)
+        assert isinstance(c, t.Cat)
+        assert t.p2i(c) == i
+
+    large = 0xffffffffffffffff
+    for i in range(large - 10, large):
+        c = t.i2p(i)
+        assert isinstance(c, t.Cat)
+        assert t.p2i(c) == i
+
+def test12_implicitly_convertible():
     assert t.get_d.__doc__ == "get_d(arg0: test_classes_ext.D) -> int"
     a = t.A(1)
     b = t.B(2)

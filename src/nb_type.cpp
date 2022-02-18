@@ -15,25 +15,23 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 }
 
 static void *inst_data(nb_inst *self) {
-    void *ptr = (void *) ((uintptr_t) self + self->offset);
-    return self->internal ? ptr : *(void **) ptr;
+    void *ptr = (void *) ((intptr_t) self + self->offset);
+    return self->direct ? ptr : *(void **) ptr;
 }
 
-// Allocate a new instance with internal or external storage
+/// Allocate memory for a nb_type instance with internal or external storage
 PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
     const type_data *t = &((nb_type *) tp)->t;
     const bool has_gc = tp->tp_flags & Py_TPFLAGS_HAVE_GC;
 
-    size_t gc_head = has_gc ? sizeof(uintptr_t) * 2 : 0,
-           basicsize_plus_gc = (size_t) tp->tp_basicsize + gc_head,
+    size_t gc_size = has_gc ? sizeof(uintptr_t) * 2 : 0,
+           basic_size = (size_t) tp->tp_basicsize,
+           nb_inst_size = basic_size + gc_size,
            align = (size_t) t->align;
 
-    size_t size = basicsize_plus_gc;
-    if (value) {
-        // External: only allocate space for a pointer
-        size += sizeof(void *);
-    } else {
-        // Internal: allocate space for the object and padding for alignment
+    size_t size = nb_inst_size;
+    if (!value) {
+        // Internal storage: space for the object and padding for alignment
         size += t->size;
         if (align > sizeof(void *))
             size += align - sizeof(void *);
@@ -44,27 +42,43 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         return PyErr_NoMemory();
 
     // Clear only the initial part of the object (GC head, nb_inst contents)
-    // memset(alloc, 0, basicsize_plus_gc);
-    memset(alloc, 0, size);
+    memset(alloc, 0, nb_inst_size);
 
-    // Initialize the Python object and register it with the GC if needed
-    PyObject *o = (PyObject *) (alloc + gc_head);
-    PyObject_Init(o, tp);
-    if (has_gc)
-        PyObject_GC_Track(o);
+    nb_inst *self = (nb_inst *) (alloc + gc_size);
+    if (!value) {
+        // Address of instance payload area (aligned)
+        uintptr_t payload = (uintptr_t) alloc + nb_inst_size;
+        payload = (payload + align - 1) / align * align;
 
-    nb_inst *self = (nb_inst *) o;
-    uint8_t *data = alloc + basicsize_plus_gc;
+        // Encode offset to aligned payload
+        self->offset = (int32_t) ((intptr_t) payload - (intptr_t) self);
+        self->direct = true;
 
-    if (value) {
-        *(void **) data = value;
+        value = (void *) payload;
     } else {
-        data = (uint8_t *) ((((uintptr_t) data) + align - 1) / align * align);
-        self->internal = true;
-        value = data;
-    }
+        // Compute offset to instance value
+        int32_t offset = (int32_t) ((intptr_t) value - (intptr_t) self);
 
-    self->offset = (uintptr_t) data - (uintptr_t) o;
+        if ((intptr_t) self + offset == (intptr_t) value) {
+            // Offset *is* representable as 32 bit value
+            self->offset = offset;
+            self->direct = true;
+        } else {
+            // Offset *not* representable, allocate extra memory for a pointer
+            uint8_t *new_alloc = (uint8_t *)
+                PyObject_Realloc(alloc, nb_inst_size + sizeof(void *));
+
+            if (!new_alloc) {
+                PyObject_Free(alloc);
+                return PyErr_NoMemory();
+            }
+
+            *(void **) (new_alloc + nb_inst_size) = value;
+            self = (nb_inst *) (new_alloc + gc_size);
+            self->offset = basic_size;
+            self->direct = false;
+        }
+    }
 
     // Update hash table that maps from C++ to Python instance
     auto [it, success] = internals_get().inst_c2p.try_emplace(
@@ -73,6 +87,10 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
     if (!success)
         fail("nanobind::detail::inst_new(): duplicate object!");
+
+    PyObject_Init((PyObject *) self, tp);
+    if (has_gc)
+        PyObject_GC_Track(self);
 
     return (PyObject *) self;
 }
@@ -124,7 +142,7 @@ static void inst_dealloc(PyObject *self) {
         std::pair<void *, std::type_index>(p, *type->t.type));
     if (it == internals.inst_c2p.end())
         fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
-             "an unknown instance!", type->ht.ht_type.tp_name);
+             "an unknown instance (%p)!", type->ht.ht_type.tp_name, p);
     internals.inst_c2p.erase(it);
 
     type->ht.ht_type.tp_free(self);

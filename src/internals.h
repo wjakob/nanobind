@@ -25,10 +25,15 @@ struct nb_inst { // usually: 24 bytes
     PyObject_HEAD
 
     /// Offset to the actual instance data
-    uint32_t offset;
+    int32_t offset;
 
-    /// Is the instance data stored within the Python object?
-    bool internal : 1;
+    /**
+     * The variable 'offset' can either encode an offset relative to the
+     * nb_inst address that leads to the instance data, or it can encode a
+     * relative offset to a pointer that must be dereferenced to get to the
+     * instance data. 'direct' is 'true' in the former case.
+     */
+    bool direct : 1;
 
     /// Is the instance properly initialized?
     bool ready : 1;

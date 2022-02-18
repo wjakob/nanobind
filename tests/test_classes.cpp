@@ -177,8 +177,11 @@ NB_MODULE(test_classes_ext, m) {
         return h.attr("f")(1, 2, "hello", true, 4);
     });
 
-    // test11_implicitly_convertible
+    // test11_large_pointers
+    m.def("i2p", [](uintptr_t x) { return (Cat *) x; }, nb::rv_policy::reference);
+    m.def("p2i", [](Cat *x) { return (uintptr_t) x; });
 
+    // test12_implicitly_convertible
     struct A { int a; };
     struct B { int b; };
     struct C { int c; };

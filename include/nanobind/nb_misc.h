@@ -9,4 +9,8 @@ private:
     const PyGILState_STATE state;
 };
 
+template <typename Src, typename Dst> void implicitly_convertible() {
+    detail::implicitly_convertible(&typeid(Src), &typeid(Dst));
+}
+
 NAMESPACE_END(NB_NAMESPACE)

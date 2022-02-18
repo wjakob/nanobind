@@ -192,6 +192,13 @@ PyObject *nb_type_new(const type_data *t) noexcept {
                 PyUnicode_FromFormat("%U.%U", scope_name.ptr(), name.ptr()));
     }
 
+    char *doc = nullptr;
+    if (has_doc) {
+        size_t len = strlen(t->doc) + 1;
+        doc = (char *) PyObject_Malloc(len);
+        memcpy(doc, t->doc, len);
+    }
+
     /* Danger zone: from now (and until PyType_Ready), make sure to
        issue no Python C API calls which could potentially invoke the
        garbage collector (the GC will call type_traverse(), which will in
@@ -232,7 +239,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     type->tp_flags |=
         Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE | Py_TPFLAGS_BASETYPE;
     if (has_doc)
-        type->tp_doc = t->doc;
+        type->tp_doc = doc;
     type->tp_base = base;
     type->tp_init = inst_init;
     type->tp_new = inst_new;
@@ -275,17 +282,26 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *o, uint8_t flags,
         return false;
 
     nb_type *nbt = (nb_type *) type;
+    bool valid = nbt->t.type == cpp_type || *nbt->t.type == *cpp_type;
 
-    if (nbt->t.type == cpp_type || *nbt->t.type == *cpp_type ||
-        PyType_IsSubtype(type, nbt->t.type_py)) {
+    if (!valid) {
+        auto it = internals.type_c2p.find(std::type_index(*cpp_type));
+        if (it != internals.type_c2p.end())
+            valid = PyType_IsSubtype(type, it->second->type_py);
+    }
+
+    if (valid) {
         nb_inst *inst = (nb_inst *) o;
+
         if (!inst->ready && (flags & (uint8_t) cast_flags::construct) == 0) {
             fprintf(stderr,
                    "nb_type_get(): attempted to access an uninitialized instance "
                    "of type '%s'!\n", nbt->t.name);
             return false;
         }
+
         *out = inst_data(inst);
+
         return true;
     } else {
         return false;

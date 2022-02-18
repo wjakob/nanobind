@@ -55,7 +55,7 @@ struct alignas(1024) BigAligned {
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::unique_ptr<Struct>(new Struct(12));
 
-    nb::class_<Struct>(m, "Struct")
+    nb::class_<Struct>(m, "Struct", "Some documentation")
         .def(nb::init<>())
         .def(nb::init<int>())
         .def("value", &Struct::value)
@@ -96,11 +96,16 @@ NB_MODULE(test_classes_ext, m) {
         destructed = 0;
     });
 
+    // test06_big
+
     nb::class_<Big>(m, "Big")
         .def(nb::init<>());
 
     nb::class_<BigAligned>(m, "BigAligned")
         .def(nb::init<>());
+
+    // test09_trampoline
+    // test10_trampoline_failures
 
     struct Animal {
         virtual ~Animal() = default;
@@ -171,4 +176,38 @@ NB_MODULE(test_classes_ext, m) {
     m.def("call_method", [](nb::handle h) {
         return h.attr("f")(1, 2, "hello", true, 4);
     });
+
+    // test11_implicitly_convertible
+
+    struct A { int a; };
+    struct B { int b; };
+    struct C { int c; };
+
+    struct D {
+        D(const A &a) : value(a.a + 10) { }
+        D(const B *b) : value(b->b + 100) { }
+        D(C c) : value(c.c + 1000) { }
+        D(int d) : value(d + 10000) { }
+        int value;
+    };
+
+    nb::class_<A>(m, "A")
+        .def(nb::init<int>());
+
+    nb::class_<B>(m, "B")
+        .def(nb::init<int>());
+
+    nb::class_<C>(m, "C")
+        .def(nb::init<int>());
+
+    nb::class_<D>(m, "D")
+        .def(nb::init<const A &>())
+        .def(nb::init<const B *>())
+        .def(nb::init<int>())
+        .def_readwrite("value", &D::value);
+
+    nb::implicitly_convertible<A, D>();
+    nb::implicitly_convertible<B, D>();
+
+    m.def("get_d", [](const D &d) { return d.value; });
 }

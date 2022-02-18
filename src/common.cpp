@@ -134,8 +134,8 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
 }
 
 #if PY_VERSION_HEX < 0x03090000
-PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
-                               size_t nargsf, PyObject *kwnames) {
+static PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
+                                      size_t nargsf, PyObject *kwnames) {
     PyObject *obj = PyObject_GetAttr(args[0], name);
     if (!obj)
         return obj;

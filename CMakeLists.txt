@@ -76,6 +76,7 @@ add_library(nanobind ${NB_LIB_TYPE}
   src/nb_type.cpp
   src/error.cpp
   src/trampoline.cpp
+  src/implicit.cpp
 )
 
 if (NB_SHARED)

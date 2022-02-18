@@ -13,6 +13,7 @@ def test01_signature():
     assert t.Struct.value.__doc__ == "value(self) -> int"
     assert t.Struct.create_move.__doc__ == "create_move() -> test_classes_ext.Struct"
     assert t.Struct.set_value.__doc__ == "set_value(self, value: int) -> None"
+    assert t.Struct.__doc__ == 'Some documentation'
 
 
 def test02_instantiate():
@@ -274,3 +275,22 @@ def test10_trampoline_failures():
     with pytest.raises(TypeError) as excinfo:
         t.go(Incomplete2())
     assert 'incompatible function arguments' in str(excinfo.value)
+
+
+def test11_implicitly_convertible():
+    assert t.get_d.__doc__ == "get_d(arg0: test_classes_ext.D) -> int"
+    a = t.A(1)
+    b = t.B(2)
+    c = t.C(3)
+    d = 4
+    print('before')
+    with pytest.raises(TypeError) as excinfo:
+        assert t.get_d(c) == 1003
+    assert str(excinfo.value) == (
+        "get_d(): incompatible function arguments. The following argument types are supported:\n"
+        "    1. get_d(arg0: test_classes_ext.D) -> int\n"
+        "\n"
+        "Invoked with types: C")
+    assert t.get_d(a) == 11
+    assert t.get_d(b) == 102
+    assert t.get_d(d) == 10004

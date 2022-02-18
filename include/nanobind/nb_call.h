@@ -19,7 +19,7 @@ args_proxy api<Derived>::operator*() const {
 
 /// Implementation detail of api<T>::operator() (call operator)
 template <typename T>
-NB_INLINE void call_prepare(size_t &nargs, size_t &nkwargs, const T &value) {
+NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
     using D = std::decay_t<T>;
 
     if constexpr (std::is_same_v<D, arg_v>) {
@@ -37,40 +37,54 @@ NB_INLINE void call_prepare(size_t &nargs, size_t &nkwargs, const T &value) {
 
 /// Implementation detail of api<T>::operator() (call operator)
 template <rv_policy policy, typename T>
-NB_INLINE void call_append(PyObject **args, PyObject *kwnames, size_t &args_i,
-                           size_t &kwargs_i, const size_t kwargs_offset, T &&value) {
+NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
+                         size_t &nkwargs, const size_t kwargs_offset,
+                         T &&value) {
     using D = std::decay_t<T>;
 
     if constexpr (std::is_same_v<D, arg_v>) {
-        printf("Case A\n");
-        args[kwargs_i + kwargs_offset] = value.value.inc_ref().ptr();
-        PyTuple_SET_ITEM(kwnames, kwargs_i++,
+        args[kwargs_offset + nkwargs] = value.value.release().ptr();
+        PyTuple_SET_ITEM(kwnames, nkwargs++,
                          PyUnicode_InternFromString(value.name));
     } else if constexpr (std::is_same_v<D, args_proxy>) {
-        printf("Case B\n");
         for (size_t i = 0, l = len(value); i < l; ++i)
-            args[args_i++] = borrow(value[i]).release().ptr();
+            args[nargs++] = borrow(value[i]).release().ptr();
     } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
-        printf("Case C\n");
         PyObject *key, *entry;
         Py_ssize_t pos = 0;
 
         while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {
             Py_INCREF(key); Py_INCREF(entry);
-            args[kwargs_i + kwargs_offset] = entry;
-            PyTuple_SET_ITEM(kwnames, kwargs_i++, key);
+            args[kwargs_offset + nkwargs] = entry;
+            PyTuple_SET_ITEM(kwnames, nkwargs++, key);
         }
     } else {
-        printf("Case D\n");
-        args[args_i++] =
-            make_caster<T>::cast((forward_t<T>) value, policy, nullptr).ptr();
+        args[nargs++] =
+            make_caster<T>::cast((forward_t<T>) value,
+                                 detail::policy<T>(policy), nullptr).ptr();
     }
-    (void) args; (void) kwnames; (void) args_i; (void) kwargs_i; (void) kwargs_offset;
+    (void) args; (void) kwnames; (void) nargs;
+    (void) nkwargs; (void) kwargs_offset;
 }
+
+#define NB_DO_VECTORCALL()                                                     \
+    PyObject *base, **args_p;                                                  \
+    if constexpr (method_call) {                                               \
+        base = derived().key().release().ptr();                                \
+        args[0] = derived().base().inc_ref().ptr();                            \
+        args_p = args;                                                         \
+        nargs++;                                                               \
+    } else {                                                                   \
+        base = derived().inc_ref().ptr();                                      \
+        args[0] = nullptr;                                                     \
+        args_p = args + 1;                                                     \
+    }                                                                          \
+    nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;                                   \
+    return steal(obj_vectorcall(base, args_p, nargs, kwnames, method_call))
 
 template <typename Derived>
 template <rv_policy policy, typename... Args>
-object api<Derived>::operator()(Args &&...args) const {
+object api<Derived>::operator()(Args &&...args_) const {
     static constexpr bool method_call =
         std::is_same_v<Derived, accessor<obj_attr>> ||
         std::is_same_v<Derived, accessor<str_attr>>;
@@ -79,62 +93,37 @@ object api<Derived>::operator()(Args &&...args) const {
                     std::is_same_v<Args, args_proxy> ||
                     std::is_same_v<Args, kwargs_proxy>) || ...)) {
         // Complex call with keyword arguments, *args/**kwargs expansion, etc.
-        size_t nargs = 0, nkwargs = 0;
+        size_t nargs = 0, nkwargs = 0, nargs2 = 0, nkwargs2 = 0;
 
-        (call_prepare(nargs, nkwargs, (const Args &) args), ...);
+        // Determine storage requirements for positional and keyword args
+        (call_analyze(nargs, nkwargs, (const Args &) args_), ...);
 
-        PyObject **args_py = (PyObject **) alloca(nargs + nkwargs + 1);
-        PyObject *kwnames = nkwargs ? PyTuple_New((Py_ssize_t) nkwargs) : nullptr;
+        // Allocate memory on the stack
+        PyObject **args =
+            (PyObject **) alloca((nargs + nkwargs + 1) * sizeof(PyObject *));
+        PyObject *kwnames =
+            nkwargs ? PyTuple_New((Py_ssize_t) nkwargs) : nullptr;
 
-        size_t args_i = 0, kwargs_i = 0;
-        (call_append<policy>(args_py + 1, kwnames, args_i, kwargs_i, nargs,
-                             (forward_t<Args>) args), ...);
+        // Fill 'args' and 'kwnames' variables
+        (call_init<policy>(args + 1, kwnames, nargs2, nkwargs2, nargs,
+                           (forward_t<Args>) args_), ...);
 
-        printf("%zu %zu %zu %zu\n", nargs, nkwargs, args_i, kwargs_i);
-        PyObject *base, **args_ptr;
-        if constexpr (method_call) {
-            base = derived().key().release().ptr();
-            args_py[0] = derived().base().inc_ref().ptr();
-            args_ptr = args_py;
-            nargs++;
-        } else {
-            base = derived().inc_ref().ptr();
-            args_py[0] = nullptr;
-            args_ptr = args_py + 1;
-        }
-
-        nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;
-
-        return steal(
-            obj_vectorcall(base, args_ptr, nargs, kwnames, method_call));
+        NB_DO_VECTORCALL();
     } else {
         // Simple version with only positional arguments
-        PyObject *args_py[sizeof...(Args) + 1];
+        PyObject *args[sizeof...(Args) + 1], *kwnames = nullptr;
         size_t nargs = 0;
 
-        ((args_py[1 + nargs++] =
-              detail::make_caster<Args>::cast((detail::forward_t<Args>) args,
+        ((args[1 + nargs++] =
+              detail::make_caster<Args>::cast((detail::forward_t<Args>) args_,
                                               policy, nullptr).ptr()),
          ...);
 
-        PyObject **args_ptr, *base;
-        if constexpr (method_call) {
-            base = derived().key().release().ptr();
-            args_py[0] = derived().base().inc_ref().ptr();
-            args_ptr = args_py;
-            nargs++;
-        } else {
-            base = derived().inc_ref().ptr();
-            args_py[0] = nullptr;
-            args_ptr = args_py + 1;
-        }
-
-        nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;
-
-        return steal(
-            obj_vectorcall(base, args_ptr, nargs, nullptr, method_call));
+        NB_DO_VECTORCALL();
     }
 }
+
+#undef NB_DO_VECTORCALL
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

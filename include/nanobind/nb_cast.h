@@ -41,7 +41,7 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
     using T1 = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
     using Tp = std::conditional_t<std::is_floating_point_v<T>, double, T1>;
 public:
-    bool load(handle src, uint8_t flags) noexcept {
+    bool load(handle src, uint8_t flags, PyObject ** /* scratch */) noexcept {
         Tp value_p;
 
         if (!src.is_valid())
@@ -102,14 +102,13 @@ public:
 };
 
 template <> struct type_caster<std::nullptr_t> {
-    bool load(handle src, bool) noexcept {
-        if (src && src.is_none())
+    bool load(handle src, uint8_t, PyObject **) noexcept {
+        if (src.is_none())
             return true;
         return false;
     }
 
-    static handle cast(std::nullptr_t, rv_policy /* policy */,
-                       handle /* parent */) noexcept {
+    static handle cast(std::nullptr_t, rv_policy, handle) noexcept {
         return none().inc_ref();
     }
 
@@ -117,7 +116,7 @@ template <> struct type_caster<std::nullptr_t> {
 };
 
 template <> struct type_caster<bool> {
-    bool load(handle src, bool) noexcept {
+    bool load(handle src, uint8_t, PyObject **) noexcept {
         if (src.ptr() == Py_True) {
             value = true;
             return true;
@@ -129,8 +128,7 @@ template <> struct type_caster<bool> {
         }
     }
 
-    static handle cast(bool src, rv_policy /* policy */,
-                       handle /* parent */) noexcept {
+    static handle cast(bool src, rv_policy, handle) noexcept {
         return handle(src ? Py_True : Py_False).inc_ref();
     }
 
@@ -138,7 +136,7 @@ template <> struct type_caster<bool> {
 };
 
 template <> struct type_caster<char> {
-    bool load(handle src, bool) noexcept {
+    bool load(handle src, uint8_t, PyObject **) noexcept {
         value = PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
         if (!value) {
             PyErr_Clear();
@@ -163,7 +161,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     NB_TYPE_CASTER(T, const_name("Tuple[") + concat(C1::cname, C2::cname) +
                           const_name("]"))
 
-    bool load(handle src, uint8_t flags) noexcept {
+    bool load(handle src, uint8_t flags, PyObject **scratch) noexcept {
         PyObject *o[2];
 
         if (!seq_size_fetch(src.ptr(), 2, o))
@@ -172,9 +170,9 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         C1 c1;
         C2 c2;
 
-        if (!c1.load(o[0], flags & (uint8_t) cast_flags::convert))
+        if (!c1.load(o[0], flags, scratch))
             goto fail;
-        if (!c2.load(o[1], flags & (uint8_t) cast_flags::convert))
+        if (!c2.load(o[1], flags, scratch))
             goto fail;
 
         value.first  = std::move(c1.value);
@@ -210,7 +208,7 @@ struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
 public:
     NB_TYPE_CASTER(T, T::cname)
 
-    bool load(handle src, bool) noexcept {
+    bool load(handle src, uint8_t, PyObject **) noexcept {
         if (!isinstance<T>(src))
             return false;
 
@@ -232,8 +230,8 @@ template <typename T, typename SFINAE> struct type_caster {
     static constexpr auto cname = const_name<T>();
     static constexpr bool is_class = true;
 
-    NB_INLINE bool load(handle src, uint8_t flags) noexcept {
-        return detail::nb_type_get(&typeid(T), src.ptr(), flags,
+    NB_INLINE bool load(handle src, uint8_t flags, PyObject **scratch) noexcept {
+        return detail::nb_type_get(&typeid(T), src.ptr(), flags, scratch,
                                    (void **) &value);
     }
 
@@ -308,7 +306,8 @@ template <typename T, typename Derived> T cast(const detail::api<Derived> &value
         using Caster = detail::make_caster<Ti>;
 
         Caster caster;
-        if (!caster.load(value.derived().ptr(), (uint8_t) detail::cast_flags::convert))
+        if (!caster.load(value.derived().ptr(),
+                         (uint8_t) detail::cast_flags::convert, nullptr))
             detail::raise("nanobind::cast(...): conversion failed!");
 
         static_assert(

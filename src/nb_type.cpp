@@ -3,11 +3,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename T>
-NB_INLINE T *get_data(void *o) {
-    return (T*) ((char *) o + Py_TYPE(o)->tp_basicsize);
-}
-
 static int inst_init(PyObject *self, PyObject *, PyObject *) {
     PyErr_Format(PyExc_TypeError, "%s: no constructor defined!",
                  Py_TYPE(self)->tp_name);
@@ -185,6 +180,12 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     type->t = parent->t;
     type->t.flags |=  (uint16_t) type_flags::is_python_type;
     type->t.flags &= ~(uint16_t) type_flags::has_implicit_conversions;
+    type->t.name = type->ht.ht_type.tp_name;
+    type->t.type_py = &type->ht.ht_type;
+    type->t.base = parent->t.type;
+    type->t.base_py = &parent->ht.ht_type;
+    type->t.implicit = nullptr;
+    type->t.implicit_py = nullptr;
 
     return 0;
 }
@@ -291,53 +292,129 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     return (PyObject *) type;
 }
 
-bool nb_type_get(const std::type_info *cpp_type, PyObject *o, uint8_t flags,
-                 void **out) noexcept {
-    if (o == nullptr || o == Py_None) {
+
+/// Encapsulates the implicit conversion part of nb_type_get()
+static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
+                                             const std::type_info *cpp_type_src,
+                                             const type_data *dst_type,
+                                             internals &internals,
+                                             PyObject **scratch, void **out) {
+    if (dst_type->implicit) {
+        const std::type_info **it = dst_type->implicit;
+        const std::type_info *v;
+
+        while ((v = *it++)) {
+            if (v == cpp_type_src || *v == *cpp_type_src)
+                goto found;
+        }
+
+        it = dst_type->implicit;
+        while ((v = *it++)) {
+            auto it = internals.type_c2p.find(std::type_index(*v));
+            if (it != internals.type_c2p.end() &&
+                PyType_IsSubtype(Py_TYPE(src), it->second->type_py))
+                goto found;
+        }
+    }
+
+    if (dst_type->implicit_py) {
+        bool (**it)(PyObject *) noexcept = dst_type->implicit_py;
+        bool (*v2)(PyObject *) noexcept;
+
+        while ((v2 = *it++)) {
+            if (v2(src))
+                goto found;
+        }
+    }
+
+    return false;
+
+found:
+    PyObject *result =
+        PyObject_CallOneArg((PyObject *) dst_type->type_py, src);
+
+    if (result) {
+        if (scratch[1]) {
+            if (PyList_Append(scratch[1], result))
+                fail("nanobind::nb_type_get_implicit(): internal error (1)");
+            Py_DECREF(result);
+        } else {
+            scratch[1] = PyList_New(1);
+            if (!scratch[1])
+                fail("nanobind::nb_type_get_implicit(): internal error (2)");
+            PyList_SET_ITEM(scratch[1], 0, result);
+        }
+
+        *out = inst_data((nb_inst *) result);
+        return true;
+    } else {
+        PyErr_Clear();
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                         "nanobind: implicit conversion from type '%s' "
+                         "to type '%s' failed!",
+                         Py_TYPE(src)->tp_name, dst_type->name);
+
+        return false;
+    }
+}
+
+// Attempt to retrieve a pointer to a C++ instance
+bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
+                 PyObject **scratch, void **out) noexcept {
+    // Convert None -> nullptr
+    if (src == Py_None) {
         *out = nullptr;
-        return o != nullptr;
+        return true;
     }
 
     internals &internals = internals_get();
-    PyTypeObject *type = Py_TYPE(o);
+    PyTypeObject *src_type = Py_TYPE(src);
 
     // Reject if this object doesn't have the nanobind metaclass
-    if (Py_TYPE(type) != internals.nb_type)
+    if (Py_TYPE(src_type) != internals.nb_type)
         return false;
 
-    nb_type *nbt = (nb_type *) type;
-    type_data *dst_type = nullptr;
-    bool valid = nbt->t.type == cpp_type || *nbt->t.type == *cpp_type;
+    nb_type *nbt = (nb_type *) src_type;
+    const std::type_info *cpp_type_src = nbt->t.type;
 
+    // Check if the source / destination typeid are an exact match
+    bool valid = cpp_type == cpp_type_src || *cpp_type == *cpp_type_src;
+
+    // If not, look up the Python type and check the inheritance chain
+    type_data *dst_type = nullptr;
     if (!valid) {
         auto it = internals.type_c2p.find(std::type_index(*cpp_type));
         if (it != internals.type_c2p.end()) {
             dst_type = it->second;
-            valid = PyType_IsSubtype(type, dst_type->type_py);
+            valid = PyType_IsSubtype(src_type, dst_type->type_py);
         }
     }
 
+    // Success, return the pointer if the instance is correctly initialized
     if (valid) {
-        nb_inst *inst = (nb_inst *) o;
+        nb_inst *inst = (nb_inst *) src;
 
         if (!inst->ready && (flags & (uint8_t) cast_flags::construct) == 0) {
-            fprintf(stderr,
-                   "nb_type_get(): attempted to access an uninitialized instance "
-                   "of type '%s'!\n", nbt->t.name);
+            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                             "nanobind: attempted to access an uninitialized "
+                             "instance of type '%s'!\n", nbt->t.name);
             return false;
         }
 
         *out = inst_data(inst);
 
         return true;
-    } else if ((flags & (uint16_t) cast_flags::convert) && dst_type &&
-               (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions)) {
-        printf("Trying..\n");
-        return false;
-    } else {
-        return false;
     }
+
+    // Try an implicit conversion as last resort (if possible & requested)
+    if ((flags & (uint16_t) cast_flags::convert) && dst_type &&
+        (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions))
+        return nb_type_get_implicit(src, cpp_type_src, dst_type, internals,
+                                    scratch, out);
+
+    return false;
 }
+
 
 void inst_keep_alive(PyObject *nurse, PyObject *patient) {
     if (!patient)

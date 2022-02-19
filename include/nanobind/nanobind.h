@@ -27,4 +27,3 @@
 #include "nb_func.h"
 #include "nb_class.h"
 #include "nb_misc.h"
-#include "nb_compat.h"

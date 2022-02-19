@@ -52,7 +52,6 @@ add_library(nanobind ${NB_LIB_TYPE}
   include/nanobind/nanobind.h
   include/nanobind/nb_attr.h
   include/nanobind/nb_cast.h
-  include/nanobind/nb_compat.h
   include/nanobind/nb_descr.h
   include/nanobind/nb_error.h
   include/nanobind/nb_lib.h
@@ -69,6 +68,7 @@ add_library(nanobind ${NB_LIB_TYPE}
   include/nanobind/nb_types.h
   include/nanobind/trampoline.h
   include/nanobind/stl/string.h
+  include/nanobind/pybind11.h
 
   src/internals.cpp
   src/common.cpp

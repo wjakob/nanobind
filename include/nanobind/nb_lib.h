@@ -134,7 +134,7 @@ NB_CORE PyObject *nb_type_new(const type_data *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
-                         void **out) noexcept;
+                         PyObject **scratch, void **out) noexcept;
 
 /// Cast a C++ type instance into a Python object
 NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
@@ -150,6 +150,11 @@ NB_CORE void property_install(PyObject *scope, const char *name, bool is_static,
 
 NB_CORE PyObject *get_override(void *ptr, const std::type_info *type,
                                const char *name, bool pure);
+
+// ========================================================================
+
+NB_CORE void implicitly_convertible(const std::type_info *src,
+                                    const std::type_info *dst) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -29,7 +29,7 @@ void implicitly_convertible(const std::type_info *src,
     const std::type_info **data = (const std::type_info **) malloc(
         sizeof(const std::type_info *) * (size + 2));
 
-    memcpy(data, t->implicit, size);
+    memcpy(data, t->implicit, size * sizeof(const std::type_info *));
     data[size] = src;
     data[size + 1] = nullptr;
     free(t->implicit);

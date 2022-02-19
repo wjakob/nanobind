@@ -72,7 +72,8 @@ struct ptr_hash {
 };
 
 struct ptr_type_hash {
-    NB_INLINE size_t operator()(const std::pair<const void *, std::type_index> &value) const {
+    NB_INLINE size_t
+    operator()(const std::pair<const void *, std::type_index> &value) const {
         return ptr_hash()(value.first) ^ value.second.hash_code();
     }
 };
@@ -90,7 +91,8 @@ struct internals {
     PyTypeObject *nb_meth;
 
     /// Instance pointer -> Python object mapping
-    tsl::robin_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash> inst_c2p;
+    tsl::robin_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
+        inst_c2p;
 
     /// C++ type -> Python type mapping
     tsl::robin_map<std::type_index, type_data *> type_c2p;

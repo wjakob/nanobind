@@ -11,9 +11,12 @@ NAMESPACE_BEGIN(detail)
 // Forward/external declarations
 extern Buffer buf;
 static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
-                                           size_t, PyObject *);
+                                           size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
-                                            size_t, PyObject *);
+                                            size_t, PyObject *) noexcept;
+
+using error_handler_t = PyObject *(PyObject *, PyObject *const *, size_t,
+                                   PyObject *) noexcept;
 
 /// Free a function overload chain
 void nb_func_dealloc(PyObject *self) {
@@ -223,7 +226,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 /// Used by nb_func_vectorcall: generate an error when overload resolution fails
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
-                         size_t nargs_in, PyObject *kwargs_in) noexcept {
+                       size_t nargs_in, PyObject *kwargs_in) noexcept {
     const size_t count = (size_t) Py_SIZE(self);
     func_record *f = nb_func_get(self);
 
@@ -273,7 +276,10 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
 }
 
 /// Used by nb_func_vectorcall: generate an error when result conversion fails
-static NB_NOINLINE PyObject *nb_func_error_noconvert(const func_record *f) noexcept {
+static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
+                                                     PyObject *const *, size_t,
+                                                     PyObject *) noexcept {
+    func_record *f = nb_func_get(self);
     buf.clear();
     buf.put("Unable to convert function return value to a Python "
             "type! The signature was\n    ");
@@ -284,16 +290,12 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(const func_record *f) noexc
 }
 
 /// Used by nb_func_vectorcall: convert a C++ exception into a Python error
-static NB_NOINLINE PyObject *nb_func_error_except() {
+static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
     std::exception_ptr e = std::current_exception();
     for (auto const &et : internals_get().exception_translators) {
         try {
             et(e);
-            return nullptr;
-#if defined(__GLIBCXX__)
-        } catch (abi::__forced_unwind&) {
-            throw;
-#endif
+            return;
         } catch (...) {
             e = std::current_exception();
         }
@@ -302,28 +304,38 @@ static NB_NOINLINE PyObject *nb_func_error_except() {
     PyErr_SetString(PyExc_SystemError,
                     "nanobind::detail::nb_func_error_except(): exception "
                     "could not be translated!");
-
-    return nullptr;
 }
 
 /// Dispatch loop that is used to invoke functions created by nb_func_new
 PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
-                                     size_t nargsf, PyObject *kwargs_in) {
+                                     size_t nargsf, PyObject *kwargs_in) noexcept {
     const size_t count      = (size_t) Py_SIZE(self),
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
                  nkwargs_in = kwargs_in ? (size_t) PyTuple_GET_SIZE(kwargs_in) : 0;
 
     func_record *fr = nb_func_get(self);
-    PyObject *parent = nullptr;
     bool is_constructor = false;
 
+    /* The following array may hold (created on demand):
+       scratch[0]: a parent pointer for use by the the reference_internal RVP
+       scratch[1]: a list with temporaries created by implicit type conversions
+       scratch[2]: *args tuple for extra positional arguments
+       scratch[3]: *kwargs tuple for extra keyword arguments
+       The refcounts of entries 1-3 must be decreased upon return. */
+    PyObject *scratch[4] { };
+
+    // Handler routine that will be invoked in case of an error condition
+    PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
+                               PyObject *) noexcept = nullptr;
+
     if (nargs_in > 0) {
-        parent = args_in[0];
+        scratch[0] = args_in[0];
+
         if (fr->flags & (uint16_t) func_flags::is_constructor) {
             is_constructor =
-                strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
+                strcmp(Py_TYPE(Py_TYPE(args_in[0]))->tp_name, "nb_type") == 0;
 
-            if (is_constructor && ((nb_inst *) parent)->ready) {
+            if (is_constructor && ((nb_inst *) args_in[0])->ready) {
                 PyErr_SetString(PyExc_RuntimeError,
                                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
                                 "method should not be called on an initialized object!");
@@ -332,13 +344,24 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
         }
     }
 
+    /* The following lines allocate memory on the stack, which is very efficient
+       but also potentially dangerous since it can be used to generate stack
+       overflows. We refuse unrealistically large number of 'kwargs' (the
+       'max_nargs_pos' value is fine since it is specified by the bindings) */
+    if (nkwargs_in > 1024) {
+        PyErr_SetString(PyExc_TypeError,
+                        "nanobind::detail::nb_func_vectorcall(): too many (> "
+                        "1024) keyword arguments.");
+        return nullptr;
+    }
+
     // Preallocate stack memory for function dispatch
     size_t max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
-    PyObject **args    = (PyObject **) alloca(max_nargs_pos * sizeof(PyObject *));
+    PyObject **args = (PyObject **) alloca(max_nargs_pos * sizeof(PyObject *));
     uint8_t *args_flags = (uint8_t *) alloca(max_nargs_pos * sizeof(uint8_t));
-    bool *kwarg_used   = (bool *) alloca(nkwargs_in * sizeof(bool));
+    bool *kwarg_used = (bool *) alloca(nkwargs_in * sizeof(bool));
 
-    object extra_args, extra_kwargs;
+    PyObject *result = nullptr;
 
     /*  The logic below tries to find a suitable overload using two passes
         of the overload chain (or 1, if there are no overloads). The first pass
@@ -367,10 +390,9 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
         until we get a result other than NB_NEXT_OVERLOAD.
     */
 
-    PyObject *result = NB_NEXT_OVERLOAD;
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
-        if (is_constructor)
-            args_flags[0] = (uint8_t) cast_flags::construct;
+        // if (is_constructor)
+            // args_flags[0] = (uint8_t) cast_flags::construct;
 
         for (size_t k = 0; k < count; ++k) {
             const func_record *f = fr + k;
@@ -442,31 +464,32 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
 
             // Deal with remaining positional arguments
             if (has_var_args) {
-                extra_args = steal(PyTuple_New(
-                    nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0));
+                PyObject *tuple = PyTuple_New(
+                    nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0);
 
-                for (size_t j = nargs_pos; j < nargs_in; ++j) {
-                    PyObject *o = args_in[j];
-                    Py_INCREF(o);
-                    PyTuple_SET_ITEM(extra_args.ptr(), j - nargs_pos, o);
-                }
+                for (size_t j = nargs_pos; j < nargs_in; ++j)
+                    PyTuple_SET_ITEM(tuple, j - nargs_pos,
+                                     _Py_NewRef(args_in[j]));
 
-                args[nargs_pos] = extra_args.ptr();
+                args[nargs_pos] = tuple;
                 args_flags[nargs_pos] = 0;
+                Py_XDECREF(scratch[2]);
+                scratch[2] = tuple;
             }
 
             // Deal with remaining keyword arguments
             if (has_var_kwargs) {
                 PyObject *dict = PyDict_New();
                 for (size_t j = 0; j < nkwargs_in; ++j) {
-                    PyObject *key   = PyTuple_GET_ITEM(kwargs_in, j);
+                    PyObject *key = PyTuple_GET_ITEM(kwargs_in, j);
                     if (!kwarg_used[j])
                         PyDict_SetItem(dict, key, args_in[nargs_in + j]);
                 }
 
-                extra_kwargs = steal(dict);
                 args[nargs_pos + has_var_args] = dict;
                 args_flags[nargs_pos + has_var_args] = 0;
+                Py_XDECREF(scratch[3]);
+                scratch[3] = dict;
             } else if (kwargs_in) {
                 bool success = true;
                 for (size_t j = 0; j < nkwargs_in; ++j)
@@ -478,56 +501,85 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
             try {
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, args, args_flags,
-                                 (rv_policy) (f->flags & 0b111), parent);
+                                 (rv_policy) (f->flags & 0b111), scratch);
+
+                if (!result) {
+                    error_handler = nb_func_error_noconvert;
+                    goto done;
+                }
             } catch (next_overload &) {
                 result = NB_NEXT_OVERLOAD;
             } catch (python_error &e) {
                 e.restore();
-                return nullptr;
+                result = nullptr;
+                goto done;
             } catch (...) {
-                return nb_func_error_except();
+                nb_func_convert_cpp_exception();
+                result = nullptr;
+                goto done;
             }
-
-            if (!result)
-                return nb_func_error_noconvert(f);
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self = (nb_inst *) parent;
+                    nb_inst *self = (nb_inst *) scratch[0];
                     self->destruct = true;
                     self->ready = true;
                 }
-                return result;
+
+                goto done;
             }
         }
     }
 
-    return nb_func_error_overload(self, args_in, nargs_in, kwargs_in);
+    error_handler = nb_func_error_overload;
+
+done:
+    for (int i = 1; i < 4; ++i)
+        Py_XDECREF(scratch[i]);
+
+    if (error_handler)
+        result = error_handler(self, args_in, nargs_in, kwargs_in);
+
+    return result;
 }
 
 /// Simplified nb_func_vectorcall variant for functions w/o keyword arguments
 PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
-                                    size_t nargsf, PyObject *kwargs_in) {
-    const size_t count      = (size_t) Py_SIZE(self),
-                 nargs_in   = (size_t) PyVectorcall_NARGS(nargsf);
-
-    uint8_t *args_flags = (uint8_t *) alloca(nargs_in * sizeof(bool));
+                                    size_t nargsf, PyObject *kwargs_in) noexcept {
     func_record *fr = nb_func_get(self);
-    PyObject *parent = nullptr;
-    bool is_constructor = false;
-    PyObject *result = NB_NEXT_OVERLOAD;
 
-    if (kwargs_in)
-        goto error;
+    const size_t count         = (size_t) Py_SIZE(self),
+                 nargs_in      = (size_t) PyVectorcall_NARGS(nargsf),
+                 max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
+
+    bool is_constructor = false;
+    PyObject *result = nullptr;
+
+    /* The following array may hold (created on demand):
+       scratch[0]: a parent pointer for use by the the reference_internal RVP
+       scratch[1]: a list with temporaries created by implicit type conversions
+       The refcounts of entry 1 must be decreased upon return. */
+    PyObject *scratch[2] { };
+
+    uint8_t *args_flags = (uint8_t *) alloca(max_nargs_pos * sizeof(uint8_t));
+
+    // Handler routine that will be invoked in case of an error condition
+    PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
+                               PyObject *) noexcept = nullptr;
+
+    if (kwargs_in) {
+        error_handler = nb_func_error_overload;
+        goto done;
+    }
 
     if (nargs_in > 0) {
-        parent = args_in[0];
+        scratch[0] = args_in[0];
 
         if (fr->flags & (uint16_t) func_flags::is_constructor) {
             is_constructor =
-                strcmp(Py_TYPE(Py_TYPE(parent))->tp_name, "nb_type") == 0;
+                strcmp(Py_TYPE(Py_TYPE(args_in[0]))->tp_name, "nb_type") == 0;
 
-            if (is_constructor && ((nb_inst *) parent)->ready) {
+            if (is_constructor && ((nb_inst *) args_in[0])->ready) {
                 PyErr_SetString(PyExc_RuntimeError,
                                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
                                 "method should not be called on an initialized object!");
@@ -537,7 +589,7 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
     }
 
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
-        memset(args_flags, pass, nargs_in * sizeof(bool));
+        memset(args_flags, pass, max_nargs_pos * sizeof(uint8_t));
         if (is_constructor)
             args_flags[0] = (uint8_t) cast_flags::construct;
 
@@ -551,32 +603,45 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, (PyObject **) args_in,
                                  args_flags, (rv_policy) (f->flags & 0b111),
-                                 parent);
+                                 scratch);
+
+                if (!result) {
+                    error_handler = nb_func_error_noconvert;
+                    goto done;
+                }
             } catch (next_overload &) {
                 result = NB_NEXT_OVERLOAD;
             } catch (python_error &e) {
                 e.restore();
-                return nullptr;
+                result = nullptr;
+                goto done;
             } catch (...) {
-                return nb_func_error_except();
+                nb_func_convert_cpp_exception();
+                result = nullptr;
+                goto done;
             }
-
-            if (!result)
-                return nb_func_error_noconvert(f);
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self = (nb_inst *) parent;
+                    nb_inst *self = (nb_inst *) scratch[0];
                     self->destruct = true;
                     self->ready = true;
                 }
-                return result;
+
+                goto done;
             }
         }
     }
 
-error:
-    return nb_func_error_overload(self, args_in, nargs_in, kwargs_in);
+    error_handler = nb_func_error_overload;
+
+done:
+    Py_XDECREF(scratch[1]);
+
+    if (error_handler)
+        result = error_handler(self, args_in, nargs_in, kwargs_in);
+
+    return result;
 }
 
 PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {

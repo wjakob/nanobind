@@ -46,7 +46,7 @@ Besides this, the following features were removed:
 - Eigen and NumPy integration.
 - Nested exceptions.
 - Pickling.
-- ``kw_only`` / ``pos_only`` argument annotations.
+- `kw_only` / `pos_only` argument annotations.
 - MyPy-compatible docstrings.
 - The `options` class for customizing docstring generation.
 
@@ -77,19 +77,19 @@ long-standing performance issues with _pybind11_:
   in each binding file (e.g., the function dispatch loop and all of the related
   internal data structures). _nanobind_ compiles a separate shared or static
   support library (`libnanobind`) and links it against the binding code to
-  avoid redundant compilation. When using the CMake ``nanobind_add_module()``
+  avoid redundant compilation. When using the CMake `nanobind_add_module()`
   function, this all happens transparently.
-- ``#include <pybind11/pybind11.h>`` pulls in a large portion of the STL (about
+- `#include <pybind11/pybind11.h>` pulls in a large portion of the STL (about
   2.1 MiB of headers with Clang and libc++). _nanobind_ minimizes STL usage to
   avoid this problem. Type casters even for for basic types like
-  ``std::string`` require an explicit include directive (e.g. `#include
+  `std::string` require an explicit include directive (e.g. `#include
   <nanobind/stl/string.h>`).
 
 ### Dependencies
 
 nanobind depends on very recent versions of everything:
 
-- **C++17**: The ``if constexpr`` feature was crucial to simplify the internal
+- **C++17**: The `if constexpr` feature was crucial to simplify the internal
   meta-templating of this library.
 - **Python 3.8+**: _nanobind_ heavily relies on [vector
   calls](https://www.python.org/dev/peps/pep-0590) that were introduced in
@@ -100,20 +100,27 @@ nanobind depends on very recent versions of everything:
 ### Syntactic differences
 
 _nanobind_ mostly follows the _pybind11_ syntax, hence the [pybind11
-documentation](https://pybind11.readthedocs.io/en/stable) is a useful resource.
-There are, however, a few important differences:
+documentation](https://pybind11.readthedocs.io/en/stable) is the main source of
+documentation for this project. A number of API simplifications are
+detailed below.
 
-- _nanobind_ uses a different namespace. You can declare ``namespace py =
-  nanobind;`` to port existing code. New code should use the ``namespace nb =
-  nanobind;`` shorthand alias.
+To quickly port exsting code without adaptation, you can include
+```cpp
+#include <nanobind/pybind11.h>
+```
+which exposes a _pybind11_ namespace.
 
-- Macros of the form ``PYBIND11_*`` (e.g., ``PYBIND11_OVERRIDE(..)``) were
-  renamed to ``NB_*`` (e.g., ``NB_OVERRIDE(..)``).
+- _nanobind_ uses a different namespace. The `namespace nb = nanobind;`
+  shorthand alias is recommended.
+
+- Macros of the form `PYBIND11_*` (e.g., `PYBIND11_OVERRIDE(..)`) were
+  renamed to `NB_*` (e.g., `NB_OVERRIDE(..)`).
 
 - In _pybind11_, implicit type conversions were specified using a follow-up
-  function call. In _nanobind_, they are specified along with the constructor:
+  function call. In _nanobind_, they are specified within the constructor
+  declarations:
 
-  Before:
+  _pybind11_:
   ```cpp
   py::class_<MyType>(m, "MyType")
       .def(py::init<MyOtherType>());
@@ -121,8 +128,17 @@ There are, however, a few important differences:
   py::implicitly_convertible<MyOtherType, MyType>();
   ```
 
-  After:
+  _nanobind_:
   ```cpp
   nb::class_<MyType>(m, "MyType")
       .def(nb::init_implicit<MyOtherType>());
   ```
+
+- The following types and functions were renamed:
+
+  | _pybind11_           | _nanobind_     |
+  | -------------------- | -------------- |
+  | `error_already_set`  | `python_error` |
+  | `reinterpret_borrow` | `borrow`       |
+  | `reinterpret_steal`  | `steal`        |
+

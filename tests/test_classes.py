@@ -272,8 +272,9 @@ def test10_trampoline_failures():
         def what(self):
             return "b"
 
-    with pytest.raises(TypeError) as excinfo:
-        t.go(Incomplete2())
+    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'Incomplete2\'!'):
+        with pytest.raises(TypeError) as excinfo:
+            t.go(Incomplete2())
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
@@ -293,11 +294,12 @@ def test12_implicitly_convertible():
     assert t.get_d.__doc__ == "get_d(arg0: test_classes_ext.D) -> int"
     a = t.A(1)
     b = t.B(2)
-    c = t.C(3)
-    d = 4
+    b2 = t.B2(3)
+    c = t.C(4)
+    d = 5
     print('before')
     with pytest.raises(TypeError) as excinfo:
-        assert t.get_d(c) == 1003
+        t.get_d(c)
     assert str(excinfo.value) == (
         "get_d(): incompatible function arguments. The following argument types are supported:\n"
         "    1. get_d(arg0: test_classes_ext.D) -> int\n"
@@ -305,4 +307,5 @@ def test12_implicitly_convertible():
         "Invoked with types: C")
     assert t.get_d(a) == 11
     assert t.get_d(b) == 102
-    assert t.get_d(d) == 10004
+    assert t.get_d(b2) == 103
+    assert t.get_d(d) == 10005

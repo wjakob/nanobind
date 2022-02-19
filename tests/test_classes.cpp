@@ -184,6 +184,7 @@ NB_MODULE(test_classes_ext, m) {
     // test12_implicitly_convertible
     struct A { int a; };
     struct B { int b; };
+    struct B2 : B { B2(int i) : B{i} { } };
     struct C { int c; };
 
     struct D {
@@ -198,6 +199,9 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<int>());
 
     nb::class_<B>(m, "B")
+        .def(nb::init<int>());
+
+    nb::class_<B2, B>(m, "B2")
         .def(nb::init<int>());
 
     nb::class_<C>(m, "C")

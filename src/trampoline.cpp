@@ -25,7 +25,7 @@ void trampoline_release(void **data, size_t size) noexcept {
 
 PyObject *trampoline_lookup(void **data, size_t size, const char *name,
                             bool pure) {
-    // First quick sweep without lock -- safe with weakly ordered memory model
+    // First quick sweep without lock
     for (size_t i = 0; i < size; i++) {
         void *d_name  = data[2*i + 1],
              *d_value = data[2*i + 2];
@@ -34,6 +34,18 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
     }
 
     PyGILState_STATE state = PyGILState_Ensure();
+
+    // Nothing found -- retry, now with lock held
+    for (size_t i = 0; i < size; i++) {
+        void *d_name  = data[2*i + 1],
+             *d_value = data[2*i + 2];
+        if (name == d_name && d_value) {
+            PyGILState_Release(state);
+            return (PyObject *) d_value;
+        }
+    }
+
+    // Sill no luck -- perform a lookup and populate the trampoline
     const char *error;
     bool is_nb_func;
 

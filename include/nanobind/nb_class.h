@@ -54,7 +54,7 @@ struct type_data {
     void (*copy)(void *, const void *);
     void (*move)(void *, void *);
     const std::type_info **implicit;
-    bool (**implicit_py)(PyObject *);
+    bool (**implicit_py)(PyObject *) noexcept;
 };
 
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {

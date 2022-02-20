@@ -335,8 +335,10 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
     return false;
 
 found:
+    PyObject *args[2] = { nullptr, src };
     PyObject *result =
-        PyObject_CallOneArg((PyObject *) dst_type->type_py, src);
+        NB_VECTORCALL((PyObject *) dst_type->type_py, args + 1,
+                      PY_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
 
     if (result) {
         cleanup->append(result);

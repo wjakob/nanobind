@@ -88,7 +88,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             return NB_NEXT_OVERLOAD;
 
         if constexpr (std::is_void_v<Return>) {
-            (void) policy;
+            (void) policy; (void) cleanup;
             cap->func(
                 in.template get<Is>().operator typename make_caster<Args>::
                     template cast_op_type<Args>()...),

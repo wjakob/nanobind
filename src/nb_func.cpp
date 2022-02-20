@@ -451,9 +451,11 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
                 PyObject *tuple = PyTuple_New(
                     nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0);
 
-                for (size_t j = nargs_pos; j < nargs_in; ++j)
-                    PyTuple_SET_ITEM(tuple, j - nargs_pos,
-                                     _Py_NewRef(args_in[j]));
+                for (size_t j = nargs_pos; j < nargs_in; ++j) {
+                    PyObject *o = args_in[j];
+                    Py_INCREF(o);
+                    PyTuple_SET_ITEM(tuple, j - nargs_pos, o);
+                }
 
                 args[nargs_pos] = tuple;
                 args_flags[nargs_pos] = 0;

@@ -215,7 +215,8 @@ template <typename T, typename SFINAE> struct type_caster {
 
     NB_INLINE static handle cast_impl(const T *p, rv_policy policy,
                                       cleanup_list *cleanup) noexcept {
-        return detail::nb_type_put(&typeid(T), (void *) p, policy, cleanup);
+        return detail::nb_type_put(&typeid(T), (void *) p, policy, cleanup,
+                                   nullptr);
     }
 
     operator T*() { return value; }

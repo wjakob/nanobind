@@ -66,5 +66,24 @@ using forward_t = std::conditional_t<std::is_lvalue_reference_v<T>, T, T &&>;
 
 template <typename...> inline constexpr bool false_v = false;
 
+template <typename... Args> struct overload_cast_impl {
+    template <typename Return>
+    constexpr auto operator()(Return (*pf)(Args...)) const noexcept
+                              -> decltype(pf) { return pf; }
+
+    template <typename Return, typename Class>
+    constexpr auto operator()(Return (Class::*pmf)(Args...), std::false_type = {}) const noexcept
+                              -> decltype(pmf) { return pmf; }
+
+    template <typename Return, typename Class>
+    constexpr auto operator()(Return (Class::*pmf)(Args...) const, std::true_type) const noexcept
+                              -> decltype(pmf) { return pmf; }
+};
+
 NAMESPACE_END(detail)
+
+template <typename... Args>
+static constexpr detail::overload_cast_impl<Args...> overload_cast = {};
+static constexpr auto const_ = std::true_type{};
+
 NAMESPACE_END(NB_NAMESPACE)

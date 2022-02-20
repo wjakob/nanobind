@@ -11,17 +11,18 @@ I started the _[pybind11](http://github.com/pybind/pybind11)_ project in back
 in 2015 to improve the efficiency of C++/Python bindings. Thanks to many
 amazing contributions by others, _pybind11_ has become a core dependency of
 software across the world including flagship projects like PyTorch and
-Tensorflow; every day, the repository is cloned more than 100.000 times. Many
-extensions and generalizations were added by users and core developers over the
-years to address use cases of this diverse audience. However, all of this
-success also came with _costs_: the complexity of the library grew
-tremendously, causing overheads on binary size, compilation time, and runtime
-performance.
+Tensorflow. Every day, the repository is cloned more than 100.000 times.
+Hundreds of contributed extensions and generalizations address use cases of
+this diverse audience. However, all of this success also came with _costs_: the
+complexity of the library grew tremendously, causing overheads on binary size,
+compilation time, and runtime performance.
 
-Ironically, the situation feels just like 2015: bindings are once again slow to
-compile with existing tools (_Boost.Python_, _pybind11_), and the conditions
-(C++17, Python 3.8+) are ripe for drastic simplifications. It seems that
-another round of this cycle is needed..
+Ironically, the situation today feels like 2015 all over again: binding
+generation with existing tools (_Boost.Python_, _pybind11_) is extremely slow
+and produces enormous binaries. At the same time, key improvements in C++17 and
+Python 3.8 provide opportunities for drastic simplifications. It seems that
+another round of this cycle is needed (though the plan is that this doesn't
+become a _vicious cycle_, see below..)
 
 ## Performance numbers
 
@@ -61,14 +62,16 @@ performance of the base case.
 ### Optimizations
 
 Besides removing features, the rewrite was an opportunity to address
-long-standing performance issues with _pybind11_:
+long-standing performance issues:
 
-- C++ objects are co-located with the Python object whenever possible (less
-  pointer chasing).
-- C++ function binding information is co-located with the Python function
+- C++ objects are now co-located with the Python object whenever possible (less
+  pointer chasing compard to _pybind11_). The per-instance overhead for
+  wrapping a C++ type into a
+  Python object shrinks by 2.3x. (_pybind11_: 56 bytes, _nanobind_: 24 bytes.)
+- C++ function binding information is now co-located with the Python function
   object (less pointer chasing).
-- C++ type binding information is co-located with the Python type object (less
-  pointer chasing, fewer hashtable lookups).
+- C++ type binding information is now co-located with the Python type object
+  (less pointer chasing, fewer hashtable lookups).
 - _nanobind_ internally replaces `std::unordered_map` with a more efficient
   hash table ([tsl::robin_map](https://github.com/Tessil/robin-map), which is
   included as a git submodule).
@@ -92,25 +95,47 @@ long-standing performance issues with _pybind11_:
   reasonably-sized bindings, which makes linking a build time bottleneck. With
   _nanobind_'s split into a precompiled core library and minimal
   metatemplating, LTO is no longer important.
+- _nanobind_ maintains efficient internal data structures for lifetime
+  management (needed for `nb::keep_alive`, `nb::rv_policy::reference_internal`,
+  the `std::shared_ptr` interface, etc.). With these changes, it is no longer
+  necessary that pybind11-bound types are weak-referenceable, which saves a
+  pointer per instance.
+
+### Other improvements
+
+Besides performance improvements, _nanobind_ includes a quality-of-live
+improvements for developers:
+
+- When the python interpreter shuts down, _nanobind_ reports instance, type,
+  and function leaks related to bindings, which is useful for tracking down
+  reference counting issues.
+
+- _nanobind_ deletes its internal data structures when the Python interpreter
+  terminates, which avoids memory leak reports in tools like _valgrind_.
+
+- In _pybind11_, function docstrings are pre-rendered while the binding code
+  runs (`.def(...)`). This can create confusing signatures containing C++ types
+  when the binding code of those C++ types hasn't yet run. _nanobind_ does not
+  pre-render function docstrings, they are created on the fly when queried.
 
 ### Dependencies
 
-nanobind depends on very recent versions of everything:
+_nanobind_ depends on very recent versions of everything:
 
 - **C++17**: The `if constexpr` feature was crucial to simplify the internal
   meta-templating of this library.
-- **Python 3.8+**: _nanobind_ heavily relies on [vector
+- **Python 3.8+**: _nanobind_ heavily relies on [PEP 590 vector
   calls](https://www.python.org/dev/peps/pep-0590) that were introduced in
   version 3.8.
 - **CMake 3.17+**: Recent CMake versions include important improvements to
   `FindPython` that this project depends on.
 
-### Syntactic differences
+### API differences
 
-_nanobind_ mostly follows the _pybind11_ syntax, hence the [pybind11
+_nanobind_ mostly follows the _pybind11_ API, hence the [pybind11
 documentation](https://pybind11.readthedocs.io/en/stable) is the main source of
-documentation for this project. A number of API simplifications are
-detailed below.
+documentation for this project. A number of simplifications are detailed
+below.
 
 To port existing code with minimal adaptation, you can include
 ```cpp
@@ -150,7 +175,7 @@ For new projects, note the following differences:
   virtual function calls to Python require an extra `NB_TRAMPOLINE(parent,
   size)` declaration, where `parent` refers to the parent class and `size` is
   at least as big as the number of `NB_OVERRIDE_*()` calls. _nanobind_ caches
-  information to enable a more efficient implementation, which requires knowing
+  information to enable efficient function dispatch, which requires knowing
   the number of trampoline "slots". Example:
 
   ```cpp
@@ -174,7 +199,7 @@ For new projects, note the following differences:
 
   - `load()` was renamed to `from_python()`. The function now takes an extra
     `uint8_t flags` (instead `bool convert`, which is now represented by the
-    flag `nanobind::detail::arg_flags::convert`). A `cleanup_list *` pointer
+    flag `nanobind::detail::cast_flags::convert`). A `cleanup_list *` pointer
     keeps track of Python temporaries that are created by the conversion, and
     which need to be deallocated after a function call has taken place. `flags`
     and `cleanup` should be passed to any recursive usage of

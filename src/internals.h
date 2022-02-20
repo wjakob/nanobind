@@ -6,12 +6,9 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-/// Nanobind function metadata (signature, overloads, etc.)
+/// Nanobind function metadata (overloads, etc.)
 struct func_record : func_data<0> {
     arg_data *args;
-
-    /// Function signature in string format
-    char *signature;
 };
 
 /// Python object representing a bound C++ type
@@ -78,7 +75,29 @@ struct ptr_type_hash {
     }
 };
 
-using tsl_ptr_set = tsl::robin_set<void *, ptr_hash>;
+struct keep_alive_entry {
+    void *data; // unique data pointer
+    void (*deleter)(void *) noexcept; // custom deleter, excluded from hashing/equality
+
+    keep_alive_entry(void *data, void (*deleter)(void *) noexcept = nullptr)
+        : data(data), deleter(deleter) { }
+};
+
+struct keep_alive_eq {
+    NB_INLINE bool operator()(const keep_alive_entry &a,
+                              const keep_alive_entry &b) const {
+        return a.data == b.data;
+    }
+};
+
+struct keep_alive_hash {
+    NB_INLINE size_t operator()(const keep_alive_entry &entry) const {
+        return ptr_hash()(entry.data);
+    }
+};
+
+using keep_alive_set =
+    tsl::robin_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
 struct internals {
     /// Base type of all nanobind types
@@ -97,11 +116,11 @@ struct internals {
     /// C++ type -> Python type mapping
     tsl::robin_map<std::type_index, type_data *> type_c2p;
 
-    /// Python dictionary of sets storing keep_alive references
-    tsl::robin_map<void *, tsl_ptr_set, ptr_hash> keep_alive;
+    /// Dictionary of sets storing keep_alive references
+    tsl::robin_map<void *, keep_alive_set, ptr_hash> keep_alive;
 
-    /// Python set of functions for docstring generation
-    tsl_ptr_set funcs;
+    /// nb_func/meth instance list for leak reporting
+    tsl::robin_set<void *, ptr_hash> funcs;
 
     std::vector<void (*)(std::exception_ptr)> exception_translators;
 };
@@ -109,28 +128,10 @@ struct internals {
 extern internals &internals_get() noexcept;
 extern char *type_name(const std::type_info *t);
 
-/* The following two functions convert between pointers and Python long values
-   that can be used as hash keys. They internally perform rotations to avoid
-   collisions following 'pyhash.c' */
-inline PyObject *ptr_to_key(void *p) {
-    uintptr_t i = (uintptr_t) p;
-    i = (i >> 4) | (i << (8 * sizeof(uintptr_t) - 4));
-    return PyLong_FromSsize_t((Py_ssize_t) i);
-}
-
-inline void *key_to_ptr(PyObject *o) {
-    uintptr_t i = (uintptr_t) PyLong_AsSsize_t(o);
-    i = (i << 4) | (i >> (8 * sizeof(uintptr_t) - 4));
-    return (void *) i;
-}
-
 /// Fetch the nanobind function record from a 'nb_func' instance
 inline func_record *nb_func_get(void *o) {
     return (func_record *) (((char *) o) + sizeof(nb_func));
 }
-
-extern void implicitly_convertible(const std::type_info *src,
-                                   const std::type_info *dst) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -27,6 +27,9 @@ struct Struct {
     int value() const { return i; }
     void set_value(int value) { i = value; }
 
+    static int static_test(int) { return 1; }
+    static int static_test(float) { return 2; }
+
     static Struct* create_take() { return new Struct(10); }
     static Struct  create_move() { return Struct(11); }
     static Struct* create_copy() { return struct_tmp.get(); }
@@ -62,6 +65,8 @@ NB_MODULE(test_classes_ext, m) {
         .def("set_value", &Struct::set_value, "value"_a)
         .def("self", &Struct::self)
         .def("none", [](Struct &) -> const Struct * { return nullptr; })
+        .def_static("static_test", nb::overload_cast<int>(&Struct::static_test))
+        .def_static("static_test", nb::overload_cast<float>(&Struct::static_test))
         .def_static("create_move", &Struct::create_move)
         .def_static("create_reference", &Struct::create_reference,
                     nb::rv_policy::reference)

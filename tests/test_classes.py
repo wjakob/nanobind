@@ -14,9 +14,20 @@ def test01_signature():
     assert t.Struct.create_move.__doc__ == "create_move() -> test_classes_ext.Struct"
     assert t.Struct.set_value.__doc__ == "set_value(self, value: int) -> None"
     assert t.Struct.__doc__ == 'Some documentation'
+    assert t.Struct.static_test.__doc__ == (
+        "static_test(*args, **kwargs) -> Any\n"
+        "Overloaded function.\n"
+        "\n"
+        "1. static_test(arg0: int) -> int\n"
+        "2. static_test(arg0: float) -> int")
 
 
-def test02_instantiate():
+def test02_static_overload():
+    assert t.Struct.static_test(1) == 1
+    assert t.Struct.static_test(1.0) == 2
+
+
+def test03_instantiate():
     gc.collect()
     t.reset()
 
@@ -38,15 +49,14 @@ def test02_instantiate():
         'destructed': 2
     }
 
-
-def test03_double_init():
+def test04_double_init():
     s = t.Struct()
     with pytest.raises(RuntimeError) as excinfo:
         s.__init__()
     assert 'the __init__ method should not be called on an initialized object!' in str(excinfo.value)
 
 
-def test04_rv_policy():
+def test05_rv_policy():
     gc.collect()
     t.reset()
     s = t.Struct()
@@ -124,7 +134,7 @@ def test04_rv_policy():
         'destructed': 1
     }
 
-def test05_reference_internal():
+def test06_reference_internal():
     gc.collect()
     t.reset()
     s = t.PairStruct()
@@ -169,12 +179,12 @@ def test05_reference_internal():
     }
 
 
-def test06_big():
+def test07_big():
     x = [t.Big() for i in range(1024)]
     x = [t.BigAligned() for i in range(1024)]
 
 
-def test07_inheritance():
+def test08_inheritance():
     dog = t.Dog('woof')
     cat = t.Cat('meow')
     assert isinstance(dog, t.Animal) and isinstance(dog, t.Dog)
@@ -183,7 +193,7 @@ def test07_inheritance():
     assert t.go(cat) == 'Cat says meow'
 
 
-def test08_method_vectorcall():
+def test09_method_vectorcall():
     out = []
 
     def f(a, b, c, d, e):
@@ -201,7 +211,7 @@ def test08_method_vectorcall():
     assert i.out == (1, 2, "hello", True, 4)
 
 
-def test09_trampoline():
+def test10_trampoline():
     gc.collect()
     t.reset()
     for i in range(10):
@@ -246,7 +256,7 @@ def test09_trampoline():
     }
 
 
-def test10_trampoline_failures():
+def test11_trampoline_failures():
     class Incomplete(t.Animal):
         def __init__(self):
             super().__init__()
@@ -278,7 +288,7 @@ def test10_trampoline_failures():
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
-def test11_large_pointers():
+def test12_large_pointers():
     for i in range(1, 10):
         c = t.i2p(i)
         assert isinstance(c, t.Cat)
@@ -290,14 +300,14 @@ def test11_large_pointers():
         assert isinstance(c, t.Cat)
         assert t.p2i(c) == i
 
-def test12_implicitly_convertible():
+
+def test13_implicitly_convertible():
     assert t.get_d.__doc__ == "get_d(arg0: test_classes_ext.D) -> int"
     a = t.A(1)
     b = t.B(2)
     b2 = t.B2(3)
     c = t.C(4)
     d = 5
-    print('before')
     with pytest.raises(TypeError) as excinfo:
         t.get_d(c)
     assert str(excinfo.value) == (

@@ -167,9 +167,6 @@ NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 /// Create a Python function object for the given function record
 NB_CORE PyObject *nb_func_new(const void *data) noexcept;
 
-/// Generate docstrings for all newly defined functions
-NB_CORE void nb_func_finalize() noexcept;
-
 // ========================================================================
 
 /// Create a Python type object for the given type record
@@ -182,7 +179,8 @@ NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
 
 /// Cast a C++ type instance into a Python object
 NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
-                              rv_policy rvp, cleanup_list *cleanup) noexcept;
+                              rv_policy rvp, cleanup_list *cleanup,
+                              bool *is_new) noexcept;
 
 // ========================================================================
 
@@ -197,9 +195,20 @@ NB_CORE PyObject *get_override(void *ptr, const std::type_info *type,
 
 // ========================================================================
 
+// Ensure that 'patient' cannot be GCed while 'nurse' is alive
+NB_CORE void keep_alive(PyObject *nurse, PyObject *patient) noexcept;
+
+// Keep 'payload' alive until 'nurse' is GCed
+NB_CORE void keep_alive(PyObject *nurse, void *payload,
+                        void (*deleter)(void *) noexcept) noexcept;
+
+// ========================================================================
+
+/// Indicate to nanobind that an implicit constructor can convert 'src' -> 'dst'
 NB_CORE void implicitly_convertible(const std::type_info *src,
                                     const std::type_info *dst) noexcept;
 
+/// Register a callback to check if implicit conversion to 'dst' is possible
 NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *,
                                                       cleanup_list *),
                                     const std::type_info *dst) noexcept;

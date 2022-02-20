@@ -74,7 +74,6 @@
                 NB_TOSTRING(name), &NB_CONCAT(nanobind_module_def_, name)));   \
         try {                                                                  \
             NB_CONCAT(nanobind_init_, name)(m);                                \
-            nanobind::detail::nb_func_finalize();                              \
             return m.ptr();                                                    \
         } catch (const std::exception &e) {                                    \
             PyErr_SetString(PyExc_ImportError, e.what());                      \

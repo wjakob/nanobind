@@ -122,14 +122,18 @@ static void inst_dealloc(PyObject *self) {
     if (inst->clear_keep_alive) {
         auto it = internals.keep_alive.find(self);
         if (it == internals.keep_alive.end())
-            fail("nanobind::detail::inst_dealloc(\"%s\"): inconsistent keep_alive information",
-                 type->ht.ht_type.tp_name);
+            fail("nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
+                 "keep_alive information", type->ht.ht_type.tp_name);
 
-        tsl_ptr_set ref_set = std::move(it.value());
+        keep_alive_set ref_set = std::move(it.value());
         internals.keep_alive.erase(it);
 
-        for (void *v: ref_set)
-            Py_DECREF((PyObject *) v);
+        for (keep_alive_entry e: ref_set) {
+            if (!e.deleter)
+                Py_DECREF((PyObject *) e.data);
+            else
+                e.deleter(e.data);
+        }
     }
 
     // Update hash table that maps from C++ to Python instance
@@ -417,25 +421,42 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 }
 
 
-void inst_keep_alive(PyObject *nurse, PyObject *patient) {
+void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
     if (!patient)
         return;
 
     internals &internals = internals_get();
     if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
-        raise("inst_keep_alive(): expected a nb_type 'nurse' argument");
+        fail("keep_alive(): expected a nb_type 'nurse' argument");
 
-    tsl_ptr_set &keep_alive = internals.keep_alive[nurse];
+    keep_alive_set &keep_alive = internals.keep_alive[nurse];
 
-    auto [it, success] = keep_alive.insert(patient);
+    auto [it, success] = keep_alive.emplace(patient);
     if (success) {
         Py_INCREF(patient);
         ((nb_inst *) nurse)->clear_keep_alive = true;
+    } else {
+        if (it->deleter)
+            fail("keep_alive(): internal error: entry has a deleter!");
     }
 }
 
+void keep_alive(PyObject *nurse, void *payload,
+                void (*callback)(void *) noexcept) noexcept {
+    internals &internals = internals_get();
+    if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
+        fail("keep_alive(): expected a nb_type 'nurse' argument");
+
+    keep_alive_set &keep_alive = internals.keep_alive[nurse];
+    auto [it, success] = keep_alive.emplace(payload, callback);
+    if (!success)
+        raise("keep_alive(): the given 'payload' pointer was already registered!");
+    ((nb_inst *) nurse)->clear_keep_alive = true;
+}
+
 PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
-                      rv_policy rvp, cleanup_list *cleanup) noexcept {
+                      rv_policy rvp, cleanup_list *cleanup,
+                      bool *is_new) noexcept {
     // Convert nullptr -> None
     if (!value) {
         Py_INCREF(Py_None);
@@ -471,6 +492,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     if (!inst)
         return nullptr;
 
+    if (is_new)
+        *is_new = true;
     inst->free = inst->destruct && !store_in_obj;
 
     void *new_value = inst_data(inst);
@@ -515,7 +538,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
         rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
 
     if (rvp == rv_policy::reference_internal)
-        inst_keep_alive((PyObject *) inst, cleanup->self());
+        keep_alive((PyObject *) inst, cleanup->self());
 
     return (PyObject *) inst;
 }

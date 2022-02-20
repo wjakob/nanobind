@@ -1,6 +1,50 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+/**
+ * Helper class to clean temporaries created by function dispatch.
+ * The first element serves a special role: it stores the 'self'
+ * object of method calls (for rv_policy::reference_internal).
+ */
+struct NB_CORE cleanup_list {
+public:
+    static constexpr uint32_t Small = 6;
+
+    cleanup_list(PyObject *self) {
+        m_size = 1;
+        m_capacity = Small;
+        m_data = m_local;
+        m_local[0] = self;
+    }
+
+    ~cleanup_list() = default;
+
+    /// Append a single PyObject to the cleanup stack
+    NB_INLINE void append(PyObject *value) noexcept {
+        if (m_size >= m_capacity)
+            expand();
+        m_data[m_size++] = value;
+    }
+
+    NB_INLINE PyObject *self() const {
+        return m_local[0];
+    }
+
+    /// This should only be called by nb_func_vectorcall_*
+    void release() noexcept;
+
+protected:
+    /// Out of memory, expand..
+    void expand() noexcept;
+
+protected:
+    uint32_t m_size;
+    uint32_t m_capacity;
+    PyObject **m_data;
+    PyObject *m_local[Small];
+};
+
+
 // ========================================================================
 
 /// Raise a std::runtime_error with the given message
@@ -134,11 +178,11 @@ NB_CORE PyObject *nb_type_new(const type_data *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
-                         PyObject **scratch, void **out) noexcept;
+                         cleanup_list *cleanup, void **out) noexcept;
 
 /// Cast a C++ type instance into a Python object
 NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
-                              rv_policy rvp, PyObject *parent) noexcept;
+                              rv_policy rvp, cleanup_list *cleanup) noexcept;
 
 // ========================================================================
 
@@ -154,6 +198,9 @@ NB_CORE PyObject *get_override(void *ptr, const std::type_info *type,
 // ========================================================================
 
 NB_CORE void implicitly_convertible(const std::type_info *src,
+                                    const std::type_info *dst) noexcept;
+
+NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *, PyObject **),
                                     const std::type_info *dst) noexcept;
 
 NAMESPACE_END(detail)

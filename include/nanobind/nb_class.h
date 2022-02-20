@@ -86,6 +86,7 @@ template <typename Arg> struct init_implicit {
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
         using Value = typename Class::Value;
         using Alias = typename Class::Alias;
+        using Caster = make_caster<Arg>;
 
         cl.def(
             "__init__",
@@ -93,8 +94,11 @@ template <typename Arg> struct init_implicit {
                 new ((Alias *) v) Alias{ (forward_t<Arg>) arg };
             }, is_implicit(), extra...);
 
-        if constexpr (!make_caster<Arg>::is_class) {
-            printf("Unhandled case.. %s\n", typeid(Arg).name());
+        if constexpr (!Caster::is_class) {
+            // implicitly_convertible(
+            //     &typeid(Value), [](PyObject *src, PyObject **scratch) -> bool {
+            //         return Caster().load(src, cast_flags::convert, scratch);
+            //     });
         }
     }
 };

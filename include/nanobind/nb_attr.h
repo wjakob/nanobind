@@ -79,7 +79,8 @@ template <size_t Size> struct func_data {
     void (*free)(void *);
 
     /// Implementation of the function call
-    PyObject *(*impl)(void *, PyObject **, uint8_t *, rv_policy, PyObject **);
+    PyObject *(*impl)(void *, PyObject **, uint8_t *, rv_policy,
+                      cleanup_list *);
 
     /// Function signature description
     const char *descr;

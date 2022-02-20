@@ -74,7 +74,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     }
 
     f.impl = [](void *p, PyObject **args, uint8_t *args_flags, rv_policy policy,
-                PyObject **scratch) -> PyObject * {
+                cleanup_list *cleanup) -> PyObject * {
         const capture *cap;
         if constexpr (sizeof(capture) <= sizeof(f.capture))
             cap = (capture *) p;
@@ -84,7 +84,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         nb_tuple<make_caster<Args>...> in;
         (void) in;
         if ((!in.template get<Is>().load(args[Is], args_flags[Is],
-                                         scratch) || ...))
+                                         cleanup) || ...))
             return NB_NEXT_OVERLOAD;
 
         if constexpr (std::is_void_v<Return>) {
@@ -99,7 +99,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                 cap->func(
                     in.template get<Is>().operator typename make_caster<Args>::
                         template cast_op_type<Args>()...),
-                policy, scratch[0]).ptr();
+                policy, cleanup).ptr();
         }
     };
 

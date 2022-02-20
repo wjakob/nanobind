@@ -192,6 +192,7 @@ NB_MODULE(test_classes_ext, m) {
         D(const B *b) : value(b->b + 100) { }
         D(C c) : value(c.c + 1000) { }
         D(int d) : value(d + 10000) { }
+        D(float) : value(0) { throw std::runtime_error("Fail!"); }
         int value;
     };
 
@@ -211,6 +212,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init_implicit<const A &>())
         .def(nb::init_implicit<const B *>())
         .def(nb::init_implicit<int>())
+        .def(nb::init_implicit<float>())
         .def_readwrite("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });

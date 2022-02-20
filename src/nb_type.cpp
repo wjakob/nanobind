@@ -298,7 +298,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                                              const std::type_info *cpp_type_src,
                                              const type_data *dst_type,
                                              internals &internals,
-                                             PyObject **scratch, void **out) {
+                                             cleanup_list *cleanup, void **out) {
     if (dst_type->implicit) {
         const std::type_info **it = dst_type->implicit;
         const std::type_info *v;
@@ -334,17 +334,7 @@ found:
         PyObject_CallOneArg((PyObject *) dst_type->type_py, src);
 
     if (result) {
-        if (scratch[1]) {
-            if (PyList_Append(scratch[1], result))
-                fail("nanobind::nb_type_get_implicit(): internal error (1)");
-            Py_DECREF(result);
-        } else {
-            scratch[1] = PyList_New(1);
-            if (!scratch[1])
-                fail("nanobind::nb_type_get_implicit(): internal error (2)");
-            PyList_SET_ITEM(scratch[1], 0, result);
-        }
-
+        cleanup->append(result);
         *out = inst_data((nb_inst *) result);
         return true;
     } else {
@@ -360,7 +350,7 @@ found:
 
 // Attempt to retrieve a pointer to a C++ instance
 bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
-                 PyObject **scratch, void **out) noexcept {
+                 cleanup_list *cleanup, void **out) noexcept {
     // Convert None -> nullptr
     if (src == Py_None) {
         *out = nullptr;
@@ -410,7 +400,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     if ((flags & (uint16_t) cast_flags::convert) && dst_type &&
         (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions))
         return nb_type_get_implicit(src, cpp_type_src, dst_type, internals,
-                                    scratch, out);
+                                    cleanup, out);
 
     return false;
 }
@@ -434,7 +424,7 @@ void inst_keep_alive(PyObject *nurse, PyObject *patient) {
 }
 
 PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
-                      rv_policy rvp, PyObject *parent) noexcept {
+                      rv_policy rvp, cleanup_list *cleanup) noexcept {
     // Convert nullptr -> None
     if (!value) {
         Py_INCREF(Py_None);
@@ -511,7 +501,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
         rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
 
     if (rvp == rv_policy::reference_internal)
-        inst_keep_alive((PyObject *) inst, parent);
+        inst_keep_alive((PyObject *) inst, cleanup->self());
 
     return (PyObject *) inst;
 }

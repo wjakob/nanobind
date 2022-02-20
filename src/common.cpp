@@ -96,6 +96,30 @@ void python_error_raise() {
 
 // ========================================================================
 
+void cleanup_list::release() noexcept {
+    // (Don't decrease the reference count of the first element, it
+    //  stores the 'self' element.)
+    for (size_t i = 1; i < m_size; ++i)
+        Py_DECREF(m_data[i]);
+    if (m_capacity != Small)
+        free(m_data);
+    m_data = nullptr;
+}
+
+void cleanup_list::expand() noexcept {
+    uint32_t new_capacity = m_capacity * 2;
+    PyObject **new_data = (PyObject **) malloc(new_capacity * sizeof(PyObject *));
+    if (!new_data)
+        fail("nanobind::detail::cleanup_list::expand(): out of memory!");
+    memcpy(new_data, m_data, m_size * sizeof(PyObject *));
+    if (m_capacity != Small)
+        free(m_data);
+    m_data = new_data;
+    m_capacity = new_capacity;
+}
+
+// ========================================================================
+
 size_t obj_len(PyObject *o) {
     Py_ssize_t res = PyObject_Length(o);
     if (res < 0)

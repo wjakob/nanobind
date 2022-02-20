@@ -54,7 +54,7 @@ struct type_data {
     void (*copy)(void *, const void *);
     void (*move)(void *, void *);
     const std::type_info **implicit;
-    bool (**implicit_py)(PyObject *) noexcept;
+    bool (**implicit_py)(PyObject *, cleanup_list *) noexcept;
 };
 
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
@@ -95,10 +95,12 @@ template <typename Arg> struct init_implicit {
             }, is_implicit(), extra...);
 
         if constexpr (!Caster::is_class) {
-            // implicitly_convertible(
-            //     &typeid(Value), [](PyObject *src, PyObject **scratch) -> bool {
-            //         return Caster().load(src, cast_flags::convert, scratch);
-            //     });
+            implicitly_convertible(
+                [](PyObject *src, cleanup_list *cleanup) noexcept -> bool {
+                    return Caster().from_python(src, cast_flags::convert,
+                                                cleanup);
+                },
+                &typeid(Value));
         }
     }
 };

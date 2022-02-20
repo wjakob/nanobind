@@ -299,7 +299,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                                              const type_data *dst_type,
                                              internals &internals,
                                              cleanup_list *cleanup, void **out) {
-    if (dst_type->implicit) {
+    if (dst_type->implicit && cpp_type_src) {
         const std::type_info **it = dst_type->implicit;
         const std::type_info *v;
 
@@ -318,11 +318,12 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
     }
 
     if (dst_type->implicit_py) {
-        bool (**it)(PyObject *) noexcept = dst_type->implicit_py;
-        bool (*v2)(PyObject *) noexcept;
+        bool (**it)(PyObject *, cleanup_list *) noexcept =
+            dst_type->implicit_py;
+        bool (*v2)(PyObject *, cleanup_list *) noexcept;
 
         while ((v2 = *it++)) {
-            if (v2(src))
+            if (v2(src, cleanup))
                 goto found;
         }
     }
@@ -359,49 +360,59 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
     internals &internals = internals_get();
     PyTypeObject *src_type = Py_TYPE(src);
-
-    // Reject if this object doesn't have the nanobind metaclass
-    if (Py_TYPE(src_type) != internals.nb_type)
-        return false;
-
-    nb_type *nbt = (nb_type *) src_type;
-    const std::type_info *cpp_type_src = nbt->t.type;
-
-    // Check if the source / destination typeid are an exact match
-    bool valid = cpp_type == cpp_type_src || *cpp_type == *cpp_type_src;
-
-    // If not, look up the Python type and check the inheritance chain
+    const std::type_info *cpp_type_src = nullptr;
+    const bool src_is_nb_type = Py_TYPE(src_type) == internals.nb_type;
     type_data *dst_type = nullptr;
-    if (!valid) {
-        auto it = internals.type_c2p.find(std::type_index(*cpp_type));
-        if (it != internals.type_c2p.end()) {
-            dst_type = it->second;
-            valid = PyType_IsSubtype(src_type, dst_type->type_py);
+
+    // If 'src' is a nanobind-bound type
+    if (src_is_nb_type) {
+        nb_type *nbt = (nb_type *) src_type;
+        cpp_type_src = nbt->t.type;
+
+        // Check if the source / destination typeid are an exact match
+        bool valid = cpp_type == cpp_type_src || *cpp_type == *cpp_type_src;
+
+        // If not, look up the Python type and check the inheritance chain
+        if (!valid) {
+            auto it = internals.type_c2p.find(std::type_index(*cpp_type));
+            if (it != internals.type_c2p.end()) {
+                dst_type = it->second;
+                valid = PyType_IsSubtype(src_type, dst_type->type_py);
+            }
         }
-    }
 
-    // Success, return the pointer if the instance is correctly initialized
-    if (valid) {
-        nb_inst *inst = (nb_inst *) src;
+        // Success, return the pointer if the instance is correctly initialized
+        if (valid) {
+            nb_inst *inst = (nb_inst *) src;
 
-        if (!inst->ready && (flags & (uint8_t) cast_flags::construct) == 0) {
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: attempted to access an uninitialized "
-                             "instance of type '%s'!\n", nbt->t.name);
-            return false;
+            if (!inst->ready &&
+                (flags & (uint8_t) cast_flags::construct) == 0) {
+                PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                                 "nanobind: attempted to access an "
+                                 "uninitialized instance of type '%s'!\n",
+                                 nbt->t.name);
+                return false;
+            }
+
+            *out = inst_data(inst);
+
+            return true;
         }
-
-        *out = inst_data(inst);
-
-        return true;
     }
 
     // Try an implicit conversion as last resort (if possible & requested)
-    if ((flags & (uint16_t) cast_flags::convert) && dst_type &&
-        (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions))
-        return nb_type_get_implicit(src, cpp_type_src, dst_type, internals,
-                                    cleanup, out);
+    if ((flags & (uint16_t) cast_flags::convert) && cleanup) {
+        if (!src_is_nb_type) {
+            auto it = internals.type_c2p.find(std::type_index(*cpp_type));
+            if (it != internals.type_c2p.end())
+                dst_type = it->second;
+        }
 
+        if (dst_type &&
+            (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions))
+            return nb_type_get_implicit(src, cpp_type_src, dst_type, internals,
+                                        cleanup, out);
+    }
     return false;
 }
 
@@ -448,10 +459,13 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     if (it2 == internals.type_c2p.end())
         return nullptr;
 
-    type_data *t = it2->second;
+    // The reference_internals RVP needs a self pointer, give up if unavailable
+    if (rvp == rv_policy::reference_internal && (!cleanup || !cleanup->self()))
+        return nullptr;
 
     bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
 
+    type_data *t = it2->second;
     nb_inst *inst =
         (nb_inst *) inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
     if (!inst)

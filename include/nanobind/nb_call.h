@@ -60,8 +60,8 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         }
     } else {
         args[nargs++] =
-            make_caster<T>::cast((forward_t<T>) value,
-                                 detail::policy<T>(policy), nullptr).ptr();
+            make_caster<T>::from_cpp((forward_t<T>) value,
+                                     detail::policy<T>(policy), nullptr).ptr();
     }
     (void) args; (void) kwnames; (void) nargs;
     (void) nkwargs; (void) kwargs_offset;
@@ -115,8 +115,9 @@ object api<Derived>::operator()(Args &&...args_) const {
         size_t nargs = 0;
 
         ((args[1 + nargs++] =
-              detail::make_caster<Args>::cast((detail::forward_t<Args>) args_,
-                                              policy, nullptr).ptr()),
+              detail::make_caster<Args>::from_cpp(
+                  (detail::forward_t<Args>) args_, policy, nullptr)
+                  .ptr()),
          ...);
 
         NB_DO_VECTORCALL();

@@ -15,8 +15,8 @@ void implicitly_convertible(const std::type_info *src,
              type_name(dst));
 
     type_data *t = it->second;
-
     size_t size = 0;
+
     if (t->flags & (uint16_t) type_flags::has_implicit_conversions) {
         while (t->implicit && t->implicit[size])
             size++;
@@ -26,17 +26,16 @@ void implicitly_convertible(const std::type_info *src,
         t->flags |= (uint16_t) type_flags::has_implicit_conversions;
     }
 
-    const std::type_info **data = (const std::type_info **) malloc(
-        sizeof(const std::type_info *) * (size + 2));
+    void **data = (void **) malloc(sizeof(void *) * (size + 2));
 
-    memcpy(data, t->implicit, size * sizeof(const std::type_info *));
-    data[size] = src;
+    memcpy(data, t->implicit, size * sizeof(void *));
+    data[size] = (void *) src;
     data[size + 1] = nullptr;
     free(t->implicit);
-    t->implicit = data;
+    t->implicit = (decltype(t->implicit)) data;
 }
 
-void implicitly_convertible(bool (*predicate)(PyObject *, PyObject **),
+void implicitly_convertible(bool (*predicate)(PyObject *, cleanup_list *),
                             const std::type_info *dst) noexcept {
     internals &internals = internals_get();
 
@@ -45,9 +44,9 @@ void implicitly_convertible(bool (*predicate)(PyObject *, PyObject **),
         fail("nanobind::detail::implicitly_convertible(src=<predicate>, dst=%s): "
              "destination type unknown!", type_name(dst));
 
-    (void) predicate;
-#if 0
+    type_data *t = it->second;
     size_t size = 0;
+
     if (t->flags & (uint16_t) type_flags::has_implicit_conversions) {
         while (t->implicit_py && t->implicit_py[size])
             size++;
@@ -57,13 +56,12 @@ void implicitly_convertible(bool (*predicate)(PyObject *, PyObject **),
         t->flags |= (uint16_t) type_flags::has_implicit_conversions;
     }
 
-    const void **data = (const void **) malloc(sizeof(void *) * (size + 2));
-    memcpy(data, t->implicit_py, size * sizeof(const void *));
-    data[size] = predicate;
+    void **data = (void **) malloc(sizeof(void *) * (size + 2));
+    memcpy(data, t->implicit_py, size * sizeof(void *));
+    data[size] = (void *) predicate;
     data[size + 1] = nullptr;
     free(t->implicit_py);
-    t->implicit_py = data;
-#endif
+    t->implicit_py = (decltype(t->implicit_py)) data;
 }
 
 NAMESPACE_END(detail)

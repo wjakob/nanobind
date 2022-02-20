@@ -4,10 +4,10 @@ protected:                                                                     \
                                                                                \
 public:                                                                        \
     static constexpr auto cname = descr;                                       \
-    static handle cast(type *p, rv_policy policy, cleanup_list *list) {        \
+    static handle from_cpp(type *p, rv_policy policy, cleanup_list *list) {    \
         if (!p)                                                                \
             return none().release();                                           \
-        return cast(*p, policy, list);                                         \
+        return from_cpp(*p, policy, list);                                     \
     }                                                                          \
     operator type *() { return &value; }                                       \
     operator type &() { return value; }                                        \
@@ -41,7 +41,7 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
     using T1 = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
     using Tp = std::conditional_t<std::is_floating_point_v<T>, double, T1>;
 public:
-    bool load(handle src, uint8_t flags, cleanup_list*) noexcept {
+    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         Tp value_p;
 
         if (!src.is_valid())
@@ -82,7 +82,7 @@ public:
         return true;
     }
 
-    static handle cast(T src, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>)
             return PyFloat_FromDouble((double) src);
         else if constexpr (std::is_unsigned_v<T> && sizeof(T) <= sizeof(long))
@@ -101,13 +101,13 @@ public:
 };
 
 template <> struct type_caster<std::nullptr_t> {
-    bool load(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (src.is_none())
             return true;
         return false;
     }
 
-    static handle cast(std::nullptr_t, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(std::nullptr_t, rv_policy, cleanup_list *) noexcept {
         return none().inc_ref();
     }
 
@@ -115,7 +115,7 @@ template <> struct type_caster<std::nullptr_t> {
 };
 
 template <> struct type_caster<bool> {
-    bool load(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (src.ptr() == Py_True) {
             value = true;
             return true;
@@ -127,7 +127,7 @@ template <> struct type_caster<bool> {
         }
     }
 
-    static handle cast(bool src, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(bool src, rv_policy, cleanup_list *) noexcept {
         return handle(src ? Py_True : Py_False).inc_ref();
     }
 
@@ -135,7 +135,7 @@ template <> struct type_caster<bool> {
 };
 
 template <> struct type_caster<char> {
-    bool load(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         value = PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
         if (!value) {
             PyErr_Clear();
@@ -144,61 +144,12 @@ template <> struct type_caster<char> {
         return true;
     }
 
-    static handle cast(const char *value, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(const char *value, rv_policy,
+                           cleanup_list *) noexcept {
         return PyUnicode_FromString(value);
     }
 
     NB_TYPE_CASTER(const char *, const_name("str"));
-};
-
-template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
-    using T = std::pair<T1, T2>;
-    using C1 = make_caster<T1>;
-    using C2 = make_caster<T2>;
-
-    NB_TYPE_CASTER(T, const_name("Tuple[") + concat(C1::cname, C2::cname) +
-                          const_name("]"))
-
-    bool load(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        PyObject *o[2];
-
-        if (!seq_size_fetch(src.ptr(), 2, o))
-            return false;
-
-        C1 c1;
-        C2 c2;
-
-        if (!c1.load(o[0], flags, cleanup))
-            goto fail;
-        if (!c2.load(o[1], flags, cleanup))
-            goto fail;
-
-        value.first  = std::move(c1.value);
-        value.second = std::move(c2.value);
-
-        return true;
-
-    fail:
-        Py_DECREF(o[0]);
-        Py_DECREF(o[1]);
-        return false;
-    }
-
-    static handle cast(const T &value, rv_policy policy,
-                       cleanup_list *cleanup) noexcept {
-        object o1 = steal(C1::cast(value.first, policy, cleanup));
-        if (!o1.is_valid())
-            return handle();
-
-        object o2 = steal(C2::cast(value.second, policy, cleanup));
-        if (!o2.is_valid())
-            return handle();
-
-        PyObject *r = PyTuple_New(2);
-        PyTuple_SET_ITEM(r, 0, o1.release().ptr());
-        PyTuple_SET_ITEM(r, 1, o2.release().ptr());
-        return r;
-    }
 };
 
 template <typename T>
@@ -206,7 +157,7 @@ struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
 public:
     NB_TYPE_CASTER(T, T::cname)
 
-    bool load(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (!isinstance<T>(src))
             return false;
 
@@ -218,7 +169,8 @@ public:
         return true;
     }
 
-    static handle cast(const handle &src, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(const handle &src, rv_policy,
+                           cleanup_list *) noexcept {
         return src.inc_ref();
     }
 };
@@ -227,14 +179,14 @@ template <typename T, typename SFINAE> struct type_caster {
     static constexpr auto cname = const_name<T>();
     static constexpr bool is_class = true;
 
-    NB_INLINE bool load(handle src, uint8_t flags,
-                        cleanup_list *cleanup) noexcept {
+    NB_INLINE bool from_python(handle src, uint8_t flags,
+                               cleanup_list *cleanup) noexcept {
         return detail::nb_type_get(&typeid(T), src.ptr(), flags, cleanup,
                                    (void **) &value);
     }
 
-    NB_INLINE static handle cast(const T *p, rv_policy policy,
-                                 cleanup_list *cleanup) noexcept {
+    NB_INLINE static handle from_cpp(const T *p, rv_policy policy,
+                                     cleanup_list *cleanup) noexcept {
         if (policy == rv_policy::automatic)
             policy = rv_policy::take_ownership;
         else if (policy == rv_policy::automatic_reference)
@@ -243,8 +195,8 @@ template <typename T, typename SFINAE> struct type_caster {
         return cast_impl(p, policy, cleanup);
     }
 
-    NB_INLINE static handle cast(const T &p, rv_policy policy,
-                                 cleanup_list *cleanup) noexcept {
+    NB_INLINE static handle from_cpp(const T &p, rv_policy policy,
+                                     cleanup_list *cleanup) noexcept {
         if (policy == rv_policy::automatic ||
             policy == rv_policy::automatic_reference)
             policy = rv_policy::copy;
@@ -252,8 +204,8 @@ template <typename T, typename SFINAE> struct type_caster {
         return cast_impl(&p, policy, cleanup);
     }
 
-    NB_INLINE static handle cast(const T &&p, rv_policy policy,
-                                 cleanup_list *cleanup) noexcept {
+    NB_INLINE static handle from_cpp(const T &&p, rv_policy policy,
+                                     cleanup_list *cleanup) noexcept {
         if (policy == rv_policy::automatic ||
             policy == rv_policy::automatic_reference)
             policy = rv_policy::move;
@@ -303,8 +255,8 @@ template <typename T, typename Derived> T cast(const detail::api<Derived> &value
         using Caster = detail::make_caster<Ti>;
 
         Caster caster;
-        if (!caster.load(value.derived().ptr(),
-                         (uint8_t) detail::cast_flags::convert, nullptr))
+        if (!caster.from_python(value.derived().ptr(),
+                                (uint8_t) detail::cast_flags::convert, nullptr))
             detail::raise("nanobind::cast(...): conversion failed!");
 
         static_assert(
@@ -320,8 +272,8 @@ template <typename T, typename Derived> T cast(const detail::api<Derived> &value
 
 template <typename T>
 object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
-    handle h = detail::make_caster<T>::cast((detail::forward_t<T>) value,
-                                            detail::policy<T>(policy), nullptr);
+    handle h = detail::make_caster<T>::from_cpp(
+        (detail::forward_t<T>) value, detail::policy<T>(policy), nullptr);
     if (!h.is_valid())
         detail::raise("nanobind::cast(...): conversion failed!");
     return steal(h);
@@ -336,8 +288,8 @@ tuple make_tuple(Args &&...args) {
 
     (PyTuple_SET_ITEM(
          o, nargs++,
-         detail::make_caster<Args>::cast((detail::forward_t<Args>) args,
-                                         detail::policy<Args>(policy), nullptr).ptr()),
+         detail::make_caster<Args>::from_cpp((detail::forward_t<Args>) args,
+                                             detail::policy<Args>(policy), nullptr).ptr()),
      ...);
 
     detail::tuple_check(o, sizeof...(Args));

@@ -48,7 +48,11 @@ Besides this, the following features were removed:
 - Pickling.
 - `kw_only` / `pos_only` argument annotations.
 - MyPy-compatible docstrings.
+- PyPy support.
 - The `options` class for customizing docstring generation.
+- The ability to run several independent Python interpreters in the
+  same process, which requires thread-local storage for various
+  internal data structures.
 
 Some of these may be reintroduced eventually, but it will need to be done in an
 opt-in manner that does not affect binary size and compilation/runtime
@@ -59,14 +63,14 @@ performance of the base case.
 Besides removing features, the rewrite was an opportunity to address
 long-standing performance issues with _pybind11_:
 
-- C++ objects are co-located with the Python object whenever
-  possible (less pointer chasing).
+- C++ objects are co-located with the Python object whenever possible (less
+  pointer chasing).
 - C++ function binding information is co-located with the Python function
   object (less pointer chasing).
 - C++ type binding information is co-located with the Python type object (less
   pointer chasing, fewer hashtable lookups).
-- _nanobind_ internally replaces `std::unordered_map` with a more efficient hash
-  table ([tsl::robin_map](https://github.com/Tessil/robin-map), which is
+- _nanobind_ internally replaces `std::unordered_map` with a more efficient
+  hash table ([tsl::robin_map](https://github.com/Tessil/robin-map), which is
   included as a git submodule).
 - function calls from/to Python are realized using [PEP 590 vector
   calls](https://www.python.org/dev/peps/pep-0590), which gives a nice speed
@@ -81,9 +85,13 @@ long-standing performance issues with _pybind11_:
   function, this all happens transparently.
 - `#include <pybind11/pybind11.h>` pulls in a large portion of the STL (about
   2.1 MiB of headers with Clang and libc++). _nanobind_ minimizes STL usage to
-  avoid this problem. Type casters even for for basic types like
-  `std::string` require an explicit include directive (e.g. `#include
+  avoid this problem. Type casters even for for basic types like `std::string`
+  require an explicit include directive (e.g. `#include
   <nanobind/stl/string.h>`).
+- _pybind11_ is dependent on *link time optimization* (LTO) to produce
+  reasonably-sized bindings, which makes linking a build time bottleneck. With
+  _nanobind_'s split into a precompiled core library and minimal
+  metatemplating, LTO is no longer important.
 
 ### Dependencies
 
@@ -104,14 +112,18 @@ documentation](https://pybind11.readthedocs.io/en/stable) is the main source of
 documentation for this project. A number of API simplifications are
 detailed below.
 
-To quickly port exsting code without adaptation, you can include
+To port existing code with minimal adaptation, you can include
 ```cpp
 #include <nanobind/pybind11.h>
 ```
-which exposes a _pybind11_ namespace.
+which exposes a `pybind11` namespace with the previous naming scheme. (However,
+do note the `NB_TRAMPOLINE` discussion below which will require a few changes
+if you use the `PYBIND11_OVERRIDE_*()` macros in your code.)
 
-- _nanobind_ uses a different namespace. The `namespace nb = nanobind;`
-  shorthand alias is recommended.
+For new projects, note the following differences:
+
+- _nanobind_ types and functions are located in the `nanobind` namespace. The
+  `namespace nb = nanobind;` shorthand alias is recommended.
 
 - Macros of the form `PYBIND11_*` (e.g., `PYBIND11_OVERRIDE(..)`) were
   renamed to `NB_*` (e.g., `NB_OVERRIDE(..)`).
@@ -134,6 +146,57 @@ which exposes a _pybind11_ namespace.
       .def(nb::init_implicit<MyOtherType>());
   ```
 
+- Trampoline classes, i.e., polymorphic class implementations that forward
+  virtual function calls to Python require an extra `NB_TRAMPOLINE(parent,
+  size)` declaration, where `parent` refers to the parent class and `size` is
+  at least as big as the number of `NB_OVERRIDE_*()` calls. _nanobind_ caches
+  information to enable a more efficient implementation, which requires knowing
+  the number of trampoline "slots". Example:
+
+  ```cpp
+  struct PyAnimal : Animal {
+      NB_TRAMPOLINE(Animal, 1);
+
+      std::string name() const override {
+          NB_OVERRIDE(std::string, Animal, name);
+      }
+  };
+  ```
+
+  Trampolines with a too small `size` will be caught and trigger a Python
+  `RuntimeError` exception with a descriptive label, e.g.
+  `nanobind::detail::get_trampoline('PyAnimal::what()'): the trampoline ran out
+  of slots (you will need to increase the value provided to the NB_TRAMPOLINE()
+  macro)!`.
+
+- The API of custom type casters has changed _significantly_. In a nutshell,
+  the following changes are needed:
+
+  - `load()` was renamed to `from_python()`. The function now takes an extra
+    `uint8_t flags` (instead `bool convert`, which is now represented by the
+    flag `nanobind::detail::arg_flags::convert`). A `cleanup_list *` pointer
+    keeps track of Python temporaries that are created by the conversion, and
+    which need to be deallocated after a function call has taken place. `flags`
+    and `cleanup` should be passed to any recursive usage of
+    `type_caster::from_python()`.
+
+  - `cast()` was renamed to `from_cpp()`. The function takes a return value
+    policy (as before) and a `cleanup_list *` pointer.
+
+  Both functions must be marked as `noexcept`. In contrast to _pybind11_,
+  errors during type casting are only propagated using status codes. If a
+  severe error condition arises that should be reported, use Python warning API
+  calls for this, e.g. `PyErr_WarnFormat()`.
+
+  Note that the cleanup list is only available when `from_python()` or
+  `from_cpp()` are called as part of function dispatch, while usage by
+  `nanobind::cast()` sets `cleanup` to `nullptr`. This case should be handled
+  gracefully by refusing the conversion if the cleanup list is absolutely required.
+
+  The [std::pair type
+  caster](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/pair.h)
+  may be useful as a reference for these changes.
+
 - The following types and functions were renamed:
 
   | _pybind11_           | _nanobind_     |
@@ -141,4 +204,3 @@ which exposes a _pybind11_ namespace.
   | `error_already_set`  | `python_error` |
   | `reinterpret_borrow` | `borrow`       |
   | `reinterpret_steal`  | `steal`        |
-

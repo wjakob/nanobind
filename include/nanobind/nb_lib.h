@@ -200,7 +200,8 @@ NB_CORE PyObject *get_override(void *ptr, const std::type_info *type,
 NB_CORE void implicitly_convertible(const std::type_info *src,
                                     const std::type_info *dst) noexcept;
 
-NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *, PyObject **),
+NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *,
+                                                      cleanup_list *),
                                     const std::type_info *dst) noexcept;
 
 NAMESPACE_END(detail)

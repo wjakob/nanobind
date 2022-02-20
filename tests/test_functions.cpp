@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/pair.h>
 
 namespace nb = nanobind;
 using namespace nb::literals;

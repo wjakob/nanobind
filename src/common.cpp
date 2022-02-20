@@ -97,8 +97,8 @@ void python_error_raise() {
 // ========================================================================
 
 void cleanup_list::release() noexcept {
-    // (Don't decrease the reference count of the first element, it
-    //  stores the 'self' element.)
+    /* Don't decrease the reference count of the first
+       element, it stores the 'self' element. */
     for (size_t i = 1; i < m_size; ++i)
         Py_DECREF(m_data[i]);
     if (m_capacity != Small)

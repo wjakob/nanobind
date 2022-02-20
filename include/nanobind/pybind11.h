@@ -8,7 +8,7 @@
 
 NAMESPACE_BEGIN(pybind11)
 
-using namespace nanbind;
+using namespace nanobind;
 
 using error_already_set = python_error;
 using return_value_policy = rv_policy;
@@ -20,6 +20,20 @@ template <typename T> T reinterpret_borrow(handle h) {
 
 template <typename T> T reinterpret_steal(handle h) {
     return { h, nanobind::detail::steal_t() };
+}
+
+template <typename T1, typename T2> void implicitly_convertible() {
+    using Caster = make_caster<T1>;
+
+    if constexpr (Caster::is_class) {
+        nanobind::detail::implicitly_convertible(&typeid(T1), &typeid(T2));
+    } else {
+        nanobind::detail::implicitly_convertible(
+            [](PyObject *src, cleanup_list *cleanup) noexcept -> bool {
+                return Caster().from_python(src, cast_flags::convert, cleanup);
+            },
+            &typeid(T2));
+    }
 }
 
 NAMESPACE_END(pybind11)

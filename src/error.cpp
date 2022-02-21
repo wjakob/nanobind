@@ -24,8 +24,7 @@ python_error::python_error(const python_error &e) : std::exception(e) {
         m_what = strdup(e.m_what);
 }
 
-python_error::python_error(python_error &&e)
-    : std::exception(std::move(e)) {
+python_error::python_error(python_error &&e) noexcept : std::exception(e) {
     m_type = std::move(e.m_type);
     m_value = std::move(e.m_value);
     m_trace = std::move(e.m_trace);

@@ -31,6 +31,21 @@ template <typename T, size_t N> struct intrinsic_type<const T[N]> { using type =
 template <typename T, size_t N> struct intrinsic_type<T[N]>       { using type = typename intrinsic_type<T>::type; };
 template <typename T> using intrinsic_t = typename intrinsic_type<T>::type;
 
+// More relaxed pointer test
+template <typename T>
+constexpr bool is_pointer_v = std::is_pointer_v<std::remove_reference_t<T>>;
+
+template <typename T, typename U>
+using forwarded_type = std::conditional_t<std::is_lvalue_reference_v<T>,
+                                          std::remove_reference_t<U> &,
+                                          std::remove_reference_t<U> &&>;
+
+/// Forwards a value U as rvalue or lvalue according to whether T is rvalue or lvalue; typically
+/// used for forwarding a container's elements.
+template <typename T, typename U> NB_INLINE forwarded_type<T, U> forward_like(U &&u) {
+    return (forwarded_type<T, U>) u;
+}
+
 template <typename T>
 constexpr bool is_std_char_v =
     std::is_same_v<T, char>

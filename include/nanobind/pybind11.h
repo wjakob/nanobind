@@ -25,7 +25,7 @@ template <typename T> T reinterpret_steal(handle h) {
 template <typename T1, typename T2> void implicitly_convertible() {
     using Caster = make_caster<T1>;
 
-    if constexpr (Caster::is_class) {
+    if constexpr (Caster::IsClass) {
         nanobind::detail::implicitly_convertible(&typeid(T1), &typeid(T2));
     } else {
         nanobind::detail::implicitly_convertible(

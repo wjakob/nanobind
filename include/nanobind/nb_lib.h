@@ -64,7 +64,10 @@ NB_CORE void raise(const char *fmt, ...);
 NB_CORE void fail(const char *fmt, ...);
 
 /// Raise nanobind::python_error after an error condition was found
-NB_CORE void python_error_raise();
+NB_CORE void raise_python_error();
+
+/// Raise nanobind::next_overload
+NB_CORE void raise_next_overload();
 
 // ========================================================================
 
@@ -151,8 +154,14 @@ NB_CORE void call_append_kwargs(PyObject *kwargs, PyObject *value);
 
 // ========================================================================
 
-// Check if a sequence type has a given size, and fetch its values in that case
-NB_CORE bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept;
+// If the given sequence has the size 'size', return a pointer to its contents.
+// May produce a temporary.
+NB_CORE PyObject **seq_get_with_size(PyObject *seq, size_t size,
+                                     PyObject **temp) noexcept;
+
+// Like the above, but return the size instead of checking it.
+NB_CORE PyObject **seq_get(PyObject *seq, size_t *size,
+                           PyObject **temp) noexcept;
 
 // ========================================================================
 

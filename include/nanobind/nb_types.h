@@ -1,21 +1,21 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// Macro defining functions/constructors for nanobind::handle subclasses
-#define NB_OBJECT(Name, Parent, Check)                                         \
+#define NB_OBJECT(Type, Parent, Check)                                         \
 public:                                                                        \
-    static constexpr auto cname = detail::const_name(#Name);                   \
-    NB_INLINE Name(handle h, detail::borrow_t)                                 \
+    static constexpr auto Name = detail::const_name(#Type);                    \
+    NB_INLINE Type(handle h, detail::borrow_t)                                 \
         : Parent(h, detail::borrow_t{}) {}                                     \
-    NB_INLINE Name(handle h, detail::steal_t)                                  \
+    NB_INLINE Type(handle h, detail::steal_t)                                  \
         : Parent(h, detail::steal_t{}) {}                                      \
     NB_INLINE static bool check_(handle h) {                                   \
         return Check(h.ptr());                                                 \
     }
 
 /// Like NB_OBJECT but allow null-initialization
-#define NB_OBJECT_DEFAULT(Name, Parent, Check)                                 \
-    NB_OBJECT(Name, Parent, Check)                                             \
-    Name() : Parent() {}
+#define NB_OBJECT_DEFAULT(Type, Parent, Check)                                 \
+    NB_OBJECT(Type, Parent, Check)                                             \
+    Type() : Parent() {}
 
 /// Helper macro to create detail::api comparison functions
 #define NB_API_COMP(name, op)                                                  \
@@ -116,7 +116,7 @@ class handle : public detail::api<handle> {
     friend struct detail::obj_item;
     friend struct detail::num_item;
 public:
-    static constexpr auto cname = detail::const_name("handle");
+    static constexpr auto Name = detail::const_name("handle");
 
     handle() = default;
     handle(const handle &) = default;
@@ -138,7 +138,7 @@ protected:
 
 class object : public handle {
 public:
-    static constexpr auto cname = detail::const_name("object");
+    static constexpr auto Name = detail::const_name("object");
 
     object() = default;
     object(const object &o) : handle(o) { inc_ref(); }

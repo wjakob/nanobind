@@ -61,7 +61,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
     } else {
         args[nargs++] =
             make_caster<T>::from_cpp((forward_t<T>) value,
-                                     detail::policy<T>(policy), nullptr).ptr();
+                                     detail::infer_policy<T>(policy), nullptr).ptr();
     }
     (void) args; (void) kwnames; (void) nargs;
     (void) nkwargs; (void) kwargs_offset;

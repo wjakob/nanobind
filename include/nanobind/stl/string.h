@@ -1,3 +1,5 @@
+#pragma once
+
 #include <nanobind/nanobind.h>
 #include <string>
 
@@ -5,6 +7,8 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <> struct type_caster<std::string> {
+    NB_TYPE_CASTER(std::string, const_name("str"));
+
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         Py_ssize_t size;
         const char *str = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
@@ -20,8 +24,6 @@ template <> struct type_caster<std::string> {
                            cleanup_list *) noexcept {
         return PyUnicode_FromStringAndSize(value.c_str(), value.size());
     }
-
-    NB_TYPE_CASTER(std::string, const_name("str"));
 };
 
 NAMESPACE_END(detail)

@@ -41,14 +41,15 @@ inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
 template <typename T> struct type_caster<std::shared_ptr<T>> {
     using Value = std::shared_ptr<T>;
     using Caster = make_caster<T>;
-    static_assert(Caster::is_class,
+    static_assert(Caster::IsClass,
                   "Binding 'shared_ptr<T>' requires that 'T' can also be bound "
                   "by nanobind. It appears that you specified a type which "
                   "would undergo conversion/copying, which is not allowed.");
 
-    static constexpr auto cname = Caster::cname;
-    template <typename T_> using cast_op_type = cast_op_type<T_>;
-    static constexpr bool is_class = true;
+    static constexpr auto Name = Caster::Name;
+    static constexpr bool IsClass = true;
+
+    template <typename T_> using Cast = movable_cast_t<T_>;
 
     Value value;
 
@@ -84,8 +85,9 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         return result;
     }
 
-    operator Value *() { return &value; }
-    operator Value &() { return value; }
+    explicit operator Value *() { return &value; }
+    explicit operator Value &() { return value; }
+    explicit operator Value &&() && { return (Value &&) value; }
 };
 
 NAMESPACE_END(detail)

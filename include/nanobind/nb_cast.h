@@ -1,18 +1,16 @@
-#define NB_TYPE_CASTER(type, descr)                                            \
-protected:                                                                     \
-    type value;                                                                \
-                                                                               \
-public:                                                                        \
-    static constexpr auto cname = descr;                                       \
-    static handle from_cpp(type *p, rv_policy policy, cleanup_list *list) {    \
+#define NB_TYPE_CASTER(Type, descr)                                            \
+    static constexpr bool IsClass = false;                                     \
+    static constexpr auto Name = descr;                                        \
+    template <typename T_> using Cast = movable_cast_t<T_>;                    \
+    static handle from_cpp(Type *p, rv_policy policy, cleanup_list *list) {    \
         if (!p)                                                                \
             return none().release();                                           \
         return from_cpp(*p, policy, list);                                     \
     }                                                                          \
-    operator type *() { return &value; }                                       \
-    operator type &() { return value; }                                        \
-    static constexpr bool is_class = false;                                    \
-    template <typename T_> using cast_op_type = cast_op_type<T_>;
+    explicit operator Type *() { return &value; }                              \
+    explicit operator Type &() { return value; }                               \
+    explicit operator Type &&() && { return (Type &&) value; }                 \
+    Type value;                                                                \
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
@@ -28,12 +26,17 @@ enum cast_flags : uint8_t {
 
 template <typename T, typename SFINAE = int> struct type_caster;
 template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
+template <typename T> using cast_t = typename make_caster<T>::template Cast<T>;
 
 template <typename T>
-using cast_op_type =
-    std::conditional_t<std::is_pointer_v<std::remove_reference_t<T>>,
-                       typename std::add_pointer_t<intrinsic_t<T>>,
-                       typename std::add_lvalue_reference_t<intrinsic_t<T>>>;
+using simple_cast_t =
+    std::conditional_t<is_pointer_v<T>, intrinsic_t<T> *, intrinsic_t<T> &>;
+
+template <typename T>
+using movable_cast_t =
+    std::conditional_t<is_pointer_v<T>, intrinsic_t<T> *,
+                       std::conditional_t<std::is_rvalue_reference_v<T>,
+                                          intrinsic_t<T> &&, intrinsic_t<T> &>>;
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
@@ -66,11 +69,6 @@ public:
                               ? (Tp) PyLong_AsLong(src.ptr())
                               : (Tp) PyLong_AsLongLong(src.ptr());
             }
-
-            if constexpr (sizeof(Tp) != sizeof(T)) {
-                if (value_p != (Tp) (T) value_p)
-                    return false;
-            }
         }
 
         if (value_p == Tp(-1) && PyErr_Occurred()) {
@@ -79,6 +77,12 @@ public:
         }
 
         value = (T) value_p;
+
+        if constexpr (sizeof(Tp) != sizeof(T) && !std::is_floating_point_v<T>) {
+            if (value_p != (Tp) value)
+                return false;
+        }
+
         return true;
     }
 
@@ -155,7 +159,7 @@ template <> struct type_caster<char> {
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
 public:
-    NB_TYPE_CASTER(T, T::cname)
+    NB_TYPE_CASTER(T, T::Name)
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (!isinstance<T>(src))
@@ -175,66 +179,13 @@ public:
     }
 };
 
-template <typename T, typename SFINAE> struct type_caster {
-    static constexpr auto cname = const_name<T>();
-    static constexpr bool is_class = true;
-
-    NB_INLINE bool from_python(handle src, uint8_t flags,
-                               cleanup_list *cleanup) noexcept {
-        return detail::nb_type_get(&typeid(T), src.ptr(), flags, cleanup,
-                                   (void **) &value);
-    }
-
-    NB_INLINE static handle from_cpp(const T *p, rv_policy policy,
-                                     cleanup_list *cleanup) noexcept {
+template <typename T> NB_INLINE rv_policy infer_policy(rv_policy policy) {
+    if constexpr (is_pointer_v<T>) {
         if (policy == rv_policy::automatic)
             policy = rv_policy::take_ownership;
         else if (policy == rv_policy::automatic_reference)
             policy = rv_policy::reference;
-
-        return cast_impl(p, policy, cleanup);
-    }
-
-    NB_INLINE static handle from_cpp(const T &p, rv_policy policy,
-                                     cleanup_list *cleanup) noexcept {
-        if (policy == rv_policy::automatic ||
-            policy == rv_policy::automatic_reference)
-            policy = rv_policy::copy;
-
-        return cast_impl(&p, policy, cleanup);
-    }
-
-    NB_INLINE static handle from_cpp(const T &&p, rv_policy policy,
-                                     cleanup_list *cleanup) noexcept {
-        if (policy == rv_policy::automatic ||
-            policy == rv_policy::automatic_reference)
-            policy = rv_policy::move;
-
-        return cast_impl(&p, policy, cleanup);
-    }
-
-    NB_INLINE static handle cast_impl(const T *p, rv_policy policy,
-                                      cleanup_list *cleanup) noexcept {
-        return detail::nb_type_put(&typeid(T), (void *) p, policy, cleanup,
-                                   nullptr);
-    }
-
-    operator T*() { return value; }
-    operator T&() { return *value; }
-
-    template <typename T_> using cast_op_type = cast_op_type<T_>;
-
-private:
-    T *value;
-};
-
-template <typename T> NB_INLINE rv_policy policy(rv_policy policy) {
-    if constexpr (std::is_pointer_v<T>) {
-        if (policy == rv_policy::automatic)
-            policy = rv_policy::take_ownership;
-        else if (policy == rv_policy::automatic_reference)
-            policy = rv_policy::reference;
-    } else if constexpr (std::is_reference_v<T>) {
+    } else if constexpr (std::is_lvalue_reference_v<T>) {
         if (policy == rv_policy::automatic ||
             policy == rv_policy::automatic_reference)
             policy = rv_policy::copy;
@@ -245,6 +196,50 @@ template <typename T> NB_INLINE rv_policy policy(rv_policy policy) {
     }
     return policy;
 }
+
+
+template <typename Type, typename SFINAE> struct type_caster {
+    static constexpr auto Name = const_name<Type>();
+    static constexpr bool IsClass = true;
+
+    template <typename T> using Cast = movable_cast_t<T>;
+
+    NB_INLINE bool from_python(handle src, uint8_t flags,
+                               cleanup_list *cleanup) noexcept {
+        return detail::nb_type_get(&typeid(Type), src.ptr(), flags, cleanup,
+                                   (void **) &value);
+    }
+
+    template <typename T>
+    NB_INLINE static handle from_cpp(T &&value, rv_policy policy,
+                                     cleanup_list *cleanup) noexcept {
+        Type *value_p;
+        if constexpr (is_pointer_v<T>)
+            value_p = (Type *) value;
+        else
+            value_p = (Type *) &value;
+
+        return detail::nb_type_put(&typeid(Type), value_p,
+                                   infer_policy<T>(policy), cleanup, nullptr);
+    }
+
+    operator Type*() { return value; }
+
+    operator Type&() {
+        if (!value)
+            detail::raise_next_overload();
+        return *value;
+    }
+
+    operator Type&&() && {
+        if (!value)
+            detail::raise_next_overload();
+        return (Type &&) *value;
+    }
+
+private:
+    Type *value;
+};
 
 NAMESPACE_END(detail)
 
@@ -261,10 +256,10 @@ template <typename T, typename Derived> T cast(const detail::api<Derived> &value
             detail::raise("nanobind::cast(...): conversion failed!");
 
         static_assert(
-            !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::is_class,
+            !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::IsClass,
             "nanobind::cast(): cannot return a reference to a temporary.");
 
-        if constexpr (std::is_pointer_v<T>)
+        if constexpr (detail::is_pointer_v<T>)
             return caster.operator Ti*();
         else
             return caster.operator Ti&();
@@ -274,23 +269,23 @@ template <typename T, typename Derived> T cast(const detail::api<Derived> &value
 template <typename T>
 object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
     handle h = detail::make_caster<T>::from_cpp(
-        (detail::forward_t<T>) value, detail::policy<T>(policy), nullptr);
+        (detail::forward_t<T>) value, detail::infer_policy<T>(policy), nullptr);
     if (!h.is_valid())
         detail::raise("nanobind::cast(...): conversion failed!");
     return steal(h);
 }
 
-template <rv_policy policy = rv_policy::automatic_reference, typename... Args>
+template <rv_policy policy = rv_policy::automatic, typename... Args>
 tuple make_tuple(Args &&...args) {
     tuple result = steal<tuple>(PyTuple_New((Py_ssize_t) sizeof...(Args)));
 
     size_t nargs = 0;
     PyObject *o = result.ptr();
 
-    (PyTuple_SET_ITEM(
-         o, nargs++,
-         detail::make_caster<Args>::from_cpp((detail::forward_t<Args>) args,
-                                             detail::policy<Args>(policy), nullptr).ptr()),
+    (PyTuple_SET_ITEM(o, nargs++,
+                      detail::make_caster<Args>::from_cpp(
+                          (detail::forward_t<Args>) args,
+                          detail::infer_policy<Args>(policy), nullptr).ptr()),
      ...);
 
     detail::tuple_check(o, sizeof...(Args));
@@ -312,7 +307,7 @@ detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
 template <typename T> void list::append(T &&value) {
     object o = nanobind::cast(value);
     if (PyList_Append(m_ptr, o.ptr()))
-        detail::python_error_raise();
+        detail::raise_python_error();
 }
 
 NAMESPACE_END(NB_NAMESPACE)

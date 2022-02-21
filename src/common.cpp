@@ -70,28 +70,25 @@ PyObject *capsule_new(const void *ptr, void (*free)(void *)) noexcept {
 }
 
 PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
-    // Placement new (not an allocation).
-    new (def) PyModuleDef{ /* m_base */ PyModuleDef_HEAD_INIT,
-                           /* m_name */ name,
-                           /* m_doc */ nullptr,
-                           /* m_size */ -1,
-                           /* m_methods */ nullptr,
-                           /* m_slots */ nullptr,
-                           /* m_traverse */ nullptr,
-                           /* m_clear */ nullptr,
-                           /* m_free */ nullptr };
+    memset(def, 0, sizeof(PyModuleDef));
+    def->m_name = name;
+    def->m_size = -1;
     PyObject *m = PyModule_Create(def);
     if (!m)
         fail("nanobind::detail::module_new(): allocation failed!");
     return m;
 }
 
-void python_error_raise() {
+void raise_python_error() {
     if (PyErr_Occurred())
         throw python_error();
     else
         fail("nanobind::detail::raise_python_error() called without "
              "an error condition!");
+}
+
+void raise_next_overload() {
+    throw next_overload();
 }
 
 // ========================================================================
@@ -123,28 +120,28 @@ void cleanup_list::expand() noexcept {
 size_t obj_len(PyObject *o) {
     Py_ssize_t res = PyObject_Length(o);
     if (res < 0)
-        python_error_raise();
+        raise_python_error();
     return (size_t) res;
 }
 
 PyObject *obj_repr(PyObject *o) {
     PyObject *res = PyObject_Repr(o);
     if (!res)
-        python_error_raise();
+        raise_python_error();
     return res;
 }
 
 bool obj_compare(PyObject *a, PyObject *b, int value) {
     int rv = PyObject_RichCompareBool(a, b, value);
     if (rv == -1)
-        python_error_raise();
+        raise_python_error();
     return rv == 1;
 }
 
 PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
     PyObject *res = op(a);
     if (!res)
-        python_error_raise();
+        raise_python_error();
     return res;
 }
 
@@ -152,7 +149,7 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
                    PyObject *(*op)(PyObject *, PyObject *) ) {
     PyObject *res = op(a, b);
     if (!res)
-        python_error_raise();
+        raise_python_error();
 
     return res;
 }
@@ -201,7 +198,7 @@ end:
     if (error)
         raise("%s", error);
     else if (!res)
-        python_error_raise();
+        raise_python_error();
 
     return res;
 }
@@ -211,14 +208,14 @@ end:
 PyObject *getattr(PyObject *obj, const char *key) {
     PyObject *res = PyObject_GetAttrString(obj, key);
     if (!res)
-        python_error_raise();
+        raise_python_error();
     return res;
 }
 
 PyObject *getattr(PyObject *obj, PyObject *key) {
     PyObject *res = PyObject_GetAttr(obj, key);
     if (!res)
-        python_error_raise();
+        raise_python_error();
     return res;
 }
 
@@ -246,7 +243,7 @@ void getattr_maybe(PyObject *obj, const char *key, PyObject **out) {
 
     PyObject *res = PyObject_GetAttrString(obj, key);
     if (!res)
-        python_error_raise();
+        raise_python_error();
 
     *out = res;
 }
@@ -257,7 +254,7 @@ void getattr_maybe(PyObject *obj, PyObject *key, PyObject **out) {
 
     PyObject *res = PyObject_GetAttr(obj, key);
     if (!res)
-        python_error_raise();
+        raise_python_error();
 
     *out = res;
 }
@@ -265,13 +262,13 @@ void getattr_maybe(PyObject *obj, PyObject *key, PyObject **out) {
 void setattr(PyObject *obj, const char *key, PyObject *value) {
     int rv = PyObject_SetAttrString(obj, key, value);
     if (rv)
-        python_error_raise();
+        raise_python_error();
 }
 
 void setattr(PyObject *obj, PyObject *key, PyObject *value) {
     int rv = PyObject_SetAttr(obj, key, value);
     if (rv)
-        python_error_raise();
+        raise_python_error();
 }
 
 // ========================================================================
@@ -282,7 +279,7 @@ void getitem_maybe(PyObject *obj, Py_ssize_t key, PyObject **out) {
 
     PyObject *res = PySequence_GetItem(obj, key);
     if (!res)
-        python_error_raise();
+        raise_python_error();
 
     *out = res;
 }
@@ -295,13 +292,13 @@ void getitem_maybe(PyObject *obj, const char *key_, PyObject **out) {
 
     key = PyUnicode_FromString(key_);
     if (!key)
-        python_error_raise();
+        raise_python_error();
 
     res = PyObject_GetItem(obj, key);
     Py_DECREF(key);
 
     if (!res)
-        python_error_raise();
+        raise_python_error();
 
     *out = res;
 }
@@ -312,7 +309,7 @@ void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out) {
 
     PyObject *res = PyObject_GetItem(obj, key);
     if (!res)
-        python_error_raise();
+        raise_python_error();
 
     *out = res;
 }
@@ -320,25 +317,25 @@ void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out) {
 void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
     int rv = PySequence_SetItem(obj, key, value);
     if (rv)
-        python_error_raise();
+        raise_python_error();
 }
 
 void setitem(PyObject *obj, const char *key_, PyObject *value) {
     PyObject *key = PyUnicode_FromString(key_);
     if (!key)
-        python_error_raise();
+        raise_python_error();
 
     int rv = PyObject_SetItem(obj, key, value);
     Py_DECREF(key);
 
     if (rv)
-        python_error_raise();
+        raise_python_error();
 }
 
 void setitem(PyObject *obj, PyObject *key, PyObject *value) {
     int rv = PyObject_SetItem(obj, key, value);
     if (rv)
-        python_error_raise();
+        raise_python_error();
 }
 
 // ========================================================================
@@ -346,7 +343,7 @@ void setitem(PyObject *obj, PyObject *key, PyObject *value) {
 PyObject *str_from_obj(PyObject *o) {
     PyObject *result = PyObject_Str(o);
     if (!result)
-        python_error_raise();
+        raise_python_error();
     return result;
 }
 
@@ -366,42 +363,63 @@ PyObject *str_from_cstr_and_size(const char *str, size_t size) {
 
 // ========================================================================
 
-bool seq_size_fetch(PyObject *seq, size_t size, PyObject **out) noexcept {
+PyObject **seq_get(PyObject *seq, size_t *size, PyObject **temp) noexcept {
     if (PyTuple_CheckExact(seq)) {
-        if (PyTuple_GET_SIZE(seq) != (Py_ssize_t) size)
-            return false;
-        for (size_t i = 0; i < size; ++i) {
-            out[i] = PyTuple_GET_ITEM(seq, (Py_ssize_t) i);
-            Py_INCREF(out[i]);
-        }
+        PyTupleObject *tuple = (PyTupleObject *) seq;
+        *size = Py_SIZE(tuple);
+        return tuple->ob_item;
     } else if (PyList_CheckExact(seq)) {
-        if (PyList_GET_SIZE(seq) != (Py_ssize_t) size)
-            return false;
-        for (size_t i = 0; i < size; ++i) {
-            out[i] = PyList_GET_ITEM(seq, (Py_ssize_t) i);
-            Py_INCREF(out[i]);
-        }
+        PyListObject *list = (PyListObject *) seq;
+        *size = Py_SIZE(list);
+        return list->ob_item;
     } else {
-        Py_ssize_t rv = PySequence_Size(seq);
-        if (rv == -1)
+        seq = PySequence_List(seq);
+        if (!seq) {
             PyErr_Clear();
-
-        if (rv != (Py_ssize_t) size)
-            return false;
-
-        for (size_t i = 0; i < size; ++i) {
-            out[i] = PySequence_GetItem(seq, (Py_ssize_t) i);
-
-            if (!out[i]) {
-                PyErr_Clear();
-                for (size_t j = 0; j < i; ++j)
-                    Py_DECREF(out[j]);
-                return false;
-            }
+            return nullptr;
         }
+        *temp = seq;
+        PyListObject *list = (PyListObject *) seq;
+        *size = Py_SIZE(list);
+        return list->ob_item;
     }
+}
 
-    return true;
+
+PyObject **seq_get_with_size(PyObject *seq, size_t size,
+                             PyObject **temp) noexcept {
+    if (PyTuple_CheckExact(seq)) {
+        PyTupleObject *tuple = (PyTupleObject *) seq;
+        if (size != (size_t) Py_SIZE(tuple))
+            return nullptr;
+        return tuple->ob_item;
+    } else if (PyList_CheckExact(seq)) {
+        PyListObject *list = (PyListObject *) seq;
+        if (size != (size_t) Py_SIZE(list))
+            return nullptr;
+        return list->ob_item;
+    } else {
+        PySequenceMethods *m = Py_TYPE(seq)->tp_as_sequence;
+        if (m && m->sq_length) {
+            Py_ssize_t len = m->sq_length(seq);
+            if (len < 0) {
+                PyErr_Clear();
+                return nullptr;
+            }
+            if (size != (size_t) len)
+                return nullptr;
+        }
+
+        seq = PySequence_List(seq);
+        if (!seq) {
+            PyErr_Clear();
+            return nullptr;
+        }
+
+        *temp = seq;
+        PyListObject *list = (PyListObject *) seq;
+        return list->ob_item;
+    }
 }
 
 // ========================================================================

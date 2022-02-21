@@ -512,8 +512,13 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
                 memcpy(new_value, value, t->size);
             }
         } else {
-            fail("nanobind::detail::nb_type_put(\"%s\"): attempted to move "
-                 "an instance that is not move-constructible!", t->name);
+            if (t->flags & (uint16_t) type_flags::is_copy_constructible) {
+                rvp = rv_policy::copy;
+            } else {
+                fail("nanobind::detail::nb_type_put(\"%s\"): attempted to move "
+                     "an instance that is neither copy- nor move-constructible!",
+                     t->name);
+            }
         }
     }
 

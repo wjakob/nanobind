@@ -34,8 +34,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     using cast_out = make_caster<
         std::conditional_t<std::is_void_v<Return>, std::nullptr_t, Return>>;
     constexpr auto descr =
-        const_name("(") + concat(type_descr(make_caster<Args>::cname)...) +
-        const_name(") -> ") + cast_out::cname;
+        const_name("(") + concat(type_descr(make_caster<Args>::Name)...) +
+        const_name(") -> ") + cast_out::Name;
     const std::type_info* descr_types[descr.type_count() + 1];
     descr.put_types(descr_types);
 
@@ -51,8 +51,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
               (nargs_provided       ? (uint16_t) func_flags::has_args       : 0) |
               (ReturnRef            ? (uint16_t) func_flags::return_ref     : 0);
 
-    // Store captured function inside 'func_data' if there is space. Issues
-    // with aliasing are resolved via separate compilation of libnanobind
+    /* Store captured function inside 'func_data' if there is space. Issues
+       with aliasing are resolved via separate compilation of libnanobind. */
     if constexpr (sizeof(capture) <= sizeof(f.capture)) {
         capture *cap = (capture *) f.capture;
         new (cap) capture{ (forward_t<Func>) func };
@@ -89,17 +89,14 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         if constexpr (std::is_void_v<Return>) {
             (void) policy; (void) cleanup;
-            cap->func(
-                in.template get<Is>().operator typename make_caster<Args>::
-                    template cast_op_type<Args>()...),
+            cap->func(((make_caster<Args>&&) in.template get<Is>()).operator cast_t<Args>()...);
             Py_INCREF(Py_None);
             return Py_None;
         } else {
             return cast_out::from_cpp(
-                cap->func(
-                    in.template get<Is>().operator typename make_caster<Args>::
-                        template cast_op_type<Args>()...),
-                policy, cleanup).ptr();
+                       cap->func(((make_caster<Args> &&) in.template get<Is>())
+                                     .operator cast_t<Args>()...),
+                       policy, cleanup).ptr();
         }
     };
 

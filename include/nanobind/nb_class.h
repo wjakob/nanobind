@@ -94,7 +94,7 @@ template <typename Arg> struct init_implicit {
                 new ((Alias *) v) Alias{ (forward_t<Arg>) arg };
             }, is_implicit(), extra...);
 
-        if constexpr (!Caster::is_class) {
+        if constexpr (!Caster::IsClass) {
             implicitly_convertible(
                 [](PyObject *src, cleanup_list *cleanup) noexcept -> bool {
                     return Caster().from_python(src, cast_flags::convert,

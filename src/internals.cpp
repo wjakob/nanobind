@@ -119,7 +119,7 @@ extern void type_dealloc(PyObject *);
 
 static internals *internals_p = nullptr;
 
-void default_exception_translator(std::exception_ptr p) {
+void default_exception_translator(const std::exception_ptr &p) {
     try {
         std::rethrow_exception(p);
     } catch (python_error &e) {

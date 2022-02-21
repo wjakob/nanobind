@@ -82,8 +82,8 @@ overheads (hatched red bar).
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/perf.svg" alt="Runtime performance benchmark" width="850"/>
 </p>
 
-This shows that the overheads of calling a _nanobind_ function is lower than
-the cost of calling an equivalent CPython function. The difference to
+This shows that the overhead of calling a _nanobind_ function is lower than
+that of an equivalent CPython function. The difference to
 _pybind11_ is _significant_: a ~**2× improvement** for simple functions, and
 **~8× improvement** when classes are being passed around. Complexities in
 _pybind11_ related to overload resolution, multiple inheritance, and holders
@@ -163,8 +163,8 @@ long-standing performance issues:
 - _nanobind_ maintains efficient internal data structures for lifetime
   management (needed for `nb::keep_alive`, `nb::rv_policy::reference_internal`,
   the `std::shared_ptr` interface, etc.). With these changes, it is no longer
-  necessary that pybind11-bound types are weak-referenceable, which saves a
-  pointer per instance.
+  necessary that bound types are weak-referenceable, which saves a pointer per
+  instance.
 
 ### Other improvements
 

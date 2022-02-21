@@ -122,7 +122,7 @@ struct internals {
     /// nb_func/meth instance list for leak reporting
     tsl::robin_set<void *, ptr_hash> funcs;
 
-    std::vector<void (*)(std::exception_ptr)> exception_translators;
+    std::vector<void (*)(const std::exception_ptr &)> exception_translators;
 };
 
 extern internals &internals_get() noexcept;

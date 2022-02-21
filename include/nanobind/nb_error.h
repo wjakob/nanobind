@@ -12,7 +12,7 @@ class NB_EXPORT python_error : public std::exception {
 public:
     python_error();
     python_error(const python_error &);
-    python_error(python_error &&);
+    python_error(python_error &&) noexcept;
     virtual ~python_error();
 
     /// Move the error back into the Python domain

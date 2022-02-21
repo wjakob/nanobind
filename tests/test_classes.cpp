@@ -19,9 +19,9 @@ struct Struct {
     Struct() { default_constructed++; }
     Struct(int i) : i(i) { value_constructed++; }
     Struct(const Struct &s) : i(s.i) { copy_constructed++; }
-    Struct(Struct &&s) : i(s.i) { s.i = 0; move_constructed++; }
+    Struct(Struct &&s) noexcept : i(s.i) { s.i = 0; move_constructed++; }
     Struct &operator=(const Struct &s) { i = s.i; copy_assigned++; return *this; }
-    Struct &operator=(Struct &&s) { std::swap(i, s.i); move_assigned++; return *this; }
+    Struct &operator=(Struct &&s) noexcept { std::swap(i, s.i); move_assigned++; return *this; }
     ~Struct() { destructed++; }
 
     int value() const { return i; }

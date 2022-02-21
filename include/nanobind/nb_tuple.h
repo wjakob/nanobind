@@ -12,8 +12,8 @@ template <typename T, typename... Ts> struct nb_tuple<T, Ts...> : nb_tuple<Ts...
 
     nb_tuple() = default;
     nb_tuple(const nb_tuple &) = default;
-    nb_tuple(nb_tuple &&) = default;
-    nb_tuple& operator=(nb_tuple &&) = default;
+    nb_tuple(nb_tuple &&) noexcept = default;
+    nb_tuple& operator=(nb_tuple &&) noexcept = default;
     nb_tuple& operator=(const nb_tuple &) = default;
 
     NB_INLINE nb_tuple(const T& value, const Ts&... ts)

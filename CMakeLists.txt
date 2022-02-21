@@ -129,7 +129,10 @@ function(nanobind_add_module name)
   if (MSVC)
     set(NB_OPT_SIZE /Os)
   else()
-    set(NB_OPT_SIZE -Os)
+    # The stack protector affects binding size negatively (+8% on Linux in my
+    # benchmarks). Protecting from stack smashing in a Python VM seems in any
+    # case futile, so let's get rid of it by default in optimized modes.
+    set(NB_OPT_SIZE -Os -fno-stack-protector)
   endif()
 
   set(NB_SUFFIX ".so")

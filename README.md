@@ -18,15 +18,80 @@ complexity of the library grew tremendously, causing overheads on binary size,
 compilation time, and runtime performance.
 
 Ironically, the situation today feels like 2015 all over again: binding
-generation with existing tools (_Boost.Python_, _pybind11_) is extremely slow
-and produces enormous binaries. At the same time, key improvements in C++17 and
-Python 3.8 provide opportunities for drastic simplifications. It seems that
-another round of this cycle is needed (though the plan is that this doesn't
-become a _vicious cycle_, see below..)
+generation with existing tools (_Boost.Python_, _pybind11_) is slow and
+produces enormous binaries with overheads on runtime performance.
+At the same time, key improvements in C++17 and Python 3.8 provide
+opportunities for drastic simplifications. It seems that another round of this
+cycle is needed (though the plan is that this doesn't become a _vicious cycle_,
+see below..)
 
 ## Performance numbers
 
-TBD
+> **TLDR**: _nanobind_ bindings compile ~2-3× faster, producing
+~3× smaller binaries, with up to ~8× lower overheads on runtime performance
+(when comparing to _pybind11_ in _MinSizeRel_ mode).
+
+The following microbenchmark binds a _large_ number of trivial functions that
+only perform a few additions. The objective of this is to quantify the overhead
+of bindings on _compilation time_, _binary size_, and _runtime performance_.
+
+Two separate benchmarks analyze function-heavy (``func_``) and class-heavy
+(``class_``) bindings. The former consists of 720 declarations of the form
+(with permuted integer types)
+```cpp
+m.def("test_0050", [](uint16_t a, int64_t b, int32_t c, uint64_t d, uint32_t e, float f) {
+    return a+b+c+d+e+f;
+});
+```
+while the latter does exactly the same computation but packaged up in `struct`s with bindings.
+```cpp
+struct Struct50 {
+    uint16_t a; int64_t b; int32_t c; uint64_t d; uint32_t e; float f;
+    Struct50(uint16_t a, int64_t b, int32_t c, uint64_t d, uint32_t e, float f)
+        : a(a), b(b), c(c), d(d), e(e), f(f) { }
+    float sum() const { return a+b+c+d+e+f; }
+};
+
+py::class_<Struct50>(m, "Struct50")
+    .def(py::init<uint16_t, int64_t, int32_t, uint64_t, uint32_t, float>())
+    .def("sum", &Struct50::sum);
+```
+Each benchmark is compiled in debug mode (`debug`) and with optimizations
+(`opt`) that minimize size (i.e., `-Os`).
+
+The following plot shows compilation time for _Boost.Python_, _pybind11_, and _nanobind_.
+The "_number_ ×" annotations denote time relative to _nanobind_, which is
+consistently faster (e.g., a ~**2-3× improvement** compared to to _pybind11_).
+<p align="center">
+<img src="https://github.com/wjakob/nanobind/raw/master/docs/images/times.svg" alt="Compilation time benchmark" width="850"/>
+</p>
+
+As the next plot shows, _nanobind_ also greatly reduces the size of the
+compiled bindings. There is a roughly **3× improvement** compared to _pybind11_
+when compiling with optimizations.
+<p align="center">
+<img src="https://github.com/wjakob/nanobind/raw/master/docs/images/sizes.svg" alt="Binary size benchmark" width="850"/>
+</p>
+
+The last experiment compares the runtime performance overheads by by calling
+one of the bound functions many times in a loop. Here, it is also interesting
+to compare to a pure Python implementation that runs bytecode without binding
+overheads (hatched red bar).
+
+<p align="center">
+<img src="https://github.com/wjakob/nanobind/raw/master/docs/images/perf.svg" alt="Runtime performance benchmark" width="850"/>
+</p>
+
+This shows that the overheads of calling a _nanobind_ function is lower than
+the cost of calling an equivalent CPython function. The difference to
+_pybind11_ is _significant_: a ~**2× improvement** for simple functions, and
+**~8× improvement** when classes are being passed around. Complexities in
+_pybind11_ related to overload resolution, multiple inheritance, and holders
+are the main reasons for this difference (those features were either simplified
+or completely removed in _nanobind_).
+
+The code to generate these plots is available
+[here](https://github.com/wjakob/nanobind/blob/master/docs/microbenchmark.ipynb).
 
 ## What are differences between _nanobind_ and _pybind11_?
 
@@ -65,7 +130,7 @@ Besides removing features, the rewrite was an opportunity to address
 long-standing performance issues:
 
 - C++ objects are now co-located with the Python object whenever possible (less
-  pointer chasing compard to _pybind11_). The per-instance overhead for
+  pointer chasing compared to _pybind11_). The per-instance overhead for
   wrapping a C++ type into a
   Python object shrinks by 2.3x. (_pybind11_: 56 bytes, _nanobind_: 24 bytes.)
 - C++ function binding information is now co-located with the Python function
@@ -229,3 +294,4 @@ For new projects, note the following differences:
   | `error_already_set`  | `python_error` |
   | `reinterpret_borrow` | `borrow`       |
   | `reinterpret_steal`  | `steal`        |
+

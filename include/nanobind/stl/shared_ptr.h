@@ -1,3 +1,8 @@
+/*
+ * The shared pointer integration in this file is based on ideas by [Ralf
+ * Grosse-Kunstleve](https://github.com/rwgk).
+ */
+
 #include <nanobind/nanobind.h>
 #include <memory>
 

@@ -105,24 +105,38 @@ but they will likely be rejected in this project.
 
 Support for multiple inheritance was a persistent source of complexity in
 _pybind11_, and it is one of the main casualties in creating _nanobind_.
-Besides this, the following features were removed:
+The list below uses the following symbols:
 
-- Binding of classes with overloaded `operator new` / `operator delete`.
-- Module-local types or exceptions.
-- Eigen and NumPy integration.
-- Nested exceptions.
-- Pickling.
-- `kw_only` / `pos_only` argument annotations.
-- MyPy-compatible docstrings.
-- PyPy support.
-- The `options` class for customizing docstring generation.
-- The ability to run several independent Python interpreters in the
-  same process, which requires thread-local storage for various
-  internal data structures.
+- ⊘: This removal is a design choice. Use _pybind11_ if you need this feature.
+- ⊛: This feature may be added at some point; help is welcomed.
+- ⊚: Unclear, to be discussed.
 
-Some of these may be reintroduced eventually, but it will need to be done in an
-opt-in manner that does not affect binary size and compilation/runtime
-performance of the base case.
+The following _pybind11_ features are unavailable:
+
+- ⊘ _nanobind_ does not instantiate a _holder_ type internally, which has
+  implications on object ownership (though holders are still supported with
+  some restrictions, see below).
+- ⊘ Binding of classes with overloaded `operator new` / `operator delete`
+  is unsupported.
+- ⊘ The ability to run several independent Python interpreters in the same
+  process is unsupported. (This would require TLS lookups for _nanobind_ data
+  structures.)
+- ⊘ `kw_only` / `pos_only` argument annotations were removed.
+- ⊘ MyPy-compatible docstrings. (Really getting this right is a rabbit hole that
+  I don't wish to pursue in _nanobind_.)
+- ⊘ The `options` class for customizing docstring generation was removed.
+- ⊛ Module-local type or exception declarations are currently unsupported.
+- ⊛ Many STL type caster haven't been ported yet.
+- ⊚ PyPy support (PyPy requires special handling in _pybind11_, which
+    has not been added to _nanobind_).
+- ⊚ Eigen and NumPy integration.
+- ⊚ Nested exceptions.
+- ⊚ Custom metaclasses.
+- ⊚ Pickling.
+
+Features marked with ⊛ or ⊚ may be reintroduced eventually, but this will need
+to be done in an opt-in manner that does not affect binary size and
+compilation/runtime performance of the base case.
 
 ### Optimizations
 
@@ -212,15 +226,56 @@ if you use the `PYBIND11_OVERRIDE_*()` macros in your code.)
 
 For new projects, note the following differences:
 
-- _nanobind_ types and functions are located in the `nanobind` namespace. The
+- **Namespace**. _nanobind_ types and functions are located in the `nanobind` namespace. The
   `namespace nb = nanobind;` shorthand alias is recommended.
 
-- Macros of the form `PYBIND11_*` (e.g., `PYBIND11_OVERRIDE(..)`) were
+- **Macros**. The `PYBIND11_*` macros (e.g., `PYBIND11_OVERRIDE(..)`) were
   renamed to `NB_*` (e.g., `NB_OVERRIDE(..)`).
 
-- In _pybind11_, implicit type conversions were specified using a follow-up
-  function call. In _nanobind_, they are specified within the constructor
-  declarations:
+- **Shared pointers and holders**. When a bound type is instantiated within
+  Python, the instance is stored within the created `PyObject`. Alternatively,
+  when an existing C++ instance is exposed within Python via
+  `rv_policy::reference*` or `rv_policy::take_ownership`, _nanobind_ creates a
+  smaller `PyObject` that only stores a pointer to the instance data.
+
+  This is _very different_ from _pybind11_, where the instance `PyObject`
+  always had the same layout based on a _holder type_ (typically
+  `std::unique_ptr<T>`) storing a pointer to the instance data. Dealing with
+  holders in bindings caused inefficiencies and a was generally a source of
+  complexity, so this feature had to go.
+
+  _nanobind_'s design has some implications on object ownership:
+
+  - It's still possible to use `std::shared_ptr<T>` arguments and return values
+    in bound functions using the optional type caster in
+    [`nanobind/stl/shared_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/shared_ptr.h)
+    Returning a `std::shared_ptr<T>` from a function will create a new
+    `shared_ptr` control block with a custom deleter, which keeps the Python
+    instance alive.
+
+    When a function recives a `std::shared_ptr<T>` argument, _nanobind_ checks
+    if the instance already exists as a Python object. If not, it creates a
+    temporary `std::shared_ptr<T>` on the heap that will be destructed when the
+    python instance is garbage collected.
+
+    In other words, `std::shared_ptr<>` is generally usable, although with
+    small overheads compared to passing around ordinary objects. The mechanism
+    is unusual in that multiple `shared_ptr` control blocks are potentially
+    allocated for the same object, hence `std::shared_ptr<T>::user_count()`
+    will not show the true global reference count.
+
+    One thing that is **illegal** with this mechanism is creating a
+    ``std::shared_ptr<T>`` from a pointer `T* value` when `value`  is owned by
+    _nanobind_ and `T` furhermore inherits from
+    `std::enable_shared_from_this<T>`. The shared pointer will see that no
+    shared pointers have been created for `value` yet and incorrectly assume
+    ownership. When the shared pointer expires, it will call `delete value`,
+    which is undefined and will likely crash your program (_nanobind_ allocates
+    instance storage via _pymalloc_ and not a _new expression_).
+
+- **Implicit type conversions**. In _pybind11_, implicit conversions were
+  specified using a follow-up function call. In _nanobind_, they are specified
+  within the constructor declarations:
 
   _pybind11_:
   ```cpp
@@ -236,12 +291,12 @@ For new projects, note the following differences:
       .def(nb::init_implicit<MyOtherType>());
   ```
 
-- Trampoline classes, i.e., polymorphic class implementations that forward
-  virtual function calls to Python require an extra `NB_TRAMPOLINE(parent,
-  size)` declaration, where `parent` refers to the parent class and `size` is
-  at least as big as the number of `NB_OVERRIDE_*()` calls. _nanobind_ caches
-  information to enable efficient function dispatch, which requires knowing
-  the number of trampoline "slots". Example:
+- **Trampoline classes.** Trampolines, i.e., polymorphic class implementations
+  that forward virtual function calls to Python, now require an extra
+  `NB_TRAMPOLINE(parent, size)` declaration, where `parent` refers to the
+  parent class and `size` is at least as big as the number of `NB_OVERRIDE_*()`
+  calls. _nanobind_ caches information to enable efficient function dispatch,
+  for which it must know the number of trampoline "slots". Example:
 
   ```cpp
   struct PyAnimal : Animal {
@@ -253,8 +308,8 @@ For new projects, note the following differences:
   };
   ```
 
-  Trampolines with a too small `size` will be caught and trigger a Python
-  `RuntimeError` exception with a descriptive label, e.g.
+  Trampoline declarations with an insufficient size may eventually trigger a
+  Python `RuntimeError` exception with a descriptive label, e.g.
   `nanobind::detail::get_trampoline('PyAnimal::what()'): the trampoline ran out
   of slots (you will need to increase the value provided to the NB_TRAMPOLINE()
   macro)!`.

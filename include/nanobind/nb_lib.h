@@ -191,6 +191,13 @@ NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
                               rv_policy rvp, cleanup_list *cleanup,
                               bool *is_new) noexcept;
 
+// Special version of 'nb_type_put' for unique pointers and ownership transfer
+NB_CORE PyObject *nb_type_put_unique(const std::type_info *cpp_type, void *value,
+                             cleanup_list *cleanup, bool cpp_delete) noexcept;
+
+/// Try to reliquish ownership from Python object to a unique_ptr
+NB_CORE void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete);
+
 // ========================================================================
 
 // Create and install a Python property object

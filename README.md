@@ -35,8 +35,8 @@ The following microbenchmark binds a _large_ number of trivial functions that
 only perform a few additions. The objective of this is to quantify the overhead
 of bindings on _compilation time_, _binary size_, and _runtime performance_.
 
-Two separate benchmarks analyze function-heavy (``func_``) and class-heavy
-(``class_``) bindings. The former consists of 720 declarations of the form
+Two separate benchmarks analyze function-heavy (`func_`) and class-heavy
+(`class_`) bindings. The former consists of 720 declarations of the form
 (with permuted integer types)
 ```cpp
 m.def("test_0050", [](uint16_t a, int64_t b, int32_t c, uint64_t d, uint32_t e, float f) {
@@ -114,25 +114,27 @@ The list below uses the following symbols:
 The following _pybind11_ features are unavailable:
 
 - ⊘ _nanobind_ does not instantiate a _holder_ type internally, which has
-  implications on object ownership (though holders are still supported with
-  some restrictions, see below).
-- ⊘ Binding of classes with overloaded `operator new` / `operator delete`
-  is unsupported.
+  implications on object ownership (though shared/unique pointers are still
+  supported with some restrictions, see below).
+- ⊘ Binding of classes with overloaded or deleted `operator new` / `operator
+  delete` is unsupported.
 - ⊘ The ability to run several independent Python interpreters in the same
   process is unsupported. (This would require TLS lookups for _nanobind_ data
-  structures.)
+  structures, which is undesirable.)
 - ⊘ `kw_only` / `pos_only` argument annotations were removed.
-- ⊘ MyPy-compatible docstrings. (Really getting this right is a rabbit hole that
-  I don't wish to pursue in _nanobind_.)
+- ⊘ Type signatures in docstrings are "best-effort". Getting all the details
+  right for tools like MyPy is a rabbit hole that I don't wish to pursue in
+  _nanobind_.
 - ⊘ The `options` class for customizing docstring generation was removed.
 - ⊛ Module-local type or exception declarations are currently unsupported.
-- ⊛ Many STL type caster haven't been ported yet.
-- ⊚ PyPy support (PyPy requires special handling in _pybind11_, which
-    has not been added to _nanobind_).
-- ⊚ Eigen and NumPy integration.
-- ⊚ Nested exceptions.
-- ⊚ Custom metaclasses.
-- ⊚ Pickling.
+- ⊛ Many STL type caster have not yet been ported.
+- ⊚ PyPy support is gone. (PyPy requires many workaround in _pybind11_ that
+  complicate the its internals. Making PyPy interoperate with _nanobind_ will
+  likely require changes to the PyPy CPython emulation layer.)
+- ⊚ Eigen and NumPy integration have been removed.
+- ⊚ Nested exceptions are not supported.
+- ⊚ Pickling has not been ported yet.
+- ⊚ Custom metaclasses are unsupported.
 
 Features marked with ⊛ or ⊚ may be reintroduced eventually, but this will need
 to be done in an opt-in manner that does not affect binary size and
@@ -220,9 +222,10 @@ To port existing code with minimal adaptation, you can include
 ```cpp
 #include <nanobind/pybind11.h>
 ```
-which exposes a `pybind11` namespace with the previous naming scheme. (However,
-do note the `NB_TRAMPOLINE` discussion below which will require a few changes
-if you use the `PYBIND11_OVERRIDE_*()` macros in your code.)
+which exposes a `pybind11` namespace with the previous naming scheme. However,
+make note of the _holder_ and `NB_TRAMPOLINE` discussion below: these will
+require a few adaptation on your end if your code uses holder types or
+`PYBIND11_OVERRIDE_*()`.
 
 For new projects, note the following differences:
 
@@ -232,46 +235,36 @@ For new projects, note the following differences:
 - **Macros**. The `PYBIND11_*` macros (e.g., `PYBIND11_OVERRIDE(..)`) were
   renamed to `NB_*` (e.g., `NB_OVERRIDE(..)`).
 
-- **Shared pointers and holders**. When a bound type is instantiated within
-  Python, the instance is stored within the created `PyObject`. Alternatively,
-  when an existing C++ instance is exposed within Python via
-  `rv_policy::reference*` or `rv_policy::take_ownership`, _nanobind_ creates a
-  smaller `PyObject` that only stores a pointer to the instance data.
+- **Shared pointers and holders**. _nanobind_ removes the concept of a _holder
+  type_, which caused inefficiencies and introduced complexity in _pybind11_.
+  This has implications on object ownership, shared ownership, and interactions
+  with C++ shared/unique pointers. Please see the following [separate
+  document](docs/ownership.md) for the nitty-gritty details.
 
-  This is _very different_ from _pybind11_, where the instance `PyObject`
-  always had the same layout based on a _holder type_ (typically
-  `std::unique_ptr<T>`) storing a pointer to the instance data. Dealing with
-  holders in bindings caused inefficiencies and a was generally a source of
-  complexity, so this feature had to go.
+  The gist is that use of shared/unique pointers requires including extra
+  header files:
 
-  _nanobind_'s design has some implications on object ownership:
+  - [`nanobind/stl/unique_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/unique_ptr.h)
+  - [`nanobind/stl/shared_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/shared_ptr.h)
 
-  - It's still possible to use `std::shared_ptr<T>` arguments and return values
-    in bound functions using the optional type caster in
-    [`nanobind/stl/shared_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/shared_ptr.h)
-    Returning a `std::shared_ptr<T>` from a function will create a new
-    `shared_ptr` control block with a custom deleter, which keeps the Python
-    instance alive.
+  Furthermore, ``enable_shared_from_this<T>`` should be _completely avoided_,
+  and some changes to function signatures taking unique pointers may be
+  required. This is consistent with the philosophy of this library: _the
+  codebase has to adapt to the binding tool and not the other way around_.
 
-    When a function recives a `std::shared_ptr<T>` argument, _nanobind_ checks
-    if the instance already exists as a Python object. If not, it creates a
-    temporary `std::shared_ptr<T>` on the heap that will be destructed when the
-    python instance is garbage collected.
+  It is no longer necessary to specify holder types in the type declaration:
 
-    In other words, `std::shared_ptr<>` is generally usable, although with
-    small overheads compared to passing around ordinary objects. The mechanism
-    is unusual in that multiple `shared_ptr` control blocks are potentially
-    allocated for the same object, hence `std::shared_ptr<T>::user_count()`
-    will not show the true global reference count.
+  _pybind11_:
+  ```cpp
+  py::class_<MyType, std::shared_ptr<MyType>>(m, "MyType")
+    ...
+  ```
 
-    One thing that is **illegal** with this mechanism is creating a
-    ``std::shared_ptr<T>`` from a pointer `T* value` when `value`  is owned by
-    _nanobind_ and `T` furhermore inherits from
-    `std::enable_shared_from_this<T>`. The shared pointer will see that no
-    shared pointers have been created for `value` yet and incorrectly assume
-    ownership. When the shared pointer expires, it will call `delete value`,
-    which is undefined and will likely crash your program (_nanobind_ allocates
-    instance storage via _pymalloc_ and not a _new expression_).
+  _nanobind_:
+  ```cpp
+  nb::class_<MyType>(m, "MyType")
+    ...
+  ```
 
 - **Implicit type conversions**. In _pybind11_, implicit conversions were
   specified using a follow-up function call. In _nanobind_, they are specified
@@ -314,8 +307,8 @@ For new projects, note the following differences:
   of slots (you will need to increase the value provided to the NB_TRAMPOLINE()
   macro)!`.
 
-- The API of custom type casters has changed _significantly_. In a nutshell,
-  the following changes are needed:
+- *Type casters.* The API of custom type casters has changed _significantly_.
+  In a nutshell, the following changes are needed:
 
   - `load()` was renamed to `from_python()`. The function now takes an extra
     `uint8_t flags` (instead `bool convert`, which is now represented by the

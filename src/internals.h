@@ -32,14 +32,17 @@ struct nb_inst { // usually: 24 bytes
      */
     bool direct : 1;
 
+    /// Is the instance data co-located with the Python object?
+    bool internal : 1;
+
     /// Is the instance properly initialized?
     bool ready : 1;
 
     /// Should the destructor be called when this instance is GCed?
     bool destruct : 1;
 
-    /// Should the instance pointer be freed when this instance is GCed?
-    bool free : 1;
+    /// Should nanobind call 'operator delete' when this instance is GCed?
+    bool cpp_delete : 1;
 
     /// Does this instance hold reference to others? (via internals.keep_alive)
     bool clear_keep_alive : 1;

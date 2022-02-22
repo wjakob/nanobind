@@ -1,8 +1,3 @@
-/*
- * The shared pointer integration in this file is based on ideas by [Ralf
- * Grosse-Kunstleve](https://github.com/rwgk).
- */
-
 #include <nanobind/nanobind.h>
 #include <memory>
 
@@ -19,9 +14,9 @@ NAMESPACE_BEGIN(detail)
  * single shared_ptr type_caster, which would enlarge the binding size)
  */
 inline NB_NOINLINE std::shared_ptr<void>
-shared_from_python(void *ptr, PyObject *o) noexcept {
-    struct decref_deleter {
-        void operator()(void*) noexcept {
+shared_from_python(void *ptr, handle h) noexcept {
+    struct py_deleter {
+        void operator()(void *) noexcept {
             gil_scoped_acquire guard;
             Py_DECREF(o);
         }
@@ -29,12 +24,10 @@ shared_from_python(void *ptr, PyObject *o) noexcept {
         PyObject *o;
     };
 
-    if (ptr) {
-        Py_INCREF(o);
-        return std::shared_ptr<void>(ptr, decref_deleter{ o });
-    } else {
+    if (ptr)
+        return std::shared_ptr<void>(ptr, py_deleter{ h.inc_ref().ptr() });
+    else
         return std::shared_ptr<void>(nullptr);
-    }
 }
 
 inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
@@ -65,7 +58,7 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
             return false;
 
         value = std::static_pointer_cast<T>(
-            shared_from_python(caster.operator T *(), src.ptr()));
+            shared_from_python(caster.operator T *(), src));
 
         return true;
     }
@@ -80,8 +73,8 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
     static handle from_cpp(const Value &value, rv_policy,
                            cleanup_list *cleanup) noexcept {
         bool is_new = false;
-        handle result = detail::nb_type_put(
-            &typeid(T), value.get(), rv_policy::reference, cleanup, &is_new);
+        handle result = nb_type_put(&typeid(T), value.get(),
+                                    rv_policy::reference, cleanup, &is_new);
 
         if (is_new)
             shared_from_cpp(std::static_pointer_cast<void>(value),

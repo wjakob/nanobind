@@ -1,4 +1,5 @@
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/pair.h>
 
 namespace nb = nanobind;
@@ -17,9 +18,9 @@ struct Example {
     }
 };
 
-struct ExampleWrapper {
-    std::shared_ptr<Example> test;
-};
+struct SharedWrapper { std::shared_ptr<Example> value; };
+struct UniqueWrapper { std::unique_ptr<Example> value; };
+struct UniqueWrapper2 { std::unique_ptr<Example, nb::deleter<Example>> value; };
 
 NB_MODULE(test_holders_ext, m) {
     nb::class_<Example>(m, "Example")
@@ -28,18 +29,43 @@ NB_MODULE(test_holders_ext, m) {
         .def_static("make", &Example::make)
         .def_static("make_shared", &Example::make_shared);
 
-    nb::class_<ExampleWrapper>(m, "ExampleWrapper")
+    // ------- shared_ptr -------
+
+    nb::class_<SharedWrapper>(m, "SharedWrapper")
         .def(nb::init<std::shared_ptr<Example>>())
-        .def_readwrite("test", &ExampleWrapper::test)
+        .def_readwrite("ptr", &SharedWrapper::value)
         .def_property("value",
-            [](ExampleWrapper &t) { return t.test->value; },
-            [](ExampleWrapper &t, int value) { t.test->value = value; }
+            [](SharedWrapper &t) { return t.value->value; },
+            [](SharedWrapper &t, int value) { t.value->value = value; }
         );
 
     m.def("query_shared_1", [](Example *shared) { return shared->value; });
-    m.def("query_shared_2", [](std::shared_ptr<Example> &shared) { return shared->value; });
-    m.def("passthrough", [](std::shared_ptr<Example> shared) { return shared; });
+    m.def("query_shared_2",
+          [](std::shared_ptr<Example> &shared) { return shared->value; });
+    m.def("passthrough",
+          [](std::shared_ptr<Example> shared) { return shared; });
+
+    // ------- unique_ptr -------
+
+    m.def("unique_from_cpp",
+          []() { return std::unique_ptr<Example>(new Example(1)); });
+    m.def("unique_from_cpp_2", []() {
+        return std::unique_ptr<Example, nb::deleter<Example>>(new Example(2));
+    });
+
+    nb::class_<UniqueWrapper>(m, "UniqueWrapper")
+        .def(nb::init<std::unique_ptr<Example>>())
+        .def("get", [](UniqueWrapper *uw) { return std::move(uw->value); });
+
+    nb::class_<UniqueWrapper2>(m, "UniqueWrapper2")
+        .def(nb::init<std::unique_ptr<Example, nb::deleter<Example>>>())
+        .def("get", [](UniqueWrapper2 *uw) { return std::move(uw->value); });
+
+    m.def("passthrough_unique",
+          [](std::unique_ptr<Example> unique) { return unique; });
+    m.def("passthrough_unique_2",
+          [](std::unique_ptr<Example, nb::deleter<Example>> unique) { return unique; });
 
     m.def("stats", []{ return std::make_pair(created, deleted); });
-    m.def("clear", []{ created = deleted = 0; });
+    m.def("reset", []{ created = deleted = 0; });
 }

@@ -206,8 +206,8 @@ template <typename Type, typename SFINAE> struct type_caster {
 
     NB_INLINE bool from_python(handle src, uint8_t flags,
                                cleanup_list *cleanup) noexcept {
-        return detail::nb_type_get(&typeid(Type), src.ptr(), flags, cleanup,
-                                   (void **) &value);
+        return nb_type_get(&typeid(Type), src.ptr(), flags, cleanup,
+                           (void **) &value);
     }
 
     template <typename T>
@@ -219,21 +219,21 @@ template <typename Type, typename SFINAE> struct type_caster {
         else
             value_p = (Type *) &value;
 
-        return detail::nb_type_put(&typeid(Type), value_p,
-                                   infer_policy<T>(policy), cleanup, nullptr);
+        return nb_type_put(&typeid(Type), value_p, infer_policy<T>(policy),
+                           cleanup, nullptr);
     }
 
     operator Type*() { return value; }
 
     operator Type&() {
         if (!value)
-            detail::raise_next_overload();
+            raise_next_overload();
         return *value;
     }
 
     operator Type&&() && {
         if (!value)
-            detail::raise_next_overload();
+            raise_next_overload();
         return (Type &&) *value;
     }
 

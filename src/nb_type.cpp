@@ -48,6 +48,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         // Encode offset to aligned payload
         self->offset = (int32_t) ((intptr_t) payload - (intptr_t) self);
         self->direct = true;
+        self->internal = true;
 
         value = (void *) payload;
     } else {
@@ -73,6 +74,8 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
             self->offset = basic_size;
             self->direct = false;
         }
+
+        self->internal = false;
     }
 
     // Update hash table that maps from C++ to Python instance
@@ -111,7 +114,7 @@ static void inst_dealloc(PyObject *self) {
         }
     }
 
-    if (inst->free) {
+    if (inst->cpp_delete) {
         if (type->t.align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__)
             operator delete(p);
         else
@@ -496,7 +499,6 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
 
     if (is_new)
         *is_new = true;
-    inst->free = inst->destruct && !store_in_obj;
 
     void *new_value = inst_data(inst);
     if (rvp == rv_policy::move) {
@@ -540,14 +542,81 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
         }
     }
 
+    inst->destruct = rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
+    inst->cpp_delete = rvp == rv_policy::take_ownership;
     inst->ready = true;
-    inst->destruct =
-        rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
 
     if (rvp == rv_policy::reference_internal)
         keep_alive((PyObject *) inst, cleanup->self());
 
     return (PyObject *) inst;
+}
+
+PyObject *nb_type_put_unique(const std::type_info *cpp_type, void *value,
+                             cleanup_list *cleanup, bool cpp_delete) noexcept {
+    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+
+    bool is_new = false;
+    PyObject *o = nb_type_put(cpp_type, value, policy, cleanup, &is_new);
+    if (!o)
+        return nullptr;
+
+    if (!cpp_delete && is_new)
+        fail("nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
+             "ownership status has become corrupted.",
+             Py_TYPE(o)->tp_name, cpp_delete);
+
+    nb_inst *inst = (nb_inst *) o;
+
+    if (cpp_delete) {
+        if (inst->ready != is_new || inst->destruct != is_new ||
+            inst->cpp_delete != is_new)
+            fail("nanobind::detail::nb_type_put_unique(type='%s', "
+                 "cpp_delete=%i): unexpected status flags! (ready=%i, "
+                 "destruct=%i, cpp_delete=%i)",
+                 Py_TYPE(o)->tp_name, cpp_delete, inst->ready,
+                 inst->destruct, inst->cpp_delete);
+
+        inst->ready = inst->destruct = inst->cpp_delete = true;
+    } else {
+        if (inst->ready)
+            fail("nanobind::detail::nb_type_put_unique('%s'): ownership "
+                 "status has become corrupted.",
+                 Py_TYPE(o)->tp_name);
+        inst->ready = true;
+    }
+    return o;
+}
+
+void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
+    nb_inst *inst = (nb_inst *) o;
+
+    // This function is called to indicate ownership *changes*
+    if (!inst->ready)
+        fail("nanobind::detail::nb_relinquish_ownership('%s'): ownership "
+             "status has become corrupted.",
+             Py_TYPE(o)->tp_name);
+
+    if (cpp_delete) {
+        if (!inst->cpp_delete || !inst->destruct || inst->internal) {
+            PyErr_WarnFormat(
+                PyExc_RuntimeWarning, 1,
+                "nanobind::detail::nb_relinquish_ownership(): could not "
+                "transfer ownership of a Python instance of type '%s' to C++. "
+                "This is only possible when the instance was previously "
+                "constructed on the C++ side and is now owned by Python, which "
+                "was not the case here. You could change the unique pointer "
+                "signature to std::unique_ptr<T, nb::deleter<T>> to work around "
+                "this issue.", Py_TYPE(o)->tp_name);
+
+            raise_next_overload();
+        }
+
+        inst->cpp_delete = false;
+        inst->destruct = false;
+    }
+
+    inst->ready = false;
 }
 
 NAMESPACE_END(detail)

@@ -1,5 +1,9 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/trampoline.h>
+#include <nanobind/stl/pair.h>
+#include <nanobind/stl/tuple.h>
+#include <nanobind/stl/unique_ptr.h>
+#include <nanobind/stl/shared_ptr.h>
 
 #define PYBIND11_OVERRIDE(...)           NB_OVERRIDE_NAME(__VA_ARGS__)
 #define PYBIND11_OVERRIDE_NAME(...)      NB_OVERRIDE_NAME(__VA_ARGS__)

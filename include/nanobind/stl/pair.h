@@ -7,7 +7,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
-    using Type = std::pair<T1, T2>;
+    using Value = std::pair<T1, T2>;
 
     // Sub type casters
     using Caster1 = make_caster<T1>;
@@ -15,7 +15,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
 
     /**
      * \brief Target type for extracting the result of a `from_python` cast
-     * using the C++ cast operator (see operator Type() below)
+     * using the C++ cast operator (see operator Value() below)
      *
      * The std::pair type caster is slightly restricted: to support pairs
      * containing references, the pair is constructed on the fly in the cast
@@ -29,9 +29,9 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
      *
      * which can also cast to pointers, or lvalue/rvalue references.
      */
-    template <typename T> using Cast = Type;
+    template <typename T> using Cast = Value;
 
-    // Type name for docstring generation
+    // Value name for docstring generation
     static constexpr auto Name =
         const_name("Tuple[") + concat(Caster1::Name, Caster2::Name) + const_name("]");
 
@@ -79,15 +79,15 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     }
 
     /// Return the constructed tuple by copying from the sub-casters
-    explicit operator Type() & {
-        return Type(caster1.operator cast_t<T1>(),
-                    caster2.operator cast_t<T2>());
+    explicit operator Value() & {
+        return Value(caster1.operator cast_t<T1>(),
+                     caster2.operator cast_t<T2>());
     }
 
     // Return the constructed type by moving from the sub-casters
-    explicit operator Type() && {
-        return Type(((Caster1 &&) caster1).operator cast_t<T1>(),
-                    ((Caster2 &&) caster2).operator cast_t<T2>());
+    explicit operator Value() && {
+        return Value(((Caster1 &&) caster1).operator cast_t<T1>(),
+                     ((Caster2 &&) caster2).operator cast_t<T2>());
     }
 
     Caster1 caster1;

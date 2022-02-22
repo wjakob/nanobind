@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/trampoline.h>
+#include <nanobind/enum.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/unique_ptr.h>

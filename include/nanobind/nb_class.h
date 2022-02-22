@@ -70,11 +70,11 @@ NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
 template <typename... Args> struct init {
     template <typename Class, typename... Extra>
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
-        using Value = typename Class::Value;
+        using Type = typename Class::Type;
         using Alias = typename Class::Alias;
         cl.def(
             "__init__",
-            [](Value *v, Args... args) {
+            [](Type *v, Args... args) {
                 new ((Alias *) v) Alias{ (forward_t<Args>) args... };
             },
             extra...);
@@ -84,13 +84,13 @@ template <typename... Args> struct init {
 template <typename Arg> struct init_implicit {
     template <typename Class, typename... Extra>
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
-        using Value = typename Class::Value;
+        using Type = typename Class::Type;
         using Alias = typename Class::Alias;
         using Caster = make_caster<Arg>;
 
         cl.def(
             "__init__",
-            [](Value *v, Arg arg) {
+            [](Type *v, Arg arg) {
                 new ((Alias *) v) Alias{ (forward_t<Arg>) arg };
             }, is_implicit(), extra...);
 
@@ -100,7 +100,7 @@ template <typename Arg> struct init_implicit {
                     return Caster().from_python(src, cast_flags::convert,
                                                 cleanup);
                 },
-                &typeid(Value));
+                &typeid(Type));
         }
     }
 };
@@ -138,13 +138,18 @@ struct extract<T, Pred, Tv, Ts...> {
 template <typename T, typename Arg> using is_alias = std::is_base_of<T, Arg>;
 template <typename T, typename Arg> using is_base = std::is_base_of<Arg, T>;
 
+enum op_id : int;
+enum op_type : int;
+struct undefined_t;
+template <op_id id, op_type ot, typename L = undefined_t, typename R = undefined_t> struct op_;
+
 NAMESPACE_END(detail)
 
 template <typename T, typename... Ts>
 class class_ : public object {
 public:
     NB_OBJECT_DEFAULT(class_, object, PyType_Check);
-    using Value = T;
+    using Type = T;
     using Base  = typename detail::extract<T, detail::is_base,  Ts...>::type;
     using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;
 
@@ -327,6 +332,19 @@ public:
 
         return *this;
     }
+
+    template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra>
+    class_ &def(const detail::op_<id, ot, L, R> &op, const Extra&... extra) {
+        op.execute(*this, extra...);
+        return *this;
+    }
+
+    template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra>
+    class_ & def_cast(const detail::op_<id, ot, L, R> &op, const Extra&... extra) {
+        op.execute_cast(*this, extra...);
+        return *this;
+    }
+
 };
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }

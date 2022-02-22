@@ -227,6 +227,11 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     const size_t count = (size_t) Py_SIZE(self);
     func_record *f = nb_func_get(self);
 
+    if (f->flags & (uint16_t) func_flags::is_operator) {
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
     buf.clear();
     buf.put_dstr(f->name);
     buf.put("(): incompatible function arguments. The following argument types "

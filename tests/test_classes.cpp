@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/trampoline.h>
+#include <nanobind/operators.h>
 #include <nanobind/stl/string.h>
 #include <memory>
 
@@ -221,4 +222,20 @@ NB_MODULE(test_classes_ext, m) {
         .def_readwrite("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });
+
+    struct Int {
+        int i;
+        Int operator+(Int o) const { return {i + o.i}; }
+        Int &operator+=(Int o) {
+            i += o.i;
+            return *this;
+        }
+    };
+
+    /// test13_operators
+    nb::class_<Int>(m, "Int")
+        .def(nb::init<int>())
+        .def(nb::self + nb::self)
+        .def(nb::self += nb::self)
+        .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
 }

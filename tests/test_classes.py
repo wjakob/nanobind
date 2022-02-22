@@ -319,3 +319,14 @@ def test13_implicitly_convertible():
     assert t.get_d(b) == 102
     assert t.get_d(b2) == 103
     assert t.get_d(d) == 10005
+
+
+def test14_operators():
+    a = t.Int(1)
+    b = t.Int(2)
+    assert repr(a + b) == "3"
+    a += b
+    assert repr(a) == "3"
+    assert repr(b) == "2"
+
+    assert a.__add__("test") is NotImplemented

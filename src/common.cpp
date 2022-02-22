@@ -416,8 +416,13 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
             return nullptr;
         }
 
-        *temp = seq;
         PyListObject *list = (PyListObject *) seq;
+        if (size != (size_t) Py_SIZE(list)) {
+            Py_CLEAR(seq);
+            return nullptr;
+        }
+
+        *temp = seq;
         return list->ob_item;
     }
 }

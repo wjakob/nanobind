@@ -1,6 +1,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/vector.h>
+#include <nanobind/stl/function.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -171,4 +172,18 @@ NB_MODULE(test_stl_ext, m) {
         .def(nb::init<>())
         .def("push_back", [](fvec *fv, float f) { fv->push_back(f); })
         .def("size", [](const fvec &fv) { return fv.size(); });
+
+    // ----- test30 ------ */
+
+    m.def("return_empty_function", []() -> std::function<int(int)> {
+        return {};
+    });
+    m.def("return_function", []() -> std::function<int(int)> {
+        int k = 5;
+        return [k](int l) { return k + l; };
+    });
+
+    m.def("call_function", [](std::function<int(int)> &f, int x) {
+        return f(x);
+    });
 }

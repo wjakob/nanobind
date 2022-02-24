@@ -1,17 +1,17 @@
-#define NB_TYPE_CASTER(Type_, descr)                                           \
-    using Type = Type_;                                                        \
+#define NB_TYPE_CASTER(Value_, descr)                                          \
+    using Value = Value_;                                                      \
     static constexpr bool IsClass = false;                                     \
     static constexpr auto Name = descr;                                        \
     template <typename T_> using Cast = movable_cast_t<T_>;                    \
-    static handle from_cpp(Type *p, rv_policy policy, cleanup_list *list) {    \
+    static handle from_cpp(Value *p, rv_policy policy, cleanup_list *list) {   \
         if (!p)                                                                \
             return none().release();                                           \
         return from_cpp(*p, policy, list);                                     \
     }                                                                          \
-    explicit operator Type *() { return &value; }                              \
-    explicit operator Type &() { return value; }                               \
-    explicit operator Type &&() && { return (Type &&) value; }                 \
-    Type value;
+    explicit operator Value *() { return &value; }                             \
+    explicit operator Value &() { return value; }                              \
+    explicit operator Value &&() && { return (Value &&) value; }               \
+    Value value;
 
 #define NB_MAKE_OPAQUE(...)                                                    \
     namespace nanobind::detail {                                               \

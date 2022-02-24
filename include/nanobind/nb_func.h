@@ -16,9 +16,9 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
-        ((std::is_same_v<arg, Extra> + std::is_same_v<arg_v, Extra>) + ...);
+        ((std::is_same_v<arg, Extra> + std::is_same_v<arg_v, Extra>) + ... + 0);
     constexpr bool is_method_det =
-        (std::is_same_v<is_method, Extra> + ...) != 0;
+        (std::is_same_v<is_method, Extra> + ... + 0) != 0;
 
     /// A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
@@ -130,7 +130,7 @@ template <
     typename Func, typename... Extra,
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE object cpp_function(Func &&f, const Extra &...extra) {
-    using am = detail::analyze_method<decltype(&Func::operator())>;
+    using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
     return steal(detail::func_create<true>(
         (detail::forward_t<Func>) f, (typename am::func *) nullptr,
         std::make_index_sequence<am::argc>(), extra...));
@@ -140,7 +140,7 @@ template <
     typename Func, typename... Extra,
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
-    using am = detail::analyze_method<decltype(&Func::operator())>;
+    using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
     detail::func_create<false>(
         (detail::forward_t<Func>) f, (typename am::func *) nullptr,
         std::make_index_sequence<am::argc>(), extra...);

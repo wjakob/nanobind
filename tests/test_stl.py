@@ -301,3 +301,17 @@ def test29_opaque_vector():
     assert isinstance(f, t.float_vec)
     f.push_back(1)
     assert f.size() == 1
+
+
+def test30_std_function():
+    assert t.return_empty_function() is None
+    assert t.return_function()(3) == 8
+    assert t.call_function(lambda x: 5 + x, 3) == 8
+
+    with pytest.raises(TypeError) as excinfo:
+        assert t.call_function(5, 3) == 8
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+    with pytest.raises(TypeError) as excinfo:
+        assert t.call_function(lambda x, y: x+y, 3) == 8
+    assert 'missing 1 required positional argument' in str(excinfo.value)

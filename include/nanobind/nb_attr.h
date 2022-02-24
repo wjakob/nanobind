@@ -30,6 +30,7 @@ struct arg_v : arg {
 struct is_method { };
 struct is_implicit { };
 struct is_operator { };
+struct is_arithmetic { };
 struct is_enum { bool is_signed; };
 
 NAMESPACE_BEGIN(literals)

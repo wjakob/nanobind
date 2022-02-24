@@ -18,19 +18,56 @@ struct nb_enum {
     const char *doc;
 };
 
-static PyObject *nb_enum_repr(PyObject *self) {
+static PyObject *nb_enum_int(PyObject *o);
+
+/// Map to unique representative enum instance
+static nb_enum *nb_enum_get_unique(PyObject *self) {
     nb_enum *e = (nb_enum *) self;
+    if (e->name)
+        return e;
+
+    PyObject *int_val = nb_enum_int(self);
+    PyObject *dict = PyObject_GetAttrString((PyObject *) Py_TYPE(self), "__entries");
+    nb_enum *e2 = nullptr;
+    if (int_val && dict)
+        e2 = (nb_enum *) PyDict_GetItem(dict, int_val);
+
+    bool found = e2 && e2->name;
+
+    Py_XDECREF(int_val);
+    Py_XDECREF(dict);
+
+    if (found) {
+        return e2;
+    } else {
+        PyErr_Clear();
+        PyErr_SetString(PyExc_RuntimeError, "nb_enum: could not find entry!");
+        return nullptr;
+    }
+}
+
+static PyObject *nb_enum_repr(PyObject *self) {
+    nb_enum *e = nb_enum_get_unique(self);
+    if (!e)
+        return nullptr;
+
     return PyUnicode_FromFormat(
         "%U.%U", ((PyHeapTypeObject *) Py_TYPE(self))->ht_qualname, e->name);
 }
 
-
 static PyObject *nb_enum_get_name(PyObject *self, void *) {
-    return ((nb_enum *) self)->name;
+    nb_enum *e = nb_enum_get_unique(self);
+    if (!e)
+        return nullptr;
+    Py_INCREF(e->name);
+    return e->name;
 }
 
 static PyObject *nb_enum_get_doc(PyObject *self, void *) {
-    nb_enum *e = (nb_enum *) self;
+    nb_enum *e = nb_enum_get_unique(self);
+    if (!e)
+        return nullptr;
+
     if (e->doc) {
         return PyUnicode_FromString(e->doc);
     } else {
@@ -109,7 +146,53 @@ static PyGetSetDef nb_enum_getset[] = {
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
-void nb_enum_prepare(PyTypeObject *tp) {
+PyObject *nb_enum_richcompare(PyObject *a, PyObject *b, int op) {
+    PyObject *ia = PyNumber_Long(a);
+    PyObject *ib = PyNumber_Long(b);
+    if (!ia || !ib)
+        return nullptr;
+    PyObject *result = PyObject_RichCompare(ia, ib, op);
+    Py_DECREF(ia);
+    Py_DECREF(ib);
+    return result;
+}
+
+#define NB_ENUM_UNOP(name, op)                                                 \
+    PyObject *nb_enum_##name(PyObject *a) {                                    \
+        PyObject *ia = PyNumber_Long(a);                                       \
+        if (!ia)                                                               \
+            return nullptr;                                                    \
+        PyObject *result = op(ia);                                             \
+        Py_DECREF(ia);                                                         \
+        return result;                                                         \
+    }
+
+#define NB_ENUM_BINOP(name, op)                                                \
+    PyObject *nb_enum_##name(PyObject *a, PyObject *b) {                       \
+        PyObject *ia = PyNumber_Long(a);                                       \
+        PyObject *ib = PyNumber_Long(b);                                       \
+        if (!ia || !ib)                                                        \
+            return nullptr;                                                    \
+        PyObject *result = op(ia, ib);                                         \
+        Py_DECREF(ia);                                                         \
+        Py_DECREF(ib);                                                         \
+        return result;                                                         \
+    }
+
+NB_ENUM_BINOP(add, PyNumber_Add)
+NB_ENUM_BINOP(sub, PyNumber_Subtract)
+NB_ENUM_BINOP(mul, PyNumber_Multiply)
+NB_ENUM_BINOP(div, PyNumber_FloorDivide)
+NB_ENUM_BINOP(and, PyNumber_And)
+NB_ENUM_BINOP(or, PyNumber_Or)
+NB_ENUM_BINOP(xor, PyNumber_Xor)
+NB_ENUM_BINOP(lshift, PyNumber_Lshift)
+NB_ENUM_BINOP(rshift, PyNumber_Rshift)
+NB_ENUM_UNOP(neg, PyNumber_Negative)
+NB_ENUM_UNOP(inv, PyNumber_Invert)
+NB_ENUM_UNOP(abs, PyNumber_Absolute)
+
+void nb_enum_prepare(PyTypeObject *tp, bool is_arithmetic) {
     tp->tp_flags |= Py_TPFLAGS_HAVE_GC;
     tp->tp_traverse = [](PyObject *o, visitproc visit, void *arg) {
         Py_VISIT(Py_TYPE(o));
@@ -119,14 +202,29 @@ void nb_enum_prepare(PyTypeObject *tp) {
     tp->tp_init = nullptr;
     tp->tp_clear = [](PyObject *) { return 0; };
     tp->tp_repr = nb_enum_repr;
+    tp->tp_richcompare = nb_enum_richcompare;
     tp->tp_as_number->nb_int = nb_enum_int;
+    if (is_arithmetic) {
+        tp->tp_as_number->nb_add = nb_enum_add;
+        tp->tp_as_number->nb_subtract = nb_enum_sub;
+        tp->tp_as_number->nb_multiply = nb_enum_sub;
+        tp->tp_as_number->nb_floor_divide = nb_enum_div;
+        tp->tp_as_number->nb_or = nb_enum_or;
+        tp->tp_as_number->nb_xor = nb_enum_xor;
+        tp->tp_as_number->nb_and = nb_enum_and;
+        tp->tp_as_number->nb_rshift = nb_enum_rshift;
+        tp->tp_as_number->nb_lshift = nb_enum_lshift;
+        tp->tp_as_number->nb_negative = nb_enum_neg;
+        tp->tp_as_number->nb_invert = nb_enum_inv;
+        tp->tp_as_number->nb_absolute = nb_enum_abs;
+    }
     tp->tp_basicsize = sizeof(nb_enum);
     tp->tp_getset = nb_enum_getset;
 }
 
-void nb_enum_add(PyObject *type, const char *name, const void *value,
+void nb_enum_put(PyObject *type, const char *name, const void *value,
                  const char *doc) noexcept {
-    PyObject *name_py, *intval, *dict;
+    PyObject *name_py, *int_val, *dict;
     nb_enum *inst = (nb_enum *) inst_new_impl((PyTypeObject *) type, nullptr);
     if (!inst)
         goto error;
@@ -145,8 +243,8 @@ void nb_enum_add(PyObject *type, const char *name, const void *value,
     if (PyObject_SetAttr(type, name_py, (PyObject *) inst))
         goto error;
 
-    intval = nb_enum_int((PyObject *) inst);
-    if (!intval)
+    int_val = nb_enum_int((PyObject *) inst);
+    if (!int_val)
         goto error;
 
     dict = PyObject_GetAttrString(type, "__entries");
@@ -160,10 +258,10 @@ void nb_enum_add(PyObject *type, const char *name, const void *value,
             goto error;
     }
 
-    if (PyDict_SetItem(dict, intval, (PyObject *) inst))
+    if (PyDict_SetItem(dict, int_val, (PyObject *) inst))
         goto error;
 
-    Py_DECREF(intval);
+    Py_DECREF(int_val);
     Py_DECREF(dict);
     Py_DECREF(inst);
 

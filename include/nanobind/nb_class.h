@@ -42,7 +42,10 @@ enum class type_flags : uint16_t {
     is_signed_enum           = (1 << 13),
 
     /// This type is an unsigned enumeration
-    is_unsigned_enum         = (1 << 14)
+    is_unsigned_enum         = (1 << 14),
+
+    /// This type is an arithmetic enumeration
+    is_arithmetic            = (1 << 15)
 };
 
 struct type_data {
@@ -78,6 +81,10 @@ NB_INLINE void type_extra_apply(type_data &t, is_enum e) {
         t.flags |= (uint16_t) type_flags::is_signed_enum;
     else
         t.flags |= (uint16_t) type_flags::is_unsigned_enum;
+}
+
+NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
+    t.flags |= (uint16_t) type_flags::is_arithmetic;
 }
 
 template <typename... Args> struct init {
@@ -383,7 +390,7 @@ public:
                is_enum{ std::is_signed_v<std::underlying_type_t<T>> }) { }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
-        detail::nb_enum_add(Base::m_ptr, name, &value, doc);
+        detail::nb_enum_put(Base::m_ptr, name, &value, doc);
         return *this;
     }
 };

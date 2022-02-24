@@ -81,7 +81,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         else
             cap = (capture *) ((void **) p)[0];
 
-        nb_tuple<make_caster<Args>...> in;
+        detail::tuple<make_caster<Args>...> in;
         (void) in;
         if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
                                                 cleanup) || ...))
@@ -189,8 +189,7 @@ NB_INLINE void cpp_function_def(Return (Class::*f)(Args...) const, const Extra &
 }
 
 template <typename Func, typename... Extra>
-module_ &module_::def(const char *name_, Func &&f,
-                                const Extra &...extra) {
+module_ &module_::def(const char *name_, Func &&f, const Extra &...extra) {
     cpp_function_def((detail::forward_t<Func>) f, scope(*this),
                      name(name_), extra...);
     return *this;

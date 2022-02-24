@@ -1,3 +1,5 @@
+#pragma once
+
 #define NB_STRINGIFY(x) #x
 #define NB_TOSTRING(x) NB_STRINGIFY(x)
 #define NB_CONCAT(first, second) first##second

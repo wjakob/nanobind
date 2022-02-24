@@ -149,7 +149,7 @@ extern char *type_name(const std::type_info *t);
 extern int nb_type_init(PyObject *, PyObject *, PyObject *);
 extern void nb_type_dealloc(PyObject *o);
 extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
-extern void nb_enum_prepare(PyTypeObject *tp);
+extern void nb_enum_prepare(PyTypeObject *tp, bool is_arithmetic);
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 inline func_record *nb_func_get(void *o) {

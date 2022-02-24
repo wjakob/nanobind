@@ -66,4 +66,5 @@ NB_MODULE(test_functions_ext, m) {
             result += nb::cast<int>(l[i]);
         return result;
     });
+
 }

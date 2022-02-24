@@ -210,6 +210,7 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 PyObject *nb_type_new(const type_data *t) noexcept {
     const bool is_signed_enum   = t->flags & (uint16_t) type_flags::is_signed_enum,
                is_unsigned_enum = t->flags & (uint16_t) type_flags::is_unsigned_enum,
+               is_arithmetic    = t->flags & (uint16_t) type_flags::is_arithmetic,
                is_enum          = is_signed_enum || is_unsigned_enum,
                has_scope        = t->flags & (uint16_t) type_flags::has_scope,
                has_doc          = t->flags & (uint16_t) type_flags::has_doc,
@@ -291,7 +292,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     type->tp_new = inst_new;
 
     if (is_enum) // last step before PyType_Ready
-        nb_enum_prepare(type);
+        nb_enum_prepare(type, is_arithmetic);
 
     if (PyType_Ready(type) < 0)
         fail("nanobind::detail::nb_type_new(\"%s\"): PyType_Ready() failed!", t->name);
@@ -387,7 +388,10 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     internals &internals = internals_get();
     PyTypeObject *src_type = Py_TYPE(src);
     const std::type_info *cpp_type_src = nullptr;
-    const bool src_is_nb_type = Py_TYPE(src_type) == internals.nb_type;
+    const PyTypeObject *metaclass = Py_TYPE(src_type);
+    const bool src_is_nb_type =
+        metaclass == internals.nb_type ||
+        metaclass == internals.nb_enum;
     type_data *dst_type = nullptr;
 
     // If 'src' is a nanobind-bound type

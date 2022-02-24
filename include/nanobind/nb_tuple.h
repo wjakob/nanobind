@@ -1,26 +1,35 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-// Tiny self-contained tuple to avoid having to import 1000s of LOC from <tuple>
-template <typename... Ts> struct nb_tuple;
-template <> struct nb_tuple<> {
+/**
+ * \brief nanobind::tuple<...>: a tiny recursive tuple class
+ *
+ * std::tuple<...> is one of those STL types that just seems unnecessarily
+ * complex for typical usage. It pulls in a large amount of headers (22K LOC,
+ * 530 KiB with Clang/libc++) and goes through elaborate contortions to avoid a
+ * recursive definition. This is helpful when dealing with very large tuples
+ * (e.g. efficient compilation of std::get<1000>() in a tuple with 10K entries).
+ * When working with small tuples used to pass around a few arguments, a simple
+ * recursive definition compiles faster (generated code is identical).
+ */
+
+template <typename... Ts> struct tuple;
+template <> struct tuple<> {
     template <size_t> using type = void;
 };
 
-template <typename T, typename... Ts> struct nb_tuple<T, Ts...> : nb_tuple<Ts...> {
-    using Base = nb_tuple<Ts...>;
+template <typename T, typename... Ts> struct tuple<T, Ts...> : tuple<Ts...> {
+    using Base = tuple<Ts...>;
 
-    nb_tuple() = default;
-    nb_tuple(const nb_tuple &) = default;
-    nb_tuple(nb_tuple &&) noexcept = default;
-    nb_tuple& operator=(nb_tuple &&) noexcept = default;
-    nb_tuple& operator=(const nb_tuple &) = default;
+    tuple() = default;
+    tuple(const tuple &) = default;
+    tuple(tuple &&) noexcept = default;
+    tuple& operator=(tuple &&) noexcept = default;
+    tuple& operator=(const tuple &) = default;
 
-    NB_INLINE nb_tuple(const T& value, const Ts&... ts)
-        : Base(ts...), value(value) { }
-
-    NB_INLINE nb_tuple(T&& value, Ts&&... ts)
-        : Base(std::move(ts)...), value(std::move(value)) { }
+    template <typename A, typename... As>
+    NB_INLINE tuple(A &&a, As &&...as)
+        : Base((detail::forward_t<As>) as...), value((detail::forward_t<A>) a) {}
 
     template <size_t I> NB_INLINE auto& get() {
         if constexpr (I == 0)
@@ -44,7 +53,17 @@ private:
     T value;
 };
 
-template <typename... Ts> nb_tuple(Ts &&...) -> nb_tuple<std::decay_t<Ts>...>;
+template <typename... Ts> tuple(Ts &&...) -> tuple<std::decay_t<Ts>...>;
 
-NAMESPACE_END(NB_NAMESPACE)
 NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
+// Support for C++17 structured bindings
+template <typename... Ts>
+struct std::tuple_size<nanobind::detail::tuple<Ts...>>
+    : std::integral_constant<size_t, sizeof...(Ts)> { };
+
+template <size_t I, typename... Ts>
+struct std::tuple_element<I, nanobind::detail::tuple<Ts...>> {
+    using type = typename nanobind::detail::tuple<Ts...>::template type<I>;
+};

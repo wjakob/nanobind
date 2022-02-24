@@ -232,7 +232,7 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *,
 // ========================================================================
 
 /// Add an entry to an enumeration
-NB_CORE void nb_enum_add(PyObject *type, const char *name, const void *value,
+NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
                          const char *doc) noexcept;
 
 NAMESPACE_END(detail)

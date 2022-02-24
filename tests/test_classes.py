@@ -325,6 +325,10 @@ def test14_operators():
     a = t.Int(1)
     b = t.Int(2)
     assert repr(a + b) == "3"
+    with pytest.raises(TypeError) as excinfo:
+        assert repr(a - b) == "3"
+    assert "unsupported operand type" in str(excinfo.value)
+    assert repr(a - 2) == "-1"
     a += b
     assert repr(a) == "3"
     assert repr(b) == "2"

@@ -226,6 +226,7 @@ NB_MODULE(test_classes_ext, m) {
     struct Int {
         int i;
         Int operator+(Int o) const { return {i + o.i}; }
+        Int operator-(int j) const { return {i - j}; }
         Int &operator+=(Int o) {
             i += o.i;
             return *this;
@@ -237,5 +238,6 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<int>())
         .def(nb::self + nb::self)
         .def(nb::self += nb::self)
+        .def(nb::self - float())
         .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
 }

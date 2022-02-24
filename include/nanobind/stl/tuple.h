@@ -27,6 +27,8 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     NB_INLINE bool from_python_impl(handle src, uint8_t flags,
                                     cleanup_list *cleanup,
                                     std::index_sequence<Is...>) noexcept {
+        (void) src; (void) flags; (void) cleanup;
+
         PyObject *temp = nullptr;
         PyObject **o = seq_get_with_size(src.ptr(), N, &temp);
 
@@ -56,6 +58,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     static NB_INLINE handle from_cpp_impl(T &&value, rv_policy policy,
                                           cleanup_list *cleanup,
                                           std::index_sequence<Is...>) noexcept {
+        (void) value; (void) policy; (void) cleanup;
         object o[N1];
 
         bool success =

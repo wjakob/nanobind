@@ -74,6 +74,7 @@ add_library(nanobind ${NB_LIB_TYPE}
   src/common.cpp
   src/nb_func.cpp
   src/nb_type.cpp
+  src/nb_enum.cpp
   src/error.cpp
   src/trampoline.cpp
   src/implicit.cpp
@@ -95,7 +96,9 @@ target_compile_features(nanobind PRIVATE cxx_std_17)
 
 set_target_properties(nanobind PROPERTIES
   POSITION_INDEPENDENT_CODE ON
-  INTERPROCEDURAL_OPTIMIZATION ON)
+  INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+  INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON
+)
 
 target_include_directories(nanobind PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include

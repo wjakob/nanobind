@@ -1,4 +1,5 @@
-#define NB_TYPE_CASTER(Type, descr)                                            \
+#define NB_TYPE_CASTER(Type_, descr)                                           \
+    using Type = Type_;                                                        \
     static constexpr bool IsClass = false;                                     \
     static constexpr auto Name = descr;                                        \
     template <typename T_> using Cast = movable_cast_t<T_>;                    \
@@ -10,10 +11,16 @@
     explicit operator Type *() { return &value; }                              \
     explicit operator Type &() { return value; }                               \
     explicit operator Type &&() && { return (Type &&) value; }                 \
-    Type value;                                                                \
+    Type value;
+
+#define NB_MAKE_OPAQUE(...)                                                    \
+    namespace nanobind::detail {                                               \
+    template <> class type_caster<__VA_ARGS__>                                 \
+        : public type_caster_base<__VA_ARGS__> { }; }
+
+#define NB_TYPE(...) __VA_ARGS__
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
-
 NAMESPACE_BEGIN(detail)
 
 enum cast_flags : uint8_t {
@@ -197,8 +204,8 @@ template <typename T> NB_INLINE rv_policy infer_policy(rv_policy policy) {
     return policy;
 }
 
-
-template <typename Type, typename SFINAE> struct type_caster {
+template <typename Type_> struct type_caster_base {
+    using Type = Type_;
     static constexpr auto Name = const_name<Type>();
     static constexpr bool IsClass = true;
 
@@ -240,6 +247,9 @@ template <typename Type, typename SFINAE> struct type_caster {
 private:
     Type *value;
 };
+
+template <typename Type, typename SFINAE>
+struct type_caster : type_caster_base<Type> { };
 
 NAMESPACE_END(detail)
 

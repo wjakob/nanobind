@@ -1,3 +1,8 @@
+#if defined(__GNUC__)
+/// Don't warn about missing fields in PyTypeObject declarations
+#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
@@ -5,6 +10,14 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
+
+/// Metaclass of nb_type
+extern PyTypeObject nb_type_type;
+/// Metaclass of nb_enum
+extern PyTypeObject nb_enum_type;
+
+extern PyTypeObject nb_func_type;
+extern PyTypeObject nb_meth_type;
 
 /// Nanobind function metadata (overloads, etc.)
 struct func_record : func_data<0> {
@@ -58,6 +71,7 @@ struct nb_func {
     bool complex_call;
 };
 
+/// Pointers require a good hash function to randomize the mapping to buckets
 struct ptr_hash {
     size_t operator()(const void *p) const {
         uintptr_t v = (uintptr_t) p;
@@ -86,6 +100,7 @@ struct keep_alive_entry {
         : data(data), deleter(deleter) { }
 };
 
+/// Equality operator for keep_alive_entry (only targets data field)
 struct keep_alive_eq {
     NB_INLINE bool operator()(const keep_alive_entry &a,
                               const keep_alive_entry &b) const {
@@ -93,6 +108,7 @@ struct keep_alive_eq {
     }
 };
 
+/// Hash operator for keep_alive_entry (only targets data field)
 struct keep_alive_hash {
     NB_INLINE size_t operator()(const keep_alive_entry &entry) const {
         return ptr_hash()(entry.data);
@@ -103,14 +119,11 @@ using keep_alive_set =
     tsl::robin_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
 struct internals {
-    /// Base type of all nanobind types
-    PyTypeObject *nb_type;
+    /// Registered metaclasses for nanobind classes and enumerations
+    PyTypeObject *nb_type, *nb_enum;
 
-    /// Base type of all nanobind functions
-    PyTypeObject *nb_func;
-
-    /// Base type of all nanobind methods
-    PyTypeObject *nb_meth;
+    /// Types of nanobind functions and methods
+    PyTypeObject *nb_func, *nb_meth;
 
     /// Instance pointer -> Python object mapping
     tsl::robin_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
@@ -125,16 +138,29 @@ struct internals {
     /// nb_func/meth instance list for leak reporting
     tsl::robin_set<void *, ptr_hash> funcs;
 
+    /// Registered C++ -> Python exception translators
     std::vector<void (*)(const std::exception_ptr &)> exception_translators;
 };
 
 extern internals &internals_get() noexcept;
 extern char *type_name(const std::type_info *t);
 
+// Forward declarations
+extern int nb_type_init(PyObject *, PyObject *, PyObject *);
+extern void nb_type_dealloc(PyObject *o);
+extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
+extern void nb_enum_prepare(PyTypeObject *tp);
+
 /// Fetch the nanobind function record from a 'nb_func' instance
 inline func_record *nb_func_get(void *o) {
     return (func_record *) (((char *) o) + sizeof(nb_func));
 }
+
+inline void *inst_data(nb_inst *self) {
+    void *ptr = (void *) ((intptr_t) self + self->offset);
+    return self->direct ? ptr : *(void **) ptr;
+}
+
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

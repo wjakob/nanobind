@@ -10,14 +10,58 @@ NAMESPACE_BEGIN(detail)
 
 // Forward/external declarations
 extern Buffer buf;
+
+static void nb_func_dealloc(PyObject *);
+static PyObject *nb_func_get_doc(PyObject *, void *);
+static PyObject *nb_func_get_name(PyObject *, void *);
+static PyObject *nb_meth_descr_get(PyObject *, PyObject *, PyObject *);
 static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
 static void nb_func_render_signature(const func_record *f) noexcept;
 
+static PyGetSetDef nb_func_getset[] = {
+    { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
+    { "__name__", nb_func_get_name, nullptr, nullptr, nullptr },
+    { nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
+PyTypeObject nb_func_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "nb_func",
+    .tp_basicsize = sizeof(nb_func),
+    .tp_itemsize = sizeof(func_record),
+    .tp_dealloc = nb_func_dealloc,
+    .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
+    .tp_call = PyVectorcall_Call,
+    .tp_getattro = PyObject_GenericGetAttr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL,
+    .tp_doc = "nanobind function object",
+    .tp_getset = nb_func_getset,
+    .tp_new = PyType_GenericNew
+};
+
+PyTypeObject nb_meth_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "nb_meth",
+    .tp_basicsize = sizeof(nb_func),
+    .tp_itemsize = sizeof(func_record),
+    .tp_dealloc = nb_func_dealloc,
+    .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
+    .tp_call = PyVectorcall_Call,
+    .tp_getattro = PyObject_GenericGetAttr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL |
+                Py_TPFLAGS_METHOD_DESCRIPTOR,
+    .tp_doc = "nanobind method object",
+    .tp_getset = nb_func_getset,
+    .tp_descr_get = nb_meth_descr_get,
+    .tp_new = PyType_GenericNew
+};
+
+
 /// Free a function overload chain
-void nb_func_dealloc(PyObject *self) {
+static void nb_func_dealloc(PyObject *self) {
     size_t size = (size_t) Py_SIZE(self);
 
     if (size) {
@@ -139,7 +183,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     }
 
     func->vectorcall = func->complex_call ? nb_func_vectorcall_complex
-                                        : nb_func_vectorcall_simple;
+                                          : nb_func_vectorcall_simple;
 
     // Register the function
     auto [it, success] = internals.funcs.insert(func);
@@ -308,8 +352,10 @@ static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
 }
 
 /// Dispatch loop that is used to invoke functions created by nb_func_new
-PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
-                                     size_t nargsf, PyObject *kwargs_in) noexcept {
+static PyObject *nb_func_vectorcall_complex(PyObject *self,
+                                            PyObject *const *args_in,
+                                            size_t nargsf,
+                                            PyObject *kwargs_in) noexcept {
     const size_t count      = (size_t) Py_SIZE(self),
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
                  nkwargs_in = kwargs_in ? (size_t) PyTuple_GET_SIZE(kwargs_in) : 0;
@@ -326,16 +372,25 @@ PyObject *nb_func_vectorcall_complex(PyObject *self, PyObject *const *args_in,
                                PyObject *) noexcept = nullptr;
 
     if (nargs_in > 0 && (fr->flags & (uint16_t) func_flags::is_constructor)) {
-        is_constructor =
-            strcmp(Py_TYPE(Py_TYPE(args_in[0]))->tp_name, "nb_type") == 0;
+        PyObject *self = args_in[0];
 
-        if (is_constructor && ((nb_inst *) args_in[0])->ready) {
+        if (strcmp(Py_TYPE(Py_TYPE(self))->tp_name, "nb_type") != 0) {
+            PyErr_SetString(
+                PyExc_RuntimeError,
+                "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
+                "of an __init__ argument should be a nanobind class.");
+            return nullptr;
+        }
+
+        if (((nb_inst *) self)->ready) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
                 "method should not be called on an initialized object!");
             return nullptr;
         }
+
+        is_constructor = true;
     }
 
     /* The following lines allocate memory on the stack, which is very efficient
@@ -535,8 +590,10 @@ done:
 }
 
 /// Simplified nb_func_vectorcall variant for functions w/o keyword arguments
-PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
-                                    size_t nargsf, PyObject *kwargs_in) noexcept {
+static PyObject *nb_func_vectorcall_simple(PyObject *self,
+                                           PyObject *const *args_in,
+                                           size_t nargsf,
+                                           PyObject *kwargs_in) noexcept {
     func_record *fr = nb_func_get(self);
 
     const size_t count         = (size_t) Py_SIZE(self),
@@ -561,15 +618,25 @@ PyObject *nb_func_vectorcall_simple(PyObject *self, PyObject *const *args_in,
     }
 
     if (nargs_in > 0 && (fr->flags & (uint16_t) func_flags::is_constructor)) {
-        is_constructor =
-            strcmp(Py_TYPE(Py_TYPE(args_in[0]))->tp_name, "nb_type") == 0;
+        PyObject *self = args_in[0];
 
-        if (is_constructor && ((nb_inst *) args_in[0])->ready) {
-            PyErr_SetString(PyExc_RuntimeError,
-                            "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                            "method should not be called on an initialized object!");
+        if (strcmp(Py_TYPE(Py_TYPE(self))->tp_name, "nb_type") != 0) {
+            PyErr_SetString(
+                PyExc_RuntimeError,
+                "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
+                "of an __init__ argument should be a nanobind class.");
             return nullptr;
         }
+
+        if (((nb_inst *) self)->ready) {
+            PyErr_SetString(
+                PyExc_RuntimeError,
+                "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                "method should not be called on an initialized object!");
+            return nullptr;
+        }
+
+        is_constructor = true;
     }
 
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
@@ -628,7 +695,7 @@ done:
     return result;
 }
 
-PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
+static PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     if (inst) {
         /* Return a classic bound method. This should be avoidable
            in most cases via the 'CALL_METHOD' opcode and vector calls. PyTest
@@ -745,7 +812,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
         fail("nanobind::detail::nb_func_finalize(): arguments inconsistent.");
 }
 
-PyObject *nb_func_get_doc(PyObject *self, void *) {
+static PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_record *f = nb_func_get(self);
     size_t count = (size_t) Py_SIZE(self);
 
@@ -781,7 +848,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
     return PyUnicode_FromString(buf.get());
 }
 
-PyObject *nb_func_get_name(PyObject *self, void *) {
+static PyObject *nb_func_get_name(PyObject *self, void *) {
     func_record *f = nb_func_get(self);
     if (f->flags & (uint16_t) func_flags::has_name) {
         return PyUnicode_FromString(f->name);

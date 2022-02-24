@@ -1,3 +1,8 @@
+#if defined(__GNUC__)
+// warning: '..' declared with greater visibility than the type of its field '..'
+#  pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/pair.h>

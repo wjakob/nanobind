@@ -229,5 +229,11 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *,
                                                       cleanup_list *),
                                     const std::type_info *dst) noexcept;
 
+// ========================================================================
+
+/// Add an entry to an enumeration
+NB_CORE void nb_enum_add(PyObject *type, const char *name, const void *value,
+                         const char *doc) noexcept;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

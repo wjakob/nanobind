@@ -3,15 +3,21 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+PyTypeObject nb_type_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "nb_type",
+    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
+    .tp_dealloc = nb_type_dealloc,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc = "nanobind metaclass",
+    .tp_init = nb_type_init
+};
+
+
 static int inst_init(PyObject *self, PyObject *, PyObject *) {
     PyErr_Format(PyExc_TypeError, "%s: no constructor defined!",
                  Py_TYPE(self)->tp_name);
     return -1;
-}
-
-static void *inst_data(nb_inst *self) {
-    void *ptr = (void *) ((intptr_t) self + self->offset);
-    return self->direct ? ptr : *(void **) ptr;
 }
 
 /// Allocate memory for a nb_type instance with internal or external storage
@@ -100,6 +106,9 @@ PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
 
 static void inst_dealloc(PyObject *self) {
     nb_type *type = (nb_type *) Py_TYPE(self);
+    if (type->ht.ht_type.tp_flags & Py_TPFLAGS_HAVE_GC)
+        PyObject_GC_UnTrack(self);
+
     nb_inst *inst = (nb_inst *) self;
     void *p = inst_data(inst);
 
@@ -199,10 +208,13 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_data *t) noexcept {
-    const bool has_scope   = t->flags & (uint16_t) type_flags::has_scope,
-               has_doc     = t->flags & (uint16_t) type_flags::has_doc,
-               has_base    = t->flags & (uint16_t) type_flags::has_base,
-               has_base_py = t->flags & (uint16_t) type_flags::has_base_py;
+    const bool is_signed_enum   = t->flags & (uint16_t) type_flags::is_signed_enum,
+               is_unsigned_enum = t->flags & (uint16_t) type_flags::is_unsigned_enum,
+               is_enum          = is_signed_enum || is_unsigned_enum,
+               has_scope        = t->flags & (uint16_t) type_flags::has_scope,
+               has_doc          = t->flags & (uint16_t) type_flags::has_doc,
+               has_base         = t->flags & (uint16_t) type_flags::has_base,
+               has_base_py      = t->flags & (uint16_t) type_flags::has_base_py;
 
     str name(t->name), qualname = name, fullname = name;
 
@@ -237,8 +249,10 @@ PyObject *nb_type_new(const type_data *t) noexcept {
        turn find the newly constructed type in an invalid state) */
 
     internals &internals = internals_get();
+    PyTypeObject *metaclass =
+        is_enum ? internals.nb_enum : internals.nb_type;
     nb_type *nbt =
-        (nb_type *) internals.nb_type->tp_alloc(internals.nb_type, 0);
+        (nb_type *) metaclass->tp_alloc(metaclass, 0);
     PyTypeObject *type = &nbt->ht.ht_type;
 
     memcpy(&nbt->t, t, sizeof(type_data));
@@ -275,6 +289,9 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     type->tp_base = base;
     type->tp_init = inst_init;
     type->tp_new = inst_new;
+
+    if (is_enum) // last step before PyType_Ready
+        nb_enum_prepare(type);
 
     if (PyType_Ready(type) < 0)
         fail("nanobind::detail::nb_type_new(\"%s\"): PyType_Ready() failed!", t->name);

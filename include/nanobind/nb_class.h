@@ -36,7 +36,13 @@ enum class type_flags : uint16_t {
     has_move                 = (1 << 11),
 
     /// Internal: does the type maintain a list of implicit conversions?
-    has_implicit_conversions = (1 << 12)
+    has_implicit_conversions = (1 << 12),
+
+    /// This type is a signed enumeration
+    is_signed_enum           = (1 << 13),
+
+    /// This type is an unsigned enumeration
+    is_unsigned_enum         = (1 << 14)
 };
 
 struct type_data {
@@ -67,11 +73,24 @@ NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
     t.doc = doc;
 }
 
+NB_INLINE void type_extra_apply(type_data &t, is_enum e) {
+    if (e.is_signed)
+        t.flags |= (uint16_t) type_flags::is_signed_enum;
+    else
+        t.flags |= (uint16_t) type_flags::is_unsigned_enum;
+}
+
 template <typename... Args> struct init {
     template <typename Class, typename... Extra>
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
         using Type = typename Class::Type;
         using Alias = typename Class::Alias;
+        static_assert(
+            make_caster<Type>::IsClass,
+            "Attempted to create a constructor for a type that won't be "
+            "handled by the nanobind's class type caster. Is it possible that "
+            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
+
         cl.def(
             "__init__",
             [](Type *v, Args... args) {
@@ -87,6 +106,11 @@ template <typename Arg> struct init_implicit {
         using Type = typename Class::Type;
         using Alias = typename Class::Alias;
         using Caster = make_caster<Arg>;
+        static_assert(
+            make_caster<Type>::IsClass,
+            "Attempted to create a constructor for a type that won't be "
+            "handled by the nanobind's class type caster. Is it possible that "
+            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
 
         cl.def(
             "__init__",
@@ -345,6 +369,23 @@ public:
         return *this;
     }
 
+};
+
+template <typename T> class enum_ : public class_<T> {
+public:
+    static_assert(std::is_enum_v<T>, "nanobind::enum_<> requires an enumeration type!");
+
+    using Base = class_<T>;
+
+    template <typename... Extra>
+    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra)
+        : Base(scope, name, extra...,
+               is_enum{ std::is_signed_v<std::underlying_type_t<T>> }) { }
+
+    NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
+        detail::nb_enum_add(Base::m_ptr, name, &value, doc);
+        return *this;
+    }
 };
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }

@@ -52,8 +52,8 @@ pointers.
   ``std::enable_shared_from_this<T>::shared_from_this()`` within an instance
   owned by _nanobind_ will raise `std::bad_weak_ptr`.
 
-  It is likely best to _refrain_ from using `std::enable_shared_from_this<T>`
-  due to these limitations.
+  It is best to _refrain_ from using `std::enable_shared_from_this<T>` due to
+  these limitations.
 
 - **Unique pointers**: It is possible to bind functions that receive and return
   `std::unique_ptr<T, Deleter>` by including the optional type caster
@@ -69,36 +69,32 @@ pointers.
   from Python, there is an ownership transfer from Python to C++ that must be
   handled.
 
-  * When `Deleter` is `std::default_delete<T>` (i.e., the default), this
-    ownership transfer is only possible when the instance was originally
-    created by a _new expression_ within C++ and _nanobind_ has taken over
-    ownership (i.e., it was created by a function returning a raw pointer `T *`
-    with `rv_policy::take_ownership` or a `std::unique_ptr<T>`). Otherwise,
-    calling `delete` on the object will cause undefined behavior, and
-    _nanobind_ therefore refuses the conversion with a warning.
+  * When `Deleter` is `std::default_delete<T>` (i.e., the default when no
+    `Deleter` is specified), this ownership transfer is only possible when the
+    instance was originally created by a _new expression_ within C++ and
+    _nanobind_ has taken over ownership (i.e., it was created by a function
+    returning a raw pointer `T *value` with `rv_policy::take_ownership`, or a
+    function returning a `std::unique_ptr<T>`). This limitation exists because
+    the `Deleter` will execute the statement `delete value` when the unique
+    pointer expires, causing undefined behavior when the object was allocated
+    within Python. _nanobind_ detects this and refuses such unsafe conversions
+    with a warning.
 
   * To enable ownership transfer under all conditions, _nanobind_ provides a
-    custom `Deleter` named `nb::deleter<T>`. It keeps the underlying `PyObject`
-    alive during the lifetime of the unique pointer but marks it as invalid on
-    the Python side, which means that operations involving the object will
-    raise exceptions. Following this route requires changing the interface of
-    all functions to be exposed in Python so that they take `std::unique_ptr<T,
-    nb::deleter<T>>` as input (this custom deleter transparently handles _both_
-    instances owned by C++ and instance owned by _nanobind_).
+    custom `Deleter` named `nb::deleter<T>` that uses reference counting to
+    keep the underlying `PyObject` alive during the lifetime of the unique
+    pointer. Following this route requires changing function signatures so that
+    they use `std::unique_ptr<T, nb::deleter<T>>` instead of
+    `std::unique_ptr<T>`. This custom deleter supports ownership by both C++
+    and Python and can be used in all situations.
 
-  Returning a `std::unique_ptr<T, Deleter>` from a function always works---but
-  again, the details depend on the `Deleter`.
+  In both cases, a Python object may continue to exist after ownership was
+  transferred to C++ side. _nanobind_ marks this object as _invalid_: any
+  operations involving it will fail with a `TypeError`. Reverse ownership
+  transfer at a later point will make it usable again.
 
-  * If `Deleter` is the default `std::default_delete<T>`, _nanobind_ ignores
-    the return value policy (if specified) and takes ownership of the object.
-    It will eventually invoke `delete` when the associated Python object is
-    garbage-collected.
-
-  * If `Deleter` is `nb::deleter<T>`, then _nanobind_ checks if the deleter
-    indicates ownership by C++ or Python. In the former case, everything
-    proceeds as with `std::default_deleter<T>`. Otherwise, a `PyObject` has
-    already been created _nanobind_. This instance is currently marked as
-    invalid and becomes valid again due to reverse ownership transfer.
+  Binding functions that return a `std::unique_ptr<T, Deleter>` always works:
+  _nanobind_ will then (re-)acquire ownership of the object.
 
   Deleters other than `std::default_delete<T>` or `nb::deleter<T>` are _not
   supported_.

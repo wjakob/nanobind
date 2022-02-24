@@ -30,6 +30,7 @@ struct arg_v : arg {
 struct is_method { };
 struct is_implicit { };
 struct is_operator { };
+struct is_enum { bool is_signed; };
 
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }

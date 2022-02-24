@@ -59,64 +59,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-extern void nb_func_dealloc(PyObject *);
-extern int nb_type_init (PyObject *, PyObject *, PyObject *);
-extern void nb_type_dealloc(PyObject *o);
-extern PyObject *nb_func_call(PyObject *self, PyObject *, PyObject *);
-extern PyObject *nb_func_get_doc(PyObject *, void *);
-extern PyObject *nb_func_get_name(PyObject *, void *);
-extern PyObject *nb_meth_descr_get(PyObject *, PyObject *, PyObject *);
-
-static PyGetSetDef nb_func_getset[] = {
-    { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
-    { "__name__", nb_func_get_name, nullptr, nullptr, nullptr },
-    { nullptr, nullptr, nullptr, nullptr, nullptr }
-};
-
-static PyTypeObject nb_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "nb_type",
-    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
-    .tp_dealloc = nb_type_dealloc,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .tp_doc = "nanobind metaclass",
-    .tp_init = nb_type_init
-};
-
-static PyTypeObject nb_func_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "nb_func",
-    .tp_basicsize = sizeof(nb_func),
-    .tp_itemsize = sizeof(func_record),
-    .tp_dealloc = nb_func_dealloc,
-    .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
-    .tp_call = PyVectorcall_Call,
-    .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL,
-    .tp_doc = "nanobind function object",
-    .tp_getset = nb_func_getset,
-    .tp_new = PyType_GenericNew
-};
-
-static PyTypeObject nb_meth_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "nb_meth",
-    .tp_basicsize = sizeof(nb_func),
-    .tp_itemsize = sizeof(func_record),
-    .tp_dealloc = nb_func_dealloc,
-    .tp_vectorcall_offset = offsetof(nb_func, vectorcall),
-    .tp_call = PyVectorcall_Call,
-    .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL |
-                Py_TPFLAGS_METHOD_DESCRIPTOR,
-    .tp_doc = "nanobind method object",
-    .tp_getset = nb_func_getset,
-    .tp_descr_get = nb_meth_descr_get,
-    .tp_new = PyType_GenericNew
-};
-
-extern void type_dealloc(PyObject *);
-
 static internals *internals_p = nullptr;
 
 void default_exception_translator(const std::exception_ptr &p) {
@@ -197,14 +139,18 @@ static void internals_make() {
              "data structure!");
     Py_DECREF(capsule);
 
-    nb_type.tp_base = &PyType_Type;
-    if (PyType_Ready(&nb_type) < 0 || PyType_Ready(&nb_func_type) < 0 ||
-        PyType_Ready(&nb_meth_type) < 0)
+    nb_type_type.tp_base = &PyType_Type;
+    nb_enum_type.tp_base = &nb_type_type;
+    nb_enum_type.tp_clear = PyType_Type.tp_clear;
+    nb_enum_type.tp_traverse = PyType_Type.tp_traverse;
+
+    if (PyType_Ready(&nb_type_type) < 0 || PyType_Ready(&nb_func_type) < 0 ||
+        PyType_Ready(&nb_meth_type) < 0 || PyType_Ready(&nb_enum_type) < 0)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
-    if ((nb_type.tp_flags & Py_TPFLAGS_HEAPTYPE) != 0 ||
-        nb_type.tp_basicsize != sizeof(PyHeapTypeObject) + sizeof(type_data) ||
-        nb_type.tp_itemsize != sizeof(PyMemberDef))
+    if ((nb_type_type.tp_flags & Py_TPFLAGS_HEAPTYPE) != 0 ||
+        nb_type_type.tp_basicsize != sizeof(PyHeapTypeObject) + sizeof(type_data) ||
+        nb_type_type.tp_itemsize != sizeof(PyMemberDef))
         fail("nanobind::detail::internals_make(): initialized type invalid!");
 
     if (Py_AtExit(internals_cleanup))
@@ -215,9 +161,10 @@ static void internals_make() {
                 "reported by tools like 'valgrind'). If you are a user of a "
                 "python extension library, you can ignore this warning.");
 
-    internals_p->nb_type = &nb_type;
+    internals_p->nb_type = &nb_type_type;
     internals_p->nb_func = &nb_func_type;
     internals_p->nb_meth = &nb_meth_type;
+    internals_p->nb_enum = &nb_enum_type;
 }
 
 static void internals_fetch() {

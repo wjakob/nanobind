@@ -295,3 +295,9 @@ def test28_vec_movable_in_rvalue_ref(clean):
         destructed=20
     )
 
+def test29_opaque_vector():
+    f = t.float_vec()
+    assert f.size() == 0
+    assert isinstance(f, t.float_vec)
+    f.push_back(1)
+    assert f.size() == 1

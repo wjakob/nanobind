@@ -2,6 +2,8 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/vector.h>
 
+NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
+
 namespace nb = nanobind;
 
 static int default_constructed = 0, value_constructed = 0, copy_constructed = 0,
@@ -162,4 +164,11 @@ NB_MODULE(test_stl_ext, m) {
             if (x[i]->value != i)
                 fail();
     });
+
+    // ----- test29 ------ */
+    using fvec = std::vector<float, std::allocator<float>>;
+    nb::class_<fvec>(m, "float_vec")
+        .def(nb::init<>())
+        .def("push_back", [](fvec *fv, float f) { fv->push_back(f); })
+        .def("size", [](const fvec &fv) { return fv.size(); });
 }

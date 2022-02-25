@@ -122,3 +122,9 @@ def test12_list_tuple_manipulation():
     assert t.test_tuple(tu) == 19
     assert tu == (1, 5, 6, 7)
 
+
+def test13_call_guard():
+    assert t.call_guard_value() == 0
+    assert t.test_call_guard() == 1
+    assert t.call_guard_value() == 2
+    assert t.test_release_gil() == False

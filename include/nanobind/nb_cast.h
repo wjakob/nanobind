@@ -111,6 +111,10 @@ public:
     NB_TYPE_CASTER(T, const_name<std::is_integral_v<T>>("int", "float"));
 };
 
+template <> struct type_caster<void_type> {
+    static constexpr auto Name = const_name("None");
+};
+
 template <> struct type_caster<std::nullptr_t> {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (src.is_none())

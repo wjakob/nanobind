@@ -27,6 +27,10 @@ struct arg_v : arg {
     NB_INLINE arg_v(const arg &base, object &&value) : arg(base), value(std::move(value)) { }
 };
 
+template <typename... Ts> struct call_guard {
+    using type = detail::tuple<Ts...>;
+};
+
 struct is_method { };
 struct is_implicit { };
 struct is_operator { };
@@ -161,6 +165,9 @@ template <typename F> NB_INLINE void func_extra_apply(F &f, const arg_v &a, size
     arg.convert = a.convert_;
     arg.none = a.none_;
 }
+
+template <typename F, typename... Ts>
+NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t&) { }
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

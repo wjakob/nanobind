@@ -4,6 +4,13 @@
 namespace nb = nanobind;
 using namespace nb::literals;
 
+int call_guard_value = 0;
+
+struct my_call_guard {
+    my_call_guard() { call_guard_value = 1; }
+    ~my_call_guard() { call_guard_value = 2; }
+};
+
 NB_MODULE(test_functions_ext, m) {
     // Function without inputs/outputs
     m.def("test_01", []() { });
@@ -66,5 +73,16 @@ NB_MODULE(test_functions_ext, m) {
             result += nb::cast<int>(l[i]);
         return result;
     });
+
+    /// Test call_guard feature
+    m.def("test_call_guard", []() {
+        return call_guard_value;
+    }, nb::call_guard<my_call_guard>());
+
+    m.def("call_guard_value", []() { return call_guard_value; });
+
+    m.def("test_release_gil", []() -> bool {
+        return PyGILState_Check();
+    }, nb::call_guard<nb::gil_scoped_release>());
 
 }

@@ -9,6 +9,15 @@ private:
     const PyGILState_STATE state;
 };
 
+class gil_scoped_release {
+public:
+    gil_scoped_release() { state = PyEval_SaveThread(); }
+    ~gil_scoped_release() { PyEval_RestoreThread(state); }
+
+private:
+    PyThreadState *state;
+};
+
 // Deleter for std::unique_ptr<T> (handles ownership by both C++ and Python)
 template <typename T> struct deleter {
     /// Instance should be cleared using a delete expression

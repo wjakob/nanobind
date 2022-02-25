@@ -1,11 +1,37 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <bool ReturnRef, typename Func, typename Return, typename... Args,
-          size_t... Is, typename... Extra>
+template <typename... Ts> struct extract_guard {
+    using type = void;
+};
+
+template <typename T, typename... Ts> struct extract_guard<T, Ts...> {
+    using type = typename extract_guard<Ts...>::type;
+};
+
+template <typename... Cs, typename... Ts> struct extract_guard<call_guard<Cs...>, Ts...> {
+    using type = call_guard<Cs...>;
+};
+
+template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
+          typename... Args, size_t... Is, typename... Extra>
 NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
-                                std::index_sequence<Is...>,
+                                std::index_sequence<Is...> is,
                                 const Extra &...extra) {
+    using Guard = typename extract_guard<Extra...>::type;
+
+    if constexpr (CheckGuard && !std::is_same_v<Guard, void>) {
+        return func_create<ReturnRef, false>(
+            [func = (forward_t<Func>) func](Args... args) {
+                typename Guard::type g;
+                (void) g;
+                return func(args...);
+            },
+            (Return(*)(Args...)) nullptr, is, extra...);
+    }
+
+    (void) is;
+
     // Detect locations of nb::args / nb::kwargs (if exists)
     static constexpr size_t
         args_pos_1 = index_1_v<std::is_same_v<intrinsic_t<Args>, args>...>,
@@ -32,7 +58,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Collect function signature information for the docstring
     using cast_out = make_caster<
-        std::conditional_t<std::is_void_v<Return>, std::nullptr_t, Return>>;
+        std::conditional_t<std::is_void_v<Return>, void_type, Return>>;
     constexpr auto descr =
         const_name("(") + concat(type_descr(make_caster<Args>::Name)...) +
         const_name(") -> ") + cast_out::Name;
@@ -116,13 +142,13 @@ NAMESPACE_END(detail)
 
 template <typename Return, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (*f)(Args...), const Extra&... extra) {
-    return steal(detail::func_create<true>(
+    return steal(detail::func_create<true, true>(
         f, f, std::make_index_sequence<sizeof...(Args)>(), extra...));
 }
 
 template <typename Return, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (*f)(Args...), const Extra&... extra) {
-    detail::func_create<false>(
+    detail::func_create<false, true>(
         f, f, std::make_index_sequence<sizeof...(Args)>(), extra...);
 }
 
@@ -132,7 +158,7 @@ template <
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE object cpp_function(Func &&f, const Extra &...extra) {
     using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
-    return steal(detail::func_create<true>(
+    return steal(detail::func_create<true, true>(
         (detail::forward_t<Func>) f, (typename am::func *) nullptr,
         std::make_index_sequence<am::argc>(), extra...));
 }
@@ -142,7 +168,7 @@ template <
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
     using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
-    detail::func_create<false>(
+    detail::func_create<false, true>(
         (detail::forward_t<Func>) f, (typename am::func *) nullptr,
         std::make_index_sequence<am::argc>(), extra...);
 }
@@ -150,7 +176,7 @@ NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
 /// Construct a cpp_function from a class method (non-const)
 template <typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...), const Extra &...extra) {
-    return steal(detail::func_create<true>(
+    return steal(detail::func_create<true, true>(
         [f](Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
@@ -160,7 +186,7 @@ NB_INLINE object cpp_function(Return (Class::*f)(Args...), const Extra &...extra
 
 template <typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (Class::*f)(Args...), const Extra &...extra) {
-    detail::func_create<false>(
+    detail::func_create<false, true>(
         [f](Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
@@ -171,7 +197,7 @@ NB_INLINE void cpp_function_def(Return (Class::*f)(Args...), const Extra &...ext
 /// Construct a cpp_function from a class method (const)
 template <typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...) const, const Extra &...extra) {
-    return steal(detail::func_create<true>(
+    return steal(detail::func_create<true, true>(
         [f](const Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
@@ -181,7 +207,7 @@ NB_INLINE object cpp_function(Return (Class::*f)(Args...) const, const Extra &..
 
 template <typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (Class::*f)(Args...) const, const Extra &...extra) {
-    detail::func_create<false>(
+    detail::func_create<false, true>(
         [f](const Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },

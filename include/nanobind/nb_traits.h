@@ -1,6 +1,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+struct void_type { };
+
 template <bool... Bs> struct index_1;
 template <bool... Bs> struct index_n;
 

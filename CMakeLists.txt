@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.17...3.22)
 project(nanobind)
 
+if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  set(NB_NB_TEST_DEFAULT ON)
+else()
+  set(NB_NB_TEST_DEFAULT OFF)
+endif()
+
 option(NB_SHARED "Should nanobind produce a shared core library?" ON)
-option(NB_TEST   "Compile nanobind tests?" ON)
+option(NB_TEST   "Compile nanobind tests?" ${NB_TEST_DEFAULT})
 
 # ---------------------------------------------------------------------------
 # Do a release build if nothing was specified
@@ -123,7 +129,7 @@ target_include_directories(nanobind PRIVATE
 # Define a convenience function for creating nanobind targets
 # ---------------------------------------------------------------------------
 
-SET(NB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+SET(NB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE STRING "" FORCE)
 
 # Strip unnecessary sections of the binary on Linux/macOS
 function(nanobind_strip name)
@@ -143,36 +149,58 @@ endfunction()
 nanobind_strip(nanobind)
 
 function(nanobind_add_module name)
-  if (MSVC)
-    set(NB_OPT_SIZE /Os)
-  else()
-    # The stack protector affects binding size negatively (+8% on Linux in my
-    # benchmarks). Protecting from stack smashing in a Python VM seems in any
-    # case futile, so let's get rid of it by default in optimized modes.
-    set(NB_OPT_SIZE -Os -fno-stack-protector)
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;NOSTRIP;PROTECT_STACK;LTO" "" "")
+  set(NB_COMPILE_OPTIONS "")
+  set(NB_OPT_SIZE "")
+
+  if (NOT ARG_NOMINSIZE)
+    if (MSVC)
+      set(NB_OPT_SIZE /Os)
+    else()
+      set(NB_OPT_SIZE -Os)
+    endif()
+  endif()
+
+  if (NOT ARG_PROTECT_STACK)
+      # The stack protector affects binding size negatively (+8% on Linux in my
+      # benchmarks). Protecting from stack smashing in a Python VM seems in any
+      # case futile, so let's get rid of it by default in optimized modes.
+    set(NB_OPT_SIZE ${NB_OPT_SIZE} -fno-stack-protector)
+  endif()
+
+  if (NB_OPT_SIZE)
+    set(NB_COMPILE_OPTIONS
+      $<$<CONFIG:Release>:${NB_OPT_SIZE}>
+      $<$<CONFIG:MinSizeRel>:${NB_OPT_SIZE}>
+      $<$<CONFIG:RelWithDebInfo>:${NB_OPT_SIZE}>)
   endif()
 
   set(NB_SUFFIX ".so")
-  set(NB_COMPILE_OPTIONS
-    $<$<CONFIG:Release>:${NB_OPT_SIZE}>
-    $<$<CONFIG:MinSizeRel>:${NB_OPT_SIZE}>
-    $<$<CONFIG:RelWithDebInfo>:${NB_OPT_SIZE}>)
-
   if(MSVC)
-    set(NB_COMPILE_OPTIONS ${NB_COMPILE_OPTIONS} /bigobj /MP)
     set(NB_SUFFIX ".pyd")
+    set(NB_COMPILE_OPTIONS ${NB_COMPILE_OPTIONS} /bigobj /MP)
   endif()
 
   set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX}")
 
-  Python_add_library(${name} MODULE ${ARGV1})
+  Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
   target_compile_features(${name} PRIVATE cxx_std_17)
   target_compile_options(${name} PRIVATE ${NB_COMPILE_OPTIONS})
   target_link_libraries(${name} PRIVATE nanobind)
-  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ${NB_SUFFIX})
-  target_include_directories(${name} PRIVATE ${NB_SOURCE_DIR}/include)
-  nanobind_strip(${name})
+  set_target_properties(${name} PROPERTIES
+    PREFIX "" SUFFIX ${NB_SUFFIX} LINKER_LANGUAGE CXX)
+  target_include_directories(${name} PRIVATE ${NB_INCLUDE_DIR})
+
+  if (NOT ARG_NOSTRIP)
+    nanobind_strip(${name})
+  endif()
+
+  if (ARG_LTO)
+    set_target_properties(${name} PROPERTIES
+      INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+      INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
+  endif()
 endfunction()
 
 if (NB_TEST)

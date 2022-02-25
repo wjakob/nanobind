@@ -50,7 +50,7 @@ template <typename T>
 constexpr bool is_std_char_v =
     std::is_same_v<T, char>
 #if defined(NB_HAS_U8STRING)
-    std::is_same<CharT, char8_t>, /* std::u8string */
+    || std::is_same_v<T, char8_t> /* std::u8string */
 #endif
     || std::is_same_v<T, char16_t> ||
     std::is_same_v<T, char32_t> || std::is_same_v<T, wchar_t>;

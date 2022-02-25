@@ -70,6 +70,8 @@ add_library(nanobind ${NB_LIB_TYPE}
   include/nanobind/stl/string.h
   include/nanobind/pybind11.h
 
+  src/internals.h
+  src/buffer.h
   src/internals.cpp
   src/common.cpp
   src/nb_func.cpp
@@ -85,14 +87,26 @@ if (NB_SHARED)
     target_link_options(nanobind PRIVATE -undefined dynamic_lookup)
   endif()
 
-  target_compile_definitions(nanobind PRIVATE -D NB_BUILD)
+  target_compile_definitions(nanobind PRIVATE -DNB_BUILD)
+  target_compile_definitions(nanobind PUBLIC -DNB_SHARED)
 endif()
 
-if (NOT MSVC)
+if (MSVC)
+   # Properly report the C++ version, just like other compilers do.
+   target_compile_options(nanobind PUBLIC /Zc:__cplusplus)
+endif()
+
+if (MSVC)
+   # C++20 needed for designated initializers on MSVC..
+   target_compile_features(nanobind PRIVATE cxx_std_20)
+else()
+  target_compile_features(nanobind PRIVATE cxx_std_17)
   target_compile_options(nanobind PRIVATE -fno-strict-aliasing)
 endif()
 
-target_compile_features(nanobind PRIVATE cxx_std_17)
+if (WIN32)
+    target_link_libraries(nanobind PUBLIC Python::Module)
+endif()
 
 set_target_properties(nanobind PROPERTIES
   POSITION_INDEPENDENT_CODE ON

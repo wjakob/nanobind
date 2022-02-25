@@ -37,7 +37,7 @@ template <typename Value_, typename Entry> struct list_caster {
     static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
         object list = steal(PyList_New(src.size()));
         if (list) {
-            ssize_t index = 0;
+            Py_ssize_t index = 0;
 
             for (auto &value : src) {
                 handle h =

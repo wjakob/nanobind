@@ -5,6 +5,10 @@
 #  include <cxxabi.h>
 #endif
 
+#if defined(_MSC_VER)
+#  pragma warning(disable: 4706) // assignment within conditional expression
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -28,7 +32,6 @@ static PyGetSetDef nb_func_getset[] = {
 };
 
 PyTypeObject nb_func_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_func",
     .tp_basicsize = sizeof(nb_func),
     .tp_itemsize = sizeof(func_record),
@@ -43,7 +46,6 @@ PyTypeObject nb_func_type = {
 };
 
 PyTypeObject nb_meth_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_meth",
     .tp_basicsize = sizeof(nb_func),
     .tp_itemsize = sizeof(func_record),
@@ -83,9 +85,9 @@ static void nb_func_dealloc(PyObject *self) {
                 f->free(f->capture);
 
             if (f->flags & (uint16_t) func_flags::has_args) {
-                for (size_t i = 0; i< f->nargs; ++i) {
-                    Py_XDECREF(f->args[i].value);
-                    Py_XDECREF(f->args[i].name_py);
+                for (size_t j = 0; j < f->nargs; ++j) {
+                    Py_XDECREF(f->args[j].value);
+                    Py_XDECREF(f->args[j].name_py);
                 }
             }
 
@@ -268,7 +270,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
                        size_t nargs_in, PyObject *kwargs_in) noexcept {
-    const size_t count = (size_t) Py_SIZE(self);
+    const uint32_t count = (uint32_t) Py_SIZE(self);
     func_record *f = nb_func_get(self);
 
     if (f->flags & (uint16_t) func_flags::is_operator) {
@@ -281,7 +283,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     buf.put("(): incompatible function arguments. The following argument types "
             "are supported:\n");
 
-    for (size_t i = 0; i < count; ++i) {
+    for (uint32_t i = 0; i < count; ++i) {
         buf.put("    ");
         buf.put_uint32(i + 1);
         buf.put(". ");
@@ -302,7 +304,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             buf.put(", ");
         buf.put("kwargs = { ");
 
-        size_t nkwargs_in = (ssize_t) PyTuple_GET_SIZE(kwargs_in);
+        size_t nkwargs_in = (size_t) PyTuple_GET_SIZE(kwargs_in);
         for (size_t j = 0; j < nkwargs_in; ++j) {
             PyObject *key   = PyTuple_GET_ITEM(kwargs_in, j),
                      *value = args_in[nargs_in + j];
@@ -372,9 +374,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                PyObject *) noexcept = nullptr;
 
     if (nargs_in > 0 && (fr->flags & (uint16_t) func_flags::is_constructor)) {
-        PyObject *self = args_in[0];
+        PyObject *self_arg = args_in[0];
 
-        if (strcmp(Py_TYPE(Py_TYPE(self))->tp_name, "nb_type") != 0) {
+        if (strcmp(Py_TYPE(Py_TYPE(self_arg))->tp_name, "nb_type") != 0) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
@@ -382,7 +384,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             return nullptr;
         }
 
-        if (((nb_inst *) self)->ready) {
+        if (((nb_inst *) self_arg)->ready) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
@@ -568,9 +570,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self = (nb_inst *) args_in[0];
-                    self->destruct = true;
-                    self->ready = true;
+                    nb_inst *self_arg = (nb_inst *) args_in[0];
+                    self_arg->destruct = true;
+                    self_arg->ready = true;
                 }
 
                 goto done;
@@ -618,9 +620,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     }
 
     if (nargs_in > 0 && (fr->flags & (uint16_t) func_flags::is_constructor)) {
-        PyObject *self = args_in[0];
+        PyObject *self_arg = args_in[0];
 
-        if (strcmp(Py_TYPE(Py_TYPE(self))->tp_name, "nb_type") != 0) {
+        if (strcmp(Py_TYPE(Py_TYPE(self_arg))->tp_name, "nb_type") != 0) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
@@ -628,7 +630,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
             return nullptr;
         }
 
-        if (((nb_inst *) self)->ready) {
+        if (((nb_inst *) self_arg)->ready) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall(): the __init__ "
@@ -674,9 +676,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self = (nb_inst *) args_in[0];
-                    self->destruct = true;
-                    self->ready = true;
+                    nb_inst *self_arg = (nb_inst *) args_in[0];
+                    self_arg->destruct = true;
+                    self_arg->ready = true;
                 }
 
                 goto done;
@@ -753,7 +755,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                     buf.put("self");
                 } else {
                     buf.put("arg");
-                    buf.put_uint32(arg_index - is_method);
+                    buf.put_uint32((uint32_t) (arg_index - is_method));
                 }
 
                 if (!(is_method && arg_index == 0))
@@ -789,9 +791,9 @@ static void nb_func_render_signature(const func_record *f) noexcept {
 
                     if (it != internals.type_c2p.end()) {
                         handle th((PyObject *) it->second->type_py);
-                        buf.put_dstr(((str) th.attr("__module__")).c_str());
+                        buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                         buf.put('.');
-                        buf.put_dstr(((str) th.attr("__qualname__")).c_str());
+                        buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
                     } else {
                         char *name = type_name(*descr_type);
                         buf.put_dstr(name);
@@ -814,7 +816,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
 
 static PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_record *f = nb_func_get(self);
-    size_t count = (size_t) Py_SIZE(self);
+    uint32_t count = (uint32_t) Py_SIZE(self);
 
     buf.clear();
 
@@ -825,7 +827,7 @@ static PyObject *nb_func_get_doc(PyObject *self, void *) {
                 "Overloaded function.\n\n");
     }
 
-    for (size_t i = 0; i < count; ++i) {
+    for (uint32_t i = 0; i < count; ++i) {
         if (i > 0)
             buf.put('\n');
 
@@ -877,7 +879,7 @@ char *type_name(const std::type_info *t) {
     int status = 0;
     char *name = abi::__cxa_demangle(name_in, nullptr, nullptr, &status);
 #else
-    char *name = strdup(name_in);
+    char *name = NB_STRDUP(name_in);
     strexc(name, "class ");
     strexc(name, "struct ");
     strexc(name, "enum ");

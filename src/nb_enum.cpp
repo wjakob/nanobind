@@ -5,7 +5,6 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 PyTypeObject nb_enum_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_enum",
     .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,

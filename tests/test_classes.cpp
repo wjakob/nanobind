@@ -56,6 +56,13 @@ struct alignas(1024) BigAligned {
     }
 };
 
+struct Animal {
+    virtual ~Animal() = default;
+    virtual std::string name() const { return "Animal"; }
+    virtual std::string what() const = 0;
+    virtual void void_ret() { }
+};
+
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::unique_ptr<Struct>(new Struct(12));
 
@@ -112,13 +119,6 @@ NB_MODULE(test_classes_ext, m) {
 
     // test09_trampoline
     // test10_trampoline_failures
-
-    struct Animal {
-        virtual ~Animal() = default;
-        virtual std::string name() const { return "Animal"; }
-        virtual std::string what() const = 0;
-        virtual void void_ret() { }
-    };
 
     struct PyAnimal : Animal {
         NB_TRAMPOLINE(Animal, 3);
@@ -226,7 +226,7 @@ NB_MODULE(test_classes_ext, m) {
     struct Int {
         int i;
         Int operator+(Int o) const { return {i + o.i}; }
-        Int operator-(int j) const { return {i - j}; }
+        Int operator-(float j) const { return {int(i - j)}; }
         Int &operator+=(Int o) {
             i += o.i;
             return *this;

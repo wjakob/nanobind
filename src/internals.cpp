@@ -139,6 +139,11 @@ static void internals_make() {
              "data structure!");
     Py_DECREF(capsule);
 
+    nb_type_type.ob_base.ob_base.ob_refcnt = 1;
+    nb_enum_type.ob_base.ob_base.ob_refcnt = 1;
+    nb_func_type.ob_base.ob_base.ob_refcnt = 1;
+    nb_meth_type.ob_base.ob_base.ob_refcnt = 1;
+
     nb_type_type.tp_base = &PyType_Type;
     nb_enum_type.tp_base = &nb_type_type;
     nb_enum_type.tp_clear = PyType_Type.tp_clear;

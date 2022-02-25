@@ -15,10 +15,11 @@
 
 #if defined(_WIN32)
 #  define NB_EXPORT        __declspec(dllexport)
-#  define NB_IMPORT        __declspec(import)
+#  define NB_IMPORT        __declspec(dllimport)
 #  define NB_INLINE        __forceinline
 #  define NB_INLINE_LAMBDA
 #  define NB_NOINLINE      __declspec(noinline)
+# define  NB_STRDUP        _strdup
 #else
 #  define NB_EXPORT        __attribute__ ((visibility("default")))
 #  define NB_IMPORT
@@ -29,6 +30,7 @@
 #else
 #    define NB_INLINE_LAMBDA
 #endif
+#  define NB_STRDUP        strdup
 #endif
 
 #if defined(__GNUC__)

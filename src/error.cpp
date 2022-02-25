@@ -21,7 +21,7 @@ python_error::python_error(const python_error &e) : std::exception(e) {
     m_value = e.m_value;
     m_trace = e.m_trace;
     if (e.m_what)
-        m_what = strdup(e.m_what);
+        m_what = NB_STRDUP(e.m_what);
 }
 
 python_error::python_error(python_error &&e) noexcept : std::exception(e) {

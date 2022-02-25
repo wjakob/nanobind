@@ -57,11 +57,11 @@ NB_CORE void raise(const char *fmt, ...);
 
 /// Abort the process with a fatal error
 #if defined(__GNUC__)
-    __attribute__((noreturn, nothrow, __format__ (__printf__, 1, 2)))
+    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
 #else
-    [[noreturn, noexcept]]
+    [[noreturn]]
 #endif
-NB_CORE void fail(const char *fmt, ...);
+NB_CORE void fail(const char *fmt, ...) noexcept;
 
 /// Raise nanobind::python_error after an error condition was found
 NB_CORE void raise_python_error();

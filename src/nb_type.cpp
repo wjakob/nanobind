@@ -1,10 +1,13 @@
 #include "internals.h"
 
+#if defined(_MSC_VER)
+#  pragma warning(disable: 4706) // assignment within conditional expression
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 PyTypeObject nb_type_type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "nb_type",
     .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
     .tp_dealloc = nb_type_dealloc,
@@ -77,7 +80,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
             *(void **) (new_alloc + nb_inst_size) = value;
             self = (nb_inst *) (new_alloc + gc_size);
-            self->offset = basic_size;
+            self->offset = (uint32_t) basic_size;
             self->direct = false;
         }
 
@@ -335,9 +338,9 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
 
         it = dst_type->implicit;
         while ((v = *it++)) {
-            auto it = internals.type_c2p.find(std::type_index(*v));
-            if (it != internals.type_c2p.end() &&
-                PyType_IsSubtype(Py_TYPE(src), it->second->type_py))
+            auto it2 = internals.type_c2p.find(std::type_index(*v));
+            if (it2 != internals.type_c2p.end() &&
+                PyType_IsSubtype(Py_TYPE(src), it2->second->type_py))
                 goto found;
         }
     }

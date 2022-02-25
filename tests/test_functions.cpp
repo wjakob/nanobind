@@ -18,7 +18,7 @@ NB_MODULE(test_functions_ext, m) {
 
     // Large capture object requiring separate storage
     uint64_t k = 10, l = 11, m_ = 12, n = 13, o = 14;
-    m.def("test_04", [k, l, m_, n, o]() -> int { return k + l + m_ + n + o; });
+    m.def("test_04", [k, l, m_, n, o]() -> int { return (int) (k + l + m_ + n + o); });
 
     // Overload chain with two docstrings
     m.def("test_05", [](int) -> int { return 1; }, "doc_1");

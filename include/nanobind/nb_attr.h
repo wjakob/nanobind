@@ -36,6 +36,7 @@ struct is_implicit { };
 struct is_operator { };
 struct is_arithmetic { };
 struct is_enum { bool is_signed; };
+template <size_t Nurse, size_t Patient> struct keep_alive { };
 
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
@@ -168,6 +169,34 @@ template <typename F> NB_INLINE void func_extra_apply(F &f, const arg_v &a, size
 
 template <typename F, typename... Ts>
 NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t&) { }
+
+template <typename F, size_t Nurse, size_t Patient>
+NB_INLINE void func_extra_apply(F &, nanobind::keep_alive<Nurse, Patient>, size_t&) { }
+
+
+template <typename... Ts> struct extract_guard {
+    using type = void;
+};
+
+template <typename T, typename... Ts> struct extract_guard<T, Ts...> {
+    using type = typename extract_guard<Ts...>::type;
+};
+
+template <typename... Cs, typename... Ts> struct extract_guard<call_guard<Cs...>, Ts...> {
+    static_assert(std::is_same_v<typename extract_guard<Ts...>::type, void>,
+                  "call_guard<> can only be specified once!");
+    using type = call_guard<Cs...>;
+};
+
+template <typename T> NB_INLINE void process_keep_alive(PyObject **, PyObject *, T*) { }
+
+template <size_t Nurse, size_t Patient>
+NB_INLINE void process_keep_alive(PyObject **args, PyObject *result,
+                                  nanobind::keep_alive<Nurse, Patient> *) noexcept {
+    keep_alive(
+        Nurse   == 0 ? result : args[Nurse - 1],
+        Patient == 0 ? result : args[Patient - 1]);
+}
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -449,31 +449,73 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     return false;
 }
 
+static PyObject *keep_alive_callback(PyObject *self, PyObject *const *args,
+                                     Py_ssize_t nargs) {
+    if (nargs != 1 || !PyWeakref_CheckRefExact(args[0]))
+        fail("nanobind::detail::keep_alive_callback(): invalid input!");
+    Py_DECREF(args[0]); // self
+    Py_DECREF(self); // patient
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyMethodDef keep_alive_callback_def = {
+    "keep_alive_callback",
+    (PyCFunction) keep_alive_callback,
+    METH_FASTCALL,
+    "Implementation detail of nanobind::detail::keep_alive"
+};
+
 
 void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
     if (!patient)
         return;
 
+    if (!nurse)
+        fail("nanobind::detail::keep_alive(): the 'nurse' argument must be "
+             "provided!");
+
     internals &internals = internals_get();
-    if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
-        fail("keep_alive(): expected a nb_type 'nurse' argument");
+    PyTypeObject *metaclass = Py_TYPE(Py_TYPE(nurse));
 
-    keep_alive_set &keep_alive = internals.keep_alive[nurse];
+    if (metaclass == internals.nb_type || metaclass == internals.nb_enum) {
+        // Populate nanobind-internal data structures
+        keep_alive_set &keep_alive = internals.keep_alive[nurse];
 
-    auto [it, success] = keep_alive.emplace(patient);
-    if (success) {
-        Py_INCREF(patient);
-        ((nb_inst *) nurse)->clear_keep_alive = true;
+        auto [it, success] = keep_alive.emplace(patient);
+        if (success) {
+            Py_INCREF(patient);
+            ((nb_inst *) nurse)->clear_keep_alive = true;
+        } else {
+            if (it->deleter)
+                fail("nanobind::detail::keep_alive(): internal error: entry "
+                     "has a deletion callback!");
+        }
     } else {
-        if (it->deleter)
-            fail("keep_alive(): internal error: entry has a deleter!");
+        PyObject *callback =
+            PyCFunction_New(&keep_alive_callback_def, patient);
+        if (!callback)
+            fail("nanobind::detail::keep_alive(): callback creation failed!");
+        PyObject *weakref = PyWeakref_NewRef(nurse, callback);
+        if (!weakref)
+            fail("nanobind::detail::keep_alive(): could not create a weak "
+                 "reference! Likely, the 'nurse' argument you specified is not "
+                 "a weak-referenceable type!");
+        // Increase patient reference count, leak weak reference
+        Py_INCREF(patient);
+        Py_DECREF(callback);
     }
 }
 
 void keep_alive(PyObject *nurse, void *payload,
                 void (*callback)(void *) noexcept) noexcept {
+    if (!nurse)
+        fail("nanobind::detail::keep_alive(): nurse==nullptr!");
+
+    PyTypeObject *metaclass = Py_TYPE(Py_TYPE(nurse));
+
     internals &internals = internals_get();
-    if (!nurse || Py_TYPE(Py_TYPE(nurse)) != internals.nb_type)
+    if (metaclass != internals.nb_type && metaclass != internals.nb_enum)
         fail("keep_alive(): expected a nb_type 'nurse' argument");
 
     keep_alive_set &keep_alive = internals.keep_alive[nurse];

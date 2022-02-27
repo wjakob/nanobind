@@ -127,9 +127,6 @@ The following _pybind11_ features are unavailable in _nanobind_:
   process is unsupported. (This would require TLS lookups for _nanobind_ data
   structures, which is undesirable.)
 - ⊘ `kw_only` / `pos_only` argument annotations were removed.
-- ⊘ Type signatures in docstrings are "best-effort". Getting all the details
-  right for tools like MyPy is a rabbit hole that I don't wish to pursue in
-  _nanobind_.
 - ⊘ The `options` class for customizing docstring generation was removed.
 - ⊘ Workarounds for old/buggy/non-standard-compliant compilers are gone and
   will not be reintroduced.
@@ -145,6 +142,8 @@ The following _pybind11_ features are unavailable in _nanobind_:
 - ⊚ Custom metaclasses are unsupported.
 - ⊚ Support for embedding the interpreter and evaluating Python code
     strings was removed.
+
+### Removed features
 
 Bullet points marked with ⊛ or ⊚ may be reintroduced eventually, but this will
 need to be done in a careful opt-in manner that does not affect code

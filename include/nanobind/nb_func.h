@@ -1,18 +1,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename... Ts> struct extract_guard {
-    using type = void;
-};
-
-template <typename T, typename... Ts> struct extract_guard<T, Ts...> {
-    using type = typename extract_guard<Ts...>::type;
-};
-
-template <typename... Cs, typename... Ts> struct extract_guard<call_guard<Cs...>, Ts...> {
-    using type = call_guard<Cs...>;
-};
-
 template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
           typename... Args, size_t... Is, typename... Extra>
 NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
@@ -22,7 +10,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     if constexpr (CheckGuard && !std::is_same_v<Guard, void>) {
         return func_create<ReturnRef, false>(
-            [func = (forward_t<Func>) func](Args... args) {
+            [func = (forward_t<Func>) func](Args... args) NB_INLINE_LAMBDA {
                 typename Guard::type g;
                 (void) g;
                 return func(args...);
@@ -109,22 +97,27 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         else
             cap = (capture *) ((void **) p)[0];
 
-        detail::tuple<make_caster<Args>...> in;
+        tuple<make_caster<Args>...> in;
 
         if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
                                                 cleanup) || ...))
             return NB_NEXT_OVERLOAD;
 
+        PyObject *result;
         if constexpr (std::is_void_v<Return>) {
             cap->func(((make_caster<Args>&&) in.template get<Is>()).operator cast_t<Args>()...);
             Py_INCREF(Py_None);
-            return Py_None;
+            result = Py_None;
         } else {
-            return cast_out::from_cpp(
+            result = cast_out::from_cpp(
                        cap->func(((make_caster<Args> &&) in.template get<Is>())
                                      .operator cast_t<Args>()...),
                        policy, cleanup).ptr();
         }
+
+        (process_keep_alive(args, result, (Extra *) nullptr), ...);
+
+        return result;
     };
 
     f.descr = descr.text;
@@ -133,7 +126,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Fill remaining fields of 'f'
     size_t arg_index = 0;
-    (detail::func_extra_apply(f, extra, arg_index), ...);
+    (func_extra_apply(f, extra, arg_index), ...);
 
     return nb_func_new((const void *) &f);
 }

@@ -84,5 +84,4 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_release_gil", []() -> bool {
         return PyGILState_Check();
     }, nb::call_guard<nb::gil_scoped_release>());
-
 }

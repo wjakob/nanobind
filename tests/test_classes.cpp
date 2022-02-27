@@ -240,4 +240,14 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::self += nb::self)
         .def(nb::self - float())
         .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
+
+
+    /// Test nb::keep_alive feature
+    m.def(
+        "keep_alive_arg", [](nb::handle, nb::handle ret) { return ret; },
+        nb::keep_alive<0, 1>());
+
+    m.def(
+        "keep_alive_ret", [](nb::handle, nb::handle ret) { return ret; },
+        nb::keep_alive<1, 0>());
 }

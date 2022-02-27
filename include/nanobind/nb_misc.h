@@ -2,7 +2,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 struct gil_scoped_acquire {
 public:
-    gil_scoped_acquire() : state (PyGILState_Ensure()) { }
+    gil_scoped_acquire() noexcept : state(PyGILState_Ensure()) { }
     ~gil_scoped_acquire() { PyGILState_Release(state); }
 
 private:
@@ -11,7 +11,7 @@ private:
 
 class gil_scoped_release {
 public:
-    gil_scoped_release() { state = PyEval_SaveThread(); }
+    gil_scoped_release() noexcept : state(PyEval_SaveThread()) { }
     ~gil_scoped_release() { PyEval_RestoreThread(state); }
 
 private:

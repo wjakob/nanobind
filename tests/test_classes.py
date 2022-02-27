@@ -2,6 +2,23 @@ import test_classes_ext as t
 import pytest
 import gc
 
+@pytest.fixture
+def clean():
+    gc.collect()
+    t.reset()
+
+def assert_stats(**kwargs):
+    gc.collect()
+    for k, v in t.stats().items():
+        fail = False
+        if k in kwargs:
+            if v != kwargs[k]:
+                fail = True
+        elif v != 0:
+            fail = True
+        if fail:
+            raise Exception(f'Mismatch for key {k}: {t.stats()}')
+
 def test01_signature():
     assert t.Struct.__init__.__doc__ == (
         "__init__(*args, **kwargs) -> Any\n"
@@ -27,27 +44,18 @@ def test02_static_overload():
     assert t.Struct.static_test(1.0) == 2
 
 
-def test03_instantiate():
-    gc.collect()
-    t.reset()
-
+def test03_instantiate(clean):
     s1 = t.Struct()
     assert s1.value() == 5
     s2 = t.Struct(10)
     assert s2.value() == 10
     del s1
     del s2
-    gc.collect()
-
-    assert t.stats() == {
-        'default_constructed': 1,
-        'value_constructed': 1,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 2
-    }
+    assert_stats(
+        default_constructed=1,
+        value_constructed=1,
+        destructed=2
+    )
 
 def test04_double_init():
     s = t.Struct()
@@ -56,127 +64,67 @@ def test04_double_init():
     assert 'the __init__ method should not be called on an initialized object!' in str(excinfo.value)
 
 
-def test05_rv_policy():
-    gc.collect()
-    t.reset()
+def test05_rv_policy(clean):
     s = t.Struct()
     assert s.self() is s
     assert s.none() is None
     del s
-    gc.collect()
-    assert t.stats() == {
-        'default_constructed': 1,
-        'value_constructed': 0,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 1
-    }
+    assert_stats(
+        default_constructed=1,
+        destructed=1
+    )
 
     # ------
 
     t.reset()
     assert t.Struct.create_take().value() == 10
-    gc.collect()
-    assert t.stats() == {
-        'default_constructed': 0,
-        'value_constructed': 1,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 1
-    }
+    assert_stats(
+        value_constructed=1,
+        destructed=1
+    )
 
     # ------
 
     t.reset()
     assert t.Struct.create_move().value() == 11
-    gc.collect()
-    assert t.stats() == {
-        'default_constructed': 0,
-        'value_constructed': 1,
-        'copy_constructed': 0,
-        'move_constructed': 1,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 2
-    }
+    assert_stats(
+        value_constructed=1,
+        move_constructed=1,
+        destructed=2
+    )
 
     # ------
 
     t.reset()
     assert t.Struct.create_reference().value() == 12
-    gc.collect()
-    assert t.stats() == {
-        'default_constructed': 0,
-        'value_constructed': 0,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 0
-    }
+    assert_stats()
 
     # ------
 
     t.reset()
     assert t.Struct.create_copy().value() == 12
-    gc.collect()
-    assert t.stats() == {
-        'default_constructed': 0,
-        'value_constructed': 0,
-        'copy_constructed': 1,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 1
-    }
+    assert_stats(
+        copy_constructed=1,
+        destructed=1
+    )
 
-def test06_reference_internal():
-    gc.collect()
-    t.reset()
+def test06_reference_internal(clean):
     s = t.PairStruct()
     s1 = s.s1
     s2 = s.s2
     del s
-    assert t.stats() == {
-        'default_constructed': 2,
-        'value_constructed': 0,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 0
-    }
+    assert_stats(default_constructed=2)
     assert s2.value() == 5
     del s2
-    gc.collect()
 
-    assert t.stats() == {
-        'default_constructed': 2,
-        'value_constructed': 0,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 0
-    }
+    assert_stats(default_constructed=2)
 
     assert s1.value() == 5
     del s1
-    gc.collect()
-
-    assert t.stats() == {
-        'default_constructed': 2,
-        'value_constructed': 0,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 2
-    }
+    assert_stats(
+        default_constructed=2,
+        destructed=2
+    )
 
 
 def test07_big():
@@ -211,9 +159,7 @@ def test09_method_vectorcall():
     assert i.out == (1, 2, "hello", True, 4)
 
 
-def test10_trampoline():
-    gc.collect()
-    t.reset()
+def test10_trampoline(clean):
     for i in range(10):
         class Dachshund(t.Animal):
             def __init__(self):
@@ -243,17 +189,11 @@ def test10_trampoline():
 
     del ga
     del d
-    gc.collect()
 
-    assert t.stats() == {
-        'default_constructed': 11,
-        'value_constructed': 0,
-        'copy_constructed': 0,
-        'move_constructed': 0,
-        'copy_assigned': 0,
-        'move_assigned': 0,
-        'destructed': 11
-    }
+    assert_stats(
+        default_constructed=11,
+        destructed=11
+    )
 
 
 def test11_trampoline_failures():
@@ -334,3 +274,71 @@ def test14_operators():
     assert repr(b) == "2"
 
     assert a.__add__("test") is NotImplemented
+
+
+def test15_keep_alive_nbtype(clean):
+    t.reset()
+    s = t.Struct()
+    a = t.Dog('Rufus')
+    assert t.keep_alive_arg(s, a) is a
+    del s
+    assert_stats(
+        default_constructed=1
+    )
+    del a
+    assert_stats(
+        default_constructed=1,
+        destructed=1
+    )
+
+    t.reset()
+    s = t.Struct()
+    a = t.Dog('Rufus')
+    assert t.keep_alive_ret(a, s) is s
+    del a
+    assert_stats(
+        default_constructed=1
+    )
+    del s
+    assert_stats(
+        default_constructed=1,
+        destructed=1
+    )
+
+
+def test16_keep_alive_custom(clean):
+    constructed = 0
+    destructed = 0
+
+    class Struct():
+        def __init__(self):
+            nonlocal constructed
+            constructed += 1
+
+        def __del__(self):
+            nonlocal destructed
+            destructed += 1
+
+    class Struct2():
+        def __init__(self):
+            pass
+
+    s = Struct()
+    a = Struct2()
+    assert t.keep_alive_arg(s, a) is a
+    del s
+    gc.collect()
+    assert constructed == 1 and destructed == 0
+    del a
+    gc.collect()
+    assert constructed == 1 and destructed == 1
+
+    s = Struct()
+    a = Struct2()
+    assert t.keep_alive_ret(a, s) is s
+    del a
+    gc.collect()
+    assert constructed == 2 and destructed == 1
+    del s
+    gc.collect()
+    assert constructed == 2 and destructed == 2

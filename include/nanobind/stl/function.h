@@ -9,7 +9,7 @@ NAMESPACE_BEGIN(detail)
 struct function_handle {
     object f;
     explicit function_handle(handle h): f(borrow(h)) { }
-    function_handle(function_handle &&h) : f(std::move(h.f)) { }
+    function_handle(function_handle &&h) noexcept : f(std::move(h.f)) { }
     function_handle(const function_handle &h) {
         gil_scoped_acquire acq;
         f = h.f;

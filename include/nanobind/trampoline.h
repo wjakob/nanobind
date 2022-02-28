@@ -28,12 +28,12 @@ template <size_t Size> struct trampoline {
     NB_INLINE handle base() const { return (PyObject *) data[0]; }
 };
 
-#define NB_TRAMPOLINE(base, size)                                            \
+#define NB_TRAMPOLINE(base, size)                                              \
     nanobind::detail::trampoline<size> trampoline{ this, &typeid(base) };
 
 #define NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)                 \
     nanobind::handle key = trampoline.lookup(name, false);                     \
-    if (!key.is_none()) {                                                      \
+    if (key.is_valid()) {                                                      \
         nanobind::gil_scoped_acquire guard;                                    \
         return nanobind::cast<ret_type>(                                       \
             trampoline.base().attr(key)(__VA_ARGS__));                         \

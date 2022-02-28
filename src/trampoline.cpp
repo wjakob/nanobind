@@ -23,14 +23,23 @@ void trampoline_release(void **data, size_t size) noexcept {
         Py_XDECREF(data[i*2 + 2]);
 }
 
+extern char *cur_func;
+extern PyObject *cur_self;
+
 PyObject *trampoline_lookup(void **data, size_t size, const char *name,
                             bool pure) {
+    const PyObject *None = Py_None;
+
+    current_method cm = current_method_data;
+    if (cm.name == name && cm.self == data[0])
+        return nullptr;
+
     // First quick sweep without lock
     for (size_t i = 0; i < size; i++) {
         void *d_name  = data[2*i + 1],
              *d_value = data[2*i + 2];
         if (name == d_name && d_value)
-            return (PyObject *) d_value;
+            return d_value != None ? (PyObject *) d_value : nullptr;
     }
 
     PyGILState_STATE state = PyGILState_Ensure();
@@ -41,7 +50,7 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
              *d_value = data[2*i + 2];
         if (name == d_name && d_value) {
             PyGILState_Release(state);
-            return (PyObject *) d_value;
+            return d_value != None ? (PyObject *) d_value : nullptr;
         }
     }
 
@@ -101,7 +110,7 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
     data[2 * offset + 2] = key;
 
     PyGILState_Release(state);
-    return (PyObject *) key;
+    return key != None ? (PyObject *) key : nullptr;
 
 fail:
     const char *tp_name = Py_TYPE(data[0])->tp_name;

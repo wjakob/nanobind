@@ -160,8 +160,8 @@ NB_MODULE(test_classes_ext, m) {
 
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
         .def(nb::init<>())
-        .def("what", &Animal::what)
-        .def("name", &Animal::name);
+        .def("name", &Animal::name)
+        .def("what", &Animal::what);
 
     nb::class_<Dog, Animal>(m, "Dog")
         .def(nb::init<const std::string &>());

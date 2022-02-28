@@ -363,36 +363,34 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                  nkwargs_in = kwargs_in ? (size_t) PyTuple_GET_SIZE(kwargs_in) : 0;
 
     func_record *fr = nb_func_get(self);
-    bool is_constructor = false;
-    PyObject *result = nullptr;
 
-    /// Small array holding temporaries (implicit conversion/*args/**kwargs)
-    cleanup_list cleanup(nargs_in > 0 ? args_in[0] : nullptr);
+    const bool is_method = fr->flags & (uint16_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint16_t) func_flags::is_constructor;
 
-    // Handler routine that will be invoked in case of an error condition
-    PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
-                               PyObject *) noexcept = nullptr;
+    PyObject *result = nullptr, *self_arg = nullptr;
 
-    if (nargs_in > 0 && (fr->flags & (uint16_t) func_flags::is_constructor)) {
-        PyObject *self_arg = args_in[0];
+    if (is_method) {
+        self_arg = nargs_in > 0 ? args_in[0] : nullptr;
 
-        if (strcmp(Py_TYPE(Py_TYPE(self_arg))->tp_name, "nb_type") != 0) {
+        if (!self_arg || strcmp(Py_TYPE(Py_TYPE(self_arg))->tp_name, "nb_type") != 0) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
-                "of an __init__ argument should be a nanobind class.");
+                "of a method call should be a nanobind class.");
             return nullptr;
         }
 
-        if (((nb_inst *) self_arg)->ready) {
-            PyErr_SetString(
-                PyExc_RuntimeError,
-                "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                "method should not be called on an initialized object!");
-            return nullptr;
-        }
+        current_method_data = current_method{ fr->name, self_arg };
 
-        is_constructor = true;
+        if (is_constructor) {
+            if (((nb_inst *) self_arg)->ready) {
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                    "method should not be called on an initialized object!");
+                return nullptr;
+            }
+        }
     }
 
     /* The following lines allocate memory on the stack, which is very efficient
@@ -405,6 +403,14 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                         "1024) keyword arguments.");
         return nullptr;
     }
+
+
+    // Handler routine that will be invoked in case of an error condition
+    PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
+                               PyObject *) noexcept = nullptr;
+
+    // Small array holding temporaries (implicit conversion/*args/**kwargs)
+    cleanup_list cleanup(self_arg);
 
     // Preallocate stack memory for function dispatch
     size_t max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
@@ -588,6 +594,9 @@ done:
     if (error_handler)
         result = error_handler(self, args_in, nargs_in, kwargs_in);
 
+    if (is_method)
+        current_method_data = current_method{ nullptr, nullptr };
+
     return result;
 }
 
@@ -602,11 +611,38 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                  nargs_in      = (size_t) PyVectorcall_NARGS(nargsf),
                  max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
 
-    bool is_constructor = false;
-    PyObject *result = nullptr;
+    const bool is_method = fr->flags & (uint16_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint16_t) func_flags::is_constructor;
+
+    PyObject *result = nullptr, *self_arg = nullptr;
+
+    if (is_method) {
+        self_arg = nargs_in > 0 ? args_in[0] : nullptr;
+
+        if (!self_arg || strcmp(Py_TYPE(Py_TYPE(self_arg))->tp_name, "nb_type") != 0) {
+            PyErr_SetString(
+                PyExc_RuntimeError,
+                "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
+                "of a method call should be a nanobind class.");
+            return nullptr;
+        }
+
+        self_arg = args_in[0];
+        current_method_data = current_method{ fr->name, self_arg };
+
+        if (is_constructor) {
+            if (((nb_inst *) self_arg)->ready) {
+                PyErr_SetString(
+                    PyExc_RuntimeError,
+                    "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                    "method should not be called on an initialized object!");
+                return nullptr;
+            }
+        }
+    }
 
     /// Small array holding temporaries (implicit conversion/*args/**kwargs)
-    cleanup_list cleanup(nargs_in > 0 ? args_in[0] : nullptr);
+    cleanup_list cleanup(self_arg);
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -617,28 +653,6 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     if (kwargs_in) { // keyword arguments unsupported in the "simple" vectorcall
         error_handler = nb_func_error_overload;
         goto done;
-    }
-
-    if (nargs_in > 0 && (fr->flags & (uint16_t) func_flags::is_constructor)) {
-        PyObject *self_arg = args_in[0];
-
-        if (strcmp(Py_TYPE(Py_TYPE(self_arg))->tp_name, "nb_type") != 0) {
-            PyErr_SetString(
-                PyExc_RuntimeError,
-                "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
-                "of an __init__ argument should be a nanobind class.");
-            return nullptr;
-        }
-
-        if (((nb_inst *) self_arg)->ready) {
-            PyErr_SetString(
-                PyExc_RuntimeError,
-                "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                "method should not be called on an initialized object!");
-            return nullptr;
-        }
-
-        is_constructor = true;
     }
 
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
@@ -693,6 +707,9 @@ done:
 
     if (error_handler)
         result = error_handler(self, args_in, nargs_in, kwargs_in);
+
+    if (is_method)
+        current_method_data = current_method{ nullptr, nullptr };
 
     return result;
 }

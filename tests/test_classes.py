@@ -135,6 +135,10 @@ def test07_big():
 def test08_inheritance():
     dog = t.Dog('woof')
     cat = t.Cat('meow')
+    assert dog.name() == 'Dog'
+    assert cat.name() == 'Cat'
+    assert dog.what() == 'woof'
+    assert cat.what() == 'meow'
     assert isinstance(dog, t.Animal) and isinstance(dog, t.Dog)
     assert isinstance(cat, t.Animal) and isinstance(cat, t.Cat)
     assert t.go(dog) == 'Dog says woof'
@@ -182,8 +186,11 @@ def test10_trampoline(clean):
             nonlocal a
             a += 1
 
+        def name(self):
+            return 'Generic' + super().name()
+
     ga = GenericAnimal()
-    assert t.go(ga) == 'Animal says goo'
+    assert t.go(ga) == 'GenericAnimal says goo'
     assert t.void_ret(ga) is None
     assert a == 1
 

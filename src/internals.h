@@ -144,6 +144,13 @@ struct internals {
     std::vector<void (*)(const std::exception_ptr &)> exception_translators;
 };
 
+struct current_method {
+    const char *name = nullptr;
+    PyObject *self = nullptr;
+};
+
+extern thread_local current_method current_method_data;
+
 extern internals &internals_get() noexcept;
 extern char *type_name(const std::type_info *t);
 

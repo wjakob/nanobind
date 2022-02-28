@@ -59,6 +59,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+thread_local current_method current_method_data;
+
 static internals *internals_p = nullptr;
 
 void default_exception_translator(const std::exception_ptr &p) {

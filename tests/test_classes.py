@@ -349,3 +349,49 @@ def test16_keep_alive_custom(clean):
     del s
     gc.collect()
     assert constructed == 2 and destructed == 2
+
+def f():
+    pass
+
+class MyClass:
+    def f(self):
+        pass
+
+    class NestedClass:
+        def f(self):
+            pass
+
+def test17_name_qualname_module():
+    # First, check what CPython does
+    assert f.__module__ == 'test_classes'
+    assert f.__name__ == 'f'
+    assert f.__qualname__ == 'f'
+    assert MyClass.__name__ == 'MyClass'
+    assert MyClass.__qualname__ == 'MyClass'
+    assert MyClass.__module__ == 'test_classes'
+    assert MyClass.f.__name__ == 'f'
+    assert MyClass.f.__qualname__ == 'MyClass.f'
+    assert MyClass.f.__module__ == 'test_classes'
+    assert MyClass.NestedClass.__name__ == 'NestedClass'
+    assert MyClass.NestedClass.__qualname__ == 'MyClass.NestedClass'
+    assert MyClass.NestedClass.__module__ == 'test_classes'
+    assert MyClass.NestedClass.f.__name__ == 'f'
+    assert MyClass.NestedClass.f.__qualname__ == 'MyClass.NestedClass.f'
+    assert MyClass.NestedClass.f.__module__ == 'test_classes'
+
+    # Now, check the extension module
+    assert t.f.__module__ == 'test_classes_ext'
+    assert t.f.__name__ == 'f'
+    assert t.f.__qualname__ == 'f'
+    assert t.MyClass.__name__ == 'MyClass'
+    assert t.MyClass.__qualname__ == 'MyClass'
+    assert t.MyClass.__module__ == 'test_classes_ext'
+    assert t.MyClass.f.__name__ == 'f'
+    assert t.MyClass.f.__qualname__ == 'MyClass.f'
+    assert t.MyClass.f.__module__ == 'test_classes_ext'
+    assert t.MyClass.NestedClass.__name__ == 'NestedClass'
+    assert t.MyClass.NestedClass.__qualname__ == 'MyClass.NestedClass'
+    assert t.MyClass.NestedClass.__module__ == 'test_classes_ext'
+    assert t.MyClass.NestedClass.f.__name__ == 'f'
+    assert t.MyClass.NestedClass.f.__qualname__ == 'MyClass.NestedClass.f'
+    assert t.MyClass.NestedClass.f.__module__ == 'test_classes_ext'

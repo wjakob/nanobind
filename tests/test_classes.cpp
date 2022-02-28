@@ -242,7 +242,7 @@ NB_MODULE(test_classes_ext, m) {
         .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
 
 
-    /// Test nb::keep_alive feature
+    /// test15: Test nb::keep_alive feature
     m.def(
         "keep_alive_arg", [](nb::handle, nb::handle ret) { return ret; },
         nb::keep_alive<0, 1>());
@@ -250,4 +250,12 @@ NB_MODULE(test_classes_ext, m) {
     m.def(
         "keep_alive_ret", [](nb::handle, nb::handle ret) { return ret; },
         nb::keep_alive<1, 0>());
+
+    /// test17_name_qualname_module()
+    m.def("f", []{});
+    struct MyClass { struct NestedClass { }; };
+    nb::class_<MyClass> mcls(m, "MyClass");
+    nb::class_<MyClass::NestedClass> ncls(mcls, "NestedClass");
+    mcls.def("f", []{});
+    ncls.def("f", []{});
 }

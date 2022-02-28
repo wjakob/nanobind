@@ -18,6 +18,8 @@ extern Buffer buf;
 static void nb_func_dealloc(PyObject *);
 static PyObject *nb_func_get_doc(PyObject *, void *);
 static PyObject *nb_func_get_name(PyObject *, void *);
+static PyObject *nb_func_get_qualname(PyObject *, void *);
+static PyObject *nb_func_get_module(PyObject *, void *);
 static PyObject *nb_meth_descr_get(PyObject *, PyObject *, PyObject *);
 static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
@@ -28,6 +30,8 @@ static void nb_func_render_signature(const func_record *f) noexcept;
 static PyGetSetDef nb_func_getset[] = {
     { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
     { "__name__", nb_func_get_name, nullptr, nullptr, nullptr },
+    { "__qualname__", nb_func_get_qualname, nullptr, nullptr, nullptr },
+    { "__module__", nb_func_get_module, nullptr, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
@@ -875,6 +879,42 @@ static PyObject *nb_func_get_name(PyObject *self, void *) {
         Py_INCREF(Py_None);
         return Py_None;
     }
+}
+
+static PyObject *nb_func_get_qualname(PyObject *self, void *) {
+    func_record *f = nb_func_get(self);
+    if ((f->flags & (uint16_t) func_flags::has_scope) &&
+        (f->flags & (uint16_t) func_flags::has_name)) {
+        PyObject *scope_name = PyObject_GetAttrString(f->scope, "__qualname__");
+        if (scope_name) {
+            PyObject *result = PyUnicode_FromFormat("%U.%s", scope_name, f->name);
+            if (result)
+                return result;
+            else
+                PyErr_Clear();
+        } else {
+            PyErr_Clear();
+            return PyUnicode_FromString(f->name);
+        }
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *nb_func_get_module(PyObject *self, void *) {
+    func_record *f = nb_func_get(self);
+    if (f->flags & (uint16_t) func_flags::has_scope) {
+        PyObject *result = PyObject_GetAttrString(f->scope, "__module__");
+        if (result)
+            return result;
+        PyErr_Clear();
+        result = PyObject_GetAttrString(f->scope, "__name__");
+        if (result)
+            return result;
+        PyErr_Clear();
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 /// Excise a substring from 's'

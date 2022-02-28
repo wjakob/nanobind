@@ -235,5 +235,15 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *,
 NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
                          const char *doc) noexcept;
 
+// ========================================================================
+
+/// Try to import a Python extension module, raises an exception upon failure
+NB_CORE PyObject *module_import(const char *name);
+
+// ========================================================================
+
+/// Print to stdout using Python
+NB_CORE void print(PyObject *file, PyObject *str, PyObject *end);
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

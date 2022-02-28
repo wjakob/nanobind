@@ -128,3 +128,8 @@ def test13_call_guard():
     assert t.test_call_guard() == 1
     assert t.call_guard_value() == 2
     assert t.test_release_gil() == False
+
+def test14_print(capsys):
+    t.test_print()
+    captured = capsys.readouterr()
+    assert captured.out == "Test 1\nTest 2\n"

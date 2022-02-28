@@ -218,6 +218,11 @@ public:
 
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
+
+    /// Import and return a module or throws `python_error`.
+    static NB_INLINE module_ import(const char *name) {
+        return steal<module_>(detail::module_import(name));
+    }
 };
 
 class capsule : public object {
@@ -294,6 +299,13 @@ NB_INLINE size_t len(const tuple &t) { return PyTuple_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &t) { return PyList_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const dict &t) { return PyDict_GET_SIZE(t.ptr()); }
 
+inline void print(handle value, handle end = handle(), handle file = handle()) {
+    detail::print(value.ptr(), end.ptr(), file.ptr());
+}
+
+inline void print(const char *str, handle end = handle(), handle file = handle()) {
+    print(nanobind::str(str), end, file);
+}
 
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() {

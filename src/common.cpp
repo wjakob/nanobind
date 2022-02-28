@@ -462,5 +462,35 @@ void tuple_check(PyObject *tuple, size_t nargs) {
     }
 }
 
+// ========================================================================
+
+PyObject *module_import(const char *name) {
+    PyObject *res = PyImport_ImportModule(name);
+    if (!res)
+        throw python_error();
+    return res;
+}
+
+// ========================================================================
+
+_Py_IDENTIFIER(stdout);
+
+void print(PyObject *value, PyObject *end, PyObject *file) {
+    if (!file)
+        file = _PySys_GetObjectId(&PyId_stdout);
+
+    int rv = PyFile_WriteObject(value, file, Py_PRINT_RAW);
+    if (rv)
+        raise_python_error();
+
+    if (end)
+        rv = PyFile_WriteObject(end, file, Py_PRINT_RAW);
+    else
+        rv = PyFile_WriteString("\n", file);
+
+    if (rv)
+        raise_python_error();
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

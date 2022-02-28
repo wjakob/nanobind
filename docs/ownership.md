@@ -40,20 +40,13 @@ pointers.
   which means that `std::shared_ptr<T>::use_count()` generally won't show the
   true global reference count.
 
-  One major limitation arises when `T` inherits from
-  `std::enable_shared_from_this<T>`: in this case, it is **illegal** to create
-  `std::shared_ptr<T>` from `T* value` if `value` is _owned by nanobind_. The
-  shared pointer construtor would observe that no other shared pointers
-  currently own `value` and incorrectly assume ownership of the instance. When
-  the shared pointer expires, it will call `delete value`, causing undefined
-  behavior that will likely crash your program (_nanobind_ allocates instances
-  via _pymalloc_ as opposed to _new expressions_, so using `delete` in this
-  context makes no sense). Calling
-  ``std::enable_shared_from_this<T>::shared_from_this()`` within an instance
-  owned by _nanobind_ will raise `std::bad_weak_ptr`.
-
-  It is best to _refrain_ from using `std::enable_shared_from_this<T>` due to
-  these limitations.
+  _nanobind_ refuses conversion of classes that derive from
+  `std::enable_shared_from_this<T>`. This is a fundamental limitation:
+  _nanobind_ instances do not create a base shared pointer that declares
+  ownership of an object. Other parts of a C++ codebase might then incorrectly
+  assume ownership and eventually try to `delete` a _nanobind_ instance
+  allocated using `pymalloc` (which is undefined behavior). A compile-time
+  assertion catches this and warns about the problem.
 
 - **Unique pointers**: It is possible to bind functions that receive and return
   `std::unique_ptr<T, Deleter>` by including the optional type caster

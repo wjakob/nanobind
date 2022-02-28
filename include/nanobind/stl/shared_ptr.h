@@ -36,6 +36,14 @@ inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
                [](void *p) noexcept { delete (std::shared_ptr<void> *) p; });
 }
 
+template <class T, class = void>
+struct uses_shared_from_this : std::false_type { };
+
+template <class T>
+struct uses_shared_from_this<
+    T, std::void_t<decltype(std::declval<T>().shared_from_this())>>
+    : std::true_type { };
+
 template <typename T> struct type_caster<std::shared_ptr<T>> {
     using Value = std::shared_ptr<T>;
     using Caster = make_caster<T>;
@@ -43,6 +51,10 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                   "Binding 'shared_ptr<T>' requires that 'T' can also be bound "
                   "by nanobind. It appears that you specified a type which "
                   "would undergo conversion/copying, which is not allowed.");
+    static_assert(
+        !uses_shared_from_this<T>::value,
+        "nanobind does not permit use of std::shared_from_this, which can "
+        "cause undefined behavior. (Refer to docs/ownership.md for details.)");
 
     static constexpr auto Name = Caster::Name;
     static constexpr bool IsClass = true;

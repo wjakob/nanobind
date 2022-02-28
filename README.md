@@ -340,10 +340,10 @@ For new projects, note the following differences:
   Binding functions that take ``std::unique_ptr<T>`` arguments involves some
   limitations that can be avoided by changing their signatures to use
   ``std::unique_ptr<T, nb::deleter<T>>`` instead. Usage of
-  ``std::enable_shared_from_this<T>`` should be **completely avoided** as it
-  can cause undefined behavior in conjunction with _nanobind_. This is
-  consistent with the philosophy of this library: _the codebase has to adapt to
-  the binding tool and not the other way around_.
+  ``std::enable_shared_from_this<T>`` is prohibited and will raise a
+  compile-time assertion. This is consistent with the philosophy of this
+  library: _the codebase has to adapt to the binding tool and not the other way
+  around_.
 
   It is no longer necessary to specify holder types in the type declaration:
 

@@ -166,7 +166,7 @@ inline func_record *nb_func_get(void *o) {
 }
 
 inline void *inst_data(nb_inst *self) {
-    void *ptr = (void *) (self + (intptr_t) self->offset);
+    void *ptr = (void *) (((char *)self) + (intptr_t) self->offset);
     return self->direct ? ptr : *(void **) ptr;
 }
 

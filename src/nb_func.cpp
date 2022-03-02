@@ -166,7 +166,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         fail("nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
              has_name ? f->name : "<anonymous>");
 
-    func->max_nargs_pos = f->nargs - has_var_args - has_var_kwargs;
+    func->max_nargs_pos = f->nargs;
     func->complex_call = has_args || has_var_args || has_var_kwargs;
 
     if (func_prev) {
@@ -580,9 +580,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self_arg = (nb_inst *) args_in[0];
-                    self_arg->destruct = true;
-                    self_arg->ready = true;
+                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    self_arg_nb->destruct = true;
+                    self_arg_nb->ready = true;
                 }
 
                 goto done;
@@ -694,9 +694,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self_arg = (nb_inst *) args_in[0];
-                    self_arg->destruct = true;
-                    self_arg->ready = true;
+                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    self_arg_nb->destruct = true;
+                    self_arg_nb->ready = true;
                 }
 
                 goto done;

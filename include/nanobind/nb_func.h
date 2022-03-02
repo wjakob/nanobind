@@ -98,6 +98,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             cap = (capture *) ((void **) p)[0];
 
         tuple<make_caster<Args>...> in;
+        (void) in;
 
         if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
                                                 cleanup) || ...))
@@ -126,6 +127,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Fill remaining fields of 'f'
     size_t arg_index = 0;
+    (void) arg_index;
     (func_extra_apply(f, extra, arg_index), ...);
 
     return nb_func_new((const void *) &f);

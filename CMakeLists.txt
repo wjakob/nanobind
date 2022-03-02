@@ -39,6 +39,7 @@ endif()
 # Find the Python interpreter and development libraries
 # ---------------------------------------------------------------------------
 
+set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 if ((Python_VERSION_MAJOR LESS 3) OR ((Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 8)))
   message(FATAL_ERROR "nanobind requires Python >= 3.8")
@@ -161,7 +162,7 @@ function(nanobind_add_module name)
     endif()
   endif()
 
-  if (NOT ARG_PROTECT_STACK)
+  if (NOT ARG_PROTECT_STACK AND NOT MSVC)
       # The stack protector affects binding size negatively (+8% on Linux in my
       # benchmarks). Protecting from stack smashing in a Python VM seems in any
       # case futile, so let's get rid of it by default in optimized modes.

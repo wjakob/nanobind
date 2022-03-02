@@ -13,10 +13,10 @@ PyTypeObject nb_type_type = {
     .tp_name = "nb_type",
     .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
     .tp_dealloc = nb_type_dealloc,
+    .tp_setattro = nb_type_setattro,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_doc = "nanobind metaclass",
-    .tp_init = nb_type_init,
-    .tp_setattro = nb_type_setattro
+    .tp_init = nb_type_init
 };
 
 static int inst_init(PyObject *self, PyObject *, PyObject *) {
@@ -463,7 +463,7 @@ static PyObject *keep_alive_callback(PyObject *self, PyObject *const *args,
 
 static PyMethodDef keep_alive_callback_def = {
     "keep_alive_callback",
-    (PyCFunction) keep_alive_callback,
+    (PyCFunction) (void *) keep_alive_callback,
     METH_FASTCALL,
     "Implementation detail of nanobind::detail::keep_alive"
 };

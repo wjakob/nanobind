@@ -22,7 +22,7 @@
 # define  NB_STRDUP        _strdup
 #else
 #  define NB_EXPORT        __attribute__ ((visibility("default")))
-#  define NB_IMPORT
+#  define NB_IMPORT        __attribute__ ((visibility("default")))
 #  define NB_INLINE        inline __attribute__((always_inline))
 #  define NB_NOINLINE      __attribute__((noinline))
 #if defined(__clang__)

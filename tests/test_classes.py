@@ -395,3 +395,10 @@ def test17_name_qualname_module():
     assert t.MyClass.NestedClass.f.__name__ == 'f'
     assert t.MyClass.NestedClass.f.__qualname__ == 'MyClass.NestedClass.f'
     assert t.MyClass.NestedClass.f.__module__ == 'test_classes_ext'
+
+
+def test18_static_properties():
+    assert t.StaticProperties.value == 23
+    t.StaticProperties.value += 1
+    assert t.StaticProperties.value == 24
+    assert t.StaticProperties.get() == 24

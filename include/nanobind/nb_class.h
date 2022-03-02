@@ -337,8 +337,8 @@ public:
     NB_INLINE class_ &def_readwrite_static(const char *name, D *pm,
                                            const Extra &...extra) {
         def_property_static(name,
-            [pm]() -> const D & { return *pm; },
-            [pm](const D &value) { *pm = value; }, extra...);
+            [pm](handle) -> const D & { return *pm; },
+            [pm](handle, const D &value) { *pm = value; }, extra...);
 
         return *this;
     }
@@ -359,7 +359,7 @@ public:
     NB_INLINE class_ &def_readonly_static(const char *name, D *pm,
                                           const Extra &...extra) {
         def_property_readonly_static(name,
-            [pm]() -> const D & { return *pm; }, extra...);
+            [pm](handle) -> const D & { return *pm; }, extra...);
 
         return *this;
     }

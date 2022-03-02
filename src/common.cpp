@@ -431,11 +431,12 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
 void property_install(PyObject *scope, const char *name, bool is_static,
                       PyObject *getter, PyObject *setter) noexcept {
-    handle property = (PyObject *) &PyProperty_Type;
+    const internals &internals = internals_get();
+    handle property = (PyObject *) (is_static ? internals.nb_static_property
+                                              : &PyProperty_Type);
     (void) is_static;
     PyObject *m = getter ? getter : setter;
     object doc = none();
-    const internals &internals = internals_get();
 
     if (m && (Py_TYPE(m) == internals.nb_func ||
               Py_TYPE(m) == internals.nb_meth)) {

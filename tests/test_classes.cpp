@@ -47,6 +47,7 @@ struct Big {
     char data[1024];
     Big() { memset(data, 0xff, 1024); }
 };
+
 struct alignas(1024) BigAligned {
     char data[1024];
     BigAligned() {
@@ -62,6 +63,12 @@ struct Animal {
     virtual std::string what() const = 0;
     virtual void void_ret() { }
 };
+
+struct StaticProperties {
+    static int value;
+};
+
+int StaticProperties::value = 23;
 
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::unique_ptr<Struct>(new Struct(12));
@@ -258,4 +265,9 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<MyClass::NestedClass> ncls(mcls, "NestedClass");
     mcls.def("f", []{});
     ncls.def("f", []{});
+
+    /// test18_static_properties
+    nb::class_<StaticProperties>(m, "StaticProperties")
+        .def_readwrite_static("value", &StaticProperties::value)
+        .def_static("get", []{ return StaticProperties::value; } );
 }

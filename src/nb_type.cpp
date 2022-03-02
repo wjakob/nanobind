@@ -7,15 +7,17 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+static int nb_type_setattro(PyObject*, PyObject*, PyObject*);
+
 PyTypeObject nb_type_type = {
     .tp_name = "nb_type",
     .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
     .tp_dealloc = nb_type_dealloc,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_doc = "nanobind metaclass",
-    .tp_init = nb_type_init
+    .tp_init = nb_type_init,
+    .tp_setattro = nb_type_setattro
 };
-
 
 static int inst_init(PyObject *self, PyObject *, PyObject *) {
     PyErr_Format(PyExc_TypeError, "%s: no constructor defined!",
@@ -683,6 +685,17 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
     }
 
     inst->ready = false;
+}
+
+/// Special case to handle 'Class.property = value' assignments
+static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
+    PyObject *descr = _PyType_Lookup((PyTypeObject *) obj, name);
+    PyTypeObject *descr_t = descr ? Py_TYPE(descr) : nullptr;
+
+    if (descr_t == internals_get().nb_static_property)
+        return descr_t->tp_descr_set(descr, obj, value);
+
+    return PyType_Type.tp_setattro(obj, name, value);
 }
 
 NAMESPACE_END(detail)

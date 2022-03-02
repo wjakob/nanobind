@@ -307,6 +307,11 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
+/// Check if it's safe to issue to issue Python operations (GIL held, python not finalizing)
+inline bool ready() {
+    return PyGILState_Check() && !_Py_IsFinalizing();
+}
+
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() {
     return derived().ptr();

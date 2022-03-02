@@ -127,6 +127,9 @@ struct internals {
     /// Types of nanobind functions and methods
     PyTypeObject *nb_func, *nb_meth;
 
+    /// Property variant for static attributes
+    PyTypeObject *nb_static_property;
+
     /// Instance pointer -> Python object mapping
     tsl::robin_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
         inst_c2p;

@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.17...3.22)
 project(nanobind)
 
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-  set(NB_NB_TEST_DEFAULT ON)
+  set(NB_TEST_DEFAULT ON)
 else()
-  set(NB_NB_TEST_DEFAULT OFF)
+  set(NB_TEST_DEFAULT OFF)
 endif()
 
 option(NB_SHARED "Should nanobind produce a shared core library?" ON)

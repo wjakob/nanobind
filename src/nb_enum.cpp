@@ -80,7 +80,7 @@ static PyObject *nb_enum_int(PyObject *o) {
     nb_enum *e = (nb_enum *) o;
 
     const void *p = inst_data(&e->inst);
-    if (t->t.flags & (uint16_t) type_flags::is_unsigned_enum) {
+    if (t->t.flags & (uint32_t) type_flags::is_unsigned_enum) {
         unsigned long long value;
         switch (t->t.size) {
             case 1: value = (unsigned long long) *(const uint8_t *)  p; break;
@@ -91,7 +91,7 @@ static PyObject *nb_enum_int(PyObject *o) {
                      return nullptr;
         }
         return PyLong_FromUnsignedLongLong(value);
-    } else if (t->t.flags & (uint16_t) type_flags::is_signed_enum) {
+    } else if (t->t.flags & (uint32_t) type_flags::is_signed_enum) {
         long long value;
         switch (t->t.size) {
             case 1: value = (long long) *(const int8_t *)  p; break;

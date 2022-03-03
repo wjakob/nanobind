@@ -118,8 +118,8 @@ static void inst_dealloc(PyObject *self) {
     void *p = inst_data(inst);
 
     if (inst->destruct) {
-        if (type->t.flags & (int16_t) type_flags::is_destructible) {
-            if (type->t.flags & (int16_t) type_flags::has_destruct)
+        if (type->t.flags & (int32_t) type_flags::is_destructible) {
+            if (type->t.flags & (int32_t) type_flags::has_destruct)
                 type->t.destruct(p);
         } else {
             fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
@@ -168,7 +168,7 @@ static void inst_dealloc(PyObject *self) {
 void nb_type_dealloc(PyObject *o) {
     nb_type *nbt = (nb_type *) o;
 
-    if ((nbt->t.flags & (uint16_t) type_flags::is_python_type) == 0) {
+    if ((nbt->t.flags & (uint32_t) type_flags::is_python_type) == 0) {
         // Try to find type in data structure
         internals &internals = internals_get();
         auto it = internals.type_c2p.find(std::type_index(*nbt->t.type));
@@ -178,7 +178,7 @@ void nb_type_dealloc(PyObject *o) {
         internals.type_c2p.erase(it);
     }
 
-    if (nbt->t.flags & (uint16_t) type_flags::has_implicit_conversions) {
+    if (nbt->t.flags & (uint32_t) type_flags::has_implicit_conversions) {
         free(nbt->t.implicit);
         free(nbt->t.implicit_py);
     }
@@ -201,8 +201,8 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     nb_type *parent = (nb_type *) type->ht.ht_type.tp_base;
 
     type->t = parent->t;
-    type->t.flags |=  (uint16_t) type_flags::is_python_type;
-    type->t.flags &= ~(uint16_t) type_flags::has_implicit_conversions;
+    type->t.flags |=  (uint32_t) type_flags::is_python_type;
+    type->t.flags &= ~(uint32_t) type_flags::has_implicit_conversions;
     type->t.name = strdup(type->ht.ht_type.tp_name);
     type->t.type_py = &type->ht.ht_type;
     type->t.base = parent->t.type;
@@ -215,14 +215,15 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_data *t) noexcept {
-    const bool is_signed_enum   = t->flags & (uint16_t) type_flags::is_signed_enum,
-               is_unsigned_enum = t->flags & (uint16_t) type_flags::is_unsigned_enum,
-               is_arithmetic    = t->flags & (uint16_t) type_flags::is_arithmetic,
-               is_enum          = is_signed_enum || is_unsigned_enum,
-               has_scope        = t->flags & (uint16_t) type_flags::has_scope,
-               has_doc          = t->flags & (uint16_t) type_flags::has_doc,
-               has_base         = t->flags & (uint16_t) type_flags::has_base,
-               has_base_py      = t->flags & (uint16_t) type_flags::has_base_py;
+    const bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
+               is_unsigned_enum  = t->flags & (uint32_t) type_flags::is_unsigned_enum,
+               is_arithmetic     = t->flags & (uint32_t) type_flags::is_arithmetic,
+               is_enum           = is_signed_enum || is_unsigned_enum,
+               has_scope         = t->flags & (uint32_t) type_flags::has_scope,
+               has_doc           = t->flags & (uint32_t) type_flags::has_doc,
+               has_base          = t->flags & (uint32_t) type_flags::has_base,
+               has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
+               has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback;
 
     str name(t->name), qualname = name, fullname = name;
 
@@ -316,6 +317,9 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     if (is_enum) // last step before PyType_Ready
         nb_enum_prepare(type, is_arithmetic);
+
+    if (has_type_callback)
+        nbt->t.type_callback(type);
 
     if (PyType_Ready(type) < 0)
         fail("nanobind::detail::nb_type_new(\"%s\"): PyType_Ready() failed!", t->name);
@@ -462,7 +466,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         }
 
         if (dst_type &&
-            (dst_type->flags & (uint16_t) type_flags::has_implicit_conversions))
+            (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions))
             return nb_type_get_implicit(src, cpp_type_src, dst_type, internals,
                                         cleanup, out);
     }
@@ -588,8 +592,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
 
     void *new_value = inst_data(inst);
     if (rvp == rv_policy::move) {
-        if (t->flags & (uint16_t) type_flags::is_move_constructible) {
-            if (t->flags & (uint16_t) type_flags::has_move) {
+        if (t->flags & (uint32_t) type_flags::is_move_constructible) {
+            if (t->flags & (uint32_t) type_flags::has_move) {
                 try {
                     t->move(new_value, value);
                 } catch (...) {
@@ -600,7 +604,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
                 memcpy(new_value, value, t->size);
             }
         } else {
-            if (t->flags & (uint16_t) type_flags::is_copy_constructible) {
+            if (t->flags & (uint32_t) type_flags::is_copy_constructible) {
                 rvp = rv_policy::copy;
             } else {
                 fail("nanobind::detail::nb_type_put(\"%s\"): attempted to move "
@@ -611,8 +615,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     }
 
     if (rvp == rv_policy::copy) {
-        if (t->flags & (uint16_t) type_flags::is_copy_constructible) {
-            if (t->flags & (uint16_t) type_flags::has_copy) {
+        if (t->flags & (uint32_t) type_flags::is_copy_constructible) {
+            if (t->flags & (uint32_t) type_flags::has_copy) {
                 try {
                     t->copy(new_value, value);
                 } catch (...) {

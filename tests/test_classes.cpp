@@ -48,12 +48,12 @@ struct Big {
     Big() { memset(data, 0xff, 1024); }
 };
 
-struct alignas(1024) BigAligned {
-    char data[1024];
+struct alignas(128) BigAligned {
+    char data[128];
     BigAligned() {
-        if (((uintptr_t) data) % 1024)
+        if (((uintptr_t) data) % 128)
             throw std::runtime_error("data is not aligned!");
-        memset(data, 0xff, 1024);
+        memset(data, 0xff, 128);
     }
 };
 
@@ -244,7 +244,7 @@ NB_MODULE(test_classes_ext, m) {
         }
     };
 
-    /// test13_operators
+    // test13_operators
     nb::class_<Int>(m, "Int")
         .def(nb::init<int>())
         .def(nb::self + nb::self)
@@ -253,7 +253,7 @@ NB_MODULE(test_classes_ext, m) {
         .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
 
 
-    /// test15: Test nb::keep_alive feature
+    // test15: Test nb::keep_alive feature
     m.def(
         "keep_alive_arg", [](nb::handle, nb::handle ret) { return ret; },
         nb::keep_alive<0, 1>());
@@ -262,7 +262,7 @@ NB_MODULE(test_classes_ext, m) {
         "keep_alive_ret", [](nb::handle, nb::handle ret) { return ret; },
         nb::keep_alive<1, 0>());
 
-    /// test17_name_qualname_module()
+    // test17_name_qualname_module()
     m.def("f", []{});
     struct MyClass { struct NestedClass { }; };
     nb::class_<MyClass> mcls(m, "MyClass");
@@ -270,12 +270,12 @@ NB_MODULE(test_classes_ext, m) {
     mcls.def("f", []{});
     ncls.def("f", []{});
 
-    /// test18_static_properties
+    // test18_static_properties
     nb::class_<StaticProperties>(m, "StaticProperties")
         .def_readwrite_static("value", &StaticProperties::value)
         .def_static("get", []{ return StaticProperties::value; } );
 
-    /// test19_supplement
+    // test19_supplement
     struct ClassWithSupplement { };
     struct Supplement {
         uint8_t data[0xFF];
@@ -299,4 +299,15 @@ NB_MODULE(test_classes_ext, m) {
         }
         return false;
     });
+
+    // test20_type_callback
+    auto callback = [](PyTypeObject *tp) noexcept {
+        tp->tp_as_sequence->sq_length = [](PyObject *) -> Py_ssize_t {
+            return 123;
+        };
+    };
+
+    struct ClassWithLen { };
+    nb::class_<ClassWithLen>(m, "ClassWithLen", nb::type_callback(callback))
+        .def(nb::init<>());
 }

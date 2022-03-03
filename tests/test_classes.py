@@ -408,3 +408,7 @@ def test19_supplement():
     c = t.ClassWithSupplement()
     assert t.check_supplement(c)
     assert not t.check_supplement(t.Struct())
+
+def test20_type_callback():
+    o = t.ClassWithLen()
+    assert len(o) == 123

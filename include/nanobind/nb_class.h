@@ -1,7 +1,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-enum class type_flags : uint16_t {
+enum class type_flags : uint32_t {
     /// Does the type provide a C++ destructor?
     is_destructible          = (1 << 0),
 
@@ -45,13 +45,16 @@ enum class type_flags : uint16_t {
     is_unsigned_enum         = (1 << 14),
 
     /// This type is an arithmetic enumeration
-    is_arithmetic            = (1 << 15)
+    is_arithmetic            = (1 << 15),
+
+    /// This type is an arithmetic enumeration
+    has_type_callback        = (1 << 16)
 };
 
 struct type_data {
-    uint16_t flags;
-    uint16_t align;
     uint32_t size : 24;
+    uint32_t align : 8;
+    uint32_t flags : 24;
     uint32_t supplement : 8;
     const char *name;
     const char *doc;
@@ -62,30 +65,38 @@ struct type_data {
     PyTypeObject *base_py;
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
-    void (*move)(void *, void *);
+    void (*move)(void *, void *) noexcept;
     const std::type_info **implicit;
     bool (**implicit_py)(PyObject *, cleanup_list *) noexcept;
+    void (*type_callback)(PyTypeObject *) noexcept;
 };
 
+static_assert(sizeof(type_data) == 8 + sizeof(void *) * 13);
+
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
-    t.flags |= (uint16_t) type_flags::has_base_py;
+    t.flags |= (uint32_t) type_flags::has_base_py;
     t.base_py = (PyTypeObject *) h.ptr();
 }
 
 NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
-    t.flags |= (uint16_t) type_flags::has_doc;
+    t.flags |= (uint32_t) type_flags::has_doc;
     t.doc = doc;
+}
+
+NB_INLINE void type_extra_apply(type_data &t, type_callback c) {
+    t.flags |= (uint32_t) type_flags::has_type_callback;
+    t.type_callback = c.value;
 }
 
 NB_INLINE void type_extra_apply(type_data &t, is_enum e) {
     if (e.is_signed)
-        t.flags |= (uint16_t) type_flags::is_signed_enum;
+        t.flags |= (uint32_t) type_flags::is_signed_enum;
     else
-        t.flags |= (uint16_t) type_flags::is_unsigned_enum;
+        t.flags |= (uint32_t) type_flags::is_unsigned_enum;
 }
 
 NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
-    t.flags |= (uint16_t) type_flags::is_arithmetic;
+    t.flags |= (uint32_t) type_flags::is_arithmetic;
 }
 
 template <typename T>
@@ -147,7 +158,7 @@ template <typename T> void wrap_copy(void *dst, const void *src) {
     new ((T *) dst) T(*(const T *) src);
 }
 
-template <typename T> void wrap_move(void *dst, void *src) {
+template <typename T> void wrap_move(void *dst, void *src) noexcept {
     new ((T *) dst) T(std::move(*(T *) src));
 }
 
@@ -192,6 +203,7 @@ public:
     using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;
 
     static_assert(sizeof(Alias) < (1 << 24), "instance size is too big!");
+    static_assert(alignof(Alias) < (1 << 8), "instance alignment is too big!");
     static_assert(
         sizeof...(Ts) == !std::is_same_v<Base, T> + !std::is_same_v<Alias, T>,
         "nanobind::class_<> was invoked with extra arguments that could not be handled");
@@ -200,8 +212,8 @@ public:
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
         detail::type_data d;
 
-        d.flags = (uint16_t) detail::type_flags::has_scope;
-        d.align = (uint16_t) alignof(Alias);
+        d.flags = (uint32_t) detail::type_flags::has_scope;
+        d.align = (uint8_t) alignof(Alias);
         d.size = (uint32_t) sizeof(Alias);
         d.supplement = 0;
         d.name = name;

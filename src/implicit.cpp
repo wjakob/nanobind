@@ -17,13 +17,13 @@ void implicitly_convertible(const std::type_info *src,
     type_data *t = it->second;
     size_t size = 0;
 
-    if (t->flags & (uint16_t) type_flags::has_implicit_conversions) {
+    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
         while (t->implicit && t->implicit[size])
             size++;
     } else {
         t->implicit = nullptr;
         t->implicit_py = nullptr;
-        t->flags |= (uint16_t) type_flags::has_implicit_conversions;
+        t->flags |= (uint32_t) type_flags::has_implicit_conversions;
     }
 
     void **data = (void **) malloc(sizeof(void *) * (size + 2));
@@ -47,13 +47,13 @@ void implicitly_convertible(bool (*predicate)(PyObject *, cleanup_list *),
     type_data *t = it->second;
     size_t size = 0;
 
-    if (t->flags & (uint16_t) type_flags::has_implicit_conversions) {
+    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
         while (t->implicit_py && t->implicit_py[size])
             size++;
     } else {
         t->implicit = nullptr;
         t->implicit_py = nullptr;
-        t->flags |= (uint16_t) type_flags::has_implicit_conversions;
+        t->flags |= (uint32_t) type_flags::has_implicit_conversions;
     }
 
     void **data = (void **) malloc(sizeof(void *) * (size + 2));

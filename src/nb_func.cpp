@@ -774,6 +774,15 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                     buf.put_dstr(f->args[arg_index].name);
                 } else if (is_method && arg_index == 0) {
                     buf.put("self");
+
+                    // Skip over type
+                    while (*pc != '}') {
+                        if (*pc == '%')
+                            descr_type++;
+                        pc++;
+                    }
+                    arg_index++;
+                    continue;
                 } else {
                     buf.put("arg");
                     buf.put_uint32((uint32_t) (arg_index - is_method));

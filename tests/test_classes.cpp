@@ -73,7 +73,7 @@ int StaticProperties::value = 23;
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::unique_ptr<Struct>(new Struct(12));
 
-    nb::class_<Struct>(m, "Struct", "Some documentation")
+    auto cls = nb::class_<Struct>(m, "Struct", "Some documentation")
         .def(nb::init<>())
         .def(nb::init<int>())
         .def("value", &Struct::value)
@@ -88,6 +88,10 @@ NB_MODULE(test_classes_ext, m) {
         .def_static("create_copy", &Struct::create_copy,
                     nb::rv_policy::copy)
         .def_static("create_take", &Struct::create_take);
+
+
+    if (!nb::type<Struct>().is(cls))
+        nb::detail::raise("type lookup failed!");
 
     nb::class_<PairStruct>(m, "PairStruct")
         .def(nb::init<>())
@@ -277,10 +281,10 @@ NB_MODULE(test_classes_ext, m) {
         uint8_t data[0xFF];
     };
 
-    nb::class_<ClassWithSupplement> cls(m, "ClassWithSupplement", nb::supplement<Supplement>());
-    cls.def(nb::init<>());
+    nb::class_<ClassWithSupplement> scls(m, "ClassWithSupplement", nb::supplement<Supplement>());
+    scls.def(nb::init<>());
 
-    Supplement &supplement = nb::type_supplement<Supplement>(cls);
+    Supplement &supplement = nb::type_supplement<Supplement>(scls);
     for (uint16_t i = 0; i < 0xFF; ++i)
         supplement.data[i] = i;
 

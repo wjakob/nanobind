@@ -427,3 +427,10 @@ changes are detailed below.
     /// Mutable reference to 'Supplement' portion in Python type object
     Supplement &supplement = nb::type_supplement<Supplement>(cls);
     ```
+
+  - The function `nb::type<Class>()` can be used to look up the Python
+    type object associated with a bound C++ type named `Class`.
+
+  - The `nb::ready()` returns `true` if the GIL is held and the Python
+    interpreter is not currently being finalized. Use this function to to test
+    if it is safe to issue Python API calls.

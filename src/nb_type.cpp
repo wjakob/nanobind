@@ -724,6 +724,15 @@ bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept {
     return PyType_IsSubtype(Py_TYPE(obj), it->second->type_py);
 }
 
+PyObject *nb_type_lookup(const std::type_info *t) noexcept {
+    internals &internals = internals_get();
+    auto it = internals.type_c2p.find(std::type_index(*t));
+    if (it != internals.type_c2p.end())
+        return (PyObject *) it->second->type_py;
+    return nullptr;
+}
+
+
 void *nb_type_extra(PyObject *t) noexcept {
     PyTypeObject *tp = Py_TYPE(t);
     return (uint8_t *) t + tp->tp_basicsize + tp->tp_itemsize;

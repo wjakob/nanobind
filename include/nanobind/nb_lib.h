@@ -204,6 +204,9 @@ NB_CORE void *nb_inst_data(PyObject *o) noexcept;
 /// Check if a Python type object wraps an instance of a specific C++ type
 NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept;
 
+/// Search for the Python type object associated with a C++ type
+NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
+
 // ========================================================================
 
 // Create and install a Python property object

@@ -319,6 +319,12 @@ inline bool ready() {
     return PyGILState_Check() && !_Py_IsFinalizing();
 }
 
+/// Retrieve the Python type object associated with a C++ class
+template <typename T> handle type() {
+    return detail::nb_type_lookup(&typeid(detail::intrinsic_t<T>));
+}
+
+
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() const {
     return derived().ptr();

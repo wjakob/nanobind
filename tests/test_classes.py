@@ -402,3 +402,9 @@ def test18_static_properties():
     t.StaticProperties.value += 1
     assert t.StaticProperties.value == 24
     assert t.StaticProperties.get() == 24
+
+
+def test19_supplement():
+    c = t.ClassWithSupplement()
+    assert t.check_supplement(c)
+    assert not t.check_supplement(t.Struct())

@@ -37,6 +37,7 @@ struct is_operator { };
 struct is_arithmetic { };
 struct is_enum { bool is_signed; };
 template <size_t Nurse, size_t Patient> struct keep_alive { };
+template <typename T> struct supplement { };
 
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }

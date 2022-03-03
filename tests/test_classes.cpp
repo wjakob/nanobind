@@ -270,4 +270,29 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<StaticProperties>(m, "StaticProperties")
         .def_readwrite_static("value", &StaticProperties::value)
         .def_static("get", []{ return StaticProperties::value; } );
+
+    /// test19_supplement
+    struct ClassWithSupplement { };
+    struct Supplement {
+        uint8_t data[0xFF];
+    };
+
+    nb::class_<ClassWithSupplement> cls(m, "ClassWithSupplement", nb::supplement<Supplement>());
+    cls.def(nb::init<>());
+
+    Supplement &supplement = nb::type_supplement<Supplement>(cls);
+    for (uint16_t i = 0; i < 0xFF; ++i)
+        supplement.data[i] = i;
+
+    m.def("check_supplement", [](nb::handle h) {
+        if (nb::isinstance<ClassWithSupplement>(h)) {
+            Supplement &s2 = nb::type_supplement<Supplement>(h.type());
+            for (uint16_t i = 0; i < 0xFF; ++i) {
+                if (s2.data[i] != i)
+                    return false;
+            }
+            return true;
+        }
+        return false;
+    });
 }

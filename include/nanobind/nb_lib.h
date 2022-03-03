@@ -168,9 +168,6 @@ NB_CORE PyObject **seq_get(PyObject *seq, size_t *size,
 /// Create a new capsule object
 NB_CORE PyObject *capsule_new(const void *ptr, void (*free)(void *)) noexcept;
 
-/// Create a new extension module with the given name
-NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
-
 // ========================================================================
 
 /// Create a Python function object for the given function record
@@ -197,6 +194,15 @@ NB_CORE PyObject *nb_type_put_unique(const std::type_info *cpp_type, void *value
 
 /// Try to reliquish ownership from Python object to a unique_ptr
 NB_CORE void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete);
+
+/// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
+NB_CORE void *nb_type_extra(PyObject *t) noexcept;
+
+/// Get a pointer to the instance data of a nanobind instance (nb_inst)
+NB_CORE void *nb_inst_data(PyObject *o) noexcept;
+
+/// Check if a Python type object wraps an instance of a specific C++ type
+NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept;
 
 // ========================================================================
 
@@ -239,6 +245,13 @@ NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
 
 /// Try to import a Python extension module, raises an exception upon failure
 NB_CORE PyObject *module_import(const char *name);
+
+/// Create a new extension module with the given name
+NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
+
+/// Create a submodule of an existing module
+NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
+                                       const char *doc) noexcept;
 
 // ========================================================================
 

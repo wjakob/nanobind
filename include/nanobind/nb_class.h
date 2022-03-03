@@ -51,7 +51,8 @@ enum class type_flags : uint16_t {
 struct type_data {
     uint16_t flags;
     uint16_t align;
-    uint32_t size;
+    uint32_t size : 24;
+    uint32_t supplement : 8;
     const char *name;
     const char *doc;
     PyObject *scope;
@@ -85,6 +86,12 @@ NB_INLINE void type_extra_apply(type_data &t, is_enum e) {
 
 NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
     t.flags |= (uint16_t) type_flags::is_arithmetic;
+}
+
+template <typename T>
+NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
+    static_assert(sizeof(T) <= 0xFF, "Supplement is too big!");
+    t.supplement += sizeof(T);
 }
 
 template <typename... Args> struct init {
@@ -184,10 +191,10 @@ public:
     using Base  = typename detail::extract<T, detail::is_base,  Ts...>::type;
     using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;
 
+    static_assert(sizeof(Alias) < (1 << 24), "instance size is too big!");
     static_assert(
         sizeof...(Ts) == !std::is_same_v<Base, T> + !std::is_same_v<Alias, T>,
-        "nanobind::class_<> was invoked with extra arguments that could not be handled"
-    );
+        "nanobind::class_<> was invoked with extra arguments that could not be handled");
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
@@ -196,6 +203,7 @@ public:
         d.flags = (uint16_t) detail::type_flags::has_scope;
         d.align = (uint16_t) alignof(Alias);
         d.size = (uint32_t) sizeof(Alias);
+        d.supplement = 0;
         d.name = name;
         d.scope = scope.ptr();
         d.type = &typeid(T);
@@ -397,5 +405,8 @@ public:
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }
 template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { return { }; }
+
+template <typename T>
+inline T &type_supplement(handle h) { return *(T *) detail::nb_type_extra(h.ptr()); }
 
 NAMESPACE_END(NB_NAMESPACE)

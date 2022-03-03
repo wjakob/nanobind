@@ -63,7 +63,8 @@ public:
     NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
     NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
-    NB_INLINE operator handle();
+    NB_INLINE handle type() const;
+    NB_INLINE operator handle() const;
 
     accessor<obj_attr> attr(handle key) const;
     accessor<str_attr> attr(const char *key) const;
@@ -220,8 +221,14 @@ public:
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
 
     /// Import and return a module or throws `python_error`.
-    static NB_INLINE module_ import(const char *name) {
+    static NB_INLINE module_ import_(const char *name) {
         return steal<module_>(detail::module_import(name));
+    }
+
+    /// Import and return a module or throws `python_error`.
+    NB_INLINE module_ def_submodule(const char *name,
+                                    const char *doc = nullptr) {
+        return steal<module_>(detail::module_new_submodule(m_ptr, name, doc));
     }
 };
 
@@ -290,7 +297,7 @@ NB_INLINE bool isinstance(handle obj) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(obj);
     else
-        detail::fail("isinstance(): unsupported case!");
+        return detail::nb_type_isinstance(obj.ptr(), &typeid(detail::intrinsic_t<T>));
 }
 
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
@@ -313,9 +320,14 @@ inline bool ready() {
 }
 
 NAMESPACE_BEGIN(detail)
-template <typename Derived> NB_INLINE api<Derived>::operator handle() {
+template <typename Derived> NB_INLINE api<Derived>::operator handle() const {
     return derived().ptr();
 }
+
+template <typename Derived> NB_INLINE handle api<Derived>::type() const {
+    return (PyObject *) Py_TYPE(derived().ptr());
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 

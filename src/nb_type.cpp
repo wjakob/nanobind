@@ -11,7 +11,7 @@ static int nb_type_setattro(PyObject*, PyObject*, PyObject*);
 
 PyTypeObject nb_type_type = {
     .tp_name = "nb_type",
-    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
+    .tp_basicsize = sizeof(nb_type),
     .tp_dealloc = nb_type_dealloc,
     .tp_setattro = nb_type_setattro,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
@@ -183,6 +183,8 @@ void nb_type_dealloc(PyObject *o) {
         free(nbt->t.implicit_py);
     }
 
+    free((char *) nbt->t.name);
+
     PyType_Type.tp_dealloc(o);
 }
 
@@ -201,7 +203,7 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     type->t = parent->t;
     type->t.flags |=  (uint16_t) type_flags::is_python_type;
     type->t.flags &= ~(uint16_t) type_flags::has_implicit_conversions;
-    type->t.name = type->ht.ht_type.tp_name;
+    type->t.name = strdup(type->ht.ht_type.tp_name);
     type->t.type_py = &type->ht.ht_type;
     type->t.base = parent->t.type;
     type->t.base_py = &parent->ht.ht_type;
@@ -249,19 +251,35 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         memcpy(doc, t->doc, len);
     }
 
+    internals &internals = internals_get();
+    PyTypeObject *tp =
+        is_enum ? internals.nb_enum : internals.nb_type;
+
+    const bool has_gc = tp->tp_flags & Py_TPFLAGS_HAVE_GC;
+
+    size_t gc_size = has_gc ? sizeof(uintptr_t) * 2 : 0,
+           size = gc_size + (size_t) (tp->tp_basicsize + tp->tp_itemsize) +
+                  t->supplement;
+    uint8_t *alloc = (uint8_t *) PyObject_Malloc(size);
+    if (!alloc)
+        return PyErr_NoMemory();
+    memset(alloc, 0, size);
+
+    nb_type *nbt = (nb_type *) (alloc + gc_size);
+
+    PyObject_InitVar((PyVarObject *) nbt, tp, 0);
+    if (has_gc)
+        PyObject_GC_Track(nbt);
+
     /* Danger zone: from now (and until PyType_Ready), make sure to
        issue no Python C API calls which could potentially invoke the
        garbage collector (the GC will call type_traverse(), which will in
        turn find the newly constructed type in an invalid state) */
 
-    internals &internals = internals_get();
-    PyTypeObject *metaclass =
-        is_enum ? internals.nb_enum : internals.nb_type;
-    nb_type *nbt =
-        (nb_type *) metaclass->tp_alloc(metaclass, 0);
     PyTypeObject *type = &nbt->ht.ht_type;
 
     memcpy(&nbt->t, t, sizeof(type_data));
+    nbt->t.name = strdup(t->name);
 
     nbt->ht.ht_name = name.release().ptr();
     nbt->ht.ht_qualname = qualname.release().ptr();
@@ -280,7 +298,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         base = it->second->type_py;
     }
 
-    type->tp_name = t->name;
+    type->tp_name = nbt->t.name;
     type->tp_basicsize = (Py_ssize_t) sizeof(nb_inst);
 
     type->tp_dealloc = inst_dealloc;
@@ -696,6 +714,23 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         return descr_t->tp_descr_set(descr, obj, value);
 
     return PyType_Type.tp_setattro(obj, name, value);
+}
+
+bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept {
+    internals &internals = internals_get();
+    auto it = internals.type_c2p.find(std::type_index(*t));
+    if (it == internals.type_c2p.end())
+        return false;
+    return PyType_IsSubtype(Py_TYPE(obj), it->second->type_py);
+}
+
+void *nb_type_extra(PyObject *t) noexcept {
+    PyTypeObject *tp = Py_TYPE(t);
+    return (uint8_t *) t + tp->tp_basicsize + tp->tp_itemsize;
+}
+
+NB_CORE void *nb_inst_data(PyObject *o) noexcept {
+    return inst_data((nb_inst *) o);
 }
 
 NAMESPACE_END(detail)

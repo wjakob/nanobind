@@ -33,51 +33,26 @@ drastic simplifications. It seems that another round of this cycle is needed
 ~3× smaller binaries, with up to ~8× lower overheads on runtime performance
 (when comparing to _pybind11_ with `-Os` size optimizations).
 
-The following microbenchmark binds a _large_ number of trivial functions that
-only perform a few additions. The objective of this is to quantify the overhead
-of bindings on _compilation time_, _binary size_, and _runtime performance_.
-
-Two separate benchmarks analyze function-heavy (`func_`) and class-heavy
-(`class_`) bindings. The former consists of 720 declarations of the form
-(with permuted integer types)
-```cpp
-m.def("test_0050", [](uint16_t a, int64_t b, int32_t c, uint64_t d, uint32_t e, float f) {
-    return a+b+c+d+e+f;
-});
-```
-while the latter does exactly the same computation but packaged up in `struct`s with bindings.
-```cpp
-struct Struct50 {
-    uint16_t a; int64_t b; int32_t c; uint64_t d; uint32_t e; float f;
-    Struct50(uint16_t a, int64_t b, int32_t c, uint64_t d, uint32_t e, float f)
-        : a(a), b(b), c(c), d(d), e(e), f(f) { }
-    float sum() const { return a+b+c+d+e+f; }
-};
-
-py::class_<Struct50>(m, "Struct50")
-    .def(py::init<uint16_t, int64_t, int32_t, uint64_t, uint32_t, float>())
-    .def("sum", &Struct50::sum);
-```
-Each benchmark is compiled in debug mode (`debug`) and with optimizations
-(`opt`) that minimize size (i.e., `-Os`).
-
-The following plot shows the compilation time of bindings created using
-_Boost.Python_, _pybind11_, and _nanobind_, which are all produced by the same
-compiler (Clang) using consistent flags. The "_number_ ×" annotations denote
+The following experiments analyze the performance of function-heavy (`func_`)
+and class-heavy (`class_`) bindings. Technical details on the experimental
+setup can be found
+[here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md). The
+first plot shows the **compilation time** of bindings created using
+_Boost.Python_, _pybind11_, and _nanobind_. The "_number_ ×" annotations denote
 time relative to _nanobind_, which is consistently faster (e.g., a ~**2-3×
 improvement** compared to to _pybind11_).
 <p align="center">
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/times.svg" alt="Compilation time benchmark" width="850"/>
 </p>
 
-As the next plot shows, _nanobind_ also greatly reduces the size of the
+As the next plot shows, _nanobind_ also greatly reduces the **size** of the
 compiled bindings. There is a roughly **3× improvement** compared to _pybind11_
 when compiling with size optimizations.
 <p align="center">
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/sizes.svg" alt="Binary size benchmark" width="850"/>
 </p>
 
-The last experiment compares the runtime performance overheads by by calling
+The last experiment compares the **runtime performance overheads** by by calling
 one of the bound functions many times in a loop. Here, it is also interesting
 to compare to a pure Python implementation that runs bytecode without binding
 overheads (hatched red bar).
@@ -93,9 +68,6 @@ _pybind11_ is _significant_: a ~**2× improvement** for simple functions, and
 _pybind11_ related to overload resolution, multiple inheritance, and holders
 are the main reasons for this difference (those features were either simplified
 or completely removed in _nanobind_).
-
-The code to generate these plots is available
-[here](https://github.com/wjakob/nanobind/blob/master/docs/microbenchmark.ipynb).
 
 ## What are differences between _nanobind_ and _pybind11_?
 
@@ -400,7 +372,7 @@ For new projects, note the following differences:
   of slots (you will need to increase the value provided to the NB_TRAMPOLINE()
   macro)!`.
 
-- *Type casters.* The API of custom type casters has changed _significantly_.
+- **Type casters.** The API of custom type casters has changed _significantly_.
   In a nutshell, the following changes are needed:
 
   - `load()` was renamed to `from_python()`. The function now takes an extra
@@ -436,3 +408,22 @@ For new projects, note the following differences:
   | `reinterpret_borrow` | `borrow`       |
   | `reinterpret_steal`  | `steal`        |
 
+- **New features.**
+
+  - _nanobind_ can store supplemental data along with registered types. This
+    information is co-located with the Python type object. An example use of
+    this fairly advanced feature is in libraries that register large numbers of
+    different types (e.g. flavors of tensors). Generically implemented
+    functions can use the supplement to handle each type slightly differently.
+
+    ```cpp
+    struct Supplement {
+        ...
+    };
+
+    // Register a new type Test, and reserve space for sizeof(Supplement)
+    nb::class_<Test> cls(m, "Test", nb::supplement<Supplement>())
+
+    /// Mutable reference to 'Supplement' portion in Python type object
+    Supplement &supplement = nb::type_supplement<Supplement>(cls);
+    ```

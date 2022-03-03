@@ -69,16 +69,6 @@ PyObject *capsule_new(const void *ptr, void (*free)(void *)) noexcept {
     return c;
 }
 
-PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
-    memset(def, 0, sizeof(PyModuleDef));
-    def->m_name = name;
-    def->m_size = -1;
-    PyObject *m = PyModule_Create(def);
-    if (!m)
-        fail("nanobind::detail::module_new(): allocation failed!");
-    return m;
-}
-
 void raise_python_error() {
     if (PyErr_Occurred())
         throw python_error();
@@ -113,6 +103,53 @@ void cleanup_list::expand() noexcept {
         free(m_data);
     m_data = new_data;
     m_capacity = new_capacity;
+}
+
+// ========================================================================
+
+PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
+    memset(def, 0, sizeof(PyModuleDef));
+    def->m_name = name;
+    def->m_size = -1;
+    PyObject *m = PyModule_Create(def);
+    if (!m)
+        fail("nanobind::detail::module_new(): allocation failed!");
+    return m;
+}
+
+PyObject *module_import(const char *name) {
+    PyObject *res = PyImport_ImportModule(name);
+    if (!res)
+        throw python_error();
+    return res;
+}
+
+PyObject *module_new_submodule(PyObject *base, const char *name,
+                               const char *doc) noexcept {
+
+    PyObject *base_name = PyModule_GetNameObject(base),
+             *name_py, *res;
+    if (!base_name)
+        goto fail;
+
+    name_py = PyUnicode_FromFormat("%U.%s", base_name, name);
+    if (!name_py)
+        goto fail;
+
+    res = PyImport_AddModuleObject(name_py);
+    if (doc) {
+        PyObject *doc_py = PyUnicode_FromString(doc);
+        if (!doc_py || PyObject_SetAttrString(res, "__doc__", doc_py))
+            goto fail;
+        Py_DECREF(doc_py);
+    }
+    Py_DECREF(name_py);
+    Py_DECREF(base_name);
+
+    return res;
+
+fail:
+    fail("nanobind::detail::module_new_submodule(): failed.");
 }
 
 // ========================================================================
@@ -461,15 +498,6 @@ void tuple_check(PyObject *tuple, size_t nargs) {
             raise("nanobind::detail::tuple_check(...): conversion of argument "
                   "%zu failed!", i + 1);
     }
-}
-
-// ========================================================================
-
-PyObject *module_import(const char *name) {
-    PyObject *res = PyImport_ImportModule(name);
-    if (!res)
-        throw python_error();
-    return res;
 }
 
 // ========================================================================

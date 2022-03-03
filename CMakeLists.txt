@@ -99,13 +99,13 @@ if (NB_SHARED)
 endif()
 
 if (MSVC)
-   # Properly report the C++ version, just like other compilers do.
-   target_compile_options(nanobind PUBLIC /Zc:__cplusplus)
+  # Properly report the C++ version, just like other compilers do.
+  target_compile_options(nanobind PUBLIC /Zc:__cplusplus)
 endif()
 
 if (MSVC)
-   # C++20 needed for designated initializers on MSVC..
-   target_compile_features(nanobind PRIVATE cxx_std_20)
+  # C++20 needed for designated initializers on MSVC..
+  target_compile_features(nanobind PRIVATE cxx_std_20)
 else()
   target_compile_features(nanobind PRIVATE cxx_std_17)
   target_compile_options(nanobind PRIVATE -fno-strict-aliasing)
@@ -130,8 +130,6 @@ target_include_directories(nanobind PRIVATE
 # Define a convenience function for creating nanobind targets
 # ---------------------------------------------------------------------------
 
-SET(NB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE STRING "" FORCE)
-
 # Strip unnecessary sections of the binary on Linux/macOS
 function(nanobind_strip name)
   if (CMAKE_STRIP AND NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
@@ -146,63 +144,97 @@ function(nanobind_strip name)
   endif()
 endfunction()
 
-
-nanobind_strip(nanobind)
-
-function(nanobind_add_module name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;NOSTRIP;PROTECT_STACK;LTO" "" "")
-  set(NB_COMPILE_OPTIONS "")
-  set(NB_OPT_SIZE "")
-
-  if (NOT ARG_NOMINSIZE)
-    if (MSVC)
-      set(NB_OPT_SIZE /Os)
-    else()
-      set(NB_OPT_SIZE -Os)
-    endif()
+function(nanobind_opt_size name)
+  if (MSVC)
+    set(NB_OPT_SIZE /Os)
+  else()
+    set(NB_OPT_SIZE -Os)
   endif()
 
-  if (NOT ARG_PROTECT_STACK AND NOT MSVC)
-      # The stack protector affects binding size negatively (+8% on Linux in my
-      # benchmarks). Protecting from stack smashing in a Python VM seems in any
-      # case futile, so let's get rid of it by default in optimized modes.
-    set(NB_OPT_SIZE ${NB_OPT_SIZE} -fno-stack-protector)
-  endif()
-
-  if (NB_OPT_SIZE)
-    set(NB_COMPILE_OPTIONS
+  target_compile_options(${name} PRIVATE
       $<$<CONFIG:Release>:${NB_OPT_SIZE}>
       $<$<CONFIG:MinSizeRel>:${NB_OPT_SIZE}>
       $<$<CONFIG:RelWithDebInfo>:${NB_OPT_SIZE}>)
-  endif()
+endfunction()
 
-  set(NB_SUFFIX ".so")
-  if(MSVC)
+function(nanobind_disable_stack_protector name)
+  if (NOT MSVC)
+    # The stack protector affects binding size negatively (+8% on Linux in my
+    # benchmarks). Protecting from stack smashing in a Python VM seems in any
+    # case futile, so let's get rid of it by default in optimized modes.
+    target_compile_options(${name} PRIVATE
+        $<$<CONFIG:Release>:-fno-stack-protector>
+        $<$<CONFIG:MinSizeRel>:-fno-stack-protector>
+        $<$<CONFIG:RelWithDebInfo>:-fno-stack-protector>)
+  endif()
+endfunction()
+
+function(nanobind_extension name)
+  if (WIN32)
     set(NB_SUFFIX ".pyd")
-    set(NB_COMPILE_OPTIONS ${NB_COMPILE_OPTIONS} /bigobj /MP)
+  else()
+    set(NB_SUFFIX ".so")
   endif()
 
-  set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX}")
+  set_target_properties(${name} PROPERTIES
+    PREFIX "" SUFFIX ".${Python_SOABI}${NB_SUFFIX}")
+endfunction()
+
+function (nanobind_cpp17 name)
+  target_compile_features(${name} PRIVATE cxx_std_17)
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+endfunction()
+
+function (nanobind_msvc)
+  if (MSVC)
+    target_compile_options(${name} PRIVATE /bigobj /MP)
+  endif()
+endfunction()
+
+function (nanobind_lto name)
+  set_target_properties(${name} PROPERTIES
+    INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+    INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
+endfunction()
+
+set(NB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include CACHE INTERNAL "")
+function (nanobind_headers name)
+  target_include_directories(${name} PRIVATE ${NB_INCLUDE_DIR})
+endfunction()
+
+function (nanobind_lib name)
+  target_link_libraries(${name} PRIVATE nanobind)
+endfunction()
+
+function(nanobind_add_module name)
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;NOSTRIP;PROTECT_STACK;LTO" "" "")
 
   Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
-  target_compile_features(${name} PRIVATE cxx_std_17)
-  target_compile_options(${name} PRIVATE ${NB_COMPILE_OPTIONS})
-  target_link_libraries(${name} PRIVATE nanobind)
-  set_target_properties(${name} PROPERTIES
-    PREFIX "" SUFFIX ${NB_SUFFIX} LINKER_LANGUAGE CXX)
-  target_include_directories(${name} PRIVATE ${NB_INCLUDE_DIR})
+  nanobind_cpp17(${name})
+  nanobind_extension(${name})
+  nanobind_msvc(${name})
+  nanobind_headers(${name})
+  nanobind_lib(${name})
+
+  if (NOT ARG_PROTECT_STACK)
+    nanobind_disable_stack_protector(${name})
+  endif()
+
+  if (NOT ARG_NOMINSIZE)
+    nanobind_opt_size(${name})
+  endif()
 
   if (NOT ARG_NOSTRIP)
     nanobind_strip(${name})
   endif()
 
   if (ARG_LTO)
-    set_target_properties(${name} PROPERTIES
-      INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
-      INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
+    nanobind_lto(${name})
   endif()
 endfunction()
+
+nanobind_strip(nanobind)
 
 if (NB_TEST)
   add_subdirectory(tests)

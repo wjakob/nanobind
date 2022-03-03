@@ -1,5 +1,7 @@
 # nanobind — Seamless operability between C++17 and Python
 
+[![Continuous Integration](https://github.com/wjakob/nanobind/actions/workflows/ci.yml/badge.svg)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
+
 _nanobind_ is a small binding library that exposes C++ types in Python and vice
 versa. It is reminiscent of
 _[Boost.Python](https://www.boost.org/doc/libs/1_64_0/libs/python/doc/html)_
@@ -24,35 +26,38 @@ Ironically, the situation today feels like 2015 all over again: binding
 generation with existing tools (_Boost.Python_, _pybind11_) is slow and
 produces enormous binaries with overheads on runtime performance. At the same
 time, key improvements in C++17 and Python 3.8 provide opportunities for
-drastic simplifications. It seems that another round of this cycle is needed
-(though the plan is that this doesn't become a _vicious cycle_, see below..)
+drastic simplifications. Therefore, I am starting _another_ binding project..
+This time, the scope is intentionally limited so that this doesn't turn into an
+endless cycle.
 
-## Performance numbers
+## Performance
 
 > **TLDR**: _nanobind_ bindings compile ~2-3× faster, producing
 ~3× smaller binaries, with up to ~8× lower overheads on runtime performance
 (when comparing to _pybind11_ with `-Os` size optimizations).
 
-The following experiments analyze the performance of function-heavy (`func_`)
-and class-heavy (`class_`) bindings. Technical details on the experimental
-setup can be found
-[here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md). The
-first plot shows the **compilation time** of bindings created using
-_Boost.Python_, _pybind11_, and _nanobind_. The "_number_ ×" annotations denote
-time relative to _nanobind_, which is consistently faster (e.g., a ~**2-3×
-improvement** compared to to _pybind11_).
+The following experiments analyze the performance of a very large
+function-heavy (`func`) and class-heavy (`class`) binding microbenchmark
+compiled using _Boost.Python_, _pybind11_, and _nanobind_ in both `debug` and
+size-optimized (`opt`) modes. Details on the experimental setup can be found
+[here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md). 
+
+The first plot contrasts the **compilation time**, where "_number_ ×"
+annotations denote the amount of time spent relative to _nanobind_. As shown
+below, _nanobind_ achieves a consistent ~**2-3× improvement** compared to to
+_pybind11_.
 <p align="center">
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/times.svg" alt="Compilation time benchmark" width="850"/>
 </p>
 
-As the next plot shows, _nanobind_ also greatly reduces the **size** of the
-compiled bindings. There is a roughly **3× improvement** compared to _pybind11_
-when compiling with size optimizations.
+_nanobind_ also greatly reduces the **binary size** of the compiled bindings.
+There is a roughly **3× improvement** compared to _pybind11_ and a **8-9×
+improvement** compared to _Boost.Python_ (both with size optimizations).
 <p align="center">
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/sizes.svg" alt="Binary size benchmark" width="850"/>
 </p>
 
-The last experiment compares the **runtime performance overheads** by by calling
+The last experiment compares the **runtime performance overheads** by calling
 one of the bound functions many times in a loop. Here, it is also interesting
 to compare to a pure Python implementation that runs bytecode without binding
 overheads (hatched red bar).
@@ -61,63 +66,69 @@ overheads (hatched red bar).
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/perf.svg" alt="Runtime performance benchmark" width="850"/>
 </p>
 
-This shows that the overhead of calling a _nanobind_ function is lower than
-that of an equivalent CPython function. The difference to
-_pybind11_ is _significant_: a ~**2× improvement** for simple functions, and
-**~8× improvement** when classes are being passed around. Complexities in
-_pybind11_ related to overload resolution, multiple inheritance, and holders
-are the main reasons for this difference (those features were either simplified
-or completely removed in _nanobind_).
+The overhead of a _nanobind_ function is lower than that of an equivalent pure
+CPython function (the functions do essentially nothing in this experiment, so
+this plot measures function call overheads).
 
-## What are differences between _nanobind_ and _pybind11_?
+The difference to _pybind11_ is _significant_: a ~**2× improvement** for simple
+functions, and an **~8× improvement** when classes are being passed around.
+Complexities in _pybind11_ related to overload resolution, multiple
+inheritance, and holders are the main reasons for this difference. Those
+features were either simplified or completely removed in _nanobind_.
 
-The main difference is philosophical: _pybind11_ must deal with *all of C++* to
-bind complex legacy codebases, while _nanobind_ targets a smaller C++ subset.
-**The codebase has to adapt to the binding tool and not the other way around!**
-This change of perspective allows _nanobind_ to be simpler and faster. Pull
-requests with extensions and generalizations were welcomed in _pybind11_, but
-they will likely be rejected in this project.
+## What are technical differences between _nanobind_ and _pybind11_?
+
+The main difference is actually more philosophical: _pybind11_ must deal with
+*all of C++* to bind complex legacy codebases, while _nanobind_ targets a
+smaller C++ subset. **The codebase has to adapt to the binding tool and not the
+other way around!** This change of perspective allows _nanobind_ to be simpler
+and faster. Pull requests with extensions and generalizations were welcomed in
+_pybind11_, but they will likely be rejected in this project.
 
 ### Removed features
 
-Support for multiple inheritance was a persistent source of complexity in
-_pybind11_, and it is one of the main casualties in creating _nanobind_.
-The list below uses the following symbols:
+A number of _pybind11_ features are unavailable in _nanobind_. The list below
+uses the following symbols:
 
-- ⊘: This removal is a design choice. Use _pybind11_ if you need this feature.
-- ⊛: This feature may be added at some point; help is welcomed.
-- ⊚: Unclear, to be discussed.
+- ○: This removal is a design choice. Use _pybind11_ if you need this feature.
+- ●: This feature will likely be added at some point; your help is welcomed.
+- ◑: Unclear, to be discussed.
 
-The following _pybind11_ features are unavailable in _nanobind_:
+Removed features include:
 
-- ⊘ _nanobind_ does not instantiate a _holder_ type internally, which has
-  implications on object ownership (though shared/unique pointers are still
-  supported with some restrictions, see below).
-- ⊘ Binding does not support C++ classes with overloaded or deleted `operator
+- ○ Multiple inheritance was a persistent source of complexity in _pybind11_,
+  and it is one of the main casualties in creating _nanobind_. C++ classes
+  involving multiple inheritance cannot be mapped onto an equivalent Python
+  class hierarchy.
+- ○ _nanobind_ instances co-locate instance data with a Python object instead
+  of accessing it via a _holder_ type. This is a major difference compared to
+  _pybind11_, which has implications on object ownership. Shared/unique
+  pointers are still supported with some restrictions, see below for details.
+- ○ Binding does not support C++ classes with overloaded or deleted `operator
   new` / `operator delete`.
-- ⊘ The ability to run several independent Python interpreters in the same
+- ○ The ability to run several independent Python interpreters in the same
   process is unsupported. (This would require TLS lookups for _nanobind_ data
   structures, which is undesirable.)
-- ⊘ `kw_only` / `pos_only` argument annotations were removed.
-- ⊘ The `options` class for customizing docstring generation was removed.
-- ⊘ Workarounds for old/buggy/non-standard-compliant compilers are gone and
+- ○ `kw_only` / `pos_only` argument annotations were removed.
+- ○ The `options` class for customizing docstring generation was removed.
+- ○ Workarounds for old/buggy/non-standard-compliant compilers are gone and
   will not be reintroduced.
-- ⊛ Module-local type or exception declarations are currently unsupported.
-- ⊛ Many STL type caster have not yet been ported.
-- ⊚ PyPy support is gone. (PyPy requires many workaround in _pybind11_ that
+- ○ Module-local types and exceptions are unsupported.
+- ○ Custom metaclasses are unsupported.
+- ● Many STL type caster have not yet been ported.
+- ● PyPy support is gone. (PyPy requires many workaround in _pybind11_ that
   complicate the its internals. Making PyPy interoperate with _nanobind_ will
   likely require changes to the PyPy CPython emulation layer.)
-- ⊚ Eigen and NumPy integration have been removed.
-- ⊚ Buffer protocol functionality was removed.
-- ⊚ Nested exceptions are not supported.
-- ⊚ Features to facilitate pickling and unpickling were removed.
-- ⊚ Custom metaclasses are unsupported.
-- ⊚ Support for embedding the interpreter and evaluating Python code
+- ◑ Eigen and NumPy integration have been removed.
+- ◑ Buffer protocol functionality was removed.
+- ◑ Nested exceptions are not supported.
+- ◑ Features to facilitate pickling and unpickling were removed.
+- ◑ Support for embedding the interpreter and evaluating Python code
     strings was removed.
 
 ### Removed features
 
-Bullet points marked with ⊛ or ⊚ may be reintroduced eventually, but this will
+Bullet points marked with ● or ◑ may be reintroduced eventually, but this will
 need to be done in a careful opt-in manner that does not affect code
 complexity, binary size, and compilation/runtime performance of basic bindings
 that don't depend on these features.
@@ -268,7 +279,7 @@ it performs the following steps to produce efficient bindings.
 
   ```cmake
 
-  set(NB_SHARED OFF CACHE INTERNAL "") # Static libnanobind
+  set(NB_SHARED OFF CACHE INTERNAL "") # Request static compilation of libnanobind
   add_subdirectory(.. path to nanobind directory ..)
   nanobind_add_module(...)
   ```
@@ -277,19 +288,8 @@ it performs the following steps to produce efficient bindings.
 
 _nanobind_ mostly follows the _pybind11_ API, hence the [pybind11
 documentation](https://pybind11.readthedocs.io/en/stable) is the main source of
-documentation for this project. A number of simplifications and other changes
-are detailed below.
-
-To port existing code with minimal adaptation, you can include
-```cpp
-#include <nanobind/pybind11.h>
-```
-which exposes a `pybind11` namespace with the previous naming scheme. However,
-make note of the _holder_ and `NB_TRAMPOLINE` discussion below: these will
-require a few adaptation on your end if your code uses holder types or
-`PYBIND11_OVERRIDE_*()`.
-
-For new projects, note the following differences:
+documentation for this project. A number of simplifications and noteworthy
+changes are detailed below.
 
 - **Namespace**. _nanobind_ types and functions are located in the `nanobind` namespace. The
   `namespace nb = nanobind;` shorthand alias is recommended.

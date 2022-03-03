@@ -75,7 +75,6 @@ add_library(nanobind ${NB_LIB_TYPE}
   include/nanobind/nb_types.h
   include/nanobind/trampoline.h
   include/nanobind/stl/string.h
-  include/nanobind/pybind11.h
 
   src/internals.h
   src/buffer.h

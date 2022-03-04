@@ -3,6 +3,8 @@ NAMESPACE_BEGIN(detail)
 
 template <typename Impl> class accessor : public api<accessor<Impl>> {
 public:
+    static constexpr auto Name = const_name("object");
+
     template <typename Key>
     accessor(handle obj, Key &&key)
         : m_base(obj.ptr()), m_cache(nullptr), m_key(std::move(key)) { }

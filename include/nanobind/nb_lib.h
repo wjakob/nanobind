@@ -30,7 +30,7 @@ public:
         return m_local[0];
     }
 
-    /// This should only be called by nb_func_vectorcall_*
+    /// Decrease the reference count of all appended objects
     void release() noexcept;
 
 protected:

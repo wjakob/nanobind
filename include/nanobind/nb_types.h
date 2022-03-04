@@ -125,6 +125,7 @@ public:
     handle &operator=(const handle &) = default;
     handle &operator=(handle &&) noexcept = default;
     NB_INLINE handle(const PyObject *ptr) : m_ptr((PyObject *) ptr) { }
+    NB_INLINE handle(const PyTypeObject *ptr) : m_ptr((PyObject *) ptr) { }
 
     const handle& inc_ref() const & noexcept { Py_XINCREF(m_ptr); return *this; }
     const handle& dec_ref() const & noexcept { Py_XDECREF(m_ptr); return *this; }

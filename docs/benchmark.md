@@ -25,8 +25,8 @@ py::class_<Struct50>(m, "Struct50")
     .def("sum", &Struct50::sum);
 ```
 Each benchmark is compiled in debug mode (`debug`) and with optimizations
-(`opt`) that minimize size (i.e., `-Os`). Compilation is done by AppleClang
-using consistent flags for all three binding tools.
+(`opt`) that minimize size (i.e., `-Os`) and run on Python 3.9.10. Compilation
+is done by AppleClang using consistent flags for all three binding tools.
 
 The code to generate the plots on the main project page is available
 [here](https://github.com/wjakob/nanobind/blob/master/docs/microbenchmark.ipynb).

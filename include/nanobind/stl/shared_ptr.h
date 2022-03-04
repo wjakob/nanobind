@@ -78,7 +78,7 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
     static handle from_cpp(const Value *value, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
         if (!value)
-            return nullptr;
+            return (PyObject *) nullptr;
         return from_cpp(*value, policy, cleanup);
     }
 

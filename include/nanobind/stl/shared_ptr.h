@@ -27,7 +27,7 @@ shared_from_python(void *ptr, handle h) noexcept {
     if (ptr)
         return std::shared_ptr<void>(ptr, py_deleter{ h.inc_ref().ptr() });
     else
-        return std::shared_ptr<void>(nullptr);
+        return std::shared_ptr<void>((PyObject *) nullptr);
 }
 
 inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,

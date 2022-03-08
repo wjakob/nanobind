@@ -155,6 +155,10 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
     Py_DECREF(name_py);
     Py_DECREF(base_name);
 
+    Py_INCREF(res);
+    if (PyModule_AddObject(base, name, res))
+        goto fail;
+
     return res;
 
 fail:

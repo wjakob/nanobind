@@ -1,3 +1,13 @@
+/*
+    nanobind/nb_python.h: Include CPython headers while temporarily disabling
+    certain warnings. Also, disable dangerous preprocessor definitions.
+
+    Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 /// Include Python header, disable linking to pythonX_d.lib on Windows in debug mode
 #if defined(_MSC_VER)
 #  pragma warning(push)

@@ -1,3 +1,12 @@
+/*
+    nanobind/nb_types.h: nb::dict/str/list/..: C++ wrappers for Python types
+
+    Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// Macro defining functions/constructors for nanobind::handle subclasses

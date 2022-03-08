@@ -1,3 +1,12 @@
+/*
+    nanobind/nb_enum.h: enumerations used in nanobind (just rv_policy atm.)
+
+    Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 // Approach used to cast a previously unknown C++ instance into a Python object

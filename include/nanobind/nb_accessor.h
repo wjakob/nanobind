@@ -1,3 +1,12 @@
+/*
+    nanobind/nb_accessor.h: Accessor helper class for .attr(), operator[]
+
+    Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

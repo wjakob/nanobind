@@ -1,3 +1,12 @@
+/*
+    nanobind/nb_error.h: Python exception handling, binding of exceptions
+
+    Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// RAII wrapper that temporarily clears any Python error state

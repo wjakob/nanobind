@@ -751,8 +751,32 @@ void *nb_type_extra(PyObject *t) noexcept {
     return (uint8_t *) t + tp->tp_basicsize + tp->tp_itemsize;
 }
 
-NB_CORE void *nb_inst_data(PyObject *o) noexcept {
+void *nb_inst_data(PyObject *o) noexcept {
     return inst_data((nb_inst *) o);
+}
+
+void nb_inst_zero(PyObject *o) noexcept {
+    nb_inst *nbi = (nb_inst *) o;
+    memset(inst_data(nbi), 0, ((nb_type *) Py_TYPE(o))->t.size);
+    nbi->ready = nbi->destruct = true;
+}
+
+void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
+    nb_type *nbt = (nb_type *) Py_TYPE(src);
+    if (Py_TYPE(src) != Py_TYPE(dst) ||
+        (nbt->t.flags & (uint32_t) type_flags::is_copy_constructible) == 0)
+        fail("nanobind::detail::nb_inst_copy(): invalid arguments!");
+
+    nb_inst *nbi = (nb_inst *) dst;
+    const void *src_data = inst_data((nb_inst *) src);
+    void *dst_data = inst_data(nbi);
+
+    if (nbt->t.flags & (uint32_t) type_flags::has_copy)
+        nbt->t.copy(dst_data, src_data);
+    else
+        memcpy(dst_data, src_data, nbt->t.size);
+
+    nbi->ready = nbi->destruct = true;
 }
 
 NAMESPACE_END(detail)

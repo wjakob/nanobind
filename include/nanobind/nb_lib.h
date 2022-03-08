@@ -216,6 +216,12 @@ NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept
 /// Search for the Python type object associated with a C++ type
 NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
 
+/// Zero-initialize a POD type and mark it as ready
+NB_CORE void nb_inst_zero(PyObject *o) noexcept;
+
+/// Copy-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
+NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
+
 // ========================================================================
 
 // Create and install a Python property object

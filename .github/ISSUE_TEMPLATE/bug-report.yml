@@ -1,0 +1,33 @@
+name: Bug report
+description: File an issue about a critical issue in nanobind
+title: "[BUG]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Important information
+        The author's time for processing GitHub issues is unfortunately very limited. Because of this, _nanobind_ cannot accept feature requests. Furthermore, questions should not be submitted here, please use the separate "Discussions" tab. I will unfortunately need to close feature requests or questions maquerading as bug reports.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem description
+      placeholder: >-
+        Provide a short description, state the expected behavior and what
+        actually happens. Include relevant information like what version of
+        Python and nanobind you are using, what system you are on, and any
+        useful commands / output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Reproducible example code
+      placeholder: >-
+        The code should be minimal, have no external dependencies, isolate the
+        function(s) that cause breakage. Submit matched and complete C++ and
+        Python snippets that can be easily compiled and run to diagnose the
+        issue. If possible, make a PR with a new, failing test to provide a
+        starting point to work on!
+      render: text

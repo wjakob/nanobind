@@ -50,7 +50,7 @@ Details on the experimental setup can be found
 
 The first plot contrasts the **compilation time**, where "_number_ ×"
 annotations denote the amount of time spent relative to _nanobind_. As shown
-below, _nanobind_ achieves a consistent ~**2-3× improvement** compared to to
+below, _nanobind_ achieves a consistent ~**2-3× improvement** compared to
 _pybind11_.
 <p align="center">
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/times.svg" alt="Compilation time benchmark" width="850"/>
@@ -65,18 +65,19 @@ improvement** compared to _Boost.Python_ (both with size optimizations).
 
 The last experiment compares the **runtime performance overheads** by calling
 one of the bound functions many times in a loop. Here, it is also interesting
-to compare against [cppyy](https://cppyy.readthedocs.io/en/latest/) and a pure
-Python implementation that runs bytecode without binding overheads (hatched red
-bar).
+to compare against [cppyy](https://cppyy.readthedocs.io/en/latest/) (gray bar)
+and a pure Python implementation that runs bytecode without binding overheads
+(hatched red bar).
 
 <p align="center">
 <img src="https://github.com/wjakob/nanobind/raw/master/docs/images/perf.svg" alt="Runtime performance benchmark" width="850"/>
 </p>
 
-The overhead of a _nanobind_ function is lower than that of an equivalent pure
-CPython function. The functions benchmarked here don't perform CPU-intensive
-work, so this this plot mainly mainly measures the overheads of performing a
-function call, boxing/unboxing arguments and return values, etc.
+This data shows that the overhead of calling a _nanobind_ function is lower
+than that of an equivalent function call done within CPython. The functions
+benchmarked here don't perform CPU-intensive work, so this this mainly measures
+the overheads of performing a function call, boxing/unboxing arguments and
+return values, etc.
 
 The difference to _pybind11_ is _significant_: a ~**2× improvement** for simple
 functions, and an **~8× improvement** when classes are being passed around.
@@ -102,18 +103,23 @@ differences make these two tools appropriate to different audiences: _cppyy_
 has its origin in CERN's ROOT mega-project and must be highly dynamic to work
 with that codebase: it can parse header files to generate bindings as needed.
 _cppyy_ works particularly well together with PyPy and can avoid
-boxing/unboxing overheads. The main downside of this tool is that it has
-relatively big complex machinery (Cling/Clang/LLVM) as a dependency that must
-always run on the user's end.
+boxing/unboxing overheads with this combination. The main downside of _cppyy_
+is that it depends on big and complex machinery (Cling/Clang/LLVM) that must
+be deployed on the user's side and then run there. There isn't a way of
+pre-generating bindings and then shipping just the output of this process.
 
-_nanobind_ is static in comparison: you must tell it which functions to expose
-via binding declarations. At compile-time, those declarations turn into a
-sequence of CPython API calls. This produces self-contained bindings that are
-easier to redistribute via [PyPI](https://pypi.org) or elsewhere. Tools like
+_nanobind_ is relatively static in comparison: you must tell it which functions
+to expose via binding declarations. These declarations offer a high degree of
+flexibility that users will typically use to create bindings that feel
+_pythonic_. At compile-time, those declarations turn into a sequence of CPython
+API calls, which produces self-contained bindings that are easy to redistribute
+via [PyPI](https://pypi.org) or elsewhere. Tools like
 [cibuildwheel](https://cibuildwheel.readthedocs.io/en/stable/) and
 [scikit-build](https://scikit-build.readthedocs.io/en/latest/index.html) can
 fully automate the process of generating _Python wheels_ for each target
-platform. 
+platform. A minimal [example
+project](https://github.com/wjakob/nanobind_example) shows how to do this
+automatically via [GitHub Actions](https://github.com/features/actions).
 
 ## What are technical differences between _nanobind_ and _pybind11_?
 

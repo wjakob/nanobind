@@ -1,6 +1,9 @@
 # nanobind — Seamless operability between C++17 and Python
 
 [![Continuous Integration](https://github.com/wjakob/nanobind/actions/workflows/ci.yml/badge.svg)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
+[![](https://img.shields.io/pypi/v/nanobind.svg)](https://pypi.org/pypi/nanobind/)
+![](https://img.shields.io/pypi/l/nanobind.svg)
+[![](https://img.shields.io/badge/Example_project-Link-green)](https://github.com/wjakob/nanobind_example)
 
 _nanobind_ is a small binding library that exposes C++ types in Python and vice
 versa. It is reminiscent of
@@ -252,6 +255,12 @@ _nanobind_ depends on recent versions of everything:
   vendors so that they will fix their compilers.
 
 ### CMake interface
+
+Note: for your convenience, a minimal example of a project with C++ bindings
+compiled using _nanobind_ and
+[`scikit-build`](https://scikit-build.readthedocs.io/en/latest/) is available
+in the [`nanobind_example`](https://github.com/wjakob/nanobind_example)
+repository. To set up a build system manually, read on:
 
 _nanobind_ provides a CMake convenience function that automates the process of
 building a python extension module. This works analogously to _pybind11_.

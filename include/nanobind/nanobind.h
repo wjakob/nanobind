@@ -9,7 +9,7 @@
 
 #pragma once
 
-#if __cplusplus < 201703L
+#if __cplusplus < 201703L && (!defined(_MSVC_LANG) || _MSVC_LANG < 201703L)
 #  error The nanobind library requires C++17!
 #endif
 
@@ -20,6 +20,10 @@
 #  pragma warning(disable: 4275) // non dll-interface class 'std::exception' used as base for dll-interface class [..]
 #  pragma warning(disable: 4251) // [..] needs to have a dll-interface to be used by clients of class [..]
 #endif
+
+#define NB_VERSION_MAJOR 0
+#define NB_VERSION_MINOR 0
+#define NB_VERSION_PATCH 2
 
 // Core C++ headers that nanobind depends on
 #include <cstdint>

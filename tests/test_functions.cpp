@@ -89,4 +89,11 @@ NB_MODULE(test_functions_ext, m) {
         nb::print("Test 1");
         nb::print(nb::str("Test 2"));
     });
+
+    m.def("test_iter", [](nb::object in) {
+        nb::list l;
+        for (nb::handle h : in)
+            l.append(h);
+        return l;
+    });
 }

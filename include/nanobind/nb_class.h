@@ -430,4 +430,8 @@ template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { r
 template <typename T>
 inline T &type_supplement(handle h) { return *(T *) detail::nb_type_extra(h.ptr()); }
 
+template <typename T> T *instance(PyObject *o) {
+    return (T *) detail::nb_inst_data(o);
+}
+
 NAMESPACE_END(NB_NAMESPACE)

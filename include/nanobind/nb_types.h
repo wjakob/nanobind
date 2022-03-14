@@ -48,6 +48,7 @@ public:                                                                        \
 // A few forward declarations
 class object;
 class handle;
+class iterator;
 
 template <typename T = object> T borrow(handle h);
 template <typename T = object> T steal(handle h);
@@ -72,6 +73,11 @@ public:
     NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
     NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
+    NB_INLINE handle inc_ref() const & noexcept;
+    NB_INLINE handle dec_ref() const & noexcept;
+    iterator begin() const;
+    iterator end() const;
+
     NB_INLINE handle type() const;
     NB_INLINE operator handle() const;
 
@@ -221,8 +227,6 @@ inline void setattr(handle obj, handle key, handle value) {
     detail::setattr(obj.ptr(), key.ptr(), value.ptr());
 }
 
-inline object none() { return borrow(Py_None); }
-
 class module_ : public object {
 public:
     NB_OBJECT(module_, object, PyModule_CheckExact);
@@ -275,7 +279,8 @@ class tuple : public object {
 };
 
 class list : public object {
-    NB_OBJECT_DEFAULT(list, object, PyList_Check)
+    NB_OBJECT(list, object, PyList_Check)
+    list() : object(PyList_New(0), detail::steal_t()) { }
     size_t size() const { return PyList_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);
@@ -301,6 +306,44 @@ class args : public tuple {
 class kwargs : public dict {
     NB_OBJECT_DEFAULT(kwargs, dict, PyDict_Check)
 };
+
+class iterator : public object {
+public:
+    using difference_type = Py_ssize_t;
+    using value_type = handle;
+    using reference = const handle;
+    using pointer = const handle *;
+
+    NB_OBJECT_DEFAULT(iterator, object, PyIter_Check)
+
+    iterator& operator++() {
+        m_value = steal(detail::obj_iter_next(m_ptr));
+        return *this;
+    }
+
+    iterator operator++(int) {
+        iterator rv = *this;
+        m_value = steal(detail::obj_iter_next(m_ptr));
+        return rv;
+    }
+
+    handle operator*() const {
+        if (is_valid() & !m_value.is_valid())
+            m_value = steal(detail::obj_iter_next(m_ptr));
+        return m_value;
+    }
+
+    pointer operator->() const { operator*(); return &m_value; }
+
+    static iterator sentinel() { return {}; }
+
+    friend bool operator==(const iterator &a, const iterator &b) { return a->ptr() == b->ptr(); }
+    friend bool operator!=(const iterator &a, const iterator &b) { return a->ptr() != b->ptr(); }
+
+private:
+    mutable object m_value;
+};
+
 
 template <typename T>
 NB_INLINE bool isinstance(handle obj) noexcept {
@@ -334,6 +377,12 @@ template <typename T> handle type() {
     return detail::nb_type_lookup(&typeid(detail::intrinsic_t<T>));
 }
 
+inline object none() { return borrow(Py_None); }
+inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
+
+inline iterator iter(handle h) {
+    return steal<iterator>(detail::obj_iter(h.ptr()));
+}
 
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() const {
@@ -342,6 +391,19 @@ template <typename Derived> NB_INLINE api<Derived>::operator handle() const {
 
 template <typename Derived> NB_INLINE handle api<Derived>::type() const {
     return (PyObject *) Py_TYPE(derived().ptr());
+}
+
+template <typename Derived>
+NB_INLINE handle api<Derived>::inc_ref() const &noexcept {
+    return operator handle().inc_ref();
+}
+
+template <typename Derived> iterator api<Derived>::begin() const {
+    return iter(*this);
+}
+
+template <typename Derived> iterator api<Derived>::end() const {
+    return iterator::sentinel();
 }
 
 NAMESPACE_END(detail)

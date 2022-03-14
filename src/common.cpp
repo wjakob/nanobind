@@ -253,6 +253,22 @@ end:
     return res;
 }
 
+
+PyObject *obj_iter(PyObject *o) {
+    PyObject *result = PyObject_GetIter(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *obj_iter_next(PyObject *o) {
+    PyObject *result = PyIter_Next(o);
+    if (!result && PyErr_Occurred())
+        raise_python_error();
+    return result;
+}
+
+
 // ========================================================================
 
 PyObject *getattr(PyObject *obj, const char *key) {

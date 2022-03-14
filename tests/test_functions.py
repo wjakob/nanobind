@@ -133,3 +133,6 @@ def test14_print(capsys):
     t.test_print()
     captured = capsys.readouterr()
     assert captured.out == "Test 1\nTest 2\n"
+
+def test15_iter():
+    assert t.test_iter([1,2,3]) == [1,2,3]

@@ -137,7 +137,7 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
 
     PyObject *base_name = PyModule_GetNameObject(base),
-             *name_py = nullptr, *res = nullptr;
+             *name_py, *res;
     if (!base_name)
         goto fail;
 
@@ -354,7 +354,7 @@ void getitem_maybe(PyObject *obj, const char *key_, PyObject **out) {
     if (*out)
         return;
 
-    PyObject *key = nullptr, *res = nullptr;
+    PyObject *key, *res;
 
     key = PyUnicode_FromString(key_);
     if (!key)

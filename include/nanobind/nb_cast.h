@@ -233,7 +233,7 @@ template <typename Type_> struct type_caster_base {
     template <typename T>
     NB_INLINE static handle from_cpp(T &&value, rv_policy policy,
                                      cleanup_list *cleanup) noexcept {
-        Type *value_p = nullptr;
+        Type *value_p;
         if constexpr (is_pointer_v<T>)
             value_p = (Type *) value;
         else

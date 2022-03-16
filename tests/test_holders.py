@@ -139,7 +139,7 @@ def test07_uniqueptr_passthrough(clean):
     t.reset()
 
     with pytest.warns(RuntimeWarning, match=r'nanobind::detail::nb_relinquish_ownership()'):
-        with pytest.raises(TypeError) as excinfo:
+        with pytest.raises(TypeError):
             assert t.passthrough_unique(t.Example(1)).value == 1
     assert t.passthrough_unique_2(t.Example(1)).value == 1
     assert t.stats() == (2, 2)

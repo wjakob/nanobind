@@ -3,7 +3,7 @@ import pytest
 
 def test01_capture():
     # Functions with and without capture object of different sizes
-    assert t.test_01() == None
+    assert t.test_01() is None
     assert t.test_02(5, 3) == 2
     assert t.test_03(5, 3) == 44
     assert t.test_04() == 60
@@ -127,7 +127,7 @@ def test13_call_guard():
     assert t.call_guard_value() == 0
     assert t.test_call_guard() == 1
     assert t.call_guard_value() == 2
-    assert t.test_release_gil() == False
+    assert not t.test_release_gil()
 
 def test14_print(capsys):
     t.test_print()

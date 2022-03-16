@@ -129,7 +129,8 @@ def test06_reference_internal(clean):
 
 def test07_big():
     x = [t.Big() for i in range(1024)]
-    x = [t.BigAligned() for i in range(1024)]
+    x2 = [t.BigAligned() for i in range(1024)]
+    assert x == x2
 
 
 def test08_inheritance():
@@ -151,20 +152,20 @@ def test09_method_vectorcall():
     def f(a, b, c, d, e):
         out.append((a, b, c, d, e))
 
-    class my_class:
+    class MyClass:
         def f(self, a, b, c, d, e):
             self.out = ((a, b, c, d, e))
 
     t.call_function(f)
 
-    i = my_class()
+    i = MyClass()
     t.call_method(i)
     assert out == [(1, 2, "hello", True, 4)]
     assert i.out == (1, 2, "hello", True, 4)
 
 
 def test10_trampoline(clean):
-    for i in range(10):
+    for _ in range(10):
         class Dachshund(t.Animal):
             def __init__(self):
                 super().__init__()
@@ -174,7 +175,7 @@ def test10_trampoline(clean):
                 return "yap"
 
         d = Dachshund()
-        for i in range(10):
+        for _ in range(10):
             assert t.go(d) == 'Dachshund says yap'
 
     a = 0

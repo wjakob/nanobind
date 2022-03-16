@@ -64,8 +64,8 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
     }
 
     // Sill no luck -- perform a lookup and populate the trampoline
-    const char *error;
-    bool is_nb_func;
+    const char *error = nullptr;
+    bool is_nb_func = false;
 
     size_t offset = 0;
     for (; offset < size; offset++) {

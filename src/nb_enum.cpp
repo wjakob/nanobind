@@ -90,7 +90,7 @@ static PyObject *nb_enum_int(PyObject *o) {
 
     const void *p = inst_data(&e->inst);
     if (t->t.flags & (uint32_t) type_flags::is_unsigned_enum) {
-        unsigned long long value;
+        unsigned long long value = 0;
         switch (t->t.size) {
             case 1: value = (unsigned long long) *(const uint8_t *)  p; break;
             case 2: value = (unsigned long long) *(const uint16_t *) p; break;
@@ -101,7 +101,7 @@ static PyObject *nb_enum_int(PyObject *o) {
         }
         return PyLong_FromUnsignedLongLong(value);
     } else if (t->t.flags & (uint32_t) type_flags::is_signed_enum) {
-        long long value;
+        long long value = 0;
         switch (t->t.size) {
             case 1: value = (long long) *(const int8_t *)  p; break;
             case 2: value = (long long) *(const int16_t *) p; break;
@@ -118,7 +118,7 @@ static PyObject *nb_enum_int(PyObject *o) {
 }
 
 static PyObject *nb_enum_init(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
-    PyObject *arg;
+    PyObject *arg = nullptr;
 
     if (kwds || PyTuple_GET_SIZE(args) != 1)
         goto error;
@@ -232,7 +232,7 @@ void nb_enum_prepare(PyTypeObject *tp, bool is_arithmetic) {
 
 void nb_enum_put(PyObject *type, const char *name, const void *value,
                  const char *doc) noexcept {
-    PyObject *name_py, *int_val, *dict;
+    PyObject *name_py = nullptr, *int_val = nullptr, *dict = nullptr;
     nb_enum *inst = (nb_enum *) inst_new_impl((PyTypeObject *) type, nullptr);
     if (!inst)
         goto error;

@@ -59,7 +59,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         for (size_t i = 0, l = len(value); i < l; ++i)
             args[nargs++] = borrow(value[i]).release().ptr();
     } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
-        PyObject *key, *entry;
+        PyObject *key = nullptr, *entry = nullptr;
         Py_ssize_t pos = 0;
 
         while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {

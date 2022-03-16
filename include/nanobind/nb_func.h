@@ -100,7 +100,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                 cleanup_list *cleanup) -> PyObject * {
         (void)p; (void)args; (void)args_flags; (void)policy; (void)cleanup;
 
-        const capture *cap;
+        const capture *cap = nullptr;
         if constexpr (sizeof(capture) <= sizeof(f.capture))
             cap = (capture *) p;
         else
@@ -113,7 +113,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                                                 cleanup) || ...))
             return NB_NEXT_OVERLOAD;
 
-        PyObject *result;
+        PyObject *result = nullptr;
         if constexpr (std::is_void_v<Return>) {
             cap->func(((make_caster<Args>&&) in.template get<Is>()).operator cast_t<Args>()...);
             Py_INCREF(Py_None);

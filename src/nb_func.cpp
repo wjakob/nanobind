@@ -730,7 +730,7 @@ done:
 static PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     if (inst) {
         /* Return a classic bound method. This should be avoidable
-           in most cases via the 'CALL_METHOD' opcode and vector calls. PyTest
+           in most cases via the 'CALL_METHOD' opcode and vector calls. Pytest
            rewrites the bytecode in a way that breaks this optimization :-/ */
         return PyMethod_New(self, inst);
     } else {

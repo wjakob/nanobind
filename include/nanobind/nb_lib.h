@@ -19,10 +19,9 @@ struct NB_CORE cleanup_list {
 public:
     static constexpr uint32_t Small = 6;
 
-    cleanup_list(PyObject *self) {
-        m_size = 1;
-        m_capacity = Small;
-        m_data = m_local;
+    cleanup_list(PyObject *self) : m_size{1},
+		   m_capacity{Small},
+		   m_data{m_local} {
         m_local[0] = self;
     }
 

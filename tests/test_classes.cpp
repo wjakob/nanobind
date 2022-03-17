@@ -138,7 +138,7 @@ NB_MODULE(test_classes_ext, m) {
             default_constructed++;
         }
 
-        ~PyAnimal() {
+        ~PyAnimal() override {
             destructed++;
         }
 

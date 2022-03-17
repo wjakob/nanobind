@@ -30,7 +30,7 @@ private:
 // Deleter for std::unique_ptr<T> (handles ownership by both C++ and Python)
 template <typename T> struct deleter {
     /// Instance should be cleared using a delete expression
-    deleter() : o(nullptr) { }
+    deleter()  = default;
 
     /// Instance owned by Python, reduce reference count upon deletion
     deleter(handle h) : o(h.ptr()) { }
@@ -51,7 +51,7 @@ template <typename T> struct deleter {
         }
     }
 
-    PyObject *o;
+    PyObject *o{nullptr};
 };
 
 NAMESPACE_END(NB_NAMESPACE)

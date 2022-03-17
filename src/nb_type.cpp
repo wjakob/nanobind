@@ -379,12 +379,12 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
     }
 
     if (dst_type->implicit_py) {
-        bool (**it)(PyObject *, cleanup_list *) noexcept =
+        bool (**it)(PyTypeObject *, PyObject *, cleanup_list *) noexcept =
             dst_type->implicit_py;
-        bool (*v2)(PyObject *, cleanup_list *) noexcept;
+        bool (*v2)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
 
         while ((v2 = *it++)) {
-            if (v2(src, cleanup))
+            if (v2(dst_type->type_py, src, cleanup))
                 goto found;
         }
     }
@@ -758,6 +758,11 @@ void *nb_inst_data(PyObject *o) noexcept {
 void nb_inst_zero(PyObject *o) noexcept {
     nb_inst *nbi = (nb_inst *) o;
     memset(inst_data(nbi), 0, ((nb_type *) Py_TYPE(o))->t.size);
+    nbi->ready = nbi->destruct = true;
+}
+
+void nb_inst_ready(PyObject *o) noexcept {
+    nb_inst *nbi = (nb_inst *) o;
     nbi->ready = nbi->destruct = true;
 }
 

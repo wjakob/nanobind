@@ -76,7 +76,7 @@ struct type_data {
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
     const std::type_info **implicit;
-    bool (**implicit_py)(PyObject *, cleanup_list *) noexcept;
+    bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
     void (*type_callback)(PyTypeObject *) noexcept;
 };
 
@@ -154,7 +154,8 @@ template <typename Arg> struct init_implicit {
 
         if constexpr (!Caster::IsClass) {
             implicitly_convertible(
-                [](PyObject *src, cleanup_list *cleanup) noexcept -> bool {
+                [](PyTypeObject *, PyObject *src,
+                   cleanup_list *cleanup) noexcept -> bool {
                     return Caster().from_python(src, cast_flags::convert,
                                                 cleanup);
                 },
@@ -430,8 +431,8 @@ template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { r
 template <typename T>
 inline T &type_supplement(handle h) { return *(T *) detail::nb_type_extra(h.ptr()); }
 
-template <typename T> T *instance(PyObject *o) {
-    return (T *) detail::nb_inst_data(o);
+template <typename T> T *instance(handle o) {
+    return (T *) detail::nb_inst_data(o.ptr());
 }
 
 NAMESPACE_END(NB_NAMESPACE)

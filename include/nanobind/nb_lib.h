@@ -229,6 +229,9 @@ NB_CORE void nb_inst_zero(PyObject *o) noexcept;
 /// Copy-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
 NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
 
+/// Mark an instance as ready
+NB_CORE void nb_inst_ready(PyObject *o) noexcept;
+
 // ========================================================================
 
 // Create and install a Python property object
@@ -256,7 +259,8 @@ NB_CORE void implicitly_convertible(const std::type_info *src,
                                     const std::type_info *dst) noexcept;
 
 /// Register a callback to check if implicit conversion to 'dst' is possible
-NB_CORE void implicitly_convertible(bool (*predicate)(PyObject *,
+NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
+                                                      PyObject *,
                                                       cleanup_list *),
                                     const std::type_info *dst) noexcept;
 

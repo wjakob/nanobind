@@ -44,7 +44,8 @@ void implicitly_convertible(const std::type_info *src,
     t->implicit = (decltype(t->implicit)) data;
 }
 
-void implicitly_convertible(bool (*predicate)(PyObject *, cleanup_list *),
+void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
+                                              cleanup_list *),
                             const std::type_info *dst) noexcept {
     internals &internals = internals_get();
 

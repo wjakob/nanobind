@@ -88,7 +88,7 @@ static PyObject *nb_enum_int(PyObject *o) {
     nb_type *t = (nb_type *) Py_TYPE(o);
     nb_enum *e = (nb_enum *) o;
 
-    const void *p = inst_data(&e->inst);
+    const void *p = inst_ptr(&e->inst);
     if (t->t.flags & (uint32_t) type_flags::is_unsigned_enum) {
         unsigned long long value;
         switch (t->t.size) {
@@ -241,7 +241,7 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
     if (!name_py)
         goto error;
 
-    memcpy(inst_data(&inst->inst), value, ((nb_type *) type)->t.size);
+    memcpy(inst_ptr(&inst->inst), value, ((nb_type *) type)->t.size);
     inst->inst.destruct = false;
     inst->inst.cpp_delete = false;
     inst->inst.ready = true;

@@ -368,7 +368,7 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
 }
 
 /// Check if it's safe to issue to issue Python operations (GIL held, python not finalizing)
-inline bool ready() {
+inline bool safe() {
     return PyGILState_Check() && !_Py_IsFinalizing();
 }
 

@@ -412,3 +412,13 @@ def test19_supplement():
 def test20_type_callback():
     o = t.ClassWithLen()
     assert len(o) == 123
+
+def test21_low_level(clean):
+    s = t.test_lowlevel()
+    assert s.value() == 123
+    del s
+    assert_stats(
+        value_constructed=1,
+        copy_constructed=1,
+        destructed=2
+    )

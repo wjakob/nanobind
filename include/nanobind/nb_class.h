@@ -428,11 +428,25 @@ public:
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }
 template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { return { }; }
 
+// Low level access to nanobind type objects
+inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }
+inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }
+inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
+inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
 template <typename T>
-inline T &type_supplement(handle h) { return *(T *) detail::nb_type_extra(h.ptr()); }
+inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
 
-template <typename T> T *instance(handle o) {
-    return (T *) detail::nb_inst_data(o.ptr());
+// Low level access to nanobind instance objects
+inline bool inst_check(handle h) { return type_check(h.type()); }
+inline object inst_alloc(handle h) {
+    PyTypeObject *tp = (PyTypeObject *) h.ptr();
+    return steal(tp->tp_new(tp, nullptr, nullptr));
 }
+inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
+inline bool inst_ready(handle h) { return detail::nb_inst_ready(h.ptr()); }
+inline void inst_mark_ready(handle h) { detail::nb_inst_mark_ready(h.ptr()); }
+inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
+inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
+template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 
 NAMESPACE_END(NB_NAMESPACE)

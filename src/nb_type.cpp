@@ -124,7 +124,7 @@ static void inst_dealloc(PyObject *self) {
         PyObject_GC_UnTrack(self);
 
     nb_inst *inst = (nb_inst *) self;
-    void *p = inst_data(inst);
+    void *p = inst_ptr(inst);
 
     if (inst->destruct) {
         if (type->t.flags & (int32_t) type_flags::is_destructible) {
@@ -399,7 +399,7 @@ found:
 
     if (result) {
         cleanup->append(result);
-        *out = inst_data((nb_inst *) result);
+        *out = inst_ptr((nb_inst *) result);
         return true;
     } else {
         PyErr_Clear();
@@ -460,7 +460,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
                 return false;
             }
 
-            *out = inst_data(inst);
+            *out = inst_ptr(inst);
 
             return true;
         }
@@ -599,7 +599,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     if (is_new)
         *is_new = true;
 
-    void *new_value = inst_data(inst);
+    void *new_value = inst_ptr(inst);
     if (rvp == rv_policy::move) {
         if (t->flags & (uint32_t) type_flags::is_move_constructible) {
             if (t->flags & (uint32_t) type_flags::has_move) {
@@ -745,25 +745,66 @@ PyObject *nb_type_lookup(const std::type_info *t) noexcept {
     return nullptr;
 }
 
+bool nb_type_check(PyObject *t) noexcept {
+    internals &internals = internals_get();
+    const PyTypeObject *metaclass = Py_TYPE(t);
+    return metaclass == internals.nb_type || metaclass == internals.nb_enum;
+}
 
-void *nb_type_extra(PyObject *t) noexcept {
+size_t nb_type_size(PyObject *t) noexcept {
+    return ((nb_type *) t)->t.size;
+}
+
+size_t nb_type_align(PyObject *t) noexcept {
+    return ((nb_type *) t)->t.align;
+}
+
+const std::type_info *nb_type_info(PyObject *t) noexcept {
+    return ((nb_type *) t)->t.type;
+}
+
+void *nb_type_supplement(PyObject *t) noexcept {
     PyTypeObject *tp = Py_TYPE(t);
     return (uint8_t *) t + tp->tp_basicsize + tp->tp_itemsize;
 }
 
-void *nb_inst_data(PyObject *o) noexcept {
-    return inst_data((nb_inst *) o);
+void *nb_inst_ptr(PyObject *o) noexcept {
+    return inst_ptr((nb_inst *) o);
 }
 
 void nb_inst_zero(PyObject *o) noexcept {
     nb_inst *nbi = (nb_inst *) o;
-    memset(inst_data(nbi), 0, ((nb_type *) Py_TYPE(o))->t.size);
+    memset(inst_ptr(nbi), 0, ((nb_type *) Py_TYPE(o))->t.size);
     nbi->ready = nbi->destruct = true;
 }
 
-void nb_inst_ready(PyObject *o) noexcept {
+void nb_inst_mark_ready(PyObject *o) noexcept {
     nb_inst *nbi = (nb_inst *) o;
     nbi->ready = nbi->destruct = true;
+}
+
+bool nb_inst_ready(PyObject *o) noexcept {
+    nb_inst *nbi = (nb_inst *) o;
+    return nbi->ready;
+}
+
+void nb_inst_destruct(PyObject *o) noexcept {
+    nb_inst *nbi = (nb_inst *) o;
+    nb_type *nbt = (nb_type *) Py_TYPE(o);
+
+    if (nbi->destruct) {
+        if (nbt->t.flags & (int32_t) type_flags::is_destructible) {
+            if (nbt->t.flags & (int32_t) type_flags::has_destruct)
+                nbt->t.destruct(inst_ptr(nbi));
+        } else {
+            fail("nanobind::detail::nb_inst_destruct(\"%s\"): attempted to call "
+                 "the destructor of a non-destructible nbt!",
+                 nbt->ht.ht_type.tp_name);
+        }
+        nbi->destruct = false;
+    }
+
+    nbi->ready = false;
 }
 
 void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
@@ -773,8 +814,8 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
         fail("nanobind::detail::nb_inst_copy(): invalid arguments!");
 
     nb_inst *nbi = (nb_inst *) dst;
-    const void *src_data = inst_data((nb_inst *) src);
-    void *dst_data = inst_data(nbi);
+    const void *src_data = inst_ptr((nb_inst *) src);
+    void *dst_data = inst_ptr(nbi);
 
     if (nbt->t.flags & (uint32_t) type_flags::has_copy)
         nbt->t.copy(dst_data, src_data);

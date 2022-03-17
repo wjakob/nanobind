@@ -310,4 +310,43 @@ NB_MODULE(test_classes_ext, m) {
     struct ClassWithLen { };
     nb::class_<ClassWithLen>(m, "ClassWithLen", nb::type_callback(callback))
         .def(nb::init<>());
+
+    // test21_low_level
+    m.def("test_lowlevel", []() {
+        nb::handle py_type = nb::type<Struct>();
+        if (!(nb::type_check(py_type) &&
+              nb::type_size(py_type) == sizeof(Struct) &&
+              nb::type_align(py_type) == alignof(Struct) &&
+              nb::type_info(py_type) == typeid(Struct)))
+            throw std::runtime_error("Internal error!");
+
+        nb::object py_inst = nb::inst_alloc(py_type);
+        if (!(nb::inst_check(py_inst) && py_inst.type().is(py_type) &&
+              !nb::inst_ready(py_inst)))
+            throw std::runtime_error("Internal error! (2)");
+
+        // Get a C++ pointer to the uninitialized instance data
+        Struct *ptr = nb::inst_ptr<Struct>(py_inst);
+
+        // Perform an in-place construction of the C++ object
+        new (ptr) Struct(123);
+
+        nb::inst_mark_ready(py_inst);
+        if (!nb::inst_ready(py_inst))
+            throw std::runtime_error("Internal error! (3)");
+
+        nb::object py_inst_2 = nb::inst_alloc(py_type);
+        if (nb::inst_ready(py_inst_2))
+            throw std::runtime_error("Internal error! (4)");
+
+        nb::inst_copy(py_inst_2, py_inst);
+        if (!nb::inst_ready(py_inst_2))
+            throw std::runtime_error("Internal error! (5)");
+
+        nb::inst_destruct(py_inst);
+        if (nb::inst_ready(py_inst))
+            throw std::runtime_error("Internal error! (6)");
+
+        return py_inst_2;
+    });
 }

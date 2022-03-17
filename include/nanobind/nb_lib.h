@@ -211,10 +211,22 @@ NB_CORE PyObject *nb_type_put_unique(const std::type_info *cpp_type,
 NB_CORE void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete);
 
 /// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
-NB_CORE void *nb_type_extra(PyObject *t) noexcept;
+NB_CORE void *nb_type_supplement(PyObject *t) noexcept;
+
+/// Check if the given python object represents a nanobind type
+NB_CORE bool nb_type_check(PyObject *t) noexcept;
+
+/// Return the size of the type wrapped by the given nanobind type object
+NB_CORE size_t nb_type_size(PyObject *t) noexcept;
+
+/// Return the alignment of the type wrapped by the given nanobind type object
+NB_CORE size_t nb_type_align(PyObject *t) noexcept;
+
+/// Return the C++ type_info wrapped by the given nanobind type object
+NB_CORE const std::type_info *nb_type_info(PyObject *t) noexcept;
 
 /// Get a pointer to the instance data of a nanobind instance (nb_inst)
-NB_CORE void *nb_inst_data(PyObject *o) noexcept;
+NB_CORE void *nb_inst_ptr(PyObject *o) noexcept;
 
 /// Check if a Python type object wraps an instance of a specific C++ type
 NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept;
@@ -225,11 +237,17 @@ NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
 /// Zero-initialize a POD type and mark it as ready
 NB_CORE void nb_inst_zero(PyObject *o) noexcept;
 
+/// Call the destructor of the given python object
+NB_CORE void nb_inst_destruct(PyObject *o) noexcept;
+
 /// Copy-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
 NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
 
+/// Check if an instance is ready
+NB_CORE bool nb_inst_ready(PyObject *o) noexcept;
+
 /// Mark an instance as ready
-NB_CORE void nb_inst_ready(PyObject *o) noexcept;
+NB_CORE void nb_inst_mark_ready(PyObject *o) noexcept;
 
 // ========================================================================
 

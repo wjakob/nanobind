@@ -47,6 +47,7 @@ setup(
     package_data={'nanobind': [
         'include/nanobind/*.h',
         'include/nanobind/stl/*.h',
+        'include/nanobind/stl/detail/*.h',
         'ext/robin_map/include/tsl/*.h',
         'cmake/nanobind-config.cmake',
         'src/*.h',

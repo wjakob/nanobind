@@ -22,7 +22,7 @@ public:
     python_error();
     python_error(const python_error &);
     python_error(python_error &&) noexcept;
-    virtual ~python_error();
+    ~python_error() override;
 
     /// Move the error back into the Python domain
     void restore();
@@ -31,7 +31,7 @@ public:
     const handle value() const { return m_value; }
     const handle trace() const { return m_trace; }
 
-    virtual const char *what() const noexcept override;
+    const char *what() const noexcept override;
 
 private:
     object m_type, m_value, m_trace;
@@ -42,7 +42,7 @@ private:
 class NB_EXPORT next_overload : public std::exception {
 public:
     next_overload();
-    virtual ~next_overload();
+    ~next_overload() override;
 };
 
 // Base interface used to expose common Python exceptions in C++

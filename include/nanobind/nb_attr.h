@@ -21,14 +21,14 @@ struct name {
 
 struct arg_v;
 struct arg {
-    NB_INLINE constexpr explicit arg(const char *name = nullptr) : name(name), convert_(true), none_(false) { }
+    NB_INLINE constexpr explicit arg(const char *name = nullptr) : name(name) { }
     template <typename T> NB_INLINE arg_v operator=(T &&value) const;
     NB_INLINE arg &noconvert(bool value = true) { convert_ = !value; return *this; }
     NB_INLINE arg &none(bool value = true) { none_ = value; return *this; }
 
     const char *name;
-    uint8_t convert_;
-    bool none_;
+    uint8_t convert_{true};
+    bool none_{false};
 };
 
 struct arg_v : arg {

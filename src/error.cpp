@@ -25,18 +25,18 @@ python_error::~python_error() {
     free(m_what);
 }
 
-python_error::python_error(const python_error &e) : std::exception(e) {
-    m_type = e.m_type;
-    m_value = e.m_value;
-    m_trace = e.m_trace;
+python_error::python_error(const python_error &e) : std::exception(e),
+    m_type{e.m_type},
+    m_value{e.m_value},
+    m_trace{e.m_trace} {
     if (e.m_what)
         m_what = NB_STRDUP(e.m_what);
 }
 
-python_error::python_error(python_error &&e) noexcept : std::exception(e) {
-    m_type = std::move(e.m_type);
-    m_value = std::move(e.m_value);
-    m_trace = std::move(e.m_trace);
+python_error::python_error(python_error &&e) noexcept : std::exception(e),
+    m_type{std::move(e.m_type)},
+    m_value{std::move(e.m_value)},
+    m_trace{std::move(e.m_trace)} {
     std::swap(m_what, e.m_what);
 }
 
@@ -95,7 +95,7 @@ void python_error::restore() {
 }
 
 next_overload::next_overload() : std::exception() { }
-next_overload::~next_overload() { }
+next_overload::~next_overload() = default;
 
 #define NB_EXCEPTION(name, type)                                               \
     name::name() : builtin_exception("") { }                                   \

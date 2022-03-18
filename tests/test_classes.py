@@ -409,9 +409,11 @@ def test19_supplement():
     assert t.check_supplement(c)
     assert not t.check_supplement(t.Struct())
 
+
 def test20_type_callback():
     o = t.ClassWithLen()
     assert len(o) == 123
+
 
 def test21_low_level(clean):
     s1, s2 = t.test_lowlevel()
@@ -423,4 +425,19 @@ def test21_low_level(clean):
         copy_constructed=1,
         move_constructed=1,
         destructed=3
+    )
+
+
+def test22_handle_of(clean):
+    assert t.test_handle_of.__doc__ == 'test_handle_of(arg0: test_classes_ext.Struct) -> object'
+    s = t.test_handle_of(t.Struct(5))
+    assert s.value() == 5
+    del s
+
+    with pytest.raises(TypeError) as excinfo:
+        t.test_handle_of("test")
+    assert "incompatible function argument" in str(excinfo.value)
+    assert_stats(
+        value_constructed=1,
+        destructed=1
     )

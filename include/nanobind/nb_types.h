@@ -170,6 +170,11 @@ public:
       return temp;
     }
 
+    void clear() {
+        dec_ref();
+        m_ptr = nullptr;
+    }
+
     object& operator=(const object &o) {
         handle temp(m_ptr);
         o.inc_ref();
@@ -185,6 +190,12 @@ public:
         temp.dec_ref();
         return *this;
     }
+};
+
+template <typename T> class handle_of : public handle {
+public:
+    using handle::handle;
+    using handle::operator=;
 };
 
 template <typename T> NB_INLINE T borrow(handle h) {

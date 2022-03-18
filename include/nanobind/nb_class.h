@@ -63,8 +63,8 @@ enum class type_flags : uint32_t {
 struct type_data {
     uint32_t size : 24;
     uint32_t align : 8;
-    uint32_t flags : 24;
-    uint32_t supplement : 8;
+    uint32_t flags : 20;
+    uint32_t supplement : 12;
     const char *name;
     const char *doc;
     PyObject *scope;
@@ -438,10 +438,7 @@ inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h
 
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
-inline object inst_alloc(handle h) {
-    PyTypeObject *tp = (PyTypeObject *) h.ptr();
-    return steal(tp->tp_new(tp, nullptr, nullptr));
-}
+inline object inst_alloc(handle h) { return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr())); }
 inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
 inline bool inst_ready(handle h) { return detail::nb_inst_ready(h.ptr()); }
 inline void inst_mark_ready(handle h) { detail::nb_inst_mark_ready(h.ptr()); }

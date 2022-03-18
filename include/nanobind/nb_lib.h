@@ -234,6 +234,9 @@ NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept
 /// Search for the Python type object associated with a C++ type
 NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
 
+/// Allocate an instance of type 't'
+NB_CORE PyObject *nb_inst_alloc(PyTypeObject *t);
+
 /// Zero-initialize a POD type and mark it as ready
 NB_CORE void nb_inst_zero(PyObject *o) noexcept;
 

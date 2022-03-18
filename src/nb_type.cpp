@@ -769,6 +769,13 @@ void *nb_type_supplement(PyObject *t) noexcept {
     return (uint8_t *) t + tp->tp_basicsize + tp->tp_itemsize;
 }
 
+PyObject *nb_inst_alloc(PyTypeObject *t) {
+    PyObject *result = t->tp_new(t, nullptr, nullptr);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
 void *nb_inst_ptr(PyObject *o) noexcept {
     return inst_ptr((nb_inst *) o);
 }

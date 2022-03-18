@@ -547,6 +547,12 @@ changes are detailed below.
     and `nb::inst_check()` accept any Python object and test whether something
     is a _nanobind_ type or instance object.
 
+  - **Python type wrappers**: The `nb::handle_of<T>` type behaves just like the
+    `nb::handle` class and wraps a `PyObject *` pointer. However, when binding
+    a function that takes such an argument, _nanobind_ will only call the
+    associated function overload when the underlying Python object wraps a C++
+    `T` instance.
+
   - The function `nb::safe()` returns `true` if the GIL is held and the Python
     interpreter is not currently being finalized. Use this function to to test
     if it is safe to issue Python API calls.

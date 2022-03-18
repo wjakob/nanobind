@@ -243,6 +243,9 @@ NB_CORE void nb_inst_destruct(PyObject *o) noexcept;
 /// Copy-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
 NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
 
+/// Move-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
+NB_CORE void nb_inst_move(PyObject *dst, const PyObject *src) noexcept;
+
 /// Check if an instance is ready
 NB_CORE bool nb_inst_ready(PyObject *o) noexcept;
 

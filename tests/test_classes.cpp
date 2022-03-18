@@ -2,6 +2,7 @@
 #include <nanobind/trampoline.h>
 #include <nanobind/operators.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/pair.h>
 #include <memory>
 
 namespace nb = nanobind;
@@ -347,6 +348,10 @@ NB_MODULE(test_classes_ext, m) {
         if (nb::inst_ready(py_inst))
             throw std::runtime_error("Internal error! (6)");
 
-        return py_inst_2;
+        nb::inst_move(py_inst, py_inst_2);
+        if (!nb::inst_ready(py_inst))
+            throw std::runtime_error("Internal error! (7)");
+
+        return std::make_pair(py_inst, py_inst_2);
     });
 }

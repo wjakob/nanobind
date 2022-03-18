@@ -414,11 +414,13 @@ def test20_type_callback():
     assert len(o) == 123
 
 def test21_low_level(clean):
-    s = t.test_lowlevel()
-    assert s.value() == 123
-    del s
+    s1, s2 = t.test_lowlevel()
+    assert s1.value() == 123 and s2.value() == 0
+    del s1
+    del s2
     assert_stats(
         value_constructed=1,
         copy_constructed=1,
-        destructed=2
+        move_constructed=1,
+        destructed=3
     )

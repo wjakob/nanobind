@@ -527,6 +527,15 @@ changes are detailed below.
        by initializing it yet again. */
     nb::inst_destruct(py_inst);
     assert(!nb::inst_ready(py_inst));
+
+    /* We can copy- or move-construct 'py_inst' from another instance of the
+       same type. This calls the C++ copy or move constructor and transitions
+       'py_inst' back to 'ready' status. Note that this is equivalent to calling
+       an in-place version of these constructors above but compiles to more
+       compact code (the 'nb::class_<MyClass>' declaration has already created
+       bindings for both constructors, and this simply calls those bindings). */
+    // nb::inst_copy(/* dst = */ py_inst, /* src = */ some_other_instance);
+    // nb::inst_move(/* dst = */ py_inst, /* src = */ some_other_instance);
     ```
 
     Note that these functions are all _unsafe_ in the sense that they do not

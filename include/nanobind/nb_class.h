@@ -447,6 +447,7 @@ inline bool inst_ready(handle h) { return detail::nb_inst_ready(h.ptr()); }
 inline void inst_mark_ready(handle h) { detail::nb_inst_mark_ready(h.ptr()); }
 inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
 inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
+inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 
 NAMESPACE_END(NB_NAMESPACE)

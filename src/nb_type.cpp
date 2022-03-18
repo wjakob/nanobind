@@ -611,6 +611,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
                 }
             } else {
                 memcpy(new_value, value, t->size);
+                memset(value, 0, t->size);
             }
         } else {
             if (t->flags & (uint32_t) type_flags::is_copy_constructible) {
@@ -821,6 +822,26 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
         nbt->t.copy(dst_data, src_data);
     else
         memcpy(dst_data, src_data, nbt->t.size);
+
+    nbi->ready = nbi->destruct = true;
+}
+
+void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
+    nb_type *nbt = (nb_type *) Py_TYPE(src);
+    if (Py_TYPE(src) != Py_TYPE(dst) ||
+        (nbt->t.flags & (uint32_t) type_flags::is_move_constructible) == 0)
+        fail("nanobind::detail::nb_inst_move(): invalid arguments!");
+
+    nb_inst *nbi = (nb_inst *) dst;
+    void *src_data = inst_ptr((nb_inst *) src);
+    void *dst_data = inst_ptr(nbi);
+
+    if (nbt->t.flags & (uint32_t) type_flags::has_move) {
+        nbt->t.move(dst_data, src_data);
+    } else {
+        memcpy(dst_data, src_data, nbt->t.size);
+        memset(src_data, 0, nbt->t.size);
+    }
 
     nbi->ready = nbi->destruct = true;
 }

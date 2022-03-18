@@ -553,10 +553,6 @@ changes are detailed below.
     associated function overload when the underlying Python object wraps a C++
     `T` instance.
 
-  - The function `nb::safe()` returns `true` if the GIL is held and the Python
-    interpreter is not currently being finalized. Use this function to to test
-    if it is safe to issue Python API calls.
-
 ## How to cite this project?
 
 Please use the following BibTeX template to cite nanobind in scientific

@@ -378,11 +378,6 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
-/// Check if it's safe to issue to issue Python operations (GIL held, python not finalizing)
-inline bool safe() {
-    return PyGILState_Check() && !_Py_IsFinalizing();
-}
-
 /// Retrieve the Python type object associated with a C++ class
 template <typename T> handle type() {
     return detail::nb_type_lookup(&typeid(detail::intrinsic_t<T>));

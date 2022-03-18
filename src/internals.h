@@ -4,7 +4,6 @@
 #elif defined(_MSC_VER)
 #  pragma warning(disable: 4127) // conditional expression is constant (in robin_*.h)
 #endif
-
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
@@ -117,8 +116,44 @@ struct keep_alive_hash {
     }
 };
 
+// Minimal allocator definition, contains only the parts needed by tsl::*
+template <typename T> class py_allocator {
+public:
+    using value_type = T;
+    using pointer = T *;
+    using size_type = std::size_t;
+
+    py_allocator() = default;
+    py_allocator(const py_allocator &) = default;
+
+    template <typename U> py_allocator(const py_allocator<U> &) { }
+
+    pointer allocate(size_type n, const void * /*hint*/ = 0) noexcept {
+        void *p = PyMem_Malloc(n * sizeof(T));
+        if (!p)
+            fail("PyMem_Malloc(): out of memory!");
+        return static_cast<pointer>(p);
+    }
+
+    void deallocate(T *p, size_type /*n*/) noexcept { PyMem_Free(p); }
+};
+
+template <class T1, class T2>
+bool operator==(const py_allocator<T1> &, const py_allocator<T2> &) noexcept {
+    return true;
+}
+
+template <typename key, typename hash = std::hash<key>,
+          typename eq = std::equal_to<key>>
+using py_set = tsl::robin_set<key, hash, eq, py_allocator<key>>;
+
+template <typename key, typename value, typename hash = std::hash<key>,
+          typename eq = std::equal_to<key>>
+using py_map =
+    tsl::robin_map<key, value, hash, eq, py_allocator<std::pair<key, value>>>;
+
 using keep_alive_set =
-    tsl::robin_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
+    py_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
 struct internals {
     /// Registered metaclasses for nanobind classes and enumerations
@@ -131,17 +166,17 @@ struct internals {
     PyTypeObject *nb_static_property;
 
     /// Instance pointer -> Python object mapping
-    tsl::robin_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
+    py_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
         inst_c2p;
 
     /// C++ type -> Python type mapping
-    tsl::robin_map<std::type_index, type_data *> type_c2p;
+    py_map<std::type_index, type_data *> type_c2p;
 
     /// Dictionary of sets storing keep_alive references
-    tsl::robin_map<void *, keep_alive_set, ptr_hash> keep_alive;
+    py_map<void *, keep_alive_set, ptr_hash> keep_alive;
 
     /// nb_func/meth instance list for leak reporting
-    tsl::robin_set<void *, ptr_hash> funcs;
+    py_set<void *, ptr_hash> funcs;
 
     /// Registered C++ -> Python exception translators
     std::vector<void (*)(const std::exception_ptr &)> exception_translators;

@@ -212,7 +212,7 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     type->t = parent->t;
     type->t.flags |=  (uint32_t) type_flags::is_python_type;
     type->t.flags &= ~(uint32_t) type_flags::has_implicit_conversions;
-    type->t.name = strdup(type->ht.ht_type.tp_name);
+    type->t.name = NB_STRDUP(type->ht.ht_type.tp_name);
     type->t.type_py = &type->ht.ht_type;
     type->t.base = parent->t.type;
     type->t.base_py = &parent->ht.ht_type;
@@ -289,7 +289,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     PyTypeObject *type = &nbt->ht.ht_type;
 
     memcpy(&nbt->t, t, sizeof(type_data));
-    nbt->t.name = strdup(t->name);
+    nbt->t.name = NB_STRDUP(t->name);
 
     nbt->ht.ht_name = name.release().ptr();
     nbt->ht.ht_qualname = qualname.release().ptr();

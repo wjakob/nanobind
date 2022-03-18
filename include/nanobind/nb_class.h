@@ -23,25 +23,25 @@ enum class type_flags : uint32_t {
     /// Is this a python type that extends a bound C++ type?
     is_python_type           = (1 << 4),
 
-    /// Is the 'scope' field of the type_data struture set?
+    /// Is the 'scope' field of the type_data structure set?
     has_scope                = (1 << 5),
 
-    /// Is the 'doc' field of the type_data struture set?
+    /// Is the 'doc' field of the type_data structure set?
     has_doc                  = (1 << 6),
 
-    /// Is the 'base' field of the type_data struture set?
+    /// Is the 'base' field of the type_data structure set?
     has_base                 = (1 << 7),
 
-    /// Is the 'base_py' field of the type_data struture set?
+    /// Is the 'base_py' field of the type_data structure set?
     has_base_py              = (1 << 8),
 
-    /// Is the 'destruct' field of the type_data struture set?
+    /// Is the 'destruct' field of the type_data structure set?
     has_destruct             = (1 << 9),
 
-    /// Is the 'copy' field of the type_data struture set?
+    /// Is the 'copy' field of the type_data structure set?
     has_copy                 = (1 << 10),
 
-    /// Is the 'move' field of the type_data struture set?
+    /// Is the 'move' field of the type_data structure set?
     has_move                 = (1 << 11),
 
     /// Internal: does the type maintain a list of implicit conversions?

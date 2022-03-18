@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from setuptools import setup
 import re
 import os
@@ -13,8 +11,8 @@ with open(os.path.join("include/nanobind/nanobind.h")) as f:
     matches = dict(VERSION_REGEX.findall(f.read()))
     nanobind_version = "{MAJOR}.{MINOR}.{PATCH}".format(**matches)
 
-long_description = \
-'''_nanobind_ is a small binding library that exposes C++ types in Python and
+long_description = '''\
+_nanobind_ is a small binding library that exposes C++ types in Python and
 vice versa. It is reminiscent of
 _[Boost.Python](https://www.boost.org/doc/libs/1_64_0/libs/python/doc/html)_
 and _[pybind11](http://github.com/pybind/pybind11)_ and uses near-identical
@@ -28,7 +26,7 @@ for name in ['include', 'ext', 'cmake', 'src']:
     try:
         os.symlink(os.path.join(dirname, name),
                    os.path.join(dirname, 'src', 'nanobind', name))
-    except FileExistsError: 
+    except FileExistsError:
         pass
 
 setup(

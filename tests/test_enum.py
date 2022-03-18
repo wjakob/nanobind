@@ -1,6 +1,5 @@
 import test_enum_ext as t
 import pytest
-import gc
 
 def test01_unsigned_enum():
     assert repr(t.Enum.A) == 'Enum.A'

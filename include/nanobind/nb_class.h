@@ -219,7 +219,7 @@ public:
         "nanobind::class_<> was invoked with extra arguments that could not be handled");
 
     template <typename... Extra>
-    NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
+    NB_INLINE class_(handle scope, const char *name = detail::get_name<T>(), const Extra &... extra) {
         detail::type_data d;
 
         d.flags = (uint32_t) detail::type_flags::has_scope;
@@ -274,6 +274,11 @@ public:
         return *this;
     }
 
+    template <auto func, typename... Extra>
+    NB_INLINE class_ &def(const Extra &... extra) {
+        return def(detail::get_name<func>(), func, extra...);
+    }
+
     template <typename... Args, typename... Extra>
     NB_INLINE class_ &def(detail::init<Args...> init, const Extra &... extra) {
         init.execute(*this, extra...);
@@ -296,6 +301,11 @@ public:
         cpp_function_def((detail::forward_t<Func>) f, scope(*this), name(name_),
                          extra...);
         return *this;
+    }
+
+    template <auto func, typename... Extra>
+    NB_INLINE class_ &def_static(const Extra &... extra) {
+        return def_static(detail::get_name<func>(), func, extra...);
     }
 
     template <typename Getter, typename Setter, typename... Extra>
@@ -363,6 +373,11 @@ public:
         return *this;
     }
 
+    template <auto mem_ptr, typename... Extra>
+    NB_INLINE class_ &def_readwrite(const Extra &...extra) {
+        return def_readwrite(detail::get_name<mem_ptr>(), mem_ptr, extra...);
+    }
+
     template <typename D, typename... Extra>
     NB_INLINE class_ &def_readwrite_static(const char *name, D *pm,
                                            const Extra &...extra) {
@@ -371,6 +386,11 @@ public:
             [pm](handle, const D &value) { *pm = value; }, extra...);
 
         return *this;
+    }
+
+    template <auto stat_ptr, typename... Extra>
+    NB_INLINE class_ &def_readwrite_static(const Extra &...extra) {
+        return def_readwrite_static(detail::get_name<stat_ptr>(), stat_ptr, extra...);
     }
 
     template <typename C, typename D, typename... Extra>
@@ -384,6 +404,10 @@ public:
 
         return *this;
     }
+    template <auto mem_ptr, typename... Extra>
+    NB_INLINE class_ &def_readonly(const Extra &...extra) {
+        return def_readonly(detail::get_name<mem_ptr>(), mem_ptr, extra...);
+    }
 
     template <typename D, typename... Extra>
     NB_INLINE class_ &def_readonly_static(const char *name, D *pm,
@@ -392,6 +416,11 @@ public:
             [pm](handle) -> const D & { return *pm; }, extra...);
 
         return *this;
+    }
+
+    template <auto stat_ptr, typename... Extra>
+    NB_INLINE class_ &def_readonly_static(const Extra &...extra) {
+        return def_readonly_static(detail::get_name<stat_ptr>(), stat_ptr, extra...);
     }
 
     template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra>
@@ -415,13 +444,18 @@ public:
     using Base = class_<T>;
 
     template <typename... Extra>
-    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra)
+    NB_INLINE enum_(handle scope, const char *name = detail::get_name<T>(), const Extra &...extra)
         : Base(scope, name, extra...,
                is_enum{ std::is_signed_v<std::underlying_type_t<T>> }) { }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
         detail::nb_enum_put(Base::m_ptr, name, &value, doc);
         return *this;
+    }
+
+    template<T val>
+    NB_INLINE enum_ &value(const char *doc = nullptr) {
+        return value(detail::get_name<val>(), val, doc);
     }
 };
 

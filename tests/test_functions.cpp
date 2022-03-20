@@ -11,13 +11,18 @@ struct my_call_guard {
     ~my_call_guard() { call_guard_value = 2; }
 };
 
+auto test_02(int j, int k) -> int {
+    return j - k;
+}
+
+constexpr static inline auto test_01 = []() { };
+
 NB_MODULE(test_functions_ext, m) {
     // Function without inputs/outputs
-    m.def("test_01", []() { });
+    m.def<&test_01>();
 
     // Simple binary function (via function pointer)
-    auto test_02 = [](int j, int k) -> int { return j - k; };
-    m.def("test_02", (int (*)(int, int)) test_02, "j"_a = 8, "k"_a = 1);
+    m.def<test_02>("j"_a = 8, "k"_a = 1);
 
     // Simple binary function with capture object
     int i = 42;

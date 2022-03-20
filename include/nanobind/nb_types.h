@@ -245,6 +245,9 @@ public:
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
 
+    template <auto func, typename... Extra>
+    module_ &def(const Extra &...extra);
+
     /// Import and return a module or throws `python_error`.
     static NB_INLINE module_ import_(const char *name) {
         return steal<module_>(detail::module_import(name));

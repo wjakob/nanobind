@@ -226,4 +226,9 @@ module_ &module_::def(const char *name_, Func &&f, const Extra &...extra) {
     return *this;
 }
 
+template<auto func, typename... Extra>
+module_ &module_::def(const Extra &...extra) {
+    return def(detail::get_name<func>(), *func, extra...);
+}
+
 NAMESPACE_END(NB_NAMESPACE)

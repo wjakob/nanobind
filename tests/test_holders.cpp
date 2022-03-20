@@ -28,15 +28,15 @@ struct UniqueWrapper { std::unique_ptr<Example> value; };
 struct UniqueWrapper2 { std::unique_ptr<Example, nb::deleter<Example>> value; };
 
 NB_MODULE(test_holders_ext, m) {
-    nb::class_<Example>(m, "Example")
+    nb::class_<Example>(m)
         .def(nb::init<int>())
-        .def_readwrite("value", &Example::value)
-        .def_static("make", &Example::make)
-        .def_static("make_shared", &Example::make_shared);
+        .def_readwrite<&Example::value>()
+        .def_static<&Example::make>()
+        .def_static<&Example::make_shared>();
 
     // ------- shared_ptr -------
 
-    nb::class_<SharedWrapper>(m, "SharedWrapper")
+    nb::class_<SharedWrapper>(m)
         .def(nb::init<std::shared_ptr<Example>>())
         .def_readwrite("ptr", &SharedWrapper::value)
         .def_property("value",
@@ -58,11 +58,11 @@ NB_MODULE(test_holders_ext, m) {
         return std::unique_ptr<Example, nb::deleter<Example>>(new Example(2));
     });
 
-    nb::class_<UniqueWrapper>(m, "UniqueWrapper")
+    nb::class_<UniqueWrapper>(m)
         .def(nb::init<std::unique_ptr<Example>>())
         .def("get", [](UniqueWrapper *uw) { return std::move(uw->value); });
 
-    nb::class_<UniqueWrapper2>(m, "UniqueWrapper2")
+    nb::class_<UniqueWrapper2>(m)
         .def(nb::init<std::unique_ptr<Example, nb::deleter<Example>>>())
         .def("get", [](UniqueWrapper2 *uw) { return std::move(uw->value); });
 

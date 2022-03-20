@@ -58,15 +58,15 @@ NB_MODULE(test_stl_ext, m) {
         destructed = 0;
     });
 
-    nb::class_<Movable>(m, "Movable")
+    nb::class_<Movable>(m)
         .def(nb::init<>())
         .def(nb::init<int>())
-        .def_readwrite("value", &Movable::value);
+        .def_readwrite<&Movable::value>();
 
-    nb::class_<Copyable>(m, "Copyable")
+    nb::class_<Copyable>(m)
         .def(nb::init<>())
         .def(nb::init<int>())
-        .def_readwrite("value", &Copyable::value);
+        .def_readwrite<&Copyable::value>();
 
     // ----- test01-test12 ------ */
 
@@ -170,8 +170,8 @@ NB_MODULE(test_stl_ext, m) {
     using fvec = std::vector<float, std::allocator<float>>;
     nb::class_<fvec>(m, "float_vec")
         .def(nb::init<>())
-        .def("push_back", [](fvec *fv, float f) { fv->push_back(f); })
-        .def("size", [](const fvec &fv) { return fv.size(); });
+        .def<nb::overload_cast<float&&>(&fvec::push_back)>()
+        .def<&fvec::size>();
 
     // ----- test30 ------ */
 

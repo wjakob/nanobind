@@ -72,32 +72,30 @@ struct StaticProperties {
 int StaticProperties::value = 23;
 
 NB_MODULE(test_classes_ext, m) {
-    struct_tmp = std::unique_ptr<Struct>(new Struct(12));
+    struct_tmp = std::make_unique<Struct>(12);
 
     auto cls = nb::class_<Struct>(m, "Struct", "Some documentation")
         .def(nb::init<>())
         .def(nb::init<int>())
-        .def("value", &Struct::value)
-        .def("set_value", &Struct::set_value, "value"_a)
-        .def("self", &Struct::self)
+        .def<&Struct::value>()
+        .def<&Struct::set_value>("value"_a)
+        .def<&Struct::self>()
         .def("none", [](Struct &) -> const Struct * { return nullptr; })
-        .def_static("static_test", nb::overload_cast<int>(&Struct::static_test))
-        .def_static("static_test", nb::overload_cast<float>(&Struct::static_test))
-        .def_static("create_move", &Struct::create_move)
-        .def_static("create_reference", &Struct::create_reference,
-                    nb::rv_policy::reference)
-        .def_static("create_copy", &Struct::create_copy,
-                    nb::rv_policy::copy)
-        .def_static("create_take", &Struct::create_take);
+        .def_static<nb::overload_cast<int>(&Struct::static_test)>()
+        .def_static<nb::overload_cast<float>(&Struct::static_test)>()
+        .def_static<&Struct::create_move>()
+        .def_static<&Struct::create_reference>(nb::rv_policy::reference)
+        .def_static<&Struct::create_copy>(nb::rv_policy::copy)
+        .def_static<&Struct::create_take>();
 
 
     if (!nb::type<Struct>().is(cls))
         nb::detail::raise("type lookup failed!");
 
-    nb::class_<PairStruct>(m, "PairStruct")
+    nb::class_<PairStruct>(m)
         .def(nb::init<>())
-        .def_readwrite("s1", &PairStruct::s1)
-        .def_readwrite("s2", &PairStruct::s2);
+        .def_readwrite<&PairStruct::s1>()
+        .def_readwrite<&PairStruct::s2>();
 
     m.def("stats", []{
         nb::dict d;
@@ -123,10 +121,10 @@ NB_MODULE(test_classes_ext, m) {
 
     // test06_big
 
-    nb::class_<Big>(m, "Big")
+    nb::class_<Big>(m)
         .def(nb::init<>());
 
-    nb::class_<BigAligned>(m, "BigAligned")
+    nb::class_<BigAligned>(m)
         .def(nb::init<>());
 
     // test09_trampoline
@@ -170,12 +168,12 @@ NB_MODULE(test_classes_ext, m) {
         std::string s;
     };
 
-    auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
+    auto animal = nb::class_<Animal, PyAnimal>(m)
         .def(nb::init<>())
-        .def("name", &Animal::name)
-        .def("what", &Animal::what);
+        .def<&Animal::name>()
+        .def<&Animal::what>();
 
-    nb::class_<Dog, Animal>(m, "Dog")
+    nb::class_<Dog, Animal>(m)
         .def(nb::init<const std::string &>());
 
     nb::class_<Cat>(m, "Cat", animal)
@@ -214,24 +212,24 @@ NB_MODULE(test_classes_ext, m) {
         int value;
     };
 
-    nb::class_<A>(m, "A")
+    nb::class_<A>(m)
         .def(nb::init<int>());
 
-    nb::class_<B>(m, "B")
+    nb::class_<B>(m)
         .def(nb::init<int>());
 
-    nb::class_<B2, B>(m, "B2")
+    nb::class_<B2, B>(m)
         .def(nb::init<int>());
 
-    nb::class_<C>(m, "C")
+    nb::class_<C>(m)
         .def(nb::init<int>());
 
-    nb::class_<D>(m, "D")
+    nb::class_<D>(m)
         .def(nb::init_implicit<const A &>())
         .def(nb::init_implicit<const B *>())
         .def(nb::init_implicit<int>())
         .def(nb::init_implicit<float>())
-        .def_readwrite("value", &D::value);
+        .def_readwrite<&D::value>();
 
     m.def("get_d", [](const D &d) { return d.value; });
 
@@ -246,7 +244,7 @@ NB_MODULE(test_classes_ext, m) {
     };
 
     // test13_operators
-    nb::class_<Int>(m, "Int")
+    nb::class_<Int>(m)
         .def(nb::init<int>())
         .def(nb::self + nb::self)
         .def(nb::self += nb::self)
@@ -266,14 +264,14 @@ NB_MODULE(test_classes_ext, m) {
     // test17_name_qualname_module()
     m.def("f", []{});
     struct MyClass { struct NestedClass { }; };
-    nb::class_<MyClass> mcls(m, "MyClass");
-    nb::class_<MyClass::NestedClass> ncls(mcls, "NestedClass");
+    nb::class_<MyClass> mcls(m);
+    nb::class_<MyClass::NestedClass> ncls(mcls);
     mcls.def("f", []{});
     ncls.def("f", []{});
 
     // test18_static_properties
-    nb::class_<StaticProperties>(m, "StaticProperties")
-        .def_readwrite_static("value", &StaticProperties::value)
+    nb::class_<StaticProperties>(m)
+        .def_readwrite_static<&StaticProperties::value>()
         .def_static("get", []{ return StaticProperties::value; } );
 
     // test19_supplement

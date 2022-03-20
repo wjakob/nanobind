@@ -36,6 +36,7 @@
 // Implementation. The nb_*.h files should only be included through nanobind.h
 #include "nb_python.h"
 #include "nb_defs.h"
+#include "nb_name.h"
 #include "nb_enums.h"
 #include "nb_traits.h"
 #include "nb_tuple.h"

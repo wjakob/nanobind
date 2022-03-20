@@ -48,6 +48,7 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     ${NB_DIR}/include/nanobind/nb_call.h
     ${NB_DIR}/include/nanobind/nb_class.h
     ${NB_DIR}/include/nanobind/nb_defs.h
+    ${NB_DIR}/include/nanobind/nb_name.h
     ${NB_DIR}/include/nanobind/nb_enums.h
     ${NB_DIR}/include/nanobind/nb_func.h
     ${NB_DIR}/include/nanobind/nb_misc.h

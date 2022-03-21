@@ -340,6 +340,8 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
 static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
                                                      PyObject *const *, size_t,
                                                      PyObject *) noexcept {
+    if (PyErr_Occurred())
+        return nullptr;
     func_record *f = nb_func_get(self);
     buf.clear();
     buf.put("Unable to convert function return value to a Python "

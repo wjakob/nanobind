@@ -5,3 +5,21 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = [ "tests" ]
+
+
+[tool.flake8]
+extend-select = ["B", "B9"]
+extend-ignore = [
+  "E203", "E501", "E722", "B950",
+  "E302", "E111", "E261", "E306", "E305", "E231", "E122", # Would be fixed by using Black
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_unused_configs = true
+strict = true
+
+# You can disable imports or control per-module/file settings here
+[[tool.mypy.overrides]]
+module = [ "setuptools.*", ]
+ignore_missing_imports = true

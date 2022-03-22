@@ -1,0 +1,130 @@
+# To use:
+#
+#     pre-commit run -a
+#
+# Or:
+#
+#     pre-commit install  # (runs every time you commit in git)
+#
+# To update this file:
+#
+#     pre-commit autoupdate
+#
+# See https://github.com/pre-commit/pre-commit
+
+exclude: \.svg$
+
+repos:
+# Standard hooks
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: "v4.1.0"
+  hooks:
+  - id: check-added-large-files
+  - id: check-case-conflict
+  - id: check-docstring-first
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: check-toml
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+  - id: requirements-txt-fixer
+  - id: trailing-whitespace
+
+# Upgrade old Python syntax
+- repo: https://github.com/asottile/pyupgrade
+  rev: "v2.31.0"
+  hooks:
+  - id: pyupgrade
+    args: [--py38-plus]
+
+# Changes tabs to spaces
+- repo: https://github.com/Lucas-C/pre-commit-hooks
+  rev: "v1.1.13"
+  hooks:
+  - id: remove-tabs
+
+- repo: https://github.com/sirosen/texthooks
+  rev: "0.2.2"
+  hooks:
+  - id: fix-ligatures
+  - id: fix-smartquotes
+
+# Autoremoves unused imports
+- repo: https://github.com/hadialqattan/pycln
+  rev: "v1.2.4"
+  hooks:
+  - id: pycln
+    stages: [manual]
+
+# Checking for common mistakes
+- repo: https://github.com/pre-commit/pygrep-hooks
+  rev: "v1.9.0"
+  hooks:
+  - id: python-check-blanket-noqa
+  - id: python-check-blanket-type-ignore
+  - id: python-no-log-warn
+  - id: python-use-type-annotations
+  - id: rst-backticks
+  - id: rst-directive-colons
+  - id: rst-inline-touching-normal
+
+# Flake8 also supports pre-commit natively (same author)
+- repo: https://github.com/PyCQA/flake8
+  rev: "4.0.1"
+  hooks:
+  - id: flake8
+    entry: pflake8
+    exclude: ^docs/
+    additional_dependencies:
+      - flake8-bugbear
+      - pep8-naming
+      - pyproject-flake8
+
+# PyLint has native support - not always usable, but works for us
+- repo: https://github.com/PyCQA/pylint
+  rev: "v2.12.2"
+  hooks:
+  - id: pylint
+    files: ^pybind11
+
+# CMake formatting
+- repo: https://github.com/cheshirekow/cmake-format-precommit
+  rev: "v0.6.13"
+  hooks:
+  - id: cmake-format
+    additional_dependencies: [pyyaml]
+    types: [file]
+    files: (\.cmake|CMakeLists.txt)(.in)?$
+
+# Check static types with mypy
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: "v0.931"
+  hooks:
+  - id: mypy
+    args: [--show-error-codes]
+    exclude: ^(tests|docs)/
+
+# Check for spelling
+- repo: https://github.com/codespell-project/codespell
+  rev: "v2.1.0"
+  hooks:
+  - id: codespell
+    exclude: ".supp$"
+    args: ["-L", "nd,ot,thist"]
+
+# Check for common shell mistakes
+- repo: https://github.com/shellcheck-py/shellcheck-py
+  rev: "v0.8.0.4"
+  hooks:
+  - id: shellcheck
+
+# Disallow some common capitalization mistakes
+- repo: local
+  hooks:
+  - id: disallow-caps
+    name: Disallow improper capitalization
+    language: pygrep
+    entry: PyBind|Numpy|Cmake|CCache|PyTest
+    exclude: ^\.pre-commit-config.yaml$

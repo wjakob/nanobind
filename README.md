@@ -42,11 +42,11 @@ endless cycle.
 The following experiments analyze the performance of a very large
 function-heavy (`func`) and class-heavy (`class`) binding microbenchmark
 compiled using _Boost.Python_, _pybind11_, and _nanobind_ in both `debug` and
-size-optimized (`opt`) modes. 
+size-optimized (`opt`) modes.
 A comparison with [cppyy](https://cppyy.readthedocs.io/en/latest/) (which uses
 dynamic compilation) is also shown later.
 Details on the experimental setup can be found
-[here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md). 
+[here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md).
 
 The first plot contrasts the **compilation time**, where "_number_ ×"
 annotations denote the amount of time spent relative to _nanobind_. As shown
@@ -96,7 +96,7 @@ _cppyy_ is based on dynamic parsing of C++ code and *just-in-time* (JIT)
 compilation of bindings via the LLVM compiler infrastructure. The authors of
 _cppyy_ report that their tool produces bindings with much lower overheads
 compared to _pybind11_, and the above plots show that this is indeed true.
-However, _nanobind_ retakes the performance lead in these experiments. 
+However, _nanobind_ retakes the performance lead in these experiments.
 
 With speed gone as the main differentiating factor, other qualitative
 differences make these two tools appropriate to different audiences: _cppyy_
@@ -552,6 +552,32 @@ changes are detailed below.
     a function that takes such an argument, _nanobind_ will only call the
     associated function overload when the underlying Python object wraps a C++
     `T` instance.
+
+  - **Raw docstrings**: In cases where absolute control over docstrings is
+    required (for example, so that they can be parsed by a tool like
+    [Sphinx](https://www.sphinx-doc.org)), the ``nb::raw_doc`` attribute can be
+    specified to functions. In this case, _nanobind_ will _skip_ generation of
+    a combined docstring that enumerates overloads along with type information.
+
+    Example:
+
+    ```cpp
+    m.def("identity", [](float arg) { return arg; });
+    m.def("identity", [](int arg) { return arg; },
+          nb::raw_doc(
+              "identity(arg)\n"
+              "An identity function for integers and floats\n"
+              "\n"
+              "Args:\n"
+              "    arg (float | int): Input value\n"
+              "\n"
+              "Returns:\n"
+              "    float | int: Result of the identity operation"));
+    ```
+
+    Writing detailed docstrings in this way is rather tedious. In practice,
+    they would usually be extracted from C++ heades using a tool like
+    [pybind11_mkdoc](https://github.com/pybind/pybind11_mkdoc).
 
 ## How to cite this project?
 

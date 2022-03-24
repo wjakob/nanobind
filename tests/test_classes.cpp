@@ -94,8 +94,8 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<PairStruct>(m)
         .def(nb::init<>())
-        .def_readwrite<&PairStruct::s1>()
-        .def_readwrite<&PairStruct::s2>();
+        .def_readwrite("s1", &PairStruct::s1)
+        .def_readwrite("s2", &PairStruct::s2);
 
     m.def("stats", []{
         nb::dict d;
@@ -229,7 +229,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init_implicit<const B *>())
         .def(nb::init_implicit<int>())
         .def(nb::init_implicit<float>())
-        .def_readwrite<&D::value>();
+        .def_readwrite("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });
 

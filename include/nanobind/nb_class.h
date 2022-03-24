@@ -375,7 +375,7 @@ public:
 
     template <auto mem_ptr, typename... Extra>
     NB_INLINE class_ &def_readwrite(const Extra &...extra) {
-        static_assert(detail::get_name_impl<mem_ptr>().name[0] != '\0',
+        static_assert(detail::get_name_var_v<mem_ptr>.name[0] != '\0',
                 "Member names are not recognized on this platform. Please use explicit named overload");
         return def_readwrite(detail::get_name<mem_ptr>(), mem_ptr, extra...);
     }
@@ -408,7 +408,7 @@ public:
     }
     template <auto mem_ptr, typename... Extra>
     NB_INLINE class_ &def_readonly(const Extra &...extra) {
-        static_assert(detail::get_name_impl<mem_ptr>().name[0] != '\0',
+        static_assert(detail::get_name_var_v<mem_ptr>.name[0] != '\0',
                       "Member names are not recognized on this platform. Please use explicit named overload");
         return def_readonly(detail::get_name<mem_ptr>(), mem_ptr, extra...);
     }

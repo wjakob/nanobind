@@ -25,7 +25,7 @@ def test01_signature():
         "Overloaded function.\n"
         "\n"
         "1. __init__(self) -> None\n"
-        "2. __init__(self, arg0: int) -> None")
+        "2. __init__(self, arg: int) -> None")
 
     assert t.Struct.value.__doc__ == "value(self) -> int"
     assert t.Struct.create_move.__doc__ == "create_move() -> test_classes_ext.Struct"
@@ -35,8 +35,8 @@ def test01_signature():
         "static_test(*args, **kwargs) -> Any\n"
         "Overloaded function.\n"
         "\n"
-        "1. static_test(arg0: int) -> int\n"
-        "2. static_test(arg0: float) -> int")
+        "1. static_test(arg: int) -> int\n"
+        "2. static_test(arg: float) -> int")
 
 
 def test02_static_overload():
@@ -249,7 +249,7 @@ def test12_large_pointers():
 
 
 def test13_implicitly_convertible():
-    assert t.get_d.__doc__ == "get_d(arg0: test_classes_ext.D) -> int"
+    assert t.get_d.__doc__ == "get_d(arg: test_classes_ext.D) -> int"
     a = t.A(1)
     b = t.B(2)
     b2 = t.B2(3)
@@ -259,7 +259,7 @@ def test13_implicitly_convertible():
         t.get_d(c)
     assert str(excinfo.value) == (
         "get_d(): incompatible function arguments. The following argument types are supported:\n"
-        "    1. get_d(arg0: test_classes_ext.D) -> int\n"
+        "    1. get_d(arg: test_classes_ext.D) -> int\n"
         "\n"
         "Invoked with types: C")
     assert t.get_d(a) == 11
@@ -429,7 +429,7 @@ def test21_low_level(clean):
 
 
 def test22_handle_of(clean):
-    assert t.test_handle_of.__doc__ == 'test_handle_of(arg0: test_classes_ext.Struct) -> object'
+    assert t.test_handle_of.__doc__ == 'test_handle_of(arg: test_classes_ext.Struct) -> object'
     s = t.test_handle_of(t.Struct(5))
     assert s.value() == 5
     del s

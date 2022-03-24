@@ -101,4 +101,8 @@ NB_MODULE(test_functions_ext, m) {
             l.append(h);
         return l;
     });
+
+    // Overload chain with a raw docstring that has precedence
+    m.def("test_08", [](int) -> int { return 1; }, "ignored");
+    m.def("test_08", [](float) -> int { return 2; }, nb::raw_doc("raw"));
 }

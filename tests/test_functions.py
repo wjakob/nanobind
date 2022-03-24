@@ -34,11 +34,11 @@ def test05_signature():
         "test_05(*args, **kwargs) -> Any\n"
         "Overloaded function.\n"
         "\n"
-        "1. test_05(arg0: int) -> int\n"
+        "1. test_05(arg: int) -> int\n"
         "\n"
         "doc_1\n"
         "\n"
-        "2. test_05(arg0: float) -> int\n"
+        "2. test_05(arg: float) -> int\n"
         "\n"
         "doc_2\n")
 
@@ -55,8 +55,8 @@ def test06_signature_error():
     assert str(excinfo.value) == (
         "test_05(): incompatible function arguments. The "
         "following argument types are supported:\n"
-        "    1. test_05(arg0: int) -> int\n"
-        "    2. test_05(arg0: float) -> int\n\n"
+        "    1. test_05(arg: int) -> int\n"
+        "    2. test_05(arg: float) -> int\n\n"
         "Invoked with types: str, kwargs = { y: int }")
 
 
@@ -136,3 +136,6 @@ def test14_print(capsys):
 
 def test15_iter():
     assert t.test_iter([1,2,3]) == [1,2,3]
+
+def test16_raw_doc():
+    assert t.test_08.__doc__ == 'raw'

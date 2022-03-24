@@ -72,6 +72,7 @@ public:
 
     NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
     NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
+    NB_INLINE bool is_type() const  { return PyType_Check(derived().ptr()); }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
     NB_INLINE handle inc_ref() const & noexcept;
     NB_INLINE handle dec_ref() const & noexcept;

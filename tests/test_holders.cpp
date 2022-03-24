@@ -30,7 +30,7 @@ struct UniqueWrapper2 { std::unique_ptr<Example, nb::deleter<Example>> value; };
 NB_MODULE(test_holders_ext, m) {
     nb::class_<Example>(m)
         .def(nb::init<int>())
-        .def_readwrite<&Example::value>()
+        .def_readwrite("value", &Example::value)
         .def_static("make", &Example::make)
         .def_static("make_shared", &Example::make_shared);
 

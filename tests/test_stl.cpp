@@ -61,12 +61,12 @@ NB_MODULE(test_stl_ext, m) {
     nb::class_<Movable>(m)
         .def(nb::init<>())
         .def(nb::init<int>())
-        .def_readwrite<&Movable::value>();
+        .def_readwrite("value", &Movable::value);
 
     nb::class_<Copyable>(m)
         .def(nb::init<>())
         .def(nb::init<int>())
-        .def_readwrite<&Copyable::value>();
+        .def_readwrite("value", &Copyable::value);
 
     // ----- test01-test12 ------ */
 

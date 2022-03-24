@@ -98,13 +98,13 @@ constexpr inline auto get_name_var_v = get_name_impl<T>();
 
 template<typename T>
 constexpr NB_INLINE const char* get_name() noexcept {
-    static_assert(get_name_v<T>.name[0] != '\0', "Cannot deduce class name. Please use implicit name.");
+    static_assert(get_name_v<T>.name[0] != '\0', "Cannot deduce class name. Please add it manually.");
     return get_name_v<T>.name;
 }
 
 template<auto T>
 constexpr NB_INLINE const char* get_name() noexcept {
-    static_assert(get_name_var_v<T>.name[0] != '\0', "Cannot deduce member/function name. Please use implicit name.");
+    static_assert(get_name_var_v<T>.name[0] != '\0', "Cannot deduce member/function name. Please add it manually.");
     return get_name_var_v<T>.name;
 }
 

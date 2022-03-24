@@ -1,53 +1,72 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-constexpr NB_INLINE std::string_view pretty_name(std::string_view name, bool remove_args = false) noexcept {
+template<std::size_t size>
+struct CArray {
+    char name[size+1];
+};
+
+struct StringView {
+    const char* data;
+    std::size_t size;
+
+    [[nodiscard]] constexpr char front() const {
+        return data[0];
+    }
+
+    [[nodiscard]] constexpr char back() const {
+        return data[size-1];
+    }
+};
+
+constexpr NB_INLINE StringView pretty_name(StringView name, bool remove_args = false) noexcept {
     if (remove_args) {
-        auto i = name.find_last_of(')');
-        assert(i != std::string_view::npos);
+        auto i = name.size;
+        while (i > 0 && name.data[--i] != ')');
 
         for (std::size_t countOfParenthesis{}; ; --i) {
-            if (auto v = name[i]; v == ')') {
+            if (auto v = name.data[i]; v == ')') {
                 ++countOfParenthesis;
             } else if (v == '(' && --countOfParenthesis == 0) {
                 break;
             }
         }
-        while (i > 0 && name[i] == ' ') {
+        while (i > 0 && name.data[i] == ' ') {
             --i;
         }
-        name = name.substr(0, i);
+        name.size = i;
     } else if (name.back() == ')')
-        name.remove_suffix(1);
+        --name.size;
 
     if (name.back() == '>') {
-        auto i = name.size() - 1;
+        auto i = name.size - 1;
 
         for (std::size_t countOfAngleBracket{}; ; --i) {
-            if (auto v = name[i]; v == '>') {
+            if (auto v = name.data[i]; v == '>') {
                 ++countOfAngleBracket;
             } else if (v == '<' && --countOfAngleBracket == 0) {
                 break;
             }
         }
-        while (i > 0 && name[i] == ' ') {
+        while (i > 0 && name.data[i] == ' ') {
             --i;
         }
 
-        name = name.substr(0, i);
+        name.size = i;
     }
 
-    for (std::size_t i = name.size(); i > 0; --i) {
-        if (!((name[i - 1] >= '0' && name[i - 1] <= '9') ||
-              (name[i - 1] >= 'a' && name[i - 1] <= 'z') ||
-              (name[i - 1] >= 'A' && name[i - 1] <= 'Z') ||
-              (name[i - 1] == '_'))) {
-            name.remove_prefix(i);
+    for (std::size_t i = name.size; i > 0; --i) {
+        if (!((name.data[i - 1] >= '0' && name.data[i - 1] <= '9') ||
+              (name.data[i - 1] >= 'a' && name.data[i - 1] <= 'z') ||
+              (name.data[i - 1] >= 'A' && name.data[i - 1] <= 'Z') ||
+              (name.data[i - 1] == '_'))) {
+            name.data += i;
+            name.size -= i;
             break;
         }
     }
 
-    if (!name.empty() && ((name.front() >= 'a' && name.front() <= 'z') ||
+    if (name.size > 0 && ((name.front() >= 'a' && name.front() <= 'z') ||
                           (name.front() >= 'A' && name.front() <= 'Z') ||
                           (name.front() == '_'))) {
         return name;
@@ -56,14 +75,9 @@ constexpr NB_INLINE std::string_view pretty_name(std::string_view name, bool rem
     return {}; // Invalid name.
 }
 
-template<std::size_t size>
-struct CArray {
-    char name[size+1];
-};
-
 template<std::size_t ...Ix>
-constexpr NB_INLINE auto to_array(std::string_view sv, std::index_sequence<Ix...>) {
-    return CArray<sizeof...(Ix)>{sv[Ix]..., '\0'};
+constexpr NB_INLINE auto to_array(StringView sv, std::index_sequence<Ix...>) {
+    return CArray<sizeof...(Ix)>{sv.data[Ix]..., '\0'};
 }
 
 #if defined(__clang__) || defined(__GNUC__)
@@ -72,20 +86,20 @@ constexpr NB_INLINE auto to_array(std::string_view sv, std::index_sequence<Ix...
 #   define NB_NAME_GETTER constexpr auto name = pretty_name({__FUNCSIG__, sizeof(__FUNCSIG__) - 17}, \
         std::is_member_function_pointer_v<T> || std::is_function_v<T>)
 #else
-#   define NB_NAME_GETTER constexpr auto name = string_view{}
+#   define NB_NAME_GETTER constexpr auto name = StringView{}
 #endif
 
 template<typename T>
 constexpr NB_INLINE auto get_name_impl() noexcept {
     NB_NAME_GETTER;
-    return to_array(name, std::make_index_sequence<name.size()>{});
+    return to_array(name, std::make_index_sequence<name.size>{});
 }
 
 template<auto V>
 constexpr NB_INLINE auto get_name_impl() noexcept {
     using T = std::remove_pointer_t<std::decay_t<decltype(V)>>;
     NB_NAME_GETTER;
-    return to_array(name, std::make_index_sequence<name.size()>{});
+    return to_array(name, std::make_index_sequence<name.size>{});
 }
 
 

@@ -32,7 +32,6 @@
 #include <typeinfo>
 #include <utility>
 #include <new>
-#include <string_view>
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
 #include "nb_python.h"

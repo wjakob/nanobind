@@ -19,7 +19,7 @@ constexpr static inline auto test_01 = []() { };
 
 NB_MODULE(test_functions_ext, m) {
     // Function without inputs/outputs
-    m.def<&test_01>();
+    m.def("test_01", test_01);
 
     // Simple binary function (via function pointer)
     m.def<test_02>("j"_a = 8, "k"_a = 1);

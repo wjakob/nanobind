@@ -72,7 +72,7 @@ struct StaticProperties {
 int StaticProperties::value = 23;
 
 NB_MODULE(test_classes_ext, m) {
-    struct_tmp = std::make_unique<Struct>(12);
+    struct_tmp = std::unique_ptr<Struct>(new Struct(12));
 
     auto cls = nb::class_<Struct>(m, "Struct", "Some documentation")
         .def(nb::init<>())

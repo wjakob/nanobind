@@ -301,6 +301,8 @@ def test29_opaque_vector():
     assert isinstance(f, t.float_vec)
     f.push_back(1)
     assert f.size() == 1
+    f.emplace_back(2)
+    assert f.size() == 2
 
 
 def test30_std_function():

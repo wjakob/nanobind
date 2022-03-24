@@ -171,6 +171,8 @@ NB_MODULE(test_stl_ext, m) {
     nb::class_<fvec>(m, "float_vec")
         .def(nb::init<>())
         .def<nb::overload_cast<float&&>(&fvec::push_back)>()
+        .def<&fvec::emplace_back<float&&>>()
+        .def<&fvec::emplace_back<const float&>>()
         .def<&fvec::size>();
 
     // ----- test30 ------ */

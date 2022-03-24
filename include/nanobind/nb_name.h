@@ -20,6 +20,23 @@ constexpr NB_INLINE std::string_view pretty_name(std::string_view name, bool rem
     } else if (name.back() == ')')
         name.remove_suffix(1);
 
+    if (name.back() == '>') {
+        auto i = name.size() - 1;
+
+        for (std::size_t countOfAngleBracket{}; ; --i) {
+            if (auto v = name[i]; v == '>') {
+                ++countOfAngleBracket;
+            } else if (v == '<' && --countOfAngleBracket == 0) {
+                break;
+            }
+        }
+        while (i > 0 && name[i] == ' ') {
+            --i;
+        }
+
+        name = name.substr(0, i);
+    }
+
     for (std::size_t i = name.size(); i > 0; --i) {
         if (!((name[i - 1] >= '0' && name[i - 1] <= '9') ||
               (name[i - 1] >= 'a' && name[i - 1] <= 'z') ||
@@ -61,7 +78,6 @@ constexpr NB_INLINE auto to_array(std::string_view sv, std::index_sequence<Ix...
 template<typename T>
 constexpr NB_INLINE auto get_name_impl() noexcept {
     NB_NAME_GETTER;
-    static_assert(name.size() > 0, "Cannot deduce class name. Please use implicit name.");
     return to_array(name, std::make_index_sequence<name.size()>{});
 }
 
@@ -81,12 +97,14 @@ constexpr inline auto get_name_var_v = get_name_impl<T>();
 
 
 template<typename T>
-constexpr NB_INLINE const char* get_name() {
+constexpr NB_INLINE const char* get_name() noexcept {
+    static_assert(get_name_v<T>.name[0] != '\0', "Cannot deduce class name. Please use implicit name.");
     return get_name_v<T>.name;
 }
 
 template<auto T>
-constexpr NB_INLINE const char* get_name() {
+constexpr NB_INLINE const char* get_name() noexcept {
+    static_assert(get_name_var_v<T>.name[0] != '\0', "Cannot deduce member/function name. Please use implicit name.");
     return get_name_var_v<T>.name;
 }
 

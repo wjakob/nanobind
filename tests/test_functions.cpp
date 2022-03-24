@@ -15,7 +15,8 @@ auto test_02(int j, int k) -> int {
     return j - k;
 }
 
-auto test_08(int) -> int {
+template<typename T>
+auto test_08(T) -> int {
     return 1;
 }
 
@@ -107,6 +108,6 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     // Overload chain with a raw docstring that has precedence
-    m.def<&test_08>("ignored");
+    m.def<&test_08<int>>("ignored");
     m.def("test_08", [](float) -> int { return 2; }, nb::raw_doc("raw"));
 }

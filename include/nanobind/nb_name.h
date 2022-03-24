@@ -43,14 +43,14 @@ constexpr NB_INLINE auto to_array(std::string_view sv, std::index_sequence<Ix...
 #endif
 
 template<typename T>
-constexpr NB_INLINE auto get_name_impl() {
+constexpr NB_INLINE auto get_name_impl() noexcept {
     NB_NAME_GETTER;
     static_assert(name.size() > 0, "Cannot deduce class name. Please use implicit name.");
     return to_array(name, std::make_index_sequence<name.size()>{});
 }
 
 template<auto T>
-constexpr NB_INLINE auto get_name_impl() {
+constexpr NB_INLINE auto get_name_impl() noexcept {
     NB_NAME_GETTER;
     static_assert(name.size() > 0, "Cannot deduce member/function name. Please use implicit name.");
     return to_array(name, std::make_index_sequence<name.size()>{});

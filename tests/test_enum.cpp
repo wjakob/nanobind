@@ -6,7 +6,7 @@ enum class Enum  : uint32_t { A, B, C = (uint32_t) -1 };
 enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
 
 NB_MODULE(test_enum_ext, m) {
-    nb::enum_<Enum>(m, "Enum")
+    nb::enum_<Enum>(m)
         .value<Enum::A>("Value A")
         .value<Enum::B>("Value B")
         .value<Enum::C>("Value C");

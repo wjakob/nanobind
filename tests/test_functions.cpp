@@ -15,11 +15,15 @@ auto test_02(int j, int k) -> int {
     return j - k;
 }
 
+auto test_08(int) -> int {
+    return 1;
+}
+
 constexpr static inline auto test_01 = []() { };
 
 NB_MODULE(test_functions_ext, m) {
     // Function without inputs/outputs
-    m.def("test_01", test_01);
+    m.def<&test_01>();
 
     // Simple binary function (via function pointer)
     m.def<test_02>("j"_a = 8, "k"_a = 1);
@@ -103,6 +107,6 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     // Overload chain with a raw docstring that has precedence
-    m.def("test_08", [](int) -> int { return 1; }, "ignored");
+    m.def<&test_08>("ignored");
     m.def("test_08", [](float) -> int { return 2; }, nb::raw_doc("raw"));
 }

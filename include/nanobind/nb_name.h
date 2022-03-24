@@ -69,7 +69,6 @@ template<auto V>
 constexpr NB_INLINE auto get_name_impl() noexcept {
     using T = std::remove_pointer_t<std::decay_t<decltype(V)>>;
     NB_NAME_GETTER;
-    static_assert(name.size() > 0, "Cannot deduce member/function name. Please use implicit name.");
     return to_array(name, std::make_index_sequence<name.size()>{});
 }
 

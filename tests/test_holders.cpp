@@ -31,8 +31,8 @@ NB_MODULE(test_holders_ext, m) {
     nb::class_<Example>(m)
         .def(nb::init<int>())
         .def_readwrite("value", &Example::value)
-        .def_static("make", &Example::make)
-        .def_static("make_shared", &Example::make_shared);
+        .def_static<&Example::make>()
+        .def_static<&Example::make_shared>();
 
     // ------- shared_ptr -------
 

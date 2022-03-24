@@ -228,7 +228,12 @@ module_ &module_::def(const char *name_, Func &&f, const Extra &...extra) {
 
 template<auto func, typename... Extra>
 module_ &module_::def(const Extra &...extra) {
-    return def(detail::get_name<func>(), *func, extra...);
+    if constexpr(std::is_pointer_v<decltype(func)> &&
+            !std::is_function_v<std::remove_pointer_t<decltype(func)>>) {
+        return def(detail::get_name<func>(), *func, extra...);
+    } else {
+        return def(detail::get_name<func>(), func, extra...);
+    }
 }
 
 NAMESPACE_END(NB_NAMESPACE)

@@ -374,9 +374,13 @@ public:
     }
 
     template <auto mem_ptr, typename... Extra>
-    NB_INLINE class_ &def_readwrite(const Extra &...extra) {
+    NB_INLINE std::enable_if_t<detail::get_name<mem_ptr>()[0], class_ &> def_readwrite(const Extra &...extra) {
         return def_readwrite(detail::get_name<mem_ptr>(), mem_ptr, extra...);
     }
+
+    template <auto mem_ptr>
+    [[deprecated("Member names are not recognized on this platform. Please use explicit named overload")]]
+    NB_INLINE std::enable_if_t<!detail::get_name<mem_ptr>()[0], class_ &> def_readwrite(...) = delete;
 
     template <typename D, typename... Extra>
     NB_INLINE class_ &def_readwrite_static(const char *name, D *pm,
@@ -405,9 +409,13 @@ public:
         return *this;
     }
     template <auto mem_ptr, typename... Extra>
-    NB_INLINE class_ &def_readonly(const Extra &...extra) {
+    NB_INLINE std::enable_if_t<detail::get_name<mem_ptr>()[0], class_ &> &def_readonly(const Extra &...extra) {
         return def_readonly(detail::get_name<mem_ptr>(), mem_ptr, extra...);
     }
+
+    template <auto mem_ptr>
+    [[deprecated("Member names are not recognized on this platform. Please use explicit named overload")]]
+    NB_INLINE std::enable_if_t<!detail::get_name<mem_ptr>()[0], class_ &> def_readonly(...) = delete;
 
     template <typename D, typename... Extra>
     NB_INLINE class_ &def_readonly_static(const char *name, D *pm,

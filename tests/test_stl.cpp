@@ -170,7 +170,7 @@ NB_MODULE(test_stl_ext, m) {
     using fvec = std::vector<float, std::allocator<float>>;
     nb::class_<fvec>(m, "float_vec")
         .def(nb::init<>())
-        .def("push_back", [](fvec *fv, float f) { fv->push_back(f); })
+        .def<nb::overload_cast<float&&>(&fvec::push_back)>()
         .def<&fvec::size>();
 
     // ----- test30 ------ */

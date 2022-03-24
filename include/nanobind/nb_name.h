@@ -1,8 +1,23 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-constexpr NB_INLINE std::string_view pretty_name(std::string_view name) noexcept {
-    if (name.back() == ')')
+constexpr NB_INLINE std::string_view pretty_name(std::string_view name, bool remove_args = false) noexcept {
+    if (remove_args) {
+        auto i = name.find_last_of(')');
+        assert(i != std::string_view::npos);
+
+        for (std::size_t countOfParenthesis{}; ; --i) {
+            if (auto v = name[i]; v == ')') {
+                ++countOfParenthesis;
+            } else if (v == '(' && --countOfParenthesis == 0) {
+                break;
+            }
+        }
+        while (i > 0 && name[i] == ' ') {
+            --i;
+        }
+        name = name.substr(0, i);
+    } else if (name.back() == ')')
         name.remove_suffix(1);
 
     for (std::size_t i = name.size(); i > 0; --i) {
@@ -37,7 +52,8 @@ constexpr NB_INLINE auto to_array(std::string_view sv, std::index_sequence<Ix...
 #if defined(__clang__) || defined(__GNUC__)
 #   define NB_NAME_GETTER constexpr auto name = pretty_name({__PRETTY_FUNCTION__, sizeof(__PRETTY_FUNCTION__) - 2})
 #elif defined(_MSC_VER)
-#   define NB_NAME_GETTER constexpr auto name = pretty_name({__FUNCSIG__, sizeof(__FUNCSIG__) - 17})
+#   define NB_NAME_GETTER constexpr auto name = pretty_name({__FUNCSIG__, sizeof(__FUNCSIG__) - 17}, \
+        std::is_member_function_pointer_v<T> || std::is_function_v<T>)
 #else
 #   define NB_NAME_GETTER constexpr auto name = string_view{}
 #endif
@@ -49,8 +65,9 @@ constexpr NB_INLINE auto get_name_impl() noexcept {
     return to_array(name, std::make_index_sequence<name.size()>{});
 }
 
-template<auto T>
+template<auto V>
 constexpr NB_INLINE auto get_name_impl() noexcept {
+    using T = std::remove_pointer_t<std::decay_t<decltype(V)>>;
     NB_NAME_GETTER;
     static_assert(name.size() > 0, "Cannot deduce member/function name. Please use implicit name.");
     return to_array(name, std::make_index_sequence<name.size()>{});

@@ -53,7 +53,7 @@ NB_MODULE(test_holders_ext, m) {
     // ------- unique_ptr -------
 
     m.def("unique_from_cpp",
-          []() { return std::unique_ptr<Example>(new Example(1)); });
+          []() { return std::make_unique<Example>(1); });
     m.def("unique_from_cpp_2", []() {
         return std::unique_ptr<Example, nb::deleter<Example>>(new Example(2));
     });

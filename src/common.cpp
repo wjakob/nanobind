@@ -29,7 +29,7 @@ void raise(const char *fmt, ...) {
     if (size < sizeof(buf))
         throw std::runtime_error(buf);
 
-    auto allocated = std::make_unique<char[]>(size + 1);
+    auto allocated = std::unique_ptr<char[], decltype(&free)>{(char*) malloc(size + 1), &free};
     if (!allocated) {
         fprintf(stderr, "nb::detail::raise(): out of memory!");
         abort();

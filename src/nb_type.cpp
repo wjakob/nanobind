@@ -91,7 +91,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
             *(void **) (new_alloc + nb_inst_size) = value;
             self = (nb_inst *) (new_alloc + gc_size);
-            self->offset = (int32_t) (uint32_t) basic_size;
+            self->offset = (int32_t) basic_size;
             self->direct = false;
         }
 

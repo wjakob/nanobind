@@ -86,7 +86,7 @@ static void nb_func_dealloc(PyObject *self) {
         auto &funcs = internals_get().funcs;
         auto it = funcs.find(self);
         if (it == funcs.end()) {
-            const char *name = (f->flags & (uint16_t) func_flags::has_name)
+            const char *name = (f->flags & (uint32_t) func_flags::has_name)
                                    ? f->name : "<anonymous>";
             fail("nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
                  name);
@@ -94,10 +94,10 @@ static void nb_func_dealloc(PyObject *self) {
         funcs.erase(it);
 
         for (size_t i = 0; i < size; ++i) {
-            if (f->flags & (uint16_t) func_flags::has_free)
+            if (f->flags & (uint32_t) func_flags::has_free)
                 f->free(f->capture);
 
-            if (f->flags & (uint16_t) func_flags::has_args) {
+            if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_XDECREF(f->args[j].value);
                     Py_XDECREF(f->args[j].name_py);
@@ -122,14 +122,14 @@ static void nb_func_dealloc(PyObject *self) {
 PyObject *nb_func_new(const void *in_) noexcept {
     func_data<0> *f = (func_data<0> *) in_;
 
-    const bool has_scope      = f->flags & (uint16_t) func_flags::has_scope,
-               has_name       = f->flags & (uint16_t) func_flags::has_name,
-               has_args       = f->flags & (uint16_t) func_flags::has_args,
-               has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
-               has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs,
-               is_implicit    = f->flags & (uint16_t) func_flags::is_implicit,
-               is_method      = f->flags & (uint16_t) func_flags::is_method,
-               return_ref     = f->flags & (uint16_t) func_flags::return_ref;
+    const bool has_scope      = f->flags & (uint32_t) func_flags::has_scope,
+               has_name       = f->flags & (uint32_t) func_flags::has_name,
+               has_args       = f->flags & (uint32_t) func_flags::has_args,
+               has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
+               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
+               is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
+               is_method      = f->flags & (uint32_t) func_flags::is_method,
+               return_ref     = f->flags & (uint32_t) func_flags::return_ref;
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -147,8 +147,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
                 Py_TYPE(func_prev) == internals.nb_meth) {
                 func_record *fp = nb_func_get(func_prev);
 
-                if ((fp->flags & (uint16_t) func_flags::is_method) !=
-                    (f ->flags & (uint16_t) func_flags::is_method))
+                if ((fp->flags & (uint32_t) func_flags::is_method) !=
+                    (f ->flags & (uint32_t) func_flags::is_method))
                     fail("nb::detail::nb_func_new(\"%s\"): mismatched static/"
                          "instance method flags in function overloads!", f->name);
 
@@ -209,14 +209,14 @@ PyObject *nb_func_new(const void *in_) noexcept {
     memcpy(fc, f, sizeof(func_data<0>));
     if (has_name) {
         fc->flags |= strcmp(fc->name, "__init__") == 0
-                         ? (uint16_t) func_flags::is_constructor
+                         ? (uint32_t) func_flags::is_constructor
                          : (uint16_t) 0;
     } else {
         fc->name = "<anonymous>";
     }
 
     if (is_implicit) {
-        if (!(fc->flags & (uint16_t) func_flags::is_constructor))
+        if (!(fc->flags & (uint32_t) func_flags::is_constructor))
             fail("nb::detail::nb_func_new(\"%s\"): nanobind::is_implicit() "
                  "should only be specified for constructors.", f->name);
         if (f->nargs != 2)
@@ -286,7 +286,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     const uint32_t count = (uint32_t) Py_SIZE(self);
     func_record *f = nb_func_get(self);
 
-    if (f->flags & (uint16_t) func_flags::is_operator) {
+    if (f->flags & (uint32_t) func_flags::is_operator) {
         Py_INCREF(Py_NotImplemented);
         return Py_NotImplemented;
     }
@@ -340,6 +340,8 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
 static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
                                                      PyObject *const *, size_t,
                                                      PyObject *) noexcept {
+    if (PyErr_Occurred())
+        return nullptr;
     func_record *f = nb_func_get(self);
     buf.clear();
     buf.put("Unable to convert function return value to a Python "
@@ -377,8 +379,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
     func_record *fr = nb_func_get(self);
 
-    const bool is_method = fr->flags & (uint16_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint16_t) func_flags::is_constructor;
+    const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
     PyObject *result = nullptr, *self_arg = nullptr;
 
@@ -462,9 +464,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
         for (size_t k = 0; k < count; ++k) {
             const func_record *f = fr + k;
 
-            const bool has_args       = f->flags & (uint16_t) func_flags::has_args,
-                       has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
-                       has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs;
+            const bool has_args       = f->flags & (uint32_t) func_flags::has_args,
+                       has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
+                       has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 
             /// Number of positional arguments
             size_t nargs_pos = f->nargs - has_var_args - has_var_kwargs;
@@ -624,8 +626,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                  nargs_in      = (size_t) PyVectorcall_NARGS(nargsf),
                  max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
 
-    const bool is_method = fr->flags & (uint16_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint16_t) func_flags::is_constructor;
+    const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
     PyObject *result = nullptr, *self_arg = nullptr;
 
@@ -742,10 +744,10 @@ static PyObject *nb_meth_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 
 /// Render the function signature of a single function
 static void nb_func_render_signature(const func_record *f) noexcept {
-    const bool is_method      = f->flags & (uint16_t) func_flags::is_method,
-               has_args       = f->flags & (uint16_t) func_flags::has_args,
-               has_var_args   = f->flags & (uint16_t) func_flags::has_var_args,
-               has_var_kwargs = f->flags & (uint16_t) func_flags::has_var_kwargs;
+    const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
+               has_args       = f->flags & (uint32_t) func_flags::has_args,
+               has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
+               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 
     const std::type_info **descr_type = f->descr_types;
     internals &internals = internals_get();
@@ -794,7 +796,8 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                     continue;
                 } else {
                     buf.put("arg");
-                    buf.put_uint32((uint32_t) (arg_index - is_method));
+                    if (arg_index > is_method || f->nargs > 1 + is_method)
+                        buf.put_uint32((uint32_t) (arg_index - is_method));
                 }
 
                 if (!(is_method && arg_index == 0))
@@ -860,7 +863,7 @@ static PyObject *nb_func_get_doc(PyObject *self, void *) {
     buf.clear();
 
     if (count > 1) {
-        buf.put_dstr((f->flags & (uint16_t) func_flags::has_name)
+        buf.put_dstr((f->flags & (uint32_t) func_flags::has_name)
                          ? f->name : "<anonymous>");
         buf.put("(*args, **kwargs) -> Any\n"
                 "Overloaded function.\n\n");
@@ -877,7 +880,10 @@ static PyObject *nb_func_get_doc(PyObject *self, void *) {
 
         nb_func_render_signature(f);
 
-        if ((f->flags & (uint16_t) func_flags::has_doc) && f->doc[0] != '\0') {
+        if ((f->flags & (uint32_t) func_flags::has_doc) && f->doc[0] != '\0') {
+            if (f->flags & (uint32_t) func_flags::raw_doc)
+                return PyUnicode_FromString(f->doc);
+
             buf.put("\n\n");
             buf.put_dstr(f->doc);
             buf.put('\n');
@@ -891,7 +897,7 @@ static PyObject *nb_func_get_doc(PyObject *self, void *) {
 
 static PyObject *nb_func_get_name(PyObject *self, void *) {
     func_record *f = nb_func_get(self);
-    if (f->flags & (uint16_t) func_flags::has_name) {
+    if (f->flags & (uint32_t) func_flags::has_name) {
         return PyUnicode_FromString(f->name);
     } else {
         Py_INCREF(Py_None);
@@ -901,8 +907,8 @@ static PyObject *nb_func_get_name(PyObject *self, void *) {
 
 static PyObject *nb_func_get_qualname(PyObject *self, void *) {
     func_record *f = nb_func_get(self);
-    if ((f->flags & (uint16_t) func_flags::has_scope) &&
-        (f->flags & (uint16_t) func_flags::has_name)) {
+    if ((f->flags & (uint32_t) func_flags::has_scope) &&
+        (f->flags & (uint32_t) func_flags::has_name)) {
         PyObject *scope_name = PyObject_GetAttrString(f->scope, "__qualname__");
         if (scope_name) {
             PyObject *result = PyUnicode_FromFormat("%U.%s", scope_name, f->name);
@@ -921,7 +927,7 @@ static PyObject *nb_func_get_qualname(PyObject *self, void *) {
 
 static PyObject *nb_func_get_module(PyObject *self, void *) {
     func_record *f = nb_func_get(self);
-    if (f->flags & (uint16_t) func_flags::has_scope) {
+    if (f->flags & (uint32_t) func_flags::has_scope) {
         PyObject *result = PyObject_GetAttrString(f->scope, "__module__");
         if (result)
             return result;

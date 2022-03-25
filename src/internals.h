@@ -128,7 +128,7 @@ public:
 
     template <typename U> py_allocator(const py_allocator<U> &) { }
 
-    pointer allocate(size_type n, const void * /*hint*/ = 0) noexcept {
+    pointer allocate(size_type n, const void * /*hint*/ = nullptr) noexcept {
         void *p = PyMem_Malloc(n * sizeof(T));
         if (!p)
             fail("PyMem_Malloc(): out of memory!");

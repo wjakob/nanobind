@@ -65,12 +65,12 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         object o1 = steal(
             Caster1::from_cpp(forward_like<T>(value.first), policy, cleanup));
         if (!o1.is_valid())
-            return handle();
+            return {};
 
         object o2 = steal(
             Caster2::from_cpp(forward_like<T>(value.second), policy, cleanup));
         if (!o2.is_valid())
-            return handle();
+            return {};
 
         PyObject *r = PyTuple_New(2);
         PyTuple_SET_ITEM(r, 0, o1.release().ptr());

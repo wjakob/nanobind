@@ -32,8 +32,8 @@ void trampoline_release(void **data, size_t size) noexcept {
         Py_XDECREF(data[i*2 + 2]);
 }
 
-extern char *cur_func;
-extern PyObject *cur_self;
+[[maybe_unused]] extern char *cur_func;
+[[maybe_unused]] extern PyObject *cur_self;
 
 PyObject *trampoline_lookup(void **data, size_t size, const char *name,
                             bool pure) {

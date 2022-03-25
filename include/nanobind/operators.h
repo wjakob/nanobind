@@ -29,13 +29,10 @@ enum op_type : int {
 };
 
 struct self_t { };
-static const self_t self = self_t();
+[[maybe_unused]] static const self_t self = self_t();
 
 /// Type for an unused type slot
 struct undefined_t { };
-
-/// Don't warn about an unused variable
-inline self_t __self() { return self; }
 
 /// base template of operator implementations
 template <op_id, op_type, typename B, typename L, typename R> struct op_impl { };

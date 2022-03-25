@@ -532,7 +532,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             // Deal with remaining positional arguments
             if (has_var_args) {
                 PyObject *tuple = PyTuple_New(
-                    nargs_in > nargs_pos ? (nargs_in - nargs_pos) : 0);
+                    nargs_in > nargs_pos ? (Py_ssize_t) (nargs_in - nargs_pos) : 0);
 
                 for (size_t j = nargs_pos; j < nargs_in; ++j) {
                     PyObject *o = args_in[j];

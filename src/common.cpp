@@ -19,17 +19,17 @@ NAMESPACE_BEGIN(detail)
     [[noreturn]]
 #endif
 void raise(const char *fmt, ...) {
-    char buf[512], *ptr = buf;
+    char buf[512];
     va_list args;
 
     va_start(args, fmt);
-    size_t size = vsnprintf(ptr, sizeof(buf), fmt, args);
+    size_t size = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
     if (size < sizeof(buf))
         throw std::runtime_error(buf);
 
-    ptr = (char *) malloc(size + 1);
+    char *ptr = (char *) malloc(size + 1);
     if (!ptr) {
         fprintf(stderr, "nb::detail::raise(): out of memory!");
         abort();
@@ -62,7 +62,7 @@ void fail(const char *fmt, ...) noexcept {
 
 PyObject *capsule_new(const void *ptr, void (*free)(void *)) noexcept {
     auto capsule_free = [](PyObject *o) {
-        void (*free_2)(void *) = (void (*)(void *))(PyCapsule_GetContext(o));
+        auto free_2 = (void (*)(void *))(PyCapsule_GetContext(o));
         if (free_2)
             free_2(PyCapsule_GetPointer(o, nullptr));
     };

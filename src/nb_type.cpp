@@ -91,7 +91,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
             *(void **) (new_alloc + nb_inst_size) = value;
             self = (nb_inst *) (new_alloc + gc_size);
-            self->offset = (uint32_t) basic_size;
+            self->offset = (int32_t) basic_size;
             self->direct = false;
         }
 
@@ -127,8 +127,8 @@ static void inst_dealloc(PyObject *self) {
     void *p = inst_ptr(inst);
 
     if (inst->destruct) {
-        if (type->t.flags & (int32_t) type_flags::is_destructible) {
-            if (type->t.flags & (int32_t) type_flags::has_destruct)
+        if (type->t.flags & (uint32_t) type_flags::is_destructible) {
+            if (type->t.flags & (uint32_t) type_flags::has_destruct)
                 type->t.destruct(p);
         } else {
             fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
@@ -138,7 +138,7 @@ static void inst_dealloc(PyObject *self) {
     }
 
     if (inst->cpp_delete) {
-        if (type->t.align <= __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+        if (type->t.align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__)
             operator delete(p);
         else
             operator delete(p, std::align_val_t(type->t.align));
@@ -801,8 +801,8 @@ void nb_inst_destruct(PyObject *o) noexcept {
     nb_type *nbt = (nb_type *) Py_TYPE(o);
 
     if (nbi->destruct) {
-        if (nbt->t.flags & (int32_t) type_flags::is_destructible) {
-            if (nbt->t.flags & (int32_t) type_flags::has_destruct)
+        if (nbt->t.flags & (uint32_t) type_flags::is_destructible) {
+            if (nbt->t.flags & (uint32_t) type_flags::has_destruct)
                 nbt->t.destruct(inst_ptr(nbi));
         } else {
             fail("nanobind::detail::nb_inst_destruct(\"%s\"): attempted to call "

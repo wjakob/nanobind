@@ -340,7 +340,7 @@ public:
     }
 
     handle operator*() const {
-        if (is_valid() & !m_value.is_valid())
+        if (is_valid() && !m_value.is_valid())
             m_value = steal(detail::obj_iter_next(m_ptr));
         return m_value;
     }

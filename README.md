@@ -459,6 +459,8 @@ changes are detailed below.
   | _pybind11_           | _nanobind_      |
   | -------------------- | --------------- |
   | `error_already_set`  | `python_error`  |
+  | `type::of<T>`        | `type<T>`       |
+  | `type`               | `type_object`   |
   | `reinterpret_borrow` | `borrow`        |
   | `reinterpret_steal`  | `steal`         |
   | `custom_type_setup`  | `type_callback` |

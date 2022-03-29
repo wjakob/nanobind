@@ -142,3 +142,13 @@ def test15_iter():
 
 def test16_raw_doc():
     assert t.test_08.__doc__ == 'raw'
+
+def test17_type_check_manual():
+    assert t.test_09.__doc__ == 'test_09(arg: type) -> bool'
+
+    assert t.test_09(bool) is True
+    assert t.test_09(int) is False
+    with pytest.raises(TypeError) as excinfo:
+        assert t.test_09(True)
+    assert "incompatible function arguments" in str(excinfo.value)
+

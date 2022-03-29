@@ -100,4 +100,7 @@ NB_MODULE(test_functions_ext, m) {
     // Overload chain with a raw docstring that has precedence
     m.def("test_08", [](int) -> int { return 1; }, "ignored");
     m.def("test_08", [](float) -> int { return 2; }, nb::raw_doc("raw"));
+
+    // Manual type check
+    m.def("test_09", [](nb::type_object t) -> bool { return t.is(&PyBool_Type); });
 }

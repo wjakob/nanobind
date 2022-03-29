@@ -70,9 +70,9 @@ public:
     Derived &derived() { return static_cast<Derived &>(*this); }
     const Derived &derived() const { return static_cast<const Derived &>(*this); }
 
-    NB_INLINE bool is(const api& o) const { return derived().ptr() == o.derived().ptr(); }
-    NB_INLINE bool is_none() const  { return derived().ptr() == Py_None; }
-    NB_INLINE bool is_type() const  { return PyType_Check(derived().ptr()); }
+    NB_INLINE bool is(handle value) const;
+    NB_INLINE bool is_none() const { return derived().ptr() == Py_None; }
+    NB_INLINE bool is_type() const { return PyType_Check(derived().ptr()); }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
     NB_INLINE handle inc_ref() const & noexcept;
     NB_INLINE handle dec_ref() const & noexcept;
@@ -290,6 +290,10 @@ class tuple : public object {
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
 };
 
+class type_object : public object {
+    NB_OBJECT_DEFAULT(type_object, object, "type", PyType_Check)
+};
+
 class list : public object {
     NB_OBJECT(list, object, "list", PyList_Check)
     list() : object(PyList_New(0), detail::steal_t()) { }
@@ -403,6 +407,11 @@ template <typename Derived> NB_INLINE handle api<Derived>::type() const {
 template <typename Derived>
 NB_INLINE handle api<Derived>::inc_ref() const &noexcept {
     return operator handle().inc_ref();
+}
+
+template <typename Derived>
+NB_INLINE bool api<Derived>::is(handle value) const {
+    return derived().ptr() == value.ptr();
 }
 
 template <typename Derived> iterator api<Derived>::begin() const {

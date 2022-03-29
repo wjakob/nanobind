@@ -767,7 +767,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                         buf.put_dstr(f->args[arg_index].name);
                     else
                         buf.put("kwargs");
-                    pc += 6;
+                    pc += 4; // strlen("dict")
                     break;
                 }
 
@@ -777,7 +777,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                         buf.put_dstr(f->args[arg_index].name);
                     else
                         buf.put("args");
-                    pc += 4;
+                    pc += 5; // strlen("tuple")
                     break;
                 }
 
@@ -853,7 +853,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
     }
 
     if (arg_index != f->nargs || *descr_type != nullptr)
-        fail("nanobind::detail::nb_func_finalize(): arguments inconsistent.");
+        fail("nanobind::detail::nb_func_finalize(%s): arguments inconsistent.", f->name);
 }
 
 static PyObject *nb_func_get_doc(PyObject *self, void *) {

@@ -207,7 +207,7 @@ NAMESPACE_END(detail)
 template <typename T, typename... Ts>
 class class_ : public object {
 public:
-    NB_OBJECT_DEFAULT(class_, object, PyType_Check);
+    NB_OBJECT_DEFAULT(class_, object, "type", PyType_Check);
     using Type = T;
     using Base  = typename detail::extract<T, detail::is_base,  Ts...>::type;
     using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;

@@ -10,9 +10,9 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// Macro defining functions/constructors for nanobind::handle subclasses
-#define NB_OBJECT(Type, Parent, Check)                                         \
+#define NB_OBJECT(Type, Parent, Str, Check)                                    \
 public:                                                                        \
-    static constexpr auto Name = detail::const_name(#Type);                    \
+    static constexpr auto Name = detail::const_name(Str);                      \
     NB_INLINE Type(handle h, detail::borrow_t)                                 \
         : Parent(h, detail::borrow_t{}) {}                                     \
     NB_INLINE Type(handle h, detail::steal_t)                                  \
@@ -22,9 +22,9 @@ public:                                                                        \
     }
 
 /// Like NB_OBJECT but allow null-initialization
-#define NB_OBJECT_DEFAULT(Type, Parent, Check)                                 \
-    NB_OBJECT(Type, Parent, Check)                                             \
-    Type() : Parent() {}
+#define NB_OBJECT_DEFAULT(Type, Parent, Str, Check)                            \
+    NB_OBJECT(Type, Parent, Str, Check)                                        \
+    NB_INLINE Type() : Parent() {}
 
 /// Helper macro to create detail::api comparison functions
 #define NB_API_COMP(name, op)                                                  \
@@ -241,7 +241,7 @@ inline void setattr(handle obj, handle key, handle value) {
 
 class module_ : public object {
 public:
-    NB_OBJECT(module_, object, PyModule_CheckExact);
+    NB_OBJECT(module_, object, "module", PyModule_CheckExact);
 
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
@@ -259,7 +259,7 @@ public:
 };
 
 class capsule : public object {
-    NB_OBJECT_DEFAULT(capsule, object, PyCapsule_CheckExact)
+    NB_OBJECT_DEFAULT(capsule, object, "capsule", PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*free)(void *) = nullptr) {
         m_ptr = detail::capsule_new(ptr, free);
@@ -269,7 +269,7 @@ class capsule : public object {
 };
 
 class str : public object {
-    NB_OBJECT_DEFAULT(str, object, PyUnicode_Check)
+    NB_OBJECT_DEFAULT(str, object, "str", PyUnicode_Check)
 
     explicit str(handle h)
         : object(detail::str_from_obj(h.ptr()), detail::steal_t{}) { }
@@ -284,14 +284,14 @@ class str : public object {
 };
 
 class tuple : public object {
-    NB_OBJECT_DEFAULT(tuple, object, PyTuple_Check)
+    NB_OBJECT_DEFAULT(tuple, object, "tuple", PyTuple_Check)
     size_t size() const { return PyTuple_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
 };
 
 class list : public object {
-    NB_OBJECT(list, object, PyList_Check)
+    NB_OBJECT(list, object, "list", PyList_Check)
     list() : object(PyList_New(0), detail::steal_t()) { }
     size_t size() const { return PyList_GET_SIZE(m_ptr); }
 
@@ -302,21 +302,21 @@ class list : public object {
 };
 
 class dict : public object {
-    NB_OBJECT(dict, object, PyDict_Check)
+    NB_OBJECT(dict, object, "dict", PyDict_Check)
     dict() : object(PyDict_New(), detail::steal_t()) { }
     size_t size() const { return PyDict_GET_SIZE(m_ptr); }
 };
 
 class sequence : public object {
-    NB_OBJECT_DEFAULT(sequence, object, PySequence_Check)
+    NB_OBJECT_DEFAULT(sequence, object, "Sequence", PySequence_Check)
 };
 
 class args : public tuple {
-    NB_OBJECT_DEFAULT(args, tuple, PyTuple_Check)
+    NB_OBJECT_DEFAULT(args, tuple, "tuple", PyTuple_Check)
 };
 
 class kwargs : public dict {
-    NB_OBJECT_DEFAULT(kwargs, dict, PyDict_Check)
+    NB_OBJECT_DEFAULT(kwargs, dict, "dict", PyDict_Check)
 };
 
 class iterator : public object {
@@ -326,7 +326,7 @@ public:
     using reference = const handle;
     using pointer = const handle *;
 
-    NB_OBJECT_DEFAULT(iterator, object, PyIter_Check)
+    NB_OBJECT_DEFAULT(iterator, object, "Iterable", PyIter_Check)
 
     iterator& operator++() {
         m_value = steal(detail::obj_iter_next(m_ptr));

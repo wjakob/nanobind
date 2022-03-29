@@ -31,23 +31,22 @@ def test05_signature():
     assert t.test_01.__doc__ == 'test_01() -> None'
     assert t.test_02.__doc__ == 'test_02(j: int = 8, k: int = 1) -> int'
     assert t.test_05.__doc__ == (
-        "test_05(*args, **kwargs) -> Any\n"
+        "test_05(arg: int) -> int\n"
+        "test_05(arg: float) -> int\n"
+        "\n"
         "Overloaded function.\n"
         "\n"
-        "1. test_05(arg: int) -> int\n"
+        "1. ``test_05(arg: int) -> int``\n"
         "\n"
         "doc_1\n"
         "\n"
-        "2. test_05(arg: float) -> int\n"
+        "2. ``test_05(arg: float) -> int``\n"
         "\n"
-        "doc_2\n")
+        "doc_2")
 
     assert t.test_07.__doc__ == (
-        "test_07(*args, **kwargs) -> Any\n"
-        "Overloaded function.\n"
-        "\n"
-        "1. test_07(arg0: int, arg1: int, *args, **kwargs) -> Tuple[int, int]\n"
-        "2. test_07(a: int, b: int, *myargs, **mykwargs) -> Tuple[int, int]")
+        "test_07(arg0: int, arg1: int, *args, **kwargs) -> Tuple[int, int]\n"
+        "test_07(a: int, b: int, *myargs, **mykwargs) -> Tuple[int, int]")
 
 def test06_signature_error():
     with pytest.raises(TypeError) as excinfo:

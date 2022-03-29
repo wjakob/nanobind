@@ -21,22 +21,17 @@ def assert_stats(**kwargs):
 
 def test01_signature():
     assert t.Struct.__init__.__doc__ == (
-        "__init__(*args, **kwargs) -> Any\n"
-        "Overloaded function.\n"
-        "\n"
-        "1. __init__(self) -> None\n"
-        "2. __init__(self, arg: int) -> None")
+        "__init__(self) -> None\n"
+        "__init__(self, arg: int) -> None"
+    )
 
     assert t.Struct.value.__doc__ == "value(self) -> int"
     assert t.Struct.create_move.__doc__ == "create_move() -> test_classes_ext.Struct"
     assert t.Struct.set_value.__doc__ == "set_value(self, value: int) -> None"
     assert t.Struct.__doc__ == 'Some documentation'
     assert t.Struct.static_test.__doc__ == (
-        "static_test(*args, **kwargs) -> Any\n"
-        "Overloaded function.\n"
-        "\n"
-        "1. static_test(arg: int) -> int\n"
-        "2. static_test(arg: float) -> int")
+        "static_test(arg: int) -> int\n"
+        "static_test(arg: float) -> int")
 
 
 def test02_static_overload():

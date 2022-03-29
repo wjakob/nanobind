@@ -862,35 +862,41 @@ static PyObject *nb_func_get_doc(PyObject *self, void *) {
 
     buf.clear();
 
-    if (count > 1) {
-        buf.put_dstr((f->flags & (uint32_t) func_flags::has_name)
-                         ? f->name : "<anonymous>");
-        buf.put("(*args, **kwargs) -> Any\n"
-                "Overloaded function.\n\n");
+    size_t doc_count = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        const func_record *fi = f + i;
+        if (fi->flags & (uint32_t) func_flags::raw_doc)
+            return PyUnicode_FromString(fi->doc);
+
+        nb_func_render_signature(fi);
+        buf.put("\n");
+        if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0')
+            doc_count++;
     }
+
+    if (doc_count > 1)
+        buf.put("\nOverloaded function.\n");
 
     for (uint32_t i = 0; i < count; ++i) {
-        if (i > 0)
+        const func_record *fi = f + i;
+
+        if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0') {
             buf.put('\n');
 
-        if (count > 1) {
-            buf.put_uint32(i + 1);
-            buf.put(". ");
-        }
+            if (doc_count > 1) {
+                buf.put_uint32(i + 1);
+                buf.put(". ``");
+                nb_func_render_signature(fi);
+                buf.put("``\n\n");
+            }
 
-        nb_func_render_signature(f);
-
-        if ((f->flags & (uint32_t) func_flags::has_doc) && f->doc[0] != '\0') {
-            if (f->flags & (uint32_t) func_flags::raw_doc)
-                return PyUnicode_FromString(f->doc);
-
-            buf.put("\n\n");
-            buf.put_dstr(f->doc);
+            buf.put_dstr(fi->doc);
             buf.put('\n');
         }
-
-        f++;
     }
+
+    if (buf.size() > 0) // remove last newline
+        buf.rewind(1);
 
     return PyUnicode_FromString(buf.get());
 }

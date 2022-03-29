@@ -133,7 +133,7 @@ class handle : public detail::api<handle> {
     friend struct detail::obj_item;
     friend struct detail::num_item;
 public:
-    static constexpr auto Name = detail::const_name("handle");
+    static constexpr auto Name = detail::const_name("object");
 
     handle() = default;
     handle(const handle &) = default;
@@ -330,7 +330,7 @@ public:
     using reference = const handle;
     using pointer = const handle *;
 
-    NB_OBJECT_DEFAULT(iterator, object, "Iterable", PyIter_Check)
+    NB_OBJECT_DEFAULT(iterator, object, "iterator", PyIter_Check)
 
     iterator& operator++() {
         m_value = steal(detail::obj_iter_next(m_ptr));

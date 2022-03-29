@@ -560,7 +560,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             } else if (kwargs_in) {
                 bool success = true;
                 for (size_t j = 0; j < nkwargs_in; ++j)
-                    success = kwarg_used[j];
+                    success &= kwarg_used[j];
                 if (!success)
                     continue;
             }

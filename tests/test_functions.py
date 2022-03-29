@@ -135,7 +135,10 @@ def test14_print(capsys):
     assert captured.out == "Test 1\nTest 2\n"
 
 def test15_iter():
-    assert t.test_iter([1,2,3]) == [1,2,3]
+    assert t.test_iter(()) == []
+    assert t.test_iter((1,)) == [1]
+    assert t.test_iter((1, 2)) == [1, 2]
+    assert t.test_iter((1, 2, 3)) == [1, 2, 3]
 
 def test16_raw_doc():
     assert t.test_08.__doc__ == 'raw'

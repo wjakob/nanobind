@@ -29,7 +29,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
                                     std::index_sequence<Is...>) noexcept {
         (void) src; (void) flags; (void) cleanup;
 
-        PyObject *temp = nullptr;
+        PyObject *temp; // always initialized by the following line
         PyObject **o = seq_get_with_size(src.ptr(), N, &temp);
 
         bool success =

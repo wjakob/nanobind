@@ -38,9 +38,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     /// Python -> C++ caster, populates `caster1` and `caster2` upon success
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {
-        PyObject *temp = nullptr;
-
-        // Convert `src` into a fast sequence if needed, may produce a temporary
+        PyObject *temp; // always initialized by the following line
         PyObject **o = seq_get_with_size(src.ptr(), 2, &temp);
 
         bool success = o &&

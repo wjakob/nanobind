@@ -433,15 +433,19 @@ PyObject **seq_get(PyObject *seq, size_t *size, PyObject **temp) noexcept {
     if (PyTuple_CheckExact(seq)) {
         PyTupleObject *tuple = (PyTupleObject *) seq;
         *size = Py_SIZE(tuple);
+        *temp = nullptr;
         return tuple->ob_item;
     } else if (PyList_CheckExact(seq)) {
         PyListObject *list = (PyListObject *) seq;
         *size = Py_SIZE(list);
+        *temp = nullptr;
         return list->ob_item;
     } else {
         seq = PySequence_List(seq);
         if (!seq) {
             PyErr_Clear();
+            *size = 0;
+            *temp = nullptr;
             return nullptr;
         }
         *temp = seq;
@@ -454,6 +458,8 @@ PyObject **seq_get(PyObject *seq, size_t *size, PyObject **temp) noexcept {
 
 PyObject **seq_get_with_size(PyObject *seq, size_t size,
                              PyObject **temp) noexcept {
+    *temp = nullptr;
+
     if (PyTuple_CheckExact(seq)) {
         PyTupleObject *tuple = (PyTupleObject *) seq;
         if (size != (size_t) Py_SIZE(tuple))

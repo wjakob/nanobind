@@ -10,15 +10,18 @@ template <typename Value_, typename Entry> struct list_caster {
     using Caster = make_caster<Entry>;
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        size_t size = 0;
-        PyObject *temp = nullptr;
+        size_t size;
+        PyObject *temp;
+
+        /* Will initialize 'size' and 'temp'. All return values and
+           return parameters are zero/NULL in the case of a failure. */
         PyObject **o = seq_get(src.ptr(), &size, &temp);
 
         value.clear();
         value.reserve(size);
 
         Caster caster;
-        bool success = true;
+        bool success = o != nullptr;
 
         for (size_t i = 0; i < size; ++i) {
             if (!caster.from_python(o[i], flags, cleanup)) {

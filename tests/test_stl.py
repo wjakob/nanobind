@@ -315,3 +315,8 @@ def test30_std_function():
     with pytest.raises(TypeError) as excinfo:
         assert t.call_function(lambda x, y: x+y, 3) == 8
     assert 'missing 1 required positional argument' in str(excinfo.value)
+
+
+def test31_vec_type_check():
+    with pytest.raises(TypeError) as excinfo:
+        t.vec_moveable_in_value(0)

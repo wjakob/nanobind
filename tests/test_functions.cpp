@@ -103,4 +103,12 @@ NB_MODULE(test_functions_ext, m) {
 
     // Manual type check
     m.def("test_09", [](nb::type_object t) -> bool { return t.is(&PyBool_Type); });
+
+    // nb::dict iterator
+    m.def("test_10", [](nb::dict d) {
+        nb::dict result;
+        for (auto [k, v] : d)
+            result[k] = v;
+        return result;
+    });
 }

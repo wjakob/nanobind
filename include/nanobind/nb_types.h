@@ -63,6 +63,7 @@ class args_proxy; class kwargs_proxy;
 struct borrow_t { };
 struct steal_t { };
 class api_tag { };
+class dict_iterator;
 
 // Standard operations provided by every nanobind object
 template <typename Derived> class api : public api_tag {
@@ -309,6 +310,8 @@ class dict : public object {
     NB_OBJECT(dict, object, "dict", PyDict_Check)
     dict() : object(PyDict_New(), detail::steal_t()) { }
     size_t size() const { return PyDict_GET_SIZE(m_ptr); }
+    detail::dict_iterator begin() const;
+    detail::dict_iterator end() const;
 };
 
 class sequence : public object {
@@ -422,7 +425,51 @@ template <typename Derived> iterator api<Derived>::end() const {
     return iterator::sentinel();
 }
 
+class dict_iterator : public object {
+public:
+    using value_type = std::pair<handle, handle>;
+    using reference = const value_type;
+
+    dict_iterator() : obj(handle()), pos(-1) { }
+
+    dict_iterator(handle obj) : obj(obj), pos(0) {
+        increment();
+    }
+
+    dict_iterator& operator++() {
+        increment();
+        return *this;
+    }
+
+    dict_iterator operator++(int) {
+        dict_iterator rv = *this;
+        increment();
+        return rv;
+    }
+
+    void increment() {
+        if (PyDict_Next(obj.ptr(), &pos, &key, &value) == 0) {
+            pos = -1;
+        }
+    }
+
+    value_type operator*() const { return { key, value }; }
+
+    friend bool operator==(const dict_iterator &a, const dict_iterator &b) { return a.pos == b.pos; }
+    friend bool operator!=(const dict_iterator &a, const dict_iterator &b) { return a.pos != b.pos; }
+
+private:
+    handle obj;
+    Py_ssize_t pos;
+    PyObject *key = nullptr, *value = nullptr;
+};
+
+
 NAMESPACE_END(detail)
+
+inline detail::dict_iterator dict::begin() const { return { *this }; }
+inline detail::dict_iterator dict::end() const { return { }; }
+
 NAMESPACE_END(NB_NAMESPACE)
 
 #undef NB_API_COMP

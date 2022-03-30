@@ -151,3 +151,9 @@ def test17_type_check_manual():
         assert t.test_09(True)
     assert "incompatible function arguments" in str(excinfo.value)
 
+def test18_dict_iterator():
+    assert t.test_10({}) == {}
+    assert t.test_10({1:2}) == {1:2}
+    assert t.test_10({1:2, 3:4}) == {1:2, 3:4}
+    assert t.test_10({1:2, 3:4, 'a': 'b'}) == {1:2, 3:4, 'a':'b'}
+

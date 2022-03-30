@@ -16,7 +16,7 @@ public:
 
     template <typename Key>
     accessor(handle obj, Key &&key)
-        : m_base(obj.ptr()), m_cache(nullptr), m_key(std::move(key)) { }
+        : m_base(obj.ptr()),  m_key(std::move(key)) { }
     accessor(const accessor &) = delete;
     accessor(accessor &&) = delete;
     ~accessor() {
@@ -37,7 +37,7 @@ public:
 
 private:
     PyObject *m_base;
-    mutable PyObject *m_cache;
+    mutable PyObject *m_cache{nullptr};
     typename Impl::key_type m_key;
 };
 

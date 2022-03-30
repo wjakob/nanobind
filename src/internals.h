@@ -9,6 +9,13 @@
 #include <tsl/robin_set.h>
 #include <typeindex>
 
+#if defined(_MSC_VER)
+#  define NB_THREAD_LOCAL __declspec(thread)
+#else
+#  define NB_THREAD_LOCAL __thread
+#endif
+
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -183,11 +190,11 @@ struct internals {
 };
 
 struct current_method {
-    const char *name = nullptr;
-    PyObject *self = nullptr;
+    const char *name;
+    PyObject *self;
 };
 
-extern thread_local current_method current_method_data;
+extern NB_THREAD_LOCAL current_method current_method_data;
 
 extern internals &internals_get() noexcept;
 extern char *type_name(const std::type_info *t);

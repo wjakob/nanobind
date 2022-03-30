@@ -87,7 +87,7 @@ PyTypeObject nb_static_property_type = {
     .tp_descr_set = nb_static_property_set
 };
 
-thread_local current_method current_method_data;
+NB_THREAD_LOCAL current_method current_method_data = current_method { nullptr, nullptr };
 
 static internals *internals_p = nullptr;
 

@@ -796,7 +796,7 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                     continue;
                 } else {
                     buf.put("arg");
-                    if (arg_index > is_method || f->nargs > 1 + is_method)
+                    if (arg_index > is_method || f->nargs > 1 + (uint32_t) is_method)
                         buf.put_uint32((uint32_t) (arg_index - is_method));
                 }
 

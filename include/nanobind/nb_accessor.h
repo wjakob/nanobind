@@ -16,7 +16,7 @@ public:
 
     template <typename Key>
     accessor(handle obj, Key &&key)
-        : m_base(obj.ptr()),  m_key(std::move(key)) { }
+        : m_base(obj.ptr()), m_key(std::move(key)) { }
     accessor(const accessor &) = delete;
     accessor(accessor &&) = delete;
     ~accessor() {

@@ -20,6 +20,7 @@ public:
     static constexpr uint32_t Small = 6;
 
     cleanup_list(PyObject *self) :
+        m_size{1},
         m_capacity{Small},
         m_data{m_local} {
         m_local[0] = self;
@@ -46,7 +47,7 @@ protected:
     void expand() noexcept;
 
 protected:
-    uint32_t m_size{1};
+    uint32_t m_size;
     uint32_t m_capacity;
     PyObject **m_data;
     PyObject *m_local[Small];

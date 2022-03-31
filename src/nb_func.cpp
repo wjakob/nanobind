@@ -301,7 +301,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
         buf.put_uint32(i + 1);
         buf.put(". ");
         nb_func_render_signature(f + i);
-        buf.put("\n");
+        buf.put('\n');
     }
 
     buf.put("\nInvoked with types: ");
@@ -869,7 +869,7 @@ static PyObject *nb_func_get_doc(PyObject *self, void *) {
             return PyUnicode_FromString(fi->doc);
 
         nb_func_render_signature(fi);
-        buf.put("\n");
+        buf.put('\n');
         if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0')
             doc_count++;
     }

@@ -286,7 +286,7 @@ NB_MODULE(test_classes_ext, m) {
     scls.def(nb::init<>());
 
     Supplement &supplement = nb::type_supplement<Supplement>(scls);
-    for (uint16_t i = 0; i < 0xFF; ++i)
+    for (uint8_t i = 0; i < 0xFF; ++i)
         supplement.data[i] = i;
 
     m.def("check_supplement", [](nb::handle h) {

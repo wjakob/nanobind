@@ -26,6 +26,7 @@ extern PyTypeObject nb_enum_type;
 
 extern PyTypeObject nb_func_type;
 extern PyTypeObject nb_meth_type;
+extern PyTypeObject nb_tensor_type;
 
 /// Nanobind function metadata (overloads, etc.)
 struct func_record : func_data<0> {
@@ -172,6 +173,9 @@ struct internals {
     /// Property variant for static attributes
     PyTypeObject *nb_static_property;
 
+    /// Tensor wrpaper
+    PyTypeObject *nb_tensor;
+
     /// Instance pointer -> Python object mapping
     py_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
         inst_c2p;
@@ -215,6 +219,29 @@ inline void *inst_ptr(nb_inst *self) {
     return self->direct ? ptr : *(void **) ptr;
 }
 
+template <typename T> struct scoped_pymalloc {
+    scoped_pymalloc(size_t size = 1) {
+        ptr = (T *) PyMem_Malloc(size * sizeof(T));
+        if (!ptr)
+            fail("scoped_pymalloc(): could not allocate %zu bytes of memory!", size);
+    }
+    ~scoped_pymalloc() { PyMem_Free(ptr); }
+    T *release() {
+        T *temp = ptr;
+        ptr = nullptr;
+        return temp;
+    }
+    T *get() const { return ptr; }
+    T &operator[](size_t i) { return ptr[i]; }
+    T *operator->() { return ptr; }
+private:
+    T *ptr{ nullptr };
+};
+
+#if PY_VERSION_HEX < 0x03090000
+extern PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
+                                      size_t nargsf, PyObject *kwnames);
+#endif
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

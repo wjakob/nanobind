@@ -4,7 +4,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Value_, typename Entry> struct list_caster {
-    NB_TYPE_CASTER(Value_, const_name("List[") + make_caster<Entry>::Name +
+    NB_TYPE_CASTER(Value_, const_name("list[") + make_caster<Entry>::Name +
                                const_name("]"));
 
     using Caster = make_caster<Entry>;

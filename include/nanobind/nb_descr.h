@@ -54,6 +54,8 @@ template <size_t... Digits> struct int_to_str<0, Digits...> {
     static constexpr auto digits = descr<sizeof...(Digits)>(('0' + Digits)...);
 };
 
+constexpr auto const_name(char c) { return descr<1>(c); }
+
 // Ternary description (like std::conditional)
 template <bool B, size_t N1, size_t N2>
 constexpr auto const_name(char const(&text1)[N1], char const(&text2)[N2]) {
@@ -73,6 +75,11 @@ constexpr auto const_name(const T1 &d1, const T2 &d2) {
         return d1;
     else
         return d2;
+}
+
+template <size_t Size>
+auto constexpr const_name() -> std::remove_cv_t<decltype(int_to_str<Size / 10, Size % 10>::digits)> {
+    return int_to_str<Size / 10, Size % 10>::digits;
 }
 
 template <typename Type> constexpr descr<1, Type> const_name() { return {'%'}; }

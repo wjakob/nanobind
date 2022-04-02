@@ -22,7 +22,7 @@ def assert_stats(**kwargs):
 def test01_signature():
     assert t.Struct.__init__.__doc__ == (
         "__init__(self) -> None\n"
-        "__init__(self, arg: int) -> None"
+        "__init__(self, arg: int, /) -> None"
     )
 
     assert t.Struct.value.__doc__ == "value(self) -> int"
@@ -30,8 +30,8 @@ def test01_signature():
     assert t.Struct.set_value.__doc__ == "set_value(self, value: int) -> None"
     assert t.Struct.__doc__ == 'Some documentation'
     assert t.Struct.static_test.__doc__ == (
-        "static_test(arg: int) -> int\n"
-        "static_test(arg: float) -> int")
+        "static_test(arg: int, /) -> int\n"
+        "static_test(arg: float, /) -> int")
 
 
 def test02_static_overload():
@@ -244,7 +244,7 @@ def test12_large_pointers():
 
 
 def test13_implicitly_convertible():
-    assert t.get_d.__doc__ == "get_d(arg: test_classes_ext.D) -> int"
+    assert t.get_d.__doc__ == "get_d(arg: test_classes_ext.D, /) -> int"
     a = t.A(1)
     b = t.B(2)
     b2 = t.B2(3)
@@ -254,7 +254,7 @@ def test13_implicitly_convertible():
         t.get_d(c)
     assert str(excinfo.value) == (
         "get_d(): incompatible function arguments. The following argument types are supported:\n"
-        "    1. get_d(arg: test_classes_ext.D) -> int\n"
+        "    1. get_d(arg: test_classes_ext.D, /) -> int\n"
         "\n"
         "Invoked with types: C")
     assert t.get_d(a) == 11
@@ -424,7 +424,7 @@ def test21_low_level(clean):
 
 
 def test22_handle_of(clean):
-    assert t.test_handle_of.__doc__ == 'test_handle_of(arg: test_classes_ext.Struct) -> object'
+    assert t.test_handle_of.__doc__ == 'test_handle_of(arg: test_classes_ext.Struct, /) -> object'
     s = t.test_handle_of(t.Struct(5))
     assert s.value() == 5
     del s

@@ -821,7 +821,12 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                         PyErr_Clear();
                     }
                 }
+
                 arg_index++;
+
+                if (arg_index == f->nargs - has_var_args - has_var_kwargs && !has_args)
+                    buf.put(", /");
+
                 break;
 
             case '%':

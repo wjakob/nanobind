@@ -21,11 +21,13 @@ def test01_metadata():
 
 
 def test02_docstr():
-    assert t.get_shape.__doc__ == "get_shape(arg: tensor[]) -> list"
-    assert t.pass_uint32.__doc__ == "pass_uint32(arg: tensor[dtype=uint32]) -> None"
-    assert t.pass_float32.__doc__ == "pass_float32(arg: tensor[dtype=float32]) -> None"
-    assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(arg: tensor[dtype=float32, shape=(3, *, 4)]) -> None"
-    assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(arg: tensor[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
+    assert t.get_shape.__doc__ == "get_shape(arg: tensor[], /) -> list"
+    assert t.pass_uint32.__doc__ == "pass_uint32(arg: tensor[dtype=uint32], /) -> None"
+    assert t.pass_float32.__doc__ == "pass_float32(arg: tensor[dtype=float32], /) -> None"
+    assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(arg: tensor[dtype=float32, shape=(3, *, 4)], /) -> None"
+    assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(arg: tensor[dtype=float32, order='C', shape=(*, *, 4)], /) -> None"
+    assert t.check_device.__doc__ == ("check_device(arg: tensor[device='cpu'], /) -> str\n"
+                                      "check_device(arg: tensor[device='cuda'], /) -> str")
 
 
 def test03_constrain_dtype():

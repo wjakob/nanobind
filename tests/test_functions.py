@@ -31,21 +31,21 @@ def test05_signature():
     assert t.test_01.__doc__ == 'test_01() -> None'
     assert t.test_02.__doc__ == 'test_02(j: int = 8, k: int = 1) -> int'
     assert t.test_05.__doc__ == (
-        "test_05(arg: int) -> int\n"
-        "test_05(arg: float) -> int\n"
+        "test_05(arg: int, /) -> int\n"
+        "test_05(arg: float, /) -> int\n"
         "\n"
         "Overloaded function.\n"
         "\n"
-        "1. ``test_05(arg: int) -> int``\n"
+        "1. ``test_05(arg: int, /) -> int``\n"
         "\n"
         "doc_1\n"
         "\n"
-        "2. ``test_05(arg: float) -> int``\n"
+        "2. ``test_05(arg: float, /) -> int``\n"
         "\n"
         "doc_2")
 
     assert t.test_07.__doc__ == (
-        "test_07(arg0: int, arg1: int, *args, **kwargs) -> tuple[int, int]\n"
+        "test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]\n"
         "test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]")
 
 def test06_signature_error():
@@ -54,8 +54,8 @@ def test06_signature_error():
     assert str(excinfo.value) == (
         "test_05(): incompatible function arguments. The "
         "following argument types are supported:\n"
-        "    1. test_05(arg: int) -> int\n"
-        "    2. test_05(arg: float) -> int\n\n"
+        "    1. test_05(arg: int, /) -> int\n"
+        "    2. test_05(arg: float, /) -> int\n\n"
         "Invoked with types: str, kwargs = { y: int }")
 
 
@@ -143,7 +143,7 @@ def test16_raw_doc():
     assert t.test_08.__doc__ == 'raw'
 
 def test17_type_check_manual():
-    assert t.test_09.__doc__ == 'test_09(arg: type) -> bool'
+    assert t.test_09.__doc__ == 'test_09(arg: type, /) -> bool'
 
     assert t.test_09(bool) is True
     assert t.test_09(int) is False

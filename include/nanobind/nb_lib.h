@@ -8,7 +8,15 @@
 */
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
+
+// Forward declarations for types in dlpack.h (1)
+namespace dlpack { struct Tensor; }
+
 NAMESPACE_BEGIN(detail)
+
+// Forward declarations for types in dlpack.h (2)
+struct TensorHandle;
+struct TensorReq;
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -305,6 +313,19 @@ NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 /// Create a submodule of an existing module
 NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
                                        const char *doc) noexcept;
+
+
+// ========================================================================
+
+// Try to create a reference-counted tensor object via DLPack
+NB_CORE TensorHandle *tensor_create(PyObject *o, const TensorReq *req) noexcept;
+
+/// Increase the reference count of the given tensor object; returns a pointer
+/// to the underlying DLTensor
+NB_CORE dlpack::Tensor *tensor_inc_ref(TensorHandle *) noexcept;
+
+/// Decrease the reference count of the given tensor object
+NB_CORE void tensor_dec_ref(TensorHandle *) noexcept;
 
 // ========================================================================
 

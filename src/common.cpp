@@ -8,10 +8,15 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <nanobind/dlpack.h>
+#include <atomic>
 #include "internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
+
+_Py_static_string(id_stdout, "stdout");
+_Py_static_string(id_dlpack, "__dlpack__");
 
 #if defined(__GNUC__)
     __attribute__((noreturn, __format__ (__printf__, 1, 2)))
@@ -537,11 +542,163 @@ void tuple_check(PyObject *tuple, size_t nargs) {
 
 // ========================================================================
 
-_Py_IDENTIFIER(stdout);
+struct ManagedTensor {
+	dlpack::Tensor dl_tensor;
+	void *manager_ctx;
+	void (*deleter)(ManagedTensor *);
+};
+
+struct TensorHandle {
+    ManagedTensor *tensor;
+    std::atomic<size_t> refcount;
+    bool free_strides;
+};
+
+TensorHandle *tensor_create(PyObject *o, const TensorReq *req) noexcept {
+    PyObject *temp = nullptr;
+
+    // If this is not a capsule, try calling o.__dlpack__()
+    if (!PyCapsule_CheckExact(o)) {
+        o = temp = PyObject_CallMethodNoArgs(o, _PyUnicode_FromId(&id_dlpack));
+
+        if (!o) {
+            PyErr_Clear();
+            return nullptr;
+        }
+    }
+
+    // Extract the pointer underlying the capsule
+    void *ptr = PyCapsule_GetPointer(o, "dltensor");
+    if (!ptr) {
+        PyErr_Clear();
+        Py_XDECREF(temp);
+        return nullptr;
+    }
+
+    // Check if the tensor satisfies the requirements
+    bool valid = true;
+    dlpack::Tensor &t = ((ManagedTensor *) ptr)->dl_tensor;
+    int64_t *strides = (int64_t *) PyMem_Malloc(sizeof(int64_t) * (size_t) t.ndim);
+
+    if (!strides) {
+        Py_XDECREF(temp);
+        return nullptr;
+    }
+
+    if (req->req_dtype)
+        valid &= t.dtype == req->dtype;
+
+    if (req->req_shape) {
+        valid &= req->ndim == (uint32_t) t.ndim;
+
+        if (valid) {
+            for (uint32_t i = 0; i < req->ndim; ++i) {
+                if (req->shape[i] != (size_t) t.shape[i] &&
+                    req->shape[i] != nanobind::any) {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    if ((req->req_order || t.strides == nullptr) && t.ndim > 0) {
+        size_t accum = 1;
+
+        if (req->req_order == 'C' || t.strides == nullptr) {
+            for (uint32_t i = (uint32_t) (t.ndim - 1);;) {
+                strides[i] = accum;
+                accum *= t.shape[i];
+                if (i == 0)
+                    break;
+                --i;
+            }
+        } else if (req->req_order == 'F') {
+            valid &= t.strides != nullptr;
+
+            for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
+                strides[i] = accum;
+                accum *= t.shape[i];
+            }
+        } else {
+            valid = false;
+        }
+
+        if (t.strides) {
+            for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
+                if (strides[i] != t.strides[i]) {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!valid) {
+        PyMem_Free(strides);
+        Py_XDECREF(temp);
+        return nullptr;
+    }
+
+    // Create a reference-counted wrapper
+    TensorHandle *result = (TensorHandle *) PyMem_Malloc(sizeof(TensorHandle));
+    if (!result) {
+        Py_XDECREF(temp);
+        PyMem_Free(strides);
+        return nullptr;
+    }
+
+    result->tensor = (ManagedTensor *) ptr;
+    result->refcount = 0;
+
+    // Ensure that the strides member is always initialized
+    if (t.strides) {
+        result->free_strides = false;
+        PyMem_Free(strides);
+    } else {
+        result->free_strides = true;
+        t.strides = strides;
+    }
+
+    // Mark the dltensor capsule as "consumed"
+    if (PyCapsule_SetName(o, "used_dltensor") ||
+        PyCapsule_SetDestructor(o, nullptr))
+        fail("nanobind::detail::tensor_create(): could not mark dltensor "
+             "capsule as consumed!");
+
+    Py_XDECREF(temp);
+
+    return result;
+}
+
+
+dlpack::Tensor *tensor_inc_ref(TensorHandle *th) noexcept {
+    if (!th)
+        return nullptr;
+    ++th->refcount;
+    return &th->tensor->dl_tensor;
+}
+
+void tensor_dec_ref(TensorHandle *th) noexcept {
+    if (!th)
+        return;
+    if (--th->refcount == 0) {
+        if (th->free_strides) {
+            PyMem_Free(th->tensor->dl_tensor.strides);
+            th->tensor->dl_tensor.strides = nullptr;
+        }
+        if (th->tensor->deleter)
+            th->tensor->deleter(th->tensor);
+        PyMem_Free(th);
+    }
+}
+
+
+// ========================================================================
 
 void print(PyObject *value, PyObject *end, PyObject *file) {
     if (!file)
-        file = _PySys_GetObjectId(&PyId_stdout);
+        file = _PySys_GetObjectId(&id_stdout);
 
     int rv = PyFile_WriteObject(value, file, Py_PRINT_RAW);
     if (rv)

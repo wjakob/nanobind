@@ -173,6 +173,10 @@ template <> struct type_caster<char> {
         return PyUnicode_FromString(value);
     }
 
+    static handle from_cpp(char value, rv_policy, cleanup_list *) noexcept {
+        return PyUnicode_FromStringAndSize(&value, 1);
+    }
+
     NB_TYPE_CASTER(const char *, const_name("str"));
 };
 

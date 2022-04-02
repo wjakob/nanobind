@@ -10,13 +10,13 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 // Forward declarations for types in dlpack.h (1)
-namespace dlpack { struct Tensor; }
+namespace dlpack { struct tensor; struct dtype; }
 
 NAMESPACE_BEGIN(detail)
 
 // Forward declarations for types in dlpack.h (2)
-struct TensorHandle;
-struct TensorReq;
+struct tensor_handle;
+struct tensor_req;
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -317,15 +317,26 @@ NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
 
 // ========================================================================
 
-// Try to create a reference-counted tensor object via DLPack
-NB_CORE TensorHandle *tensor_create(PyObject *o, const TensorReq *req) noexcept;
+// Try to import a reference-counted tensor object via DLPack
+NB_CORE tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
+                                     bool convert) noexcept;
+
+// Describe a local tensor object using a DLPack capsule
+NB_CORE tensor_handle *tensor_create(void *value, size_t ndim,
+                                     const size_t *shape, PyObject *owner,
+                                     const int64_t *strides,
+                                     dlpack::dtype *dtype, int32_t device,
+                                     int32_t device_id);
 
 /// Increase the reference count of the given tensor object; returns a pointer
-/// to the underlying DLTensor
-NB_CORE dlpack::Tensor *tensor_inc_ref(TensorHandle *) noexcept;
+/// to the underlying DLtensor
+NB_CORE dlpack::tensor *tensor_inc_ref(tensor_handle *) noexcept;
 
 /// Decrease the reference count of the given tensor object
-NB_CORE void tensor_dec_ref(TensorHandle *) noexcept;
+NB_CORE void tensor_dec_ref(tensor_handle *) noexcept;
+
+/// Wrap a tensor_handle* into a PyCapsule
+NB_CORE PyObject *tensor_wrap(tensor_handle *, int framework) noexcept;
 
 // ========================================================================
 

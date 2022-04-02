@@ -173,6 +173,7 @@ static void internals_make() {
     nb_enum_type.ob_base.ob_base.ob_refcnt = 1;
     nb_func_type.ob_base.ob_base.ob_refcnt = 1;
     nb_meth_type.ob_base.ob_base.ob_refcnt = 1;
+    nb_tensor_type.ob_base.ob_base.ob_refcnt = 1;
     nb_static_property_type.ob_base.ob_base.ob_refcnt = 1;
 
     nb_type_type.tp_base = &PyType_Type;
@@ -187,7 +188,8 @@ static void internals_make() {
 
     if (PyType_Ready(&nb_type_type) < 0 || PyType_Ready(&nb_func_type) < 0 ||
         PyType_Ready(&nb_meth_type) < 0 || PyType_Ready(&nb_enum_type) < 0 ||
-        PyType_Ready(&nb_static_property_type))
+        PyType_Ready(&nb_static_property_type) < 0 ||
+        PyType_Ready(&nb_tensor_type) < 0)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
     if ((nb_type_type.tp_flags & Py_TPFLAGS_HEAPTYPE) != 0 ||
@@ -207,6 +209,7 @@ static void internals_make() {
     internals_p->nb_func = &nb_func_type;
     internals_p->nb_meth = &nb_meth_type;
     internals_p->nb_enum = &nb_enum_type;
+    internals_p->nb_tensor = &nb_tensor_type;
     internals_p->nb_static_property = &nb_static_property_type;
 }
 

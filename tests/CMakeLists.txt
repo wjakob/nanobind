@@ -3,7 +3,7 @@ nanobind_add_module(test_classes_ext test_classes.cpp)
 nanobind_add_module(test_holders_ext test_holders.cpp)
 nanobind_add_module(test_stl_ext test_stl.cpp)
 nanobind_add_module(test_enum_ext test_enum.cpp)
-nanobind_add_module(test_dlpack_ext test_dlpack.cpp)
+nanobind_add_module(test_tensor_ext test_tensor.cpp)
 
 set(TEST_FILES
   test_functions.py
@@ -11,7 +11,7 @@ set(TEST_FILES
   test_holders.py
   test_stl.py
   test_enum.py
-  test_dlpack.py
+  test_tensor.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

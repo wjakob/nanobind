@@ -8,15 +8,25 @@
 */
 
 #include <nanobind/nanobind.h>
-#include <nanobind/dlpack.h>
-#include <atomic>
 #include "internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 _Py_static_string(id_stdout, "stdout");
-_Py_static_string(id_dlpack, "__dlpack__");
+
+#if PY_VERSION_HEX < 0x03090000
+PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
+                               size_t nargsf, PyObject *kwnames) {
+    PyObject *obj = PyObject_GetAttr(args[0], name);
+    if (!obj)
+        return obj;
+    PyObject *result = NB_VECTORCALL(obj, args + 1, nargsf - 1, kwnames);
+    Py_DECREF(obj);
+    return result;
+}
+#endif
+
 
 #if defined(__GNUC__)
     __attribute__((noreturn, __format__ (__printf__, 1, 2)))
@@ -34,19 +44,13 @@ void raise(const char *fmt, ...) {
     if (size < sizeof(buf))
         throw std::runtime_error(buf);
 
-    char *ptr = (char *) malloc(size + 1);
-    if (!ptr) {
-        fprintf(stderr, "nb::detail::raise(): out of memory!");
-        abort();
-    }
+    scoped_pymalloc<char> temp(size + 1);
 
     va_start(args, fmt);
-    vsnprintf(ptr, size + 1, fmt, args);
+    vsnprintf(temp.get(), size + 1, fmt, args);
     va_end(args);
 
-    std::runtime_error err(ptr);
-    free(ptr);
-    throw err;
+    throw std::runtime_error(temp.get());
 }
 
 /// Abort the process with a fatal error
@@ -208,18 +212,6 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
 
     return res;
 }
-
-#if PY_VERSION_HEX < 0x03090000
-static PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
-                                      size_t nargsf, PyObject *kwnames) {
-    PyObject *obj = PyObject_GetAttr(args[0], name);
-    if (!obj)
-        return obj;
-    PyObject *result = NB_VECTORCALL(obj, args + 1, nargsf - 1, kwnames);
-    Py_DECREF(obj);
-    return result;
-}
-#endif
 
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
@@ -539,160 +531,6 @@ void tuple_check(PyObject *tuple, size_t nargs) {
                   "%zu failed!", i + 1);
     }
 }
-
-// ========================================================================
-
-struct ManagedTensor {
-	dlpack::Tensor dl_tensor;
-	void *manager_ctx;
-	void (*deleter)(ManagedTensor *);
-};
-
-struct TensorHandle {
-    ManagedTensor *tensor;
-    std::atomic<size_t> refcount;
-    bool free_strides;
-};
-
-TensorHandle *tensor_create(PyObject *o, const TensorReq *req) noexcept {
-    PyObject *temp = nullptr;
-
-    // If this is not a capsule, try calling o.__dlpack__()
-    if (!PyCapsule_CheckExact(o)) {
-        o = temp = PyObject_CallMethodNoArgs(o, _PyUnicode_FromId(&id_dlpack));
-
-        if (!o) {
-            PyErr_Clear();
-            return nullptr;
-        }
-    }
-
-    // Extract the pointer underlying the capsule
-    void *ptr = PyCapsule_GetPointer(o, "dltensor");
-    if (!ptr) {
-        PyErr_Clear();
-        Py_XDECREF(temp);
-        return nullptr;
-    }
-
-    // Check if the tensor satisfies the requirements
-    bool valid = true;
-    dlpack::Tensor &t = ((ManagedTensor *) ptr)->dl_tensor;
-    int64_t *strides = (int64_t *) PyMem_Malloc(sizeof(int64_t) * (size_t) t.ndim);
-
-    if (!strides) {
-        Py_XDECREF(temp);
-        return nullptr;
-    }
-
-    if (req->req_dtype)
-        valid &= t.dtype == req->dtype;
-
-    if (req->req_shape) {
-        valid &= req->ndim == (uint32_t) t.ndim;
-
-        if (valid) {
-            for (uint32_t i = 0; i < req->ndim; ++i) {
-                if (req->shape[i] != (size_t) t.shape[i] &&
-                    req->shape[i] != nanobind::any) {
-                    valid = false;
-                    break;
-                }
-            }
-        }
-    }
-
-    if ((req->req_order || t.strides == nullptr) && t.ndim > 0) {
-        size_t accum = 1;
-
-        if (req->req_order == 'C' || t.strides == nullptr) {
-            for (uint32_t i = (uint32_t) (t.ndim - 1);;) {
-                strides[i] = accum;
-                accum *= t.shape[i];
-                if (i == 0)
-                    break;
-                --i;
-            }
-        } else if (req->req_order == 'F') {
-            valid &= t.strides != nullptr;
-
-            for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
-                strides[i] = accum;
-                accum *= t.shape[i];
-            }
-        } else {
-            valid = false;
-        }
-
-        if (t.strides) {
-            for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
-                if (strides[i] != t.strides[i]) {
-                    valid = false;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (!valid) {
-        PyMem_Free(strides);
-        Py_XDECREF(temp);
-        return nullptr;
-    }
-
-    // Create a reference-counted wrapper
-    TensorHandle *result = (TensorHandle *) PyMem_Malloc(sizeof(TensorHandle));
-    if (!result) {
-        Py_XDECREF(temp);
-        PyMem_Free(strides);
-        return nullptr;
-    }
-
-    result->tensor = (ManagedTensor *) ptr;
-    result->refcount = 0;
-
-    // Ensure that the strides member is always initialized
-    if (t.strides) {
-        result->free_strides = false;
-        PyMem_Free(strides);
-    } else {
-        result->free_strides = true;
-        t.strides = strides;
-    }
-
-    // Mark the dltensor capsule as "consumed"
-    if (PyCapsule_SetName(o, "used_dltensor") ||
-        PyCapsule_SetDestructor(o, nullptr))
-        fail("nanobind::detail::tensor_create(): could not mark dltensor "
-             "capsule as consumed!");
-
-    Py_XDECREF(temp);
-
-    return result;
-}
-
-
-dlpack::Tensor *tensor_inc_ref(TensorHandle *th) noexcept {
-    if (!th)
-        return nullptr;
-    ++th->refcount;
-    return &th->tensor->dl_tensor;
-}
-
-void tensor_dec_ref(TensorHandle *th) noexcept {
-    if (!th)
-        return;
-    if (--th->refcount == 0) {
-        if (th->free_strides) {
-            PyMem_Free(th->tensor->dl_tensor.strides);
-            th->tensor->dl_tensor.strides = nullptr;
-        }
-        if (th->tensor->deleter)
-            th->tensor->deleter(th->tensor);
-        PyMem_Free(th);
-    }
-}
-
 
 // ========================================================================
 

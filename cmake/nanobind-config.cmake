@@ -54,12 +54,20 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     ${NB_DIR}/include/nanobind/nb_traits.h
     ${NB_DIR}/include/nanobind/nb_types.h
     ${NB_DIR}/include/nanobind/trampoline.h
+    ${NB_DIR}/include/nanobind/tensor.h
+    ${NB_DIR}/include/nanobind/operators.h
+    ${NB_DIR}/include/nanobind/stl/shared_ptr.h
+    ${NB_DIR}/include/nanobind/stl/unique_ptr.h
     ${NB_DIR}/include/nanobind/stl/string.h
+    ${NB_DIR}/include/nanobind/stl/tuple.h
+    ${NB_DIR}/include/nanobind/stl/pair.h
+    ${NB_DIR}/include/nanobind/stl/function.h
 
     ${NB_DIR}/src/internals.h
     ${NB_DIR}/src/buffer.h
     ${NB_DIR}/src/internals.cpp
     ${NB_DIR}/src/common.cpp
+    ${NB_DIR}/src/tensor.cpp
     ${NB_DIR}/src/nb_func.cpp
     ${NB_DIR}/src/nb_type.cpp
     ${NB_DIR}/src/nb_enum.cpp

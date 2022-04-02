@@ -43,10 +43,7 @@ endif()
 # ---------------------------------------------------------------------------
 
 set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-if ((Python_VERSION_MAJOR LESS 3) OR ((Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 8)))
-  message(FATAL_ERROR "nanobind requires Python >= 3.8")
-endif()
+find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
 
 # ---------------------------------------------------------------------------
 # Include nanobind cmake functionality

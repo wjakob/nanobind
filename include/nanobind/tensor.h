@@ -233,12 +233,10 @@ public:
            const int64_t *strides = nullptr,
            dlpack::dtype dtype = nanobind::dtype<Scalar>(),
            int32_t device_type = device::cpu::value,
-           int32_t device_id = 0) {
-        m_handle =
-            detail::tensor_create(value, ndim, shape, owner.ptr(), strides,
-                                  &dtype, device_type, device_id);
-        m_tensor = *detail::tensor_inc_ref(m_handle);
-    }
+           int32_t device_id = 0)
+        : m_handle(detail::tensor_create(value, ndim, shape, owner.ptr(), strides,
+                                  &dtype, device_type, device_id)),
+          m_tensor(*detail::tensor_inc_ref(m_handle)) {}
 
     ~tensor() {
         detail::tensor_dec_ref(m_handle);

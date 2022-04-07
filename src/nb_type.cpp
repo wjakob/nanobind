@@ -120,6 +120,11 @@ PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
 
 static void inst_dealloc(PyObject *self) {
     nb_type *type = (nb_type *) Py_TYPE(self);
+
+    PyObject **dict_ptr = _PyObject_GetDictPtr(self);
+    if (dict_ptr)
+        Py_CLEAR(*dict_ptr);
+
     if (type->ht.ht_type.tp_flags & Py_TPFLAGS_HAVE_GC)
         PyObject_GC_UnTrack(self);
 
@@ -222,6 +227,62 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     return 0;
 }
 
+/// dynamic_attr: Support for `d = instance.__dict__`.
+extern "C" inline PyObject *nb_get_dict(PyObject *self, void *) {
+    PyObject *&dict = *_PyObject_GetDictPtr(self);
+    if (!dict)
+        dict = PyDict_New();
+    Py_XINCREF(dict);
+    return dict;
+}
+
+/// dynamic_attr: Support for `instance.__dict__ = dict()`.
+extern "C" inline int nb_set_dict(PyObject *self, PyObject *new_dict, void *) {
+    if (!PyDict_Check(new_dict)) {
+        PyErr_Format(PyExc_TypeError, "__dict__ must be set to a dictionary, not a '%.200s'",
+                     Py_TYPE(new_dict)->tp_name);
+        return -1;
+    }
+    PyObject *&dict = *_PyObject_GetDictPtr(self);
+    Py_INCREF(new_dict);
+    Py_CLEAR(dict);
+    dict = new_dict;
+    return 0;
+}
+
+/// dynamic_attr: Allow the garbage collector to traverse the internal instance `__dict__`.
+extern "C" inline int nb_traverse(PyObject *self, visitproc visit, void *arg) {
+    PyObject *&dict = *_PyObject_GetDictPtr(self);
+    Py_VISIT(dict);
+    return 0;
+}
+
+/// dynamic_attr: Allow the GC to clear the dictionary.
+extern "C" inline int nb_clear(PyObject *self) {
+    PyObject *&dict = *_PyObject_GetDictPtr(self);
+    Py_CLEAR(dict);
+    return 0;
+}
+
+/// Give instances of this type a `__dict__` and opt into garbage collection.
+inline void enable_dynamic_attributes(PyHeapTypeObject *heap_type) {
+    // This must be harmless to call if the base class has dynamic attributes
+    // also enabled.
+
+    auto type = &heap_type->ht_type;
+    type->tp_flags |= Py_TPFLAGS_HAVE_GC;
+    type->tp_dictoffset = type->tp_basicsize; // place dict at the end
+    type->tp_basicsize += (Py_ssize_t)sizeof(PyObject *); // and allocate enough space for it
+    type->tp_traverse = nb_traverse;
+    type->tp_clear = nb_clear;
+
+    static PyGetSetDef getset[] = {
+        {const_cast<char*>("__dict__"), nb_get_dict, nb_set_dict, nullptr, nullptr},
+        {nullptr, nullptr, nullptr, nullptr, nullptr}
+    };
+    type->tp_getset = getset;
+}
+
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_data *t) noexcept {
     const bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
@@ -232,7 +293,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
                has_doc           = t->flags & (uint32_t) type_flags::has_doc,
                has_base          = t->flags & (uint32_t) type_flags::has_base,
                has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
-               has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback;
+               has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback,
+               has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr;
 
     str name(t->name), qualname = name, fullname = name;
 
@@ -324,6 +386,26 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     type->tp_init = inst_init;
     type->tp_new = inst_new;
 
+    // If our base class has dynamic attributes, we must enable them, too, to
+    // match the base's layout.
+    // enable_dynamic_attributes is harmless to call if the base class
+    // has dynamic attributes also enabled.
+    if (has_dynamic_attr || (base && base->tp_dictoffset))
+    {
+        // We're about to set our tp_dictoffset to this value.
+        // The base class must be consistent with that.
+        assert(!base
+                || !base->tp_dictoffset
+                || (base->tp_dictoffset == type->tp_basicsize));
+
+        enable_dynamic_attributes(&nbt->ht);
+    }
+
+    // tp_basicsize is computed above, depending on whether the class has
+    // a dict pointer for dynamic attributes. tp_basicsize can only
+    // grow, not shrink.
+    assert(!has_base || (base->tp_basicsize <= type->tp_basicsize));
+
     if (is_enum) // last step before PyType_Ready
         nb_enum_prepare(type, is_arithmetic);
 
@@ -332,6 +414,11 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     if (PyType_Ready(type) < 0)
         fail("nanobind::detail::nb_type_new(\"%s\"): PyType_Ready() failed!", t->name);
+
+    // If we have a base class, it's up to it whether we HAVE_GC.
+    assert(has_base || ((has_dynamic_attr || is_enum)
+                    ? PyType_HasFeature(type, Py_TPFLAGS_HAVE_GC)
+                    : !PyType_HasFeature(type, Py_TPFLAGS_HAVE_GC)));
 
     Py_INCREF(type->tp_base);
 

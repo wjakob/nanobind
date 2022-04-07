@@ -57,7 +57,12 @@ enum class type_flags : uint32_t {
     is_arithmetic            = (1 << 15),
 
     /// This type is an arithmetic enumeration
-    has_type_callback        = (1 << 16)
+    has_type_callback        = (1 << 16),
+
+    /// The user requested dynamic attributes. (i.e. a dict in the instance)
+    /// Note that the actual presence of an instance dict will depend on more
+    /// than this flag. (see nb_type_new for details)
+    has_dynamic_attr        = (1 << 17)
 };
 
 struct type_data {
@@ -112,6 +117,10 @@ template <typename T>
 NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
     static_assert(sizeof(T) <= 0xFF, "Supplement is too big!");
     t.supplement += sizeof(T);
+}
+
+NB_INLINE void type_extra_apply(type_data &t, dynamic_attr) {
+    t.flags |= (uint32_t) type_flags::has_dynamic_attr;
 }
 
 template <typename... Args> struct init {

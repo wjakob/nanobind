@@ -54,6 +54,8 @@ struct is_arithmetic {};
 struct is_enum {
     bool is_signed;
 };
+struct dynamic_attr {};
+
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
 struct type_callback {

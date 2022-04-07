@@ -161,11 +161,16 @@ template <> struct type_caster<bool> {
 template <> struct type_caster<char> {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         value = PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
-        if (!value) {
-            PyErr_Clear();
-            return false;
+        if (value) {
+            return true;
         }
-        return true;
+        PyErr_Clear();
+        value = PyBytes_AsString(src.ptr());
+        if (value) {
+            return true;
+        }
+        PyErr_Clear();
+        return false;
     }
 
     static handle from_cpp(const char *value, rv_policy,
@@ -177,7 +182,7 @@ template <> struct type_caster<char> {
         return PyUnicode_FromStringAndSize(&value, 1);
     }
 
-    NB_TYPE_CASTER(const char *, const_name("str"));
+    NB_TYPE_CASTER(const char *, const_name("str | bytes"));
 };
 
 template <typename T>

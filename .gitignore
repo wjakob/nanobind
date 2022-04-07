@@ -21,3 +21,6 @@ cmake_install.cmake
 __pycache__
 nanobind.egg-info
 test_*_ext*
+
+*~
+.*.sw[op]

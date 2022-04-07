@@ -9,6 +9,7 @@
     The API below is based on the DLPack project
     (https://github.com/dmlc/dlpack/blob/main/include/dlpack/dlpack.h)
 */
+#pragma once
 
 #include <nanobind/nanobind.h>
 

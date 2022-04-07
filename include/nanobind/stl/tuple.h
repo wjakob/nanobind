@@ -1,3 +1,5 @@
+#pragma once
+
 #include <nanobind/nanobind.h>
 #include <tuple>
 

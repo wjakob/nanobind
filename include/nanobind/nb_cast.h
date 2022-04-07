@@ -69,22 +69,45 @@ public:
         const bool convert = flags & (uint8_t) cast_flags::convert;
 
         if constexpr (std::is_floating_point_v<T>) {
-            if (!convert && !PyFloat_Check(src.ptr()))
-                return false;
-            value_p = (Tp) PyFloat_AsDouble(src.ptr());
-        } else {
-            if (!convert && !PyLong_Check(src.ptr()))
-                return false;
-
-            if constexpr (std::is_unsigned_v<Tp>) {
-                value_p = sizeof(T) <= sizeof(long)
-                              ? (Tp) PyLong_AsUnsignedLong(src.ptr())
-                              : (Tp) PyLong_AsUnsignedLongLong(src.ptr());
-            } else {
-                value_p = sizeof(T) <= sizeof(long)
-                              ? (Tp) PyLong_AsLong(src.ptr())
-                              : (Tp) PyLong_AsLongLong(src.ptr());
+            if (PyFloat_Check(src.ptr())) {
+                value_p = (Tp) PyFloat_AsDouble(src.ptr());
             }
+            else {
+                if (!convert) {
+                    return false;
+                }
+                else {
+                    auto tmp = steal<object>(PyNumber_Float(src.ptr()));
+                    PyErr_Clear();
+                    return from_python(tmp, flags & ~(uint8_t) cast_flags::convert, nullptr);
+                }
+            }
+        } else {
+            static_assert(std::is_integral_v<T>,
+                "nanobind::cast(): non-integral, non-FP arithmetic type encountered?");
+            if (PyLong_Check(src.ptr()))
+            {
+                if constexpr (std::is_unsigned_v<Tp>) {
+                    value_p = sizeof(T) <= sizeof(long)
+                                  ? (Tp) PyLong_AsUnsignedLong(src.ptr())
+                                  : (Tp) PyLong_AsUnsignedLongLong(src.ptr());
+                } else {
+                    value_p = sizeof(T) <= sizeof(long)
+                                  ? (Tp) PyLong_AsLong(src.ptr())
+                                  : (Tp) PyLong_AsLongLong(src.ptr());
+                }
+            }
+            else {
+                if (!convert) {
+                    return false;
+                }
+                else {
+                    auto tmp = steal<object>(PyNumber_Long(src.ptr()));
+                    PyErr_Clear();
+                    return from_python(tmp, flags & ~(uint8_t) cast_flags::convert, nullptr);
+                }
+            }
+
         }
 
         if (value_p == Tp(-1) && PyErr_Occurred()) {

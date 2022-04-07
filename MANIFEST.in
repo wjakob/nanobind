@@ -1,0 +1,13 @@
+recursive-include include *.h
+recursive-include src *.h *.cpp
+
+recursive-exclude src/nanobind/cmake *
+recursive-exclude src/nanobind/include *
+recursive-exclude src/nanobind/src *
+recursive-exclude src/nanobind/ext *
+
+recursive-include ext *.h
+recursive-include docs *.md *.svg *.ipynb
+recursive-include tests *.py *.cpp *.txt
+
+include CMakeLists.txt cmake/nanobind-config.cmake

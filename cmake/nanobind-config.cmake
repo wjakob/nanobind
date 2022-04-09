@@ -62,6 +62,8 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     ${NB_DIR}/include/nanobind/stl/tuple.h
     ${NB_DIR}/include/nanobind/stl/pair.h
     ${NB_DIR}/include/nanobind/stl/function.h
+    ${NB_DIR}/include/nanobind/stl/vector.h
+    ${NB_DIR}/include/nanobind/stl/list.h
 
     ${NB_DIR}/src/internals.h
     ${NB_DIR}/src/buffer.h

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <nanobind/nanobind.h>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -9,6 +11,8 @@ template <typename Value_, typename Entry> struct list_caster {
 
     using Caster = make_caster<Entry>;
 
+    template <typename T> using has_reserve = decltype(std::declval<T>().reserve(0));
+
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         size_t size;
         PyObject *temp;
@@ -18,7 +22,9 @@ template <typename Value_, typename Entry> struct list_caster {
         PyObject **o = seq_get(src.ptr(), &size, &temp);
 
         value.clear();
-        value.reserve(size);
+
+        if constexpr (is_detected_v<has_reserve, Value_>)
+            value.reserve(size);
 
         Caster caster;
         bool success = o != nullptr;

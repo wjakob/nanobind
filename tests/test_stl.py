@@ -320,3 +320,6 @@ def test30_std_function():
 def test31_vec_type_check():
     with pytest.raises(TypeError) as excinfo:
         t.vec_moveable_in_value(0)
+
+def test32_list():
+    assert t.identity_list([1, 2, 3]) == [1, 2, 3]

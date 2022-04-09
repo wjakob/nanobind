@@ -106,10 +106,21 @@ template <typename... Args> struct overload_cast_impl {
                               -> decltype(pmf) { return pmf; }
 };
 
+/// Detector pattern
+template <typename SFINAE, template <typename> typename Op, typename Arg>
+struct detector : std::false_type { };
+
+template <template <typename> typename Op, typename Arg>
+struct detector<std::void_t<Op<Arg>>, Op, Arg>
+    : std::true_type { };
+
 NAMESPACE_END(detail)
 
 template <typename... Args>
 static constexpr detail::overload_cast_impl<Args...> overload_cast = {};
 static constexpr auto const_ = std::true_type{};
+
+template <template<typename> class Op, typename Arg>
+constexpr bool is_detected_v = detail::detector<void, Op, Arg>::value;
 
 NAMESPACE_END(NB_NAMESPACE)

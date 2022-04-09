@@ -2,6 +2,7 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/function.h>
+#include <nanobind/stl/list.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -186,4 +187,6 @@ NB_MODULE(test_stl_ext, m) {
     m.def("call_function", [](std::function<int(int)> &f, int x) {
         return f(x);
     });
+
+    m.def("identity_list", [](std::list<int> &x) { return x; });
 }

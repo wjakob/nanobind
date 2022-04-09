@@ -128,10 +128,12 @@ def test13_call_guard():
     assert t.call_guard_value() == 2
     assert not t.test_release_gil()
 
+
 def test14_print(capsys):
     t.test_print()
     captured = capsys.readouterr()
     assert captured.out == "Test 1\nTest 2\n"
+
 
 def test15_iter():
     assert t.test_iter(()) == []
@@ -139,10 +141,26 @@ def test15_iter():
     assert t.test_iter((1, 2)) == [1, 2]
     assert t.test_iter((1, 2, 3)) == [1, 2, 3]
 
-def test16_raw_doc():
+
+def test16_iter_tuple():
+    assert t.test_iter_tuple(()) == []
+    assert t.test_iter_tuple((1,)) == [1]
+    assert t.test_iter_tuple((1, 2)) == [1, 2]
+    assert t.test_iter_tuple((1, 2, 3)) == [1, 2, 3]
+
+
+def test17_iter_tuple():
+    assert t.test_iter_list([]) == []
+    assert t.test_iter_list([1]) == [1]
+    assert t.test_iter_list([1, 2]) == [1, 2]
+    assert t.test_iter_list([1, 2, 3]) == [1, 2, 3]
+
+
+def test18_raw_doc():
     assert t.test_08.__doc__ == 'raw'
 
-def test17_type_check_manual():
+
+def test19_type_check_manual():
     assert t.test_09.__doc__ == 'test_09(arg: type, /) -> bool'
 
     assert t.test_09(bool) is True
@@ -151,7 +169,8 @@ def test17_type_check_manual():
         assert t.test_09(True)
     assert "incompatible function arguments" in str(excinfo.value)
 
-def test18_dict_iterator():
+
+def test20_dict_iterator():
     assert t.test_10({}) == {}
     assert t.test_10({1:2}) == {1:2}
     assert t.test_10({1:2, 3:4}) == {1:2, 3:4}

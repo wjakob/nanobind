@@ -64,6 +64,7 @@ struct borrow_t { };
 struct steal_t { };
 class api_tag { };
 class dict_iterator;
+struct fast_iterator;
 
 // Standard operations provided by every nanobind object
 template <typename Derived> class api : public api_tag {
@@ -289,6 +290,8 @@ class tuple : public object {
     size_t size() const { return PyTuple_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
+    detail::fast_iterator begin() const;
+    detail::fast_iterator end() const;
 };
 
 class type_object : public object {
@@ -304,6 +307,8 @@ class list : public object {
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
+    detail::fast_iterator begin() const;
+    detail::fast_iterator end() const;
 };
 
 class dict : public object {
@@ -425,7 +430,23 @@ template <typename Derived> iterator api<Derived>::end() const {
     return iterator::sentinel();
 }
 
-class dict_iterator : public object {
+struct fast_iterator {
+    using value_type = handle;
+    using reference = const value_type;
+
+    fast_iterator(PyObject **value) : value(value) { }
+
+    fast_iterator& operator++() { value++; return *this; }
+    fast_iterator operator++(int) { fast_iterator rv = *this; value++; return rv; }
+    friend bool operator==(const fast_iterator &a, const fast_iterator &b) { return a.value == b.value; }
+    friend bool operator!=(const fast_iterator &a, const fast_iterator &b) { return a.value != b.value; }
+
+    handle operator*() const { return *value; }
+
+    PyObject **value;
+};
+
+class dict_iterator {
 public:
     using value_type = std::pair<handle, handle>;
     using reference = const value_type;
@@ -448,9 +469,8 @@ public:
     }
 
     void increment() {
-        if (PyDict_Next(obj.ptr(), &pos, &key, &value) == 0) {
+        if (PyDict_Next(obj.ptr(), &pos, &key, &value) == 0)
             pos = -1;
-        }
     }
 
     value_type operator*() const { return { key, value }; }
@@ -469,6 +489,21 @@ NAMESPACE_END(detail)
 
 inline detail::dict_iterator dict::begin() const { return { *this }; }
 inline detail::dict_iterator dict::end() const { return { }; }
+
+inline detail::fast_iterator tuple::begin() const {
+    return ((PyTupleObject *) m_ptr)->ob_item;
+}
+inline detail::fast_iterator tuple::end() const {
+    PyTupleObject *v = (PyTupleObject *) m_ptr;
+    return v->ob_item + v->ob_base.ob_size;
+}
+inline detail::fast_iterator list::begin() const {
+    return ((PyListObject *) m_ptr)->ob_item;
+}
+inline detail::fast_iterator list::end() const {
+    PyListObject *v = (PyListObject *) m_ptr;
+    return v->ob_item + v->ob_base.ob_size;
+}
 
 NAMESPACE_END(NB_NAMESPACE)
 

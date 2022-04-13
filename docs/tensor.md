@@ -83,23 +83,27 @@ m.def("process", [](nb::tensor<uint8_t, nb::shape<nb::any, nb::any, 3>, nb::c_co
 The above example also demonstrates the use of `nb::tensor<...>::operator()`,
 which provides direct (i.e., high-performance) read/write access to the tensor
 data. Note that this function is only available when the underlying data type
-and tensor rank are specified.
+and tensor rank are specified. It should only be used when the tensor storage
+is reachable via CPU's virtual memory address space.
 
 ### Tensor constraints
 
 The following tensor constraints are available
 
-- `nb::shape` annotation simultaneously constrains the tensor rank and
+- The `nb::shape` annotation simultaneously constrains the tensor rank and
   the size along specific dimensions. A `nb::any` entry leaves the
   corresponding dimension unconstrained.
 
-- Device tags: `nb::device::cpu`, `nb::device::cuda`, `nb::device::cuda_host`,
+- Device tags like `nb::device::cpu`, `nb::device::cuda`, `nb::device::cuda_host`,
   `nb::device::cuda_managed`, `nb::device::opencl`, `nb::device::vulkan`,
   `nb::device::metal`, `nb::device::rocm`, `nb::device::rocm_host`, and
-  `nb::device::oneapi`.
+  `nb::device::oneapi` constrain the source device and address space.
 
-- Ordering tags: `nb::c_contig` (contiguous C-style array storage),
-  and `nb::f_contig` (contiguous Fortran-style array storage).
+- Two ordering tags `nb::c_contig` and `nb::f_contig` enforce contiguous
+  storage in either C or Fortran style. In the case of matrices, C-contiguous
+  corresponds to row-major storage, and F-contiguous corresponds to
+  column-major storage. Without this tag, non-contiguous representations (e.g.
+  produced by slicing operations) and other unusual layouts are permitted.
 
 ## Passing `nb::tensor<>` instances in C++ code
 
@@ -156,20 +160,22 @@ The following simple binding declaration shows how to return a `2x4` NumPy
 floating point matrix.
 
 ```cpp
-const float *data = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+const float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
 
 m.def("ret_pytorch", []() {
     size_t shape[2] = { 2, 4 };
     return nb::tensor<nb::numpy, float, nb::shape<2, nb::any>>(
         data, /* ndim = */ 2, shape);
 });
-
-# The auto-generated docstring of this function is:
-# ret_pytorch() -> np.ndarray[float32, shape=(2, *)]
-
-# Calling it in Python yields
-# array([[1., 2., 3., 4.],
-#        [5., 6., 7., 8.]], dtype=float32)
+```
+The auto-generated docstring of this function is:
+```python
+ret_pytorch() -> np.ndarray[float32, shape=(2, *)]
+```
+Calling it in Python yields
+```python
+array([[1., 2., 3., 4.],
+       [5., 6., 7., 8.]], dtype=float32)
 ```
 
 The following additional tensor declarations are possible for return values:
@@ -177,8 +183,8 @@ The following additional tensor declarations are possible for return values:
 - `nb::numpy`. Returns the tensor as a `numpy.ndarray`.
 - `nb::pytorch`. Returns the tensor as a `torch.Tensor`.
 - `nb::tensorflow`. Returns the tensor as a `tensorflow.python.framework.ops.EagerTensor`.
-- `nb.jax`. Returns the tensor as a `jaxlib.xla_extension.DeviceArray`.
-- `nb::none` (the default). In this case, _nanobind_ will return a raw Python
+- `nb::jax`. Returns the tensor as a `jaxlib.xla_extension.DeviceArray`.
+- No framework annotation. In this case, _nanobind_ will return a raw Python
   `dltensor` [capsule](https://docs.python.org/3/c-api/capsule.html)
   representing the [DLPack](https://github.com/dmlc/dlpack) metadata.
 
@@ -205,14 +211,15 @@ implement a data destructor as follows:
 
 ```cpp
 m.def("ret_pytorch", []() {
+    // Dynamically allocate 'data'
     float *data = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
     size_t shape[2] = { 2, 4 };
 
-    /// Delete 'data' when the 'deleter' capsule expires
-    nb::capsule deleter(data, [](void *p) {
+    // Delete 'data' when the 'owner' capsule expires
+    nb::capsule owner(data, [](void *p) {
        delete[] (float *) p;
     });
 
-    return nb::tensor<nb::pytorch, float>(data, 2, shape, /* owner = */ deleter);
+    return nb::tensor<nb::pytorch, float>(data, 2, shape, owner);
 });
 ```

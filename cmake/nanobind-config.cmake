@@ -86,7 +86,15 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
     nanobind_strip(${TARGET_NAME})
+
+    # LTO causes problems in a static build, but use it in shared release builds
+    set_target_properties(${TARGET_NAME} PROPERTIES
+      INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+      INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
   endif()
+
+  set_target_properties(${TARGET_NAME} PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
 
   if (MSVC)
     # C++20 needed for designated initializers on MSVC..
@@ -101,12 +109,6 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
   if (WIN32)
     target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
   endif()
-
-  set_target_properties(${TARGET_NAME} PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
-    INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON
-  )
 
   target_include_directories(${TARGET_NAME} PRIVATE
     ${NB_DIR}/include

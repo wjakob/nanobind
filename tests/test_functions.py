@@ -176,3 +176,12 @@ def test20_dict_iterator():
     assert t.test_10({1:2, 3:4}) == {1:2, 3:4}
     assert t.test_10({1:2, 3:4, 'a': 'b'}) == {1:2, 3:4, 'a':'b'}
 
+
+def test21_numpy_overloads():
+    try:
+        import numpy as np
+    except ImportError:
+        pytest.skip('numpy is missing')
+
+    assert t.test_05(np.int32(0)) == 1
+    assert t.test_05(np.float64(0.0)) == 2

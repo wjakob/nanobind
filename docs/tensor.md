@@ -162,7 +162,7 @@ floating point matrix.
 ```cpp
 const float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-m.def("ret_pytorch", []() {
+m.def("ret_numpy", []() {
     size_t shape[2] = { 2, 4 };
     return nb::tensor<nb::numpy, float, nb::shape<2, nb::any>>(
         data, /* ndim = */ 2, shape);
@@ -188,9 +188,13 @@ The following additional tensor declarations are possible for return values:
   `dltensor` [capsule](https://docs.python.org/3/c-api/capsule.html)
   representing the [DLPack](https://github.com/dmlc/dlpack) metadata.
 
-Note that shape and order annotations like `nb::shape` and `nb::c_contig`
-enter into docstring, but _nanobind_ won't spend time on additional checks. It
-trusts that your method returns what it declares.
+Note that shape and order annotations like `nb::shape` and `nb::c_contig` enter
+into docstring, but _nanobind_ won't spend time on additional checks. It trusts
+that your method returns what it declares. Furthermore, non-CPU tensors must be
+explicitly indicate the device type and device ID using special parameters of
+the `tensor()` constructor shown below. Device types indicated via template
+arguments, e.g., `nb::tensor<..., nb::device::cuda>`, are only used for
+decorative purposes to generate an informative function docstring.
 
 The full signature of the tensor constructor is:
 ```cpp

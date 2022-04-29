@@ -4,6 +4,21 @@ if (NOT TARGET Python::Module)
   message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
 endif()
 
+# Determine the Python extension suffix and stash in the CMake cache
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" "-c"
+    "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
+  RESULT_VARIABLE NB_SUFFIX_RET
+  OUTPUT_VARIABLE NB_SUFFIX
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+if (NB_SUFFIX_RET AND NOT NB_SUFFIX_RET EQUAL 0)
+  message(FATAL_ERROR "nanobind: Python sysconfig query to "
+    "find 'EXT_SUFFIX' property failed!")
+endif()
+
+set(NB_SUFFIX ${NB_SUFFIX} CACHE INTERNAL "")
+
 get_filename_component(NB_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 get_filename_component(NB_DIR "${NB_DIR}" PATH)
 set(NB_DIR ${NB_DIR} CACHE INTERNAL "")
@@ -146,14 +161,8 @@ function(nanobind_disable_stack_protector name)
 endfunction()
 
 function(nanobind_extension name)
-  if (WIN32)
-    set(NB_SUFFIX ".pyd")
-  else()
-    set(NB_SUFFIX ".so")
-  endif()
-
   set_target_properties(${name} PROPERTIES
-    PREFIX "" SUFFIX ".${Python_SOABI}${NB_SUFFIX}")
+    PREFIX "" SUFFIX "${NB_SUFFIX}")
 endfunction()
 
 function (nanobind_cpp17 name)

@@ -257,7 +257,7 @@ _nanobind_ depends on recent versions of everything:
 - **Python 3.8+**: _nanobind_ heavily relies on [PEP 590 vector
   calls](https://www.python.org/dev/peps/pep-0590) that were introduced in
   version 3.8.
-- **CMake 3.17+**: Recent CMake versions include important improvements to
+- **CMake 3.15+**: Recent CMake versions include important improvements to
   `FindPython` that this project depends on.
 - **Supported compilers**: Clang 7, GCC 8, MSVC2019 (or newer) are officially
   supported.

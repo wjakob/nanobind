@@ -7,9 +7,6 @@ NAMESPACE_BEGIN(detail)
 
 // ========================================================================
 
-_Py_static_string(id_dlpack, "__dlpack__");
-
-
 struct managed_tensor {
     dlpack::tensor dl_tensor;
     void *manager_ctx;
@@ -276,9 +273,10 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
 
     // If this is not a capsule, try calling o.__dlpack__()
     if (!PyCapsule_CheckExact(o)) {
-        PyObject *args[1] = { o }, *name = _PyUnicode_FromId(&id_dlpack);
+        str name("__dlpack__");
+        PyObject *args[1] = { o };
         capsule = steal(NB_VECTORCALL_METHOD(
-            name, args, 1 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr));
+            name.ptr(), args, 1 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr));
 
         if (!capsule.is_valid()) {
             PyErr_Clear();

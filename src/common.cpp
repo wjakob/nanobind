@@ -13,7 +13,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-_Py_static_string(id_stdout, "stdout");
 
 #if PY_VERSION_HEX < 0x03090000
 PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
@@ -536,7 +535,7 @@ void tuple_check(PyObject *tuple, size_t nargs) {
 
 void print(PyObject *value, PyObject *end, PyObject *file) {
     if (!file)
-        file = _PySys_GetObjectId(&id_stdout);
+        file = PySys_GetObject("stdout");
 
     int rv = PyFile_WriteObject(value, file, Py_PRINT_RAW);
     if (rv)

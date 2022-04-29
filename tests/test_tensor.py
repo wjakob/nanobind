@@ -200,15 +200,18 @@ def test12_implicit_conversion_jax():
 
 def test13_destroy_capsule():
     gc.collect()
+    gc.collect()
     dc = t.destruct_count()
     a = t.return_dlpack()
     assert dc == t.destruct_count()
     del a
     gc.collect()
+    gc.collect()
     assert t.destruct_count() - dc == 1
 
 
 def test14_consume_numpy():
+    gc.collect()
     gc.collect()
     class wrapper:
         def __init__(self, value):
@@ -227,15 +230,18 @@ def test14_consume_numpy():
 
     del a
     gc.collect()
+    gc.collect()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     assert dc == t.destruct_count()
     del x
     gc.collect()
+    gc.collect()
     assert t.destruct_count() - dc == 1
 
 
 def test15_passthrough():
+    gc.collect()
     gc.collect()
     class wrapper:
         def __init__(self, value):
@@ -256,15 +262,18 @@ def test15_passthrough():
     del a
     del b
     gc.collect()
+    gc.collect()
     assert dc == t.destruct_count()
     assert y.shape == (2, 4)
     assert np.all(y == [[1, 2, 3, 4], [5, 6, 7, 8]])
     del y
     gc.collect()
+    gc.collect()
     assert t.destruct_count() - dc == 1
 
 
 def test16_return_numpy():
+    gc.collect()
     gc.collect()
     import numpy as np
     dc = t.destruct_count()
@@ -272,6 +281,7 @@ def test16_return_numpy():
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     del x
+    gc.collect()
     gc.collect()
     assert t.destruct_count() - dc == 1
 
@@ -283,11 +293,13 @@ def test17_return_pytorch():
     except:
         pytest.skip('pytorch is missing')
     gc.collect()
+    gc.collect()
     import numpy as np
     dc = t.destruct_count()
     x = t.ret_pytorch()
     assert x.shape == (2, 4)
     assert torch.all(x == torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]]))
     del x
+    gc.collect()
     gc.collect()
     assert t.destruct_count() - dc == 1

@@ -5,9 +5,11 @@ import gc
 @pytest.fixture
 def clean():
     gc.collect()
+    gc.collect()
     t.reset()
 
 def assert_stats(**kwargs):
+    gc.collect()
     gc.collect()
     for k, v in t.stats().items():
         fail = False
@@ -330,8 +332,10 @@ def test16_keep_alive_custom(clean):
     assert t.keep_alive_arg(s, a) is a
     del s
     gc.collect()
+    gc.collect()
     assert constructed == 1 and destructed == 0
     del a
+    gc.collect()
     gc.collect()
     assert constructed == 1 and destructed == 1
 
@@ -340,8 +344,10 @@ def test16_keep_alive_custom(clean):
     assert t.keep_alive_ret(a, s) is s
     del a
     gc.collect()
+    gc.collect()
     assert constructed == 2 and destructed == 1
     del s
+    gc.collect()
     gc.collect()
     assert constructed == 2 and destructed == 2
 

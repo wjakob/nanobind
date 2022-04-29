@@ -5,9 +5,11 @@ import gc
 @pytest.fixture
 def clean():
     gc.collect()
+    gc.collect()
     t.reset()
 
 def assert_stats(**kwargs):
+    gc.collect()
     gc.collect()
     for k, v in t.stats().items():
         fail = False

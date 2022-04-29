@@ -499,7 +499,13 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                         PyObject *hit = nullptr;
                         for (size_t j = 0; j < nkwargs_in; ++j) {
                             PyObject *key = PyTuple_GET_ITEM(kwargs_in, j);
-                            if (key == ad.name_py) {
+                            bool match;
+                            #if !defined(PYPY_VERSION)
+                                match = key == ad.name_py;
+                            #else
+                                match = PyUnicode_Compare(key, ad.name_py) == 0;
+                            #endif
+                            if (match) {
                                 hit = args_in[nargs_in + j];
                                 kwarg_used[j] = true;
                                 break;

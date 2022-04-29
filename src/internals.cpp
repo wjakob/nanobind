@@ -193,8 +193,7 @@ static void internals_make() {
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
     if ((nb_type_type.tp_flags & Py_TPFLAGS_HEAPTYPE) != 0 ||
-        nb_type_type.tp_basicsize != sizeof(PyHeapTypeObject) + sizeof(type_data) ||
-        nb_type_type.tp_itemsize != sizeof(PyMemberDef))
+        nb_type_type.tp_basicsize != sizeof(PyHeapTypeObject) + sizeof(type_data))
         fail("nanobind::detail::internals_make(): initialized type invalid!");
 
     if (Py_AtExit(internals_cleanup))

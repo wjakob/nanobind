@@ -395,7 +395,7 @@ found:
     PyObject *args[2] = { nullptr, src };
     PyObject *result =
         NB_VECTORCALL((PyObject *) dst_type->type_py, args + 1,
-                      PY_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
+                      NB_VECTORCALL_ARGUMENTS_OFFSET | 1, nullptr);
 
     if (result) {
         cleanup->append(result);

@@ -164,9 +164,6 @@ Removed features include:
 - ○ Module-local types and exceptions are unsupported.
 - ○ Custom metaclasses are unsupported.
 - ● Many STL type caster have not yet been ported.
-- ● PyPy support is gone. (PyPy requires many workaround in _pybind11_ that
-  complicate the its internals. Making PyPy interoperate with _nanobind_ will
-  likely require changes to the PyPy CPython emulation layer.)
 - ◑ NumPy integration was replaced by a more general ``nb::tensor<>``
   integration that supports CPU/GPU tensors produced by various frameworks
   (NumPy, PyTorch, TensorFlow, JAX, ..).
@@ -254,9 +251,9 @@ _nanobind_ depends on recent versions of everything:
 
 - **C++17**: The `if constexpr` feature was crucial to simplify the internal
   meta-templating of this library.
-- **Python 3.8+**: _nanobind_ heavily relies on [PEP 590 vector
-  calls](https://www.python.org/dev/peps/pep-0590) that were introduced in
-  version 3.8.
+- **Python 3.8+** or **PyPy 3.9+**: _nanobind_ heavily relies on [PEP 590
+  vector calls](https://www.python.org/dev/peps/pep-0590) that were introduced
+  in Python version 3.8. Note that PyPy support is not stable yet.
 - **CMake 3.15+**: Recent CMake versions include important improvements to
   `FindPython` that this project depends on.
 - **Supported compilers**: Clang 7, GCC 8, MSVC2019 (or newer) are officially

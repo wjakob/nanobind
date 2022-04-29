@@ -276,7 +276,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
         str name("__dlpack__");
         PyObject *args[1] = { o };
         capsule = steal(NB_VECTORCALL_METHOD(
-            name.ptr(), args, 1 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr));
+            name.ptr(), args, 1 | NB_VECTORCALL_ARGUMENTS_OFFSET, nullptr));
 
         if (!capsule.is_valid()) {
             PyErr_Clear();

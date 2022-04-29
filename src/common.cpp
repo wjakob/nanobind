@@ -13,8 +13,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-
-#if PY_VERSION_HEX < 0x03090000
+#if defined(PYPY_VERSION) || PY_VERSION_HEX < 0x03090000
 PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
                                size_t nargsf, PyObject *kwnames) {
     PyObject *obj = PyObject_GetAttr(args[0], name);
@@ -143,17 +142,26 @@ PyObject *module_import(const char *name) {
 
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
+    PyObject *name_py, *res;
 
-    PyObject *base_name = PyModule_GetNameObject(base),
-             *name_py, *res;
+#if !defined(PYPY_VERSION)
+    PyObject *base_name = PyModule_GetNameObject(base);
     if (!base_name)
         goto fail;
-
     name_py = PyUnicode_FromFormat("%U.%s", base_name, name);
     if (!name_py)
         goto fail;
-
     res = PyImport_AddModuleObject(name_py);
+#else
+    const char *base_name = PyModule_GetName(base);
+    if (!base_name)
+        goto fail;
+    name_py = PyUnicode_FromFormat("%s.%s", base_name, name);
+    if (!name_py)
+        goto fail;
+    res = PyImport_AddModule(PyUnicode_AsUTF8AndSize(name_py, nullptr));
+#endif
+
     if (doc) {
         PyObject *doc_py = PyUnicode_FromString(doc);
         if (!doc_py || PyObject_SetAttrString(res, "__doc__", doc_py))
@@ -431,13 +439,15 @@ PyObject **seq_get(PyObject *seq, size_t *size, PyObject **temp) noexcept {
         *size = Py_SIZE(tuple);
         *temp = nullptr;
         return tuple->ob_item;
+#if !defined(PYPY_VERSION)
     } else if (PyList_CheckExact(seq)) {
         PyListObject *list = (PyListObject *) seq;
         *size = Py_SIZE(list);
         *temp = nullptr;
         return list->ob_item;
+#endif
     } else {
-        seq = PySequence_List(seq);
+        seq = PySequence_Fast(seq, "");
         if (!seq) {
             PyErr_Clear();
             *size = 0;
@@ -445,9 +455,8 @@ PyObject **seq_get(PyObject *seq, size_t *size, PyObject **temp) noexcept {
             return nullptr;
         }
         *temp = seq;
-        PyListObject *list = (PyListObject *) seq;
-        *size = Py_SIZE(list);
-        return list->ob_item;
+        *size = PySequence_Fast_GET_SIZE(seq);
+        return PySequence_Fast_ITEMS(seq);
     }
 }
 
@@ -461,11 +470,13 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
         if (size != (size_t) Py_SIZE(tuple))
             return nullptr;
         return tuple->ob_item;
+#if !defined(PYPY_VERSION)
     } else if (PyList_CheckExact(seq)) {
         PyListObject *list = (PyListObject *) seq;
         if (size != (size_t) Py_SIZE(list))
             return nullptr;
         return list->ob_item;
+#endif
     } else {
         PySequenceMethods *m = Py_TYPE(seq)->tp_as_sequence;
         if (m && m->sq_length) {
@@ -478,20 +489,20 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                 return nullptr;
         }
 
-        seq = PySequence_List(seq);
+
+        seq = PySequence_Fast(seq, "");
         if (!seq) {
             PyErr_Clear();
             return nullptr;
         }
 
-        PyListObject *list = (PyListObject *) seq;
-        if (size != (size_t) Py_SIZE(list)) {
+        if (size != (size_t) PySequence_Fast_GET_SIZE(seq)) {
             Py_CLEAR(seq);
             return nullptr;
         }
 
         *temp = seq;
-        return list->ob_item;
+        return PySequence_Fast_ITEMS(seq);
     }
 }
 

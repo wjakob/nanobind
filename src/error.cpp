@@ -57,6 +57,7 @@ const char *python_error::what() const noexcept {
     if (m_value.is_valid())
         buf.put_dstr(str(m_value).c_str());
 
+#if !defined(PYPY_VERSION)
     if (m_trace.is_valid()) {
         PyTracebackObject *to = (PyTracebackObject *) m_trace.ptr();
 
@@ -84,6 +85,7 @@ const char *python_error::what() const noexcept {
             Py_DECREF(f_code);
         }
     }
+#endif
 
     m_what = buf.copy();
     return m_what;

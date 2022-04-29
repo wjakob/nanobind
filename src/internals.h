@@ -238,7 +238,7 @@ private:
     T *ptr{ nullptr };
 };
 
-#if PY_VERSION_HEX < 0x03090000
+#if defined(PYPY_VERSION) || PY_VERSION_HEX < 0x03090000
 extern PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
                                       size_t nargsf, PyObject *kwnames);
 #endif

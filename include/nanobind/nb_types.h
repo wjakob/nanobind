@@ -308,8 +308,11 @@ class list : public object {
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
+
+#if !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
+#endif
 };
 
 class dict : public object {
@@ -498,6 +501,8 @@ inline detail::fast_iterator tuple::end() const {
     PyTupleObject *v = (PyTupleObject *) m_ptr;
     return v->ob_item + v->ob_base.ob_size;
 }
+
+#if !defined(PYPY_VERSION)
 inline detail::fast_iterator list::begin() const {
     return ((PyListObject *) m_ptr)->ob_item;
 }
@@ -505,6 +510,7 @@ inline detail::fast_iterator list::end() const {
     PyListObject *v = (PyListObject *) m_ptr;
     return v->ob_item + v->ob_base.ob_size;
 }
+#endif
 
 NAMESPACE_END(NB_NAMESPACE)
 

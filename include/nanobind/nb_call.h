@@ -88,7 +88,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         args[0] = nullptr;                                                     \
         args_p = args + 1;                                                     \
     }                                                                          \
-    nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;                                   \
+    nargs |= NB_VECTORCALL_ARGUMENTS_OFFSET;                                   \
     return steal(obj_vectorcall(base, args_p, nargs, kwnames, method_call))
 
 template <typename Derived>

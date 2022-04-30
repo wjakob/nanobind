@@ -56,77 +56,57 @@ using movable_cast_t =
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
-    using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
-    using T1 = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
-    using Tp = std::conditional_t<std::is_floating_point_v<T>, double, T1>;
 public:
-    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
-        Tp value_p;
-
-        if (!src.is_valid())
-            return false;
-
-        const bool convert = flags & (uint8_t) cast_flags::convert;
+    NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+        std::pair<T, bool> result;
 
         if constexpr (std::is_floating_point_v<T>) {
-            if (!convert && !PyFloat_Check(src.ptr()))
-                return false;
-            value_p = (Tp) PyFloat_AsDouble(src.ptr());
+            if constexpr (sizeof(T) == 8)
+                result = detail::load_f64(src.ptr(), flags);
+            else
+                result = detail::load_f32(src.ptr(), flags);
         } else {
-            if (!PyLong_Check(src.ptr())) {
-                if (!convert)
-                    return false;
-
-                if constexpr (std::is_unsigned_v<Tp>) {
-                    // Unsigned conversions don't call __index__()..
-                    object temp = borrow(PyNumber_Long(src.ptr()));
-                    if (!temp.is_valid()) {
-                        PyErr_Clear();
-                        return false;
-                    }
-                    return from_python(temp, 0, nullptr);
-                }
-            }
-
-            if constexpr (std::is_unsigned_v<Tp>) {
-                value_p = sizeof(T) <= sizeof(long)
-                              ? (Tp) PyLong_AsUnsignedLong(src.ptr())
-                              : (Tp) PyLong_AsUnsignedLongLong(src.ptr());
+            if constexpr (std::is_signed_v<T>) {
+                if constexpr (sizeof(T) == 8)
+                    result = detail::load_i64(src.ptr(), flags);
+                else if constexpr (sizeof(T) == 4)
+                    result = detail::load_i32(src.ptr(), flags);
+                else if constexpr (sizeof(T) == 2)
+                    result = detail::load_i16(src.ptr(), flags);
+                else
+                    result = detail::load_i8(src.ptr(), flags);
             } else {
-                value_p = sizeof(T) <= sizeof(long)
-                              ? (Tp) PyLong_AsLong(src.ptr())
-                              : (Tp) PyLong_AsLongLong(src.ptr());
+                if constexpr (sizeof(T) == 8)
+                    result = detail::load_u64(src.ptr(), flags);
+                else if constexpr (sizeof(T) == 4)
+                    result = detail::load_u32(src.ptr(), flags);
+                else if constexpr (sizeof(T) == 2)
+                    result = detail::load_u16(src.ptr(), flags);
+                else
+                    result = detail::load_u8(src.ptr(), flags);
             }
         }
 
-        if (value_p == Tp(-1) && PyErr_Occurred()) {
-            PyErr_Clear();
-            return false;
-        }
-
-        value = (T) value_p;
-
-        if constexpr (sizeof(Tp) != sizeof(T) && !std::is_floating_point_v<T>) {
-            if (value_p != (Tp) value)
-                return false;
-        }
-
-        return true;
+        value = result.first;
+        return result.second;
     }
 
-    static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
-        if constexpr (std::is_floating_point_v<T>)
+    NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
+        if constexpr (std::is_floating_point_v<T>) {
             return PyFloat_FromDouble((double) src);
-        else if constexpr (std::is_unsigned_v<T> && sizeof(T) <= sizeof(long))
-            return PyLong_FromUnsignedLong((unsigned long) src);
-        else if constexpr (std::is_signed_v<T> && sizeof(T) <= sizeof(long))
-            return PyLong_FromLong((long) src);
-        else if constexpr (std::is_unsigned_v<T>)
-            return PyLong_FromUnsignedLongLong((unsigned long long) src);
-        else if constexpr (std::is_signed_v<T>)
-            return PyLong_FromLongLong((long long) src);
-        else
-            fail("invalid number cast");
+        } else {
+            if constexpr (std::is_signed_v<T>) {
+                if constexpr (sizeof(T) <= sizeof(long))
+                    return PyLong_FromLong((long) src);
+                else
+                    return PyLong_FromLongLong((long long) src);
+            } else {
+                if constexpr (sizeof(T) <= sizeof(unsigned long))
+                    return PyLong_FromUnsignedLong((unsigned long) src);
+                else
+                    return PyLong_FromUnsignedLongLong((unsigned long long) src);
+            }
+        }
     }
 
     NB_TYPE_CASTER(T, const_name<std::is_integral_v<T>>("int", "float"));

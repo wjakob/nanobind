@@ -550,5 +550,115 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
         raise_python_error();
 }
 
+// ========================================================================
+
+std::pair<double, bool> load_f64(PyObject *o, uint8_t flags) noexcept {
+    const bool convert = flags & (uint8_t) cast_flags::convert;
+
+    if (convert || PyFloat_Check(o)) {
+        double result = PyFloat_AsDouble(o);
+
+        if (result != -1.0 || !PyErr_Occurred())
+            return { result, true };
+        else
+            PyErr_Clear();
+    }
+
+    return { 0.0, false };
+}
+
+std::pair<float, bool> load_f32(PyObject *o, uint8_t flags) noexcept {
+    const bool convert = flags & (uint8_t) cast_flags::convert;
+    if (convert || PyFloat_Check(o)) {
+        double result = PyFloat_AsDouble(o);
+
+        if (result != -1.0 || !PyErr_Occurred())
+            return { (float) result, true };
+        else
+            PyErr_Clear();
+    }
+
+    return { 0.f, false };
+}
+
+template <typename T>
+NB_INLINE std::pair<T, bool> load_int(PyObject *o, uint32_t flags) noexcept {
+    using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
+    using Tp = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
+
+    const bool convert = flags & (uint8_t) cast_flags::convert;
+    object temp;
+
+    if (!PyLong_Check(o)) {
+        if (convert) {
+            if constexpr (std::is_unsigned_v<T>) {
+                // Unsigned PyLong_* conversions don't call __index__()..
+                temp = steal(PyNumber_Long(o));
+                if (!temp.is_valid()) {
+                    PyErr_Clear();
+                    return { T(0), false };
+                }
+
+                o = temp.ptr();
+            }
+        } else {
+            return { T(0), false };
+        }
+    }
+
+    Tp value_p;
+    if constexpr (std::is_unsigned_v<Tp>) {
+        value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsUnsignedLong(o)
+                                            : (Tp) PyLong_AsUnsignedLongLong(o);
+    } else {
+        value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsLong(o)
+                                            : (Tp) PyLong_AsLongLong(o);
+    }
+
+    if (value_p == Tp(-1) && PyErr_Occurred()) {
+        PyErr_Clear();
+        return { T(0), false };
+    }
+
+    T value = (T) value_p;
+    if constexpr (sizeof(Tp) != sizeof(T)) {
+        if (value_p != (Tp) value)
+            return { T(0), false };
+    }
+    return { value, true };
+}
+
+std::pair<uint8_t, bool> load_u8(PyObject *o, uint8_t flags) noexcept {
+    return load_int<uint8_t>(o, flags);
+}
+
+std::pair<int8_t, bool> load_i8(PyObject *o, uint8_t flags) noexcept {
+    return load_int<int8_t>(o, flags);
+}
+
+std::pair<uint16_t, bool> load_u16(PyObject *o, uint8_t flags) noexcept {
+    return load_int<uint16_t>(o, flags);
+}
+
+std::pair<int16_t, bool> load_i16(PyObject *o, uint8_t flags) noexcept {
+    return load_int<int16_t>(o, flags);
+}
+
+std::pair<uint32_t, bool> load_u32(PyObject *o, uint8_t flags) noexcept {
+    return load_int<uint32_t>(o, flags);
+}
+
+std::pair<int32_t, bool> load_i32(PyObject *o, uint8_t flags) noexcept {
+    return load_int<int32_t>(o, flags);
+}
+
+std::pair<uint64_t, bool> load_u64(PyObject *o, uint8_t flags) noexcept {
+    return load_int<uint64_t>(o, flags);
+}
+
+std::pair<int64_t, bool> load_i64(PyObject *o, uint8_t flags) noexcept {
+    return load_int<int64_t>(o, flags);
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

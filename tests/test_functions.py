@@ -185,3 +185,7 @@ def test21_numpy_overloads():
 
     assert t.test_05(np.int32(0)) == 1
     assert t.test_05(np.float64(0.0)) == 2
+    assert t.test_11_sl(np.int32(5)) == 5
+    assert t.test_11_ul(np.int32(5)) == 5
+    assert t.test_11_sll(np.int32(5)) == 5
+    assert t.test_11_ull(np.int32(5)) == 5

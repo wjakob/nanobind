@@ -73,8 +73,20 @@ public:
                 return false;
             value_p = (Tp) PyFloat_AsDouble(src.ptr());
         } else {
-            if (!convert && !PyLong_Check(src.ptr()))
-                return false;
+            if (!PyLong_Check(src.ptr())) {
+                if (!convert)
+                    return false;
+
+                if constexpr (std::is_unsigned_v<Tp>) {
+                    // Unsigned conversions don't call __index__()..
+                    object temp = borrow(PyNumber_Long(src.ptr()));
+                    if (!temp.is_valid()) {
+                        PyErr_Clear();
+                        return false;
+                    }
+                    return from_python(temp, 0, nullptr);
+                }
+            }
 
             if constexpr (std::is_unsigned_v<Tp>) {
                 value_p = sizeof(T) <= sizeof(long)

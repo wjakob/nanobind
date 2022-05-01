@@ -665,7 +665,10 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
     uint8_t *args_flags = (uint8_t *) alloca(max_nargs_pos * sizeof(uint8_t));
 
-    if (kwargs_in) { // keyword arguments unsupported in the "simple" vectorcall
+    bool fail = kwargs_in != nullptr;
+    for (size_t i = 0; i < nargs_in; ++i)
+        fail |= args_in[i] == Py_None;
+    if (fail) { // keyword/None arguments unsupported in simple vectorcall
         error_handler = nb_func_error_overload;
         goto done;
     }

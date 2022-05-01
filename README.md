@@ -241,7 +241,10 @@ improvements for developers:
 - In _pybind11_, function docstrings are pre-rendered while the binding code
   runs (`.def(...)`). This can create confusing signatures containing C++ types
   when the binding code of those C++ types hasn't yet run. _nanobind_ does not
-  pre-render function docstrings, they are created on the fly when queried.
+  pre-render function docstrings: they are created on the fly when queried.
+
+- _nanobind_ docstrings have improved out-of-the-box compatibility with tools
+  like [Sphinx](https://www.sphinx-doc.org/en/master/).
 
 - _nanobind_ has [greatly
   improved](https://github.com/wjakob/nanobind/blob/master/docs/tensor.md)
@@ -391,6 +394,21 @@ changes are detailed below.
   ```cpp
   nb::class_<MyType>(m, "MyType")
     ...
+  ```
+
+- **Null pointers**. In contrast to _pybind11_, _nanobind_ by default does
+  _not_ permit ``None``-valued arguments during overload resolution. They need
+  to be enabled explicitly using the ``.none()`` member of an argument
+  annotation.
+
+  ```cpp
+      .def("func", &func, "arg"_a.none());
+  ```
+
+  It is also possible to set a ``None`` default value as follows:
+
+  ```cpp
+      .def("func", &func, "arg"_a.none() = nb::none());
   ```
 
 - **Implicit type conversions**. In _pybind11_, implicit conversions were

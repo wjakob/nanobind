@@ -120,8 +120,12 @@ PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
 
 static void inst_dealloc(PyObject *self) {
     nb_type *type = (nb_type *) Py_TYPE(self);
-    if (type->ht.ht_type.tp_flags & Py_TPFLAGS_HAVE_GC)
+    uint8_t *alloc = (uint8_t *) self;
+
+    if (type->ht.ht_type.tp_flags & Py_TPFLAGS_HAVE_GC) {
         PyObject_GC_UnTrack(self);
+        alloc -= sizeof(uintptr_t) * 2;
+    }
 
     nb_inst *inst = (nb_inst *) self;
     void *p = inst_ptr(inst);
@@ -170,7 +174,8 @@ static void inst_dealloc(PyObject *self) {
              "an unknown instance (%p)!", type->ht.ht_type.tp_name, p);
     internals.inst_c2p.erase(it);
 
-    type->ht.ht_type.tp_free(self);
+    PyObject_Free(alloc);
+
     Py_DECREF(type);
 }
 

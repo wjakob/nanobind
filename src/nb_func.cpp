@@ -806,23 +806,30 @@ static void nb_func_render_signature(const func_record *f) noexcept {
 
                 if (!(is_method && arg_index == 0))
                     buf.put(": ");
+                if (has_args && f->args[arg_index].none)
+                    buf.put("Optional[");
                 break;
 
             case '}':
                 // Default argument
-                if (has_args && f->args[arg_index].value) {
-                    PyObject *str = PyObject_Str(f->args[arg_index].value);
-                    if (str) {
-                        Py_ssize_t size = 0;
-                        const char *cstr =
-                            PyUnicode_AsUTF8AndSize(str, &size);
-                        if (cstr) {
-                            buf.put(" = ");
-                            buf.put(cstr, (size_t) size);
+                if (has_args) {
+                    if (f->args[arg_index].none)
+                        buf.put(']');
+
+                    if (f->args[arg_index].value) {
+                        PyObject *str = PyObject_Str(f->args[arg_index].value);
+                        if (str) {
+                            Py_ssize_t size = 0;
+                            const char *cstr =
+                                PyUnicode_AsUTF8AndSize(str, &size);
+                            if (cstr) {
+                                buf.put(" = ");
+                                buf.put(cstr, (size_t) size);
+                            }
+                            Py_DECREF(str);
+                        } else {
+                            PyErr_Clear();
                         }
-                        Py_DECREF(str);
-                    } else {
-                        PyErr_Clear();
                     }
                 }
 

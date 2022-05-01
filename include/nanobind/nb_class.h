@@ -423,6 +423,8 @@ public:
         detail::nb_enum_put(Base::m_ptr, name, &value, doc);
         return *this;
     }
+
+    NB_INLINE void export_values() { detail::nb_enum_export(Base::m_ptr); }
 };
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }

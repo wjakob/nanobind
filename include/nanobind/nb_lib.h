@@ -302,6 +302,9 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
 NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
                          const char *doc) noexcept;
 
+/// Export enum entries to the parent scope
+NB_CORE void nb_enum_export(PyObject *type);
+
 // ========================================================================
 
 /// Try to import a Python extension module, raises an exception upon failure

@@ -4,6 +4,7 @@ namespace nb = nanobind;
 
 enum class Enum  : uint32_t { A, B, C = (uint32_t) -1 };
 enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
+enum ClassicEnum { Item1, Item2 };
 
 NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum")
@@ -15,6 +16,11 @@ NB_MODULE(test_enum_ext, m) {
         .value("A", SEnum::A)
         .value("B", SEnum::B)
         .value("C", SEnum::C);
+
+    nb::enum_<ClassicEnum>(m, "ClassicEnum")
+        .value("Item1", ClassicEnum::Item1)
+        .value("Item2", ClassicEnum::Item2)
+        .export_values();
 
     m.def("from_enum", [](Enum value) { return (uint32_t) value; });
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });

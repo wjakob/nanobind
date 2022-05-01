@@ -61,3 +61,8 @@ def test03_enum_arithmetic():
     with pytest.raises(TypeError) as excinfo:
         assert t.Enum.B + 2 == 3
     assert 'unsupported operand type' in str(excinfo.value)
+
+
+def test04_enum_export():
+    assert t.Item1 is t.ClassicEnum.Item1 and int(t.Item1) == 0
+    assert t.Item2 is t.ClassicEnum.Item2 and int(t.Item2) == 1

@@ -279,5 +279,23 @@ error:
     fail("nanobind::detail::nb_enum_add(): could not create enum entry!");
 }
 
+void nb_enum_export(PyObject *type) {
+    type_data &t = ((nb_type *) type)->t;
+    PyObject *entries = PyObject_GetAttrString(type, "__entries");
+
+    if (!entries || !(t.flags & (uint32_t) type_flags::has_scope))
+        fail("nanobind::detail::nb_enum_export(): internal error!");
+
+    PyObject *key, *entry;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(entries, &pos, &key, &entry)) {
+        nb_enum *item = (nb_enum *) entry;
+        setattr(t.scope, item->name, entry);
+    }
+
+    Py_DECREF(entries);
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

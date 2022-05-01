@@ -151,6 +151,13 @@ template <> struct type_caster<bool> {
 };
 
 template <> struct type_caster<char> {
+    using Value = const char *;
+    Value value;
+    static constexpr bool IsClass = false;
+    static constexpr auto Name = const_name("str");
+    template <typename T_>
+    using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
+
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         value = PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
         if (!value) {
@@ -169,7 +176,13 @@ template <> struct type_caster<char> {
         return PyUnicode_FromStringAndSize(&value, 1);
     }
 
-    NB_TYPE_CASTER(const char *, const_name("str"));
+    explicit operator const char *() { return value; }
+
+    explicit operator char() {
+        if (value && value[0] && value[1] == '\0')
+            return value[0];
+        throw next_overload();
+    }
 };
 
 template <typename T>

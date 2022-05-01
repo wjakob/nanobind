@@ -189,3 +189,8 @@ def test21_numpy_overloads():
     assert t.test_11_ul(np.int32(5)) == 5
     assert t.test_11_sll(np.int32(5)) == 5
     assert t.test_11_ull(np.int32(5)) == 5
+
+
+def test22_string_return():
+    assert t.test_12("hello") == "hello"
+    assert t.test_13() == "test"

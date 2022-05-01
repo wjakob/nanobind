@@ -131,4 +131,8 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_11_ul",  [](unsigned long x)        { return x; });
     m.def("test_11_sll", [](signed long long x) { return x; });
     m.def("test_11_ull", [](unsigned long long x)   { return x; });
+
+    // Test string caster
+    m.def("test_12", [](const char *c) { return nb::str(c); });
+    m.def("test_13", []() -> const char * { return "test"; });
 }

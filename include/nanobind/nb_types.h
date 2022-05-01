@@ -123,6 +123,7 @@ public:
     NB_API_OP_2(operator<<=,PyNumber_InPlaceLshift)
     NB_API_OP_2(operator>>, PyNumber_Rshift)
     NB_API_OP_2(operator>>=,PyNumber_InPlaceRshift)
+    NB_API_OP_2(floor_div,  PyNumber_FloorDivide)
 };
 
 NAMESPACE_END(detail)

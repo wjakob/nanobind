@@ -357,4 +357,11 @@ NB_MODULE(test_classes_ext, m) {
 
     // test22_handle_of
     m.def("test_handle_of", [](nb::handle_of<Struct> h) { return borrow(h); });
+
+    // test23_none_arg
+    m.def("none_0", [](Struct *s) { return s == nullptr; });
+    m.def("none_1", [](Struct *s) { return s == nullptr; }, nb::arg());
+    m.def("none_2", [](Struct *s) { return s == nullptr; }, nb::arg("arg"));
+    m.def("none_3", [](Struct *s) { return s == nullptr; }, nb::arg().none());
+    m.def("none_4", [](Struct *s) { return s == nullptr; }, nb::arg("arg").none());
 }

@@ -436,3 +436,18 @@ def test22_handle_of(clean):
         value_constructed=1,
         destructed=1
     )
+
+def test23_none_arg():
+    with pytest.raises(TypeError):
+        t.none_0(None)
+    with pytest.raises(TypeError):
+        t.none_1(None)
+    with pytest.raises(TypeError):
+        t.none_2(arg=None)
+    assert t.none_3(None) is True
+    assert t.none_4(arg=None) is True
+    assert t.none_0.__doc__ == 'none_0(arg: test_classes_ext.Struct, /) -> bool'
+    assert t.none_1.__doc__ == 'none_1(arg: test_classes_ext.Struct) -> bool'
+    assert t.none_2.__doc__ == 'none_2(arg: test_classes_ext.Struct) -> bool'
+    assert t.none_3.__doc__ == 'none_3(arg: Optional[test_classes_ext.Struct]) -> bool'
+    assert t.none_4.__doc__ == 'none_4(arg: Optional[test_classes_ext.Struct]) -> bool'

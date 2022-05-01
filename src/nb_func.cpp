@@ -259,6 +259,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
             arg_data &a = fc->args[i];
             if (a.name)
                 a.name_py = PyUnicode_InternFromString(a.name);
+            else
+                a.name_py = nullptr;
             Py_XINCREF(a.value);
         }
     }

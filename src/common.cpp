@@ -189,7 +189,7 @@ PyObject *obj_repr(PyObject *o) {
     return res;
 }
 
-bool obj_compare(PyObject *a, PyObject *b, int value) {
+bool obj_comp(PyObject *a, PyObject *b, int value) {
     int rv = PyObject_RichCompareBool(a, b, value);
     if (rv == -1)
         raise_python_error();

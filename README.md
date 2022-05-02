@@ -429,6 +429,34 @@ changes are detailed below.
       .def(nb::init_implicit<MyOtherType>());
   ```
 
+- **Custom constructors**: In _pybind11_, custom constructors (i.e. ones that
+  do not already exist in the C++ class) could be specified as lambda function
+  returning an instance of the desired type.
+
+  ```
+  nb::class_<MyType>(m, "MyType")
+      .def(nb::init([](int) { return MyType(...); }));
+
+  ```
+
+  Unfortunately, the implementation of this feature was quite complex and often
+  required involved further internal calls to the move or copy constructor.
+  *nanobind* instead reverts to how pybind11 originally implemented this
+  feature using in-place construction ("[placement
+  new](https://en.wikipedia.org/wiki/Placement_syntax)"):
+
+  ```
+  nb::class_<MyType>(m, "MyType")
+      .def("__init__", [](MyType *t) { new (t) MyType(...); });
+  ```
+
+  The provided lambda function will be called with a pointer to uninitialized
+  memory that has already been allocated (this memory region is co-located with
+  the Python object for reasons of efficiency). The lambda function can then
+  either run an in-place constructor and return normally (in which case the
+  instance is assumed to be correctly constructed) or fail by raising an
+  exception.
+
 - **Trampoline classes.** Trampolines, i.e., polymorphic class implementations
   that forward virtual function calls to Python, now require an extra
   `NB_TRAMPOLINE(parent, size)` declaration, where `parent` refers to the

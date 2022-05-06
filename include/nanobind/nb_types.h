@@ -200,6 +200,7 @@ template <typename T> class handle_of : public handle {
 public:
     using handle::handle;
     using handle::operator=;
+    handle_of(const handle &h) : handle(h) { }
 };
 
 template <typename T> NB_INLINE T borrow(handle h) {

@@ -534,6 +534,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
             fail("nanobind::detail::keep_alive(): could not create a weak "
                  "reference! Likely, the 'nurse' argument you specified is not "
                  "a weak-referenceable type!");
+
         // Increase patient reference count, leak weak reference
         Py_INCREF(patient);
         Py_DECREF(callback);
@@ -548,14 +549,18 @@ void keep_alive(PyObject *nurse, void *payload,
     PyTypeObject *metaclass = Py_TYPE(Py_TYPE(nurse));
 
     internals &internals = internals_get();
-    if (metaclass != internals.nb_type && metaclass != internals.nb_enum)
-        fail("keep_alive(): expected a nb_type 'nurse' argument");
 
-    keep_alive_set &keep_alive = internals.keep_alive[nurse];
-    auto [it, success] = keep_alive.emplace(payload, callback);
-    if (!success)
-        raise("keep_alive(): the given 'payload' pointer was already registered!");
-    ((nb_inst *) nurse)->clear_keep_alive = true;
+    if (metaclass == internals.nb_type || metaclass == internals.nb_enum) {
+        keep_alive_set &keep_alive = internals.keep_alive[nurse];
+        auto [it, success] = keep_alive.emplace(payload, callback);
+        if (!success)
+            raise("keep_alive(): the given 'payload' pointer was already registered!");
+        ((nb_inst *) nurse)->clear_keep_alive = true;
+    } else {
+        PyObject *patient = capsule_new(payload, callback);
+        keep_alive(nurse, patient);
+        Py_DECREF(patient);
+    }
 }
 
 PyObject *nb_type_put(const std::type_info *cpp_type, void *value,

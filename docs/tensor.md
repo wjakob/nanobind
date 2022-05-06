@@ -220,7 +220,7 @@ m.def("ret_pytorch", []() {
     size_t shape[2] = { 2, 4 };
 
     // Delete 'data' when the 'owner' capsule expires
-    nb::capsule owner(data, [](void *p) {
+    nb::capsule owner(data, [](void *p) noexcept {
        delete[] (float *) p;
     });
 

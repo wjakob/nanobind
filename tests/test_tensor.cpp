@@ -91,7 +91,7 @@ NB_MODULE(test_tensor_ext, m) {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };
 
-        nb::capsule deleter(f, [](void *data) {
+        nb::capsule deleter(f, [](void *data) noexcept {
             destruct_count++;
             delete[] (float *) data;
         });
@@ -104,7 +104,7 @@ NB_MODULE(test_tensor_ext, m) {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };
 
-        nb::capsule deleter(f, [](void *data) {
+        nb::capsule deleter(f, [](void *data) noexcept {
             destruct_count++;
             delete[] (float *) data;
         });
@@ -117,7 +117,7 @@ NB_MODULE(test_tensor_ext, m) {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };
 
-        nb::capsule deleter(f, [](void *data) {
+        nb::capsule deleter(f, [](void *data) noexcept {
            destruct_count++;
            delete[] (float *) data;
         });

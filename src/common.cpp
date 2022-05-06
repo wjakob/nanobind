@@ -68,7 +68,7 @@ void fail(const char *fmt, ...) noexcept {
     abort();
 }
 
-PyObject *capsule_new(const void *ptr, void (*free)(void *)) noexcept {
+PyObject *capsule_new(const void *ptr, void (*free)(void *) noexcept) noexcept {
     auto capsule_free = [](PyObject *o) {
         auto free_2 = (void (*)(void *))(PyCapsule_GetContext(o));
         if (free_2)

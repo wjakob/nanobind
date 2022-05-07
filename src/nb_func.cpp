@@ -819,14 +819,23 @@ static void nb_func_render_signature(const func_record *f) noexcept {
                         buf.put(']');
 
                     if (f->args[arg_index].value) {
-                        PyObject *str = PyObject_Str(f->args[arg_index].value);
+                        PyObject *o = f->args[arg_index].value;
+                        PyObject *str = PyObject_Str(o);
+                        bool is_str = PyUnicode_Check(o);
+
                         if (str) {
                             Py_ssize_t size = 0;
                             const char *cstr =
                                 PyUnicode_AsUTF8AndSize(str, &size);
-                            if (cstr) {
+                            if (!cstr) {
+                                PyErr_Clear();
+                            } else {
                                 buf.put(" = ");
+                                if (is_str)
+                                    buf.put('\'');
                                 buf.put(cstr, (size_t) size);
+                                if (is_str)
+                                    buf.put('\'');
                             }
                             Py_DECREF(str);
                         } else {

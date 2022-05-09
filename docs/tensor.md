@@ -208,6 +208,10 @@ tensor(void *value,
        int32_t device_id = 0) { .. }
 ```
 
+If no `strides` parameter is provided, the implementation will assume a C-style
+ordering. Both `strides` and `shape` will be copied by the constructor, hence
+the targets of these pointers don't need to remain valid following the call.
+
 The `owner` parameter can be used to keep another Python object alive while
 the tensor data is referenced by a consumer. This mechanism can be used to
 implement a data destructor as follows:

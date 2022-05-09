@@ -325,6 +325,13 @@ class sequence : public object {
     NB_OBJECT_DEFAULT(sequence, object, "Sequence", PySequence_Check)
 };
 
+class mapping : public object {
+    NB_OBJECT_DEFAULT(mapping, object, "Mapping", PyMapping_Check)
+    list keys() const { return steal<list>(PyMapping_Keys(m_ptr)); }
+    list values() const { return steal<list>(PyMapping_Values(m_ptr)); }
+    list items() const { return steal<list>(PyMapping_Items(m_ptr)); }
+};
+
 class args : public tuple {
     NB_OBJECT_DEFAULT(args, tuple, "tuple", PyTuple_Check)
 };

@@ -292,7 +292,8 @@ struct type_caster : type_caster_base<Type> { };
 
 NAMESPACE_END(detail)
 
-template <typename T, typename Derived> T cast(const detail::api<Derived> &value) {
+template <typename T, typename Derived>
+T cast(const detail::api<Derived> &value, bool convert = true) {
     if constexpr (std::is_same_v<T, void>) {
         return;
     } else {
@@ -301,7 +302,8 @@ template <typename T, typename Derived> T cast(const detail::api<Derived> &value
 
         Caster caster;
         if (!caster.from_python(value.derived().ptr(),
-                                (uint8_t) detail::cast_flags::convert, nullptr))
+                                convert ? (uint8_t) detail::cast_flags::convert
+                                        : (uint8_t) 0, nullptr))
             detail::raise("nanobind::cast(...): conversion failed!");
 
         static_assert(

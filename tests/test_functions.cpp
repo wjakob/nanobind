@@ -135,4 +135,5 @@ NB_MODULE(test_functions_ext, m) {
     // Test string caster
     m.def("test_12", [](const char *c) { return nb::str(c); });
     m.def("test_13", []() -> const char * { return "test"; });
+    m.def("test_14", [](nb::object o) -> const char * { return nb::cast<const char *>(o); });
 }

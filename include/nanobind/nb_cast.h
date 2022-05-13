@@ -287,14 +287,18 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
                                         : (uint8_t) 0, nullptr))
             detail::raise("nanobind::cast(...): conversion failed!");
 
-        static_assert(
-            !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::IsClass,
-            "nanobind::cast(): cannot return a reference to a temporary.");
+        if constexpr (std::is_same_v<T, const char *>) {
+            return caster.operator const char *();
+        } else {
+            static_assert(
+                !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::IsClass,
+                "nanobind::cast(): cannot return a reference to a temporary.");
 
-        if constexpr (detail::is_pointer_v<T>)
-            return caster.operator Ti*();
-        else
-            return caster.operator Ti&();
+            if constexpr (detail::is_pointer_v<T>)
+                return caster.operator Ti*();
+            else
+                return caster.operator Ti&();
+        }
     }
 }
 

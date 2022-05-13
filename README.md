@@ -562,11 +562,17 @@ changes are detailed below.
     Details on using this feature can be found
     [here](https://github.com/wjakob/nanobind/blob/master/docs/lowlevel.md).
 
-  - **Python type wrappers**: The `nb::handle_of<T>` type behaves just like the
+  - **Python type wrappers**: The `nb::handle_t<T>` type behaves just like the
     `nb::handle` class and wraps a `PyObject *` pointer. However, when binding
     a function that takes such an argument, _nanobind_ will only call the
     associated function overload when the underlying Python object wraps a C++
     instance of type `T`.
+
+    Siimlarly, the `nb::type_object_t<T>` type behaves just like the
+    `nb::type_object` class and wraps a `PyTypeObject *` pointer. However, when
+    binding a function that takes such an argument, _nanobind_ will only call
+    the associated function overload when the underlying Python type object is
+    a subtype of the C++ type `T`.
 
   - **Raw docstrings**: In cases where absolute control over docstrings is
     required (for example, so that complex cases can be parsed by a tool like

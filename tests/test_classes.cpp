@@ -355,10 +355,13 @@ NB_MODULE(test_classes_ext, m) {
         return std::make_pair(py_inst, py_inst_2);
     });
 
-    // test22_handle_of
-    m.def("test_handle_of", [](nb::handle_of<Struct> h) { return borrow(h); });
+    // test22_handle_t
+    m.def("test_handle_t", [](nb::handle_t<Struct> h) { return borrow(h); });
 
-    // test23_none_arg
+    // test23_type_object_t
+    m.def("test_type_object_t", [](nb::type_object_t<Struct> h) -> nb::object { return h; });
+
+    // test24_none_arg
     m.def("none_0", [](Struct *s) { return s == nullptr; });
     m.def("none_1", [](Struct *s) { return s == nullptr; }, nb::arg());
     m.def("none_2", [](Struct *s) { return s == nullptr; }, nb::arg("arg"));

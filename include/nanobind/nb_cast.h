@@ -40,8 +40,6 @@ enum cast_flags : uint8_t {
     construct = (1 << 1)
 };
 
-template <typename T, typename SFINAE = int> struct type_caster;
-template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 template <typename T> using cast_t = typename make_caster<T>::template Cast<T>;
 
 template <typename T>
@@ -194,28 +192,11 @@ public:
         if (!isinstance<T>(src))
             return false;
 
-        if constexpr (std::is_same_v<T, handle>)
-            value = src;
-        else
+        if constexpr (std::is_base_of_v<object, T>)
             value = borrow<T>(src);
+        else
+            value = src;
 
-        return true;
-    }
-
-    static handle from_cpp(const handle &src, rv_policy,
-                           cleanup_list *) noexcept {
-        return src.inc_ref();
-    }
-};
-
-template <typename T> struct type_caster<handle_of<T>, enable_if_t<std::is_base_of_v<detail::api_tag, handle_of<T>>>> {
-public:
-    NB_TYPE_CASTER(handle_of<T>, make_caster<T>::Name)
-
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
-        if (!isinstance<T>(src))
-            return false;
-        value = src;
         return true;
     }
 

@@ -55,6 +55,9 @@ template <typename T = object> T steal(handle h);
 
 NAMESPACE_BEGIN(detail)
 
+template <typename T, typename SFINAE = int> struct type_caster;
+template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
+
 template <typename Impl> class accessor;
 struct str_attr; struct obj_attr;
 struct str_item; struct obj_item; struct num_item;
@@ -194,13 +197,6 @@ public:
         temp.dec_ref();
         return *this;
     }
-};
-
-template <typename T> class handle_of : public handle {
-public:
-    using handle::handle;
-    using handle::operator=;
-    handle_of(const handle &h) : handle(h) { }
 };
 
 template <typename T> NB_INLINE T borrow(handle h) {
@@ -377,7 +373,6 @@ private:
     mutable object m_value;
 };
 
-
 template <typename T>
 NB_INLINE bool isinstance(handle obj) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
@@ -411,6 +406,34 @@ inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 inline iterator iter(handle h) {
     return steal<iterator>(detail::obj_iter(h.ptr()));
 }
+
+template <typename T> class handle_t : public handle {
+public:
+    static constexpr auto Name = detail::make_caster<T>::Name;
+
+    using handle::handle;
+    using handle::operator=;
+    handle_t(const handle &h) : handle(h) { }
+
+    static bool check_(handle h) { return isinstance<T>(h); }
+};
+
+template <typename T> class type_object_t : public type_object {
+public:
+    static constexpr auto Name = detail::const_name("type[") +
+                                 detail::make_caster<T>::Name +
+                                 detail::const_name("]");
+
+    using type_object::type_object;
+    using type_object::operator=;
+
+    static bool check_(handle h) {
+        return PyType_Check(h.ptr()) &&
+               PyType_IsSubtype((PyTypeObject *) h.ptr(),
+                                (PyTypeObject *) nanobind::type<T>().ptr());
+    }
+};
+
 
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() const {

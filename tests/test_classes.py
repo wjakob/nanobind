@@ -423,21 +423,33 @@ def test21_low_level(clean):
     )
 
 
-def test22_handle_of(clean):
-    assert t.test_handle_of.__doc__ == 'test_handle_of(arg: test_classes_ext.Struct, /) -> object'
-    s = t.test_handle_of(t.Struct(5))
+def test22_handle_t(clean):
+    assert t.test_handle_t.__doc__ == 'test_handle_t(arg: test_classes_ext.Struct, /) -> object'
+    s = t.test_handle_t(t.Struct(5))
     assert s.value() == 5
     del s
 
     with pytest.raises(TypeError) as excinfo:
-        t.test_handle_of("test")
+        t.test_handle_t("test")
     assert "incompatible function argument" in str(excinfo.value)
     assert_stats(
         value_constructed=1,
         destructed=1
     )
 
-def test23_none_arg():
+
+def test23_type_object_t(clean):
+    assert t.test_type_object_t.__doc__ == 'test_type_object_t(arg: type[test_classes_ext.Struct], /) -> object'
+    assert t.test_type_object_t(t.Struct) is t.Struct
+
+    with pytest.raises(TypeError):
+        t.test_type_object_t(t.Struct())
+
+    with pytest.raises(TypeError):
+        t.test_type_object_t(int)
+
+
+def test24_none_arg():
     with pytest.raises(TypeError):
         t.none_0(None)
     with pytest.raises(TypeError):

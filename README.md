@@ -126,67 +126,16 @@ automatically via [GitHub Actions](https://github.com/features/actions).
 _nanobind_ and _pybind11_ are the most similar of all of the binding tools
 compared above.
 
-The main difference is between them is largely philosophical: _pybind11_ must
+The main difference is between them is a change in philosophy: _pybind11_ must
 deal with *all of C++* to bind complex legacy codebases, while _nanobind_
 targets a smaller C++ subset. **The codebase has to adapt to the binding tool
-and not the other way around!** This change of perspective allows _nanobind_ to
-be simpler and faster. Pull requests with extensions and generalizations were
-welcomed in _pybind11_, but they will likely be rejected in this project.
+and not the other way around!**, which allows _nanobind_ to be simpler and
+faster. Pull requests with extensions and generalizations were welcomed in
+_pybind11_, but they will likely be rejected in this project.
 
-### Removed features
-
-A number of _pybind11_ features are unavailable in _nanobind_. The list below
-uses the following symbols:
-
-- ○: This removal is a design choice. Use _pybind11_ if you need this feature.
-- ●: This feature will likely be added at some point; your help is welcomed.
-- ◑: Unclear, to be discussed.
-
-Removed features include:
-
-- ○ Multiple inheritance was a persistent source of complexity in _pybind11_,
-  and it is one of the main casualties in creating _nanobind_. C++ classes
-  involving multiple inheritance cannot be mapped onto an equivalent Python
-  class hierarchy.
-- ○ _nanobind_ instances co-locate instance data with a Python object instead
-  of accessing it via a _holder_ type. This is a major difference compared to
-  _pybind11_, which has implications on object ownership. Shared/unique
-  pointers are still supported with some restrictions, see below for details.
-- ○ Binding does not support C++ classes with overloaded or deleted `operator
-  new` / `operator delete`.
-- ○ The ability to run several independent Python interpreters in the same
-  process is unsupported. (This would require TLS lookups for _nanobind_ data
-  structures, which is undesirable.)
-- ○ `kw_only` / `pos_only` argument annotations were removed.
-- ○ The `options` class for customizing docstring generation was removed.
-- ○ Workarounds for old/buggy/non-standard-compliant compilers are gone and
-  will not be reintroduced.
-- ○ Module-local types and exceptions are unsupported.
-- ○ Custom metaclasses are unsupported.
-- ● Many STL type caster have not yet been ported.
-- ● PyPy support is gone. (PyPy requires many workaround in _pybind11_ that
-  complicate the its internals. Making PyPy interoperate with _nanobind_ will
-  likely require changes to the PyPy CPython emulation layer.)
-- ◑ NumPy integration was replaced by a more general ``nb::tensor<>``
-  integration that supports CPU/GPU tensors produced by various frameworks
-  (NumPy, PyTorch, TensorFlow, JAX, ..).
-- ◑ Eigen integration was removed.
-- ◑ Buffer protocol functionality was removed.
-- ◑ Nested exceptions are not supported.
-- ◑ Features to facilitate pickling and unpickling were removed.
-- ◑ Support for embedding the interpreter and evaluating Python code
-    strings was removed.
-
-### Removed features
-
-Bullet points marked with ● or ◑ may be reintroduced eventually, but this will
-need to be done in a careful opt-in manner that does not affect code
-complexity, binary size, and compilation/runtime performance of basic bindings
-that don't depend on these features.
-
-### Optimizations
-
-Besides removing features, the rewrite was an opportunity to address
+An overview of removed features is provided in a [separate
+document](https://github.com/wjakob/nanobind/blob/master/docs/removed.md).
+Besides feature removal, the rewrite was also an opportunity to address
 long-standing performance issues in _pybind11_:
 
 - C++ objects are now co-located with the Python object whenever possible (less
@@ -273,81 +222,16 @@ _nanobind_ depends on recent versions of everything:
 
 ### CMake interface
 
-Note: for your convenience, a minimal example of a project with C++ bindings
-compiled using _nanobind_ and
-[`scikit-build`](https://scikit-build.readthedocs.io/en/latest/) is available
-in the [`nanobind_example`](https://github.com/wjakob/nanobind_example)
-repository. To set up a build system manually, read on:
+_nanobind_ integrates with CMake to simplify binding compilation. Please see
+the [separate
+writeup](https://github.com/wjakob/nanobind/blob/master/docs/cmake.md) for
+details.
 
-_nanobind_ provides a CMake convenience function that automates the process of
-building a python extension module. This works analogously to _pybind11_.
-Example:
-
-```cmake
-add_subdirectory(.. path to nanobind directory ..)
-nanobind_add_module(my_ext common.h source_1.cpp source_2.cpp)
-```
-
-The defaults chosen by this function are somewhat opinionated. In particular,
-it performs the following steps to produce efficient bindings.
-
-- In non-debug modes, it compiles with _size optimizations_ (i.e., `-Os`). This
-  is generally the mode that you will want to use for C++/Python bindings.
-  Switching to `-O3` would enable further optimizations like vectorization,
-  loop unrolling, etc., but these all increase compilation time and binary size
-  with no real benefit for bindings.
-
-  If your project contains portions that benefit from `-O3`-level
-  optimizations, then it's better to run two separate compilation steps.
-  An example is shown below:
-
-  ```cmake
-  # Compile project code with current optimization mode configured in CMake
-  add_library(example_lib STATIC source_1.cpp source_2.cpp)
-  # Need position independent code (-fPIC) to link into 'example_ext' below
-  set_target_properties(example_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-  # Compile extension module with size optimization and add 'example_lib'
-  nanobind_add_module(example_ext common.h source_1.cpp source_2.cpp)
-  target_link_libraries(example_ext PRIVATE example_lib)
-  ```
-
-  Size optimizations can be disabled by specifying the optional `NOMINSIZE`
-  argument, though doing so is not recommended.
-
-- `nanobind_add_module()` also disables stack-smashing protections (i.e., it
-  specifies `-fno-stack-protector` to Clang/GCC). Protecting against such
-  vulnerabilities in a Python VM seems futile, and it adds non-negligible extra
-  cost (+8% binary size in my benchmarks). This behavior can be disabled by
-  specifying the optional `PROTECT_STACK` flag. Either way, is not recommended
-  that you use _nanobind_ in a setting where it presents an attack surface.
-
-- In non-debug compilation modes, it strips internal symbol names from the
-  resulting binary, which leads to a substantial size reduction. This behavior
-  can be disabled using the optional `NOSTRIP` argument.
-
-- Link-time optimization (LTO) is _not active_ by default; benefits compared to
-  _pybind11_ are relatively low, and this tends to make linking a build
-  bottleneck. That said, the optional `LTO` argument can be specified to enable
-  LTO in non-debug modes.
-
-- The function also sets the target to C++17 mode (it's fine to manually
-  increase this later on, e.g., to C++20)
-
-- It appends the library suffix (e.g., `.cpython-39-darwin.so`) based on
-  information provided by CMake's `FindPython` module.
-
-- It statically or dynamically links against `libnanobind` depending on the
-  value of the `NB_SHARED` parameter of the CMake project. Note that
-  `NB_SHARED` is not an input of the `nanobind_add_module()` function. Rather,
-  it should be specified before including the `nanobind` CMake project:
-
-  ```cmake
-
-  set(NB_SHARED OFF CACHE INTERNAL "") # Request static compilation of libnanobind
-  add_subdirectory(.. path to nanobind directory ..)
-  nanobind_add_module(...)
-  ```
+The easiest way to get started is by cloning
+[`nanobind_example`](https://github.com/wjakob/nanobind_example), which is a
+minimal project with _nanobind_-based bindings compiled via CMake and
+[`scikit-build`](https://scikit-build.readthedocs.io/en/latest/). It also shows
+how to use GitHub Actions to deploy binary wheels for a variety of platforms.
 
 ### API differences
 

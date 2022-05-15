@@ -1,4 +1,4 @@
-# **Low-level instance interface**
+# Low-level instance interface
 
 _nanobind_ exposes a low-level interface to provide fine-grained control over
 the sequence of steps that instantiates a Python object wrapping a C++

@@ -16,6 +16,6 @@ __version__ = "0.0.5"
 
 __all__ = (
     "__version__",
-    "get_include",
-    "get_cmake_dir",
+    "include_dir",
+    "cmake_dir",
 )

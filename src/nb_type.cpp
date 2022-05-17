@@ -289,7 +289,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     PyTypeObject *type = &nbt->ht.ht_type;
 
     memcpy(&nbt->t, t, sizeof(type_data));
-    nbt->t.name = NB_STRDUP(t->name);
+    nbt->t.name = NB_STRDUP(PyUnicode_AsUTF8AndSize(fullname.ptr(), nullptr));
 
     nbt->ht.ht_name = name.release().ptr();
     nbt->ht.ht_qualname = qualname.release().ptr();

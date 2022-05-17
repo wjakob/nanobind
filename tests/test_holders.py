@@ -82,11 +82,11 @@ def test05_uniqueptr_from_cpp(clean):
     b = t.unique_from_cpp_2()
     wa = t.UniqueWrapper(a)
     wb = t.UniqueWrapper(b)
-    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'Example\'!'):
+    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'test_holders_ext.Example\'!'):
         with pytest.raises(TypeError) as excinfo:
             assert a.value == 1
         assert 'incompatible function arguments' in str(excinfo.value)
-    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'Example\'!'):
+    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'test_holders_ext.Example\'!'):
         with pytest.raises(TypeError) as excinfo:
             assert b.value == 2
         assert 'incompatible function arguments' in str(excinfo.value)
@@ -119,7 +119,7 @@ def test06_uniqueptr_from_py(clean):
         with pytest.raises(TypeError) as excinfo:
             wa = t.UniqueWrapper(a)
     wa = t.UniqueWrapper2(a)
-    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'Example\'!'):
+    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'test_holders_ext.Example\'!'):
         with pytest.raises(TypeError) as excinfo:
             assert a.value == 1
         assert 'incompatible function arguments' in str(excinfo.value)

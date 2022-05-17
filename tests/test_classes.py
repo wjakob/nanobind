@@ -256,7 +256,7 @@ def test13_implicitly_convertible():
         "get_d(): incompatible function arguments. The following argument types are supported:\n"
         "    1. get_d(arg: test_classes_ext.D, /) -> int\n"
         "\n"
-        "Invoked with types: C")
+        "Invoked with types: test_classes_ext.C")
     assert t.get_d(a) == 11
     assert t.get_d(b) == 102
     assert t.get_d(b2) == 103

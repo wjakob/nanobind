@@ -4,6 +4,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/pair.h>
 #include <memory>
+#include <cstring>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -69,7 +70,13 @@ struct StaticProperties {
     static int value;
 };
 
+struct StaticProperties2 : StaticProperties { };
+
 int StaticProperties::value = 23;
+
+static Py_ssize_t sq_length_dummy(PyObject *) {
+    return 123;
+}
 
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::make_unique<Struct>(12);
@@ -276,14 +283,16 @@ NB_MODULE(test_classes_ext, m) {
         .def_readwrite_static("value", &StaticProperties::value)
         .def_static("get", []{ return StaticProperties::value; } );
 
+    nb::class_<StaticProperties2, StaticProperties>(m, "StaticProperties2");
+
     // test19_supplement
     struct ClassWithSupplement { };
     struct Supplement {
         uint8_t data[0xFF];
     };
 
-    nb::class_<ClassWithSupplement> scls(m, "ClassWithSupplement", nb::supplement<Supplement>());
-    scls.def(nb::init<>());
+    auto scls = nb::class_<ClassWithSupplement>(m, "ClassWithSupplement", nb::supplement<Supplement>())
+        .def(nb::init<>());
 
     Supplement &supplement = nb::type_supplement<Supplement>(scls);
     for (uint8_t i = 0; i < 0xFF; ++i)
@@ -302,10 +311,8 @@ NB_MODULE(test_classes_ext, m) {
     });
 
     // test20_type_callback
-    auto callback = [](PyTypeObject *tp) noexcept {
-        tp->tp_as_sequence->sq_length = [](PyObject *) -> Py_ssize_t {
-            return 123;
-        };
+    auto callback = [](PyType_Slot **s) noexcept {
+        *(*s)++ = { Py_sq_length, (void *) sq_length_dummy };
     };
 
     struct ClassWithLen { };
@@ -367,4 +374,9 @@ NB_MODULE(test_classes_ext, m) {
     m.def("none_2", [](Struct *s) { return s == nullptr; }, nb::arg("arg"));
     m.def("none_3", [](Struct *s) { return s == nullptr; }, nb::arg().none());
     m.def("none_4", [](Struct *s) { return s == nullptr; }, nb::arg("arg").none());
+
+    // test25_is_final
+    struct FinalType { };
+    nb::class_<FinalType>(m, "FinalType", nb::is_final())
+        .def(nb::init<>());
 }

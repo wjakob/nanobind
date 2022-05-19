@@ -2,9 +2,9 @@ import test_enum_ext as t
 import pytest
 
 def test01_unsigned_enum():
-    assert repr(t.Enum.A) == 'Enum.A'
-    assert repr(t.Enum.B) == 'Enum.B'
-    assert repr(t.Enum.C) == 'Enum.C'
+    assert repr(t.Enum.A) == 'test_enum_ext.Enum.A'
+    assert repr(t.Enum.B) == 'test_enum_ext.Enum.B'
+    assert repr(t.Enum.C) == 'test_enum_ext.Enum.C'
     assert t.Enum.A.__name__ == 'A'
     assert t.Enum.B.__name__ == 'B'
     assert t.Enum.C.__name__ == 'C'
@@ -33,11 +33,15 @@ def test01_unsigned_enum():
         assert t.test_bad_tuple()
     assert 'nb_enum: could not find entry!' in str(excinfo.value)
 
+    with pytest.raises(RuntimeError) as excinfo:
+        t.Enum(0x123)
+    assert 'test_enum_ext.Enum(): could not convert the input into an enumeration value!' in str(excinfo.value)
+
 
 def test02_signed_enum():
-  assert repr(t.SEnum.A) == 'SEnum.A'
-  assert repr(t.SEnum.B) == 'SEnum.B'
-  assert repr(t.SEnum.C) == 'SEnum.C'
+  assert repr(t.SEnum.A) == 'test_enum_ext.SEnum.A'
+  assert repr(t.SEnum.B) == 'test_enum_ext.SEnum.B'
+  assert repr(t.SEnum.C) == 'test_enum_ext.SEnum.C'
   assert int(t.SEnum.A) == 0
   assert int(t.SEnum.B) == 1
   assert int(t.SEnum.C) == -1

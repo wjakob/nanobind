@@ -31,15 +31,14 @@ template <typename T>
 NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
     using D = std::decay_t<T>;
 
-    if constexpr (std::is_same_v<D, arg_v>) {
+    if constexpr (std::is_same_v<D, arg_v>)
         nkwargs++;
-    } else if constexpr (std::is_same_v<D, args_proxy>) {
+    else if constexpr (std::is_same_v<D, args_proxy>)
         nargs += len(value);
-    } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
+    else if constexpr (std::is_same_v<D, kwargs_proxy>)
         nkwargs += len(value);
-    } else {
+    else
         nargs += 1;
-    }
 
     (void) nargs; (void) nkwargs; (void) value;
 }
@@ -53,7 +52,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
 
     if constexpr (std::is_same_v<D, arg_v>) {
         args[kwargs_offset + nkwargs] = value.value.release().ptr();
-        PyTuple_SET_ITEM(kwnames, nkwargs++,
+        NB_TUPLE_SET_ITEM(kwnames, nkwargs++,
                          PyUnicode_InternFromString(value.name));
     } else if constexpr (std::is_same_v<D, args_proxy>) {
         for (size_t i = 0, l = len(value); i < l; ++i)
@@ -65,7 +64,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {
             Py_INCREF(key); Py_INCREF(entry);
             args[kwargs_offset + nkwargs] = entry;
-            PyTuple_SET_ITEM(kwnames, nkwargs++, key);
+            NB_TUPLE_SET_ITEM(kwnames, nkwargs++, key);
         }
     } else {
         args[nargs++] =
@@ -88,7 +87,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         args[0] = nullptr;                                                     \
         args_p = args + 1;                                                     \
     }                                                                          \
-    nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;                                   \
+    nargs |= NB_VECTORCALL_ARGUMENTS_OFFSET;                                   \
     return steal(obj_vectorcall(base, args_p, nargs, kwnames, method_call))
 
 template <typename Derived>

@@ -8,23 +8,10 @@
 */
 
 #include <nanobind/nanobind.h>
-#include "internals.h"
+#include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
-
-
-#if PY_VERSION_HEX < 0x03090000
-PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
-                               size_t nargsf, PyObject *kwnames) {
-    PyObject *obj = PyObject_GetAttr(args[0], name);
-    if (!obj)
-        return obj;
-    PyObject *result = NB_VECTORCALL(obj, args + 1, nargsf - 1, kwnames);
-    Py_DECREF(obj);
-    return result;
-}
-#endif
 
 
 #if defined(__GNUC__)
@@ -212,18 +199,64 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
     return res;
 }
 
+#if defined(Py_LIMITED_API)
+PyObject *_PyObject_Vectorcall(PyObject *base, PyObject *const *args,
+                               size_t nargsf, PyObject *kwnames) {
+    size_t nargs = NB_VECTORCALL_NARGS(nargsf);
+
+    PyObject *args_tuple = PyTuple_New(nargs);
+    if (!args_tuple)
+        return nullptr;
+
+    for (size_t i = 0; i < nargs; ++i) {
+        Py_INCREF(args[i]);
+        NB_TUPLE_SET_ITEM(args_tuple, i, args[i]);
+    }
+
+    PyObject *kwargs = nullptr;
+    if (kwnames) {
+        kwargs = PyDict_New();
+        if (!kwargs) {
+            Py_DECREF(args_tuple);
+            return nullptr;
+        }
+
+        for (size_t i = 0, l = NB_TUPLE_GET_SIZE(kwnames); i < l; ++i) {
+            PyObject *k = NB_TUPLE_GET_ITEM(kwnames, i),
+                     *v = args[i + nargs];
+            if (PyDict_SetItem(kwargs, k, v)) {
+                Py_DECREF(kwargs);
+                Py_DECREF(args_tuple);
+                return nullptr;
+            }
+
+        }
+    }
+
+    PyObject *res = PyObject_Call(base, args_tuple, kwargs);
+
+    Py_DECREF(args_tuple);
+    Py_XDECREF(kwargs);
+
+    return res;
+}
+#endif
+
+
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
     const char *error = nullptr;
     PyObject *res = nullptr;
 
     size_t nargs_total =
-        PyVectorcall_NARGS(nargsf) + (kwnames ? PyTuple_GET_SIZE(kwnames) : 0);
+        NB_VECTORCALL_NARGS(nargsf) + (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0);
 
+#if !defined(Py_LIMITED_API)
     if (!PyGILState_Check()) {
         error = "nanobind::detail::obj_vectorcall(): PyGILState_Check() failure." ;
         goto end;
     }
+#endif
 
     for (size_t i = 0; i < nargs_total; ++i) {
         if (!args[i]) {
@@ -232,8 +265,20 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
         }
     }
 
-    res = (method_call ? NB_VECTORCALL_METHOD
-                       : NB_VECTORCALL)(base, args, nargsf, kwnames);
+#if PY_VERSION_HEX < 0x03090000 || defined(Py_LIMITED_API)
+    if (method_call) {
+        PyObject *self = PyObject_GetAttr(args[0], /* name = */ base);
+        if (self) {
+            res = _PyObject_Vectorcall(self, args + 1, nargsf - 1, kwnames);
+            Py_DECREF(self);
+        }
+    } else {
+        res = _PyObject_Vectorcall(base, args, nargsf, kwnames);
+    }
+#else
+    res = (method_call ? PyObject_VectorcallMethod
+                       : PyObject_Vectorcall)(base, args, nargsf, kwnames);
+#endif
 
 end:
     for (size_t i = 0; i < nargs_total; ++i)
@@ -425,81 +470,176 @@ PyObject *str_from_cstr_and_size(const char *str, size_t size) {
 
 // ========================================================================
 
-PyObject **seq_get(PyObject *seq, size_t *size, PyObject **temp) noexcept {
+PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {
+    PyObject *temp = nullptr;
+    size_t size = 0;
+    PyObject **result = nullptr;
+
+    /* This function is used during overload resolution; if anything
+       goes wrong, it fails gracefully without reporting errors. Other
+       overloads will then be tried. */
+
+#if !defined(Py_LIMITED_API)
     if (PyTuple_CheckExact(seq)) {
-        PyTupleObject *tuple = (PyTupleObject *) seq;
-        *size = Py_SIZE(tuple);
-        *temp = nullptr;
-        return tuple->ob_item;
+        size = (size_t) PyTuple_GET_SIZE(seq);
+        result = ((PyTupleObject *) seq)->ob_item;
     } else if (PyList_CheckExact(seq)) {
-        PyListObject *list = (PyListObject *) seq;
-        *size = Py_SIZE(list);
-        *temp = nullptr;
-        return list->ob_item;
-    } else {
-        seq = PySequence_List(seq);
-        if (!seq) {
+        size = (size_t) PyList_GET_SIZE(seq);
+        result = ((PyListObject *) seq)->ob_item;
+    } else if (PySequence_Check(seq)) {
+        temp = PySequence_Fast(seq, "");
+
+        if (temp)
+            result = seq_get(temp, &size, temp_out);
+        else
             PyErr_Clear();
-            *size = 0;
-            *temp = nullptr;
-            return nullptr;
-        }
-        *temp = seq;
-        PyListObject *list = (PyListObject *) seq;
-        *size = Py_SIZE(list);
-        return list->ob_item;
     }
+#else
+    /* There isn't a nice way to get a PyObject** in Py_LIMITED_API. This
+       is going to be slow, but hopefully also very future-proof.. */
+    if (PySequence_Check(seq)) {
+        Py_ssize_t size_seq = PySequence_Length(seq);
+
+        if (size_seq >= 0) {
+            result = (PyObject **) PyObject_Malloc(sizeof(PyObject *) *
+                                                   (size_seq + 1));
+
+            if (result) {
+                result[size_seq] = nullptr;
+
+                for (Py_ssize_t i = 0; i < size_seq; ++i) {
+                    PyObject *o = PySequence_GetItem(seq, i);
+
+                    if (o) {
+                        result[i] = o;
+                    } else {
+                        for (Py_ssize_t j = 0; j < i; ++j)
+                            Py_DECREF(result[j]);
+
+                        PyObject_Free(result);
+                        result = nullptr;
+                        break;
+                    }
+                }
+            }
+
+            if (result) {
+                temp = PyCapsule_New(result, nullptr, [](PyObject *o) {
+                    PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
+                    for (size_t i = 0; ptr[i] != nullptr; ++i)
+                        Py_DECREF(ptr[i]);
+                    PyObject_Free(ptr);
+                });
+
+                if (temp) {
+                    size = (size_t) size_seq;
+                } else if (!temp) {
+                    PyErr_Clear();
+                    for (Py_ssize_t i = 0; i < size_seq; ++i)
+                        Py_DECREF(result[i]);
+
+                    PyObject_Free(result);
+                    result = nullptr;
+                }
+            }
+        } else if (size_seq < 0) {
+            PyErr_Clear();
+        }
+    }
+#endif
+
+    *temp_out = temp;
+    *size_out = size;
+    return result;
 }
 
 
 PyObject **seq_get_with_size(PyObject *seq, size_t size,
-                             PyObject **temp) noexcept {
-    *temp = nullptr;
+                             PyObject **temp_out) noexcept {
 
+    /* This function is used during overload resolution; if anything
+       goes wrong, it fails gracefully without reporting errors. Other
+       overloads will then be tried. */
+
+    PyObject *temp = nullptr,
+             **result = nullptr;
+
+#if !defined(Py_LIMITED_API)
     if (PyTuple_CheckExact(seq)) {
-        PyTupleObject *tuple = (PyTupleObject *) seq;
-        if (size != (size_t) Py_SIZE(tuple))
-            return nullptr;
-        return tuple->ob_item;
+        if (size == (size_t) PyTuple_GET_SIZE(seq))
+            result = ((PyTupleObject *) seq)->ob_item;
     } else if (PyList_CheckExact(seq)) {
-        PyListObject *list = (PyListObject *) seq;
-        if (size != (size_t) Py_SIZE(list))
-            return nullptr;
-        return list->ob_item;
-    } else {
-        PySequenceMethods *m = Py_TYPE(seq)->tp_as_sequence;
-        if (m && m->sq_length) {
-            Py_ssize_t len = m->sq_length(seq);
-            if (len < 0) {
-                PyErr_Clear();
-                return nullptr;
-            }
-            if (size != (size_t) len)
-                return nullptr;
-        }
+        if (size == (size_t) PyList_GET_SIZE(seq))
+            result = ((PyListObject *) seq)->ob_item;
+    } else if (PySequence_Check(seq)) {
+        temp = PySequence_Fast(seq, "");
 
-        seq = PySequence_List(seq);
-        if (!seq) {
+        if (temp)
+            result = seq_get_with_size(temp, size, temp_out);
+        else
             PyErr_Clear();
-            return nullptr;
-        }
-
-        PyListObject *list = (PyListObject *) seq;
-        if (size != (size_t) Py_SIZE(list)) {
-            Py_CLEAR(seq);
-            return nullptr;
-        }
-
-        *temp = seq;
-        return list->ob_item;
     }
+#else
+    /* There isn't a nice way to get a PyObject** in Py_LIMITED_API. This
+       is going to be slow, but hopefully also very future-proof.. */
+    if (PySequence_Check(seq)) {
+        Py_ssize_t size_seq = PySequence_Length(seq);
+
+        if (size == (size_t) size_seq) {
+            result =
+                (PyObject **) PyObject_Malloc(sizeof(PyObject *) * (size + 1));
+
+            if (result) {
+                result[size] = nullptr;
+
+                for (Py_ssize_t i = 0; i < size_seq; ++i) {
+                    PyObject *o = PySequence_GetItem(seq, i);
+
+                    if (o) {
+                        result[i] = o;
+                    } else {
+                        for (Py_ssize_t j = 0; j < i; ++j)
+                            Py_DECREF(result[j]);
+
+                        PyObject_Free(result);
+                        result = nullptr;
+                        break;
+                    }
+                }
+            }
+
+            if (result) {
+                temp = PyCapsule_New(result, nullptr, [](PyObject *o) {
+                    PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
+                    for (size_t i = 0; ptr[i] != nullptr; ++i)
+                        Py_DECREF(ptr[i]);
+                    PyObject_Free(ptr);
+                });
+
+                if (!temp) {
+                    PyErr_Clear();
+                    for (Py_ssize_t i = 0; i < size_seq; ++i)
+                        Py_DECREF(result[i]);
+
+                    PyObject_Free(result);
+                    result = nullptr;
+                }
+            }
+        } else if (size_seq < 0) {
+            PyErr_Clear();
+        }
+    }
+#endif
+
+    *temp_out = temp;
+    return result;
 }
 
 // ========================================================================
 
 void property_install(PyObject *scope, const char *name, bool is_static,
                       PyObject *getter, PyObject *setter) noexcept {
-    const internals &internals = internals_get();
+    const nb_internals &internals = internals_get();
     handle property = (PyObject *) (is_static ? internals.nb_static_property
                                               : &PyProperty_Type);
     (void) is_static;
@@ -507,8 +647,8 @@ void property_install(PyObject *scope, const char *name, bool is_static,
     object doc = none();
 
     if (m && (Py_TYPE(m) == internals.nb_func ||
-              Py_TYPE(m) == internals.nb_meth)) {
-        func_record *f = nb_func_get(m);
+              Py_TYPE(m) == internals.nb_method)) {
+        func_data *f = nb_func_data(m);
         if (f->flags & (uint32_t) func_flags::has_doc)
             doc = str(f->doc);
     }
@@ -525,7 +665,7 @@ void property_install(PyObject *scope, const char *name, bool is_static,
 
 void tuple_check(PyObject *tuple, size_t nargs) {
     for (size_t i = 0; i < nargs; ++i) {
-        if (!PyTuple_GET_ITEM(tuple, i))
+        if (!NB_TUPLE_GET_ITEM(tuple, i))
             raise("nanobind::detail::tuple_check(...): conversion of argument "
                   "%zu failed!", i + 1);
     }

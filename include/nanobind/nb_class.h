@@ -57,14 +57,19 @@ enum class type_flags : uint32_t {
     is_arithmetic            = (1 << 15),
 
     /// This type is an arithmetic enumeration
-    has_type_callback        = (1 << 16)
+    has_type_callback        = (1 << 16),
+
+    /// This type does not permit subclassing from Python
+    is_final                 = (1 << 17),
+
+    /// This type does not permit subclassing from Python
+    has_supplement           = (1 << 18)
 };
 
 struct type_data {
-    uint32_t size : 24;
+    uint32_t size;
     uint32_t align : 8;
-    uint32_t flags : 20;
-    uint32_t supplement : 12;
+    uint32_t flags : 24;
     const char *name;
     const char *doc;
     PyObject *scope;
@@ -77,10 +82,11 @@ struct type_data {
     void (*move)(void *, void *) noexcept;
     const std::type_info **implicit;
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
-    void (*type_callback)(PyTypeObject *) noexcept;
+    void (*type_callback)(PyType_Slot **) noexcept;
+    void *supplement;
 };
 
-static_assert(sizeof(type_data) == 8 + sizeof(void *) * 13);
+static_assert(sizeof(type_data) == 8 + sizeof(void *) * 14);
 
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
     t.flags |= (uint32_t) type_flags::has_base_py;
@@ -104,14 +110,20 @@ NB_INLINE void type_extra_apply(type_data &t, is_enum e) {
         t.flags |= (uint32_t) type_flags::is_unsigned_enum;
 }
 
+NB_INLINE void type_extra_apply(type_data &t, is_final) {
+    t.flags |= (uint32_t) type_flags::is_final;
+}
+
 NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
     t.flags |= (uint32_t) type_flags::is_arithmetic;
 }
 
 template <typename T>
 NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
-    static_assert(sizeof(T) <= 0xFF, "Supplement is too big!");
-    t.supplement += sizeof(T);
+    static_assert(std::is_trivially_default_constructible_v<T>,
+                  "The supplement type must be a POD (plain old data) type");
+    t.flags |= (uint32_t) type_flags::has_supplement;
+    t.supplement = (void *) malloc(sizeof(T));
 }
 
 template <typename... Args> struct init {

@@ -8,20 +8,19 @@
 */
 
 #include <nanobind/trampoline.h>
-#include "internals.h"
+#include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 void implicitly_convertible(const std::type_info *src,
                             const std::type_info *dst) noexcept {
-    internals &internals = internals_get();
+    nb_internals &internals = internals_get();
 
     auto it = internals.type_c2p.find(std::type_index(*dst));
     if (it == internals.type_c2p.end())
         fail("nanobind::detail::implicitly_convertible(src=%s, dst=%s): "
-             "destination type unknown!", type_name(src),
-             type_name(dst));
+             "destination type unknown!", type_name(src), type_name(dst));
 
     type_data *t = it->second;
     size_t size = 0;
@@ -47,7 +46,7 @@ void implicitly_convertible(const std::type_info *src,
 void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
                                               cleanup_list *),
                             const std::type_info *dst) noexcept {
-    internals &internals = internals_get();
+    nb_internals &internals = internals_get();
 
     auto it = internals.type_c2p.find(std::type_index(*dst));
     if (it == internals.type_c2p.end())

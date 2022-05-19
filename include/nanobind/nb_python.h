@@ -9,6 +9,7 @@
 */
 
 /// Include Python header, disable linking to pythonX_d.lib on Windows in debug mode
+
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  if defined(_DEBUG) && !defined(Py_DEBUG)
@@ -20,6 +21,7 @@
 #include <Python.h>
 #include <frameobject.h>
 #include <pythread.h>
+#include <structmember.h>
 
 /* Python #defines overrides on all sorts of core functions, which
    tends to weak havok in C++ codebases that expect these to work
@@ -57,4 +59,3 @@
 #if PY_VERSION_HEX < 0x03080000
 #  error The nanobind library requires Python 3.8 (or newer)
 #endif
-

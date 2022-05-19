@@ -318,7 +318,7 @@ tuple make_tuple(Args &&...args) {
     size_t nargs = 0;
     PyObject *o = result.ptr();
 
-    (PyTuple_SET_ITEM(o, nargs++,
+    (NB_TUPLE_SET_ITEM(o, nargs++,
                       detail::make_caster<Args>::from_cpp(
                           (detail::forward_t<Args>) args,
                           detail::infer_policy<Args>(policy), nullptr).ptr()),

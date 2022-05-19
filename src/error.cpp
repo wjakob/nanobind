@@ -57,6 +57,7 @@ const char *python_error::what() const noexcept {
     if (m_value.is_valid())
         buf.put_dstr(str(m_value).c_str());
 
+#if !defined(Py_LIMITED_API)
     if (m_trace.is_valid()) {
         PyTracebackObject *to = (PyTracebackObject *) m_trace.ptr();
 
@@ -65,6 +66,10 @@ const char *python_error::what() const noexcept {
             to = to->tb_next;
 
         PyFrameObject *frame = to->tb_frame;
+#if PY_VERSION_HEX >= 0x03090000
+        Py_XINCREF(frame);
+#endif
+
         buf.put("\n\nAt:\n");
         while (frame) {
 #if PY_VERSION_HEX >= 0x03090000
@@ -80,10 +85,17 @@ const char *python_error::what() const noexcept {
             buf.put_dstr(borrow<str>(f_code->co_name).c_str());
             buf.put('\n');
 
+#if PY_VERSION_HEX >= 0x03090000
+            PyFrameObject *frame_new = PyFrame_GetBack(frame);
+            Py_DECREF(frame);
+            frame = frame_new;
+#else
             frame = frame->f_back;
-            Py_DECREF(f_code);
+#endif
+           Py_DECREF(f_code);
         }
     }
+#endif
 
     m_what = buf.copy();
     return m_what;

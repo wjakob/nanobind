@@ -82,7 +82,11 @@ NB_MODULE(test_functions_ext, m) {
     m.def("call_guard_value", []() { return call_guard_value; });
 
     m.def("test_release_gil", []() -> bool {
+#if defined(Py_LIMITED_API)
+        return false;
+#else
         return PyGILState_Check();
+#endif
     }, nb::call_guard<nb::gil_scoped_release>());
 
     m.def("test_print", []{

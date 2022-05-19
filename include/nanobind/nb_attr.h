@@ -51,14 +51,16 @@ struct is_method {};
 struct is_implicit {};
 struct is_operator {};
 struct is_arithmetic {};
+struct is_final { };
 struct is_enum {
     bool is_signed;
 };
+
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
 struct type_callback {
-    type_callback(void (*value)(PyTypeObject *) noexcept) : value(value) {}
-    void (*value)(PyTypeObject *) noexcept;
+    type_callback(void (*value)(PyType_Slot **) noexcept) : value(value) {}
+    void (*value)(PyType_Slot **) noexcept;
 };
 struct raw_doc {
     const char *value;
@@ -94,7 +96,7 @@ enum class func_flags : uint32_t {
     is_implicit = (1 << 12),
     /// Is this function an arithmetic operator?
     is_operator = (1 << 13),
-    /// When the function is GCed, do we need to call func_data::free?
+    /// When the function is GCed, do we need to call func_data_prelim::free?
     has_free = (1 << 14),
     /// Should the func_new() call return a new reference?
     return_ref = (1 << 15),
@@ -110,7 +112,7 @@ struct arg_data {
     bool none;
 };
 
-template <size_t Size> struct func_data {
+template <size_t Size> struct func_data_prelim {
     // A small amount of space to capture data used by the function/closure
     void *capture[3];
 

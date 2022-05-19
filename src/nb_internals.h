@@ -4,10 +4,12 @@
 #elif defined(_MSC_VER)
 #  pragma warning(disable: 4127) // conditional expression is constant (in robin_*.h)
 #endif
+
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
 #include <typeindex>
+#include <cstring>
 
 #if defined(_MSC_VER)
 #  define NB_THREAD_LOCAL __declspec(thread)
@@ -19,24 +21,9 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-/// Metaclass of nb_type
-extern PyTypeObject nb_type_type;
-/// Metaclass of nb_enum
-extern PyTypeObject nb_enum_type;
-
-extern PyTypeObject nb_func_type;
-extern PyTypeObject nb_meth_type;
-extern PyTypeObject nb_tensor_type;
-
 /// Nanobind function metadata (overloads, etc.)
-struct func_record : func_data<0> {
+struct func_data : func_data_prelim<0> {
     arg_data *args;
-};
-
-/// Python object representing a bound C++ type
-struct nb_type {
-    PyHeapTypeObject ht;
-    type_data t;
 };
 
 /// Python object representing an instance of a bound C++ type
@@ -72,12 +59,31 @@ struct nb_inst { // usually: 24 bytes
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(void *));
 
+struct nb_enum_supplement {
+    PyObject *name;
+    const char *doc;
+};
+
 /// Python object representing a bound C++ function
 struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs_pos;
     bool complex_call;
+};
+
+/// Python object representing a `nb_tensor` (which wraps a DLPack tensor)
+struct nb_tensor {
+    PyObject_HEAD
+    PyObject *capsule;
+};
+
+/// Python object representing an `nb_method` bound to an instance (analogous to non-public PyMethod_Type)
+struct nb_bound_method {
+    PyObject_HEAD
+    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
+    nb_func *func;
+    PyObject *self;
 };
 
 /// Pointers require a good hash function to randomize the mapping to buckets
@@ -163,18 +169,22 @@ using py_map =
 using keep_alive_set =
     py_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
-struct internals {
+struct nb_internals {
     /// Registered metaclasses for nanobind classes and enumerations
     PyTypeObject *nb_type, *nb_enum;
 
     /// Types of nanobind functions and methods
-    PyTypeObject *nb_func, *nb_meth;
+    PyTypeObject *nb_func, *nb_method, *nb_bound_method;
 
     /// Property variant for static attributes
     PyTypeObject *nb_static_property;
+    bool nb_static_property_enabled;
 
     /// Tensor wrpaper
     PyTypeObject *nb_tensor;
+
+    /// Size fields of PyTypeObject
+    int type_basicsize, type_itemsize;
 
     /// Instance pointer -> Python object mapping
     py_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
@@ -200,19 +210,36 @@ struct current_method {
 
 extern NB_THREAD_LOCAL current_method current_method_data;
 
-extern internals &internals_get() noexcept;
+extern nb_internals &internals_get() noexcept;
 extern char *type_name(const std::type_info *t);
 
 // Forward declarations
 extern int nb_type_init(PyObject *, PyObject *, PyObject *);
 extern void nb_type_dealloc(PyObject *o);
 extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
-extern void nb_enum_prepare(PyTypeObject *tp, bool is_arithmetic);
+extern void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic);
+extern int nb_static_property_set(PyObject *, PyObject *, PyObject *);
 
 /// Fetch the nanobind function record from a 'nb_func' instance
-inline func_record *nb_func_get(void *o) {
-    return (func_record *) (((char *) o) + sizeof(nb_func));
+NB_INLINE func_data *nb_func_data(void *o) {
+    return (func_data *) (((char *) o) + sizeof(nb_func));
 }
+
+#if defined(Py_LIMITED_API)
+extern type_data *nb_type_data_static(PyTypeObject *o) noexcept;
+#endif
+
+/// Fetch the nanobind type record from a 'nb_type' instance
+NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
+    #if !defined(Py_LIMITED_API)
+        return (type_data *) (((char *) o) + sizeof(PyHeapTypeObject));
+    #else
+        return nb_type_data_static(o);
+    #endif
+}
+
+extern PyObject *nb_type_name(PyTypeObject *o) noexcept;
+inline PyObject *nb_inst_name(PyObject *o) noexcept { return nb_type_name(Py_TYPE(o)); }
 
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);
@@ -237,11 +264,6 @@ template <typename T> struct scoped_pymalloc {
 private:
     T *ptr{ nullptr };
 };
-
-#if PY_VERSION_HEX < 0x03090000
-extern PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
-                                      size_t nargsf, PyObject *kwnames);
-#endif
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

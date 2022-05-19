@@ -1,9 +1,39 @@
 import test_tensor_ext as t
-import numpy as np
 import pytest
 import warnings
 import gc
+import importlib
 
+try:
+    import numpy as np
+    def needs_numpy(x):
+        return x
+except:
+    needs_numpy = pytest.mark.skip(reason="NumPy is required")
+
+try:
+    import torch
+    def needs_torch(x):
+        return x
+except:
+    needs_torch = pytest.mark.skip(reason="PyTorch is required")
+
+try:
+    import tensorflow as tf
+    def needs_tensorflow(x):
+        return x
+except:
+    needs_tensorflow = pytest.mark.skip(reason="TensorFlow is required")
+
+try:
+    import jax.numpy as jnp
+    def needs_jax(x):
+        return x
+except:
+    needs_jax = pytest.mark.skip(reason="JAX is required")
+
+
+@needs_numpy
 def test01_metadata():
     a = np.zeros(shape=())
     assert t.get_shape(a) == []
@@ -37,6 +67,7 @@ def test02_docstr():
                                       "check_device(arg: tensor[device='cuda'], /) -> str")
 
 
+@needs_numpy
 def test03_constrain_dtype():
     a_u32 = np.array([1], dtype=np.uint32)
     a_f32 = np.array([1], dtype=np.float32)
@@ -53,6 +84,7 @@ def test03_constrain_dtype():
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
+@needs_numpy
 def test04_constrain_shape():
     t.pass_float32_shaped(np.zeros((3, 0, 4), dtype=np.float32))
     t.pass_float32_shaped(np.zeros((3, 5, 4), dtype=np.float32))
@@ -70,6 +102,7 @@ def test04_constrain_shape():
         t.pass_float32_shaped(np.zeros((3, 5, 4, 6), dtype=np.float32))
 
 
+@needs_numpy
 def test04_constrain_order():
     assert t.check_order(np.zeros((3, 5, 4, 6), order='C')) == 'C'
     assert t.check_order(np.zeros((3, 5, 4, 6), order='F')) == 'F'
@@ -77,23 +110,23 @@ def test04_constrain_order():
     assert t.check_order(np.zeros((3, 5, 4, 6), order='F')[:, 2, :, :]) == '?'
 
 
+@needs_jax
 def test05_constrain_order_jax():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            import jax
-            c = jax.numpy.zeros((3, 5))
+            c = jnp.zeros((3, 5))
         except:
             pytest.skip('jax is missing')
 
-    z = jax.numpy.zeros((3, 5, 4, 6))
+    z = jnp.zeros((3, 5, 4, 6))
     assert t.check_order(z) == 'C'
 
 
+@needs_torch
 @pytest.mark.filterwarnings
 def test06_constrain_order_pytorch():
     try:
-        import torch
         c = torch.zeros(3, 5)
         c.__dlpack__()
     except:
@@ -109,11 +142,11 @@ def test06_constrain_order_pytorch():
         assert t.check_device(torch.zeros(3, 5, device='cuda')) == 'cuda'
 
 
+@needs_tensorflow
 def test07_constrain_order_tensorflow():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            import tensorflow as tf
             c = tf.zeros((3, 5))
         except:
             pytest.skip('tensorflow is missing')
@@ -121,6 +154,7 @@ def test07_constrain_order_tensorflow():
     assert t.check_order(c) == 'C'
 
 
+@needs_numpy
 def test08_write_from_cpp():
     x = np.zeros(10, dtype=np.float32)
     t.initialize(x)
@@ -131,6 +165,7 @@ def test08_write_from_cpp():
     assert np.all(x == np.arange(30, dtype=np.float32).reshape(10, 3))
 
 
+@needs_numpy
 def test09_implicit_conversion():
     t.implicit(np.zeros((2, 2), dtype=np.uint32))
     t.implicit(np.zeros((2, 2, 10), dtype=np.float32)[:, :, 4])
@@ -143,11 +178,11 @@ def test09_implicit_conversion():
         t.noimplicit(np.zeros((2, 2, 10), dtype=np.float32)[:, :, 4])
 
 
+@needs_torch
 def test10_implicit_conversion_pytorch():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            import torch
             c = torch.zeros(3, 5)
             c.__dlpack__()
         except:
@@ -164,11 +199,11 @@ def test10_implicit_conversion_pytorch():
         t.noimplicit(torch.zeros(2, 2, 10, dtype=torch.float32)[:, :, 4])
 
 
+@needs_tensorflow
 def test11_implicit_conversion_tensorflow():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            import tensorflow as tf
             c = tf.zeros((3, 5))
         except:
             pytest.skip('tensorflow is missing')
@@ -181,11 +216,11 @@ def test11_implicit_conversion_tensorflow():
             t.noimplicit(tf.zeros((2, 2), dtype=tf.int32))
 
 
+@needs_jax
 def test12_implicit_conversion_jax():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            import jax.numpy as jnp
             c = jnp.zeros((3, 5))
         except:
             pytest.skip('jax is missing')
@@ -208,6 +243,7 @@ def test13_destroy_capsule():
     assert t.destruct_count() - dc == 1
 
 
+@needs_numpy
 def test14_consume_numpy():
     gc.collect()
     class wrapper:
@@ -215,7 +251,6 @@ def test14_consume_numpy():
             self.value = value
         def __dlpack__(self):
             return self.value
-    import numpy as np
     dc = t.destruct_count()
     a = t.return_dlpack()
     if hasattr(np, '_from_dlpack'):
@@ -235,6 +270,7 @@ def test14_consume_numpy():
     assert t.destruct_count() - dc == 1
 
 
+@needs_numpy
 def test15_passthrough():
     gc.collect()
     class wrapper:
@@ -242,7 +278,6 @@ def test15_passthrough():
             self.value = value
         def __dlpack__(self):
             return self.value
-    import numpy as np
     dc = t.destruct_count()
     a = t.return_dlpack()
     b = t.passthrough(a)
@@ -264,9 +299,9 @@ def test15_passthrough():
     assert t.destruct_count() - dc == 1
 
 
+@needs_numpy
 def test16_return_numpy():
     gc.collect()
-    import numpy as np
     dc = t.destruct_count()
     x = t.ret_numpy()
     assert x.shape == (2, 4)
@@ -276,14 +311,13 @@ def test16_return_numpy():
     assert t.destruct_count() - dc == 1
 
 
+@needs_torch
 def test17_return_pytorch():
     try:
-        import torch
         c = torch.zeros(3, 5)
     except:
         pytest.skip('pytorch is missing')
     gc.collect()
-    import numpy as np
     dc = t.destruct_count()
     x = t.ret_pytorch()
     assert x.shape == (2, 4)

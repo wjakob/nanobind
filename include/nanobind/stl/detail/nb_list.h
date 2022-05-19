@@ -52,7 +52,7 @@ template <typename Value_, typename Entry> struct list_caster {
                 handle h =
                     Caster::from_cpp(forward_like<T>(value), policy, cleanup);
 
-                PyList_SET_ITEM(list.ptr(), index++, h.ptr());
+                NB_LIST_SET_ITEM(list.ptr(), index++, h.ptr());
                 if (!h.is_valid())
                     return handle();
             }

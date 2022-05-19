@@ -1,6 +1,6 @@
 #include <nanobind/tensor.h>
 #include <atomic>
-#include "internals.h"
+#include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -22,29 +22,40 @@ struct tensor_handle {
     bool call_deleter;
 };
 
-struct nb_tensor {
-    PyObject_HEAD
-    PyObject *capsule;
-};
+PyObject *nb_tensor_new(PyTypeObject *tp, PyObject *args,
+                        PyObject *kwargs) {
 
-static PyObject *nb_tensor_new(PyTypeObject *subtype, PyObject *args,
-                               PyObject *kwargs) {
-    PyObject* result = subtype->tp_alloc(subtype,0);
-    if (PyTuple_GET_SIZE(args) != 1 || kwargs)
+    allocfunc tp_alloc;
+#if defined(Py_LIMITED_API)
+    tp_alloc = (allocfunc) PyType_GetSlot(tp, Py_tp_alloc);
+#else
+    tp_alloc = tp->tp_alloc;
+#endif
+
+    PyObject* result = tp_alloc(tp, 0);
+    if (NB_TUPLE_GET_SIZE(args) != 1 || kwargs)
         fail("nanobind::detail::nb_tensor_new(): internal error!");
 
-    PyObject *capsule = PyTuple_GET_ITEM(args, 0);
+    PyObject *capsule = NB_TUPLE_GET_ITEM(args, 0);
     ((nb_tensor *) result)->capsule = capsule;
     Py_INCREF(capsule);
     return result;
 }
 
-static void nb_tensor_dealloc(PyObject *self) {
+void nb_tensor_dealloc(PyObject *self) {
     Py_DECREF(((nb_tensor *) self)->capsule);
-    Py_TYPE(self)->tp_free(self);
+
+    freefunc tp_free;
+#if defined(Py_LIMITED_API)
+    tp_free = (freefunc) PyType_GetSlot(Py_TYPE(self), Py_tp_free);
+#else
+    tp_free = Py_TYPE(self)->tp_free;
+#endif
+
+    tp_free(self);
 }
 
-static PyObject *nb_tensor_get(PyObject *self, PyObject *) {
+PyObject *nb_tensor_get(PyObject *self, PyObject *) {
     PyObject *result = ((nb_tensor *) self)->capsule;
     Py_INCREF(result);
     return result;
@@ -133,26 +144,6 @@ void nb_tensor_releasebuffer(PyObject *, Py_buffer *view) {
     PyMem_Free(view->shape);
     PyMem_Free(view->strides);
 }
-
-static PyMethodDef nb_tensor_methods[] = {
-    { "__dlpack__", (PyCFunction) nb_tensor_get, METH_NOARGS, nullptr },
-    { nullptr, nullptr, 0, nullptr}
-};
-
-static PyBufferProcs nb_tensor_as_buffer = {
-    .bf_getbuffer = nb_tensor_getbuffer,
-    .bf_releasebuffer = nb_tensor_releasebuffer
-};
-
-PyTypeObject nb_tensor_type = {
-    .tp_name = "nb_tensor",
-    .tp_basicsize = sizeof(nb_tensor),
-    .tp_dealloc = nb_tensor_dealloc,
-    .tp_as_buffer = &nb_tensor_as_buffer,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_methods = nb_tensor_methods,
-    .tp_new = nb_tensor_new
-};
 
 static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
     scoped_pymalloc<Py_buffer> view;
@@ -273,10 +264,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
 
     // If this is not a capsule, try calling o.__dlpack__()
     if (!PyCapsule_CheckExact(o)) {
-        str name("__dlpack__");
-        PyObject *args[1] = { o };
-        capsule = steal(NB_VECTORCALL_METHOD(
-            name.ptr(), args, 1 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr));
+        capsule = steal(PyObject_CallMethod(o, "__dlpack__", nullptr));
 
         if (!capsule.is_valid()) {
             PyErr_Clear();
@@ -381,8 +369,8 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
     if (pass_device && pass_shape && (!pass_dtype || !pass_order) && convert &&
         capsule.ptr() != o) {
         PyTypeObject *tp = Py_TYPE(o);
-        const char *module_name =
-            borrow<str>(handle(tp).attr("__module__")).c_str();
+        str module_name_o = borrow<str>(handle(tp).attr("__module__"));
+        const char *module_name = module_name_o.c_str();
 
         char order = 'K';
         if (req->req_order != '\0')
@@ -404,14 +392,9 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
 
         object converted;
         try {
-            if (strcmp(tp->tp_name, "numpy.ndarray") == 0) {
-                converted = handle(o).attr("astype")(
-                    dtype,
-                    order
-                );
-            }
-
-            if (strcmp(module_name, "torch") == 0) {
+            if (strcmp(module_name, "numpy") == 0) {
+                converted = handle(o).attr("astype")(dtype, order);
+            } else if (strcmp(module_name, "torch") == 0) {
                 converted = handle(o).attr("to")(
                     arg("dtype") = module_::import_("torch").attr(dtype),
                     arg("copy") = true
@@ -576,7 +559,7 @@ PyObject *tensor_wrap(tensor_handle *th, int framework) noexcept {
 
         case tensor_framework::numpy:
             package = module_::import_("numpy");
-            o = handle(&nb_tensor_type)(o);
+            o = handle(internals_get().nb_tensor)(o);
             break;
 
         case tensor_framework::pytorch:

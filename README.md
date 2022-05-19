@@ -142,16 +142,21 @@ long-standing performance issues in _pybind11_:
   pointer chasing compared to _pybind11_). The per-instance overhead for
   wrapping a C++ type into a Python object shrinks by 2.3x. (_pybind11_: 56
   bytes, _nanobind_: 24 bytes.)
+
 - C++ function binding information is now co-located with the Python function
   object (less pointer chasing).
+
 - C++ type binding information is now co-located with the Python type object
   (less pointer chasing, fewer hashtable lookups).
+
 - _nanobind_ internally replaces `std::unordered_map` with a more efficient
   hash table ([tsl::robin_map](https://github.com/Tessil/robin-map), which is
   included as a git submodule).
+
 - function calls from/to Python are realized using [PEP 590 vector
   calls](https://www.python.org/dev/peps/pep-0590), which gives a nice speed
   boost. The main function dispatch loop no longer allocates heap memory.
+
 - _pybind11_ was designed as a header-only library, which is generally a good
   thing because it simplifies the compilation workflow. However, one major
   downside of this is that a large amount of redundant code has to be compiled
@@ -160,15 +165,18 @@ long-standing performance issues in _pybind11_:
   support library (`libnanobind`) and links it against the binding code to
   avoid redundant compilation. When using the CMake `nanobind_add_module()`
   function, this all happens transparently.
+
 - `#include <pybind11/pybind11.h>` pulls in a large portion of the STL (about
   2.1 MiB of headers with Clang and libc++). _nanobind_ minimizes STL usage to
   avoid this problem. Type casters even for for basic types like `std::string`
   require an explicit opt-in by including an extra header file (e.g. `#include
   <nanobind/stl/string.h>`).
+
 - _pybind11_ is dependent on *link time optimization* (LTO) to produce
   reasonably-sized bindings, which makes linking a build time bottleneck. With
   _nanobind_'s split into a precompiled core library and minimal
   metatemplating, LTO is no longer important.
+
 - _nanobind_ maintains efficient internal data structures for lifetime
   management (needed for `nb::keep_alive`, `nb::rv_policy::reference_internal`,
   the `std::shared_ptr` interface, etc.). With these changes, it is no longer
@@ -179,6 +187,18 @@ long-standing performance issues in _pybind11_:
 
 Besides performance improvements, _nanobind_ includes a quality-of-live
 improvements for developers:
+
+- _nanobind_ has [greatly
+  improved](https://github.com/wjakob/nanobind/blob/master/docs/tensor.md)
+  support for exchanging CPU/GPU/TPU/.. tensor data structures with modern
+  array programming frameworks.
+
+- _nanobind_ can target Python's [stable ABI
+  interface](https://docs.python.org/3/c-api/stable.html) starting with Python
+  3.12. This means that extension modules will eventually be compatible with
+  any future version of Python without having to compile separate binaries per
+  version. That vision is still far out, however: it will require Python 3.12+
+  to be widely deployed.
 
 - When the python interpreter shuts down, _nanobind_ reports instance, type,
   and function leaks related to bindings, which is useful for tracking down
@@ -194,11 +214,6 @@ improvements for developers:
 
 - _nanobind_ docstrings have improved out-of-the-box compatibility with tools
   like [Sphinx](https://www.sphinx-doc.org/en/master/).
-
-- _nanobind_ has [greatly
-  improved](https://github.com/wjakob/nanobind/blob/master/docs/tensor.md)
-  support for exchanging tensor data structures with modern array programming
-  frameworks.
 
 ### Dependencies
 
@@ -419,11 +434,10 @@ changes are detailed below.
 
 
   - **Supplemental type data**: _nanobind_ can store supplemental data along
-    with registered types. This information is co-located with the Python type
-    object. An example use of this fairly advanced feature are libraries that
-    register large numbers of different types (e.g. flavors of tensors). A
-    single generically implemented function can then query this supplemental
-    information to handle each type slightly differently.
+    with registered types. An example use of this fairly advanced feature are
+    libraries that register large numbers of different types (e.g. flavors of
+    tensors). A single generically implemented function can then query this
+    supplemental information to handle each type slightly differently.
 
     ```cpp
     struct Supplement {
@@ -431,11 +445,14 @@ changes are detailed below.
     };
 
     // Register a new type Test, and reserve space for sizeof(Supplement)
-    nb::class_<Test> cls(m, "Test", nb::supplement<Supplement>())
+    nb::class_<Test> cls(m, "Test", nb::supplement<Supplement>(), nb::is_final())
 
     /// Mutable reference to 'Supplement' portion in Python type object
     Supplement &supplement = nb::type_supplement<Supplement>(cls);
     ```
+
+    The supplement is not propagated to subclasses created within Python.
+    Such types should therefore be created with `nb::is_final()`.
 
   - **Low-level interface**: _nanobind_ exposes a low-level interface to
     provide fine-grained control over the sequence of steps that instantiates a

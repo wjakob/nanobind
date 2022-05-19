@@ -59,6 +59,13 @@ it performs the following steps to produce efficient bindings.
 - It appends the library suffix (e.g., `.cpython-39-darwin.so`) based on
   information provided by CMake's `FindPython` module.
 
+- When requested via the optional `STABLE_ABI` parameter, and when your
+  version of Python is sufficiently recent (3.12 +), the implementation
+  will build a [stable ABI](https://docs.python.org/3/c-api/stable.html)
+  extension module with a different suffix (e.g., `.abi3.so`). This comes at a
+  performance cost since _nanobind_ can no longer access the internals of
+  various data structures directly.
+
 - It statically or dynamically links against `libnanobind` depending on the
   value of the `NB_SHARED` parameter of the CMake project. Note that
   `NB_SHARED` is not an input of the `nanobind_add_module()` function. Rather,

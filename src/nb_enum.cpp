@@ -8,45 +8,27 @@
 */
 
 #include <nanobind/nanobind.h>
-#include "internals.h"
+#include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-PyTypeObject nb_enum_type = {
-    .tp_name = "nb_enum",
-    .tp_basicsize = sizeof(PyHeapTypeObject) + sizeof(type_data),
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
-    .tp_doc = "nanobind enumeration metaclass"
-};
-
-struct nb_enum {
-    nb_inst inst;
-    PyObject *name;
-    const char *doc;
-};
-
 static PyObject *nb_enum_int(PyObject *o);
 
-/// Map to unique representative enum instance
-static nb_enum *nb_enum_get_unique(PyObject *self) {
-    nb_enum *e = (nb_enum *) self;
-    if (e->name)
-        return e;
+/// Map to unique representative enum instance, returns a borrowed reference
+static PyObject *nb_enum_lookup(PyObject *self) {
+    PyObject *int_val = nb_enum_int(self),
+             *dict    = PyObject_GetAttrString((PyObject *) Py_TYPE(self), "__entries");
 
-    PyObject *int_val = nb_enum_int(self);
-    PyObject *dict = PyObject_GetAttrString((PyObject *) Py_TYPE(self), "__entries");
-    nb_enum *e2 = nullptr;
+    PyObject *rec = nullptr;
     if (int_val && dict)
-        e2 = (nb_enum *) PyDict_GetItem(dict, int_val);
-
-    bool found = e2 && e2->name;
+        rec = (PyObject *) PyDict_GetItem(dict, int_val);
 
     Py_XDECREF(int_val);
     Py_XDECREF(dict);
 
-    if (found) {
-        return e2;
+    if (rec && PyTuple_CheckExact(rec) && NB_TUPLE_GET_SIZE(rec) == 3) {
+        return rec;
     } else {
         PyErr_Clear();
         PyErr_SetString(PyExc_RuntimeError, "nb_enum: could not find entry!");
@@ -55,43 +37,55 @@ static nb_enum *nb_enum_get_unique(PyObject *self) {
 }
 
 static PyObject *nb_enum_repr(PyObject *self) {
-    nb_enum *e = nb_enum_get_unique(self);
-    if (!e)
+    PyObject *entry = nb_enum_lookup(self);
+    if (!entry)
         return nullptr;
 
-    return PyUnicode_FromFormat(
-        "%U.%U", ((PyHeapTypeObject *) Py_TYPE(self))->ht_qualname, e->name);
+#if defined(Py_LIMITED_API)
+    PyObject *qname = PyType_GetQualName(Py_TYPE(self));
+    if (!qname) {
+        Py_DECREF(entry);
+        return nullptr;
+    }
+
+    PyObject *result =
+        PyUnicode_FromFormat("%U.%U", qname, NB_TUPLE_GET_ITEM(entry, 0));
+    Py_DECREF(qname);
+#else
+    PyObject *result = PyUnicode_FromFormat("%s.%U", Py_TYPE(self)->tp_name,
+                                            NB_TUPLE_GET_ITEM(entry, 0));
+#endif
+
+    return result;
 }
 
 static PyObject *nb_enum_get_name(PyObject *self, void *) {
-    nb_enum *e = nb_enum_get_unique(self);
-    if (!e)
+    PyObject *entry = nb_enum_lookup(self);
+    if (!entry)
         return nullptr;
-    Py_INCREF(e->name);
-    return e->name;
+
+    PyObject *result = NB_TUPLE_GET_ITEM(entry, 0);
+    Py_INCREF(result);
+    return result;
 }
 
 static PyObject *nb_enum_get_doc(PyObject *self, void *) {
-    nb_enum *e = nb_enum_get_unique(self);
-    if (!e)
+    PyObject *entry = nb_enum_lookup(self);
+    if (!entry)
         return nullptr;
 
-    if (e->doc) {
-        return PyUnicode_FromString(e->doc);
-    } else {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    PyObject *result = NB_TUPLE_GET_ITEM(entry, 1);
+    Py_INCREF(result);
+    return result;
 }
 
 static PyObject *nb_enum_int(PyObject *o) {
-    nb_type *t = (nb_type *) Py_TYPE(o);
-    nb_enum *e = (nb_enum *) o;
+    type_data *t = nb_type_data(Py_TYPE(o));
 
-    const void *p = inst_ptr(&e->inst);
-    if (t->t.flags & (uint32_t) type_flags::is_unsigned_enum) {
+    const void *p = inst_ptr((nb_inst *) o);
+    if (t->flags & (uint32_t) type_flags::is_unsigned_enum) {
         unsigned long long value;
-        switch (t->t.size) {
+        switch (t->size) {
             case 1: value = (unsigned long long) *(const uint8_t *)  p; break;
             case 2: value = (unsigned long long) *(const uint16_t *) p; break;
             case 4: value = (unsigned long long) *(const uint32_t *) p; break;
@@ -100,9 +94,9 @@ static PyObject *nb_enum_int(PyObject *o) {
                      return nullptr;
         }
         return PyLong_FromUnsignedLongLong(value);
-    } else if (t->t.flags & (uint32_t) type_flags::is_signed_enum) {
+    } else if (t->flags & (uint32_t) type_flags::is_signed_enum) {
         long long value;
-        switch (t->t.size) {
+        switch (t->size) {
             case 1: value = (long long) *(const int8_t *)  p; break;
             case 2: value = (long long) *(const int16_t *) p; break;
             case 4: value = (long long) *(const int32_t *) p; break;
@@ -120,18 +114,21 @@ static PyObject *nb_enum_int(PyObject *o) {
 static PyObject *nb_enum_init(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
     PyObject *arg;
 
-    if (kwds || PyTuple_GET_SIZE(args) != 1)
+    if (kwds || NB_TUPLE_GET_SIZE(args) != 1)
         goto error;
 
-    arg = PyTuple_GET_ITEM(args, 0);
+    arg = NB_TUPLE_GET_ITEM(args, 0);
     if (PyLong_Check(arg)) {
         PyObject *entries =
             PyObject_GetAttrString((PyObject *) subtype, "__entries");
         if (!entries)
             goto error;
+
         PyObject *item = PyDict_GetItem(entries, arg);
         Py_DECREF(entries);
-        if (item) {
+
+        if (item && PyTuple_CheckExact(item) && NB_TUPLE_GET_SIZE(item) == 3) {
+            item = NB_TUPLE_GET_ITEM(item, 2);
             Py_INCREF(item);
             return item;
         }
@@ -142,9 +139,9 @@ static PyObject *nb_enum_init(PyTypeObject *subtype, PyObject *args, PyObject *k
 
 error:
     PyErr_Clear();
-    PyErr_Format(PyExc_TypeError,
+    PyErr_Format(PyExc_RuntimeError,
                  "%s(): could not convert the input into an enumeration value!",
-                 subtype->tp_name);
+                 nb_type_data(subtype)->name);
     return nullptr;
 }
 
@@ -200,55 +197,73 @@ NB_ENUM_UNOP(neg, PyNumber_Negative)
 NB_ENUM_UNOP(inv, PyNumber_Invert)
 NB_ENUM_UNOP(abs, PyNumber_Absolute)
 
-void nb_enum_prepare(PyTypeObject *tp, bool is_arithmetic) {
-    tp->tp_flags |= Py_TPFLAGS_HAVE_GC;
-    tp->tp_traverse = [](PyObject *o, visitproc visit, void *arg) {
-        Py_VISIT(Py_TYPE(o));
-        return 0;
-    };
-    tp->tp_new = nb_enum_init;
-    tp->tp_init = nullptr;
-    tp->tp_clear = [](PyObject *) { return 0; };
-    tp->tp_repr = nb_enum_repr;
-    tp->tp_richcompare = nb_enum_richcompare;
-    tp->tp_as_number->nb_int = nb_enum_int;
+int nb_enum_clear(PyObject *) {
+    return 0;
+}
+
+int nb_enum_traverse(PyObject *o, visitproc visit, void *arg) {
+    Py_VISIT(Py_TYPE(o));
+    return 0;
+}
+
+void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
+    PyType_Slot *t = *s;
+
+    *t++ = { Py_tp_new, (void *) nb_enum_init };
+    *t++ = { Py_tp_init, (void *) nullptr };
+    *t++ = { Py_tp_repr, (void *) nb_enum_repr };
+    *t++ = { Py_tp_richcompare, (void *) nb_enum_richcompare };
+    *t++ = { Py_nb_int, (void *) nb_enum_int };
+    *t++ = { Py_tp_getset, (void *) nb_enum_getset };
+    *t++ = { Py_tp_traverse, (void *) nb_enum_traverse };
+    *t++ = { Py_tp_clear, (void *) nb_enum_clear };
+
     if (is_arithmetic) {
-        tp->tp_as_number->nb_add = nb_enum_add;
-        tp->tp_as_number->nb_subtract = nb_enum_sub;
-        tp->tp_as_number->nb_multiply = nb_enum_sub;
-        tp->tp_as_number->nb_floor_divide = nb_enum_div;
-        tp->tp_as_number->nb_or = nb_enum_or;
-        tp->tp_as_number->nb_xor = nb_enum_xor;
-        tp->tp_as_number->nb_and = nb_enum_and;
-        tp->tp_as_number->nb_rshift = nb_enum_rshift;
-        tp->tp_as_number->nb_lshift = nb_enum_lshift;
-        tp->tp_as_number->nb_negative = nb_enum_neg;
-        tp->tp_as_number->nb_invert = nb_enum_inv;
-        tp->tp_as_number->nb_absolute = nb_enum_abs;
+        *t++ = { Py_nb_add, (void *) nb_enum_add };
+        *t++ = { Py_nb_subtract, (void *) nb_enum_sub };
+        *t++ = { Py_nb_multiply, (void *) nb_enum_sub };
+        *t++ = { Py_nb_floor_divide, (void *) nb_enum_div };
+        *t++ = { Py_nb_or, (void *) nb_enum_or };
+        *t++ = { Py_nb_xor, (void *) nb_enum_xor };
+        *t++ = { Py_nb_and, (void *) nb_enum_and };
+        *t++ = { Py_nb_rshift, (void *) nb_enum_rshift };
+        *t++ = { Py_nb_lshift, (void *) nb_enum_lshift };
+        *t++ = { Py_nb_negative, (void *) nb_enum_neg };
+        *t++ = { Py_nb_invert, (void *) nb_enum_inv };
+        *t++ = { Py_nb_absolute, (void *) nb_enum_abs };
     }
-    tp->tp_basicsize = sizeof(nb_enum);
-    tp->tp_getset = nb_enum_getset;
+
+    *s = t;
 }
 
 void nb_enum_put(PyObject *type, const char *name, const void *value,
                  const char *doc) noexcept {
-    PyObject *name_py, *int_val, *dict;
-    nb_enum *inst = (nb_enum *) inst_new_impl((PyTypeObject *) type, nullptr);
-    if (!inst)
+    PyObject *doc_obj, *rec, *dict, *int_val;
+
+    PyObject *name_obj = PyUnicode_InternFromString(name);
+    if (doc) {
+        doc_obj = PyUnicode_FromString(doc);
+    } else {
+        doc_obj = Py_None;
+        Py_INCREF(Py_None);
+    }
+
+    nb_inst *inst = (nb_inst *) inst_new_impl((PyTypeObject *) type, nullptr);
+
+    if (!doc_obj || !name_obj || !inst)
         goto error;
 
-    name_py = PyUnicode_InternFromString(name);
-    if (!name_py)
-        goto error;
+    rec = PyTuple_New(3);
+    NB_TUPLE_SET_ITEM(rec, 0, name_obj);
+    NB_TUPLE_SET_ITEM(rec, 1, doc_obj);
+    NB_TUPLE_SET_ITEM(rec, 2, (PyObject *) inst);
 
-    memcpy(inst_ptr(&inst->inst), value, ((nb_type *) type)->t.size);
-    inst->inst.destruct = false;
-    inst->inst.cpp_delete = false;
-    inst->inst.ready = true;
-    inst->name = name_py;
-    inst->doc = doc;
+    memcpy(inst_ptr(inst), value, nb_type_data((PyTypeObject *) type)->size);
+    inst->destruct = false;
+    inst->cpp_delete = false;
+    inst->ready = true;
 
-    if (PyObject_SetAttr(type, name_py, (PyObject *) inst))
+    if (PyObject_SetAttr(type, name_obj, (PyObject *) inst))
         goto error;
 
     int_val = nb_enum_int((PyObject *) inst);
@@ -266,12 +281,12 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
             goto error;
     }
 
-    if (PyDict_SetItem(dict, int_val, (PyObject *) inst))
+    if (PyDict_SetItem(dict, int_val, rec))
         goto error;
 
     Py_DECREF(int_val);
     Py_DECREF(dict);
-    Py_DECREF(inst);
+    Py_DECREF(rec);
 
     return;
 
@@ -279,19 +294,23 @@ error:
     fail("nanobind::detail::nb_enum_add(): could not create enum entry!");
 }
 
-void nb_enum_export(PyObject *type) {
-    type_data &t = ((nb_type *) type)->t;
-    PyObject *entries = PyObject_GetAttrString(type, "__entries");
+void nb_enum_export(PyObject *tp) {
+    type_data *t = nb_type_data((PyTypeObject *) tp);
+    PyObject *entries = PyObject_GetAttrString(tp, "__entries");
 
-    if (!entries || !(t.flags & (uint32_t) type_flags::has_scope))
+    if (!entries || !(t->flags & (uint32_t) type_flags::has_scope))
         fail("nanobind::detail::nb_enum_export(): internal error!");
 
-    PyObject *key, *entry;
+    PyObject *key, *value;
     Py_ssize_t pos = 0;
 
-    while (PyDict_Next(entries, &pos, &key, &entry)) {
-        nb_enum *item = (nb_enum *) entry;
-        setattr(t.scope, item->name, entry);
+    while (PyDict_Next(entries, &pos, &key, &value)) {
+        if (!PyTuple_CheckExact(value) || NB_TUPLE_GET_SIZE(value) != 3)
+            fail("nanobind::detail::nb_enum_export(): internal error! (2)");
+
+        setattr(t->scope,
+                NB_TUPLE_GET_ITEM(value, 0),
+                NB_TUPLE_GET_ITEM(value, 2));
     }
 
     Py_DECREF(entries);

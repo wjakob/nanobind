@@ -1,3 +1,5 @@
+#include <string.h>
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

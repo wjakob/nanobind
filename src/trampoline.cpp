@@ -8,7 +8,7 @@
 */
 
 #include <nanobind/trampoline.h>
-#include "internals.h"
+#include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -16,7 +16,7 @@ NAMESPACE_BEGIN(detail)
 void trampoline_new(void **data, size_t size, void *ptr,
                     const std::type_info *cpp_type) noexcept {
     // GIL is held when the trampoline constructor runs
-    internals &internals = internals_get();
+    nb_internals &internals = internals_get();
     auto it = internals.inst_c2p.find(
         std::pair<void *, std::type_index>(ptr, *cpp_type));
     if (it == internals.inst_c2p.end())
@@ -29,7 +29,7 @@ void trampoline_new(void **data, size_t size, void *ptr,
 void trampoline_release(void **data, size_t size) noexcept {
     // GIL is held when the trampoline destructor runs
     for (size_t i = 0; i < size; ++i)
-        Py_XDECREF(data[i*2 + 2]);
+        Py_XDECREF((PyObject *) data[i*2 + 2]);
 }
 
 PyObject *trampoline_lookup(void **data, size_t size, const char *name,
@@ -62,7 +62,7 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
 
     // Sill no luck -- perform a lookup and populate the trampoline
     const char *error = nullptr;
-    bool is_nb_func = false;
+    PyTypeObject *value_tp = nullptr;
 
     size_t offset = 0;
     for (; offset < size; offset++) {
@@ -71,8 +71,8 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
             break;
     }
 
-    internals &internals = internals_get();
-    PyObject *key = nullptr, *value = nullptr, *func = nullptr;
+    nb_internals &internals = internals_get();
+    PyObject *key = nullptr, *value = nullptr;
 
     if (offset == size) {
         error = "the trampoline ran out of slots (you will need to increase "
@@ -92,21 +92,16 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
         goto fail;
     }
 
-    if (PyMethod_Check(value))
-        func = PyMethod_GET_FUNCTION(value);
-    else
-        func = value;
-
-    is_nb_func = Py_TYPE(func) == internals.nb_func ||
-                 Py_TYPE(func) == internals.nb_meth;
-
+    value_tp = Py_TYPE(value);
     Py_CLEAR(value);
 
-    if (is_nb_func) {
+    if (value_tp == internals.nb_func || value_tp == internals.nb_method ||
+        value_tp == internals.nb_bound_method) {
         if (pure) {
             error = "tried to call a pure virtual function";
             goto fail;
         }
+
         Py_DECREF(key);
         key = Py_None;
         Py_INCREF(Py_None);
@@ -119,11 +114,11 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
     return key != None ? (PyObject *) key : nullptr;
 
 fail:
-    const char *tp_name = Py_TYPE(data[0])->tp_name;
+    type_data *t = nb_type_data(Py_TYPE((PyObject *) data[0]));
     PyGILState_Release(state);
 
-    raise("nanobind::detail::get_trampoline('%s::%s()'): %s!", tp_name, name,
-          error);
+    raise("nanobind::detail::get_trampoline('%s::%s()'): %s!",
+          t->name, name, error);
 }
 
 NAMESPACE_END(detail)

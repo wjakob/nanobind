@@ -80,15 +80,15 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     ${NB_DIR}/include/nanobind/stl/vector.h
     ${NB_DIR}/include/nanobind/stl/list.h
 
-    ${NB_DIR}/src/internals.h
     ${NB_DIR}/src/buffer.h
-    ${NB_DIR}/src/internals.cpp
-    ${NB_DIR}/src/common.cpp
-    ${NB_DIR}/src/tensor.cpp
+    ${NB_DIR}/src/nb_internals.h
+    ${NB_DIR}/src/nb_internals.cpp
     ${NB_DIR}/src/nb_func.cpp
     ${NB_DIR}/src/nb_type.cpp
     ${NB_DIR}/src/nb_enum.cpp
+    ${NB_DIR}/src/common.cpp
     ${NB_DIR}/src/error.cpp
+    ${NB_DIR}/src/tensor.cpp
     ${NB_DIR}/src/trampoline.cpp
     ${NB_DIR}/src/implicit.cpp
   )
@@ -161,8 +161,12 @@ function(nanobind_disable_stack_protector name)
 endfunction()
 
 function(nanobind_extension name)
-  set_target_properties(${name} PROPERTIES
-    PREFIX "" SUFFIX "${NB_SUFFIX}")
+  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX "${NB_SUFFIX}")
+endfunction()
+
+function(nanobind_extension_abi3 name)
+  get_filename_component(ext "${NB_SUFFIX}" LAST_EXT)
+  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ".abi3${ext}")
 endfunction()
 
 function (nanobind_cpp17 name)
@@ -187,22 +191,43 @@ function (nanobind_headers name)
 endfunction()
 
 function(nanobind_add_module name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;NOSTRIP;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO" "" "")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;STABLE_ABI;NOSTRIP;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO" "" "")
 
   Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
   nanobind_cpp17(${name})
-  nanobind_extension(${name})
   nanobind_msvc(${name})
   nanobind_headers(${name})
 
-  if (ARG_NB_STATIC)
-    nanobuild_build_library(nanobind-static STATIC)
-    target_link_libraries(${name} PRIVATE nanobind-static)
-  else()
-    nanobuild_build_library(nanobind SHARED)
-    target_link_libraries(${name} PRIVATE nanobind)
+  # Limited API interface only supported in Python >= 3.12
+  if ((Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 12))
+    set(ARG_STABLE_ABI OFF)
   endif()
+
+  if (ARG_STABLE_ABI)
+    if (ARG_NB_STATIC)
+      nanobuild_build_library(nanobind-static-abi3 STATIC)
+      set(libname nanobind-static-abi3)
+    else()
+      nanobuild_build_library(nanobind-abi3 SHARED)
+      set(libname nanobind-abi3)
+    endif()
+
+    target_compile_definitions(${libname} PUBLIC -DPy_STABLE_ABI=0x030C0000)
+    nanobind_extension_abi3(${name})
+  else()
+    if (ARG_NB_STATIC)
+      nanobuild_build_library(nanobind-static STATIC)
+      set(libname nanobind)
+    else()
+      nanobuild_build_library(nanobind SHARED)
+      set(libname nanobind)
+    endif()
+
+    nanobind_extension(${name})
+  endif()
+
+  target_link_libraries(${name} PRIVATE ${libname})
 
   if (NOT ARG_PROTECT_STACK)
     nanobind_disable_stack_protector(${name})

@@ -209,8 +209,7 @@ def test11_trampoline_failures():
     d = Incomplete()
     with pytest.raises(RuntimeError) as excinfo:
         t.go(d)
-    assert ('nanobind::detail::get_trampoline(\'Incomplete::what()\'): tried '
-            'to call a pure virtual function!' in str(excinfo.value))
+    assert ('test_classes.Incomplete::what()\'): tried to call a pure virtual function!' in str(excinfo.value))
 
     with pytest.raises(TypeError) as excinfo:
         t.void_ret(d)
@@ -224,7 +223,7 @@ def test11_trampoline_failures():
         def what(self):
             return "b"
 
-    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'Incomplete2\'!'):
+    with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type'):
         with pytest.raises(TypeError) as excinfo:
             t.go(Incomplete2())
     assert 'incompatible function arguments' in str(excinfo.value)
@@ -397,7 +396,10 @@ def test18_static_properties():
     t.StaticProperties.value += 1
     assert t.StaticProperties.value == 24
     assert t.StaticProperties.get() == 24
-
+    assert t.StaticProperties2.get() == 24
+    t.StaticProperties2.value = 50
+    assert t.StaticProperties2.get() == 50
+    assert t.StaticProperties.get() == 50
 
 def test19_supplement():
     c = t.ClassWithSupplement()
@@ -463,3 +465,10 @@ def test24_none_arg():
     assert t.none_2.__doc__ == 'none_2(arg: test_classes_ext.Struct) -> bool'
     assert t.none_3.__doc__ == 'none_3(arg: Optional[test_classes_ext.Struct]) -> bool'
     assert t.none_4.__doc__ == 'none_4(arg: Optional[test_classes_ext.Struct]) -> bool'
+
+
+def test25_is_final():
+    with pytest.raises(TypeError) as excinfo:
+        class MyType(t.FinalType):
+            pass
+    assert "The type 'test_classes_ext.FinalType' prohibits subclassing!" in str(excinfo.value)

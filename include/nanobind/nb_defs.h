@@ -66,15 +66,40 @@
 #  define NB_HAS_U8STRING
 #endif
 
-#if PY_VERSION_HEX < 0x03090000
-#  define NB_HAVE_VECTORCALL   _Py_TPFLAGS_HAVE_VECTORCALL
-#  define NB_VECTORCALL        _PyObject_Vectorcall
-#  define NB_VECTORCALL_METHOD  nb_vectorcall_method
+#if defined(Py_TPFLAGS_HAVE_VECTORCALL)
+#  define NB_HAVE_VECTORCALL Py_TPFLAGS_HAVE_VECTORCALL
+#elif defined(_Py_TPFLAGS_HAVE_VECTORCALL)
+#  define NB_HAVE_VECTORCALL _Py_TPFLAGS_HAVE_VECTORCALL
 #else
-#  define NB_HAVE_VECTORCALL    Py_TPFLAGS_HAVE_VECTORCALL
-#  define NB_VECTORCALL         PyObject_Vectorcall
-#  define NB_VECTORCALL_METHOD  PyObject_VectorcallMethod
+#  define NB_HAVE_VECTORCALL (1UL << 11)
 #endif
+
+#if defined(PY_VECTORCALL_ARGUMENTS_OFFSET)
+#  define NB_VECTORCALL_ARGUMENTS_OFFSET PY_VECTORCALL_ARGUMENTS_OFFSET
+#  define NB_VECTORCALL_NARGS PyVectorcall_NARGS
+#else
+#  define NB_VECTORCALL_ARGUMENTS_OFFSET ((size_t) 1 << (8 * sizeof(size_t) - 1))
+#  define NB_VECTORCALL_NARGS(n) ((n) & ~NB_VECTORCALL_ARGUMENTS_OFFSET)
+#endif
+
+#if defined(Py_LIMITED_API)
+#  define NB_TUPLE_GET_SIZE PyTuple_Size
+#  define NB_TUPLE_GET_ITEM PyTuple_GetItem
+#  define NB_TUPLE_SET_ITEM PyTuple_SetItem
+#  define NB_LIST_GET_SIZE PyList_Size
+#  define NB_LIST_GET_ITEM PyList_GetItem
+#  define NB_LIST_SET_ITEM PyList_SetItem
+#  define NB_DICT_GET_SIZE PyDict_Size
+#else
+#  define NB_TUPLE_GET_SIZE PyTuple_GET_SIZE
+#  define NB_TUPLE_GET_ITEM PyTuple_GET_ITEM
+#  define NB_TUPLE_SET_ITEM PyTuple_SET_ITEM
+#  define NB_LIST_GET_SIZE PyList_GET_SIZE
+#  define NB_LIST_GET_ITEM PyList_GET_ITEM
+#  define NB_LIST_SET_ITEM PyList_SET_ITEM
+#  define NB_DICT_GET_SIZE PyDict_GET_SIZE
+#endif
+
 
 #define NB_MODULE(name, variable)                                              \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name();           \

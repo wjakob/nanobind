@@ -120,13 +120,13 @@ struct num_item_list {
     using key_type = Py_ssize_t;
 
     NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
-        *cache = PyList_GET_ITEM(obj, index);
+        *cache = NB_LIST_GET_ITEM(obj, index);
     }
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
-        PyObject *old = PyList_GET_ITEM(obj, index);
+        PyObject *old = NB_LIST_GET_ITEM(obj, index);
         Py_INCREF(v);
-        PyList_SET_ITEM(obj, index, v);
+        NB_LIST_SET_ITEM(obj, index, v);
         Py_DECREF(old);
     }
 };
@@ -136,7 +136,7 @@ struct num_item_tuple {
     using key_type = Py_ssize_t;
 
     NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
-        *cache = PyTuple_GET_ITEM(obj, index);
+        *cache = NB_TUPLE_GET_ITEM(obj, index);
     }
 
     template <typename...Ts> static void set(Ts...) {

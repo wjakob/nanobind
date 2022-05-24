@@ -315,6 +315,9 @@ class dict : public object {
     size_t size() const { return PyDict_GET_SIZE(m_ptr); }
     detail::dict_iterator begin() const;
     detail::dict_iterator end() const;
+    list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Keys)); }
+    list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Values)); }
+    list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
 };
 
 class sequence : public object {
@@ -323,9 +326,9 @@ class sequence : public object {
 
 class mapping : public object {
     NB_OBJECT_DEFAULT(mapping, object, "Mapping", PyMapping_Check)
-    list keys() const { return steal<list>(PyMapping_Keys(m_ptr)); }
-    list values() const { return steal<list>(PyMapping_Values(m_ptr)); }
-    list items() const { return steal<list>(PyMapping_Items(m_ptr)); }
+    list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Keys)); }
+    list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
+    list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
 };
 
 class args : public tuple {

@@ -1,7 +1,7 @@
 # Details on benchmarks
 
 The microbenchmark used to compare different binding tools wraps a _large_ number of trivial functions that
-only perform a few additions. 
+only perform a few additions.
 The objective of this is to quantify the overhead
 of bindings on _compilation time_, _binary size_, and _runtime performance_.
 The function-heavy benchmark (`func_*`) consists
@@ -30,4 +30,3 @@ is done by AppleClang using consistent flags for all three binding tools.
 
 The code to generate the plots on the main project page is available
 [here](https://github.com/wjakob/nanobind/blob/master/docs/microbenchmark.ipynb).
-

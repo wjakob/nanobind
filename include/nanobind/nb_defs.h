@@ -94,4 +94,3 @@
         }                                                                      \
     }                                                                          \
     void NB_CONCAT(nanobind_init_, name)(::nanobind::module_ & (variable))
-

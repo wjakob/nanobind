@@ -11,7 +11,7 @@ testpaths = [ "tests" ]
 extend-select = ["B", "B9"]
 extend-ignore = [
   "E203", "E501", "E722", "B950",
-  "E302", "E111", "E261", "E306", "E305", "E231", "E122", # Would be fixed by using Black
+  "E302", "E111", "E261", "E306", "E305", "E231", "E122", "E127" # Would be fixed by using Black
 ]
 
 [tool.mypy]

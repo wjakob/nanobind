@@ -57,16 +57,16 @@ def test04_constrain_shape():
     t.pass_float32_shaped(np.zeros((3, 0, 4), dtype=np.float32))
     t.pass_float32_shaped(np.zeros((3, 5, 4), dtype=np.float32))
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.pass_float32_shaped(np.zeros((3, 5), dtype=np.float32))
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.pass_float32_shaped(np.zeros((2, 5, 4), dtype=np.float32))
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.pass_float32_shaped(np.zeros((3, 5, 6), dtype=np.float32))
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.pass_float32_shaped(np.zeros((3, 5, 4, 6), dtype=np.float32))
 
 
@@ -80,11 +80,8 @@ def test04_constrain_order():
 def test05_constrain_order_jax():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        try:
-            import jax
-            c = jax.numpy.zeros((3, 5))
-        except:
-            pytest.skip('jax is missing')
+        jax = pytest.importorskip('jax')
+        jax.numpy.zeros((3, 5))
 
     z = jax.numpy.zeros((3, 5, 4, 6))
     assert t.check_order(z) == 'C'
@@ -96,7 +93,7 @@ def test06_constrain_order_pytorch():
         import torch
         c = torch.zeros(3, 5)
         c.__dlpack__()
-    except:
+    except ModuleNotFoundError:
         pytest.skip('pytorch is missing')
 
     f = c.t().contiguous().t()
@@ -112,11 +109,8 @@ def test06_constrain_order_pytorch():
 def test07_constrain_order_tensorflow():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        try:
-            import tensorflow as tf
-            c = tf.zeros((3, 5))
-        except:
-            pytest.skip('tensorflow is missing')
+        tf = pytest.importorskip('tensorflow')
+        c = tf.zeros((3, 5))
 
     assert t.check_order(c) == 'C'
 
@@ -136,65 +130,56 @@ def test09_implicit_conversion():
     t.implicit(np.zeros((2, 2, 10), dtype=np.float32)[:, :, 4])
     t.implicit(np.zeros((2, 2, 10), dtype=np.uint32)[:, :, 4])
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.noimplicit(np.zeros((2, 2), dtype=np.uint32))
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.noimplicit(np.zeros((2, 2, 10), dtype=np.float32)[:, :, 4])
 
 
 def test10_implicit_conversion_pytorch():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        try:
-            import torch
-            c = torch.zeros(3, 5)
-            c.__dlpack__()
-        except:
-            pytest.skip('pytorch is missing')
+        torch = pytest.importorskip('torch')
+        c = torch.zeros(3, 5)
+        c.__dlpack__()
 
     t.implicit(torch.zeros(2, 2, dtype=torch.int32))
     t.implicit(torch.zeros(2, 2, 10, dtype=torch.float32)[:, :, 4])
     t.implicit(torch.zeros(2, 2, 10, dtype=torch.int32)[:, :, 4])
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.noimplicit(torch.zeros(2, 2, dtype=torch.int32))
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.noimplicit(torch.zeros(2, 2, 10, dtype=torch.float32)[:, :, 4])
 
 
 def test11_implicit_conversion_tensorflow():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        try:
-            import tensorflow as tf
-            c = tf.zeros((3, 5))
-        except:
-            pytest.skip('tensorflow is missing')
+        tf = pytest.importorskip("tensorflow")
+        tf.zeros((3, 5))
 
         t.implicit(tf.zeros((2, 2), dtype=tf.int32))
         t.implicit(tf.zeros((2, 2, 10), dtype=tf.float32)[:, :, 4])
         t.implicit(tf.zeros((2, 2, 10), dtype=tf.int32)[:, :, 4])
 
-        with pytest.raises(TypeError) as excinfo:
+        with pytest.raises(TypeError):
             t.noimplicit(tf.zeros((2, 2), dtype=tf.int32))
 
 
 def test12_implicit_conversion_jax():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        try:
-            import jax.numpy as jnp
-            c = jnp.zeros((3, 5))
-        except:
-            pytest.skip('jax is missing')
+        jnp = pytest.importorskip("jax.numpy")
+        jnp.zeros((3, 5))
 
     t.implicit(jnp.zeros((2, 2), dtype=jnp.int32))
     t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.float32)[:, :, 4])
     t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.int32)[:, :, 4])
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.noimplicit(jnp.zeros((2, 2), dtype=jnp.int32))
 
 
@@ -210,7 +195,7 @@ def test13_destroy_capsule():
 
 def test14_consume_numpy():
     gc.collect()
-    class wrapper:
+    class Wrapper:
         def __init__(self, value):
             self.value = value
         def __dlpack__(self):
@@ -219,9 +204,9 @@ def test14_consume_numpy():
     dc = t.destruct_count()
     a = t.return_dlpack()
     if hasattr(np, '_from_dlpack'):
-        x = np._from_dlpack(wrapper(a))
+        x = np._from_dlpack(Wrapper(a))
     elif hasattr(np, 'from_dlpack'):
-        x = np.from_dlpack(wrapper(a))
+        x = np.from_dlpack(Wrapper(a))
     else:
         pytest.skip('your version of numpy is too old')
 
@@ -237,7 +222,7 @@ def test14_consume_numpy():
 
 def test15_passthrough():
     gc.collect()
-    class wrapper:
+    class Wrapper:
         def __init__(self, value):
             self.value = value
         def __dlpack__(self):
@@ -247,9 +232,9 @@ def test15_passthrough():
     a = t.return_dlpack()
     b = t.passthrough(a)
     if hasattr(np, '_from_dlpack'):
-        y = np._from_dlpack(wrapper(b))
+        y = np._from_dlpack(Wrapper(b))
     elif hasattr(np, 'from_dlpack'):
-        y = np.from_dlpack(wrapper(b))
+        y = np.from_dlpack(Wrapper(b))
     else:
         pytest.skip('your version of numpy is too old')
 
@@ -277,13 +262,9 @@ def test16_return_numpy():
 
 
 def test17_return_pytorch():
-    try:
-        import torch
-        c = torch.zeros(3, 5)
-    except:
-        pytest.skip('pytorch is missing')
+    torch = pytest.importorskip("torch")
     gc.collect()
-    import numpy as np
+    import numpy  # noqa: F401
     dc = t.destruct_count()
     x = t.ret_pytorch()
     assert x.shape == (2, 4)

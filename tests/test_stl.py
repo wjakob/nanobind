@@ -318,7 +318,7 @@ def test30_std_function():
 
 
 def test31_vec_type_check():
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         t.vec_moveable_in_value(0)
 
 def test32_list():

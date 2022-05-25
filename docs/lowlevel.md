@@ -21,7 +21,7 @@ assert(py_type.is_valid() &&                             // Did the type lookup 
        nb::type_info(py_type) == typeid(MyClass));       // Query C++ RTTI record
 
 /* Allocate an uninitialized Python instance of this type. Nanobind will
-   refuse to pass this (still unitialized) object to bound C++ functions */
+   refuse to pass this (still uninitialized) object to bound C++ functions */
 nb::object py_inst = nb::inst_alloc(py_type);
 assert(nb::inst_check(py_inst) && py_inst.type().is(py_type) && !nb::inst_ready(py_inst));
 

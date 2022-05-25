@@ -245,4 +245,3 @@ extern PyObject *nb_vectorcall_method(PyObject *name, PyObject *const *args,
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
-

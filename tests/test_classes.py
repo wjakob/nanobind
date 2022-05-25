@@ -123,8 +123,8 @@ def test06_reference_internal(clean):
 
 
 def test07_big():
-    x = [t.Big() for i in range(1024)]
-    x2 = [t.BigAligned() for i in range(1024)]
+    [t.Big() for i in range(1024)]
+    [t.BigAligned() for i in range(1024)]
 
 
 def test08_inheritance():

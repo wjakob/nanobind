@@ -379,4 +379,9 @@ NB_MODULE(test_classes_ext, m) {
     struct FinalType { };
     nb::class_<FinalType>(m, "FinalType", nb::is_final())
         .def(nb::init<>());
+
+    // test26_dynamic_attr
+    struct StructWithAttr : Struct { };
+    nb::class_<StructWithAttr, Struct>(m, "StructWithAttr", nb::dynamic_attr())
+        .def(nb::init<int>());
 }

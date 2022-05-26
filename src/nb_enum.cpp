@@ -41,20 +41,10 @@ static PyObject *nb_enum_repr(PyObject *self) {
     if (!entry)
         return nullptr;
 
-#if defined(Py_LIMITED_API)
-    PyObject *qname = PyType_GetQualName(Py_TYPE(self));
-    if (!qname) {
-        Py_DECREF(entry);
-        return nullptr;
-    }
-
+    PyObject *name = nb_inst_name(self);
     PyObject *result =
-        PyUnicode_FromFormat("%U.%U", qname, NB_TUPLE_GET_ITEM(entry, 0));
-    Py_DECREF(qname);
-#else
-    PyObject *result = PyUnicode_FromFormat("%s.%U", Py_TYPE(self)->tp_name,
-                                            NB_TUPLE_GET_ITEM(entry, 0));
-#endif
+        PyUnicode_FromFormat("%U.%U", name, NB_TUPLE_GET_ITEM(entry, 0));
+    Py_DECREF(name);
 
     return result;
 }

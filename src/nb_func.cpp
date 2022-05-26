@@ -739,63 +739,6 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
     return result;
 }
 
-#if defined(Py_LIMITED_API)
-/* Emulate PyVectorcall_Call, which is not part of the limited API. This is
-   incredibly inefficient. Fortunately, CPython prefers the vector call
-   interface, so this is almost never needed in practice. */
-PyObject *nb_func_call(PyObject *self, PyObject *args_in, PyObject *kwargs_in) {
-    Py_ssize_t nargs   = PyTuple_Size(args_in),
-               nkwargs = kwargs_in ? PyDict_Size(kwargs_in) : 0;
-
-    PyObject **args = (PyObject **) PyObject_Malloc((nargs + nkwargs + 1) *
-                                                    sizeof(PyObject *));
-    if (!args)
-        return PyErr_NoMemory();
-
-    args[0] = nullptr;
-    for (Py_ssize_t i = 0; i < nargs; ++i)
-        args[i + 1] = PyTuple_GetItem(args_in, i);
-
-    PyObject *kwnames = nullptr;
-    if (kwargs_in) {
-        kwnames = PyTuple_New(nkwargs);
-        if (!kwnames) {
-            PyObject_Free(args);
-            return nullptr;
-        }
-
-        PyObject *key, *value;
-        Py_ssize_t pos = 0, ctr = 0;
-        while (PyDict_Next(kwargs_in, &pos, &key, &value)) {
-            args[nargs + ctr + 1] = value;
-            Py_INCREF(key);
-            PyTuple_SetItem(kwnames, ctr++, key);
-        }
-    }
-
-    PyTypeObject *tp = Py_TYPE(self);
-    nb_internals &internals = internals_get();
-
-    PyObject *result = nullptr;
-    nargs |= NB_VECTORCALL_ARGUMENTS_OFFSET;
-    if (tp == internals.nb_func || tp == internals.nb_method) {
-        result = ((nb_func *) self)->vectorcall(self, args + 1, nargs, kwnames);
-    } else if (tp == internals.nb_bound_method) {
-        result = ((nb_bound_method *) self)
-                     ->vectorcall(self, args + 1, nargs, kwnames);
-    } else {
-        PyErr_SetString(
-            PyExc_RuntimeError,
-            "nanobind::detail::nb_func_call(): unsupported type!");
-    }
-
-    Py_XDECREF(kwnames);
-    PyObject_Free(args);
-
-    return result;
-}
-#endif
-
 PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     if (inst) {
         /* Return a bound method. This should be avoidable in most cases via the

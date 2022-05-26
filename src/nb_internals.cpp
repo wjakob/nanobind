@@ -93,11 +93,13 @@ static PyMemberDef nb_func_members[] = {
 };
 
 static PyType_Slot nb_func_slots[] = {
-    { Py_tp_call, (void *) PyVectorcall_Call },
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
     { Py_tp_getattro, (void *) nb_func_getattro },
     { Py_tp_new, (void *) PyType_GenericNew },
+#if PY_VERSION_HEX < 0x030C0000
+    { Py_tp_call, (void *) PyVectorcall_Call },
+#endif
     { 0, nullptr }
 };
 
@@ -110,12 +112,14 @@ static PyType_Spec nb_func_spec = {
 };
 
 static PyType_Slot nb_method_slots[] = {
-    { Py_tp_call, (void *) PyVectorcall_Call },
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
     { Py_tp_getattro, (void *) nb_func_getattro },
     { Py_tp_descr_get, (void *) nb_method_descr_get },
     { Py_tp_new, (void *) PyType_GenericNew },
+#if PY_VERSION_HEX < 0x030C0000
+    { Py_tp_call, (void *) PyVectorcall_Call },
+#endif
     { 0, nullptr }
 };
 
@@ -135,9 +139,11 @@ static PyMemberDef nb_bound_method_members[] = {
 };
 
 static PyType_Slot nb_bound_method_slots[] = {
-    { Py_tp_call, (void *) PyVectorcall_Call },
     { Py_tp_members, (void *) nb_bound_method_members },
     { Py_tp_dealloc, (void *) nb_bound_method_dealloc },
+#if PY_VERSION_HEX < 0x030C0000
+    { Py_tp_call, (void *) PyVectorcall_Call },
+#endif
     { 0, nullptr }
 };
 

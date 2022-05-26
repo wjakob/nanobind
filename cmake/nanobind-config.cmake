@@ -213,7 +213,7 @@ function(nanobind_add_module name)
       set(libname nanobind-abi3)
     endif()
 
-    target_compile_definitions(${libname} PUBLIC -DPy_STABLE_ABI=0x030C0000)
+    target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
     nanobind_extension_abi3(${name})
   else()
     if (ARG_NB_STATIC)

@@ -63,7 +63,10 @@ enum class type_flags : uint32_t {
     is_final                 = (1 << 17),
 
     /// This type does not permit subclassing from Python
-    has_supplement           = (1 << 18)
+    has_supplement           = (1 << 18),
+
+    /// Instances of this type support dynamic attribute assignment
+    has_dynamic_attr         = (1 << 19)
 };
 
 struct type_data {
@@ -84,9 +87,10 @@ struct type_data {
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
     void (*type_callback)(PyType_Slot **) noexcept;
     void *supplement;
+#if defined(Py_LIMITED_API)
+    size_t dictoffset;
+#endif
 };
-
-static_assert(sizeof(type_data) == 8 + sizeof(void *) * 14);
 
 NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
     t.flags |= (uint32_t) type_flags::has_base_py;
@@ -116,6 +120,10 @@ NB_INLINE void type_extra_apply(type_data &t, is_final) {
 
 NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
     t.flags |= (uint32_t) type_flags::is_arithmetic;
+}
+
+NB_INLINE void type_extra_apply(type_data &t, dynamic_attr) {
+    t.flags |= (uint32_t) type_flags::has_dynamic_attr;
 }
 
 template <typename T>

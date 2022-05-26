@@ -472,3 +472,30 @@ def test25_is_final():
         class MyType(t.FinalType):
             pass
     assert "The type 'test_classes_ext.FinalType' prohibits subclassing!" in str(excinfo.value)
+
+
+def test26_dynamic_attr(clean):
+    l = [None] * 100
+    for i in range(100):
+        l[i] = t.StructWithAttr(i)
+
+    # Create a big reference cycle..
+    for i in range(100):
+        l[i].prev = l[i - 1]
+        l[i].next = l[i + 1 if i < 99 else 0]
+        l[i].t = t.StructWithAttr
+        l[i].self = l[i]
+
+    for i in range(100):
+        assert l[i].value() == i
+        assert l[i].self.value() == i
+        assert l[i].prev.value() == (i-1 if i > 0 else 99)
+        assert l[i].next.value() == (i+1 if i < 99 else 0)
+
+    del l
+    gc.collect()
+
+    assert_stats(
+        value_constructed=100,
+        destructed=100
+    )

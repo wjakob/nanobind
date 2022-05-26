@@ -16,6 +16,31 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+static PyObject **nb_dict_ptr(PyObject *self) {
+    PyTypeObject *tp = Py_TYPE(self);
+#if !defined(Py_LIMITED_API)
+    return (PyObject **) ((uint8_t *) self + tp->tp_dictoffset);
+#else
+    return (PyObject **) ((uint8_t *) self + nb_type_data(tp)->dictoffset);
+#endif
+}
+
+static int inst_clear(PyObject *self) {
+    PyObject *&dict = *nb_dict_ptr(self);
+    Py_CLEAR(dict);
+    return 0;
+}
+
+static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
+    PyObject *&dict = *nb_dict_ptr(self);
+    if (dict)
+        Py_VISIT(dict);
+#if PY_VERSION_HEX >= 0x03090000
+    Py_VISIT(Py_TYPE(self));
+#endif
+    return 0;
+}
+
 static int inst_init(PyObject *self, PyObject *, PyObject *) {
     const type_data *t = nb_type_data(Py_TYPE(self));
     PyErr_Format(PyExc_TypeError, "%s: no constructor defined!", t->name);
@@ -45,14 +70,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         memset(self, 0, sizeof(nb_inst));
         PyObject_Init((PyObject *) self, tp);
     } else {
-        #if defined(Py_LIMITED_API)
-            static allocfunc tp_alloc =
-                (allocfunc) PyType_GetSlot(tp, Py_tp_alloc);
-        #else
-            allocfunc tp_alloc = tp->tp_alloc;
-        #endif
-
-        self = (nb_inst *) tp_alloc(tp, 0);
+        self = (nb_inst *) PyType_GenericAlloc(tp, 0);
     }
 
     if (!value) {
@@ -119,6 +137,11 @@ static void inst_dealloc(PyObject *self) {
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
     if (gc)
         PyObject_GC_UnTrack(self);
+
+    if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
+        PyObject *&dict = *nb_dict_ptr(self);
+        Py_CLEAR(dict);
+    }
 
     nb_inst *inst = (nb_inst *) self;
     void *p = inst_ptr(inst);
@@ -243,7 +266,8 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     }
 
     #if defined(Py_LIMITED_API)
-        static initproc tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
+        static initproc tp_init =
+            (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
     #else
         initproc tp_init = PyType_Type.tp_init;
     #endif
@@ -273,16 +297,17 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_data *t) noexcept {
-    const bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
-               is_unsigned_enum  = t->flags & (uint32_t) type_flags::is_unsigned_enum,
-               is_arithmetic     = t->flags & (uint32_t) type_flags::is_arithmetic,
-               is_enum           = is_signed_enum || is_unsigned_enum,
-               has_scope         = t->flags & (uint32_t) type_flags::has_scope,
-               has_doc           = t->flags & (uint32_t) type_flags::has_doc,
-               has_base          = t->flags & (uint32_t) type_flags::has_base,
-               has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
-               has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback,
-               has_supplement    = t->flags & (uint32_t) type_flags::has_supplement;
+    bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
+         is_unsigned_enum  = t->flags & (uint32_t) type_flags::is_unsigned_enum,
+         is_arithmetic     = t->flags & (uint32_t) type_flags::is_arithmetic,
+         is_enum           = is_signed_enum || is_unsigned_enum,
+         has_scope         = t->flags & (uint32_t) type_flags::has_scope,
+         has_doc           = t->flags & (uint32_t) type_flags::has_doc,
+         has_base          = t->flags & (uint32_t) type_flags::has_base,
+         has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
+         has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback,
+         has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
+         has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr;
 
     nb_internals &internals = internals_get();
     str name(t->name), qualname = name;
@@ -307,9 +332,10 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         name = steal<str>(
             PyUnicode_FromFormat("%U.%U", modname.ptr(), name.ptr()));
 
+    constexpr size_t ptr_size = sizeof(void *);
     size_t basicsize = sizeof(nb_inst) + t->size;
-    if (t->align > sizeof(void *))
-        basicsize += t->align - sizeof(void *);
+    if (t->align > ptr_size)
+        basicsize += t->align - ptr_size;
 
     PyObject *base = nullptr;
     if (has_base_py) {
@@ -326,14 +352,23 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     }
 
     if (base) {
-        // Handle a corner case that can arise when using trampoline base classes
-        size_t base_basicsize = cast<size_t>(handle(base).attr("__basicsize__"));
+        // Check if the base type already has dynamic attributes
+        type_data *tb = nb_type_data((PyTypeObject *) base);
+        if (tb->flags & (uint32_t) type_flags::has_dynamic_attr)
+            has_dynamic_attr = true;
+
+        /* Handle a corner case (base class larger than derived class)
+           which can arise when extending trampoline base classes */
+        size_t base_basicsize = sizeof(nb_inst) + tb->size;
+        if (tb->align > ptr_size)
+            base_basicsize += tb->align - ptr_size;
         if (base_basicsize > basicsize)
             basicsize = base_basicsize;
     }
 
     char *name_copy = NB_STRDUP(name.c_str());
 
+    PyMemberDef members[2] { };
     PyType_Slot slots[128], *s = slots;
     PyType_Spec spec = {
         .name = name_copy,
@@ -364,10 +399,31 @@ PyObject *nb_type_new(const type_data *t) noexcept {
             spec.flags |= Py_TPFLAGS_HAVE_GC;
     }
 
+    if (has_dynamic_attr) {
+        if (spec.flags & Py_TPFLAGS_HAVE_GC)
+            fail("nanobind::detail::nb_type_new(\"%s\"): internal error -- "
+                 "attempted to enable dynamic attributes in a type with its "
+                 "own garbage collection hooks!", t->name);
+
+        // realign to sizeof(void*), add one pointer
+        basicsize = (basicsize + ptr_size - 1) / ptr_size * ptr_size;
+        basicsize += ptr_size;
+
+        members[0] = PyMemberDef{ "__dictoffset__", T_PYSSIZET,
+                                  (Py_ssize_t) (basicsize - ptr_size), READONLY,
+                                  nullptr };
+        *s++ = { Py_tp_members, (void *) members };
+        *s++ = { Py_tp_traverse, (void *) inst_traverse };
+        *s++ = { Py_tp_clear, (void *) inst_clear };
+
+        spec.basicsize = (int) basicsize;
+        spec.flags |= Py_TPFLAGS_HAVE_GC;
+    }
+
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass = is_enum ? internals.nb_enum :
-                                        internals.nb_type;
+    PyTypeObject *metaclass = is_enum ? internals.nb_enum
+                                      : internals.nb_type;
 
 #if PY_VERSION_HEX >= 0x030C0000
     // Life is good, PyType_FromMetaclass() is available
@@ -413,6 +469,11 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     tp->tp_name = name_copy;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
 
+#if PY_VERSION_HEX < 0x03090000
+    if (has_dynamic_attr)
+        tp->tp_dictoffset = (Py_ssize_t) (basicsize - ptr_size);
+#endif
+
     tp->tp_dict = tp->tp_bases = tp->tp_mro = tp->tp_cache =
         tp->tp_subclasses = tp->tp_weaklist = nullptr;
     ht->ht_cached_keys = nullptr;
@@ -420,7 +481,6 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     PyType_Ready(tp);
     Py_DECREF(temp);
-
 #endif
 
     type_data *to = nb_type_data((PyTypeObject *) result);
@@ -435,6 +495,13 @@ PyObject *nb_type_new(const type_data *t) noexcept {
                  "allocation failed!", t->name);
     } else {
         to->supplement = nullptr;
+    }
+
+    if (has_dynamic_attr) {
+        to->flags |= (uint32_t) type_flags::has_dynamic_attr;
+        #if defined(Py_LIMITED_API)
+            to->dictoffset = (Py_ssize_t) (basicsize - ptr_size);
+        #endif
     }
 
     if (has_scope)
@@ -454,7 +521,6 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     return result;
 }
-
 
 /// Encapsulates the implicit conversion part of nb_type_get()
 static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,

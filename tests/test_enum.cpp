@@ -6,6 +6,9 @@ enum class Enum  : uint32_t { A, B, C = (uint32_t) -1 };
 enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
 enum ClassicEnum { Item1, Item2 };
 
+struct EnumProperty { Enum get_enum() { return Enum::A; } };
+
+
 NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum")
         .value("A", Enum::A, "Value A")
@@ -25,4 +28,9 @@ NB_MODULE(test_enum_ext, m) {
     m.def("from_enum", [](Enum value) { return (uint32_t) value; });
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });
     m.def("from_enum", [](SEnum value) { return (int32_t) value; });
+
+    // test for issue #39
+    nb::class_<EnumProperty>(m, "EnumProperty")
+        .def(nb::init<>())
+        .def_property_readonly("read_enum", &EnumProperty::get_enum);
 }

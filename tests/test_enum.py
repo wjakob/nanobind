@@ -70,3 +70,9 @@ def test03_enum_arithmetic():
 def test04_enum_export():
     assert t.Item1 is t.ClassicEnum.Item1 and int(t.Item1) == 0
     assert t.Item2 is t.ClassicEnum.Item2 and int(t.Item2) == 1
+
+# test for issue #39
+def test05_enum_property():
+    w = t.EnumProperty()
+    assert w.read_enum == t.Enum.A
+    assert str(w.read_enum) == 'test_enum_ext.Enum.A'

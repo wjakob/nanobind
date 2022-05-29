@@ -218,7 +218,9 @@ template <typename T> NB_INLINE rv_policy infer_policy(rv_policy policy) {
             policy = rv_policy::copy;
     } else {
         if (policy == rv_policy::automatic ||
-            policy == rv_policy::automatic_reference)
+            policy == rv_policy::automatic_reference ||
+            policy == rv_policy::reference ||
+            policy == rv_policy::reference_internal)
             policy = rv_policy::move;
     }
     return policy;

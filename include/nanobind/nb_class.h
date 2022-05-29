@@ -462,8 +462,10 @@ inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline object inst_alloc(handle h) { return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr())); }
 inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
-inline bool inst_ready(handle h) { return detail::nb_inst_ready(h.ptr()); }
-inline void inst_mark_ready(handle h) { detail::nb_inst_mark_ready(h.ptr()); }
+inline void inst_set_state(handle h, bool ready, bool destruct) { detail::nb_inst_set_state(h.ptr(), ready, destruct); }
+inline std::pair<bool, bool> inst_state(handle h) { return detail::nb_inst_state(h.ptr()); }
+inline void inst_mark_ready(handle h) { inst_set_state(h, true, true); }
+inline bool inst_ready(handle h) { return inst_state(h).first; }
 inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
 inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }

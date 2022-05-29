@@ -67,8 +67,10 @@
 #endif
 
 #if defined(Py_TPFLAGS_HAVE_VECTORCALL)
+#  define NB_VECTORCALL PyObject_Vectorcall
 #  define NB_HAVE_VECTORCALL Py_TPFLAGS_HAVE_VECTORCALL
 #elif defined(_Py_TPFLAGS_HAVE_VECTORCALL)
+#  define NB_VECTORCALL _PyObject_Vectorcall
 #  define NB_HAVE_VECTORCALL _Py_TPFLAGS_HAVE_VECTORCALL
 #else
 #  define NB_HAVE_VECTORCALL (1UL << 11)

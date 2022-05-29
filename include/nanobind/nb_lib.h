@@ -247,23 +247,32 @@ NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
 /// Allocate an instance of type 't'
 NB_CORE PyObject *nb_inst_alloc(PyTypeObject *t);
 
-/// Zero-initialize a POD type and mark it as ready
-NB_CORE void nb_inst_zero(PyObject *o) noexcept;
-
 /// Call the destructor of the given python object
 NB_CORE void nb_inst_destruct(PyObject *o) noexcept;
 
-/// Copy-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
+/// Zero-initialize a POD type and mark it as ready + to be destructed upon GC
+NB_CORE void nb_inst_zero(PyObject *o) noexcept;
+
+/// Copy-construct 'dst' from 'src', mark it as ready and to be destructed (must have the same nb_type)
 NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
 
-/// Move-construct 'dst' from 'src' and mark it as ready (must have the same nb_type)
+/// Move-construct 'dst' from 'src', mark it as ready and to be destructed (must have the same nb_type)
 NB_CORE void nb_inst_move(PyObject *dst, const PyObject *src) noexcept;
 
-/// Check if an instance is ready
-NB_CORE bool nb_inst_ready(PyObject *o) noexcept;
+/**
+ * This function can be used to manually set two important flags associated with
+ * every nanobind instance (``nb_inst``).
+ *
+ * 1. 'ready': is the object fully constructed? Otherwise, nanobind will not
+ *    allow passing it to a function.
+ *
+ * 2. 'destruct': Should nanobind call the C++ destructor when the instance
+ *    is garbage collected?
+ */
+NB_CORE void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept;
 
-/// Mark an instance as ready
-NB_CORE void nb_inst_mark_ready(PyObject *o) noexcept;
+/// Query the 'ready' and 'destruct' flags of an instance
+NB_CORE std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept;
 
 // ========================================================================
 

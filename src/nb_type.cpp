@@ -994,14 +994,15 @@ void nb_inst_zero(PyObject *o) noexcept {
     nbi->ready = nbi->destruct = true;
 }
 
-void nb_inst_mark_ready(PyObject *o) noexcept {
+void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept {
     nb_inst *nbi = (nb_inst *) o;
-    nbi->ready = nbi->destruct = true;
+    nbi->ready = ready;
+    nbi->destruct = destruct;
 }
 
-bool nb_inst_ready(PyObject *o) noexcept {
+std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept {
     nb_inst *nbi = (nb_inst *) o;
-    return nbi->ready;
+    return { (bool) nbi->ready, (bool) nbi->destruct };
 }
 
 void nb_inst_destruct(PyObject *o) noexcept {

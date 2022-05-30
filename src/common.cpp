@@ -483,9 +483,17 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
     if (PyTuple_CheckExact(seq)) {
         size = (size_t) PyTuple_GET_SIZE(seq);
         result = ((PyTupleObject *) seq)->ob_item;
+        /* Special case for zero-sized lists/tuples. CPython
+           sets ob_item to NULL, which this function incidentally uses to
+           signal an error. Return a nonzero pointer that will, however,
+           still trigger a segfault if dereferenced. */
+        if (size == 0)
+            result = (PyObject **) 1;
     } else if (PyList_CheckExact(seq)) {
         size = (size_t) PyList_GET_SIZE(seq);
         result = ((PyListObject *) seq)->ob_item;
+        if (size == 0) // ditto
+            result = (PyObject **) 1;
     } else if (PySequence_Check(seq)) {
         temp = PySequence_Fast(seq, "");
 
@@ -566,11 +574,21 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
 #if !defined(Py_LIMITED_API)
     if (PyTuple_CheckExact(seq)) {
-        if (size == (size_t) PyTuple_GET_SIZE(seq))
+        if (size == (size_t) PyTuple_GET_SIZE(seq)) {
             result = ((PyTupleObject *) seq)->ob_item;
+            /* Special case for zero-sized lists/tuples. CPython
+               sets ob_item to NULL, which this function incidentally uses to
+               signal an error. Return a nonzero pointer that will, however,
+               still trigger a segfault if dereferenced. */
+            if (size == 0)
+                result = (PyObject **) 1;
+        }
     } else if (PyList_CheckExact(seq)) {
-        if (size == (size_t) PyList_GET_SIZE(seq))
+        if (size == (size_t) PyList_GET_SIZE(seq)) {
             result = ((PyListObject *) seq)->ob_item;
+            if (size == 0) // ditto
+                result = (PyObject **) 1;
+        }
     } else if (PySequence_Check(seq)) {
         temp = PySequence_Fast(seq, "");
 

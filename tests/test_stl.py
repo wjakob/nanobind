@@ -322,4 +322,7 @@ def test31_vec_type_check():
         t.vec_moveable_in_value(0)
 
 def test32_list():
+    assert t.identity_list([]) == []
     assert t.identity_list([1, 2, 3]) == [1, 2, 3]
+    assert t.identity_list(()) == []
+    assert t.identity_list((1, 2, 3)) == [1, 2, 3]

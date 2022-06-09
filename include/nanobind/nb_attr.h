@@ -57,6 +57,12 @@ struct is_enum { bool is_signed; };
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
+template <typename T> struct intrusive_ptr {
+    intrusive_ptr(void (*set_self_py)(T *, PyObject *))
+        : set_self_py(set_self_py) {}
+    void (*set_self_py)(T *, PyObject *);
+};
+
 struct type_callback {
     type_callback(void (*value)(PyType_Slot **) noexcept) : value(value) {}
     void (*value)(PyType_Slot **) noexcept;

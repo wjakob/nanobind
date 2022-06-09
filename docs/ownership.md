@@ -14,6 +14,14 @@ complexity; they were therefore removed in _nanobind_. This has implications on
 object ownership, shared ownership, and interactions with C++ shared/unique
 pointers.
 
+- **Intrusive reference counting**: Like _pybind11_, _nanobind_ provides a way
+  of binding classes with builtin ("intrusive") reference counting. This is the
+  most general and cheapest way of handling shared ownership between C++ and
+  Python, but it requires that the base class of an object hierarchy is adapted
+  according to the needs of _nanobind_. Details on using intrusive reference
+  counting can be found
+  [here](https://github.com/wjakob/nanobind/blob/master/docs/intrusive.md).
+
 - **Shared pointers**: It is possible to bind functions that receive and return
   `std::shared_ptr<T>` by including the optional type caster
   [`nanobind/stl/shared_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/shared_ptr.h)
@@ -23,13 +31,12 @@ pointers.
   ownership must be shared between Python and C++. _nanobind_ does this by
   increasing the reference count of the `PyObject` and then creating a
   `std::shared_ptr<T>` with a new control block containing a custom deleter
-  that reduces the Python reference count upon destruction of the shared
-  pointer.
+  that will in turn reduce the Python reference count upon destruction of the
+  shared pointer.
 
   When a C++ function returns a `std::shared_ptr<T>`, _nanobind_ checks if the
   instance already has a `PyObject` counterpart (nothing needs to be done in
-  this case). Otherwise, it creates a compact `PyObject` wrapping a pointer to
-  the instance data. It indicates shared ownership by creating a temporary
+  this case). Otherwise, it indicates shared ownership by creating a temporary
   `std::shared_ptr<T>` on the heap that will be destructed when the `PyObject`
   is garbage collected.
 

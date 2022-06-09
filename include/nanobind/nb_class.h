@@ -66,7 +66,10 @@ enum class type_flags : uint32_t {
     has_supplement           = (1 << 18),
 
     /// Instances of this type support dynamic attribute assignment
-    has_dynamic_attr         = (1 << 19)
+    has_dynamic_attr         = (1 << 19),
+
+    /// The class uses an intrusive reference counting approach
+    intrusive_ptr            = (1 << 20)
 };
 
 struct type_data {
@@ -87,6 +90,7 @@ struct type_data {
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
     void (*type_callback)(PyType_Slot **) noexcept;
     void *supplement;
+    void (*set_self_py)(void *, PyObject *);
 #if defined(Py_LIMITED_API)
     size_t dictoffset;
 #endif
@@ -105,6 +109,12 @@ NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
 NB_INLINE void type_extra_apply(type_data &t, type_callback c) {
     t.flags |= (uint32_t) type_flags::has_type_callback;
     t.type_callback = c.value;
+}
+
+template <typename T>
+NB_INLINE void type_extra_apply(type_data &t, intrusive_ptr<T> ip) {
+    t.flags |= (uint32_t) type_flags::intrusive_ptr;
+    t.set_self_py = (void (*)(void *, PyObject *)) ip.set_self_py;
 }
 
 NB_INLINE void type_extra_apply(type_data &t, is_enum e) {

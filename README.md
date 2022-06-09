@@ -264,8 +264,12 @@ changes are detailed below.
 - **Shared pointers and holders**. _nanobind_ removes the concept of a _holder
   type_, which caused inefficiencies and introduced complexity in _pybind11_.
   This has implications on object ownership, shared ownership, and interactions
-  with C++ shared/unique pointers. Please see the following [separate
-  document](docs/ownership.md) for the nitty-gritty details.
+  with C++ shared/unique pointers.
+
+  Please see the following [separate page](docs/ownership.md) for the
+  nitty-gritty details on shared and unique pointers. Classes with _intrusive_
+  reference counting also continue to be supported, please see the [linked
+  page](docs/intrusive.md) for details.
 
   The gist is that use of shared/unique pointers requires one or both of the
   following optional header files:

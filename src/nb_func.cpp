@@ -567,6 +567,10 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
+
+                    const type_data *t = nb_type_data(Py_TYPE(self_arg));
+                    if (t->flags & (uint32_t) type_flags::intrusive_ptr)
+                        t->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
 
                 goto done;
@@ -690,6 +694,10 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
+
+                    const type_data *t = nb_type_data(Py_TYPE(self_arg));
+                    if (t->flags & (uint32_t) type_flags::intrusive_ptr)
+                        t->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
 
                 goto done;

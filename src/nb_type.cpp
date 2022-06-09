@@ -307,7 +307,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
          has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
          has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback,
          has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
-         has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr;
+         has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
+         intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
     nb_internals &internals = internals_get();
     str name(t->name), qualname = name;
@@ -351,9 +352,10 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         base = (PyObject *) it->second->type_py;
     }
 
+    type_data *tb = nullptr;
     if (base) {
         // Check if the base type already has dynamic attributes
-        type_data *tb = nb_type_data((PyTypeObject *) base);
+        tb = nb_type_data((PyTypeObject *) base);
         if (tb->flags & (uint32_t) type_flags::has_dynamic_attr)
             has_dynamic_attr = true;
 
@@ -485,6 +487,12 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     type_data *to = nb_type_data((PyTypeObject *) result);
     *to = *t;
+
+    if (!intrusive_ptr && tb &&
+        (tb->flags & (uint32_t) type_flags::intrusive_ptr)) {
+        to->flags |= (uint32_t) type_flags::intrusive_ptr;
+        to->set_self_py = tb->set_self_py;
+    }
 
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;
@@ -776,9 +784,13 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     if (rvp == rv_policy::reference_internal && (!cleanup || !cleanup->self()))
         return nullptr;
 
-    bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
-
     type_data *t = it2->second;
+    const bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+    if (intrusive)
+        rvp = rv_policy::take_ownership;
+
+    const bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
+
     nb_inst *inst =
         (nb_inst *) inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
     if (!inst)
@@ -836,6 +848,9 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
 
     if (rvp == rv_policy::reference_internal)
         keep_alive((PyObject *) inst, cleanup->self());
+
+    if (intrusive)
+        t->set_self_py(new_value, (PyObject *) inst);
 
     return (PyObject *) inst;
 }

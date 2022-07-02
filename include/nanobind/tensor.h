@@ -268,6 +268,7 @@ public:
         detail::tensor_dec_ref(m_handle);
         m_handle = t.m_handle;
         m_tensor = t.m_tensor;
+        return *this;
     }
 
     dlpack::dtype dtype() const { return m_tensor.dtype; }

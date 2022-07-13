@@ -32,18 +32,5 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IN_FILE} ${OUT_DIR})
   endforeach()
 
-  if (WIN32)
-    set(OUT_FILE ${OUT_DIR}/nanobind.dll)
-  elseif(APPLE)
-    set(OUT_FILE ${OUT_DIR}/libnanobind.dylib)
-  else()
-    set(OUT_FILE ${OUT_DIR}/libnanobind.so)
-  endif()
-
-  add_custom_command(
-    DEPENDS nanobind TARGET OUTPUT ${OUT_FILE}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:nanobind> ${OUT_DIR})
-  set(TEST_FILES_OUT ${TEST_FILES_OUT} ${OUT_FILE})
-
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
 endif()

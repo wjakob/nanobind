@@ -45,6 +45,13 @@ public:                                                                        \
             detail::obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
     }
 
+#define NB_API_OP_2_I(name, op)                                                \
+    template <typename T> NB_INLINE auto name(const api<T> &o) {               \
+        return steal(                                                          \
+            detail::obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
+    }
+
+
 // A few forward declarations
 class object;
 class handle;
@@ -109,24 +116,24 @@ public:
     NB_API_OP_1(operator-,  PyNumber_Negative)
     NB_API_OP_1(operator!,  PyNumber_Invert)
     NB_API_OP_2(operator+,  PyNumber_Add)
-    NB_API_OP_2(operator+=, PyNumber_InPlaceAdd)
     NB_API_OP_2(operator-,  PyNumber_Subtract)
-    NB_API_OP_2(operator-=, PyNumber_InPlaceSubtract)
     NB_API_OP_2(operator*,  PyNumber_Multiply)
-    NB_API_OP_2(operator*=, PyNumber_InPlaceMultiply)
     NB_API_OP_2(operator/,  PyNumber_TrueDivide)
-    NB_API_OP_2(operator/=, PyNumber_InPlaceTrueDivide)
     NB_API_OP_2(operator|,  PyNumber_Or)
-    NB_API_OP_2(operator|=, PyNumber_InPlaceOr)
     NB_API_OP_2(operator&,  PyNumber_And)
-    NB_API_OP_2(operator&=, PyNumber_InPlaceAnd)
     NB_API_OP_2(operator^,  PyNumber_Xor)
-    NB_API_OP_2(operator^=, PyNumber_InPlaceXor)
     NB_API_OP_2(operator<<, PyNumber_Lshift)
-    NB_API_OP_2(operator<<=,PyNumber_InPlaceLshift)
     NB_API_OP_2(operator>>, PyNumber_Rshift)
-    NB_API_OP_2(operator>>=,PyNumber_InPlaceRshift)
     NB_API_OP_2(floor_div,  PyNumber_FloorDivide)
+    NB_API_OP_2_I(operator+=, PyNumber_InPlaceAdd)
+    NB_API_OP_2_I(operator-=, PyNumber_InPlaceSubtract)
+    NB_API_OP_2_I(operator*=, PyNumber_InPlaceMultiply)
+    NB_API_OP_2_I(operator/=, PyNumber_InPlaceTrueDivide)
+    NB_API_OP_2_I(operator|=, PyNumber_InPlaceOr)
+    NB_API_OP_2_I(operator&=, PyNumber_InPlaceAnd)
+    NB_API_OP_2_I(operator^=, PyNumber_InPlaceXor)
+    NB_API_OP_2_I(operator<<=,PyNumber_InPlaceLshift)
+    NB_API_OP_2_I(operator>>=,PyNumber_InPlaceRshift)
 };
 
 NAMESPACE_END(detail)
@@ -551,3 +558,4 @@ NAMESPACE_END(NB_NAMESPACE)
 #undef NB_API_COMP
 #undef NB_API_OP_1
 #undef NB_API_OP_2
+#undef NB_API_OP_2_I

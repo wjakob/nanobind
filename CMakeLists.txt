@@ -66,3 +66,21 @@ find_package(nanobind
 if (NB_TEST)
   add_subdirectory(tests)
 endif()
+
+# ---------------------------------------------------------------------------
+
+install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/nanobind DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+include(GNUInstallDirs)
+
+set(NANOBIND_CMAKECONFIG_INSTALL_DIR
+    "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+    CACHE STRING "install path for nanobind-config.cmake")
+
+install(
+  FILES ${CMAKE_CURRENT_LIST_DIR}/cmake/${PROJECT_NAME}-config.cmake
+  DESTINATION ${NANOBIND_CMAKECONFIG_INSTALL_DIR})
+
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/tests/${CMAKE_SHARED_LIBRARY_PREFIX}${PROJECT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}
+  DESTINATION ${CMAKE_INSTALL_LIBDIR})

@@ -548,7 +548,7 @@ static void tensor_capsule_destructor(PyObject *o) {
         PyErr_Clear();
 }
 
-PyObject *tensor_wrap(tensor_handle *th, int framework) noexcept {
+PyObject *tensor_wrap(tensor_handle *th, int framework, bool writeable) noexcept {
     tensor_inc_ref(th);
     object o = steal(PyCapsule_New(th->tensor, "dltensor", tensor_capsule_destructor)),
            package;
@@ -583,23 +583,41 @@ PyObject *tensor_wrap(tensor_handle *th, int framework) noexcept {
 
 
     if (package.is_valid()) {
-        try {
-            o = package.attr("from_dlpack")(o);
-        } catch (...) {
+        if (writeable)
+        {
+            // Force usage of asarray which goes via the buffer interface
+            // (see nb_tensor_getbuffer) as dlpack does not support returning
+            // a writeable array.
             if ((tensor_framework) framework == tensor_framework::numpy) {
                 try {
-                    // Older numpy versions
-                    o = package.attr("_from_dlpack")(o);
+                    o = package.attr("asarray")(o);
                 } catch (...) {
-                    try {
-                        // Yet older numpy versions
-                        o = package.attr("asarray")(o);
-                    } catch (...) {
-                        return nullptr;
-                    }
+                    return nullptr;
                 }
-            } else {
+            }
+            else
+                // This should be prevented by the static_assert in
+                // from_cpp of the type_caster.
                 return nullptr;
+        } else {
+            try {
+                o = package.attr("from_dlpack")(o);
+            } catch (...) {
+                if ((tensor_framework) framework == tensor_framework::numpy) {
+                    try {
+                        // Older numpy versions
+                        o = package.attr("_from_dlpack")(o);
+                    } catch (...) {
+                        try {
+                            // Yet older numpy versions
+                            o = package.attr("asarray")(o);
+                        } catch (...) {
+                            return nullptr;
+                        }
+                    }
+                } else {
+                    return nullptr;
+                }
             }
         }
     }

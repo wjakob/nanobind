@@ -306,6 +306,7 @@ def test16_return_numpy():
     x = t.ret_numpy()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+    assert not x.flags['WRITEABLE']
     del x
     gc.collect()
     assert t.destruct_count() - dc == 1
@@ -322,6 +323,21 @@ def test17_return_pytorch():
     x = t.ret_pytorch()
     assert x.shape == (2, 4)
     assert torch.all(x == torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]]))
+    del x
+    gc.collect()
+    assert t.destruct_count() - dc == 1
+
+
+@needs_numpy
+def test18_return_numpy_writeable():
+    gc.collect()
+    dc = t.destruct_count()
+    x = t.ret_numpy_writeable()
+    assert x.shape == (2, 4)
+    assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+    assert x.flags['WRITEABLE']
+    # Check we can actual write.
+    x[0, 0] = 1
     del x
     gc.collect()
     assert t.destruct_count() - dc == 1

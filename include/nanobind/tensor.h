@@ -75,6 +75,7 @@ struct numpy { };
 struct tensorflow { };
 struct pytorch { };
 struct jax { };
+struct writeable { };
 
 template <typename T> constexpr dlpack::dtype dtype() {
     static_assert(
@@ -181,6 +182,7 @@ template <typename... Ts> struct tensor_info {
     using shape_type = void;
     constexpr static auto name = const_name("tensor");
     constexpr static tensor_framework framework = tensor_framework::none;
+    constexpr static bool writeable = false;
 };
 
 template <typename T, typename... Ts> struct tensor_info<T, Ts...>  : tensor_info<Ts...> {
@@ -211,6 +213,10 @@ template <typename... Ts> struct tensor_info<tensorflow, Ts...> : tensor_info<Ts
 template <typename... Ts> struct tensor_info<jax, Ts...> : tensor_info<Ts...> {
     constexpr static auto name = const_name("jaxlib.xla_extension.DeviceArray");
     constexpr static tensor_framework framework = tensor_framework::jax;
+};
+
+template <typename... Ts> struct tensor_info<writeable, Ts...> : tensor_info<Ts...> {
+    constexpr static bool writeable = true;
 };
 
 NAMESPACE_END(detail)
@@ -330,7 +336,11 @@ template <typename... Args> struct type_caster<tensor<Args...>> {
 
     static handle from_cpp(const tensor<Args...> &tensor, rv_policy,
                            cleanup_list *) noexcept {
-        return tensor_wrap(tensor.handle(), int(Value::Info::framework));
+        static_assert(Value::Info::writeable == false || Value::Info::framework == tensor_framework::numpy,
+           "Currently, writeable arrays are only available with numpy." );
+
+        return tensor_wrap(tensor.handle(), int(Value::Info::framework),
+                           Value::Info::writeable);
     }
 };
 

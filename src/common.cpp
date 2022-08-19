@@ -470,6 +470,29 @@ PyObject *str_from_cstr_and_size(const char *str, size_t size) {
 
 // ========================================================================
 
+PyObject *bytes_from_obj(PyObject *o) {
+    PyObject *result = PyBytes_FromObject(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *bytes_from_cstr(const char *str) {
+    PyObject *result = PyBytes_FromString(str);
+    if (!result)
+        raise("nanobind::detail::bytes_from_cstr(): conversion error!");
+    return result;
+}
+
+PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
+    PyObject *result = PyBytes_FromStringAndSize(str, (Py_ssize_t) size);
+    if (!result)
+        raise("nanobind::detail::bytes_from_cstr_and_size(): conversion error!");
+    return result;
+}
+
+// ========================================================================
+
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {
     PyObject *temp = nullptr;
     size_t size = 0;

@@ -295,6 +295,23 @@ class str : public object {
     const char *c_str() { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };
 
+class bytes : public object {
+    NB_OBJECT_DEFAULT(bytes, object, "bytes", PyBytes_Check)
+
+    explicit bytes(handle h)
+        : object(detail::bytes_from_obj(h.ptr()), detail::steal_t{}) { }
+
+    explicit bytes(const char *c)
+        : object(detail::bytes_from_cstr(c), detail::steal_t{}) { }
+
+    explicit bytes(const char *c, size_t n)
+        : object(detail::bytes_from_cstr_and_size(c, n), detail::steal_t{}) { }
+
+    const char *c_str() { return PyBytes_AsString(m_ptr); }
+
+    size_t size() const { return PyBytes_Size(m_ptr); }
+};
+
 class tuple : public object {
     NB_OBJECT_DEFAULT(tuple, object, "tuple", PyTuple_Check)
     size_t size() const { return NB_TUPLE_GET_SIZE(m_ptr); }

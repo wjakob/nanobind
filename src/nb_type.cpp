@@ -748,7 +748,7 @@ void keep_alive(PyObject *nurse, void *payload,
             raise("keep_alive(): the given 'payload' pointer was already registered!");
         ((nb_inst *) nurse)->clear_keep_alive = true;
     } else {
-        PyObject *patient = capsule_new(payload, callback);
+        PyObject *patient = capsule_new(payload, nullptr, callback);
         keep_alive(nurse, patient);
         Py_DECREF(patient);
     }

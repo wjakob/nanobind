@@ -188,8 +188,8 @@ NB_CORE PyObject **seq_get(PyObject *seq, size_t *size,
 
 // ========================================================================
 
-/// Create a new capsule object
-NB_CORE PyObject *capsule_new(const void *ptr,
+/// Create a new capsule object with a name
+NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
                               void (*free)(void *) noexcept) noexcept;
 
 // ========================================================================

@@ -269,7 +269,12 @@ class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, "capsule", PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*free)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, free);
+        m_ptr = detail::capsule_new(ptr, nullptr, free);
+    }
+
+    capsule(const void *ptr, const char *name,
+            void (*free)(void *) noexcept = nullptr) {
+        m_ptr = detail::capsule_new(ptr, name, free);
     }
 
     void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }

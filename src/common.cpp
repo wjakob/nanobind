@@ -55,14 +55,15 @@ void fail(const char *fmt, ...) noexcept {
     abort();
 }
 
-PyObject *capsule_new(const void *ptr, void (*free)(void *) noexcept) noexcept {
+PyObject *capsule_new(const void *ptr, const char *name,
+        void (*free)(void *) noexcept) noexcept {
     auto capsule_free = [](PyObject *o) {
         auto free_2 = (void (*)(void *))(PyCapsule_GetContext(o));
         if (free_2)
-            free_2(PyCapsule_GetPointer(o, nullptr));
+            free_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
     };
 
-    PyObject *c = PyCapsule_New((void *) ptr, nullptr, capsule_free);
+    PyObject *c = PyCapsule_New((void *) ptr, name, capsule_free);
 
     if (!c)
         fail("nanobind::detail::capsule_new(): allocation failed!");

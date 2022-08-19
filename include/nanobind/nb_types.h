@@ -272,6 +272,11 @@ class capsule : public object {
         m_ptr = detail::capsule_new(ptr, free);
     }
 
+    capsule(const void *ptr, const char *name,
+            void (*free)(void *) noexcept = nullptr) {
+        m_ptr = detail::capsule_new(ptr, name, free);
+    }
+
     void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }
 };
 

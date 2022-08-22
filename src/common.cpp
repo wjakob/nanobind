@@ -55,10 +55,6 @@ void fail(const char *fmt, ...) noexcept {
     abort();
 }
 
-PyObject *capsule_new(const void *ptr, void (*free)(void *) noexcept) noexcept {
-    return capsule_new(ptr, nullptr, free);
-}
-
 PyObject *capsule_new(const void *ptr, const char *name,
         void (*free)(void *) noexcept) noexcept {
     auto capsule_free = [](PyObject *o) {

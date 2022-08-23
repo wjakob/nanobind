@@ -499,3 +499,8 @@ def test26_dynamic_attr(clean):
         value_constructed=100,
         destructed=100
     )
+
+def test27_copy_rvp():
+    a = t.Struct.create_reference()
+    b = t.Struct.create_copy()
+    assert a is not b

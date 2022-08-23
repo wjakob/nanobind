@@ -767,7 +767,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     nb_internals &internals = internals_get();
     auto it = internals.inst_c2p.find(
         std::pair<void *, std::type_index>(value, *cpp_type));
-    if (it != internals.inst_c2p.end()) {
+    if (it != internals.inst_c2p.end() && rvp != rv_policy::copy) {
         PyObject *result = (PyObject *) it->second;
         Py_INCREF(result);
         return result;

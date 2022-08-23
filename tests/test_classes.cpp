@@ -86,7 +86,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<int>())
         .def("value", &Struct::value)
         .def("set_value", &Struct::set_value, "value"_a)
-        .def("self", &Struct::self)
+        .def("self", &Struct::self, nb::rv_policy::none)
         .def("none", [](Struct &) -> const Struct * { return nullptr; })
         .def_static("static_test", nb::overload_cast<int>(&Struct::static_test))
         .def_static("static_test", nb::overload_cast<float>(&Struct::static_test))

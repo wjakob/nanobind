@@ -138,4 +138,10 @@ NB_MODULE(test_tensor_ext, m) {
         return nb::tensor<nb::numpy, float, nb::shape<2, 4>, nb::writeable>(f, 2, shape,
                                                              deleter);
     });
+
+    m.def("passthrough", [](nb::tensor<> a) { return a; });
+    m.def("accept_numpy_readonly",
+          []([[maybe_unused]] nb::tensor<nb::numpy, nb::readonly> ro,
+              [[maybe_unused]] nb::tensor<nb::numpy, nb::writeable> rw) {
+    });
 }

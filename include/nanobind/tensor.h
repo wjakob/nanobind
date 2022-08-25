@@ -76,6 +76,7 @@ struct tensorflow { };
 struct pytorch { };
 struct jax { };
 struct writeable { };
+struct readonly { };
 
 template <typename T> constexpr dlpack::dtype dtype() {
     static_assert(
@@ -109,6 +110,7 @@ struct tensor_req {
     size_t *shape = nullptr;
     bool req_shape = false;
     bool req_dtype = false;
+    bool readonly = false;
     char req_order = '\0';
     uint8_t req_device = 0;
 };
@@ -177,12 +179,21 @@ template <typename T> struct tensor_arg<T, enable_if_t<T::is_device>> {
     static void apply(tensor_req &tr) { tr.req_device = (uint8_t) T::value; }
 };
 
+template <> struct tensor_arg<readonly> {
+    static constexpr size_t size = 0;
+    static constexpr auto name = const_name("readonly");
+    static void apply(tensor_req &tr) { tr.readonly = true; }
+};
+
 template <typename... Ts> struct tensor_info {
     using scalar_type = void;
     using shape_type = void;
     constexpr static auto name = const_name("tensor");
     constexpr static tensor_framework framework = tensor_framework::none;
+    // Relevant for from_cpp
     constexpr static bool writeable = false;
+    // Relevant for from_python
+    constexpr static bool readonly = false;
 };
 
 template <typename T, typename... Ts> struct tensor_info<T, Ts...>  : tensor_info<Ts...> {
@@ -217,6 +228,10 @@ template <typename... Ts> struct tensor_info<jax, Ts...> : tensor_info<Ts...> {
 
 template <typename... Ts> struct tensor_info<writeable, Ts...> : tensor_info<Ts...> {
     constexpr static bool writeable = true;
+};
+
+template <typename... Ts> struct tensor_info<readonly, Ts...> : tensor_info<Ts...> {
+    constexpr static bool readonly = true;
 };
 
 NAMESPACE_END(detail)
@@ -325,10 +340,16 @@ template <typename... Args> struct type_caster<tensor<Args...>> {
 
     bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         constexpr size_t size = (0 + ... + detail::tensor_arg<Args>::size);
+
+        static_assert(Value::Info::readonly == false ||
+                      Value::Info::framework == tensor_framework::numpy,
+                      "Currently, only numpy arrays can be passed readonly.");
+
         size_t shape[size + 1];
         detail::tensor_req req;
         req.shape = shape;
         (detail::tensor_arg<Args>::apply(req), ...);
+
         value = tensor<Args...>(tensor_import(
             src.ptr(), &req, flags & (uint8_t) cast_flags::convert));
         return value.is_valid();
@@ -336,8 +357,10 @@ template <typename... Args> struct type_caster<tensor<Args...>> {
 
     static handle from_cpp(const tensor<Args...> &tensor, rv_policy,
                            cleanup_list *) noexcept {
-        static_assert(Value::Info::writeable == false || Value::Info::framework == tensor_framework::numpy,
-           "Currently, writeable arrays are only available with numpy." );
+
+        static_assert(Value::Info::writeable == false ||
+                    Value::Info::framework == tensor_framework::numpy,
+                    "Currently, writeable arrays are only available with numpy.");
 
         return tensor_wrap(tensor.handle(), int(Value::Info::framework),
                            Value::Info::writeable);

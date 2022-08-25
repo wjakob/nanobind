@@ -145,11 +145,11 @@ void nb_tensor_releasebuffer(PyObject *, Py_buffer *view) {
     PyMem_Free(view->strides);
 }
 
-static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
+static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool readonly) {
     scoped_pymalloc<Py_buffer> view;
     scoped_pymalloc<managed_tensor> mt;
 
-    if (PyObject_GetBuffer(o, view.get(), PyBUF_RECORDS)) {
+    if (PyObject_GetBuffer(o, view.get(), readonly ? PyBUF_RECORDS_RO : PyBUF_RECORDS)) {
         PyErr_Clear();
         return nullptr;
     }
@@ -264,7 +264,17 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
 
     // If this is not a capsule, try calling o.__dlpack__()
     if (!PyCapsule_CheckExact(o)) {
-        capsule = steal(PyObject_CallMethod(o, "__dlpack__", nullptr));
+        if (req->readonly)
+        {
+            // We need to go via the buffer protocol for this. Only numpy is supported.
+            // Others are prevented via a static_assert in from_python.
+            capsule = steal(dlpack_from_buffer_protocol(o, req->readonly));
+            if (!capsule.is_valid())
+                return nullptr;
+        }
+        else {
+            capsule = steal(PyObject_CallMethod(o, "__dlpack__", nullptr));
+        }
 
         if (!capsule.is_valid()) {
             PyErr_Clear();
@@ -291,7 +301,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
 
         // Try creating a tensor via the buffer protocol
         if (!capsule.is_valid())
-            capsule = steal(dlpack_from_buffer_protocol(o));
+            capsule = steal(dlpack_from_buffer_protocol(o, req->readonly));
 
         if (!capsule.is_valid())
             return nullptr;

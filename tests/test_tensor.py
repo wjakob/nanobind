@@ -335,9 +335,27 @@ def test18_return_numpy_writeable():
     x = t.ret_numpy_writeable()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+    # Check the flags.
     assert x.flags['WRITEABLE']
-    # Check we can actual write.
+    # Check we can actually write.
     x[0, 0] = 1
     del x
     gc.collect()
     assert t.destruct_count() - dc == 1
+
+
+@needs_numpy
+def test19_pass_numpy_readonly():
+    rw = np.zeros((2, 2))
+    ro = np.zeros((2, 2))
+    ro.setflags(write=False)
+
+    assert rw.flags["WRITEABLE"]
+    assert not ro.flags["WRITEABLE"]
+
+    # Only first parameter accepts readonly, so this should throw.
+    with pytest.raises(TypeError):
+        t.accept_numpy_readonly(ro, ro)
+
+    # This works though.
+    t.accept_numpy_readonly(ro, rw)

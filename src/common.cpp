@@ -55,14 +55,15 @@ void fail(const char *fmt, ...) noexcept {
     abort();
 }
 
-PyObject *capsule_new(const void *ptr, void (*free)(void *) noexcept) noexcept {
+PyObject *capsule_new(const void *ptr, const char *name,
+        void (*free)(void *) noexcept) noexcept {
     auto capsule_free = [](PyObject *o) {
         auto free_2 = (void (*)(void *))(PyCapsule_GetContext(o));
         if (free_2)
-            free_2(PyCapsule_GetPointer(o, nullptr));
+            free_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
     };
 
-    PyObject *c = PyCapsule_New((void *) ptr, nullptr, capsule_free);
+    PyObject *c = PyCapsule_New((void *) ptr, name, capsule_free);
 
     if (!c)
         fail("nanobind::detail::capsule_new(): allocation failed!");
@@ -465,6 +466,29 @@ PyObject *str_from_cstr_and_size(const char *str, size_t size) {
     PyObject *result = PyUnicode_FromStringAndSize(str, (Py_ssize_t) size);
     if (!result)
         raise("nanobind::detail::str_from_cstr_and_size(): conversion error!");
+    return result;
+}
+
+// ========================================================================
+
+PyObject *bytes_from_obj(PyObject *o) {
+    PyObject *result = PyBytes_FromObject(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *bytes_from_cstr(const char *str) {
+    PyObject *result = PyBytes_FromString(str);
+    if (!result)
+        raise("nanobind::detail::bytes_from_cstr(): conversion error!");
+    return result;
+}
+
+PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
+    PyObject *result = PyBytes_FromStringAndSize(str, (Py_ssize_t) size);
+    if (!result)
+        raise("nanobind::detail::bytes_from_cstr_and_size(): conversion error!");
     return result;
 }
 

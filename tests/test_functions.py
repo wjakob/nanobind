@@ -195,3 +195,11 @@ def test22_string_return():
     assert t.test_12("hello") == "hello"
     assert t.test_13() == "test"
     assert t.test_14("abc") == "abc"
+
+
+def test23_byte_return():
+    assert t.test_15(b"abc") == "abc"
+    assert t.test_16("hello") == b"hello"
+    assert t.test_17(b"four") == 4
+    assert t.test_17(b"\x00\x00\x00\x00") == 4
+    assert t.test_18("hello world", 5) == b"hello"

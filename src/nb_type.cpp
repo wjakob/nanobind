@@ -748,7 +748,7 @@ void keep_alive(PyObject *nurse, void *payload,
             raise("keep_alive(): the given 'payload' pointer was already registered!");
         ((nb_inst *) nurse)->clear_keep_alive = true;
     } else {
-        PyObject *patient = capsule_new(payload, callback);
+        PyObject *patient = capsule_new(payload, nullptr, callback);
         keep_alive(nurse, patient);
         Py_DECREF(patient);
     }
@@ -767,7 +767,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     nb_internals &internals = internals_get();
     auto it = internals.inst_c2p.find(
         std::pair<void *, std::type_index>(value, *cpp_type));
-    if (it != internals.inst_c2p.end()) {
+    if (it != internals.inst_c2p.end() && rvp != rv_policy::copy) {
         PyObject *result = (PyObject *) it->second;
         Py_INCREF(result);
         return result;

@@ -269,7 +269,12 @@ class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, "capsule", PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*free)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, free);
+        m_ptr = detail::capsule_new(ptr, nullptr, free);
+    }
+
+    capsule(const void *ptr, const char *name,
+            void (*free)(void *) noexcept = nullptr) {
+        m_ptr = detail::capsule_new(ptr, name, free);
     }
 
     void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }
@@ -288,6 +293,23 @@ class str : public object {
         : object(detail::str_from_cstr_and_size(c, n), detail::steal_t{}) { }
 
     const char *c_str() { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
+};
+
+class bytes : public object {
+    NB_OBJECT_DEFAULT(bytes, object, "bytes", PyBytes_Check)
+
+    explicit bytes(handle h)
+        : object(detail::bytes_from_obj(h.ptr()), detail::steal_t{}) { }
+
+    explicit bytes(const char *c)
+        : object(detail::bytes_from_cstr(c), detail::steal_t{}) { }
+
+    explicit bytes(const char *c, size_t n)
+        : object(detail::bytes_from_cstr_and_size(c, n), detail::steal_t{}) { }
+
+    const char *c_str() { return PyBytes_AsString(m_ptr); }
+
+    size_t size() const { return PyBytes_Size(m_ptr); }
 };
 
 class tuple : public object {

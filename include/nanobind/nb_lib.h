@@ -99,6 +99,17 @@ NB_CORE PyObject *str_from_cstr_and_size(const char *c, size_t n);
 
 // ========================================================================
 
+/// Convert a Python object into a Python byte string
+NB_CORE PyObject *bytes_from_obj(PyObject *o);
+
+/// Convert an UTF8 null-terminated C string into a Python byte string
+NB_CORE PyObject *bytes_from_cstr(const char *c);
+
+/// Convert an UTF8 C string + size into a Python byte string
+NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
+
+// ========================================================================
+
 /// Get an object attribute or raise an exception
 NB_CORE PyObject *getattr(PyObject *obj, const char *key);
 NB_CORE PyObject *getattr(PyObject *obj, PyObject *key);
@@ -188,8 +199,8 @@ NB_CORE PyObject **seq_get(PyObject *seq, size_t *size,
 
 // ========================================================================
 
-/// Create a new capsule object
-NB_CORE PyObject *capsule_new(const void *ptr,
+/// Create a new capsule object with a name
+NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
                               void (*free)(void *) noexcept) noexcept;
 
 // ========================================================================

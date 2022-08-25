@@ -80,7 +80,7 @@ NB_MODULE(test_tensor_ext, m) {
                                    nb::c_contig, nb::device::cpu> tensor) {
         // Double brightness of the MxNx3 RGB image
         for (size_t y = 0; y < tensor.shape(0); ++y)
-            for (size_t x = 0; y < tensor.shape(1); ++x)
+            for (size_t x = 0; x < tensor.shape(1); ++x)
                 for (size_t ch = 0; ch < 3; ++ch)
                     tensor(y, x, ch) = (uint8_t) std::min(255, tensor(y, x, ch) * 2);
 

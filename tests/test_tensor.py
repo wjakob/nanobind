@@ -325,3 +325,13 @@ def test17_return_pytorch():
     del x
     gc.collect()
     assert t.destruct_count() - dc == 1
+
+@needs_numpy
+def test18_return_array_scalar():
+    gc.collect()
+    dc = t.destruct_count()
+    x = t.ret_array_scalar()
+    assert np.array_equal(x, np.array(1))
+    del x
+    gc.collect()
+    assert t.destruct_count() - dc == 1

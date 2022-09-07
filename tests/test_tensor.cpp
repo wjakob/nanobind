@@ -125,4 +125,16 @@ NB_MODULE(test_tensor_ext, m) {
         return nb::tensor<nb::pytorch, float, nb::shape<2, 4>>(f, 2, shape,
                                                                deleter);
     });
+
+    m.def("ret_array_scalar", []() {
+            float* f = new float[1] { 1 };
+            size_t shape[0] = {};
+
+            nb::capsule deleter(f, [](void* data) noexcept {
+                destruct_count++;
+                delete[] (float *) data;
+            });
+
+            return nb::tensor<nb::numpy, float>(f, 0, shape, deleter);
+        });
 }

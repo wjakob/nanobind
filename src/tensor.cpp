@@ -505,17 +505,19 @@ tensor_handle *tensor_create(void *value, size_t ndim, const size_t *shape_in,
     for (size_t i = 0; i < ndim; ++i)
         shape[i] = (int64_t) shape_in[i];
 
-    int64_t prod = 1;
-    for (size_t i = ndim - 1; ;) {
-        if (strides_in) {
-            strides[i] = strides_in[i];
-        } else {
-            strides[i] = prod;
-            prod *= (int64_t) shape_in[i];
+    if (ndim > 0) {
+        int64_t prod = 1;
+        for (size_t i = ndim - 1; ;) {
+            if (strides_in) {
+                strides[i] = strides_in[i];
+            } else {
+                strides[i] = prod;
+                prod *= (int64_t) shape_in[i];
+            }
+            if (i == 0)
+                break;
+            --i;
         }
-        if (i == 0)
-            break;
-        --i;
     }
 
     tensor->dl_tensor.data = (void *) value_rounded;

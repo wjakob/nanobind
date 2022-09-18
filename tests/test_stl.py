@@ -341,3 +341,56 @@ def test33_string_and_string_view():
     assert t.identity_string_view("ส้ม") == "ส้ม"
     assert t.identity_string_view("البرتقالي") == "البرتقالي"
     assert t.identity_string_view("🍊") == "🍊"
+
+def test34_std_optional_copyable(clean):
+    t.optional_copyable(t.Copyable())
+    assert t.optional_copyable.__doc__ == (
+        "optional_copyable(x: Optional[test_stl_ext.Copyable]) -> None"
+    )
+    assert_stats(
+        default_constructed=1,
+        copy_constructed=1,
+        destructed=2
+    )
+
+def test35_std_optional_copyable_ptr(clean):
+    t.optional_copyable_ptr(t.Copyable())
+    assert t.optional_copyable_ptr.__doc__ == (
+        "optional_copyable_ptr(x: Optional[test_stl_ext.Copyable]) -> None"
+    )
+    assert_stats(
+        default_constructed=1,
+        destructed=1
+    )
+
+def test36_std_optional_none():
+    t.optional_none(None)
+
+def test37_std_optional_ret_opt_movable(clean):
+    assert t.optional_ret_opt_movable().value == 5
+    assert t.optional_ret_opt_movable.__doc__ == (
+        "optional_ret_opt_movable() -> Optional[test_stl_ext.Movable]"
+    )
+    assert_stats(
+        default_constructed=1,
+        move_constructed=2,
+        destructed=3
+    )
+
+def test38_std_optional_ret_opt_movable_ptr(clean):
+    assert t.optional_ret_opt_movable_ptr().value == 5
+    assert_stats(
+        default_constructed=1,
+        destructed=1
+    )
+
+def test39_std_optional_ret_opt_none():
+    assert t.optional_ret_opt_none() is None
+
+def test40_std_optional_unbound_type():
+    assert t.optional_unbound_type(3) == 3
+    assert t.optional_unbound_type(None) is None
+    assert t.optional_unbound_type() is None
+    assert t.optional_unbound_type.__doc__ == (
+        "optional_unbound_type(x: Optional[int] = None) -> Optional[int]"
+    )

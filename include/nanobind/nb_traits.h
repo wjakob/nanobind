@@ -114,6 +114,9 @@ template <template <typename> typename Op, typename Arg>
 struct detector<std::void_t<Op<Arg>>, Op, Arg>
     : std::true_type { };
 
+template<typename T> struct remove_optional { using type = T; };
+template<typename T> struct remove_optional<std::optional<T>> : remove_optional<T> {};
+
 NAMESPACE_END(detail)
 
 template <typename... Args>
@@ -122,5 +125,8 @@ static constexpr auto const_ = std::true_type{};
 
 template <template<typename> class Op, typename Arg>
 constexpr bool is_detected_v = detail::detector<void, Op, Arg>::value;
+
+template<typename T>
+using remove_optional_t = typename detail::remove_optional<T>::type;
 
 NAMESPACE_END(NB_NAMESPACE)

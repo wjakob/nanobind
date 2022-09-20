@@ -128,7 +128,7 @@ NB_MODULE(test_tensor_ext, m) {
 
     m.def("ret_array_scalar", []() {
             float* f = new float[1] { 1 };
-            size_t shape[0] = {};
+            size_t shape[1] = {};
 
             nb::capsule deleter(f, [](void* data) noexcept {
                 destruct_count++;

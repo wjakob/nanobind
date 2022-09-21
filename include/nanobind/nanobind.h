@@ -33,6 +33,7 @@
 #include <utility>
 #include <new>
 #include <optional>
+#include <variant>
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
 #include "nb_python.h"

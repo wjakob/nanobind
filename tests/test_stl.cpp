@@ -6,6 +6,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/variant.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -205,4 +206,14 @@ NB_MODULE(test_stl_ext, m) {
     m.def("optional_ret_opt_movable_ptr", []() { return new std::optional<Movable *>(new Movable()); });
     m.def("optional_ret_opt_none", []() { return std::optional<Movable>(); });
     m.def("optional_unbound_type", [](std::optional<int> &x) { return x; }, nb::arg("x").none() = nb::none());
+
+    // ----- test41-test47 ------ */
+    m.def("variant_copyable", [](std::variant<Copyable, int> &) {});
+    m.def("variant_copyable_none", [](std::variant<std::monostate, Copyable, int> &) {}, nb::arg("x").none());
+    m.def("variant_copyable_ptr", [](std::variant<Copyable *, int> &) {});
+    m.def("variant_copyable_ptr_none", [](std::variant<Copyable *, int> &) {}, nb::arg("x").none());
+    m.def("variant_ret_var_copyable", []() { return std::variant<Copyable, int>(); });
+    m.def("variant_ret_var_none", []() { return std::variant<std::monostate, Copyable, int>(); });
+    m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
+          nb::arg("x").none() = nb::none());
 }

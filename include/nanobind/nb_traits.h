@@ -114,8 +114,16 @@ template <template <typename> typename Op, typename Arg>
 struct detector<std::void_t<Op<Arg>>, Op, Arg>
     : std::true_type { };
 
-template<typename T> struct remove_optional { using type = T; };
-template<typename T> struct remove_optional<std::optional<T>> : remove_optional<T> {};
+template <typename T, typename...>
+struct concat_variant { using type = T; };
+template <typename... Ts1, typename... Ts2, typename... Ts3>
+struct concat_variant<std::variant<Ts1...>, std::variant<Ts2...>, Ts3...>
+    : concat_variant<std::variant<Ts1..., Ts2...>, Ts3...> {};
+
+template<typename T> struct remove_opt_mono { using type = T; };
+template<typename T> struct remove_opt_mono<std::optional<T>> : remove_opt_mono<T> {};
+template <typename... Ts> struct remove_opt_mono<std::variant<Ts...>>
+    : concat_variant<std::conditional_t<std::is_same_v<std::monostate, Ts>, std::variant<>, std::variant<Ts>>...> {};
 
 NAMESPACE_END(detail)
 
@@ -127,6 +135,6 @@ template <template<typename> class Op, typename Arg>
 constexpr bool is_detected_v = detail::detector<void, Op, Arg>::value;
 
 template<typename T>
-using remove_optional_t = typename detail::remove_optional<T>::type;
+using remove_opt_mono_t = typename detail::remove_opt_mono<T>::type;
 
 NAMESPACE_END(NB_NAMESPACE)

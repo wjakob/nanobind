@@ -21,23 +21,20 @@ struct type_caster<std::optional<T>> {
     Value value = std::nullopt;
 
     bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (src.is_none()) return true;
+        if (src.is_none())
+            return true;
 
         Caster caster;
-        if (!caster.from_python(src, flags, cleanup)) return false;
+        if (!caster.from_python(src, flags, cleanup))
+            return false;
 
-        if constexpr (is_pointer_v<T>)
-        {
+        if constexpr (is_pointer_v<T>) {
             static_assert(Caster::IsClass,
                             "Binding 'optional<T*>' requires that 'T' can also be bound by nanobind.");
             value = caster.operator cast_t<T>();
-        }
-        else if constexpr (Caster::IsClass)
-        {
+        } else if constexpr (Caster::IsClass) {
             value = caster.operator cast_t<T&>();
-        }
-        else
-        {
+        } else {
             value = std::move(caster).operator cast_t<T&&>();
         }
 
@@ -46,13 +43,15 @@ struct type_caster<std::optional<T>> {
 
     template <typename T_>
     static handle from_cpp(T_ *value, rv_policy policy, cleanup_list *cleanup) noexcept {
-        if (!value) return none().release();
+        if (!value)
+            return none().release();
         return from_cpp(*value, policy, cleanup);
     }
 
     template <typename T_>
     static handle from_cpp(T_ &&value, rv_policy policy, cleanup_list *cleanup) noexcept {
-        if (!value) return none().release();
+        if (!value)
+            return none().release();
         return Caster::from_cpp(forward_like<T_>(*value), policy, cleanup);
     }
 

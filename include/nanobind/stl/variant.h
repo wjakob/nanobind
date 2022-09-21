@@ -1,11 +1,19 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
-#include <tuple>
 #include <variant>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
+
+template <typename T, typename...>
+struct concat_variant { using type = T; };
+template <typename... Ts1, typename... Ts2, typename... Ts3>
+struct concat_variant<std::variant<Ts1...>, std::variant<Ts2...>, Ts3...>
+    : concat_variant<std::variant<Ts1..., Ts2...>, Ts3...> {};
+
+template <typename... Ts> struct remove_opt_mono<std::variant<Ts...>>
+    : concat_variant<std::conditional_t<std::is_same_v<std::monostate, Ts>, std::variant<>, std::variant<Ts>>...> {};
 
 template <>
 struct type_caster<std::monostate> {
@@ -21,8 +29,7 @@ struct type_caster<std::monostate> {
 };
 
 template <typename... Ts>
-class type_caster<std::variant<Ts...>>
-{
+class type_caster<std::variant<Ts...>> {
     template <typename T>
     using Caster = make_caster<detail::intrinsic_t<T>>;
 

@@ -114,16 +114,11 @@ template <template <typename> typename Op, typename Arg>
 struct detector<std::void_t<Op<Arg>>, Op, Arg>
     : std::true_type { };
 
-template <typename T, typename...>
-struct concat_variant { using type = T; };
-template <typename... Ts1, typename... Ts2, typename... Ts3>
-struct concat_variant<std::variant<Ts1...>, std::variant<Ts2...>, Ts3...>
-    : concat_variant<std::variant<Ts1..., Ts2...>, Ts3...> {};
-
-template<typename T> struct remove_opt_mono { using type = T; };
-template<typename T> struct remove_opt_mono<std::optional<T>> : remove_opt_mono<T> {};
-template <typename... Ts> struct remove_opt_mono<std::variant<Ts...>>
-    : concat_variant<std::conditional_t<std::is_same_v<std::monostate, Ts>, std::variant<>, std::variant<Ts>>...> {};
+/* This template is used for docstring generation and specialized in
+   ``stl/{variant,optional.h}`` to strip away std::optional and
+   ``std::variant<std::monostate>`` in top-level argument types and
+   avoid redundancy when combined with nb::arg(...).none(). */
+template <typename T> struct remove_opt_mono { using type = T; };
 
 NAMESPACE_END(detail)
 
@@ -134,7 +129,7 @@ static constexpr auto const_ = std::true_type{};
 template <template<typename> class Op, typename Arg>
 constexpr bool is_detected_v = detail::detector<void, Op, Arg>::value;
 
-template<typename T>
+template <typename T>
 using remove_opt_mono_t = typename detail::remove_opt_mono<T>::type;
 
 NAMESPACE_END(NB_NAMESPACE)

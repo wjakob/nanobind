@@ -6,6 +6,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+template <typename T> struct remove_opt_mono<std::optional<T>> : remove_opt_mono<T> {};
+
 template <typename T>
 struct type_caster<std::optional<T>> {
     using Value = std::optional<T>;

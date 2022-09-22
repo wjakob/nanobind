@@ -80,6 +80,8 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     ${NB_DIR}/include/nanobind/stl/function.h
     ${NB_DIR}/include/nanobind/stl/vector.h
     ${NB_DIR}/include/nanobind/stl/list.h
+    ${NB_DIR}/include/nanobind/stl/optional.h
+    ${NB_DIR}/include/nanobind/stl/variant.h
 
     ${NB_DIR}/src/buffer.h
     ${NB_DIR}/src/nb_internals.h

@@ -74,6 +74,7 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     ${NB_DIR}/include/nanobind/stl/shared_ptr.h
     ${NB_DIR}/include/nanobind/stl/unique_ptr.h
     ${NB_DIR}/include/nanobind/stl/string.h
+    ${NB_DIR}/include/nanobind/stl/string_view.h
     ${NB_DIR}/include/nanobind/stl/tuple.h
     ${NB_DIR}/include/nanobind/stl/pair.h
     ${NB_DIR}/include/nanobind/stl/function.h

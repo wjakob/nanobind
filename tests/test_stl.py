@@ -326,3 +326,18 @@ def test32_list():
     assert t.identity_list([1, 2, 3]) == [1, 2, 3]
     assert t.identity_list(()) == []
     assert t.identity_list((1, 2, 3)) == [1, 2, 3]
+
+def test33_string_and_string_view():
+    assert t.identity_string("") == ""
+    assert t.identity_string("orange") == "orange"
+    assert t.identity_string("橘子") == "橘子"
+    assert t.identity_string("ส้ม") == "ส้ม"
+    assert t.identity_string("البرتقالي") == "البرتقالي"
+    assert t.identity_string("🍊") == "🍊"
+
+    assert t.identity_string_view("") == ""
+    assert t.identity_string_view("orange") == "orange"
+    assert t.identity_string_view("橘子") == "橘子"
+    assert t.identity_string_view("ส้ม") == "ส้ม"
+    assert t.identity_string_view("البرتقالي") == "البرتقالي"
+    assert t.identity_string_view("🍊") == "🍊"

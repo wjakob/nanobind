@@ -3,6 +3,8 @@
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/list.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/string_view.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -189,4 +191,10 @@ NB_MODULE(test_stl_ext, m) {
     });
 
     m.def("identity_list", [](std::list<int> &x) { return x; });
+
+    // ----- test33 ------ */
+    m.def("identity_string", [](std::string& x) { return x; });
+    m.def("identity_string_view", [](std::string_view& x) { return x; });
+    //m.def("address_of", [](std::string& x) { return x.data(); });
+    m.def("address_of", [](std::string_view& x) { return reinterpret_cast<intptr_t>(x.data()); });
 }

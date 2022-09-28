@@ -195,6 +195,4 @@ NB_MODULE(test_stl_ext, m) {
     // ----- test33 ------ */
     m.def("identity_string", [](std::string& x) { return x; });
     m.def("identity_string_view", [](std::string_view& x) { return x; });
-    //m.def("address_of", [](std::string& x) { return x.data(); });
-    m.def("address_of", [](std::string_view& x) { return reinterpret_cast<intptr_t>(x.data()); });
 }

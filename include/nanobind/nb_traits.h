@@ -114,6 +114,12 @@ template <template <typename> typename Op, typename Arg>
 struct detector<std::void_t<Op<Arg>>, Op, Arg>
     : std::true_type { };
 
+/* This template is used for docstring generation and specialized in
+   ``stl/{variant,optional.h}`` to strip away std::optional and
+   ``std::variant<std::monostate>`` in top-level argument types and
+   avoid redundancy when combined with nb::arg(...).none(). */
+template <typename T> struct remove_opt_mono { using type = T; };
+
 NAMESPACE_END(detail)
 
 template <typename... Args>
@@ -122,5 +128,8 @@ static constexpr auto const_ = std::true_type{};
 
 template <template<typename> class Op, typename Arg>
 constexpr bool is_detected_v = detail::detector<void, Op, Arg>::value;
+
+template <typename T>
+using remove_opt_mono_t = typename detail::remove_opt_mono<T>::type;
 
 NAMESPACE_END(NB_NAMESPACE)

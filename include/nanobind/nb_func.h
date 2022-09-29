@@ -56,9 +56,9 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Collect function signature information for the docstring
     using cast_out = make_caster<
         std::conditional_t<std::is_void_v<Return>, void_type, Return>>;
-    constexpr auto descr =
-        const_name("(") + concat(type_descr(make_caster<Args>::Name)...) +
-        const_name(") -> ") + cast_out::Name;
+    constexpr auto descr = const_name("(") +
+                           concat(type_descr(make_caster<remove_opt_mono_t<intrinsic_t<Args>>>::Name)...) +
+                           const_name(") -> ") + cast_out::Name;
     const std::type_info* descr_types[descr.type_count() + 1];
     descr.put_types(descr_types);
 

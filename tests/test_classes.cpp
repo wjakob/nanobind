@@ -180,7 +180,8 @@ NB_MODULE(test_classes_ext, m) {
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
         .def(nb::init<>())
         .def("name", &Animal::name)
-        .def("what", &Animal::what);
+        .def("what", &Animal::what)
+        .def("__eq__", [](Animal const &self, Animal const &other) { return &self == &other; });
 
     nb::class_<Dog, Animal>(m, "Dog")
         .def(nb::init<const std::string &>());

@@ -138,6 +138,7 @@ def test08_inheritance():
     assert isinstance(cat, t.Animal) and isinstance(cat, t.Cat)
     assert t.go(dog) == 'Dog says woof'
     assert t.go(cat) == 'Cat says meow'
+    assert not dog == cat
 
 
 def test09_method_vectorcall():

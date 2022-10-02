@@ -481,4 +481,50 @@ inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), 
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 
+/**
+ * Wrapper to generate a new Python exception type.
+ *
+ * This should only be used with PyErr_SetString for now.
+ * It is not (yet) possible to use as a py::base.
+ * Template type argument is reserved for future use.
+ */
+template <typename type>
+class exception : public object {
+public:
+    exception() = default;
+    exception(handle scope, const char *name, handle base = PyExc_Exception) {
+        const char *scope_name = cast<const char *>(scope.attr("__name__"));
+        size_t scope_len = strlen(scope_name);
+        size_t name_len = strlen(name);
+        char *full_name = (char *) malloc(scope_len + 1 + name_len + 1);
+        strcpy(full_name, scope_name);
+        full_name[scope_len] = '.';
+        strcpy(full_name + scope_len + 1, name);
+        m_ptr = PyErr_NewException(full_name, base.ptr(), nullptr);
+        free(full_name);
+
+        if (hasattr(scope, "__dict__")) {
+            object scope_dict(scope.attr("__dict__"));
+
+            PyObject *key = PyUnicode_FromString(name);
+            if (!key)
+                    detail::raise_python_error();
+
+            PyObject *out = PyObject_GetItem(scope_dict.ptr(), key);
+            Py_DECREF(key);
+            if (out) {
+                Py_DECREF(out);
+                detail::fail("Error during initialization: multiple incompatible "
+                          "definitions with name \"%s\"", name);
+            } else {
+                PyErr_Clear();
+            }
+        }
+        scope.attr(name) = *this;
+    }
+
+    // Sets the current python exception to this exception object with the given message
+    void operator()(const char *message) { PyErr_SetString(m_ptr, message); }
+};
+
 NAMESPACE_END(NB_NAMESPACE)

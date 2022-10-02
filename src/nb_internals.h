@@ -200,7 +200,7 @@ struct nb_internals {
     py_set<void *, ptr_hash> funcs;
 
     /// Registered C++ -> Python exception translators
-    std::vector<void (*)(const std::exception_ptr &)> exception_translators;
+    std::vector<exception_translator_type> exception_translators;
 };
 
 struct current_method {

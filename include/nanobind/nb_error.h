@@ -71,4 +71,8 @@ NB_EXCEPTION(attribute_error)
 
 #undef NB_EXCEPTION
 
+typedef void (*exception_translator_type)(const std::exception_ptr &);
+
+void NB_EXPORT register_exception_translator(exception_translator_type translator);
+
 NAMESPACE_END(NB_NAMESPACE)

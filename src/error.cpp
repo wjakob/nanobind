@@ -7,7 +7,7 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
-#include <nanobind/nanobind.h>
+#include "nb_internals.h"
 #include "buffer.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -121,6 +121,12 @@ NB_EXCEPTION(type_error, PyExc_TypeError)
 NB_EXCEPTION(buffer_error, PyExc_BufferError)
 NB_EXCEPTION(import_error, PyExc_ImportError)
 NB_EXCEPTION(attribute_error, PyExc_AttributeError)
+
+void NB_EXPORT register_exception_translator(exception_translator_type translator) {
+    detail::internals_get().exception_translators.insert(
+                    detail::internals_get().exception_translators.begin(),
+                    translator);
+}
 
 #undef NB_EXCEPTION
 

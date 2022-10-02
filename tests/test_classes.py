@@ -504,3 +504,20 @@ def test27_copy_rvp():
     a = t.Struct.create_reference()
     b = t.Struct.create_copy()
     assert a is not b
+
+def test28_exceptions():
+    with pytest.raises(t.MyError):
+        t.throw_my_error()
+
+    with pytest.raises(t.MyError):
+        t.throw_my_sub_error()
+
+    with pytest.raises(t.MySubError):
+        t.throw_my_sub_error()
+
+    try:
+        t.throw_my_error()
+    except t.MySubError:
+        raise RuntimeError("narrow error caught invalidly")
+    except t.MyError:
+        pass

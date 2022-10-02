@@ -5,6 +5,7 @@
 #include <nanobind/stl/pair.h>
 #include <memory>
 #include <cstring>
+#include <stdexcept>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -76,6 +77,24 @@ int StaticProperties::value = 23;
 
 static Py_ssize_t sq_length_dummy(PyObject *) {
     return 123;
+}
+
+struct MyError: public std::runtime_error { 
+    MyError(const char *s)
+    : std::runtime_error(s) { }
+};
+
+struct MySubError: public MyError {
+    MySubError(const char *s)
+    : MyError(s) { }
+};
+
+void throw_my_error() {
+    throw MyError("My error occurred");
+}
+
+void throw_my_sub_error() {
+    throw MySubError("My sub-error occurred");
 }
 
 NB_MODULE(test_classes_ext, m) {
@@ -384,4 +403,27 @@ NB_MODULE(test_classes_ext, m) {
     struct StructWithAttr : Struct { };
     nb::class_<StructWithAttr, Struct>(m, "StructWithAttr", nb::dynamic_attr())
         .def(nb::init<int>());
+
+    static nb::exception<MyError> MyError_exc(m, "MyError");
+    static nb::exception<MySubError> MySubError_exc(m, "MySubError", MyError_exc.ptr());
+
+    nb::register_exception_translator(
+        [](const std::exception_ptr &p)
+        {
+            try
+            {
+              if (p) std::rethrow_exception(p);
+            }
+            catch (MySubError &err)
+            {
+                PyErr_SetString(MySubError_exc.ptr(), err.what());
+            }
+            catch (MyError &err)
+            {
+                PyErr_SetString(MyError_exc.ptr(), err.what());
+            }
+        });
+
+    m.def("throw_my_error", throw_my_error);
+    m.def("throw_my_sub_error", throw_my_sub_error);
 }

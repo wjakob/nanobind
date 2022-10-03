@@ -17,17 +17,20 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
         value.clear();
 
         PyObject *items = PyDict_Items(src.ptr());
-        if (items == nullptr) return false;
+        if (items == nullptr) {
+            PyErr_Clear();
+            return false;
+        }
 
-        Py_ssize_t size = PyList_Size(items);
+        Py_ssize_t size = NB_LIST_GET_SIZE(items);
         bool success = (size >= 0);
 
         KeyCaster key_caster;
         ElementCaster element_caster;
         for (Py_ssize_t i = 0; i < size; ++i) {
-            PyObject *item = PyList_GetItem(items, i);
-            PyObject *key = PyTuple_GetItem(item, 0);
-            PyObject *element = PyTuple_GetItem(item, 1);
+            PyObject *item = NB_LIST_GET_ITEM(items, i);
+            PyObject *key = NB_TUPLE_GET_ITEM(item, 0);
+            PyObject *element = NB_TUPLE_GET_ITEM(item, 1);
             if (!key_caster.from_python(key, flags, cleanup)) {
                 success = false;
                 break;
@@ -40,25 +43,25 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
                           ((ElementCaster &&) element_caster).operator cast_t<Element &&>());
         }
 
-        Py_XDECREF(items);
+        Py_DECREF(items);
 
         return success;
     }
 
     template <typename T>
     static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
-        object dict = steal(PyDict_New());
-        if (dict) {
+        dict ret;
+        if (ret) {
             for (auto &item : src) {
                 object k = steal(KeyCaster::from_cpp(
                     forward_like<typename T::key_type>(item.first), policy, cleanup));
                 object e = steal(ElementCaster::from_cpp(
                     forward_like<typename T::mapped_type>(item.second), policy, cleanup));
-                if (PyDict_SetItem(dict.ptr(), k.ptr(), e.ptr()) != 0) return handle();
+                if (PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) return handle();
                 if (!k.is_valid() || !e.is_valid()) return handle();
             }
         }
-        return dict.release();
+        return ret.release();
     }
 };
 

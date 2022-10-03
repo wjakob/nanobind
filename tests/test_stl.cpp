@@ -7,6 +7,7 @@
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
+#include <nanobind/stl/map.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -216,4 +217,60 @@ NB_MODULE(test_stl_ext, m) {
     m.def("variant_ret_var_none", []() { return std::variant<std::monostate, Copyable, int>(); });
     m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
           nb::arg("x").none() = nb::none());
+
+    // ----- test48-test54 ------ */
+    m.def("map_return_movable_value", [](){
+        std::map<std::string, Movable> x;
+        for (int i = 0; i < 10; ++i)
+            x.emplace(std::string(1, 'a' + i), i);
+        return x;
+    });
+    m.def("map_return_copyable_value", [](){
+        std::map<std::string, Copyable> x;
+        for (int i = 0; i < 10; ++i) {
+            Copyable c(i);
+            x.insert({std::string(1, 'a' + i), c});
+        }
+        return x;
+    });
+    m.def("map_movable_in_value", [](std::map<std::string, Movable> x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+            if (x[key].value != i) fail();
+        }
+    }, nb::arg("x"));
+    m.def("map_copyable_in_value", [](std::map<std::string, Copyable> x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+            if (x[key].value != i) fail();
+        }
+    }, nb::arg("x"));
+    m.def("map_movable_in_lvalue_ref", [](std::map<std::string, Movable> &x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+            if (x[key].value != i) fail();
+        }
+    }, nb::arg("x"));
+    m.def("map_movable_in_rvalue_ref", [](std::map<std::string, Movable> &&x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+            if (x[key].value != i) fail();
+        }
+    }, nb::arg("x"));
+    m.def("map_movable_in_ptr", [](std::map<std::string, Movable *> x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+            if (x[key]->value != i) fail();
+        }
+    }, nb::arg("x"));
 }

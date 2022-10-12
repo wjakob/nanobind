@@ -466,3 +466,48 @@ def test47_std_variant_unbound_type(clean):
         " -> Union[None, list, tuple, int]"
     )
 
+def test48_map_return_movable_value(clean):
+    for i, (k, v) in enumerate(sorted(t.map_return_movable_value().items())):
+        assert k == chr(ord("a") + i)
+        assert v.value == i
+    assert t.map_return_movable_value.__doc__ == (
+        "map_return_movable_value() -> dict[str, test_stl_ext.Movable]"
+    )
+
+def test49_map_return_copyable_value(clean):
+    for i, (k, v) in enumerate(sorted(t.map_return_copyable_value().items())):
+        assert k == chr(ord("a") + i)
+        assert v.value == i
+    assert t.map_return_copyable_value.__doc__ == (
+        "map_return_copyable_value() -> dict[str, test_stl_ext.Copyable]"
+    )
+
+def test50_map_movable_in_value(clean):
+    t.map_movable_in_value(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
+    assert t.map_movable_in_value.__doc__ == (
+        "map_movable_in_value(x: dict[str, test_stl_ext.Movable]) -> None"
+    )
+
+def test51_map_movable_in_value(clean):
+    t.map_copyable_in_value(dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)]))
+    assert t.map_copyable_in_value.__doc__ == (
+        "map_copyable_in_value(x: dict[str, test_stl_ext.Copyable]) -> None"
+    )
+
+def test52_map_movable_in_lvalue_ref(clean):
+    t.map_movable_in_lvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
+    assert t.map_movable_in_lvalue_ref.__doc__ == (
+        "map_movable_in_lvalue_ref(x: dict[str, test_stl_ext.Movable]) -> None"
+    )
+
+def test53_map_movable_in_rvalue_ref(clean):
+    t.map_movable_in_rvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
+    assert t.map_movable_in_rvalue_ref.__doc__ == (
+        "map_movable_in_rvalue_ref(x: dict[str, test_stl_ext.Movable]) -> None"
+    )
+
+def test54_map_movable_in_ptr(clean):
+    t.map_movable_in_ptr(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
+    assert t.map_movable_in_ptr.__doc__ == (
+        "map_movable_in_ptr(x: dict[str, test_stl_ext.Movable]) -> None"
+    )

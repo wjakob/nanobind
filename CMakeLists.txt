@@ -52,8 +52,10 @@ endif()
 # Find the Python interpreter and development libraries
 # ---------------------------------------------------------------------------
 
-set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
-find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
+if (NOT TARGET Python::Module OR NOT TARGET Python::Interpreter)
+    set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
+    find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
+endif()
 
 # ---------------------------------------------------------------------------
 # Include nanobind cmake functionality

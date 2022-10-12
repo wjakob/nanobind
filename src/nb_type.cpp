@@ -450,6 +450,13 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     Py_INCREF(temp_tp->tp_base);
     Py_XINCREF(temp_ht->ht_slots);
 
+    char *tp_doc = nullptr;
+    if (temp_tp->tp_doc) {
+        size_t size = strlen(temp_tp->tp_doc) + 1;
+        tp_doc = (char *) PyObject_Malloc(size);
+        memcpy(tp_doc, temp_tp->tp_doc, size);
+    }
+
     PyObject *result = PyType_GenericAlloc(metaclass, 0);
     if (!temp || !result)
         fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed!",
@@ -469,6 +476,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     tp->tp_as_mapping = &ht->as_mapping;
     tp->tp_as_buffer = &ht->as_buffer;
     tp->tp_name = name_copy;
+    tp->tp_doc = tp_doc;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
 
 #if PY_VERSION_HEX < 0x03090000
@@ -476,10 +484,14 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         tp->tp_dictoffset = (Py_ssize_t) (basicsize - ptr_size);
 #endif
 
-    tp->tp_dict = tp->tp_bases = tp->tp_mro = tp->tp_cache =
-        tp->tp_subclasses = tp->tp_weaklist = nullptr;
+    tp->tp_dict = tp->tp_bases = tp->tp_mro = tp->tp_cache = nullptr;
+    tp->tp_subclasses = tp->tp_weaklist = nullptr;
     ht->ht_cached_keys = nullptr;
     tp->tp_version_tag = 0;
+
+#if PY_VERSION_HEX >= 0x030B0000
+    ht->_ht_tpname = nullptr;
+#endif
 
     PyType_Ready(tp);
     Py_DECREF(temp);

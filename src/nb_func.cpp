@@ -319,9 +319,11 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
 /// Used by nb_func_vectorcall: convert a C++ exception into a Python error
 static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
     std::exception_ptr e = std::current_exception();
-    for (auto const &et : internals_get().exception_translators) {
+
+    for (auto pair : internals_get().exception_translators) {
         try {
-            et(e);
+            // Try exception translator & forward payload
+            pair.first(e, pair.second);
             return;
         } catch (...) {
             e = std::current_exception();

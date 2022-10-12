@@ -369,6 +369,16 @@ NB_CORE void print(PyObject *file, PyObject *str, PyObject *end);
 
 // ========================================================================
 
+typedef void (*exception_translator)(const std::exception_ptr &, void *);
+
+NB_CORE void register_exception_translator(exception_translator translator,
+                                           void *payload);
+
+NB_CORE PyObject *exception_new(PyObject *mod, const char *name,
+                                PyObject *base);
+
+// ========================================================================
+
 NB_CORE std::pair<int8_t, bool>   load_i8 (PyObject *o, uint8_t flags) noexcept;
 NB_CORE std::pair<uint8_t, bool>  load_u8 (PyObject *o, uint8_t flags) noexcept;
 NB_CORE std::pair<int16_t, bool>  load_i16(PyObject *o, uint8_t flags) noexcept;

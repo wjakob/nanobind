@@ -254,7 +254,7 @@ NB_THREAD_LOCAL current_method current_method_data =
 
 static nb_internals *internals_p = nullptr;
 
-void default_exception_translator(const std::exception_ptr &p) {
+void default_exception_translator(const std::exception_ptr &p, void *) {
     try {
         std::rethrow_exception(p);
     } catch (python_error &e) {
@@ -325,7 +325,6 @@ static void internals_make() {
     str nb_name("nanobind");
 
     internals_p = new nb_internals();
-    internals_p->exception_translators.push_back(default_exception_translator);
 
     PyObject *capsule = PyCapsule_New(internals_p, nullptr, nullptr);
     PyObject *nb_module = PyModule_NewObject(nb_name.ptr());
@@ -387,6 +386,8 @@ static void internals_make() {
     internals_p->nb_bound_method->tp_flags |= NB_HAVE_VECTORCALL;
     internals_p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
 #endif
+
+    register_exception_translator(default_exception_translator, nullptr);
 
     if (Py_AtExit(internals_cleanup))
         fprintf(stderr,

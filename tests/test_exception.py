@@ -78,3 +78,18 @@ def test16_stop_iteration():
     with pytest.raises(StopIteration) as excinfo:
         assert t.raise_stop_iteration()
     assert str(excinfo.value) == 'a stop iteration error'
+
+def test17_raise_my_error_1():
+    with pytest.raises(RuntimeError) as excinfo:
+        assert t.raise_my_error_1()
+    assert str(excinfo.value) == 'MyError1'
+
+def test18_raise_my_error_2():
+    with pytest.raises(IndexError) as excinfo:
+        assert t.raise_my_error_2()
+    assert str(excinfo.value) == 'MyError2'
+
+def test19_raise_my_error_3():
+    with pytest.raises(t.MyError3) as excinfo:
+        assert t.raise_my_error_3()
+    assert str(excinfo.value) == 'MyError3'

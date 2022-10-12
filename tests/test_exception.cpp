@@ -2,6 +2,21 @@
 
 namespace nb = nanobind;
 
+class MyError1 : public std::exception {
+public:
+    virtual const char *what() const noexcept { return "MyError1"; }
+};
+
+class MyError2 : public std::exception {
+public:
+    virtual const char *what() const noexcept { return "MyError2"; }
+};
+
+class MyError3 : public std::exception {
+public:
+    virtual const char *what() const noexcept { return "MyError3"; }
+};
+
 NB_MODULE(test_exception_ext, m) {
     m.def("raise_generic", [] { throw std::exception(); });
     m.def("raise_bad_alloc", [] { throw std::bad_alloc(); });
@@ -19,4 +34,19 @@ NB_MODULE(test_exception_ext, m) {
     m.def("raise_import_error", [] { throw nb::import_error("an import error"); });
     m.def("raise_attribute_error", [] { throw nb::attribute_error("an attribute error"); });
     m.def("raise_stop_iteration", [] { throw nb::stop_iteration("a stop iteration error"); });
+
+    m.def("raise_my_error_1", [] { throw MyError1(); });
+
+    nb::register_exception_translator(
+        [](const std::exception_ptr &p, void * /* unused */) {
+            try {
+                std::rethrow_exception(p);
+            } catch (const MyError2 &e) {
+                PyErr_SetString(PyExc_IndexError, e.what());
+            }
+        });
+    m.def("raise_my_error_2", [] { throw MyError2(); });
+
+    nb::exception<MyError3>(m, "MyError3");
+    m.def("raise_my_error_3", [] { throw MyError3(); });
 }

@@ -9,6 +9,7 @@
 
 #include <nanobind/nanobind.h>
 #include "buffer.h"
+#include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -124,4 +125,38 @@ NB_EXCEPTION(attribute_error, PyExc_AttributeError)
 
 #undef NB_EXCEPTION
 
+NAMESPACE_BEGIN(detail)
+
+void register_exception_translator(exception_translator t, void *payload) {
+    auto &et = internals_get().exception_translators;
+    et.insert(et.begin(), { t, payload });
+}
+
+NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
+                                PyObject *base) {
+    object modname;
+    if (PyModule_Check(scope))
+        modname = getattr(scope, "__name__", handle());
+    else
+        modname = getattr(scope, "__module__", handle());
+
+    if (!modname.is_valid())
+        raise("nanobind::detail::exception_new(): could not determine module name!");
+
+    str combined = steal<str>(
+        PyUnicode_FromFormat("%U.%s", modname.ptr(), name));
+
+    PyObject *result = PyErr_NewException(combined.c_str(), base, nullptr);
+    if (!result)
+        raise("nanobind::detail::exception_new(): creation failed!");
+
+    if (hasattr(scope, name))
+        raise("nb::detail::exception_new(): an object of the same name already "
+              "exists!");
+
+    setattr(scope, name, result);
+    return result;
+}
+
+NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

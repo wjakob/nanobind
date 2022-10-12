@@ -71,4 +71,27 @@ NB_EXCEPTION(attribute_error)
 
 #undef NB_EXCEPTION
 
+inline void register_exception_translator(detail::exception_translator t,
+                                          void *payload = nullptr) {
+    detail::register_exception_translator(t, payload);
+}
+
+template <typename T>
+class exception : public object {
+    NB_OBJECT_DEFAULT(exception, object, "Exception", PyExceptionClass_Check)
+
+    exception(handle mod, const char *name, handle base = PyExc_Exception)
+        : object(detail::exception_new(mod.ptr(), name, base.ptr()),
+                 detail::steal_t()) {
+        detail::register_exception_translator(
+            [](const std::exception_ptr &p, void *payload) {
+                try {
+                    std::rethrow_exception(p);
+                } catch (T &e) {
+                    PyErr_SetString((PyObject *) payload, e.what());
+                }
+            }, m_ptr);
+    }
+};
+
 NAMESPACE_END(NB_NAMESPACE)

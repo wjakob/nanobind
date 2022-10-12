@@ -66,17 +66,9 @@ it performs the following steps to produce efficient bindings.
   performance cost since _nanobind_ can no longer access the internals of
   various data structures directly.
 
-- It statically or dynamically links against `libnanobind` depending on the
-  value of the `NB_SHARED` parameter of the CMake project. Note that
-  `NB_SHARED` is not an input of the `nanobind_add_module()` function. Rather,
-  it should be specified before including the `nanobind` CMake project:
+- It statically or dynamically links against `libnanobind` depending on whether
+  the optional `NB_STATIC` parameter is provided to `nanobind_add_module()`. 
 
-  ```cmake
-
-  set(NB_SHARED OFF CACHE INTERNAL "") # Request static compilation of libnanobind
-  add_subdirectory(.. path to nanobind directory ..)
-  nanobind_add_module(...)
-  ```
 
 ## Tutorial project
 

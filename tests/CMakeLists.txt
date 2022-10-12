@@ -5,6 +5,7 @@ nanobind_add_module(test_stl_ext test_stl.cpp)
 nanobind_add_module(test_enum_ext test_enum.cpp)
 nanobind_add_module(test_tensor_ext test_tensor.cpp)
 nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h)
+nanobind_add_module(test_exception_ext test_exception.cpp object.cpp object.h)
 
 set(TEST_FILES
   test_functions.py
@@ -14,6 +15,7 @@ set(TEST_FILES
   test_enum.py
   test_tensor.py
   test_intrusive.py
+  test_exception.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

@@ -98,7 +98,7 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
 
   if (TARGET_TYPE STREQUAL "SHARED")
     if (APPLE)
-      target_link_options(${TARGET_NAME} PRIVATE -undefined dynamic_lookup)
+      target_link_options(${TARGET_NAME} PRIVATE -undefined suppress -flat_namespace)
     endif()
 
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
@@ -196,7 +196,13 @@ endfunction()
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;STABLE_ABI;NOSTRIP;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO" "" "")
 
-  Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
+  if (APPLE)
+    add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
+    target_include_directories(${name} PUBLIC ${Python_INCLUDE_DIRS})
+    target_link_options(${name} PRIVATE -undefined suppress -flat_namespace)
+  else()
+    Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
+  endif()
 
   nanobind_cpp17(${name})
   nanobind_msvc(${name})

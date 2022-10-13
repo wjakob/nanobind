@@ -26,6 +26,19 @@ public:                                                                        \
     NB_OBJECT(Type, Parent, Str, Check)                                        \
     NB_INLINE Type() : Parent() {}
 
+/// Like NB_OBJECT but allow convert-initialization
+#define NB_OBJECT_CVT(Type, Parent, Str, Check, Convert)                                \
+    NB_OBJECT(Type, Parent, Str, Check)                                                 \
+    /* This is deliberately not 'explicit' to allow implicit conversion from object: */ \
+    /* NOLINTNEXTLINE(google-explicit-constructor) */                                   \
+    Type(const object& o)                                                               \
+        : Parent(check_(o) ? o.inc_ref().ptr() : Convert(o.ptr()), detail::steal_t{})   \
+    {}                                                                                  \
+    /* NOLINTNEXTLINE(google-explicit-constructor) */                                   \
+    Type(object&& o)                                                                    \
+        : Parent(check_(o) ? o.release().ptr() : Convert(o.ptr()), detail::steal_t{})   \
+    {}
+
 /// Helper macro to create detail::api comparison functions
 #define NB_API_COMP(name, op)                                                  \
     template <typename T> NB_INLINE bool name(const api<T> &o) const {         \
@@ -340,6 +353,27 @@ class list : public object {
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
 #endif
+};
+
+class anyset : public object {
+public:
+    NB_OBJECT(anyset, object, "anyset", PySet_Check)
+    size_t size() const { return static_cast<size_t>(PySet_Size(m_ptr)); }
+    bool empty() const { return size() == 0; }
+    template <typename T> bool contains(T&& val) const;
+};
+
+class set : public anyset {
+public:
+    NB_OBJECT_CVT(set, anyset, "set", PySet_Check, PySet_New)
+    set() : anyset(PySet_New(nullptr), detail::steal_t{}) { }
+    template <typename T> bool add(T&& val);
+    void clear() { PySet_Clear(m_ptr); }
+};
+
+class frozenset : public anyset {
+public:
+    NB_OBJECT_CVT(frozenset, anyset, "frozenset", PyFrozenSet_Check, PyFrozenSet_New)
 };
 
 class dict : public object {

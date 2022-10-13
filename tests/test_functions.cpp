@@ -146,4 +146,10 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_16", [](const char *c) { return nb::bytes(c); });
     m.def("test_17", [](nb::bytes c) { return c.size(); });
     m.def("test_18", [](const char *c, int size) { return nb::bytes(c, size); });
+
+    // Test set construction
+    m.def("test_19", [](nb::set d) {
+        nb::set result(d);
+        return result;
+    });
 }

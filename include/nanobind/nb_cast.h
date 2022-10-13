@@ -348,4 +348,16 @@ template <typename T> void list::append(T &&value) {
         detail::raise_python_error();
 }
 
+template <typename T>
+bool anyset::contains(T&& value) const
+{
+    return PySet_Contains(m_ptr, nanobind::cast(value).ptr()) == 1;
+}
+
+template <typename T>
+bool set::add(T&& value)
+{
+    return PySet_Add(m_ptr, nanobind::cast(value).ptr()) == 0;
+}
+
 NAMESPACE_END(NB_NAMESPACE)

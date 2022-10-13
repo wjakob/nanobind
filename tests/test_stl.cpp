@@ -8,6 +8,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/map.h>
+#include <nanobind/stl/unordered_set.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -271,6 +272,35 @@ NB_MODULE(test_stl_ext, m) {
             std::string key(1, 'a' + i);
             if (x.find(key) == x.end()) fail();
             if (x[key]->value != i) fail();
+        }
+    }, nb::arg("x"));
+
+    // ----- test55-test58 ------ */
+    m.def("set_return_value", [](){
+        std::unordered_set<std::string> x;
+        for (int i = 0; i < 10; ++i)
+            x.emplace(std::string(1, 'a' + i));
+        return x;
+    });
+    m.def("set_in_value", [](std::unordered_set<std::string> x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+        }
+    }, nb::arg("x"));
+    m.def("set_in_lvalue_ref", [](std::unordered_set<std::string>& x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
+        }
+    }, nb::arg("x"));
+    m.def("set_in_rvalue_ref", [](std::unordered_set<std::string>&& x) {
+        if (x.size() != 10) fail();
+        for (int i = 0; i < 10; ++i) {
+            std::string key(1, 'a' + i);
+            if (x.find(key) == x.end()) fail();
         }
     }, nb::arg("x"));
 }

@@ -39,6 +39,10 @@ struct Copyable {
     ~Copyable() { destructed++; }
 };
 
+struct StructWithReadonlyMap {
+  std::map<std::string, uint64_t> map;
+};
+
 void fail() { throw std::exception(); }
 
 NB_MODULE(test_stl_ext, m) {
@@ -73,6 +77,10 @@ NB_MODULE(test_stl_ext, m) {
         .def(nb::init<>())
         .def(nb::init<int>())
         .def_readwrite("value", &Copyable::value);
+
+    nb::class_<StructWithReadonlyMap>(m, "StructWithReadonlyMap")
+        .def(nb::init<>())
+        .def_readonly("map", &StructWithReadonlyMap::map);
 
     // ----- test01-test12 ------ */
 
@@ -218,7 +226,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
           nb::arg("x").none() = nb::none());
 
-    // ----- test48-test54 ------ */
+    // ----- test48-test55 ------ */
     m.def("map_return_movable_value", [](){
         std::map<std::string, Movable> x;
         for (int i = 0; i < 10; ++i)
@@ -273,4 +281,11 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key]->value != i) fail();
         }
     }, nb::arg("x"));
+    m.def("map_return_readonly_value", [](){
+        StructWithReadonlyMap x;
+        for (int i = 0; i < 10; ++i) {
+            x.map.insert({std::string(1, 'a' + i), i});
+        }
+        return x;
+    });
 }

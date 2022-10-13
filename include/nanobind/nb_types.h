@@ -358,7 +358,7 @@ class list : public object {
 class anyset : public object {
 public:
     NB_OBJECT(anyset, object, "anyset", PySet_Check)
-    size_t size() const { return static_cast<size_t>(PySet_Size(m_ptr)); }
+    size_t size() const { return NB_SET_GET_SIZE(m_ptr); }
     bool empty() const { return size() == 0; }
     template <typename T> bool contains(T&& val) const;
 };

@@ -74,7 +74,11 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+extern int nb_func_traverse(PyObject *, visitproc, void *);
+extern int nb_func_clear(PyObject *);
 extern void nb_func_dealloc(PyObject *);
+extern int nb_bound_method_traverse(PyObject *, visitproc, void *);
+extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_func_getattro(PyObject *, PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
@@ -100,8 +104,11 @@ static PyMemberDef nb_func_members[] = {
 
 static PyType_Slot nb_func_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
+    { Py_tp_traverse, (void *) nb_func_traverse },
+    { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
     { Py_tp_getattro, (void *) nb_func_getattro },
+    { Py_tp_traverse, (void *) nb_func_traverse},
     { Py_tp_new, (void *) PyType_GenericNew },
     { Py_tp_call, (void *) PyVectorcall_Call },
     { 0, nullptr }
@@ -111,12 +118,14 @@ static PyType_Spec nb_func_spec = {
     .name = "nanobind.nb_func",
     .basicsize = (int) sizeof(nb_func),
     .itemsize = (int) sizeof(func_data),
-    .flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL_MAYBE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | NB_HAVE_VECTORCALL_MAYBE,
     .slots = nb_func_slots
 };
 
 static PyType_Slot nb_method_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
+    { Py_tp_traverse, (void *) nb_func_traverse },
+    { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
     { Py_tp_getattro, (void *) nb_func_getattro },
     { Py_tp_descr_get, (void *) nb_method_descr_get },
@@ -129,7 +138,7 @@ static PyType_Spec nb_method_spec = {
     .name = "nanobind.nb_method",
     .basicsize = (int) sizeof(nb_func),
     .itemsize = (int) sizeof(func_data),
-    .flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL_MAYBE
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | NB_HAVE_VECTORCALL_MAYBE
         | Py_TPFLAGS_METHOD_DESCRIPTOR,
     .slots = nb_method_slots
 };
@@ -142,7 +151,10 @@ static PyMemberDef nb_bound_method_members[] = {
 
 static PyType_Slot nb_bound_method_slots[] = {
     { Py_tp_members, (void *) nb_bound_method_members },
+    { Py_tp_traverse, (void *) nb_bound_method_traverse },
+    { Py_tp_clear, (void *) nb_bound_method_clear },
     { Py_tp_dealloc, (void *) nb_bound_method_dealloc },
+    { Py_tp_traverse, (void *) nb_bound_method_traverse },
     { Py_tp_call, (void *) PyVectorcall_Call },
     { 0, nullptr }
 };
@@ -150,7 +162,7 @@ static PyType_Slot nb_bound_method_slots[] = {
 static PyType_Spec nb_bound_method_spec = {
     .name = "nanobind.nb_bound_method",
     .basicsize = (int) sizeof(nb_bound_method),
-    .flags = Py_TPFLAGS_DEFAULT | NB_HAVE_VECTORCALL_MAYBE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | NB_HAVE_VECTORCALL_MAYBE,
     .slots = nb_bound_method_slots
 };
 

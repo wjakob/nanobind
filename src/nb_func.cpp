@@ -30,6 +30,46 @@ static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
 static void nb_func_render_signature(const func_data *f) noexcept;
 
+int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
+    size_t size = (size_t) Py_SIZE(self);
+
+    if (size) {
+        func_data *f = nb_func_data(self);
+
+        for (size_t i = 0; i < size; ++i) {
+            if (f->flags & (uint32_t) func_flags::has_args) {
+                for (size_t j = 0; j < f->nargs; ++j) {
+                    Py_VISIT(f->args[j].value);
+                    Py_VISIT(f->args[j].name_py);
+                }
+            }
+            ++f;
+        }
+    }
+
+    return 0;
+}
+
+int nb_func_clear(PyObject *self) {
+    size_t size = (size_t) Py_SIZE(self);
+
+    if (size) {
+        func_data *f = nb_func_data(self);
+
+        for (size_t i = 0; i < size; ++i) {
+            if (f->flags & (uint32_t) func_flags::has_args) {
+                for (size_t j = 0; j < f->nargs; ++j) {
+                    Py_CLEAR(f->args[j].value);
+                    Py_CLEAR(f->args[j].name_py);
+                }
+            }
+            ++f;
+        }
+    }
+
+    return 0;
+}
+
 /// Free a function overload chain
 void nb_func_dealloc(PyObject *self) {
     size_t size = (size_t) Py_SIZE(self);
@@ -66,14 +106,28 @@ void nb_func_dealloc(PyObject *self) {
         }
     }
 
-    PyObject_Free(self);
+    PyObject_GC_Del(self);
+}
+
+int nb_bound_method_traverse(PyObject *self, visitproc visit, void *arg) {
+    nb_bound_method *mb = (nb_bound_method *) self;
+    Py_VISIT((PyObject *) mb->func);
+    Py_VISIT(mb->self);
+    return 0;
+}
+
+int nb_bound_method_clear(PyObject *self) {
+    nb_bound_method *mb = (nb_bound_method *) self;
+    Py_CLEAR(mb->func);
+    Py_CLEAR(mb->self);
+    return 0;
 }
 
 void nb_bound_method_dealloc(PyObject *self) {
     nb_bound_method *mb = (nb_bound_method *) self;
     Py_DECREF((PyObject *) mb->func);
     Py_DECREF(mb->self);
-    PyObject_Free(self);
+    PyObject_GC_Del(self);
 }
 
 /**
@@ -755,9 +809,8 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
            'CALL_METHOD' opcode and vector calls. Pytest rewrites the bytecode
            in a way that breaks this optimization :-/ */
 
-        nb_bound_method *mb = (nb_bound_method *) PyObject_Malloc(sizeof(nb_bound_method));
-        PyObject_Init((PyObject *) mb, internals_get().nb_bound_method);
-
+        nb_bound_method *mb =
+            PyObject_GC_New(nb_bound_method, internals_get().nb_bound_method);
         mb->func = (nb_func *) self;
         mb->self = inst;
         mb->vectorcall = nb_bound_method_vectorcall;

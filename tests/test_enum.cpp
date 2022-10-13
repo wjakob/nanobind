@@ -13,7 +13,9 @@ NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum")
         .value("A", Enum::A, "Value A")
         .value("B", Enum::B, "Value B")
-        .value("C", Enum::C, "Value C");
+        .value("C", Enum::C, "Value C")
+        // ensure that cyclic dependencies are handled correctly
+        .def("dummy", [](Enum, Enum) { }, nb::arg("arg") = Enum::A);
 
     nb::enum_<SEnum>(m, "SEnum", nb::is_arithmetic())
         .value("A", SEnum::A)

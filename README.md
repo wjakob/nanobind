@@ -4,6 +4,7 @@
 [![](https://img.shields.io/pypi/v/nanobind.svg)](https://pypi.org/pypi/nanobind/)
 ![](https://img.shields.io/pypi/l/nanobind.svg)
 [![](https://img.shields.io/badge/Example_project-Link-green)](https://github.com/wjakob/nanobind_example)
+[![](https://img.shields.io/badge/Changelog-Link-green)](https://github.com/wjakob/nanobind/blob/master/docs/changelog.rst)
 
 _nanobind_ is a small binding library that exposes C++ types in Python and vice
 versa. It is reminiscent of

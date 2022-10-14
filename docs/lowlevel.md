@@ -32,7 +32,8 @@ assert(nb::type_size(py_type) == sizeof(MyClass) &&
 
 Given a type object representing a C++ type, we can create an uninitialized
 instance via ``nb::inst_alloc()``. This is an ordinary Python object that can,
-however, not be passed to bound C++ functions to prevent undefined behavior.
+however, not (yet) be passed to bound C++ functions to prevent undefined
+behavior. It must first be initialized.
 
 ```cpp
 nb::object py_inst = nb::inst_alloc(py_type);
@@ -115,7 +116,6 @@ The functions `nb::type_check()` and `nb::inst_check()` are exceptions to this
 rule: they accept any Python object and test whether something is a _nanobind_
 type or instance object.
 
-
 # Even lower-level interface
 
 Every nanobind object has two important flags that control its behavior:
@@ -130,7 +130,7 @@ The functions ``nb::inst_zero()``, ``nb::inst_mark_ready()``,
 ``nb::inst_move()``,  and ``nb::inst_copy()`` set both of these flags to
 ``true``, and ``nb::inst_destruct()`` sets both of them to ``false``.
 
-In rare situations, the destructor should *not* be is invoked when the instance
+In rare situations, the destructor should *not* be invoked when the instance
 is garbage collected, for example when working with a nanobind instance
 representing a field of a parent instance created using the
 ``nb::rv_policy::reference_internal`` return value policy. The library
@@ -140,4 +140,32 @@ flags individually.
 ```cpp
 void inst_set_state(handle h, bool ready, bool destruct);
 std::pair<bool, bool> inst_state(handle h);
+```
+
+# Referencing existing instances
+
+The above examples used the function ``nb::inst_alloc()`` to allocate
+a Python object along space to hold a C++ instance associated with
+the binding ``py_type``.
+
+```cpp
+nb::object py_inst = nb::inst_alloc(py_type);
+
+// Next, perform a C++ in-place construction into the
+// address given by nb::inst_ptr<MyClass>(py_inst)
+... omitted, see the previous examples ...
+```
+
+What if the C++ instance already exists? Nanobind also supports this case via
+the ``nb::inst_wrap()`` function—in this case, the Python object references
+the existing memory region, which is potentially (slightly) less efficient
+due to the need for an extra indirection.
+
+```cpp
+MyClass *inst = new MyClass();
+nb::object py_inst = nb::inst_wrap(py_type, inst);
+
+// Mark as ready, garbage-collecting 'py_inst' will
+// cause 'inst' to be deleted as well
+nb::inst_mark_ready(py_inst);
 ```

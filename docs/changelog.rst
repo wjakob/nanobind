@@ -8,7 +8,7 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.0.6 (TBA)
+Version 0.0.6 (Oct 14, 2022)
 ----------------------------
 
 * Fixed undefined behavior that could lead to crashes when nanobind types were

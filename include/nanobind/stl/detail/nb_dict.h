@@ -57,8 +57,14 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
                     forward_like<typename T::key_type>(item.first), policy, cleanup));
                 object e = steal(ElementCaster::from_cpp(
                     forward_like<typename T::mapped_type>(item.second), policy, cleanup));
-                if (PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) return handle();
-                if (!k.is_valid() || !e.is_valid()) return handle();
+
+                if (PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {
+                    PyErr_Clear();
+                    return handle();
+                }
+
+                if (!k.is_valid() || !e.is_valid())
+                    return handle();
             }
         }
         return ret.release();

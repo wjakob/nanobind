@@ -8,6 +8,14 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
+Version 0.0.7 (Oct 14, 2022)
+----------------------------
+
+* Fixed a regression involving function docstrings in ``pydoc``. (commit
+  `384f4a
+  <https://github.com/wjakob/nanobind/commit/384f4ada1f3f08486fb03427227878ddbbcaad43>`_).
+
+
 Version 0.0.6 (Oct 14, 2022)
 ----------------------------
 

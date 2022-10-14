@@ -5,7 +5,7 @@ How to make a new release?
 
 2. Commit: ``git commit -am "vX.Y.Z release"``
 
-3. Tag: ``git tag -a -v "vX.Y.Z release"``
+3. Tag: ``git tag -a vX.Y.Z -m "vX.Y.Z release"``
 
 3. Push: ``git push`` and ``git push --tags``
 

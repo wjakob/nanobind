@@ -203,3 +203,8 @@ def test23_byte_return():
     assert t.test_17(b"four") == 4
     assert t.test_17(b"\x00\x00\x00\x00") == 4
     assert t.test_18("hello world", 5) == b"hello"
+
+
+def test24_pydoc():
+    import pydoc
+    assert "test_05(arg: int, /)" in pydoc.render_doc(t)

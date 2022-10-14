@@ -962,81 +962,87 @@ static void nb_func_render_signature(const func_data *f) noexcept {
         fail("nanobind::detail::nb_func_finalize(%s): arguments inconsistent.", f->name);
 }
 
-PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
+PyObject *nb_func_get_name(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
-    const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr);
+    if (f->flags & (uint32_t) func_flags::has_name) {
+        return PyUnicode_FromString(f->name);
+    } else {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+}
 
-    if (!name)
-        return nullptr;
-
-    if (strcmp(name, "__name__") == 0) {
-        if (f->flags & (uint32_t) func_flags::has_name) {
+PyObject *nb_func_get_qualname(PyObject *self, void *) {
+    func_data *f = nb_func_data(self);
+    if ((f->flags & (uint32_t) func_flags::has_scope) &&
+        (f->flags & (uint32_t) func_flags::has_name)) {
+        PyObject *scope_name = PyObject_GetAttrString(f->scope, "__qualname__");
+        if (scope_name) {
+            return PyUnicode_FromFormat("%U.%s", scope_name, f->name);
+        } else {
+            PyErr_Clear();
             return PyUnicode_FromString(f->name);
         }
-    } else if (strcmp(name, "__qualname__") == 0) {
-        if ((f->flags & (uint32_t) func_flags::has_scope) &&
-            (f->flags & (uint32_t) func_flags::has_name)) {
-            PyObject *scope_name = PyObject_GetAttrString(f->scope, "__qualname__");
-            if (scope_name) {
-                return PyUnicode_FromFormat("%U.%s", scope_name, f->name);
-            } else {
-                PyErr_Clear();
-                return PyUnicode_FromString(f->name);
-            }
-        }
-    } else if (strcmp(name, "__module__") == 0) {
-        if (f->flags & (uint32_t) func_flags::has_scope) {
-            return PyObject_GetAttrString(
-                f->scope, PyModule_Check(f->scope) ? "__name__" : "__module__");
-        }
-    } else if (strcmp(name, "__doc__") == 0) {
-        uint32_t count = (uint32_t) Py_SIZE(self);
-
-        buf.clear();
-
-        size_t doc_count = 0;
-        for (uint32_t i = 0; i < count; ++i) {
-            const func_data *fi = f + i;
-            if (fi->flags & (uint32_t) func_flags::raw_doc)
-                return PyUnicode_FromString(fi->doc);
-
-            nb_func_render_signature(fi);
-            buf.put('\n');
-            if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0')
-                doc_count++;
-        }
-
-        if (doc_count > 1)
-            buf.put("\nOverloaded function.\n");
-
-        for (uint32_t i = 0; i < count; ++i) {
-            const func_data *fi = f + i;
-
-            if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0') {
-                buf.put('\n');
-
-                if (doc_count > 1) {
-                    buf.put_uint32(i + 1);
-                    buf.put(". ``");
-                    nb_func_render_signature(fi);
-                    buf.put("``\n\n");
-                }
-
-                buf.put_dstr(fi->doc);
-                buf.put('\n');
-            }
-        }
-
-        if (buf.size() > 0) // remove last newline
-            buf.rewind(1);
-
-        return PyUnicode_FromString(buf.get());
     } else {
-        return PyObject_GenericGetAttr(self, name_);
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+}
+
+PyObject *nb_func_get_module(PyObject *self, void *) {
+    func_data *f = nb_func_data(self);
+    if (f->flags & (uint32_t) func_flags::has_scope) {
+        return PyObject_GetAttrString(
+            f->scope, PyModule_Check(f->scope) ? "__name__" : "__module__");
+    } else {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+}
+
+PyObject *nb_func_get_doc(PyObject *self, void *) {
+    func_data *f = nb_func_data(self);
+    uint32_t count = (uint32_t) Py_SIZE(self);
+
+    buf.clear();
+
+    size_t doc_count = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        const func_data *fi = f + i;
+        if (fi->flags & (uint32_t) func_flags::raw_doc)
+            return PyUnicode_FromString(fi->doc);
+
+        nb_func_render_signature(fi);
+        buf.put('\n');
+        if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0')
+            doc_count++;
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    if (doc_count > 1)
+        buf.put("\nOverloaded function.\n");
+
+    for (uint32_t i = 0; i < count; ++i) {
+        const func_data *fi = f + i;
+
+        if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0') {
+            buf.put('\n');
+
+            if (doc_count > 1) {
+                buf.put_uint32(i + 1);
+                buf.put(". ``");
+                nb_func_render_signature(fi);
+                buf.put("``\n\n");
+            }
+
+            buf.put_dstr(fi->doc);
+            buf.put('\n');
+        }
+    }
+
+    if (buf.size() > 0) // remove last newline
+        buf.rewind(1);
+
+    return PyUnicode_FromString(buf.get());
 }
 
 /// Excise a substring from 's'

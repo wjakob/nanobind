@@ -505,3 +505,8 @@ def test27_copy_rvp():
     a = t.Struct.create_reference()
     b = t.Struct.create_copy()
     assert a is not b
+
+
+def test28_pydoc():
+    import pydoc
+    assert "Some documentation" in pydoc.render_doc(t)

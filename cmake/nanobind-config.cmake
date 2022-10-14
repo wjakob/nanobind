@@ -253,4 +253,6 @@ function(nanobind_add_module name)
   if (ARG_LTO)
     nanobind_lto(${name})
   endif()
+
+  set_target_properties(${name} PROPERTIES CXX_VISIBILITY_PRESET hidden)
 endfunction()

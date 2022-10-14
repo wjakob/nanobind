@@ -78,6 +78,9 @@ extern PyObject *nb_func_get_doc(PyObject *, void *);
 extern PyObject *nb_func_get_name(PyObject *, void *);
 extern PyObject *nb_func_get_qualname(PyObject *, void *);
 extern PyObject *nb_func_get_module(PyObject *, void *);
+#if PY_VERSION_HEX < 0x03090000
+extern PyObject *nb_func_getattro(PyObject *, PyObject *);
+#endif
 extern int nb_func_traverse(PyObject *, visitproc, void *);
 extern int nb_func_clear(PyObject *);
 extern void nb_func_dealloc(PyObject *);
@@ -116,6 +119,9 @@ static PyGetSetDef nb_func_getset[] = {
 static PyType_Slot nb_func_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
+#if PY_VERSION_HEX < 0x03090000
+    { Py_tp_getattro, (void *) nb_func_getattro },
+#endif
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
@@ -136,6 +142,9 @@ static PyType_Spec nb_func_spec = {
 static PyType_Slot nb_method_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
+#if PY_VERSION_HEX < 0x03090000
+    { Py_tp_getattro, (void *) nb_func_getattro },
+#endif
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },

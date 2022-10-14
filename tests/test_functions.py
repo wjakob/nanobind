@@ -1,5 +1,6 @@
 import test_functions_ext as t
 import pytest
+import sys
 
 def test01_capture():
     # Functions with and without capture object of different sizes
@@ -205,6 +206,7 @@ def test23_byte_return():
     assert t.test_18("hello world", 5) == b"hello"
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
 def test24_pydoc():
     import pydoc
     assert "test_05(arg: int, /)" in pydoc.render_doc(t)

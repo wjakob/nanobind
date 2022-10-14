@@ -1000,6 +1000,20 @@ PyObject *nb_func_get_module(PyObject *self, void *) {
     }
 }
 
+#if PY_VERSION_HEX < 0x03090000
+// PyGetSetDef entry for __module__ is ignored in Python 3.8
+PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
+    const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr);
+
+    if (!name)
+        return nullptr;
+    else if (strcmp(name, "__module__") == 0)
+        return nb_func_get_module(self, nullptr);
+    else
+        return PyObject_GenericGetAttr(self, name_);
+}
+#endif
+
 PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
     uint32_t count = (uint32_t) Py_SIZE(self);

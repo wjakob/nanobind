@@ -519,3 +519,12 @@ def test55_map_return_readonly_value(clean):
     assert t.map_return_readonly_value.__doc__ == (
         "map_return_readonly_value() -> test_stl_ext.StructWithReadonlyMap"
     )
+
+def test56_array(clean):
+    o = t.array_out()
+    assert isinstance(o, list) and o == [1, 2, 3]
+    assert t.array_in([1, 2, 3]) == 6
+    assert t.array_in((1, 2, 3)) == 6
+    with pytest.raises(TypeError) as excinfo:
+        assert t.array_in((1, 2, 3, 4)) == 6
+    assert 'incompatible function arguments' in str(excinfo.value)

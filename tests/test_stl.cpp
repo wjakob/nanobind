@@ -8,6 +8,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/map.h>
+#include <nanobind/stl/array.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -233,6 +234,7 @@ NB_MODULE(test_stl_ext, m) {
             x.emplace(std::string(1, 'a' + i), i);
         return x;
     });
+
     m.def("map_return_copyable_value", [](){
         std::map<std::string, Copyable> x;
         for (int i = 0; i < 10; ++i) {
@@ -241,6 +243,7 @@ NB_MODULE(test_stl_ext, m) {
         }
         return x;
     });
+
     m.def("map_movable_in_value", [](std::map<std::string, Movable> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -249,6 +252,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_copyable_in_value", [](std::map<std::string, Copyable> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -257,6 +261,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_movable_in_lvalue_ref", [](std::map<std::string, Movable> &x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -265,6 +270,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_movable_in_rvalue_ref", [](std::map<std::string, Movable> &&x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -273,6 +279,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_movable_in_ptr", [](std::map<std::string, Movable *> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -281,6 +288,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key]->value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_return_readonly_value", [](){
         StructWithReadonlyMap x;
         for (int i = 0; i < 10; ++i) {
@@ -288,4 +296,8 @@ NB_MODULE(test_stl_ext, m) {
         }
         return x;
     });
+
+    // test56
+    m.def("array_out", [](){ return std::array<int, 3>{1, 2, 3}; });
+    m.def("array_in", [](std::array<int, 3> x) { return x[0] + x[1] + x[2]; });
 }

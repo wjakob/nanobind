@@ -280,19 +280,19 @@ public:
     int32_t device_id() const { return m_tensor.device.device_id; }
     detail::tensor_handle *handle() const { return m_handle; }
 
-    const void *data() const {
-        return (const uint8_t *) m_tensor.data + m_tensor.byte_offset;
+    const Scalar *data() const {
+        return (const Scalar *)((const uint8_t *) m_tensor.data + m_tensor.byte_offset);
     }
-    void *data() { return (uint8_t *) m_tensor.data + m_tensor.byte_offset; }
+    Scalar *data() { return (Scalar *)((uint8_t *) m_tensor.data + m_tensor.byte_offset); }
 
     template <typename... Ts>
     NB_INLINE auto& operator()(Ts... indices) {
         static_assert(
-            !std::is_same_v<typename Info::scalar_type, void>,
+            !std::is_same_v<Scalar, void>,
             "To use nb::tensor::operator(), you must add a scalar type "
             "annotation (e.g. 'float') to the tensor template parameters.");
         static_assert(
-            !std::is_same_v<typename Info::shape_type, void>,
+            !std::is_same_v<Scalar, void>,
             "To use nb::tensor::operator(), you must add a nb::shape<> "
             "annotation to the tensor template parameters.");
         static_assert(sizeof...(Ts) == Info::shape_type::size,
@@ -300,7 +300,7 @@ public:
 
         int64_t counter = 0, index = 0;
         ((index += int64_t(indices) * m_tensor.strides[counter++]), ...);
-        return (typename Info::scalar_type &) *(
+        return (Scalar &) *(
             (uint8_t *) m_tensor.data + m_tensor.byte_offset +
             index * sizeof(typename Info::scalar_type));
     }

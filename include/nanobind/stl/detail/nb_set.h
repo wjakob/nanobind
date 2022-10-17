@@ -15,7 +15,7 @@ template <typename Value_, typename Key> struct set_caster {
 
         PyObject* iter = obj_iter(src.ptr());
         if (iter == nullptr) {
-            PyErr_Clear();
+            PyErr_Print();
             return false;
         }
 
@@ -23,13 +23,17 @@ template <typename Value_, typename Key> struct set_caster {
         bool success = (size >= 0);
 
         KeyCaster key_caster;
-        while (PyObject* key = obj_iter_next(iter)) {
+        for (PyObject* key = PyIter_Next(iter); key; key = PyIter_Next(iter)) {
             if (!key_caster.from_python(key, flags, cleanup)) {
                 success = false;
                 break;
             }
             value.emplace(((KeyCaster &&) key_caster).operator cast_t<Key&&>());
             Py_DECREF(key);
+        }
+        if (PyErr_Occurred()) {
+            PyErr_Print();
+            success = false;
         }
 
         Py_DECREF(iter);
@@ -44,9 +48,16 @@ template <typename Value_, typename Key> struct set_caster {
             for (auto& key : src) {
                 object k = steal(
                     KeyCaster::from_cpp(forward_like<T>(key), policy, cleanup));
-                if (PySet_Add(ret.ptr(), k.ptr()) != 0) return handle();
+                if (PySet_Add(ret.ptr(), k.ptr()) != 0) {
+                    if (PyErr_Occurred()) {
+                        PyErr_Print();
+                    }
+                    return handle();
+                }
                 if (!k.is_valid()) return handle();
             }
+        } else if (PyErr_Occurred()) {
+            PyErr_Print();
         }
         return ret.release();
     }

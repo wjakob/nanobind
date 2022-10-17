@@ -15,16 +15,16 @@ template <typename Value_, typename Key> struct set_caster {
 
         PyObject* iter = obj_iter(src.ptr());
         if (iter == nullptr) {
-            PyErr_Print();
+            PyErr_Clear();
             return false;
         }
 
-        Py_ssize_t size = NB_SET_GET_SIZE(src.ptr());
-        bool success = (size >= 0);
+        bool success = true;
 
         KeyCaster key_caster;
         for (PyObject* key = PyIter_Next(iter); key; key = PyIter_Next(iter)) {
             if (!key_caster.from_python(key, flags, cleanup)) {
+                Py_DECREF(key);
                 success = false;
                 break;
             }
@@ -32,7 +32,7 @@ template <typename Value_, typename Key> struct set_caster {
             Py_DECREF(key);
         }
         if (PyErr_Occurred()) {
-            PyErr_Print();
+            PyErr_Clear();
             success = false;
         }
 
@@ -50,14 +50,14 @@ template <typename Value_, typename Key> struct set_caster {
                     KeyCaster::from_cpp(forward_like<T>(key), policy, cleanup));
                 if (PySet_Add(ret.ptr(), k.ptr()) != 0) {
                     if (PyErr_Occurred()) {
-                        PyErr_Print();
+                        PyErr_Clear();
                     }
                     return handle();
                 }
                 if (!k.is_valid()) return handle();
             }
         } else if (PyErr_Occurred()) {
-            PyErr_Print();
+            PyErr_Clear();
         }
         return ret.release();
     }

@@ -511,3 +511,20 @@ def test54_map_movable_in_ptr(clean):
     assert t.map_movable_in_ptr.__doc__ == (
         "map_movable_in_ptr(x: dict[str, test_stl_ext.Movable]) -> None"
     )
+
+def test55_map_return_readonly_value(clean):
+    for i, (k, v) in enumerate(sorted(t.map_return_readonly_value().map.items())):
+        assert k == chr(ord("a") + i)
+        assert v == i
+    assert t.map_return_readonly_value.__doc__ == (
+        "map_return_readonly_value() -> test_stl_ext.StructWithReadonlyMap"
+    )
+
+def test56_array(clean):
+    o = t.array_out()
+    assert isinstance(o, list) and o == [1, 2, 3]
+    assert t.array_in([1, 2, 3]) == 6
+    assert t.array_in((1, 2, 3)) == 6
+    with pytest.raises(TypeError) as excinfo:
+        assert t.array_in((1, 2, 3, 4)) == 6
+    assert 'incompatible function arguments' in str(excinfo.value)

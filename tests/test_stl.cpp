@@ -9,6 +9,7 @@
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/unordered_set.h>
+#include <nanobind/stl/array.h>
 
 NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
 
@@ -38,6 +39,10 @@ struct Copyable {
     Copyable(const Copyable &s) : value(s.value) { copy_constructed++; }
     Copyable &operator=(const Copyable &s) { value = s.value; copy_assigned++; return *this; }
     ~Copyable() { destructed++; }
+};
+
+struct StructWithReadonlyMap {
+  std::map<std::string, uint64_t> map;
 };
 
 void fail() { throw std::exception(); }
@@ -74,6 +79,10 @@ NB_MODULE(test_stl_ext, m) {
         .def(nb::init<>())
         .def(nb::init<int>())
         .def_readwrite("value", &Copyable::value);
+
+    nb::class_<StructWithReadonlyMap>(m, "StructWithReadonlyMap")
+        .def(nb::init<>())
+        .def_readonly("map", &StructWithReadonlyMap::map);
 
     // ----- test01-test12 ------ */
 
@@ -219,13 +228,14 @@ NB_MODULE(test_stl_ext, m) {
     m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
           nb::arg("x").none() = nb::none());
 
-    // ----- test48-test54 ------ */
+    // ----- test48-test55 ------ */
     m.def("map_return_movable_value", [](){
         std::map<std::string, Movable> x;
         for (int i = 0; i < 10; ++i)
             x.emplace(std::string(1, 'a' + i), i);
         return x;
     });
+
     m.def("map_return_copyable_value", [](){
         std::map<std::string, Copyable> x;
         for (int i = 0; i < 10; ++i) {
@@ -234,6 +244,7 @@ NB_MODULE(test_stl_ext, m) {
         }
         return x;
     });
+
     m.def("map_movable_in_value", [](std::map<std::string, Movable> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -242,6 +253,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_copyable_in_value", [](std::map<std::string, Copyable> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -250,6 +262,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_movable_in_lvalue_ref", [](std::map<std::string, Movable> &x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -258,6 +271,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_movable_in_rvalue_ref", [](std::map<std::string, Movable> &&x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -266,6 +280,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x[key].value != i) fail();
         }
     }, nb::arg("x"));
+
     m.def("map_movable_in_ptr", [](std::map<std::string, Movable *> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
@@ -275,32 +290,56 @@ NB_MODULE(test_stl_ext, m) {
         }
     }, nb::arg("x"));
 
+    m.def("map_return_readonly_value", [](){
+        StructWithReadonlyMap x;
+        for (int i = 0; i < 10; ++i) {
+            x.map.insert({std::string(1, 'a' + i), i});
+        }
+        return x;
+    });
+
+    // test56
+    m.def("array_out", [](){ return std::array<int, 3>{1, 2, 3}; });
+    m.def("array_in", [](std::array<int, 3> x) { return x[0] + x[1] + x[2]; });
+
     // ----- test55-test58 ------ */
-    m.def("set_return_value", [](){
+    m.def("set_return_value", []() {
         std::unordered_set<std::string> x;
         for (int i = 0; i < 10; ++i)
             x.emplace(std::string(1, 'a' + i));
         return x;
     });
-    m.def("set_in_value", [](std::unordered_set<std::string> x) {
-        if (x.size() != 10) fail();
-        for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
-            if (x.find(key) == x.end()) fail();
-        }
-    }, nb::arg("x"));
-    m.def("set_in_lvalue_ref", [](std::unordered_set<std::string>& x) {
-        if (x.size() != 10) fail();
-        for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
-            if (x.find(key) == x.end()) fail();
-        }
-    }, nb::arg("x"));
-    m.def("set_in_rvalue_ref", [](std::unordered_set<std::string>&& x) {
-        if (x.size() != 10) fail();
-        for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
-            if (x.find(key) == x.end()) fail();
-        }
-    }, nb::arg("x"));
+    m.def(
+        "set_in_value", [](std::unordered_set<std::string> x) {
+            if (x.size() != 10)
+                fail();
+            for (int i = 0; i < 10; ++i) {
+                std::string key(1, 'a' + i);
+                if (x.find(key) == x.end())
+                    fail();
+            }
+        },
+        nb::arg("x"));
+    m.def(
+        "set_in_lvalue_ref", [](std::unordered_set<std::string>& x) {
+            if (x.size() != 10)
+                fail();
+            for (int i = 0; i < 10; ++i) {
+                std::string key(1, 'a' + i);
+                if (x.find(key) == x.end())
+                    fail();
+            }
+        },
+        nb::arg("x"));
+    m.def(
+        "set_in_rvalue_ref", [](std::unordered_set<std::string>&& x) {
+            if (x.size() != 10)
+                fail();
+            for (int i = 0; i < 10; ++i) {
+                std::string key(1, 'a' + i);
+                if (x.find(key) == x.end())
+                    fail();
+            }
+        },
+        nb::arg("x"));
 }

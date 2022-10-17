@@ -359,7 +359,13 @@ NB_MODULE(test_classes_ext, m) {
         if (!nb::inst_ready(py_inst))
             throw std::runtime_error("Internal error! (7)");
 
-        return std::make_pair(py_inst, py_inst_2);
+        nb::object py_inst_3 = nb::inst_wrap(py_type, new Struct(345));
+        if (!(nb::inst_check(py_inst_3) && py_inst_3.type().is(py_type) &&
+              !nb::inst_ready(py_inst_3)))
+            throw std::runtime_error("Internal error! (2)");
+        nb::inst_mark_ready(py_inst_3);
+
+        return nb::make_tuple(py_inst, py_inst_2, py_inst_3);
     });
 
     // test22_handle_t

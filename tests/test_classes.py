@@ -413,15 +413,16 @@ def test20_type_callback():
 
 
 def test21_low_level(clean):
-    s1, s2 = t.test_lowlevel()
-    assert s1.value() == 123 and s2.value() == 0
+    s1, s2, s3 = t.test_lowlevel()
+    assert s1.value() == 123 and s2.value() == 0 and s3.value() == 345
     del s1
     del s2
+    del s3
     assert_stats(
-        value_constructed=1,
+        value_constructed=2,
         copy_constructed=1,
         move_constructed=1,
-        destructed=3
+        destructed=4
     )
 
 
@@ -504,3 +505,8 @@ def test27_copy_rvp():
     a = t.Struct.create_reference()
     b = t.Struct.create_copy()
     assert a is not b
+
+
+def test28_pydoc():
+    import pydoc
+    assert "Some documentation" in pydoc.render_doc(t)

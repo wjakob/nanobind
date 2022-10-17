@@ -8,7 +8,19 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.0.6 (TBA)
+Version 0.0.8 (TBD)
+----------------------------
+
+* Caster for ``std::array<..>``.
+
+Version 0.0.7 (Oct 14, 2022)
+----------------------------
+
+* Fixed a regression involving function docstrings in ``pydoc``. (commit
+  `384f4a
+  <https://github.com/wjakob/nanobind/commit/384f4ada1f3f08486fb03427227878ddbbcaad43>`_).
+
+Version 0.0.6 (Oct 14, 2022)
 ----------------------------
 
 * Fixed undefined behavior that could lead to crashes when nanobind types were
@@ -49,16 +61,9 @@ Version 0.0.3 (Apr 14, 2022)
 Version 0.0.2 (Mar 10, 2022)
 ----------------------------
 
-* Enumeration support.
-* Operator overloading support.
-* Initial ``unique_ptr<T>``, ``std::shared_ptr<T>`` support.
-* Support for ``std::function<..>`` bindings.
-* Support for ``nb::call_guard<>``, ``nb::keep_alive<>``.
-* Support for static class properties.
-* Various minor fixes and improvements
-
+* Initial release of _nanobind_ codebase.
 
 Version 0.0.1 (Feb 21, 2022)
 ----------------------------
 
-* Initial release
+* Placeholder package on PyPI.

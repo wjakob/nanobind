@@ -1010,6 +1010,13 @@ PyObject *nb_inst_alloc(PyTypeObject *t) {
     return result;
 }
 
+PyObject *nb_inst_wrap(PyTypeObject *t, void *ptr) {
+    PyObject *result = inst_new_impl(t, ptr);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
 void *nb_inst_ptr(PyObject *o) noexcept {
     return inst_ptr((nb_inst *) o);
 }
@@ -1025,6 +1032,7 @@ void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept {
     nb_inst *nbi = (nb_inst *) o;
     nbi->ready = ready;
     nbi->destruct = destruct;
+    nbi->cpp_delete = destruct && !nbi->internal;
 }
 
 std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept {

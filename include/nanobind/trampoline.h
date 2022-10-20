@@ -39,22 +39,23 @@ template <size_t Size> struct trampoline {
 };
 
 #define NB_TRAMPOLINE(base, size)                                              \
-    nanobind::detail::trampoline<size> trampoline{ this, &typeid(base) };
+    nanobind::detail::trampoline<size> nb_trampoline{ this, &typeid(base) };
 
 #define NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)                 \
-    nanobind::handle key = trampoline.lookup(name, false);                     \
-    if (key.is_valid()) {                                                      \
-        nanobind::gil_scoped_acquire guard;                                    \
+    nanobind::handle nb_key = nb_trampoline.lookup(name, false);               \
+    if (nb_key.is_valid()) {                                                   \
+        nanobind::gil_scoped_acquire nb_guard;                                 \
         return nanobind::cast<ret_type>(                                       \
-            trampoline.base().attr(key)(__VA_ARGS__));                         \
+            nb_trampoline.base().attr(nb_key)(__VA_ARGS__));                   \
     } else {                                                                   \
         return base_type::func(__VA_ARGS__);                                   \
     }
 
 #define NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)            \
-    nanobind::handle key = trampoline.lookup(name, true);                      \
-    nanobind::gil_scoped_acquire guard;                                        \
-    return nanobind::cast<ret_type>(trampoline.base().attr(key)(__VA_ARGS__));
+    nanobind::handle nb_key = nb_trampoline.lookup(name, true);                \
+    nanobind::gil_scoped_acquire nb_guard;                                     \
+    return nanobind::cast<ret_type>(                                           \
+        nb_trampoline.base().attr(nb_key)(__VA_ARGS__));
 
 #define NB_OVERRIDE(ret_type, base_type, func, ...)                            \
     NB_OVERRIDE_NAME(ret_type, base_type, #func, func, __VA_ARGS__)

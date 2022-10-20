@@ -1,10 +1,10 @@
 #include "object.h"
 #include <stdexcept>
 
-static void (*object_inc_ref_py)(PyObject *) = nullptr;
-static void (*object_dec_ref_py)(PyObject *) = nullptr;
+static void (*object_inc_ref_py)(PyObject *) noexcept = nullptr;
+static void (*object_dec_ref_py)(PyObject *) noexcept = nullptr;
 
-void Object::inc_ref() const {
+void Object::inc_ref() const noexcept {
     uintptr_t value = m_state.load(std::memory_order_relaxed);
 
     while (true) {
@@ -22,13 +22,14 @@ void Object::inc_ref() const {
     }
 }
 
-void Object::dec_ref() const {
+void Object::dec_ref() const noexcept {
     uintptr_t value = m_state.load(std::memory_order_relaxed);
 
     while (true) {
         if (value & 1) {
             if (value == 1) {
-                throw std::runtime_error("Object::dec_ref(): reference count underflow!");
+                fprintf(stderr, "Object::dec_ref(%p): reference count underflow!", this);
+                abort();
             } else if (value == 3) {
                 delete this;
             } else {
@@ -45,7 +46,7 @@ void Object::dec_ref() const {
     }
 }
 
-void Object::set_self_py(PyObject *o) {
+void Object::set_self_py(PyObject *o) noexcept {
     uintptr_t value = m_state.load(std::memory_order_relaxed);
     if (value & 1) {
         value >>= 1;
@@ -54,11 +55,12 @@ void Object::set_self_py(PyObject *o) {
 
         m_state.store((uintptr_t) o);
     } else {
-        throw std::runtime_error("Object::set_self_py(): a Python object was already present!");
+        fprintf(stderr, "Object::set_self_py(%p): a Python object was already present!", this);
+        abort();
     }
 }
 
-PyObject *Object::self_py() const {
+PyObject *Object::self_py() const noexcept {
     uintptr_t value = m_state.load(std::memory_order_relaxed);
     if (value & 1)
         return nullptr;
@@ -66,8 +68,8 @@ PyObject *Object::self_py() const {
         return (PyObject *) value;
 }
 
-void object_init_py(void (*object_inc_ref_py_)(PyObject *),
-                    void (*object_dec_ref_py_)(PyObject *)) {
+void object_init_py(void (*object_inc_ref_py_)(PyObject *) noexcept,
+                    void (*object_dec_ref_py_)(PyObject *) noexcept) {
     object_inc_ref_py = object_inc_ref_py_;
     object_dec_ref_py = object_dec_ref_py_;
 }

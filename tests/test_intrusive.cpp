@@ -35,11 +35,11 @@ class PyTest : Test {
 
 NB_MODULE(test_intrusive_ext, m) {
     object_init_py(
-        [](PyObject *o) {
+        [](PyObject *o) noexcept {
             nb::gil_scoped_acquire guard;
             Py_INCREF(o);
         },
-        [](PyObject *o) {
+        [](PyObject *o) noexcept {
             nb::gil_scoped_acquire guard;
             Py_DECREF(o);
         });
@@ -47,7 +47,7 @@ NB_MODULE(test_intrusive_ext, m) {
     nb::class_<Object>(
         m, "Object",
         nb::intrusive_ptr<Object>(
-            [](Object *o, PyObject *po) { o->set_self_py(po); }));
+            [](Object *o, PyObject *po) noexcept { o->set_self_py(po); }));
 
     nb::class_<Test, Object, PyTest>(m, "Test")
         .def(nb::init<>())

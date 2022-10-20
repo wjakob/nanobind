@@ -11,9 +11,9 @@ follows:
 ```cpp
 class Object {
 public:
-    void inc_ref() const { ++m_ref_count; }
+    void inc_ref() const noexcept { ++m_ref_count; }
 
-    void dec_ref() const {
+    void dec_ref() const noexcept {
         if (--m_ref_count == 0)
             delete this;
     }
@@ -69,6 +69,6 @@ inherited by all subclasses.
 nb::class_<Object>(
     m, "Object",
     nb::intrusive_ptr<Object>(
-        [](Object *o, PyObject *po) { o->set_self_py(po); }));
+        [](Object *o, PyObject *po) noexcept { o->set_self_py(po); }));
 ```
 

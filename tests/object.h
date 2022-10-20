@@ -76,16 +76,16 @@ public:
     virtual ~Object() = default;
 
     /// Increase the object's reference count
-    void inc_ref() const;
+    void inc_ref() const noexcept;
 
     /// Decrease the object's reference count and potentially deallocate it
-    void dec_ref() const;
+    void dec_ref() const noexcept;
 
     /// Return the Python object associated with this instance (or NULL)
-    PyObject *self_py() const;
+    PyObject *self_py() const noexcept;
 
     /// Set the Python object associated with this instance
-    void set_self_py(PyObject *self);
+    void set_self_py(PyObject *self) noexcept;
 
 private:
     mutable std::atomic<uintptr_t> m_state { 1 };
@@ -102,8 +102,8 @@ private:
  * can be used to increase/decrease the Python reference count of an instance
  * (i.e., `Py_INCREF` / `Py_DECREF`).
  */
-void object_init_py(void (*object_inc_ref_py)(PyObject *),
-                    void (*object_dec_ref_py)(PyObject *));
+void object_init_py(void (*object_inc_ref_py)(PyObject *) noexcept,
+                    void (*object_dec_ref_py)(PyObject *) noexcept);
 
 
 /**

@@ -90,7 +90,7 @@ struct type_data {
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
     void (*type_callback)(PyType_Slot **) noexcept;
     void *supplement;
-    void (*set_self_py)(void *, PyObject *);
+    void (*set_self_py)(void *, PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
     size_t dictoffset;
 #endif
@@ -114,7 +114,7 @@ NB_INLINE void type_extra_apply(type_data &t, type_callback c) {
 template <typename T>
 NB_INLINE void type_extra_apply(type_data &t, intrusive_ptr<T> ip) {
     t.flags |= (uint32_t) type_flags::intrusive_ptr;
-    t.set_self_py = (void (*)(void *, PyObject *)) ip.set_self_py;
+    t.set_self_py = (void (*)(void *, PyObject *) noexcept) ip.set_self_py;
 }
 
 NB_INLINE void type_extra_apply(type_data &t, is_enum e) {

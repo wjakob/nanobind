@@ -45,24 +45,24 @@ template <typename Value_, typename Entry> struct list_caster {
 
     template <typename T>
     static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
-        object list = steal(PyList_New(src.size()));
+        object ret = steal(PyList_New(src.size()));
 
-        if (list.is_valid()) {
+        if (ret.is_valid()) {
             Py_ssize_t index = 0;
 
             for (auto &value : src) {
-                handle h =
-                    Caster::from_cpp(forward_like<T>(value), policy, cleanup);
+                handle h = Caster::from_cpp(forward_like<T>(value), policy, cleanup);
 
-                NB_LIST_SET_ITEM(list.ptr(), index++, h.ptr());
-                if (!h.is_valid())
-                    return handle();
+                if (!h.is_valid()) {
+                    ret.clear();
+                    break;
+                }
+
+                NB_LIST_SET_ITEM(ret.ptr(), index++, h.ptr());
             }
-        } else {
-            PyErr_Clear();
         }
 
-        return list.release();
+        return ret.release();
     }
 };
 

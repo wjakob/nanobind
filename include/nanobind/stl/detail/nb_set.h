@@ -20,9 +20,9 @@ template <typename Value_, typename Key> struct set_caster {
         }
 
         bool success = true;
-
         KeyCaster key_caster;
         PyObject *key;
+
         while ((key = PyIter_Next(iter))) {
             success &= key_caster.from_python(key, flags, cleanup);
             Py_DECREF(key);
@@ -52,16 +52,11 @@ template <typename Value_, typename Key> struct set_caster {
                 object k = steal(
                     KeyCaster::from_cpp(forward_like<T>(key), policy, cleanup));
 
-                if (!k.is_valid())
-                    return handle();
-
-                if (PySet_Add(ret.ptr(), k.ptr()) != 0) {
-                    PyErr_Clear();
-                    return handle();
+                if (!k.is_valid() || PySet_Add(ret.ptr(), k.ptr()) != 0) {
+                    ret.clear();
+                    break;
                 }
             }
-        } else {
-            PyErr_Clear();
         }
 
         return ret.release();

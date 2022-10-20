@@ -62,16 +62,12 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
                 object e = steal(ElementCaster::from_cpp(
                     forward_like<T>(item.second), policy, cleanup));
 
-                if (!k.is_valid() || !e.is_valid())
-                    return handle();
-
-                if (PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {
-                    PyErr_Clear();
-                    return handle();
+                if (!k.is_valid() || !e.is_valid() ||
+                    PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {
+                    ret.clear();
+                    break;
                 }
             }
-        } else {
-            PyErr_Clear();
         }
 
         return ret.release();

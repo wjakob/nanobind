@@ -317,6 +317,7 @@ class tuple : public object {
     size_t size() const { return NB_TUPLE_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
+
 #if !defined(Py_LIMITED_API)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
@@ -336,6 +337,7 @@ class list : public object {
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
+
 #if !defined(Py_LIMITED_API)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;

@@ -25,10 +25,13 @@ struct function_handle {
 
 template <typename Return, typename... Args>
 struct type_caster<std::function<Return(Args...)>> {
+    using ReturnCaster = make_caster<
+        std::conditional_t<std::is_void_v<Return>, void_type, Return>>;
+
     NB_TYPE_CASTER(std::function <Return(Args...)>,
                    const_name("Callable[[") +
                        concat(make_caster<Args>::Name...) + const_name("], ") +
-                       make_caster<Return>::Name + const_name("]"));
+                       ReturnCaster::Name + const_name("]"));
 
     bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if (src.is_none())

@@ -316,6 +316,13 @@ def test30_std_function():
         assert t.call_function(lambda x, y: x+y, 3) == 8
     assert 'missing 1 required positional argument' in str(excinfo.value)
 
+    l = []
+    def f():
+        l.append(1)
+    f2 = t.return_void_function(f)
+    f2()
+    assert l == [1]
+
 
 def test31_vec_type_check():
     with pytest.raises(TypeError) as excinfo:

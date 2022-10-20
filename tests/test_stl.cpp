@@ -204,6 +204,10 @@ NB_MODULE(test_stl_ext, m) {
         return f(x);
     });
 
+    m.def("return_void_function", [](std::function<void(void)> &f) {
+        return f;
+    });
+
     m.def("identity_list", [](std::list<int> &x) { return x; });
 
     // ----- test33 ------ */

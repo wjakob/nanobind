@@ -528,3 +528,8 @@ def test56_array(clean):
     with pytest.raises(TypeError) as excinfo:
         assert t.array_in((1, 2, 3, 4)) == 6
     assert 'incompatible function arguments' in str(excinfo.value)
+
+def test57_map_movable_in_failure(clean):
+    with pytest.raises(TypeError) as excinfo:
+        t.map_copyable_in_value({1:2})
+    assert 'incompatible function arguments' in str(excinfo.value)

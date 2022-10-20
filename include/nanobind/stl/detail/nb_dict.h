@@ -31,14 +31,17 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
             PyObject *item = NB_LIST_GET_ITEM(items, i);
             PyObject *key = NB_TUPLE_GET_ITEM(item, 0);
             PyObject *element = NB_TUPLE_GET_ITEM(item, 1);
+
             if (!key_caster.from_python(key, flags, cleanup)) {
                 success = false;
                 break;
             }
+
             if (!element_caster.from_python(element, flags, cleanup)) {
                 success = false;
                 break;
             }
+
             value.emplace(((KeyCaster &&) key_caster).operator cast_t<Key &&>(),
                           ((ElementCaster &&) element_caster).operator cast_t<Element &&>());
         }
@@ -51,22 +54,26 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
     template <typename T>
     static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
         dict ret;
-        if (ret) {
+
+        if (ret.is_valid()) {
             for (auto &item : src) {
                 object k = steal(KeyCaster::from_cpp(
                     forward_like<T>(item.first), policy, cleanup));
                 object e = steal(ElementCaster::from_cpp(
                     forward_like<T>(item.second), policy, cleanup));
 
+                if (!k.is_valid() || !e.is_valid())
+                    return handle();
+
                 if (PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {
                     PyErr_Clear();
                     return handle();
                 }
-
-                if (!k.is_valid() || !e.is_valid())
-                    return handle();
             }
+        } else {
+            PyErr_Clear();
         }
+
         return ret.release();
     }
 };

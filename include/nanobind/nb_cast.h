@@ -138,7 +138,7 @@ template <> struct type_caster<void> {
 
     static handle from_cpp(void *ptr, rv_policy, cleanup_list *) noexcept {
         if (ptr)
-            return detail::capsule_new(ptr, "nb_handle", nullptr);
+            return PyCapsule_New(ptr, "nb_handle", nullptr);
         else
             return none().release();
     }

@@ -146,4 +146,9 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_16", [](const char *c) { return nb::bytes(c); });
     m.def("test_17", [](nb::bytes c) { return c.size(); });
     m.def("test_18", [](const char *c, int size) { return nb::bytes(c, size); });
+
+    // Test int type
+    m.def("test_19", [](nb::int_ i) { return i + nb::int_(123); });
+    m.def("test_20", [](nb::str s) { return nb::int_(s) + nb::int_(123); });
+    m.def("test_21", [](nb::int_ i) { return (int) i; });
 }

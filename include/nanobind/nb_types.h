@@ -280,6 +280,30 @@ class capsule : public object {
     void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }
 };
 
+class int_ : public object {
+    NB_OBJECT_DEFAULT(int_, object, "int", PyLong_Check)
+
+    explicit int_(handle h)
+        : object(detail::int_from_obj(h.ptr()), detail::steal_t{}) { }
+
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
+    explicit int_(T value)
+        : object(
+              detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr),
+              detail::steal_t{}) {
+        if (!m_ptr)
+            detail::raise_python_error();
+    }
+
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
+    explicit operator T() const {
+        detail::type_caster<T> tc;
+        if (!tc.from_python(m_ptr, 0, nullptr))
+            throw std::out_of_range("Conversion of nanobind::int_ failed");
+        return tc.value;
+    }
+};
+
 class str : public object {
     NB_OBJECT_DEFAULT(str, object, "str", PyUnicode_Check)
 

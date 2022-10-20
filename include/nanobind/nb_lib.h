@@ -110,6 +110,11 @@ NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
 
 // ========================================================================
 
+/// Convert a Python object into a Python integer
+NB_CORE PyObject *int_from_obj(PyObject *o);
+
+// ========================================================================
+
 /// Get an object attribute or raise an exception
 NB_CORE PyObject *getattr(PyObject *obj, const char *key);
 NB_CORE PyObject *getattr(PyObject *obj, PyObject *key);

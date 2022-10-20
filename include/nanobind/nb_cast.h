@@ -114,6 +114,36 @@ template <> struct type_caster<void_type> {
     static constexpr auto Name = const_name("None");
 };
 
+template <> struct type_caster<void> {
+    template <typename T_> using Cast = void *;
+    using Value = void*;
+    static constexpr bool IsClass = false;
+    static constexpr auto Name = const_name("capsule");
+    explicit operator void *() { return value; }
+    Value value;
+
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+        if (src.is_none()) {
+            value = nullptr;
+            return true;
+        } else {
+            value = PyCapsule_GetPointer(src.ptr(), "nb_handle");
+            if (!value) {
+                PyErr_Clear();
+                return false;
+            }
+            return true;
+        }
+    }
+
+    static handle from_cpp(void *ptr, rv_policy, cleanup_list *) noexcept {
+        if (ptr)
+            return detail::capsule_new(ptr, "nb_handle", nullptr);
+        else
+            return none().release();
+    }
+};
+
 template <> struct type_caster<std::nullptr_t> {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (src.is_none())
@@ -122,7 +152,7 @@ template <> struct type_caster<std::nullptr_t> {
     }
 
     static handle from_cpp(std::nullptr_t, rv_policy, cleanup_list *) noexcept {
-        return none().inc_ref();
+        return none().release();
     }
 
     NB_TYPE_CASTER(std::nullptr_t, const_name("None"));

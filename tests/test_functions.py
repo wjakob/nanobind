@@ -217,3 +217,12 @@ def test25_int():
     assert t.test_20("5") == 128
     assert t.test_21(5) == 5
     assert t.test_19.__doc__ == "test_19(arg: int, /) -> object"
+
+
+def test26_capsule():
+    p = t.test_22()
+    assert 'capsule' in str(p) and 'nb_handle' in str(p)
+    assert t.test_24(p) == 1
+    p = t.test_23()
+    assert p is None
+    assert t.test_24(p) == 0

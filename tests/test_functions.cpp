@@ -151,4 +151,9 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_19", [](nb::int_ i) { return i + nb::int_(123); });
     m.def("test_20", [](nb::str s) { return nb::int_(s) + nb::int_(123); });
     m.def("test_21", [](nb::int_ i) { return (int) i; });
+
+    // Test capsule wrapper
+    m.def("test_22", []() -> void * { return (void*) 1; });
+    m.def("test_23", []() -> void * { return nullptr; });
+    m.def("test_24", [](void *p) { return (uintptr_t) p; }, "p"_a.none());
 }

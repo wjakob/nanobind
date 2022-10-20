@@ -22,15 +22,17 @@ template <typename Value_, typename Key> struct set_caster {
         bool success = true;
 
         KeyCaster key_caster;
-        for (PyObject* key = PyIter_Next(iter); key; key = PyIter_Next(iter)) {
-            if (!key_caster.from_python(key, flags, cleanup)) {
-                Py_DECREF(key);
-                success = false;
-                break;
-            }
-            value.emplace(((KeyCaster &&) key_caster).operator cast_t<Key&&>());
+        PyObject *key;
+        while ((key = PyIter_Next(iter))) {
+            success &= key_caster.from_python(key, flags, cleanup);
             Py_DECREF(key);
+
+            if (!success)
+                break;
+
+            value.emplace(((KeyCaster &&) key_caster).operator cast_t<Key&&>());
         }
+
         if (PyErr_Occurred()) {
             PyErr_Clear();
             success = false;
@@ -44,21 +46,24 @@ template <typename Value_, typename Key> struct set_caster {
     template <typename T>
     static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
         object ret = steal(PySet_New(nullptr));
-        if (ret) {
+
+        if (ret.is_valid()) {
             for (auto& key : src) {
                 object k = steal(
                     KeyCaster::from_cpp(forward_like<T>(key), policy, cleanup));
+
+                if (!k.is_valid())
+                    return handle();
+
                 if (PySet_Add(ret.ptr(), k.ptr()) != 0) {
-                    if (PyErr_Occurred()) {
-                        PyErr_Clear();
-                    }
+                    PyErr_Clear();
                     return handle();
                 }
-                if (!k.is_valid()) return handle();
             }
-        } else if (PyErr_Occurred()) {
+        } else {
             PyErr_Clear();
         }
+
         return ret.release();
     }
 };

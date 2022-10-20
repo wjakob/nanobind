@@ -537,15 +537,20 @@ def test57_map_movable_in_failure(clean):
 def test58_set_return_value(clean):
     for i, k in enumerate(sorted(t.set_return_value())):
         assert k == chr(ord("a") + i)
+    for i, k in enumerate(sorted(t.unordered_set_return_value())):
+        assert k == chr(ord("a") + i)
     assert t.set_return_value.__doc__ == (
-        "set_return_value() -> set[str]"
-    )
+        "set_return_value() -> set[str]")
+    assert t.unordered_set_return_value.__doc__ == (
+        "unordered_set_return_value() -> set[str]")
 
 def test59_set_in_value(clean):
     t.set_in_value(set([chr(ord("a") + i) for i in range(10)]))
+    t.unordered_set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_value.__doc__ == (
-        "set_in_value(x: set[str]) -> None"
-    )
+        "set_in_value(x: set[str]) -> None")
+    assert t.unordered_set_in_value.__doc__ == (
+        "unordered_set_in_value(x: set[str]) -> None")
 
 def test60_set_in_lvalue_ref(clean):
     t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))

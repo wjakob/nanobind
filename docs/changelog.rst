@@ -12,6 +12,8 @@ Version 0.0.8 (TBD)
 ----------------------------
 
 * Caster for ``std::array<..>``.
+* Caster for ``std::set<..>`` and ``std::unordered_set`` (PR `#87
+  <https://github.com/wjakob/nanobind/pull/87>`_).
 
 Version 0.0.7 (Oct 14, 2022)
 ----------------------------

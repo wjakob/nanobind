@@ -488,7 +488,7 @@ def test50_map_movable_in_value(clean):
         "map_movable_in_value(x: dict[str, test_stl_ext.Movable]) -> None"
     )
 
-def test51_map_movable_in_value(clean):
+def test51_map_copyable_in_value(clean):
     t.map_copyable_in_value(dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)]))
     assert t.map_copyable_in_value.__doc__ == (
         "map_copyable_in_value(x: dict[str, test_stl_ext.Copyable]) -> None"
@@ -532,4 +532,34 @@ def test56_array(clean):
 def test57_map_movable_in_failure(clean):
     with pytest.raises(TypeError) as excinfo:
         t.map_copyable_in_value({1:2})
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+def test58_set_return_value(clean):
+    for i, k in enumerate(sorted(t.set_return_value())):
+        assert k == chr(ord("a") + i)
+    assert t.set_return_value.__doc__ == (
+        "set_return_value() -> set[str]"
+    )
+
+def test59_set_in_value(clean):
+    t.set_in_value(set([chr(ord("a") + i) for i in range(10)]))
+    assert t.set_in_value.__doc__ == (
+        "set_in_value(x: set[str]) -> None"
+    )
+
+def test60_set_in_lvalue_ref(clean):
+    t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
+    assert t.set_in_lvalue_ref.__doc__ == (
+        "set_in_lvalue_ref(x: set[str]) -> None"
+    )
+
+def test61_set_in_rvalue_ref(clean):
+    t.set_in_rvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
+    assert t.set_in_rvalue_ref.__doc__ == (
+        "set_in_rvalue_ref(x: set[str]) -> None"
+    )
+
+def test62_set_in_failure(clean):
+    with pytest.raises(TypeError) as excinfo:
+        t.set_in_value(set([i for i in range(10)]))
     assert 'incompatible function arguments' in str(excinfo.value)

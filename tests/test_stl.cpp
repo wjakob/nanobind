@@ -302,7 +302,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("array_out", [](){ return std::array<int, 3>{1, 2, 3}; });
     m.def("array_in", [](std::array<int, 3> x) { return x[0] + x[1] + x[2]; });
 
-    // ----- test55-test58 ------ */
+    // ----- test58-test62 ------ */
     m.def("set_return_value", []() {
         std::unordered_set<std::string> x;
         for (int i = 0; i < 10; ++i)

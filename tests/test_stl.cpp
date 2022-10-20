@@ -217,7 +217,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("optional_ret_opt_movable", []() { return std::optional<Movable>(Movable()); });
     m.def("optional_ret_opt_movable_ptr", []() { return new std::optional<Movable *>(new Movable()); });
     m.def("optional_ret_opt_none", []() { return std::optional<Movable>(); });
-    m.def("optional_unbound_type", [](std::optional<int> &x) { return x; }, nb::arg("x").none() = nb::none());
+    m.def("optional_unbound_type", [](std::optional<int> &x) { return x; }, nb::arg("x") = nb::none());
 
     // ----- test41-test47 ------ */
     m.def("variant_copyable", [](std::variant<Copyable, int> &) {});
@@ -227,7 +227,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("variant_ret_var_copyable", []() { return std::variant<Copyable, int>(); });
     m.def("variant_ret_var_none", []() { return std::variant<std::monostate, Copyable, int>(); });
     m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
-          nb::arg("x").none() = nb::none());
+          nb::arg("x") = nb::none());
 
     // ----- test48-test55 ------ */
     m.def("map_return_movable_value", [](){

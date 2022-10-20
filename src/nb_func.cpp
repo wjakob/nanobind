@@ -277,6 +277,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
                 a.name_py = PyUnicode_InternFromString(a.name);
             else
                 a.name_py = nullptr;
+            a.none |= a.value == Py_None;
             Py_XINCREF(a.value);
         }
     }

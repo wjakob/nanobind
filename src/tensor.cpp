@@ -380,7 +380,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
             return nullptr;
 
         const char *prefix = nullptr;
-        char dtype[8];
+        char dtype[9];
         switch (req->dtype.code) {
             case (uint8_t) dlpack::dtype_code::Int: prefix = "int"; break;
             case (uint8_t) dlpack::dtype_code::UInt: prefix = "uint"; break;

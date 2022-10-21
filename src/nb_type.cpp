@@ -316,16 +316,20 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     PyObject *mod = nullptr;
 
     if (has_scope) {
-        if (PyModule_Check(t->scope)) {
-            mod = t->scope;
-            modname = getattr(t->scope, "__name__", handle());
-        } else {
-            modname = getattr(t->scope, "__module__", handle());
+        has_scope = t->scope != nullptr;
 
-            object scope_qualname = getattr(t->scope, "__qualname__", handle());
-            if (scope_qualname.is_valid())
-                qualname = steal<str>(
-                    PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
+        if (has_scope) {
+            if (PyModule_Check(t->scope)) {
+                mod = t->scope;
+                modname = getattr(t->scope, "__name__", handle());
+            } else {
+                modname = getattr(t->scope, "__module__", handle());
+
+                object scope_qualname = getattr(t->scope, "__qualname__", handle());
+                if (scope_qualname.is_valid())
+                    qualname = steal<str>(
+                        PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
+            }
         }
     }
 
@@ -499,6 +503,9 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     type_data *to = nb_type_data((PyTypeObject *) result);
     *to = *t;
+
+    if (!has_scope)
+        to->flags &= ~(uint32_t) type_flags::has_scope;
 
     if (!intrusive_ptr && tb &&
         (tb->flags & (uint32_t) type_flags::intrusive_ptr)) {

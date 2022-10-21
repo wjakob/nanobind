@@ -17,7 +17,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 3
+#  define NB_INTERNALS_VERSION 4
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!
@@ -364,6 +364,7 @@ static void internals_make() {
     if (rv || !capsule || !nb_module)
         fail("nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
+    internals_p->nb_module = nb_module;
 
     internals_p->type_basicsize =
         cast<int>(handle(&PyType_Type).attr("__basicsize__"));

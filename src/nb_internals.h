@@ -170,6 +170,9 @@ using keep_alive_set =
     py_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
 struct nb_internals {
+    /// Internal nanobind module
+    PyObject *nb_module;
+
     /// Registered metaclasses for nanobind classes and enumerations
     PyTypeObject *nb_type, *nb_enum;
 

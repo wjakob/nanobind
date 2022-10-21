@@ -393,15 +393,17 @@ changes are detailed below.
     keeps track of Python temporaries that are created by the conversion, and
     which need to be deallocated after a function call has taken place. `flags`
     and `cleanup` should be passed to any recursive usage of
-    `type_caster::from_python()`.
+    `type_caster::from_python()`. If casting fails due to a Python exception,
+    the function should clear it (`PyErr_Clear()`) and return false. If a
+    severe error condition arises that should be reported, use Python warning
+    API calls for this, e.g. `PyErr_WarnFormat()`.
 
   - `cast()` was renamed to `from_cpp()`. The function takes a return value
-    policy (as before) and a `cleanup_list *` pointer.
+    policy (as before) and a `cleanup_list *` pointer. If casting fails due to
+    a Python exception, the function should *leave the error set* (note the
+    asymmetry compared to ``from_python()``) and return ``nullptr``.
 
-  Both functions must be marked as `noexcept`. In contrast to _pybind11_,
-  errors during type casting are only propagated using status codes. If a
-  severe error condition arises that should be reported, use Python warning API
-  calls for this, e.g. `PyErr_WarnFormat()`.
+  Both functions must be marked as `noexcept`.
 
   Note that the cleanup list is only available when `from_python()` or
   `from_cpp()` are called as part of function dispatch, while usage by
@@ -411,6 +413,15 @@ changes are detailed below.
   The [std::pair type
   caster](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/pair.h)
   may be useful as a reference for these changes.
+
+- Use of the ``nb::make_iterator()``, ``nb::make_key_iterator()``, and
+  ``nb::make_value_iterator()`` requires including the additional header file
+  ``nanobind/make_iterator.h``. The interface of these functions has also
+  slightly changed: all take a Python scope and a name as first and second
+  arguments, which are used to permanently "install" the iterator type (which
+  is created on demand). See the The [test
+  suite](https://github.com/wjakob/nanobind/blob/master/tests/test_make_iterator.cpp)
+  for a worked out example.
 
 - The following types and functions were renamed:
 

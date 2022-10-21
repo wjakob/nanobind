@@ -1,3 +1,12 @@
+/*
+    nanobind/stl/variant.h: type caster for std::variant<...>
+
+    Copyright (c) 2022 Yoshiki Matsuda and Wenzel Jakob
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 #pragma once
 
 #include <nanobind/nanobind.h>

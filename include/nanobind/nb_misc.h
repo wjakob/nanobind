@@ -1,7 +1,7 @@
 /*
     nanobind/nb_misc.h: Miscellaneous bits (GIL, etc.)
 
-    Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
+    Copyright (c) 2022 Wenzel Jakob
 
     All rights reserved. Use of this source code is governed by a
     BSD-style license that can be found in the LICENSE file.

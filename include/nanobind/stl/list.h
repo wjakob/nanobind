@@ -1,3 +1,12 @@
+/*
+    nanobind/stl/function.h: type caster for std::list<...>
+
+    Copyright (c) 2022 Wenzel Jakob
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
 #pragma once
 
 #include "detail/nb_list.h"

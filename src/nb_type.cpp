@@ -711,7 +711,7 @@ static PyMethodDef keep_alive_callback_def = {
 
 
 void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
-    if (!patient)
+    if (!patient || patient == Py_None)
         return;
 
     if (!nurse)

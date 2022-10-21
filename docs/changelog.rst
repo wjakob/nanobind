@@ -13,10 +13,12 @@ Version 0.0.8 (TBD)
 
 * Caster for ``std::array<..>``. (commit `be34b16
   <https://github.com/wjakob/nanobind/commit/be34b165c6a0bed08e477755644f96759b9ed69a>`_).
-* Caster for untyped ``void *`` pointers. (commit `6455fff
-  <https://github.com/wjakob/nanobind/commit/6455fff7be5be2867063ea8138cf10e1d9f3065f>`_).
 * Caster for ``std::set<..>`` and ``std::unordered_set`` (PR `#87
   <https://github.com/wjakob/nanobind/pull/87>`_).
+* Ported ``nb::make[_key_,_value]_iterator()`` from pybind11. (commit `34d0be1
+  <https://github.com/wjakob/nanobind/commit/34d0be1bbeb54b8265456fd3a4a50e98f93fe6d4>`_).
+* Caster for untyped ``void *`` pointers. (commit `6455fff
+  <https://github.com/wjakob/nanobind/commit/6455fff7be5be2867063ea8138cf10e1d9f3065f>`_).
 * Various minor fixes and improvements.
 
 Version 0.0.7 (Oct 14, 2022)

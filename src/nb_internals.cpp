@@ -422,6 +422,38 @@ static void internals_make() {
 
     register_exception_translator(default_exception_translator, nullptr);
 
+    /* The implementation of typing.py tends to introduce spurious reference
+       leaks that upset nanobind's leak checker. The following band-aid,
+       installs an 'atexit' handler that clears LRU caches used in typing.py.
+       To be resilient to potential future changes in typing.py, the
+       implementation fails silently if any step goes wrong. For context on the
+       original issue, see https://github.com/python/cpython/issues/98253. */
+    const char *str =
+        "def cleanup():\n"
+        "    try:\n"
+        "        import sys\n"
+        "        fs = getattr(sys.modules.get('typing'), '_cleanups', None)\n"
+        "        if fs is not None:\n"
+        "            for f in fs:\n"
+        "                f()\n"
+        "    except:\n"
+        "        pass\n"
+        "import atexit\n"
+        "atexit.register(cleanup)\n"
+        "del atexit, cleanup";
+
+    PyObject *code = Py_CompileString(str, "<internal>", Py_file_input);
+    if (code) {
+        PyObject *result = PyEval_EvalCode(code, PyEval_GetGlobals(), nullptr);
+        if (!result)
+            PyErr_Clear();
+        Py_XDECREF(result);
+        Py_DECREF(code);
+    } else {
+        PyErr_Clear();
+    }
+
+    // Install the memory leak checker
     if (Py_AtExit(internals_cleanup))
         fprintf(stderr,
                 "Warning: could not install the nanobind cleanup handler! This "

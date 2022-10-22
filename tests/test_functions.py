@@ -226,3 +226,17 @@ def test26_capsule():
     p = t.test_23()
     assert p is None
     assert t.test_24(p) == 0
+
+
+def test27_slice():
+    s = slice(1, 10, 2)
+    assert t.test_25(s) is s
+    assert t.test_25.__doc__ == "test_25(arg: slice, /) -> slice"
+    assert t.test_26() == slice(4)
+    assert t.test_27() == slice(1, 10)
+    assert t.test_28() == slice(5, -5, -2)
+
+
+def test28_ellipsis():
+    assert t.test_29(...) is ...
+    assert t.test_29.__doc__ == "test_29(arg: EllipsisType, /) -> EllipsisType"

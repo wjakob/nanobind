@@ -330,17 +330,29 @@ static void internals_cleanup() {
     if (!internals_p->type_c2p.empty()) {
         fprintf(stderr, "nanobind: leaked %zu types!\n",
                 internals_p->type_c2p.size());
-        for (const auto &kv : internals_p->type_c2p)
+        int ctr = 0;
+        for (const auto &kv : internals_p->type_c2p) {
             fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
+            if (ctr++ == 10) {
+                fprintf(stderr, " - ... skipped remainder\n");
+                break;
+            }
+        }
         leak = true;
     }
 
     if (!internals_p->funcs.empty()) {
         fprintf(stderr, "nanobind: leaked %zu functions!\n",
                 internals_p->funcs.size());
-        for (void *f : internals_p->funcs)
+        int ctr = 0;
+        for (void *f : internals_p->funcs) {
             fprintf(stderr, " - leaked function \"%s\"\n",
                     nb_func_data(f)->name);
+            if (ctr++ == 10) {
+                fprintf(stderr, " - ... skipped remainder\n");
+                break;
+            }
+        }
         leak = true;
     }
 

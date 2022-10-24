@@ -85,6 +85,9 @@
 #endif
 
 #if defined(Py_LIMITED_API)
+#  if PY_VERSION_HEX < 0x030C0000
+#    error "nanobind can target Python's limited API, but this requires CPython >= 3.12"
+#  endif
 #  define NB_TUPLE_GET_SIZE PyTuple_Size
 #  define NB_TUPLE_GET_ITEM PyTuple_GetItem
 #  define NB_TUPLE_SET_ITEM PyTuple_SetItem

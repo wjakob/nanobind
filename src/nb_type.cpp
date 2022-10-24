@@ -589,7 +589,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
 found:
 
     PyObject *result;
-#if PY_VERSION_HEX < 0x03090000 || defined(Py_LIMITED_API)
+#if PY_VERSION_HEX < 0x03090000
     PyObject *args = PyTuple_New(1);
     if (!args) {
         PyErr_Clear();

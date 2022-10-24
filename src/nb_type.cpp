@@ -615,7 +615,7 @@ found:
         PyObject *name = nb_inst_name(src);
         PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
                          "nanobind: implicit conversion from type '%U' "
-                         "to type '%s' failed!", dst_type->name);
+                         "to type '%s' failed!", name, dst_type->name);
         Py_DECREF(name);
 
         return false;

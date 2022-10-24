@@ -60,7 +60,7 @@ struct type_caster<std::function<Return(Args...)>> {
     static handle from_cpp(const Value &value, rv_policy,
                            cleanup_list *) noexcept {
         if (!value)
-            return none().inc_ref();
+            return none().release();
         return cpp_function(value).release();
     }
 };

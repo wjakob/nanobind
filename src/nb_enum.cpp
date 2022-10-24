@@ -204,6 +204,7 @@ void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
     *t++ = { Py_tp_repr, (void *) nb_enum_repr };
     *t++ = { Py_tp_richcompare, (void *) nb_enum_richcompare };
     *t++ = { Py_nb_int, (void *) nb_enum_int };
+    *t++ = { Py_nb_index, (void *) nb_enum_int };
     *t++ = { Py_tp_getset, (void *) nb_enum_getset };
     *t++ = { Py_tp_traverse, (void *) nb_enum_traverse };
     *t++ = { Py_tp_clear, (void *) nb_enum_clear };

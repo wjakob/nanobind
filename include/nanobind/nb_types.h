@@ -469,6 +469,31 @@ inline iterator iter(handle h) {
     return steal<iterator>(detail::obj_iter(h.ptr()));
 }
 
+class slice : public object {
+public:
+    NB_OBJECT_DEFAULT(slice, object, "slice", PySlice_Check)
+    slice(handle start, handle stop, handle step) {
+        m_ptr = PySlice_New(start.ptr(), stop.ptr(), step.ptr());
+        if (!m_ptr)
+            detail::raise_python_error();
+    }
+
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
+    explicit slice(T stop) : slice(Py_None, int_(stop), Py_None) {}
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
+    slice(T start, T stop) : slice(int_(start), int_(stop), Py_None) {}
+    template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
+    slice(T start, T stop, T step) : slice(int_(start), int_(stop), int_(step)) {}
+};
+
+class ellipsis : public object {
+    static bool is_ellipsis(PyObject *obj) {return obj == Py_Ellipsis; }
+
+public:
+    NB_OBJECT(ellipsis, object, "EllipsisType", is_ellipsis)
+    ellipsis() : object(Py_Ellipsis, detail::borrow_t()) {}
+};
+
 template <typename T> class handle_t : public handle {
 public:
     static constexpr auto Name = detail::make_caster<T>::Name;

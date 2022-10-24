@@ -156,4 +156,13 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_22", []() -> void * { return (void*) 1; });
     m.def("test_23", []() -> void * { return nullptr; });
     m.def("test_24", [](void *p) { return (uintptr_t) p; }, "p"_a.none());
+
+    // Test slice
+    m.def("test_25", [](nb::slice s) { return s; });
+    m.def("test_26", []() { return nb::slice(4); });
+    m.def("test_27", []() { return nb::slice(1, 10); });
+    m.def("test_28", []() { return nb::slice(5, -5, -2); });
+
+    // Test ellipsis
+    m.def("test_29", [](nb::ellipsis) { return nb::ellipsis(); });
 }

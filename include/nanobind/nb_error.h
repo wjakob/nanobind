@@ -11,9 +11,9 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// RAII wrapper that temporarily clears any Python error state
 struct error_scope {
-    PyObject *type, *value, *trace;
     error_scope() { PyErr_Fetch(&type, &value, &trace); }
     ~error_scope() { PyErr_Restore(type, value, trace); }
+    PyObject *type, *value, *trace;
 };
 
 /// Wraps a Python error state as a C++ exception
@@ -25,7 +25,7 @@ public:
     ~python_error() override;
 
     /// Move the error back into the Python domain
-    void restore();
+    void restore() noexcept;
 
     const handle type() const { return m_type; }
     const handle value() const { return m_value; }
@@ -34,7 +34,9 @@ public:
     const char *what() const noexcept override;
 
 private:
-    object m_type, m_value, m_trace;
+    mutable PyObject *m_type = nullptr;
+    mutable PyObject *m_value = nullptr;
+    mutable PyObject *m_trace = nullptr;
     mutable char *m_what = nullptr;
 };
 

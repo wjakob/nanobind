@@ -1,6 +1,12 @@
 import test_functions_ext as t
 import pytest
 import sys
+import re
+
+
+def fail_fn(): # used in test_30
+    raise RuntimeError("Foo")
+
 
 def test01_capture():
     # Functions with and without capture object of different sizes
@@ -240,3 +246,12 @@ def test27_slice():
 def test28_ellipsis():
     assert t.test_29(...) is ...
     assert t.test_29.__doc__ == "test_29(arg: EllipsisType, /) -> EllipsisType"
+
+
+def test29_traceback():
+    result = t.test_30(fail_fn)
+    regexp = r'Traceback \(most recent call last\):\n.*\n  File "[^"]*", line 8, in fail_fn\n.*RuntimeError: Foo'
+    print("'%s'\n"%result)
+    print("'%s'\n"%regexp)
+    matches = re.findall(regexp, result, re.MULTILINE | re.DOTALL)
+    assert len(matches) == 1

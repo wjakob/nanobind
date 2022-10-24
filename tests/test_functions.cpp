@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
+#include <nanobind/stl/string.h>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -165,4 +166,16 @@ NB_MODULE(test_functions_ext, m) {
 
     // Test ellipsis
     m.def("test_29", [](nb::ellipsis) { return nb::ellipsis(); });
+
+    // Traceback test
+    m.def("test_30", [](nb::callable f) -> std::string {
+        nb::gil_scoped_release g;
+        try {
+            nb::gil_scoped_acquire g;
+            f();
+        } catch (const nb::python_error &e) {
+            return e.what();
+        }
+        return "Unknown";
+    });
 }

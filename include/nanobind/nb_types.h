@@ -487,11 +487,17 @@ public:
 };
 
 class ellipsis : public object {
-    static bool is_ellipsis(PyObject *obj) {return obj == Py_Ellipsis; }
+    static bool is_ellipsis(PyObject *obj) { return obj == Py_Ellipsis; }
 
 public:
     NB_OBJECT(ellipsis, object, "EllipsisType", is_ellipsis)
     ellipsis() : object(Py_Ellipsis, detail::borrow_t()) {}
+};
+
+class callable : public object {
+public:
+    NB_OBJECT(callable, object, "Callable[..., object]", PyCallable_Check)
+    using object::object;
 };
 
 template <typename T> class handle_t : public handle {

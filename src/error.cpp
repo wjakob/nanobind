@@ -19,92 +19,137 @@ Buffer buf(128);
 NAMESPACE_END(detail)
 
 python_error::python_error() {
-    PyErr_Fetch(&m_type.m_ptr, &m_value.m_ptr, &m_trace.m_ptr);
+    PyErr_Fetch(&m_type, &m_value, &m_trace);
+    if (!m_type)
+        detail::fail("nanobind::python_error::python_error(): error indicator unset!");
 }
 
 python_error::~python_error() {
+    if (m_type || m_value || m_trace) {
+        gil_scoped_acquire acq;
+        /* With GIL held */ {
+            // Clear error status in case the following executes Python code
+            error_scope scope;
+            Py_XDECREF(m_type);
+            Py_XDECREF(m_value);
+            Py_XDECREF(m_trace);
+        }
+    }
     free(m_what);
 }
 
-python_error::python_error(const python_error &e) : std::exception(e),
-    m_type{e.m_type},
-    m_value{e.m_value},
-    m_trace{e.m_trace} {
+python_error::python_error(const python_error &e)
+    : std::exception(e), m_type(e.m_type), m_value(e.m_value),
+      m_trace(e.m_trace) {
+    if (m_type || m_value || m_trace) {
+        gil_scoped_acquire acq;
+        Py_XINCREF(m_type);
+        Py_XINCREF(m_value);
+        Py_XINCREF(m_trace);
+    }
     if (e.m_what)
         m_what = NB_STRDUP(e.m_what);
 }
 
-python_error::python_error(python_error &&e) noexcept : std::exception(e),
-    m_type{std::move(e.m_type)},
-    m_value{std::move(e.m_value)},
-    m_trace{std::move(e.m_trace)} {
-    std::swap(m_what, e.m_what);
+python_error::python_error(python_error &&e) noexcept
+    : std::exception(e), m_type(e.m_type), m_value(e.m_value),
+      m_trace(e.m_trace), m_what(e.m_what) {
+    e.m_type = e.m_value = e.m_trace = nullptr;
+    e.m_what = nullptr;
 }
 
 const char *python_error::what() const noexcept {
+    using detail::buf;
+
+    // Return the existing error message if already computed once
     if (m_what)
         return m_what;
 
-    using detail::buf;
+    gil_scoped_acquire acq;
 
-    buf.clear();
+    // Try again with GIL held
+    if (m_what)
+        return m_what;
 
-    if (m_type.is_valid()) {
-        object name = m_type.attr("__name__");
-        buf.put_dstr(borrow<str>(name).c_str());
-        buf.put(": ");
+    PyErr_NormalizeException(&m_type, &m_value, &m_trace);
+
+    if (!m_type)
+        detail::fail("nanobind::python_error::what(): PyNormalize_Exception() failed!");
+
+    if (m_trace) {
+        if (PyException_SetTraceback(m_value, m_trace) < 0)
+            PyErr_Clear();
     }
 
-    if (m_value.is_valid())
-        buf.put_dstr(str(m_value).c_str());
-
-#if !defined(Py_LIMITED_API)
-    if (m_trace.is_valid()) {
-        PyTracebackObject *to = (PyTracebackObject *) m_trace.ptr();
+#if defined(Py_LIMITED_API)
+    object mod = module_::import_("traceback"),
+           result = mod.attr("format_exception")(handle(m_type), handle(m_value), handle(m_trace));
+    m_what = NB_STRDUP(borrow<str>(str("\n").attr("join")(result)).c_str());
+#else
+    buf.clear();
+    if (m_trace) {
+        PyTracebackObject *to = (PyTracebackObject *) m_trace;
 
         // Get the deepest trace possible
         while (to->tb_next)
             to = to->tb_next;
 
         PyFrameObject *frame = to->tb_frame;
-#if PY_VERSION_HEX >= 0x03090000
         Py_XINCREF(frame);
-#endif
 
-        buf.put("\n\nAt:\n");
+        buf.put("Traceback (most recent call last):\n");
+        std::vector<PyFrameObject *> frames;
+
         while (frame) {
+            frames.push_back(frame);
+#if PY_VERSION_HEX >= 0x03090000
+            frame = PyFrame_GetBack(frame);
+#else
+            frame = frame->f_back;
+            Py_XINCREF(frame);
+#endif
+        }
+
+        for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
+            PyFrameObject *frame = *it;
 #if PY_VERSION_HEX >= 0x03090000
             PyCodeObject *f_code = PyFrame_GetCode(frame);
 #else
             PyCodeObject *f_code = frame->f_code;
-            Py_INCREF(f_code);
 #endif
+            buf.put("  File \"");
             buf.put_dstr(borrow<str>(f_code->co_filename).c_str());
-            buf.put('(');
+            buf.put("\", line ");
             buf.put_uint32(PyFrame_GetLineNumber(frame));
-            buf.put("): ");
+            buf.put(", in ");
             buf.put_dstr(borrow<str>(f_code->co_name).c_str());
             buf.put('\n');
-
 #if PY_VERSION_HEX >= 0x03090000
-            PyFrameObject *frame_new = PyFrame_GetBack(frame);
-            Py_DECREF(frame);
-            frame = frame_new;
-#else
-            frame = frame->f_back;
+            Py_DECREF(f_code);
 #endif
-           Py_DECREF(f_code);
         }
     }
+
+    if (m_type) {
+        object name = handle(m_type).attr("__name__");
+        buf.put_dstr(borrow<str>(name).c_str());
+        buf.put(": ");
+    }
+
+    if (m_value)
+        buf.put_dstr(str(m_value).c_str());
+    m_what = buf.copy();
 #endif
 
-    m_what = buf.copy();
     return m_what;
 }
 
-void python_error::restore() {
-    PyErr_Restore(m_type.release().ptr(), m_value.release().ptr(),
-                  m_trace.release().ptr());
+void python_error::restore() noexcept {
+    if (!m_type)
+        detail::fail("nanobind::python_error::restore(): error was already restored!");
+
+    PyErr_Restore(m_type, m_value, m_trace);
+    m_type = m_value = m_trace = nullptr;
 }
 
 next_overload::next_overload() : std::exception() { }

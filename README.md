@@ -491,6 +491,12 @@ changes are detailed below.
     the associated function overload when the underlying Python type object is
     a subtype of the C++ type `T`.
 
+  - In addition to all of the return value policies supported by pybind11,
+    _nanobind_ provides one additional policy named ``nb::rv_policy::none``
+    that _only_ succeeds when the return value is already a known/registered
+    Python object. In other words, this policy will never attempt to move,
+    copy, or reference a C++ instance by constructing a new Python object.
+
   - **Raw docstrings**: In cases where absolute control over docstrings is
     required (for example, so that complex cases can be parsed by a tool like
     [Sphinx](https://www.sphinx-doc.org)), the ``nb::raw_doc`` attribute can be

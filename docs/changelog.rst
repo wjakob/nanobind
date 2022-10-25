@@ -76,7 +76,7 @@ Version 0.0.3 (Apr 14, 2022)
 Version 0.0.2 (Mar 10, 2022)
 ----------------------------
 
-* Initial release of _nanobind_ codebase.
+* Initial release of the nanobind codebase.
 
 Version 0.0.1 (Feb 21, 2022)
 ----------------------------

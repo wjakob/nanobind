@@ -510,3 +510,16 @@ def test27_copy_rvp():
 def test28_pydoc():
     import pydoc
     assert "Some documentation" in pydoc.render_doc(t)
+
+
+def test29_property_assignment_instance():
+    s = t.PairStruct()
+    s1 = t.Struct(123)
+    s2 = t.Struct(456)
+    s.s1 = s1
+    s.s2 = s2
+    assert s2 is not s.s2 and s1 is not s.s1
+    assert s.s1.value() == 123
+    assert s.s2.value() == 456
+    assert s1.value() == 123
+    assert s2.value() == 456

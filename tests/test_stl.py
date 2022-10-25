@@ -575,3 +575,37 @@ def test62_set_in_failure(clean):
     with pytest.raises(TypeError) as excinfo:
         t.set_in_value(set([i for i in range(10)]))
     assert 'incompatible function arguments' in str(excinfo.value)
+
+def test65_class_with_movable_field(clean):
+    cwmf = t.ClassWithMovableField()
+    m1 = t.Movable(1)
+    m2 = t.Movable(2)
+
+    assert_stats(
+        value_constructed=2
+    )
+
+    cwmf.movable = [ m1, m2 ]
+
+    assert_stats(
+        value_constructed=2,
+        move_constructed=2
+    )
+
+    del m1, m2
+    gc.collect()
+
+    assert_stats(
+        value_constructed=2,
+        move_constructed=2,
+        destructed=2
+    )
+
+    del cwmf
+    gc.collect()
+
+    assert_stats(
+        value_constructed=2,
+        move_constructed=2,
+        destructed=4
+    )

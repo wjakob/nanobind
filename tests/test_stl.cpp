@@ -369,4 +369,12 @@ NB_MODULE(test_stl_ext, m) {
             }
         },
         nb::arg("x"));
+
+    struct ClassWithMovableField {
+        std::vector<Movable> movable;
+    };
+
+    nb::class_<ClassWithMovableField>(m, "ClassWithMovableField")
+        .def(nb::init<>())
+        .def_readwrite("movable", &ClassWithMovableField::movable);
 }

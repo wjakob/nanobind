@@ -251,7 +251,5 @@ def test28_ellipsis():
 def test29_traceback():
     result = t.test_30(fail_fn)
     regexp = r'Traceback \(most recent call last\):\n.*\n  File "[^"]*", line 8, in fail_fn\n.*RuntimeError: Foo'
-    print("'%s'\n"%result)
-    print("'%s'\n"%regexp)
     matches = re.findall(regexp, result, re.MULTILINE | re.DOTALL)
     assert len(matches) == 1

@@ -15,21 +15,33 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-struct function_handle {
-    object f;
-    explicit function_handle(handle h): f(borrow(h)) { }
-    function_handle(function_handle &&h) noexcept : f(std::move(h.f)) { }
-    function_handle(const function_handle &h) {
-        gil_scoped_acquire acq;
-        f = h.f;
+struct pyfunc_wrapper {
+    PyObject *f;
+
+    explicit pyfunc_wrapper(PyObject *f) : f(f) {
+        Py_INCREF(f);
     }
 
-    ~function_handle() {
-        if (f.is_valid()) {
+    pyfunc_wrapper(pyfunc_wrapper &&w) noexcept : f(w.f) {
+        w.f = nullptr;
+    }
+
+    pyfunc_wrapper(const pyfunc_wrapper &w) : f(w.f) {
+        if (f) {
             gil_scoped_acquire acq;
-            f.release().dec_ref();
+            Py_INCREF(f);
         }
     }
+
+    ~pyfunc_wrapper() {
+        if (f) {
+            gil_scoped_acquire acq;
+            Py_DECREF(f);
+        }
+    }
+
+    pyfunc_wrapper &operator=(const pyfunc_wrapper) = delete;
+    pyfunc_wrapper &operator=(pyfunc_wrapper &&) = delete;
 };
 
 template <typename Return, typename... Args>
@@ -42,6 +54,15 @@ struct type_caster<std::function<Return(Args...)>> {
                        concat(make_caster<Args>::Name...) + const_name("], ") +
                        ReturnCaster::Name + const_name("]"));
 
+    struct pyfunc_wrapper_t : pyfunc_wrapper {
+        using pyfunc_wrapper::pyfunc_wrapper;
+
+        Return operator()(Args... args) const {
+            gil_scoped_acquire acq;
+            return cast<Return>(handle(f)((forward_t<Args>) args...));
+        }
+    };
+
     bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if (src.is_none())
             return flags & cast_flags::convert;
@@ -49,18 +70,23 @@ struct type_caster<std::function<Return(Args...)>> {
         if (!PyCallable_Check(src.ptr()))
             return false;
 
-        value = [f = function_handle(src)](Args... args) -> Return {
-            gil_scoped_acquire acq;
-            return cast<Return>(f.f((forward_t<Args>) args...));
-        };
+        value = pyfunc_wrapper_t(src.ptr());
 
         return true;
     }
 
-    static handle from_cpp(const Value &value, rv_policy,
+    static handle from_cpp(const Value &value, rv_policy rvp,
                            cleanup_list *) noexcept {
+        const pyfunc_wrapper_t *wrapper = value.template target<pyfunc_wrapper_t>();
+        if (wrapper)
+            return handle(wrapper->f).inc_ref();
+
         if (!value)
             return none().release();
+
+        if (rvp == rv_policy::none)
+            return handle();
+
         return cpp_function(value).release();
     }
 };

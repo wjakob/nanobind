@@ -1,3 +1,6 @@
+# If leaks are found, abort() during interpreter shutdown to catch this in the CI
+add_definitions(-DNB_ABORT_ON_LEAK=1)
+
 nanobind_add_module(test_functions_ext test_functions.cpp)
 nanobind_add_module(test_classes_ext test_classes.cpp)
 nanobind_add_module(test_holders_ext test_holders.cpp)

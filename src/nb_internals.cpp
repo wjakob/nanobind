@@ -362,6 +362,10 @@ static void internals_cleanup() {
     } else {
         fprintf(stderr, "nanobind: this is likely caused by a reference "
                         "counting issue in the binding code.\n");
+
+#if NB_ABORT_ON_LEAK == 1
+        abort(); // Extra-strict behavior for the CI server
+#endif
     }
 }
 

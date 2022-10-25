@@ -43,8 +43,29 @@ struct Copyable {
 };
 
 struct StructWithReadonlyMap {
-  std::map<std::string, uint64_t> map;
+    std::map<std::string, uint64_t> map;
 };
+
+struct FuncWrapper {
+    std::function<void(void)> f;
+    static int alive;
+    FuncWrapper() { alive++; }
+    ~FuncWrapper() { alive--; }
+};
+
+int funcwrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+    FuncWrapper *w = nb::cast<FuncWrapper *>(nb::handle(self));
+    if (w) {
+        nb::object f = nb::cast(w->f, nb::rv_policy::none);
+        if (f.is_valid())
+            Py_VISIT(f.ptr());
+    }
+
+    return 0;
+};
+
+
+int FuncWrapper::alive = 0;
 
 void fail() { throw std::exception(); }
 
@@ -85,7 +106,7 @@ NB_MODULE(test_stl_ext, m) {
         .def(nb::init<>())
         .def_readonly("map", &StructWithReadonlyMap::map);
 
-    // ----- test01-test12 ------ */
+    // ----- test01-test12 ------
 
     m.def("return_movable", []() { return Movable(); });
     m.def("return_movable_ptr", []() { return new Movable(); });
@@ -100,7 +121,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("copyable_in_rvalue_ref", [](Copyable &&m) { Copyable x(m); if (x.value != 5) fail(); });
     m.def("copyable_in_ptr", [](Copyable *m) { if (m->value != 5) fail(); });
 
-    // ----- test13-test20 ------ */
+    // ----- test13-test20 ------
 
     m.def("tuple_return_movable", []() { return std::make_tuple(Movable()); });
     m.def("tuple_return_movable_ptr", []() { return std::make_tuple(new Movable()); });
@@ -111,7 +132,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("tuple_movable_in_rvalue_ref_2", [](std::tuple<Movable> &&m) { Movable x(std::move(std::get<0>(m))); if (x.value != 5) fail(); });
     m.def("tuple_movable_in_ptr", [](std::tuple<Movable*> m) { if (std::get<0>(m)->value != 5) fail(); });
 
-    // ----- test21 ------ */
+    // ----- test21 ------
 
     m.def("empty_tuple", [](std::tuple<>) { return std::tuple<>(); });
     m.def("swap_tuple", [](const std::tuple<int, float> &v) {
@@ -121,7 +142,7 @@ NB_MODULE(test_stl_ext, m) {
         return std::pair<float, int>(std::get<1>(v), std::get<0>(v));
     });
 
-    // ----- test22 ------ */
+    // ----- test22 ------
     m.def("vec_return_movable", [](){
         std::vector<Movable> x;
         x.reserve(10);
@@ -183,14 +204,14 @@ NB_MODULE(test_stl_ext, m) {
                 fail();
     });
 
-    // ----- test29 ------ */
+    // ----- test29 ------
     using fvec = std::vector<float, std::allocator<float>>;
     nb::class_<fvec>(m, "float_vec")
         .def(nb::init<>())
         .def("push_back", [](fvec *fv, float f) { fv->push_back(f); })
         .def("size", [](const fvec &fv) { return fv.size(); });
 
-    // ----- test30 ------ */
+    // ----- test30 ------
 
     m.def("return_empty_function", []() -> std::function<int(int)> {
         return {};
@@ -210,11 +231,20 @@ NB_MODULE(test_stl_ext, m) {
 
     m.def("identity_list", [](std::list<int> &x) { return x; });
 
-    // ----- test33 ------ */
+    auto callback = [](PyType_Slot **s) noexcept {
+        *(*s)++ = { Py_tp_traverse, (void *) funcwrapper_tp_traverse };
+    };
+
+    nb::class_<FuncWrapper>(m, "FuncWrapper", nb::type_callback(callback))
+        .def(nb::init<>())
+        .def_readwrite("f", &FuncWrapper::f)
+        .def_readonly_static("alive", &FuncWrapper::alive);
+
+    // ----- test35 ------
     m.def("identity_string", [](std::string& x) { return x; });
     m.def("identity_string_view", [](std::string_view& x) { return x; });
 
-    // ----- test34-test40 ------ */
+    // ----- test36-test42 ------
     m.def("optional_copyable", [](std::optional<Copyable> &) {}, nb::arg("x").none());
     m.def("optional_copyable_ptr", [](std::optional<Copyable *> &) {}, nb::arg("x").none());
     m.def("optional_none", [](std::optional<Copyable> &x) { if(x) fail(); }, nb::arg("x").none());
@@ -223,7 +253,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("optional_ret_opt_none", []() { return std::optional<Movable>(); });
     m.def("optional_unbound_type", [](std::optional<int> &x) { return x; }, nb::arg("x") = nb::none());
 
-    // ----- test41-test47 ------ */
+    // ----- test43-test50 ------
     m.def("variant_copyable", [](std::variant<Copyable, int> &) {});
     m.def("variant_copyable_none", [](std::variant<std::monostate, Copyable, int> &) {}, nb::arg("x").none());
     m.def("variant_copyable_ptr", [](std::variant<Copyable *, int> &) {});
@@ -233,7 +263,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
           nb::arg("x") = nb::none());
 
-    // ----- test48-test55 ------ */
+    // ----- test50-test57 ------
     m.def("map_return_movable_value", [](){
         std::map<std::string, Movable> x;
         for (int i = 0; i < 10; ++i)
@@ -303,11 +333,11 @@ NB_MODULE(test_stl_ext, m) {
         return x;
     });
 
-    // test56
+    // test58
     m.def("array_out", [](){ return std::array<int, 3>{1, 2, 3}; });
     m.def("array_in", [](std::array<int, 3> x) { return x[0] + x[1] + x[2]; });
 
-    // ----- test58-test62 ------ */
+    // ----- test60-test64 ------
     m.def("set_return_value", []() {
         std::set<std::string> x;
         for (int i = 0; i < 10; ++i)

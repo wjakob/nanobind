@@ -19,7 +19,14 @@ Version 0.0.8 (TBD)
   <https://github.com/wjakob/nanobind/commit/34d0be1bbeb54b8265456fd3a4a50e98f93fe6d4>`_).
 * Caster for untyped ``void *`` pointers. (commit `6455fff
   <https://github.com/wjakob/nanobind/commit/6455fff7be5be2867063ea8138cf10e1d9f3065f>`_).
+* Exploit move constructors in ``nb::class_<T>::def_readwrite()`` and
+  ``nb::class_<T>::def_readwrite_static()`` (PR `#94
+  <https://github.com/wjakob/nanobind/pull/94>`_).
+* Redesign of the ``std::function<>`` caster to enable cyclic GC traversal
+  through inter-language callbacks (PR `#95
+  <https://github.com/wjakob/nanobind/pull/95>`_).
 * Various minor fixes and improvements.
+* Internals ABI version bump.
 
 Version 0.0.7 (Oct 14, 2022)
 ----------------------------

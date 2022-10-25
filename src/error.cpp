@@ -97,8 +97,7 @@ const char *python_error::what() const noexcept {
         PyFrameObject *frame = to->tb_frame;
         Py_XINCREF(frame);
 
-        buf.put("Traceback (most recent call last):\n");
-        std::vector<PyFrameObject *> frames;
+        std::vector<PyFrameObject *, detail::py_allocator<PyFrameObject *>> frames;
 
         while (frame) {
             frames.push_back(frame);
@@ -110,6 +109,7 @@ const char *python_error::what() const noexcept {
 #endif
         }
 
+        buf.put("Traceback (most recent call last):\n");
         for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
             PyFrameObject *frame = *it;
 #if PY_VERSION_HEX >= 0x03090000
@@ -196,7 +196,7 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
         raise("nanobind::detail::exception_new(): creation failed!");
 
     if (hasattr(scope, name))
-        raise("nb::detail::exception_new(): an object of the same name already "
+        raise("nanobind::detail::exception_new(): an object of the same name already "
               "exists!");
 
     setattr(scope, name, result);

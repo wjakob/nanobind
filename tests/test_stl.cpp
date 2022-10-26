@@ -54,12 +54,10 @@ struct FuncWrapper {
 };
 
 int funcwrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
-    FuncWrapper *w = nb::cast<FuncWrapper *>(nb::handle(self));
-    if (w) {
-        nb::object f = nb::cast(w->f, nb::rv_policy::none);
-        if (f.is_valid())
-            Py_VISIT(f.ptr());
-    }
+    FuncWrapper *w = nb::inst_ptr<FuncWrapper>(self);
+
+    nb::object f = nb::cast(w->f, nb::rv_policy::none);
+    Py_VISIT(f.ptr());
 
     return 0;
 };

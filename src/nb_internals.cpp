@@ -374,9 +374,13 @@ static void internals_make() {
 
     internals_p = new nb_internals();
 
+    PyObject *dict = PyInterpreterState_GetDict(NB_INTERPRETER_STATE_GET());
+    if (!dict)
+        fail("nanobind::detail::internals_make(): PyInterpreterState_GetDict() failed!");
+
     PyObject *capsule = PyCapsule_New(internals_p, nullptr, nullptr);
     PyObject *nb_module = PyModule_NewObject(nb_name.ptr());
-    int rv = PyDict_SetItemString(PyEval_GetBuiltins(), NB_INTERNALS_ID, capsule);
+    int rv = PyDict_SetItemString(dict, NB_INTERNALS_ID, capsule);
     if (rv || !capsule || !nb_module)
         fail("nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
@@ -480,13 +484,16 @@ static void internals_make() {
 }
 
 static void internals_fetch() {
-    PyObject *capsule =
-        PyDict_GetItemString(PyEval_GetBuiltins(), NB_INTERNALS_ID);
+    PyObject *dict = PyInterpreterState_GetDict(NB_INTERPRETER_STATE_GET());
+    if (!dict)
+        fail("nanobind::detail::internals_fetch(): PyInterpreterState_GetDict() failed!");
+
+    PyObject *capsule = PyDict_GetItemString(dict, NB_INTERNALS_ID);
 
     if (capsule) {
         internals_p = (nb_internals *) PyCapsule_GetPointer(capsule, nullptr);
         if (!internals_p)
-            fail("nanobind::detail::internals_fetch(): internal error!");
+            fail("nanobind::detail::internals_fetch(): capsule pointer is NULL!");
         return;
     }
 

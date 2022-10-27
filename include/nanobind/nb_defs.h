@@ -84,6 +84,12 @@
 #  define NB_VECTORCALL_NARGS(n) ((n) & ~NB_VECTORCALL_ARGUMENTS_OFFSET)
 #endif
 
+#if PY_VERSION_HEX < 0x03090000
+#  define NB_INTERPRETER_STATE_GET _PyInterpreterState_Get
+#else
+#  define NB_INTERPRETER_STATE_GET PyInterpreterState_Get
+#endif
+
 #if defined(Py_LIMITED_API)
 #  if PY_VERSION_HEX < 0x030C0000
 #    error "nanobind can target Python's limited API, but this requires CPython >= 3.12"

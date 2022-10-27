@@ -72,8 +72,9 @@ int nb_func_clear(PyObject *self) {
 
 /// Free a function overload chain
 void nb_func_dealloc(PyObject *self) {
-    size_t size = (size_t) Py_SIZE(self);
+    PyObject_GC_UnTrack(self);
 
+    size_t size = (size_t) Py_SIZE(self);
     if (size) {
         func_data *f = nb_func_data(self);
 
@@ -125,6 +126,7 @@ int nb_bound_method_clear(PyObject *self) {
 
 void nb_bound_method_dealloc(PyObject *self) {
     nb_bound_method *mb = (nb_bound_method *) self;
+    PyObject_GC_UnTrack(self);
     Py_DECREF((PyObject *) mb->func);
     Py_DECREF(mb->self);
     PyObject_GC_Del(self);

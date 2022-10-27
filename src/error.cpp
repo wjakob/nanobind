@@ -111,7 +111,7 @@ const char *python_error::what() const noexcept {
 
         buf.put("Traceback (most recent call last):\n");
         for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
-            PyFrameObject *frame = *it;
+            frame = *it;
 #if PY_VERSION_HEX >= 0x03090000
             PyCodeObject *f_code = PyFrame_GetCode(frame);
 #else
@@ -127,6 +127,7 @@ const char *python_error::what() const noexcept {
 #if PY_VERSION_HEX >= 0x03090000
             Py_DECREF(f_code);
 #endif
+            Py_DECREF(frame);
         }
     }
 

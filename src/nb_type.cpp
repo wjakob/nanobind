@@ -375,7 +375,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     char *name_copy = NB_STRDUP(name.c_str());
 
     constexpr size_t nb_enum_max_slots = 21,
-                     nb_type_max_slots = 8,
+                     nb_type_max_slots = 10,
                      nb_extra_slots = 80,
                      nb_total_slots = nb_enum_max_slots +
                                       nb_type_max_slots +
@@ -414,17 +414,24 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         nb_enum_prepare(&s, is_arithmetic);
 
     for (PyType_Slot *ts = slots; ts != s; ++ts) {
-        if (ts->slot == Py_tp_traverse ||
-            ts->slot == Py_tp_clear)
+        if (ts->slot == Py_tp_traverse)
             spec.flags |= Py_TPFLAGS_HAVE_GC;
     }
 
-    if (has_dynamic_attr) {
-        if (spec.flags & Py_TPFLAGS_HAVE_GC)
-            fail("nanobind::detail::nb_type_new(\"%s\"): internal error -- "
-                 "attempted to enable dynamic attributes in a type with its "
-                 "own garbage collection hooks!", t->name);
+    /// Inherit GC-related slots from parent class if none were specified
+    if (base && (spec.flags & Py_TPFLAGS_HAVE_GC) == 0) {
+        void *tp_traverse = PyType_GetSlot((PyTypeObject *) base, Py_tp_traverse),
+             *tp_clear    = PyType_GetSlot((PyTypeObject *) base, Py_tp_clear);
 
+        if (tp_traverse) {
+            *s++ = { Py_tp_traverse, tp_traverse };
+            if (tp_clear)
+                *s++ = { Py_tp_clear, tp_clear };
+            spec.flags |= Py_TPFLAGS_HAVE_GC;
+        }
+    }
+
+    if (has_dynamic_attr) {
         // realign to sizeof(void*), add one pointer
         basicsize = (basicsize + ptr_size - 1) / ptr_size * ptr_size;
         basicsize += ptr_size;
@@ -433,11 +440,15 @@ PyObject *nb_type_new(const type_data *t) noexcept {
                                   (Py_ssize_t) (basicsize - ptr_size), READONLY,
                                   nullptr };
         *s++ = { Py_tp_members, (void *) members };
-        *s++ = { Py_tp_traverse, (void *) inst_traverse };
-        *s++ = { Py_tp_clear, (void *) inst_clear };
+
+        // Install GC traverse and clear routines if not inherited/overridden
+        if ((spec.flags & Py_TPFLAGS_HAVE_GC) == 0) {
+            *s++ = { Py_tp_traverse, (void *) inst_traverse };
+            *s++ = { Py_tp_clear, (void *) inst_clear };
+            spec.flags |= Py_TPFLAGS_HAVE_GC;
+        }
 
         spec.basicsize = (int) basicsize;
-        spec.flags |= Py_TPFLAGS_HAVE_GC;
     }
 
     *s++ = { 0, nullptr };

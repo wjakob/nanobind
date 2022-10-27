@@ -15,7 +15,7 @@ nb::class_<MyClass>(m, "MyClass", nb::type_slots(slots));
 Here, ``slots`` should refer to an array of function pointers
 that are tagged with a corresponding slot identifier. For example,
 here is a table and example function that overrides the addition
-operator so that it behaves like a multiplication. 
+operator so that it behaves like a multiplication.
 
 
 ```cpp
@@ -30,15 +30,14 @@ PyType_Slot slots[] = {
 ```
 
 The last entry of the ``slots`` table must equal ``{ 0, nullptr }`` and
-indicates the end of this arbitrary-length data structure.
-
-This is a somewhat silly example, because this could have done more easily
-using builtin _nanobind_ features. A more interesting example is given below.
-
-More information on type slots can be found in the CPython documentation of
-[type objects](https://docs.python.org/3/c-api/typeobj.html) and [type
+indicates the end of this arbitrary-length data structure. Information on type
+slots can be found in the CPython documentation of [type
+objects](https://docs.python.org/3/c-api/typeobj.html) and [type
 construction](https://docs.python.org/3/c-api/type.html).
 
+This example is somewhat silly because it could have easily been accomplished
+using builtin _nanobind_ features. The next section introduces a more
+interesting example.
 
 ## Integrating C++ class bindings with Python's cyclic garbage collector
 
@@ -98,24 +97,30 @@ a cycle.
 
 ```cpp
 int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+    // Retrieve a pointer to the C++ instance associated with 'self' (this can never fail)
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
 
-    // If w->value corresponds to an associated CPython object, return it
+    // If w->value has an associated CPython object, return it.
+    // If not, value.ptr() will equal NULL, which is also fine.
     nb::object value = nb::find(w->value);
 
-    // Inform the Python GC about it
+    // Inform the Python GC about the instance (if non-NULL)
     Py_VISIT(value.ptr());
 
     return 0;
 }
 
 int wrapper_tp_clear(PyObject *self) {
+    // Retrieve a pointer to the C++ instance associated with 'self' (this can never fail)
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
+
     // Clear the cycle!
     w->value.reset();
+
     return 0;
 }
 
+// Slot data structure referencing the above two functions
 PyType_Slot slots[] = {
     { Py_tp_traverse, (void *) wrapper_tp_traverse },
     { Py_tp_clear, (void *) wrapper_tp_clear },
@@ -123,12 +128,13 @@ PyType_Slot slots[] = {
 };
 ```
 
-The ``nb::inst_ptr<Wrapper>(self)`` efficiently returns the C++ instance
-associated with a Python object and is part of nanobind's [low level
+The expression ``nb::inst_ptr<Wrapper>(self)`` efficiently returns the C++
+instance associated with a Python object and is documented as part of
+_nanobind_'s [low level
 interface](https://github.com/wjakob/nanobind/blob/master/docs/lowlevel.md).
 
 Note the use of the ``nb::find()`` function, which behaves like ``nb::cast()`` by
-returning the Python object associated with a C++ instance. The important
+returning the Python object associated with a C++ instance. The main
 difference is that ``nb::cast()`` will create the Python object if it doesn't
 exist, while ``nb::find()`` returns a ``nullptr`` object in that case.
 
@@ -153,7 +159,7 @@ struct Wrapper {
 };
 ```
 
-This can also be used to create a reference cycle! For example, 
+This can also be used to create a reference cycle! For example,
 in Python we could write
 
 ```python

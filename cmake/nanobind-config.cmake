@@ -44,7 +44,7 @@ endfunction()
 # Create shared/static library targets for nanobind's non-templated core
 # ---------------------------------------------------------------------------
 
-function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
+function (nanobind_build_library TARGET_NAME TARGET_TYPE)
   if (TARGET ${TARGET_NAME})
     return()
   endif()
@@ -105,7 +105,9 @@ function (nanobuild_build_library TARGET_NAME TARGET_TYPE)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
     nanobind_strip(${TARGET_NAME})
 
-    # LTO causes problems in a static build, but use it in shared release builds
+  endif()
+
+  if ((TARGET_TYPE STREQUAL "SHARED") OR (TARGET_NAME MATCHES "-lto"))
     set_target_properties(${TARGET_NAME} PROPERTIES
       INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
       INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
@@ -215,10 +217,10 @@ function(nanobind_add_module name)
 
   if (ARG_STABLE_ABI)
     if (ARG_NB_STATIC)
-      nanobuild_build_library(nanobind-static-abi3 STATIC)
+      nanobind_build_library(nanobind-static-abi3 STATIC)
       set(libname nanobind-static-abi3)
     else()
-      nanobuild_build_library(nanobind-abi3 SHARED)
+      nanobind_build_library(nanobind-abi3 SHARED)
       set(libname nanobind-abi3)
     endif()
 
@@ -226,10 +228,15 @@ function(nanobind_add_module name)
     nanobind_extension_abi3(${name})
   else()
     if (ARG_NB_STATIC)
-      nanobuild_build_library(nanobind-static STATIC)
-      set(libname nanobind-static)
+      if (ARG_LTO)
+        nanobind_build_library(nanobind-static-lto STATIC)
+        set(libname nanobind-static-lto)
+      else()
+        nanobind_build_library(nanobind-static STATIC)
+        set(libname nanobind-static)
+      endif()
     else()
-      nanobuild_build_library(nanobind SHARED)
+      nanobind_build_library(nanobind SHARED)
       set(libname nanobind)
     endif()
 

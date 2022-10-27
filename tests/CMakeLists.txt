@@ -1,15 +1,19 @@
 # If leaks are found, abort() during interpreter shutdown to catch this in the CI
 add_definitions(-DNB_ABORT_ON_LEAK=1)
 
-nanobind_add_module(test_functions_ext test_functions.cpp)
-nanobind_add_module(test_classes_ext test_classes.cpp)
-nanobind_add_module(test_holders_ext test_holders.cpp)
-nanobind_add_module(test_stl_ext test_stl.cpp)
-nanobind_add_module(test_enum_ext test_enum.cpp)
-nanobind_add_module(test_tensor_ext test_tensor.cpp)
-nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h)
-nanobind_add_module(test_exception_ext test_exception.cpp object.cpp object.h)
-nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp)
+if (NB_TEST_STABLE_ABI)
+  set(NB_EXTRA_ARGS STABLE_ABI)
+endif()
+
+nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_stl_ext test_stl.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_enum_ext test_enum.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_tensor_ext test_tensor.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${NB_EXTRA_ARGS})
+nanobind_add_module(test_exception_ext test_exception.cpp object.cpp object.h ${NB_EXTRA_ARGS})
+nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
 
 set(TEST_FILES
   test_functions.py

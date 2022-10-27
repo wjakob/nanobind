@@ -11,7 +11,8 @@ else()
   set(NB_TEST_DEFAULT OFF)
 endif()
 
-option(NB_TEST "Compile nanobind tests?" ${NB_TEST_DEFAULT})
+option(NB_TEST            "Compile nanobind tests?" ${NB_TEST_DEFAULT})
+option(NB_TEST_STABLE_ABI "Test the stable ABI interface?" OFF)
 
 # ---------------------------------------------------------------------------
 # Do a release build if nothing was specified

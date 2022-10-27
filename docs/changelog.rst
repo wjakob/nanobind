@@ -8,7 +8,12 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.0.8 (TBD)
+Version 0.0.9 (TBA)
+----------------------------
+
+- TBA
+
+Version 0.0.8 (Oct 27, 2022)
 ----------------------------
 
 * Caster for ``std::array<..>``. (commit `be34b16
@@ -25,6 +30,12 @@ Version 0.0.8 (TBD)
 * Redesign of the ``std::function<>`` caster to enable cyclic GC traversal
   through inter-language callbacks (PR `#95
   <https://github.com/wjakob/nanobind/pull/95>`_).
+* New interface for specifying custom type slots during Python type
+  construction. (commit `38ba18a
+  <https://github.com/wjakob/nanobind/commit/38ba18a835cfcd561efb4b4c640ee5c6d525decb>`_).
+* Fixed potential undefined behavior related to ``nb_func`` garbage collection by
+  Python's cyclic garbage collector. (commit `662e1b9
+  <https://github.com/wjakob/nanobind/commit/662e1b9311e693f84c58799a67064d4a44bb706a>`_).
 * Various minor fixes and improvements.
 * Internals ABI version bump.
 

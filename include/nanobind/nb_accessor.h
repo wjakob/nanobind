@@ -124,10 +124,15 @@ struct num_item_list {
     }
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
+#if !defined(Py_LIMITED_API)
+        // Handle differences between PyList_SetItem and PyList_SET_ITEM
         PyObject *old = NB_LIST_GET_ITEM(obj, index);
+#endif
         Py_INCREF(v);
         NB_LIST_SET_ITEM(obj, index, v);
+#if !defined(Py_LIMITED_API)
         Py_DECREF(old);
+#endif
     }
 };
 

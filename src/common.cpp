@@ -200,50 +200,6 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
     return res;
 }
 
-#if defined(Py_LIMITED_API)
-PyObject *_PyObject_Vectorcall(PyObject *base, PyObject *const *args,
-                               size_t nargsf, PyObject *kwnames) {
-    size_t nargs = NB_VECTORCALL_NARGS(nargsf);
-
-    PyObject *args_tuple = PyTuple_New(nargs);
-    if (!args_tuple)
-        return nullptr;
-
-    for (size_t i = 0; i < nargs; ++i) {
-        Py_INCREF(args[i]);
-        NB_TUPLE_SET_ITEM(args_tuple, i, args[i]);
-    }
-
-    PyObject *kwargs = nullptr;
-    if (kwnames) {
-        kwargs = PyDict_New();
-        if (!kwargs) {
-            Py_DECREF(args_tuple);
-            return nullptr;
-        }
-
-        for (size_t i = 0, l = NB_TUPLE_GET_SIZE(kwnames); i < l; ++i) {
-            PyObject *k = NB_TUPLE_GET_ITEM(kwnames, i),
-                     *v = args[i + nargs];
-            if (PyDict_SetItem(kwargs, k, v)) {
-                Py_DECREF(kwargs);
-                Py_DECREF(args_tuple);
-                return nullptr;
-            }
-
-        }
-    }
-
-    PyObject *res = PyObject_Call(base, args_tuple, kwargs);
-
-    Py_DECREF(args_tuple);
-    Py_XDECREF(kwargs);
-
-    return res;
-}
-#endif
-
-
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
     const char *error = nullptr;

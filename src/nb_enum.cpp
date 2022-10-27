@@ -199,6 +199,8 @@ int nb_enum_traverse(PyObject *o, visitproc visit, void *arg) {
 void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
     PyType_Slot *t = *s;
 
+    /* Careful: update 'nb_enum_max_slots' field in nb_type.cpp
+       when adding further type slots */
     *t++ = { Py_tp_new, (void *) nb_enum_init };
     *t++ = { Py_tp_init, (void *) nullptr };
     *t++ = { Py_tp_repr, (void *) nb_enum_repr };

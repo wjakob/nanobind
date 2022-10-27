@@ -343,6 +343,10 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
     return steal(h);
 }
 
+template <typename T> object find(const T &value) noexcept {
+    return steal(detail::make_caster<T>::from_cpp(value, rv_policy::none, nullptr));
+}
+
 template <rv_policy policy = rv_policy::automatic, typename... Args>
 tuple make_tuple(Args &&...args) {
     tuple result = steal<tuple>(PyTuple_New((Py_ssize_t) sizeof...(Args)));

@@ -305,7 +305,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
          has_doc           = t->flags & (uint32_t) type_flags::has_doc,
          has_base          = t->flags & (uint32_t) type_flags::has_base,
          has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
-         has_type_callback = t->flags & (uint32_t) type_flags::has_type_callback,
+         has_type_slots    = t->flags & (uint32_t) type_flags::has_type_slots,
          has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
          has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
@@ -374,8 +374,15 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     char *name_copy = NB_STRDUP(name.c_str());
 
+    constexpr size_t nb_enum_max_slots = 21,
+                     nb_type_max_slots = 8,
+                     nb_extra_slots = 80,
+                     nb_total_slots = nb_enum_max_slots +
+                                      nb_type_max_slots +
+                                      nb_extra_slots + 1;
+
     PyMemberDef members[2] { };
-    PyType_Slot slots[128], *s = slots;
+    PyType_Slot slots[nb_total_slots], *s = slots;
     PyType_Spec spec = {
         .name = name_copy,
         .basicsize = (int) basicsize,
@@ -393,8 +400,15 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     if (has_doc)
         *s++ = { Py_tp_doc, (void *) t->doc };
 
-    if (has_type_callback)
-        t->type_callback(&s);
+    if (has_type_slots) {
+        size_t i = 0;
+        while (t->type_slots[i].slot) {
+            if (i == nb_extra_slots)
+                fail("nanobind::detail::nb_type_new(\"%s\"): ran out of type "
+                     "slots!", t->name);
+            *s++ = t->type_slots[i++];
+        }
+    }
 
     if (is_enum)
         nb_enum_prepare(&s, is_arithmetic);

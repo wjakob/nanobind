@@ -3,6 +3,7 @@
 #include <nanobind/operators.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/pair.h>
+#include <nanobind/stl/shared_ptr.h>
 #include <memory>
 #include <cstring>
 
@@ -77,6 +78,34 @@ int StaticProperties::value = 23;
 static Py_ssize_t sq_length_dummy(PyObject *) {
     return 123;
 }
+
+struct Wrapper {
+    std::shared_ptr<Wrapper> value;
+};
+
+int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+    Wrapper *w = nb::inst_ptr<Wrapper>(self);
+
+    // If c->value corresponds to an associated CPython object, return it
+    nb::object value = nb::find(w->value);
+
+    // Inform the Python GC about it
+    Py_VISIT(value.ptr());
+
+    return 0;
+}
+
+int wrapper_tp_clear(PyObject *self) {
+    Wrapper *w = nb::inst_ptr<Wrapper>(self);
+    w->value.reset();
+    return 0;
+}
+
+PyType_Slot wrapper_slots[] = {
+    { Py_tp_traverse, (void *) wrapper_tp_traverse },
+    { Py_tp_clear, (void *) wrapper_tp_clear },
+    { 0, 0 }
+};
 
 NB_MODULE(test_classes_ext, m) {
     struct_tmp = std::make_unique<Struct>(12);
@@ -311,12 +340,13 @@ NB_MODULE(test_classes_ext, m) {
     });
 
     // test20_type_callback
-    auto callback = [](PyType_Slot **s) noexcept {
-        *(*s)++ = { Py_sq_length, (void *) sq_length_dummy };
+    PyType_Slot slots[] {
+        { Py_sq_length, (void *) sq_length_dummy },
+        { 0, nullptr }
     };
 
     struct ClassWithLen { };
-    nb::class_<ClassWithLen>(m, "ClassWithLen", nb::type_callback(callback))
+    nb::class_<ClassWithLen>(m, "ClassWithLen", nb::type_slots(slots))
         .def(nb::init<>());
 
     // test21_low_level
@@ -390,4 +420,8 @@ NB_MODULE(test_classes_ext, m) {
     struct StructWithAttr : Struct { };
     nb::class_<StructWithAttr, Struct>(m, "StructWithAttr", nb::dynamic_attr())
         .def(nb::init<int>());
+
+    nb::class_<Wrapper>(m, "Wrapper", nb::type_slots(wrapper_slots))
+        .def(nb::init<>())
+        .def_readwrite("value", &Wrapper::value);
 }

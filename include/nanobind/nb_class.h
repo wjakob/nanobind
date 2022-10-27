@@ -56,8 +56,8 @@ enum class type_flags : uint32_t {
     /// This type is an arithmetic enumeration
     is_arithmetic            = (1 << 15),
 
-    /// This type is an arithmetic enumeration
-    has_type_callback        = (1 << 16),
+    /// This type provides extra PyType_Slot fields
+    has_type_slots           = (1 << 16),
 
     /// This type does not permit subclassing from Python
     is_final                 = (1 << 17),
@@ -88,7 +88,7 @@ struct type_data {
     void (*move)(void *, void *) noexcept;
     const std::type_info **implicit;
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
-    void (*type_callback)(PyType_Slot **) noexcept;
+    PyType_Slot *type_slots;
     void *supplement;
     void (*set_self_py)(void *, PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
@@ -106,9 +106,9 @@ NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
     t.doc = doc;
 }
 
-NB_INLINE void type_extra_apply(type_data &t, type_callback c) {
-    t.flags |= (uint32_t) type_flags::has_type_callback;
-    t.type_callback = c.value;
+NB_INLINE void type_extra_apply(type_data &t, type_slots c) {
+    t.flags |= (uint32_t) type_flags::has_type_slots;
+    t.type_slots = c.value;
 }
 
 template <typename T>

@@ -523,3 +523,8 @@ def test29_property_assignment_instance():
     assert s.s2.value() == 456
     assert s1.value() == 123
     assert s2.value() == 456
+
+def test30_cycle():
+    a = t.Wrapper()
+    a.value = a
+    del a

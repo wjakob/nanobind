@@ -63,10 +63,11 @@ template <typename T> struct intrusive_ptr {
     void (*set_self_py)(T *, PyObject *) noexcept;
 };
 
-struct type_callback {
-    type_callback(void (*value)(PyType_Slot **) noexcept) : value(value) {}
-    void (*value)(PyType_Slot **) noexcept;
+struct type_slots {
+    type_slots (PyType_Slot *value) : value(value) { }
+    PyType_Slot *value;
 };
+
 struct raw_doc {
     const char *value;
     raw_doc(const char *doc) : value(doc) {}

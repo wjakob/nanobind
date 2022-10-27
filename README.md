@@ -432,7 +432,6 @@ changes are detailed below.
   | `type`               | `type_object`   |
   | `reinterpret_borrow` | `borrow`        |
   | `reinterpret_steal`  | `steal`         |
-  | `custom_type_setup`  | `type_callback` |
 
 - **New features.**
 
@@ -491,11 +490,26 @@ changes are detailed below.
     the associated function overload when the underlying Python type object is
     a subtype of the C++ type `T`.
 
-  - In addition to all of the return value policies supported by pybind11,
-    _nanobind_ provides one additional policy named ``nb::rv_policy::none``
-    that _only_ succeeds when the return value is already a known/registered
-    Python object. In other words, this policy will never attempt to move,
-    copy, or reference a C++ instance by constructing a new Python object.
+  - **Finding Python objects associated with a C++ instance**: In addition to
+    all of the return value policies supported by pybind11, _nanobind_ provides
+    one additional policy named ``nb::rv_policy::none`` that _only_ succeeds
+    when the return value is already a known/registered Python object. In other
+    words, this policy will never attempt to move, copy, or reference a C++
+    instance by constructing a new Python object.
+
+    The new ``nb::find()`` function encapsulates this behavior. It resembles
+    ``nb::cast()`` in the sense that it returns the Python object associated
+    with a C++ instance. But while ``nb::cast()`` will create that Python
+    object if it doesn't yet exist, ``nb::find()`` will return a ``nullptr``
+    object.
+
+  - **Customizing types**: The pybind11 ``custom_type_setup`` annotation that
+    enabled ad-hoc write access to a constructed Python type object was
+    replaced with the limited API-compatible ``nb::type_slots`` interface. For
+    an example of using this feature to fully integrate _nanobind_ with
+    Python's cyclic garbage collector, see the [separate
+    page](https://github.com/wjakob/nanobind/blob/master/docs/typeslots_and_gc.md)
+    on this topic.
 
   - **Raw docstrings**: In cases where absolute control over docstrings is
     required (for example, so that complex cases can be parsed by a tool like

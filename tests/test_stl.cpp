@@ -229,11 +229,12 @@ NB_MODULE(test_stl_ext, m) {
 
     m.def("identity_list", [](std::list<int> &x) { return x; });
 
-    auto callback = [](PyType_Slot **s) noexcept {
-        *(*s)++ = { Py_tp_traverse, (void *) funcwrapper_tp_traverse };
+    PyType_Slot slots[] = {
+        { Py_tp_traverse, (void *) funcwrapper_tp_traverse },
+        { 0, 0 }
     };
 
-    nb::class_<FuncWrapper>(m, "FuncWrapper", nb::type_callback(callback))
+    nb::class_<FuncWrapper>(m, "FuncWrapper", nb::type_slots(slots))
         .def(nb::init<>())
         .def_readwrite("f", &FuncWrapper::f)
         .def_readonly_static("alive", &FuncWrapper::alive);

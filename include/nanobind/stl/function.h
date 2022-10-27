@@ -81,11 +81,11 @@ struct type_caster<std::function<Return(Args...)>> {
         if (wrapper)
             return handle(wrapper->f).inc_ref();
 
-        if (!value)
-            return none().release();
-
         if (rvp == rv_policy::none)
             return handle();
+
+        if (!value)
+            return none().release();
 
         return cpp_function(value).release();
     }

@@ -11,7 +11,18 @@ inconvenience whenever possible.
 Version 0.0.9 (TBA)
 ----------------------------
 
-- TBA
+- Move nanobind internal data structures from ``builtins`` to Python
+  interpreter state dictionary (commit `ca23da7
+  <https://github.com/wjakob/nanobind/commit/ca23da72ce71a45318f1e59474c9c2906fce5154>`_,
+  issue `#96 <https://github.com/wjakob/nanobind/issues/96>`_).
+- Fixed a reference leak in ``python_error::what()`` (commit `61393ad
+  <https://github.com/wjakob/nanobind/commit/61393ad3ce3bc68d195a1496422df43d5fb45ec0>`_).
+- Improved the effectiveness of link-time-optimization when building extension modules
+  with the ``NB_STATIC`` flag. This leads to smaller binaries. (commit `f64d2b9
+  <https://github.com/wjakob/nanobind/commit/f64d2b9bb558afe28cf6909e4fa47ebf720f62b3>`_).
+
+- ... TBA ...
+
 
 Version 0.0.8 (Oct 27, 2022)
 ----------------------------
@@ -27,8 +38,8 @@ Version 0.0.8 (Oct 27, 2022)
 * Exploit move constructors in ``nb::class_<T>::def_readwrite()`` and
   ``nb::class_<T>::def_readwrite_static()`` (PR `#94
   <https://github.com/wjakob/nanobind/pull/94>`_).
-* Redesign of the ``std::function<>`` caster to enable cyclic GC traversal
-  through inter-language callbacks (PR `#95
+* Redesign of the ``std::function<>`` caster to enable cyclic garbage collector
+  traversal through inter-language callbacks (PR `#95
   <https://github.com/wjakob/nanobind/pull/95>`_).
 * New interface for specifying custom type slots during Python type
   construction. (commit `38ba18a
@@ -36,6 +47,9 @@ Version 0.0.8 (Oct 27, 2022)
 * Fixed potential undefined behavior related to ``nb_func`` garbage collection by
   Python's cyclic garbage collector. (commit `662e1b9
   <https://github.com/wjakob/nanobind/commit/662e1b9311e693f84c58799a67064d4a44bb706a>`_).
+* Added a workaround for spurious reference leak warnings caused by other
+  extension modules in conjunction with ``typing.py`` (commit `5e11e80
+  <https://github.com/wjakob/nanobind/commit/5e11e8032f777c0a34abd437dc6e84a909907c91>`_).
 * Various minor fixes and improvements.
 * Internals ABI version bump.
 

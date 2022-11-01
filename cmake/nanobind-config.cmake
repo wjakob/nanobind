@@ -98,7 +98,7 @@ function (nanobind_build_library TARGET_NAME TARGET_TYPE)
 
   if (TARGET_TYPE STREQUAL "SHARED")
     if (APPLE)
-      target_link_options(${TARGET_NAME} PRIVATE -undefined suppress -flat_namespace)
+      # target_link_options(${TARGET_NAME} PRIVATE -undefined suppress -flat_namespace)
     endif()
 
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
@@ -201,7 +201,177 @@ function(nanobind_add_module name)
   if (APPLE)
     add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
     target_include_directories(${name} PUBLIC ${Python_INCLUDE_DIRS})
-    target_link_options(${name} PRIVATE -undefined suppress -flat_namespace)
+    # target_link_options(${name} PRIVATE -undefined suppress -flat_namespace)
+    set(SYMBOLS
+        PyBool_Type
+        PyBuffer_Release
+        PyBytes_AsString
+        PyBytes_FromObject
+        PyBytes_FromString
+        PyBytes_FromStringAndSize
+        PyBytes_Size
+        PyCMethod_New
+        PyCallable_Check
+        PyCapsule_GetContext
+        PyCapsule_GetName
+        PyCapsule_GetPointer
+        PyCapsule_New
+        PyCapsule_SetContext
+        PyCapsule_SetDestructor
+        PyCapsule_SetName
+        PyCapsule_Type
+        PyDict_GetItem
+        PyDict_GetItemString
+        PyDict_Items
+        PyDict_New
+        PyDict_Next
+        PyDict_SetItem
+        PyDict_SetItemString
+        PyErr_Clear
+        PyErr_Fetch
+        PyErr_Format
+        PyErr_NewException
+        PyErr_NoMemory
+        PyErr_NormalizeException
+        PyErr_Occurred
+        PyErr_Restore
+        PyErr_SetString
+        PyErr_WarnFormat
+        PyEval_EvalCode
+        PyEval_GetGlobals
+        PyEval_RestoreThread
+        PyEval_SaveThread
+        PyExc_AttributeError
+        PyExc_BufferError
+        PyExc_Exception
+        PyExc_ImportError
+        PyExc_IndexError
+        PyExc_KeyError
+        PyExc_MemoryError
+        PyExc_OverflowError
+        PyExc_RuntimeError
+        PyExc_RuntimeWarning
+        PyExc_StopIteration
+        PyExc_SystemError
+        PyExc_TypeError
+        PyExc_ValueError
+        PyException_SetTraceback
+        PyFile_WriteObject
+        PyFile_WriteString
+        PyFloat_AsDouble
+        PyFloat_FromDouble
+        PyFloat_Type
+        PyFrame_GetBack
+        PyFrame_GetCode
+        PyFrame_GetLineNumber
+        PyGILState_Check
+        PyGILState_Ensure
+        PyGILState_Release
+        PyImport_AddModuleObject
+        PyImport_ImportModule
+        PyInterpreterState_Get
+        PyInterpreterState_GetDict
+        PyIter_Check
+        PyIter_Next
+        PyList_Append
+        PyList_New
+        PyList_Type
+        PyLong_AsLong
+        PyLong_AsUnsignedLong
+        PyLong_FromLong
+        PyLong_FromLongLong
+        PyLong_FromUnsignedLong
+        PyLong_FromUnsignedLongLong
+        PyMem_Free
+        PyMem_Malloc
+        PyModule_AddObject
+        PyModule_Create2
+        PyModule_GetNameObject
+        PyModule_NewObject
+        PyModule_Type
+        PyNumber_Absolute
+        PyNumber_Add
+        PyNumber_And
+        PyNumber_FloorDivide
+        PyNumber_Invert
+        PyNumber_Lshift
+        PyNumber_Long
+        PyNumber_Multiply
+        PyNumber_Negative
+        PyNumber_Or
+        PyNumber_Rshift
+        PyNumber_Subtract
+        PyNumber_Xor
+        PyObject_CallMethod
+        PyObject_Free
+        PyObject_GC_Del
+        PyObject_GC_UnTrack
+        PyObject_GetAttr
+        PyObject_GetAttrString
+        PyObject_GetBuffer
+        PyObject_GetItem
+        PyObject_GetIter
+        PyObject_HasAttrString
+        PyObject_Init
+        PyObject_Malloc
+        PyObject_Realloc
+        PyObject_Repr
+        PyObject_RichCompare
+        PyObject_RichCompareBool
+        PyObject_SetAttr
+        PyObject_SetAttrString
+        PyObject_SetItem
+        PyObject_Size
+        PyObject_Str
+        PyObject_Vectorcall
+        PyObject_VectorcallMethod
+        PyProperty_Type
+        PySequence_Check
+        PySequence_Fast
+        PySequence_GetItem
+        PySequence_SetItem
+        PySet_Add
+        PySet_New
+        PySlice_New
+        PySlice_Type
+        PySys_GetObject
+        PyTuple_New
+        PyTuple_Type
+        PyType_FromMetaclass
+        PyType_FromSpec
+        PyType_GenericAlloc
+        PyType_GenericNew
+        PyType_GetSlot
+        PyType_IsSubtype
+        PyType_Type
+        PyUnicode_AsUTF8AndSize
+        PyUnicode_FromFormat
+        PyUnicode_FromString
+        PyUnicode_FromStringAndSize
+        PyUnicode_InternFromString
+        PyVectorcall_Call
+        PyWeakref_NewRef
+        Py_AtExit
+        Py_CompileStringExFlags
+        _PyObject_GC_New
+        _PyWeakref_RefType
+        _Py_Dealloc
+        _Py_EllipsisObject
+        _Py_FalseStruct
+        _Py_NegativeRefcount
+        _Py_NotImplementedStruct
+        _Py_NoneStruct
+        _Py_RefTotal
+        _Py_TrueStruct)
+
+    set(SYMBOL_STR "-Wl")
+    foreach (SYMBOL ${SYMBOLS}) 
+      set(SYMBOL_STR "${SYMBOL_STR},-U,_${SYMBOL}")
+    endforeach()
+    message(STATUS ${SYMBOL_STR})
+
+    target_link_options(${name} PRIVATE ${SYMBOL_STR})
+
   else()
     Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
   endif()

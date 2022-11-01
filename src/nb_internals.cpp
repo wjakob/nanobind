@@ -215,7 +215,6 @@ static PyType_Spec nb_enum_spec = {
 
 static PyType_Slot nb_static_property_slots[] = {
     { Py_tp_base, nullptr },
-    { Py_tp_methods, nullptr },
     { Py_tp_members, nullptr },
     { Py_tp_descr_get, (void *) nb_static_property_get },
     { 0, nullptr }
@@ -409,13 +408,11 @@ static void internals_make() {
 #if defined(Py_LIMITED_API)
     nb_enum_slots[1].pfunc = PyType_GetSlot(&PyType_Type, Py_tp_traverse);
     nb_enum_slots[2].pfunc = PyType_GetSlot(&PyType_Type, Py_tp_clear);
-    nb_static_property_slots[1].pfunc = PyType_GetSlot(&PyProperty_Type, Py_tp_methods);
-    nb_static_property_slots[2].pfunc = PyType_GetSlot(&PyProperty_Type, Py_tp_members);
+    nb_static_property_slots[1].pfunc = PyType_GetSlot(&PyProperty_Type, Py_tp_members);
 #else
     nb_enum_slots[1].pfunc = (void *) PyType_Type.tp_traverse;
     nb_enum_slots[2].pfunc = (void *) PyType_Type.tp_clear;
-    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_methods;
-    nb_static_property_slots[2].pfunc = PyProperty_Type.tp_members;
+    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_members;
 #endif
 
     internals_p->nb_enum = (PyTypeObject *) PyType_FromSpec(&nb_enum_spec);

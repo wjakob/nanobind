@@ -26,6 +26,7 @@ set(NB_DIR ${NB_DIR} CACHE INTERNAL "")
 # ---------------------------------------------------------------------------
 # Helper function to strip unnecessary sections from binaries on Linux/macOS
 # ---------------------------------------------------------------------------
+
 function(nanobind_strip name)
   if (CMAKE_STRIP AND NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
     if(APPLE)
@@ -39,6 +40,34 @@ function(nanobind_strip name)
   endif()
 endfunction()
 
+# ---------------------------------------------------------------------------
+# Helper function to handle undefined CPython API symbols on macOS
+# ---------------------------------------------------------------------------
+
+# Try to detect the XCode version
+if (NOT NB_XCODE_VERSION AND CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+  execute_process(
+    COMMAND xcodebuild -version
+    OUTPUT_VARIABLE NB_XCODE_VERSION_STR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_FILE /dev/null)
+  string(REGEX MATCH "Xcode ([0-9][0-9]?([.][0-9])+)" NB_XCODE_VERSION_MATCH ${NB_XCODE_VERSION_STR})
+  if (NB_XCODE_VERSION_MATCH)
+    set(NB_XCODE_VERSION ${CMAKE_MATCH_1} CACHE INTERNAL "")
+    message(STATUS "nanobind: detected Xcode version ${NB_XCODE_VERSION}.")
+  else()
+    message(WARNING "nanobind: could not detect Xcode version!")
+  endif()
+endif()
+
+function (nanobind_link_options name)
+  if (APPLE)
+    target_link_options(${name} PRIVATE -undefined dynamic_lookup)
+    if (NB_XCODE_VERSION AND NB_XCODE_VERSION VERSION_LESS 14.3)
+      target_link_options(${name} PRIVATE -Wl,-no_fixup_chains)
+    endif()
+  endif()
+endfunction()
 
 # ---------------------------------------------------------------------------
 # Create shared/static library targets for nanobind's non-templated core
@@ -103,10 +132,7 @@ function (nanobind_build_library TARGET_NAME)
   )
 
   if (TARGET_TYPE STREQUAL "SHARED")
-    if (APPLE)
-      target_link_options(${TARGET_NAME} PRIVATE -undefined suppress -flat_namespace)
-    endif()
-
+    nanobind_link_options(${TARGET_NAME})
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
     nanobind_strip(${TARGET_NAME})
@@ -193,12 +219,6 @@ endfunction()
 function (nanobind_compile_options)
   if (MSVC)
     target_compile_options(${name} PRIVATE /bigobj /MP)
-  endif()
-endfunction()
-
-function (nanobind_link_options name)
-  if (APPLE)
-    target_link_options(${name} PRIVATE -undefined suppress -flat_namespace)
   endif()
 endfunction()
 

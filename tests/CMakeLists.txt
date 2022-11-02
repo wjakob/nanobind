@@ -5,8 +5,6 @@ if (NB_TEST_STABLE_ABI)
   set(NB_EXTRA_ARGS STABLE_ABI)
 endif()
 
-set(NB_EXTRA_ARGS NB_STATIC)
-
 nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})

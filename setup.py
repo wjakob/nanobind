@@ -47,6 +47,7 @@ setup(
         'include/nanobind/stl/*.h',
         'include/nanobind/stl/detail/*.h',
         'ext/robin_map/include/tsl/*.h',
+        'cmake/darwin-ld.sym',
         'cmake/nanobind-config.cmake',
         'src/*.h',
         'src/*.cpp'

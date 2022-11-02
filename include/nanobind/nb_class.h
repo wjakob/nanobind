@@ -10,6 +10,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+struct method_tag { };
+
 enum class type_flags : uint32_t {
     /// Does the type provide a C++ destructor?
     is_destructible          = (1 << 0),
@@ -304,6 +306,30 @@ public:
         return *this;
     }
 
+    template <typename Return, typename Class, typename... Args, typename Func,
+              typename... Extra>
+    NB_INLINE class_ &def(detail::method_tag, const char *name_,
+                          Return (Class::*)(Args...), Func &&f,
+                          const Extra &...extra) {
+        detail::func_create<false, true>(
+            (detail::forward_t<Func>) f, (Return(*)(Class *, Args...)) nullptr,
+            std::make_index_sequence<sizeof...(Args) + 1>(), scope(*this),
+            name(name_), is_method(), extra...);
+        return *this;
+    }
+
+    template <typename Return, typename Class, typename... Args, typename Func,
+              typename... Extra>
+    NB_INLINE class_ &def(detail::method_tag, const char *name_,
+                          Return (Class::*)(Args...) const, Func &&f,
+                          const Extra &...extra) {
+        detail::func_create<false, true>(
+            (detail::forward_t<Func>) f, (Return(*)(const Class *, Args...)) nullptr,
+            std::make_index_sequence<sizeof...(Args) + 1>(), scope(*this),
+            name(name_), is_method(), extra...);
+        return *this;
+    }
+
     template <typename... Args, typename... Extra>
     NB_INLINE class_ &def(detail::init<Args...> init, const Extra &... extra) {
         init.execute(*this, extra...);
@@ -463,6 +489,14 @@ public:
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }
 template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { return { }; }
+
+// More efficient wrapper for binding methods
+#define nb_method(Class, name)                                                 \
+    nanobind::detail::method_tag{}, #name, &Class::name,                       \
+        [](Class *c, auto&&... args) -> decltype(auto) {                       \
+            return c->name(                                                    \
+                (nanobind::detail::forward_t<decltype(args)>) args...);        \
+        }
 
 // Low level access to nanobind type objects
 inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }

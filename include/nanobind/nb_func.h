@@ -56,9 +56,15 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Collect function signature information for the docstring
     using cast_out = make_caster<
         std::conditional_t<std::is_void_v<Return>, void_type, Return>>;
-    constexpr auto descr = const_name("(") +
-                           concat(type_descr(make_caster<remove_opt_mono_t<intrinsic_t<Args>>>::Name)...) +
-                           const_name(") -> ") + cast_out::Name;
+
+    // Compile-time function signature
+    static constexpr auto descr =
+        const_name("(") +
+        concat(type_descr(
+            make_caster<remove_opt_mono_t<intrinsic_t<Args>>>::Name)...) +
+        const_name(") -> ") + cast_out::Name;
+
+    // std::type_info for all function arguments
     const std::type_info* descr_types[descr.type_count() + 1];
     descr.put_types(descr_types);
 
@@ -116,8 +122,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
             cap->func(((make_caster<Args>&&) in.template get<Is>()).operator cast_t<Args>()...);
-            Py_INCREF(Py_None);
             result = Py_None;
+            Py_INCREF(result);
         } else {
             result = cast_out::from_cpp(
                        cap->func(((make_caster<Args> &&) in.template get<Is>())

@@ -19,6 +19,21 @@ nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${
 nanobind_add_module(test_exception_ext test_exception.cpp object.cpp object.h ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
 
+add_library(
+  inter_module
+  SHARED
+  inter_module.h
+  inter_module.cpp
+)
+target_compile_definitions(inter_module PRIVATE -DSHARED_BUILD)
+nanobind_cpp17(inter_module)
+nanobind_headers(inter_module)
+
+nanobind_add_module(test_inter_module_1_ext test_inter_module_1.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_2_ext test_inter_module_2.cpp ${NB_EXTRA_ARGS})
+target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
+target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
+
 set(TEST_FILES
   test_functions.py
   test_classes.py
@@ -29,6 +44,7 @@ set(TEST_FILES
   test_intrusive.py
   test_exception.py
   test_make_iterator.py
+  test_inter_module.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

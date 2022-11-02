@@ -850,6 +850,7 @@
 -U __PyArg_VaParseTupleAndKeywords_SizeT
 -U __PyArg_VaParse_SizeT
 -U __PyErr_BadInternalCall
+-U __PyInterpreterState_Get
 -U __PyObject_CallFunction_SizeT
 -U __PyObject_CallMethod_SizeT
 -U __PyObject_GC_Malloc
@@ -859,6 +860,7 @@
 -U __PyObject_MakeTpCall
 -U __PyObject_New
 -U __PyObject_NewVar
+-U __PyObject_NextNotImplemented
 -U __PyState_AddModule
 -U __PyThreadState_Init
 -U __PyThreadState_Prealloc

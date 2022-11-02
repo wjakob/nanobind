@@ -29,7 +29,9 @@ funcs |= {
     'PyFrame_GetBack',
     'PyGILState_Check',
     'Py_CompileStringExFlags',
+    '_PyInterpreterState_Get',
     '_PyObject_MakeTpCall',
+    '_PyObject_NextNotImplemented',
     '_Py_CheckFunctionResult',
     '_Py_RefTotal'
 }

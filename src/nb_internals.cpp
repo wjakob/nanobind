@@ -202,14 +202,12 @@ static PyType_Spec nb_type_spec = {
 
 static PyType_Slot nb_enum_slots[] = {
     { Py_tp_base, nullptr },
-    { Py_tp_traverse, nullptr },
-    { Py_tp_clear, nullptr },
     { 0, nullptr }
 };
 
 static PyType_Spec nb_enum_spec = {
     .name = "nanobind.nb_enum",
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .flags = Py_TPFLAGS_DEFAULT,
     .slots = nb_enum_slots
 };
 
@@ -384,43 +382,51 @@ static void internals_make() {
     if (rv || !capsule || !nb_module)
         fail("nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
+
     internals_p->nb_module = nb_module;
 
-    internals_p->type_basicsize =
-        cast<int>(handle(&PyType_Type).attr("__basicsize__"));
-
-    nb_type_spec.basicsize = nb_enum_spec.basicsize =
-        internals_p->type_basicsize + (int) sizeof(type_data);
-    nb_type_spec.itemsize = nb_enum_spec.itemsize =
-        cast<int>(handle(&PyType_Type).attr("__itemsize__"));
-
+    // Function objects
     internals_p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
     internals_p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     internals_p->nb_bound_method =
         (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
+    // Metaclass #1 (nb_type)
+#if defined(Py_LIMITED_API)
+    int tp_itemsize = cast<int>(handle(&PyType_Type).attr("__itemsize__"));
+    int tp_basicsize = cast<int>(handle(&PyType_Type).attr("__basicsize__"));
+#else
+    int tp_itemsize = (int) PyType_Type.tp_itemsize;
+    int tp_basicsize = (int) PyType_Type.tp_basicsize;
+#endif
+    nb_type_spec.basicsize = nb_enum_spec.basicsize = tp_basicsize
+        + (int) sizeof(type_data);
+    nb_type_spec.itemsize = nb_enum_spec.itemsize = tp_itemsize;
     nb_type_slots[0].pfunc = &PyType_Type;
     internals_p->nb_type = (PyTypeObject *) PyType_FromSpec(&nb_type_spec);
 
+    // Metaclass #2 (nb_enum)
     nb_enum_slots[0].pfunc = internals_p->nb_type;
-    nb_static_property_slots[0].pfunc = &PyProperty_Type;
-
-#if defined(Py_LIMITED_API)
-    nb_enum_slots[1].pfunc = PyType_GetSlot(&PyType_Type, Py_tp_traverse);
-    nb_enum_slots[2].pfunc = PyType_GetSlot(&PyType_Type, Py_tp_clear);
-    nb_static_property_slots[1].pfunc = PyType_GetSlot(&PyProperty_Type, Py_tp_members);
-#else
-    nb_enum_slots[1].pfunc = (void *) PyType_Type.tp_traverse;
-    nb_enum_slots[2].pfunc = (void *) PyType_Type.tp_clear;
-    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_members;
-#endif
-
     internals_p->nb_enum = (PyTypeObject *) PyType_FromSpec(&nb_enum_spec);
+
+    /// Static properties
+    nb_static_property_slots[0].pfunc = &PyProperty_Type;
+ #if defined(Py_LIMITED_API)
+    nb_static_property_slots[1].pfunc = PyType_GetSlot(&PyProperty_Type, Py_tp_members);
+    nb_static_property_spec.basicsize = cast<int>(handle(&PyProperty_Type).attr("__basicsize__"));
+    nb_static_property_spec.itemsize = cast<int>(handle(&PyProperty_Type).attr("__itemsize__"));
+ #else
+    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_members;
+    nb_static_property_spec.basicsize = (int) PyProperty_Type.tp_basicsize;
+    nb_static_property_spec.itemsize = (int) PyProperty_Type.tp_itemsize;
+ #endif
     internals_p->nb_static_property =
         (PyTypeObject *) PyType_FromSpec(&nb_static_property_spec);
     internals_p->nb_static_property_enabled = true;
 
+    // Tensor type
     internals_p->nb_tensor = (PyTypeObject *) PyType_FromSpec(&nb_tensor_spec);
+
     if (!internals_p->nb_func || !internals_p->nb_method ||
         !internals_p->nb_bound_method || !internals_p->nb_type ||
         !internals_p->nb_enum || !internals_p->nb_static_property ||

@@ -413,22 +413,10 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     if (is_enum)
         nb_enum_prepare(&s, is_arithmetic);
 
+    bool has_traverse = false;
     for (PyType_Slot *ts = slots; ts != s; ++ts) {
         if (ts->slot == Py_tp_traverse)
-            spec.flags |= Py_TPFLAGS_HAVE_GC;
-    }
-
-    /// Inherit GC-related slots from parent class if none were specified
-    if (base && (spec.flags & Py_TPFLAGS_HAVE_GC) == 0) {
-        void *tp_traverse = PyType_GetSlot((PyTypeObject *) base, Py_tp_traverse),
-             *tp_clear    = PyType_GetSlot((PyTypeObject *) base, Py_tp_clear);
-
-        if (tp_traverse) {
-            *s++ = { Py_tp_traverse, tp_traverse };
-            if (tp_clear)
-                *s++ = { Py_tp_clear, tp_clear };
-            spec.flags |= Py_TPFLAGS_HAVE_GC;
-        }
+            has_traverse = true;
     }
 
     if (has_dynamic_attr) {
@@ -442,13 +430,18 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         *s++ = { Py_tp_members, (void *) members };
 
         // Install GC traverse and clear routines if not inherited/overridden
-        if ((spec.flags & Py_TPFLAGS_HAVE_GC) == 0) {
+        if (!has_traverse) {
             *s++ = { Py_tp_traverse, (void *) inst_traverse };
             *s++ = { Py_tp_clear, (void *) inst_clear };
-            spec.flags |= Py_TPFLAGS_HAVE_GC;
+            has_traverse = true;
         }
 
         spec.basicsize = (int) basicsize;
+    }
+
+    if (has_traverse && (!base || (PyType_GetFlags((PyTypeObject *) base) &
+                                   Py_TPFLAGS_HAVE_GC) == 0)) {
+        spec.flags |= Py_TPFLAGS_HAVE_GC;
     }
 
     *s++ = { 0, nullptr };
@@ -507,6 +500,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     tp->tp_name = name_copy;
     tp->tp_doc = tp_doc;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
+    if (temp_tp->tp_flags & Py_TPFLAGS_HAVE_GC)
+        tp->tp_flags |= Py_TPFLAGS_HAVE_GC;
 
 #if PY_VERSION_HEX < 0x03090000
     if (has_dynamic_attr)

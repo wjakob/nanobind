@@ -400,6 +400,8 @@ def test18_static_properties():
     t.StaticProperties2.value = 50
     assert t.StaticProperties2.get() == 50
     assert t.StaticProperties.get() == 50
+    import pydoc
+    assert "Static property docstring" in pydoc.render_doc(t.StaticProperties2)
 
 def test19_supplement():
     c = t.ClassWithSupplement()

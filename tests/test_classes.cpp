@@ -309,7 +309,7 @@ NB_MODULE(test_classes_ext, m) {
 
     // test18_static_properties
     nb::class_<StaticProperties>(m, "StaticProperties")
-        .def_readwrite_static("value", &StaticProperties::value)
+        .def_readwrite_static("value", &StaticProperties::value, "Static property docstring")
         .def_static("get", []{ return StaticProperties::value; } );
 
     nb::class_<StaticProperties2, StaticProperties>(m, "StaticProperties2");

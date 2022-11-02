@@ -173,7 +173,7 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_30", [](nb::callable f) -> std::string {
         nb::gil_scoped_release g;
         try {
-            nb::gil_scoped_acquire g;
+            nb::gil_scoped_acquire g2;
             f();
         } catch (const nb::python_error &e) {
             return e.what();

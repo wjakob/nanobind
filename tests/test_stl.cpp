@@ -266,7 +266,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_return_movable_value", [](){
         std::map<std::string, Movable> x;
         for (int i = 0; i < 10; ++i)
-            x.emplace(std::string(1, 'a' + i), i);
+            x.emplace(std::string(1, (char) ('a' + i)), i);
         return x;
     });
 
@@ -274,7 +274,7 @@ NB_MODULE(test_stl_ext, m) {
         std::map<std::string, Copyable> x;
         for (int i = 0; i < 10; ++i) {
             Copyable c(i);
-            x.insert({std::string(1, 'a' + i), c});
+            x.insert({std::string(1, (char) ('a' + i)), c});
         }
         return x;
     });
@@ -282,7 +282,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_movable_in_value", [](std::map<std::string, Movable> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
+            std::string key(1, (char) ('a' + i));
             if (x.find(key) == x.end()) fail();
             if (x[key].value != i) fail();
         }
@@ -291,7 +291,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_copyable_in_value", [](std::map<std::string, Copyable> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
+            std::string key(1, (char) ('a' + i));
             if (x.find(key) == x.end()) fail();
             if (x[key].value != i) fail();
         }
@@ -300,7 +300,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_movable_in_lvalue_ref", [](std::map<std::string, Movable> &x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
+            std::string key(1, (char) ('a' + i));
             if (x.find(key) == x.end()) fail();
             if (x[key].value != i) fail();
         }
@@ -309,7 +309,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_movable_in_rvalue_ref", [](std::map<std::string, Movable> &&x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
+            std::string key(1, (char) ('a' + i));
             if (x.find(key) == x.end()) fail();
             if (x[key].value != i) fail();
         }
@@ -318,7 +318,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_movable_in_ptr", [](std::map<std::string, Movable *> x) {
         if (x.size() != 10) fail();
         for (int i = 0; i < 10; ++i) {
-            std::string key(1, 'a' + i);
+            std::string key(1, (char) ('a' + i));
             if (x.find(key) == x.end()) fail();
             if (x[key]->value != i) fail();
         }
@@ -327,7 +327,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("map_return_readonly_value", [](){
         StructWithReadonlyMap x;
         for (int i = 0; i < 10; ++i) {
-            x.map.insert({std::string(1, 'a' + i), i});
+            x.map.insert({std::string(1, (char) ('a' + i)), i});
         }
         return x;
     });
@@ -340,14 +340,14 @@ NB_MODULE(test_stl_ext, m) {
     m.def("set_return_value", []() {
         std::set<std::string> x;
         for (int i = 0; i < 10; ++i)
-            x.emplace(std::string(1, 'a' + i));
+            x.emplace(std::string(1, (char) ('a' + i)));
         return x;
     });
 
     m.def("unordered_set_return_value", []() {
         std::unordered_set<std::string> x;
         for (int i = 0; i < 10; ++i)
-            x.emplace(std::string(1, 'a' + i));
+            x.emplace(std::string(1, (char) ('a' + i)));
         return x;
     });
 
@@ -355,7 +355,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x.size() != 10)
                 fail();
             for (int i = 0; i < 10; ++i) {
-                std::string key(1, 'a' + i);
+                std::string key(1, (char) ('a' + i));
                 if (x.find(key) == x.end())
                     fail();
             }
@@ -368,7 +368,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x.size() != 10)
                 fail();
             for (int i = 0; i < 10; ++i) {
-                std::string key(1, 'a' + i);
+                std::string key(1, (char) ('a' + i));
                 if (x.find(key) == x.end())
                     fail();
             }
@@ -380,7 +380,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x.size() != 10)
                 fail();
             for (int i = 0; i < 10; ++i) {
-                std::string key(1, 'a' + i);
+                std::string key(1, (char) ('a' + i));
                 if (x.find(key) == x.end())
                     fail();
             }
@@ -392,7 +392,7 @@ NB_MODULE(test_stl_ext, m) {
             if (x.size() != 10)
                 fail();
             for (int i = 0; i < 10; ++i) {
-                std::string key(1, 'a' + i);
+                std::string key(1, (char) ('a' + i));
                 if (x.find(key) == x.end())
                     fail();
             }

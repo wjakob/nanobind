@@ -32,7 +32,7 @@ template <typename Value_, typename Key> struct set_caster {
         KeyCaster key_caster;
         PyObject *key;
 
-        while ((key = PyIter_Next(iter))) {
+        while ((key = PyIter_Next(iter)) != nullptr) {
             success &= key_caster.from_python(key, flags, cleanup);
             Py_DECREF(key);
 

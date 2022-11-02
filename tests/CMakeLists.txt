@@ -2,7 +2,11 @@
 add_definitions(-DNB_ABORT_ON_LEAK=1)
 
 if (NB_TEST_STABLE_ABI)
-  set(NB_EXTRA_ARGS STABLE_ABI)
+  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} STABLE_ABI)
+endif()
+
+if (NB_TEST_STATIC_BUILD)
+  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_STATIC)
 endif()
 
 nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})

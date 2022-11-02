@@ -253,3 +253,7 @@ def test29_traceback():
     regexp = r'Traceback \(most recent call last\):\n.*\n  File "[^"]*", line 8, in fail_fn\n.*RuntimeError: Foo'
     matches = re.findall(regexp, result, re.MULTILINE | re.DOTALL)
     assert len(matches) == 1
+
+def test30_noexcept():
+    assert t.test_31(123) == 123
+    assert t.test_32(123) == 123

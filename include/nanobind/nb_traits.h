@@ -82,7 +82,19 @@ struct analyze_method<Ret (Cls::*)(Args...)> {
 };
 
 template <typename Cls, typename Ret, typename... Args>
+struct analyze_method<Ret (Cls::*)(Args...) noexcept> {
+    using func = Ret(Args...);
+    static constexpr size_t argc = sizeof...(Args);
+};
+
+template <typename Cls, typename Ret, typename... Args>
 struct analyze_method<Ret (Cls::*)(Args...) const> {
+    using func = Ret(Args...);
+    static constexpr size_t argc = sizeof...(Args);
+};
+
+template <typename Cls, typename Ret, typename... Args>
+struct analyze_method<Ret (Cls::*)(Args...) const noexcept> {
     using func = Ret(Args...);
     static constexpr size_t argc = sizeof...(Args);
 };

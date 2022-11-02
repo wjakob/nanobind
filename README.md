@@ -410,7 +410,7 @@ changes are detailed below.
   `nanobind::cast()` sets `cleanup` to `nullptr`. This case should be handled
   gracefully by refusing the conversion if the cleanup list is absolutely required.
 
-  The [std::pair type
+  The [std::pair<..> type
   caster](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/pair.h)
   may be useful as a reference for these changes.
 
@@ -419,7 +419,7 @@ changes are detailed below.
   ``nanobind/make_iterator.h``. The interface of these functions has also
   slightly changed: all take a Python scope and a name as first and second
   arguments, which are used to permanently "install" the iterator type (which
-  is created on demand). See the The [test
+  is created on demand). See the [test
   suite](https://github.com/wjakob/nanobind/blob/master/tests/test_make_iterator.cpp)
   for a worked out example.
 

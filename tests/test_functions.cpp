@@ -12,6 +12,8 @@ struct my_call_guard {
     ~my_call_guard() { call_guard_value = 2; }
 };
 
+int test_31(int i) noexcept { return i; }
+
 NB_MODULE(test_functions_ext, m) {
     // Function without inputs/outputs
     m.def("test_01", []() { });
@@ -178,4 +180,7 @@ NB_MODULE(test_functions_ext, m) {
         }
         return "Unknown";
     });
+
+    m.def("test_31", &test_31);
+    m.def("test_32", [](int i) noexcept { return i; });
 }

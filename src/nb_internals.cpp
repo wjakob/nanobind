@@ -211,6 +211,14 @@ static PyType_Spec nb_enum_spec = {
     .slots = nb_enum_slots
 };
 
+
+#if PY_VERSION_HEX >= 0x030C0000
+static PyMemberDef nb_static_property_members[] = {
+    { "__doc__", T_OBJECT, 0, 0, nullptr },
+    { nullptr, 0, 0, 0, nullptr }
+};
+#endif
+
 static PyType_Slot nb_static_property_slots[] = {
     { Py_tp_base, nullptr },
     { Py_tp_members, nullptr },
@@ -410,16 +418,26 @@ static void internals_make() {
     internals_p->nb_enum = (PyTypeObject *) PyType_FromSpec(&nb_enum_spec);
 
     /// Static properties
-    nb_static_property_slots[0].pfunc = &PyProperty_Type;
  #if defined(Py_LIMITED_API)
-    nb_static_property_slots[1].pfunc = PyType_GetSlot(&PyProperty_Type, Py_tp_members);
-    nb_static_property_spec.basicsize = cast<int>(handle(&PyProperty_Type).attr("__basicsize__"));
-    nb_static_property_spec.itemsize = cast<int>(handle(&PyProperty_Type).attr("__itemsize__"));
+    tp_basicsize = cast<int>(handle(&PyProperty_Type).attr("__basicsize__"));
+    tp_itemsize = cast<int>(handle(&PyProperty_Type).attr("__itemsize__"));
  #else
-    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_members;
-    nb_static_property_spec.basicsize = (int) PyProperty_Type.tp_basicsize;
-    nb_static_property_spec.itemsize = (int) PyProperty_Type.tp_itemsize;
+    tp_basicsize = (int) PyProperty_Type.tp_basicsize;
+    tp_itemsize = (int) PyProperty_Type.tp_itemsize;
  #endif
+
+    // See https://github.com/python/cpython/issues/98963
+#if PY_VERSION_HEX >= 0x030C0000
+    nb_static_property_members[0].offset = tp_basicsize;
+    nb_static_property_slots[1].pfunc = nb_static_property_members;
+    tp_basicsize += sizeof(PyObject *);
+#else
+    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_members;
+#endif
+    nb_static_property_slots[0].pfunc = &PyProperty_Type;
+    nb_static_property_spec.basicsize = tp_basicsize;
+    nb_static_property_spec.itemsize = tp_itemsize;
+
     internals_p->nb_static_property =
         (PyTypeObject *) PyType_FromSpec(&nb_static_property_spec);
     internals_p->nb_static_property_enabled = true;

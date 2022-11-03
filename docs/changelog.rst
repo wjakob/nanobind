@@ -11,15 +11,27 @@ inconvenience whenever possible.
 Version 0.0.9 (TBA)
 ----------------------------
 
-- Move nanobind internal data structures from ``builtins`` to Python
-  interpreter state dictionary (commit `ca23da7
-  <https://github.com/wjakob/nanobind/commit/ca23da72ce71a45318f1e59474c9c2906fce5154>`_,
-  issue `#96 <https://github.com/wjakob/nanobind/issues/96>`_).
-- Fixed a reference leak in ``python_error::what()`` (commit `61393ad
+* Fixed a reference leak in ``python_error::what()`` (commit `61393ad
   <https://github.com/wjakob/nanobind/commit/61393ad3ce3bc68d195a1496422df43d5fb45ec0>`_).
-- Improved the effectiveness of link-time-optimization when building extension modules
+* Three changes that reduce the binary size and improve runtime performance of
+  binding libraries. (commits `07b4e1fc
+  <https://github.com/wjakob/nanobind/commit/07b4e1fc9e94eeaf5e9c2f4a63bdb275a25c82c6>`_,
+  `9a803796
+  <https://github.com/wjakob/nanobind/commit/9a803796cb05824f9df7593edb984130d20d3755>`_,
+  and `cba4d285
+  <https://github.com/wjakob/nanobind/commit/cba4d285f4e23b888dfcccc656c221414138a2b7>`_).
+* Improved the effectiveness of link-time-optimization when building extension modules
   with the ``NB_STATIC`` flag. This leads to smaller binaries. (commit `f64d2b9
   <https://github.com/wjakob/nanobind/commit/f64d2b9bb558afe28cf6909e4fa47ebf720f62b3>`_).
+* Nanobind now relies on standard mechanism to inherit the ``tp_traverse`` and
+  ``tp_clear`` type slots (commit `efa09a6b
+  <https://github.com/wjakob/nanobind/commit/efa09a6bf6ac27f790b2c96389c2da42d4bc176b>`_).
+* Moved nanobind internal data structures from ``builtins`` to Python
+  interpreter state dictionary. (issue `#96
+  <https://github.com/wjakob/nanobind/issues/96>`_, commit `ca23da7
+  <https://github.com/wjakob/nanobind/commit/ca23da72ce71a45318f1e59474c9c2906fce5154>`_).
+* Various minor fixes and improvements.
+
 
 - ... TBA ...
 
@@ -74,7 +86,7 @@ Version 0.0.6 (Oct 14, 2022)
 * Casters for ``std::map<..>`` and ``std::unordered_map<..>`` (PR `#73 <https://github.com/wjakob/nanobind/pull/73>`_).
 * Caster for ``std::string_view<..>`` (PR `#68 <https://github.com/wjakob/nanobind/pull/68>`_).
 * Custom exception support (commit `41b7da <https://github.com/wjakob/nanobind/commit/41b7da33f1bc5c583bb98df66bdac2a058ec5c15>`_).
-* Register nanobind functions in cyclic GC (PR `#86 <https://github.com/wjakob/nanobind/pull/86>`_).
+* Register nanobind functions with Python's cyclic garbage collector (PR `#86 <https://github.com/wjakob/nanobind/pull/86>`_).
 * Various minor fixes and improvements.
 
 Version 0.0.5 (May 13, 2022)

@@ -408,6 +408,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
+    uint32_t self_flags = 0;
+
     PyObject *result = nullptr, *self_arg = nullptr;
 
     if (is_method) {
@@ -427,7 +429,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             return nullptr;
         }
 
-        current_method_data = current_method{ fr->name, self_arg };
+        self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
+        if (self_flags & (uint32_t) type_flags::is_trampoline)
+            current_method_data = current_method{ fr->name, self_arg };
 
         if (is_constructor) {
             if (((nb_inst *) self_arg)->ready) {
@@ -627,9 +631,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
 
-                    const type_data *t = nb_type_data(Py_TYPE(self_arg));
-                    if (t->flags & (uint32_t) type_flags::intrusive_ptr)
-                        t->set_self_py(inst_ptr(self_arg_nb), self_arg);
+                    if (self_flags & (uint32_t) type_flags::intrusive_ptr)
+                        nb_type_data(Py_TYPE(self_arg))
+                            ->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
 
                 goto done;
@@ -645,7 +649,7 @@ done:
     if (error_handler)
         result = error_handler(self, args_in, nargs_in, kwargs_in);
 
-    if (is_method)
+    if (self_flags & (uint32_t) type_flags::is_trampoline)
         current_method_data = current_method{ nullptr, nullptr };
 
     return result;
@@ -664,6 +668,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
     const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+
+    uint32_t self_flags = 0;
 
     PyObject *result = nullptr, *self_arg = nullptr;
 
@@ -684,8 +690,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
             return nullptr;
         }
 
-        self_arg = args_in[0];
-        current_method_data = current_method{ fr->name, self_arg };
+        self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
+        if (self_flags & (uint32_t) type_flags::is_trampoline)
+            current_method_data = current_method{ fr->name, self_arg };
 
         if (is_constructor) {
             if (((nb_inst *) self_arg)->ready) {
@@ -754,9 +761,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
 
-                    const type_data *t = nb_type_data(Py_TYPE(self_arg));
-                    if (t->flags & (uint32_t) type_flags::intrusive_ptr)
-                        t->set_self_py(inst_ptr(self_arg_nb), self_arg);
+                    if (self_flags & (uint32_t) type_flags::intrusive_ptr)
+                        nb_type_data(Py_TYPE(self_arg))
+                            ->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
 
                 goto done;
@@ -772,7 +779,7 @@ done:
     if (error_handler)
         result = error_handler(self, args_in, nargs_in, kwargs_in);
 
-    if (is_method)
+    if (self_flags & (uint32_t) type_flags::is_trampoline)
         current_method_data = current_method{ nullptr, nullptr };
 
     return result;

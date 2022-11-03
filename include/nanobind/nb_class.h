@@ -69,7 +69,10 @@ enum class type_flags : uint32_t {
     has_dynamic_attr         = (1 << 19),
 
     /// The class uses an intrusive reference counting approach
-    intrusive_ptr            = (1 << 20)
+    intrusive_ptr            = (1 << 20),
+
+    /// Is this a trampoline class meant to be overloaded in Python?
+    is_trampoline            = (1 << 21)
 };
 
 struct type_data {
@@ -262,32 +265,35 @@ public:
 
         if constexpr (!std::is_same_v<Base, T>) {
             d.base = &typeid(Base);
-            d.flags |= (uint16_t) detail::type_flags::has_base;
+            d.flags |= (uint32_t) detail::type_flags::has_base;
         }
 
+        if constexpr (!std::is_same_v<Alias, T>)
+            d.flags |= (uint32_t) detail::type_flags::is_trampoline;
+
         if constexpr (std::is_copy_constructible_v<T>) {
-            d.flags |= (uint16_t) detail::type_flags::is_copy_constructible;
+            d.flags |= (uint32_t) detail::type_flags::is_copy_constructible;
 
             if constexpr (!std::is_trivially_copy_constructible_v<T>) {
-                d.flags |= (uint16_t) detail::type_flags::has_copy;
+                d.flags |= (uint32_t) detail::type_flags::has_copy;
                 d.copy = detail::wrap_copy<T>;
             }
         }
 
         if constexpr (std::is_move_constructible_v<T>) {
-            d.flags |= (uint16_t) detail::type_flags::is_move_constructible;
+            d.flags |= (uint32_t) detail::type_flags::is_move_constructible;
 
             if constexpr (!std::is_trivially_move_constructible_v<T>) {
-                d.flags |= (uint16_t) detail::type_flags::has_move;
+                d.flags |= (uint32_t) detail::type_flags::has_move;
                 d.move = detail::wrap_move<T>;
             }
         }
 
         if constexpr (std::is_destructible_v<T>) {
-            d.flags |= (uint16_t) detail::type_flags::is_destructible;
+            d.flags |= (uint32_t) detail::type_flags::is_destructible;
 
             if constexpr (!std::is_trivially_destructible_v<T>) {
-                d.flags |= (uint16_t) detail::type_flags::has_destruct;
+                d.flags |= (uint32_t) detail::type_flags::has_destruct;
                 d.destruct = detail::wrap_destruct<T>;
             }
         }

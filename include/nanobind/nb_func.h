@@ -103,7 +103,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     }
 
     f.impl = [](void *p, PyObject **args, uint8_t *args_flags, rv_policy policy,
-                cleanup_list *cleanup) -> PyObject * {
+                cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
         (void)p; (void)args; (void)args_flags; (void)policy; (void)cleanup;
 
         const capture *cap;
@@ -138,7 +138,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     f.descr = descr.text;
     f.descr_types = descr_types;
-    f.nargs = (uint16_t) nargs;
+    f.nargs = nargs;
 
     // Fill remaining fields of 'f'
     size_t arg_index = 0;

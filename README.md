@@ -309,10 +309,11 @@ changes are detailed below.
       .def("func", &func, "arg"_a.none());
   ```
 
-  It is also possible to set a ``None`` default value as follows:
+  It is also possible to set a ``None`` default value as follows (the
+  ``.none()`` annotation can be omitted in this special case):
 
   ```cpp
-      .def("func", &func, "arg"_a.none() = nb::none());
+      .def("func", &func, "arg"_a = nb::none());
   ```
 
 - **Implicit type conversions**. In _pybind11_, implicit conversions were

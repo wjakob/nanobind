@@ -112,6 +112,7 @@ public:
 
 template <> struct type_caster<void_type> {
     static constexpr auto Name = const_name("None");
+    static constexpr bool IsClass = false;
 };
 
 template <> struct type_caster<void> {

@@ -1,3 +1,4 @@
+import sys
 import test_classes_ext as t
 import pytest
 import gc
@@ -444,7 +445,11 @@ def test22_handle_t(clean):
 
 
 def test23_type_object_t(clean):
-    assert t.test_type_object_t.__doc__ == 'test_type_object_t(arg: type[test_classes_ext.Struct], /) -> object'
+    if sys.version_info < (3, 9):
+        assert t.test_type_object_t.__doc__ == 'test_type_object_t(arg: Type[test_classes_ext.Struct], /) -> object'
+    else:
+        assert t.test_type_object_t.__doc__ == 'test_type_object_t(arg: type[test_classes_ext.Struct], /) -> object'
+
     assert t.test_type_object_t(t.Struct) is t.Struct
 
     with pytest.raises(TypeError):

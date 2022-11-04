@@ -15,7 +15,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Value_, typename Key, typename Element> struct dict_caster {
-    NB_TYPE_CASTER(Value_, const_name("dict[") + make_caster<Key>::Name +
+    NB_TYPE_CASTER(Value_, const_name(NB_TYPING_DICT "[") + make_caster<Key>::Name +
                                const_name(", ") + make_caster<Element>::Name +
                                const_name("]"));
 

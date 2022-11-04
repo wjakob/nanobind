@@ -42,7 +42,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
 
     // Value name for docstring generation
     static constexpr auto Name =
-        const_name("tuple[") + concat(Caster1::Name, Caster2::Name) + const_name("]");
+        const_name(NB_TYPING_TUPLE "[") + concat(Caster1::Name, Caster2::Name) + const_name("]");
 
     /// Python -> C++ caster, populates `caster1` and `caster2` upon success
     bool from_python(handle src, uint8_t flags,

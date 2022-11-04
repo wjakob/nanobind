@@ -513,7 +513,7 @@ public:
 
 template <typename T> class type_object_t : public type_object {
 public:
-    static constexpr auto Name = detail::const_name("type[") +
+    static constexpr auto Name = detail::const_name(NB_TYPING_TYPE "[") +
                                  detail::make_caster<T>::Name +
                                  detail::const_name("]");
 

@@ -51,9 +51,14 @@ def test05_signature():
         "\n"
         "doc_2")
 
-    assert t.test_07.__doc__ == (
-        "test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]\n"
-        "test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]")
+    if sys.version_info < (3, 9):
+        assert t.test_07.__doc__ == (
+            "test_07(arg0: int, arg1: int, /, *args, **kwargs) -> Tuple[int, int]\n"
+            "test_07(a: int, b: int, *myargs, **mykwargs) -> Tuple[int, int]")
+    else:
+        assert t.test_07.__doc__ == (
+            "test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]\n"
+            "test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]")
 
 def test06_signature_error():
     with pytest.raises(TypeError) as excinfo:

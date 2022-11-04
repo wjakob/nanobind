@@ -87,12 +87,14 @@
 #if PY_VERSION_HEX < 0x03090000
 #  define NB_INTERPRETER_STATE_GET _PyInterpreterState_Get
 #  define NB_TYPING_DICT "Dict"
+#  define NB_TYPING_LIST "List"
 #  define NB_TYPING_SET "Set"
 #  define NB_TYPING_TUPLE "Tuple"
 #  define NB_TYPING_TYPE "Type"
 #else
 #  define NB_INTERPRETER_STATE_GET PyInterpreterState_Get
 #  define NB_TYPING_DICT "dict"
+#  define NB_TYPING_LIST "list"
 #  define NB_TYPING_SET "set"
 #  define NB_TYPING_TUPLE "tuple"
 #  define NB_TYPING_TYPE "type"
@@ -118,7 +120,6 @@
 #  define NB_LIST_SET_ITEM PyList_SET_ITEM
 #  define NB_DICT_GET_SIZE PyDict_GET_SIZE
 #endif
-
 
 #define NB_MODULE(name, variable)                                              \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name();           \

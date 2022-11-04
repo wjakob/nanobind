@@ -34,13 +34,15 @@ struct type_caster<std::monostate> {
         return false;
     }
 
-    static handle from_cpp(const std::monostate &, rv_policy, cleanup_list *) noexcept { return none().release(); }
+    static handle from_cpp(const std::monostate &, rv_policy,
+                           cleanup_list *) noexcept {
+        return none().release();
+    }
 };
 
 template <typename... Ts>
 class type_caster<std::variant<Ts...>> {
-    template <typename T>
-    using Caster = make_caster<detail::intrinsic_t<T>>;
+    template <typename T> using Caster = make_caster<detail::intrinsic_t<T>>;
 
     template <typename T>
     bool variadic_caster(const handle &src, uint8_t flags, cleanup_list *cleanup) {
@@ -69,8 +71,7 @@ public:
     static constexpr auto Name = const_name("Union[") + concat(Caster<Ts>::Name...) + const_name("]");
     static constexpr bool IsClass = false;
 
-    template <typename T>
-    using Cast = movable_cast_t<T>;
+    template <typename T> using Cast = movable_cast_t<T>;
 
     Value value;
 

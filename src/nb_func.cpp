@@ -10,6 +10,9 @@
 #include "nb_internals.h"
 #include "buffer.h"
 
+/// Maximum number of arguments supported by 'nb_vectorcall_simple'
+#define NB_MAXARGS_SIMPLE 8
+
 #if defined(__GNUG__)
 #  include <cxxabi.h>
 #endif
@@ -214,6 +217,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
             fail("nanobind::detail::nb_func_new(): internal update failed (1)!");
         internals.funcs.erase(it);
     }
+
+    func->complex_call |= func->max_nargs_pos >= NB_MAXARGS_SIMPLE;
 
     func->vectorcall = func->complex_call ? nb_func_vectorcall_complex
                                           : nb_func_vectorcall_simple;
@@ -660,11 +665,11 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                                            PyObject *const *args_in,
                                            size_t nargsf,
                                            PyObject *kwargs_in) noexcept {
+    uint8_t args_flags[NB_MAXARGS_SIMPLE];
     func_data *fr = nb_func_data(self);
 
     const size_t count         = (size_t) Py_SIZE(self),
-                 nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf),
-                 max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
+                 nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
     const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
@@ -676,13 +681,10 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     if (is_method) {
         self_arg = nargs_in > 0 ? args_in[0] : nullptr;
 
-        if (!nb_type_cache)
+        if (NB_UNLIKELY(!nb_type_cache))
             nb_type_cache = internals_get().nb_type;
 
-        if (self_arg && Py_TYPE((PyObject *) Py_TYPE(self_arg)) != nb_type_cache)
-            self_arg = nullptr;
-
-        if (!self_arg) {
+        if (NB_UNLIKELY(!self_arg || Py_TYPE((PyObject *) Py_TYPE(self_arg)) != nb_type_cache)) {
             PyErr_SetString(
                 PyExc_RuntimeError,
                 "nanobind::detail::nb_func_vectorcall_simple(): the 'self' "
@@ -691,11 +693,11 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
         }
 
         self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
-        if (self_flags & (uint32_t) type_flags::is_trampoline)
+        if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::is_trampoline))
             current_method_data = current_method{ fr->name, self_arg };
 
         if (is_constructor) {
-            if (((nb_inst *) self_arg)->ready) {
+            if (NB_UNLIKELY(((nb_inst *) self_arg)->ready)) {
                 PyErr_SetString(PyExc_RuntimeError,
                                 "nanobind::detail::nb_func_vectorcall_simple():"
                                 " the __init__ method should not be called on "
@@ -712,18 +714,20 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
                                PyObject *) noexcept = nullptr;
 
-    uint8_t *args_flags = (uint8_t *) alloca(max_nargs_pos * sizeof(uint8_t));
-
     bool fail = kwargs_in != nullptr;
+    PyObject *none_ptr = Py_None;
     for (size_t i = 0; i < nargs_in; ++i)
-        fail |= args_in[i] == Py_None;
+        fail |= args_in[i] == none_ptr;
+
     if (fail) { // keyword/None arguments unsupported in simple vectorcall
         error_handler = nb_func_error_overload;
         goto done;
     }
 
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
-        memset(args_flags, pass, max_nargs_pos * sizeof(uint8_t));
+        for (int i = 0; i < NB_MAXARGS_SIMPLE; ++i)
+            args_flags[i] = pass;
+
         if (is_constructor)
             args_flags[0] = (uint8_t) cast_flags::construct;
 
@@ -739,7 +743,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                                  args_flags, (rv_policy) (f->flags & 0b111),
                                  &cleanup);
 
-                if (!result) {
+                if (NB_UNLIKELY(!result)) {
                     error_handler = nb_func_error_noconvert;
                     goto done;
                 }
@@ -776,10 +780,10 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 done:
     cleanup.release();
 
-    if (error_handler)
+    if (NB_UNLIKELY(error_handler))
         result = error_handler(self, args_in, nargs_in, kwargs_in);
 
-    if (self_flags & (uint32_t) type_flags::is_trampoline)
+    if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::is_trampoline))
         current_method_data = current_method{ nullptr, nullptr };
 
     return result;

@@ -700,9 +700,14 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 // ========================================================================
 
 std::pair<double, bool> load_f64(PyObject *o, uint8_t flags) noexcept {
-    const bool convert = flags & (uint8_t) cast_flags::convert;
+    bool is_float = PyFloat_CheckExact(o);
 
-    if (convert || PyFloat_Check(o)) {
+#if !defined(Py_LIMITED_API)
+    if (NB_LIKELY(is_float))
+        return { (double) PyFloat_AS_DOUBLE(o), true };
+#endif
+
+    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred())
@@ -715,8 +720,14 @@ std::pair<double, bool> load_f64(PyObject *o, uint8_t flags) noexcept {
 }
 
 std::pair<float, bool> load_f32(PyObject *o, uint8_t flags) noexcept {
-    const bool convert = flags & (uint8_t) cast_flags::convert;
-    if (convert || PyFloat_Check(o)) {
+    bool is_float = PyFloat_CheckExact(o);
+
+#if !defined(Py_LIMITED_API)
+    if (NB_LIKELY(is_float))
+        return { (float) PyFloat_AS_DOUBLE(o), true };
+#endif
+
+    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred())
@@ -730,49 +741,69 @@ std::pair<float, bool> load_f32(PyObject *o, uint8_t flags) noexcept {
 
 template <typename T>
 NB_INLINE std::pair<T, bool> load_int(PyObject *o, uint32_t flags) noexcept {
-    using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
-    using Tp = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
+    if (NB_LIKELY(PyLong_CheckExact(o))) {
+        // Fast path for integers that aren't too large (max. one 15- or 30-bit "digit")
+        #if !defined(Py_LIMITED_API)
+            PyLongObject *lo = (PyLongObject *) o;
+            int size = Py_SIZE(o);
 
-    const bool convert = flags & (uint8_t) cast_flags::convert;
-    object temp;
-
-    if (!PyLong_Check(o)) {
-        if (convert) {
-            if constexpr (std::is_unsigned_v<T>) {
-                // Unsigned PyLong_* conversions don't call __index__()..
-                temp = steal(PyNumber_Long(o));
-                if (!temp.is_valid()) {
-                    PyErr_Clear();
-                    return { T(0), false };
-                }
-
-                o = temp.ptr();
+            if (size == 0 || size == 1) {
+                digit value_d = lo->ob_digit[0];
+                T value = (T) value_d;
+                return { value, sizeof(T) >= sizeof(digit) ||
+                                value_d == (digit) value };
             }
-        } else {
+
+            if constexpr (std::is_unsigned_v<T>) {
+                if (size < 0)
+                    return { T(0), false };
+            } else {
+                if (size == -1) {
+                    sdigit value_d = - (sdigit) lo->ob_digit[0];
+                    T value = (T) value_d;
+                    return { value, sizeof(T) >= sizeof(sdigit) ||
+                                    value_d == (sdigit) value };
+                }
+            }
+        #endif
+
+
+        // Slow path
+        using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
+        using Tp = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
+
+        Tp value_p;
+        if constexpr (std::is_unsigned_v<Tp>)
+            value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsUnsignedLong(o)
+                                                : (Tp) PyLong_AsUnsignedLongLong(o);
+        else
+            value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsLong(o)
+                                                : (Tp) PyLong_AsLongLong(o);
+
+        if (value_p == Tp(-1) && PyErr_Occurred()) {
+            PyErr_Clear();
             return { T(0), false };
+        }
+
+        T value = (T) value_p;
+        if constexpr (sizeof(Tp) != sizeof(T)) {
+            if (value_p != (Tp) value)
+                return { T(0), false };
+        }
+
+        return { value, true };
+    } else if ((flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
+        PyObject *temp = PyNumber_Long(o);
+        if (temp) {
+            auto result = load_int<T>(temp, 0);
+            Py_DECREF(temp);
+            return result;
+        } else {
+            PyErr_Clear();
         }
     }
 
-    Tp value_p;
-    if constexpr (std::is_unsigned_v<Tp>) {
-        value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsUnsignedLong(o)
-                                            : (Tp) PyLong_AsUnsignedLongLong(o);
-    } else {
-        value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsLong(o)
-                                            : (Tp) PyLong_AsLongLong(o);
-    }
-
-    if (value_p == Tp(-1) && PyErr_Occurred()) {
-        PyErr_Clear();
-        return { T(0), false };
-    }
-
-    T value = (T) value_p;
-    if constexpr (sizeof(Tp) != sizeof(T)) {
-        if (value_p != (Tp) value)
-            return { T(0), false };
-    }
-    return { value, true };
+    return { T(0), false };
 }
 
 std::pair<uint8_t, bool> load_u8(PyObject *o, uint8_t flags) noexcept {

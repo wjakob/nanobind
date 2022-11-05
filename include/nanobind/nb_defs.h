@@ -48,6 +48,14 @@
 #  define NB_NAMESPACE nanobind
 #endif
 
+#if defined(__GNUC__)
+#  define NB_UNLIKELY(x) __builtin_expect(bool(x), 0)
+#  define NB_LIKELY(x)   __builtin_expect(bool(x), 1)
+#else
+#  define NB_LIKELY(x) x
+#  define NB_UNLIKELY(x) x
+#endif
+
 #if defined(NB_SHARED)
 #  if defined(NB_BUILD)
 #    define NB_CORE NB_EXPORT

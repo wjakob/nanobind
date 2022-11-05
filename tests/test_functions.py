@@ -196,6 +196,7 @@ def test21_numpy_overloads():
         pytest.skip('numpy is missing')
 
     assert t.test_05(np.int32(0)) == 1
+    assert t.test_05(np.float64(0.1)) == 2
     assert t.test_05(np.float64(0.0)) == 2
     assert t.test_11_sl(np.int32(5)) == 5
     assert t.test_11_ul(np.int32(5)) == 5
@@ -262,3 +263,31 @@ def test29_traceback():
 def test30_noexcept():
     assert t.test_31(123) == 123
     assert t.test_32(123) == 123
+
+@pytest.mark.parametrize("func", [ t.identity_i8,  t.identity_u8,
+                                   t.identity_i16, t.identity_u16,
+                                   t.identity_i32, t.identity_u32,
+                                   t.identity_i64, t.identity_u64 ])
+def test31_range(func):
+    values = [
+        0, -1, 1, 2**7, 2**7-1, 2**8, 2**8-1, 2**15, 2**15-1, 2**16, 2**16-1,
+        2**29, 2**29-1, 2**30, 2**30-1, 2**31, 2**31-1, 2**32, 2**32-1, 2**63,
+        2**63-1, 2**64, 2**64-1, 2**127, 2**127-1, 2**128, 2**128-1
+    ]
+    values += [-value for value in values]
+    suffix = func.__name__[9:]
+
+    if suffix[0] == 'u':
+        range_min = 0
+        range_max = 2**int(suffix[1:]) - 1
+    else:
+        range_min = -2**(int(suffix[1:])-1)
+        range_max = -range_min - 1
+
+    for value in values:
+        if value < range_min or value > range_max:
+            with pytest.raises(TypeError):
+                value_out = func(value)
+        else:
+            value_out = func(value)
+            assert value_out == value

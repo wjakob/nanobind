@@ -183,4 +183,13 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_31", &test_31);
     m.def("test_32", [](int i) noexcept { return i; });
+
+    m.def("identity_i8", [](int8_t  i) { return i; });
+    m.def("identity_u8", [](uint8_t i) { return i; });
+    m.def("identity_i16", [](int16_t  i) { return i; });
+    m.def("identity_u16", [](uint16_t i) { return i; });
+    m.def("identity_i32", [](int32_t  i) { return i; });
+    m.def("identity_u32", [](uint32_t i) { return i; });
+    m.def("identity_i64", [](int64_t  i) { return i; });
+    m.def("identity_u64", [](uint64_t i) { return i; });
 }

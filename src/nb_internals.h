@@ -17,12 +17,6 @@
 #  define NB_THREAD_LOCAL __thread
 #endif
 
-#if defined(__GNUC__)
-#  define NB_UNLIKELY(x) __builtin_expect(bool(x), 0)
-#else
-#  define NB_UNLIKELY(x) x
-#endif
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

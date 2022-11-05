@@ -699,48 +699,56 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 
 // ========================================================================
 
-std::pair<double, bool> load_f64(PyObject *o, uint8_t flags) noexcept {
+bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
 
 #if !defined(Py_LIMITED_API)
-    if (NB_LIKELY(is_float))
-        return { (double) PyFloat_AS_DOUBLE(o), true };
+    if (NB_LIKELY(is_float)) {
+        *out = (double) PyFloat_AS_DOUBLE(o);
+        return true;
+    }
 #endif
 
     if (is_float || (flags & (uint8_t) cast_flags::convert)) {
         double result = PyFloat_AsDouble(o);
 
-        if (result != -1.0 || !PyErr_Occurred())
-            return { result, true };
-        else
+        if (result != -1.0 || !PyErr_Occurred()) {
+            *out = (double) result;
+            return true;
+        } else {
             PyErr_Clear();
+        }
     }
 
-    return { 0.0, false };
+    return false;
 }
 
-std::pair<float, bool> load_f32(PyObject *o, uint8_t flags) noexcept {
+bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
 
 #if !defined(Py_LIMITED_API)
-    if (NB_LIKELY(is_float))
-        return { (float) PyFloat_AS_DOUBLE(o), true };
+    if (NB_LIKELY(is_float)) {
+        *out = (float) PyFloat_AS_DOUBLE(o);
+        return true;
+    }
 #endif
 
     if (is_float || (flags & (uint8_t) cast_flags::convert)) {
         double result = PyFloat_AsDouble(o);
 
-        if (result != -1.0 || !PyErr_Occurred())
-            return { (float) result, true };
-        else
+        if (result != -1.0 || !PyErr_Occurred()) {
+            *out = (float) result;
+            return true;
+        } else {
             PyErr_Clear();
+        }
     }
 
-    return { 0.f, false };
+    return false;
 }
 
 template <typename T>
-NB_INLINE std::pair<T, bool> load_int(PyObject *o, uint32_t flags) noexcept {
+NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
         // Fast path for integers that aren't too large (max. one 15- or 30-bit "digit")
         #if !defined(Py_LIMITED_API)
@@ -750,19 +758,19 @@ NB_INLINE std::pair<T, bool> load_int(PyObject *o, uint32_t flags) noexcept {
             if (size == 0 || size == 1) {
                 digit value_d = lo->ob_digit[0];
                 T value = (T) value_d;
-                return { value, sizeof(T) >= sizeof(digit) ||
-                                value_d == (digit) value };
+                *out = value;
+                return sizeof(T) >= sizeof(digit) || value_d == (digit) value;
             }
 
             if constexpr (std::is_unsigned_v<T>) {
                 if (size < 0)
-                    return { T(0), false };
+                    return false;
             } else {
                 if (size == -1) {
                     sdigit value_d = - (sdigit) lo->ob_digit[0];
                     T value = (T) value_d;
-                    return { value, sizeof(T) >= sizeof(sdigit) ||
-                                    value_d == (sdigit) value };
+                    *out = value;
+                    return sizeof(T) >= sizeof(sdigit) || value_d == (sdigit) value;
                 }
             }
         #endif
@@ -782,20 +790,21 @@ NB_INLINE std::pair<T, bool> load_int(PyObject *o, uint32_t flags) noexcept {
 
         if (value_p == Tp(-1) && PyErr_Occurred()) {
             PyErr_Clear();
-            return { T(0), false };
+            return false;
         }
 
         T value = (T) value_p;
         if constexpr (sizeof(Tp) != sizeof(T)) {
             if (value_p != (Tp) value)
-                return { T(0), false };
+                return false;
         }
 
-        return { value, true };
+        *out = value;
+        return true;
     } else if ((flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
         PyObject *temp = PyNumber_Long(o);
         if (temp) {
-            auto result = load_int<T>(temp, 0);
+            bool result = load_int<T>(temp, 0, out);
             Py_DECREF(temp);
             return result;
         } else {
@@ -803,39 +812,39 @@ NB_INLINE std::pair<T, bool> load_int(PyObject *o, uint32_t flags) noexcept {
         }
     }
 
-    return { T(0), false };
+    return false;
 }
 
-std::pair<uint8_t, bool> load_u8(PyObject *o, uint8_t flags) noexcept {
-    return load_int<uint8_t>(o, flags);
+bool load_u8(PyObject *o, uint8_t flags, uint8_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<int8_t, bool> load_i8(PyObject *o, uint8_t flags) noexcept {
-    return load_int<int8_t>(o, flags);
+bool load_i8(PyObject *o, uint8_t flags, int8_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<uint16_t, bool> load_u16(PyObject *o, uint8_t flags) noexcept {
-    return load_int<uint16_t>(o, flags);
+bool load_u16(PyObject *o, uint8_t flags, uint16_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<int16_t, bool> load_i16(PyObject *o, uint8_t flags) noexcept {
-    return load_int<int16_t>(o, flags);
+bool load_i16(PyObject *o, uint8_t flags, int16_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<uint32_t, bool> load_u32(PyObject *o, uint8_t flags) noexcept {
-    return load_int<uint32_t>(o, flags);
+bool load_u32(PyObject *o, uint8_t flags, uint32_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<int32_t, bool> load_i32(PyObject *o, uint8_t flags) noexcept {
-    return load_int<int32_t>(o, flags);
+bool load_i32(PyObject *o, uint8_t flags, int32_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<uint64_t, bool> load_u64(PyObject *o, uint8_t flags) noexcept {
-    return load_int<uint64_t>(o, flags);
+bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
-std::pair<int64_t, bool> load_i64(PyObject *o, uint8_t flags) noexcept {
-    return load_int<int64_t>(o, flags);
+bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept {
+    return load_int(o, flags, out);
 }
 
 NAMESPACE_END(detail)

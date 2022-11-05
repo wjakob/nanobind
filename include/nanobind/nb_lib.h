@@ -387,16 +387,16 @@ NB_CORE PyObject *exception_new(PyObject *mod, const char *name,
 
 // ========================================================================
 
-NB_CORE std::pair<int8_t, bool>   load_i8 (PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<uint8_t, bool>  load_u8 (PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<int16_t, bool>  load_i16(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<uint16_t, bool> load_u16(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<int32_t, bool>  load_i32(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<uint32_t, bool> load_u32(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<int64_t, bool>  load_i64(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<uint64_t, bool> load_u64(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<float, bool>    load_f32(PyObject *o, uint8_t flags) noexcept;
-NB_CORE std::pair<double, bool>   load_f64(PyObject *o, uint8_t flags) noexcept;
+NB_CORE bool load_i8 (PyObject *o, uint8_t flags, int8_t *out) noexcept;
+NB_CORE bool load_u8 (PyObject *o, uint8_t flags, uint8_t *out) noexcept;
+NB_CORE bool load_i16(PyObject *o, uint8_t flags, int16_t *out) noexcept;
+NB_CORE bool load_u16(PyObject *o, uint8_t flags, uint16_t *out) noexcept;
+NB_CORE bool load_i32(PyObject *o, uint8_t flags, int32_t *out) noexcept;
+NB_CORE bool load_u32(PyObject *o, uint8_t flags, uint32_t *out) noexcept;
+NB_CORE bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept;
+NB_CORE bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept;
+NB_CORE bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept;
+NB_CORE bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -56,37 +56,32 @@ template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
 public:
     NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
-        std::pair<T, bool> result;
-
         if constexpr (std::is_floating_point_v<T>) {
             if constexpr (sizeof(T) == 8)
-                result = detail::load_f64(src.ptr(), flags);
+                return detail::load_f64(src.ptr(), flags, &value);
             else
-                result = detail::load_f32(src.ptr(), flags);
+                return detail::load_f32(src.ptr(), flags, &value);
         } else {
             if constexpr (std::is_signed_v<T>) {
                 if constexpr (sizeof(T) == 8)
-                    result = detail::load_i64(src.ptr(), flags);
+                    return detail::load_i64(src.ptr(), flags, (int64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    result = detail::load_i32(src.ptr(), flags);
+                    return detail::load_i32(src.ptr(), flags, (int32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    result = detail::load_i16(src.ptr(), flags);
+                    return detail::load_i16(src.ptr(), flags, (int16_t *) &value);
                 else
-                    result = detail::load_i8(src.ptr(), flags);
+                    return detail::load_i8(src.ptr(), flags, (int8_t *) &value);
             } else {
                 if constexpr (sizeof(T) == 8)
-                    result = detail::load_u64(src.ptr(), flags);
+                    return detail::load_u64(src.ptr(), flags, (uint64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    result = detail::load_u32(src.ptr(), flags);
+                    return detail::load_u32(src.ptr(), flags, (uint32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    result = detail::load_u16(src.ptr(), flags);
+                    return detail::load_u16(src.ptr(), flags, (uint16_t *) &value);
                 else
-                    result = detail::load_u8(src.ptr(), flags);
+                    return detail::load_u8(src.ptr(), flags, (uint8_t *) &value);
             }
         }
-
-        value = result.first;
-        return result.second;
     }
 
     NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {

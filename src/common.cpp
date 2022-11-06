@@ -301,7 +301,7 @@ PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
     return def;
 }
 
-void getattr_maybe(PyObject *obj, const char *key, PyObject **out) {
+void getattr_or_raise(PyObject *obj, const char *key, PyObject **out) {
     if (*out)
         return;
 
@@ -312,7 +312,7 @@ void getattr_maybe(PyObject *obj, const char *key, PyObject **out) {
     *out = res;
 }
 
-void getattr_maybe(PyObject *obj, PyObject *key, PyObject **out) {
+void getattr_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
     if (*out)
         return;
 
@@ -337,7 +337,7 @@ void setattr(PyObject *obj, PyObject *key, PyObject *value) {
 
 // ========================================================================
 
-void getitem_maybe(PyObject *obj, Py_ssize_t key, PyObject **out) {
+void getitem_or_raise(PyObject *obj, Py_ssize_t key, PyObject **out) {
     if (*out)
         return;
 
@@ -348,7 +348,7 @@ void getitem_maybe(PyObject *obj, Py_ssize_t key, PyObject **out) {
     *out = res;
 }
 
-void getitem_maybe(PyObject *obj, const char *key_, PyObject **out) {
+void getitem_or_raise(PyObject *obj, const char *key_, PyObject **out) {
     if (*out)
         return;
 
@@ -367,7 +367,7 @@ void getitem_maybe(PyObject *obj, const char *key_, PyObject **out) {
     *out = res;
 }
 
-void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out) {
+void getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
     if (*out)
         return;
 
@@ -707,6 +707,8 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
         *out = (double) PyFloat_AS_DOUBLE(o);
         return true;
     }
+
+    is_float = false;
 #endif
 
     if (is_float || (flags & (uint8_t) cast_flags::convert)) {
@@ -731,6 +733,8 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
         *out = (float) PyFloat_AS_DOUBLE(o);
         return true;
     }
+
+    is_float = false;
 #endif
 
     if (is_float || (flags & (uint8_t) cast_flags::convert)) {

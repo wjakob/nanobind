@@ -124,8 +124,8 @@ NB_CORE PyObject *getattr(PyObject *obj, const char *key, PyObject *def) noexcep
 NB_CORE PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept;
 
 /// Get an object attribute or raise an exception. Skip if 'out' is non-null
-NB_CORE void getattr_maybe(PyObject *obj, const char *key, PyObject **out);
-NB_CORE void getattr_maybe(PyObject *obj, PyObject *key, PyObject **out);
+NB_CORE void getattr_or_raise(PyObject *obj, const char *key, PyObject **out);
+NB_CORE void getattr_or_raise(PyObject *obj, PyObject *key, PyObject **out);
 
 /// Set an object attribute / item
 NB_CORE void setattr(PyObject *obj, const char *key, PyObject *value);
@@ -134,9 +134,9 @@ NB_CORE void setattr(PyObject *obj, PyObject *key, PyObject *value);
 // ========================================================================
 
 /// Index into an object or raise an exception. Skip if 'out' is non-null
-NB_CORE void getitem_maybe(PyObject *obj, Py_ssize_t, PyObject **out);
-NB_CORE void getitem_maybe(PyObject *obj, const char *key, PyObject **out);
-NB_CORE void getitem_maybe(PyObject *obj, PyObject *key, PyObject **out);
+NB_CORE void getitem_or_raise(PyObject *obj, Py_ssize_t, PyObject **out);
+NB_CORE void getitem_or_raise(PyObject *obj, const char *key, PyObject **out);
+NB_CORE void getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out);
 
 /// Set an item or raise an exception
 NB_CORE void setitem(PyObject *obj, Py_ssize_t, PyObject *value);

@@ -46,7 +46,7 @@ struct str_attr {
     using key_type = const char *;
 
     NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
-        detail::getattr_maybe(obj, key, cache);
+        detail::getattr_or_raise(obj, key, cache);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -63,7 +63,7 @@ struct obj_attr {
     using key_type = handle;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::getattr_maybe(obj, key.ptr(), cache);
+        detail::getattr_or_raise(obj, key.ptr(), cache);
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
@@ -81,7 +81,7 @@ struct str_item {
     using key_type = const char *;
 
     NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
-        detail::getitem_maybe(obj, key, cache);
+        detail::getitem_or_raise(obj, key, cache);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -94,7 +94,7 @@ struct obj_item {
     using key_type = handle;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::getitem_maybe(obj, key.ptr(), cache);
+        detail::getitem_or_raise(obj, key.ptr(), cache);
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
@@ -107,7 +107,7 @@ struct num_item {
     using key_type = Py_ssize_t;
 
     NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
-        detail::getitem_maybe(obj, index, cache);
+        detail::getitem_or_raise(obj, index, cache);
     }
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {

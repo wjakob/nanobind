@@ -1,15 +1,17 @@
 import test_stl_ext as t
 import pytest
-import gc
 import sys
+from common import collect
+
 
 @pytest.fixture
 def clean():
-    gc.collect()
+    collect()
     t.reset()
 
+
 def assert_stats(**kwargs):
-    gc.collect()
+    collect()
     for k, v in t.stats().items():
         fail = False
         if k in kwargs:
@@ -352,8 +354,7 @@ def test32_std_function_gc():
     assert t.FuncWrapper.alive == 1
     del b
     import gc
-    gc.collect()
-    gc.collect()
+    collect()
     assert t.FuncWrapper.alive == 0
 
 def test33_vec_type_check():
@@ -682,7 +683,7 @@ def test65_class_with_movable_field(clean):
     )
 
     del m1, m2
-    gc.collect()
+    collect()
 
     assert_stats(
         value_constructed=2,
@@ -691,7 +692,7 @@ def test65_class_with_movable_field(clean):
     )
 
     del cwmf
-    gc.collect()
+    collect()
 
     assert_stats(
         value_constructed=2,

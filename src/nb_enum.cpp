@@ -101,7 +101,11 @@ static PyObject *nb_enum_int(PyObject *o) {
     }
 }
 
-static PyObject *nb_enum_init(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
+static PyObject *nb_enum_init(PyObject *, PyObject *, PyObject *) {
+    return 0;
+}
+
+static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
     PyObject *arg;
 
     if (kwds || NB_TUPLE_GET_SIZE(args) != 1)
@@ -201,8 +205,8 @@ void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
 
     /* Careful: update 'nb_enum_max_slots' field in nb_type.cpp
        when adding further type slots */
-    *t++ = { Py_tp_new, (void *) nb_enum_init };
-    *t++ = { Py_tp_init, (void *) nullptr };
+    *t++ = { Py_tp_new, (void *) nb_enum_new };
+    *t++ = { Py_tp_init, (void *) nb_enum_init };
     *t++ = { Py_tp_repr, (void *) nb_enum_repr };
     *t++ = { Py_tp_richcompare, (void *) nb_enum_richcompare };
     *t++ = { Py_nb_int, (void *) nb_enum_int };

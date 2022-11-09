@@ -1,15 +1,17 @@
 import sys
 import test_classes_ext as t
 import pytest
-import gc
+from common import skip_on_pypy, collect
+
 
 @pytest.fixture
 def clean():
-    gc.collect()
+    collect()
     t.reset()
 
+
 def assert_stats(**kwargs):
-    gc.collect()
+    collect()
     for k, v in t.stats().items():
         fail = False
         if k in kwargs:
@@ -329,20 +331,20 @@ def test16_keep_alive_custom(clean):
     a = Struct2()
     assert t.keep_alive_arg(s, a) is a
     del s
-    gc.collect()
+    collect()
     assert constructed == 1 and destructed == 0
     del a
-    gc.collect()
+    collect()
     assert constructed == 1 and destructed == 1
 
     s = Struct()
     a = Struct2()
     assert t.keep_alive_ret(a, s) is s
     del a
-    gc.collect()
+    collect()
     assert constructed == 2 and destructed == 1
     del s
-    gc.collect()
+    collect()
     assert constructed == 2 and destructed == 2
 
 def f():
@@ -401,21 +403,26 @@ def test18_static_properties():
     t.StaticProperties2.value = 50
     assert t.StaticProperties2.get() == 50
     assert t.StaticProperties.get() == 50
+
+
+@skip_on_pypy
+def test19_static_properties_doc():
     import pydoc
     assert "Static property docstring" in pydoc.render_doc(t.StaticProperties2)
 
-def test19_supplement():
+
+def test20_supplement():
     c = t.ClassWithSupplement()
     assert t.check_supplement(c)
     assert not t.check_supplement(t.Struct())
 
 
-def test20_type_callback():
+def test21_type_callback():
     o = t.ClassWithLen()
     assert len(o) == 123
 
 
-def test21_low_level(clean):
+def test22_low_level(clean):
     s1, s2, s3 = t.test_lowlevel()
     assert s1.value() == 123 and s2.value() == 0 and s3.value() == 345
     del s1
@@ -429,7 +436,7 @@ def test21_low_level(clean):
     )
 
 
-def test22_handle_t(clean):
+def test23_handle_t(clean):
     assert t.test_handle_t.__doc__ == 'test_handle_t(arg: test_classes_ext.Struct, /) -> object'
     s = t.test_handle_t(t.Struct(5))
     assert s.value() == 5
@@ -444,7 +451,7 @@ def test22_handle_t(clean):
     )
 
 
-def test23_type_object_t(clean):
+def test24_type_object_t(clean):
     if sys.version_info < (3, 9):
         assert t.test_type_object_t.__doc__ == 'test_type_object_t(arg: Type[test_classes_ext.Struct], /) -> object'
     else:
@@ -459,7 +466,7 @@ def test23_type_object_t(clean):
         t.test_type_object_t(int)
 
 
-def test24_none_arg():
+def test25_none_arg():
     with pytest.raises(TypeError):
         t.none_0(None)
     with pytest.raises(TypeError):
@@ -475,14 +482,14 @@ def test24_none_arg():
     assert t.none_4.__doc__ == 'none_4(arg: Optional[test_classes_ext.Struct]) -> bool'
 
 
-def test25_is_final():
+def test26_is_final():
     with pytest.raises(TypeError) as excinfo:
         class MyType(t.FinalType):
             pass
     assert "The type 'test_classes_ext.FinalType' prohibits subclassing!" in str(excinfo.value)
 
 
-def test26_dynamic_attr(clean):
+def test27_dynamic_attr(clean):
     l = [None] * 100
     for i in range(100):
         l[i] = t.StructWithAttr(i)
@@ -501,25 +508,25 @@ def test26_dynamic_attr(clean):
         assert l[i].next.value() == (i+1 if i < 99 else 0)
 
     del l
-    gc.collect()
 
     assert_stats(
         value_constructed=100,
         destructed=100
     )
 
-def test27_copy_rvp():
+
+def test28_copy_rvp():
     a = t.Struct.create_reference()
     b = t.Struct.create_copy()
     assert a is not b
 
 
-def test28_pydoc():
+def test29_pydoc():
     import pydoc
     assert "Some documentation" in pydoc.render_doc(t)
 
 
-def test29_property_assignment_instance():
+def test30_property_assignment_instance():
     s = t.PairStruct()
     s1 = t.Struct(123)
     s2 = t.Struct(456)
@@ -531,7 +538,8 @@ def test29_property_assignment_instance():
     assert s1.value() == 123
     assert s2.value() == 456
 
-def test30_cycle():
+
+def test31_cycle():
     a = t.Wrapper()
     a.value = a
     del a

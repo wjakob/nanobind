@@ -43,7 +43,6 @@ int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
             if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_VISIT(f->args[j].value);
-                    Py_VISIT(f->args[j].name_py);
                 }
             }
             ++f;
@@ -63,7 +62,6 @@ int nb_func_clear(PyObject *self) {
             if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_CLEAR(f->args[j].value);
-                    Py_CLEAR(f->args[j].name_py);
                 }
             }
             ++f;
@@ -538,7 +536,12 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                         PyObject *hit = nullptr;
                         for (size_t j = 0; j < nkwargs_in; ++j) {
                             PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, j);
-                            if (key == ad.name_py) {
+                            #if defined(PYPY_VERSION)
+                                bool match = PyUnicode_Compare(key, ad.name_py) == 0;
+                            #else
+                                bool match = (key == ad.name_py);
+                            #endif
+                            if (match) {
                                 hit = args_in[nargs_in + j];
                                 kwarg_used[j] = true;
                                 break;

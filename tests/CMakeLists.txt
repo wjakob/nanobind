@@ -35,6 +35,7 @@ target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
 set(TEST_FILES
+  common.py
   test_functions.py
   test_classes.py
   test_holders.py

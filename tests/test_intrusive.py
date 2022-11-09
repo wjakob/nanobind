@@ -1,11 +1,10 @@
 import test_intrusive_ext as t
 import pytest
-import gc
+from common import collect
 
 @pytest.fixture
 def clean():
-    gc.collect()
-    gc.collect()
+    collect()
     t.reset()
 
 def test01_construct(clean):
@@ -15,8 +14,7 @@ def test01_construct(clean):
     assert t.get_value_2(o) == 123
     assert t.get_value_3(o) == 123
     del o
-    gc.collect()
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)
 
 
@@ -27,8 +25,7 @@ def test02_factory(clean):
     assert t.get_value_2(o) == 123
     assert t.get_value_3(o) == 123
     del o
-    gc.collect()
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)
 
 
@@ -39,8 +36,7 @@ def test03_factory_ref(clean):
     assert t.get_value_2(o) == 123
     assert t.get_value_3(o) == 123
     del o
-    gc.collect()
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)
 
 def test04_subclass(clean):
@@ -58,6 +54,5 @@ def test04_subclass(clean):
     assert t.get_value_2(o) == 456
     assert t.get_value_3(o) == 456
     del o
-    gc.collect()
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)

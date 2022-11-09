@@ -317,6 +317,7 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
     }
 }
 
+#if !defined(PYPY_VERSION)
 static void internals_cleanup() {
     bool leak = false;
 
@@ -373,15 +374,28 @@ static void internals_cleanup() {
 #endif
     }
 }
+#endif
+
+static PyObject *internals_dict() {
+#if defined(PYPY_VERSION)
+    PyObject *dict = PyEval_GetBuiltins();
+#elif PY_VERSION_HEX < 0x03090000
+    PyObject *dict = PyInterpreterState_GetDict(_PyInterpreterState_Get());
+#else
+    PyObject *dict = PyInterpreterState_GetDict(PyInterpreterState_Get());
+#endif
+    if (!dict)
+        fail("nanobind::detail::internals_dict(): failed!");
+
+    return dict;
+}
 
 static void internals_make() {
     str nb_name("nanobind");
 
     internals_p = new nb_internals();
 
-    PyObject *dict = PyInterpreterState_GetDict(NB_INTERPRETER_STATE_GET());
-    if (!dict)
-        fail("nanobind::detail::internals_make(): PyInterpreterState_GetDict() failed!");
+    PyObject *dict = internals_dict();
 
     const char *internals_id = NB_INTERNALS_ID;
     PyObject *capsule = PyCapsule_New(internals_p, internals_id, nullptr);
@@ -495,6 +509,7 @@ static void internals_make() {
         PyErr_Clear();
     }
 
+#if !defined(PYPY_VERSION)
     // Install the memory leak checker
     if (Py_AtExit(internals_cleanup))
         fprintf(stderr,
@@ -503,12 +518,11 @@ static void internals_make() {
                 "resources at interpreter shutdown (e.g., to avoid leaks being "
                 "reported by tools like 'valgrind'). If you are a user of a "
                 "python extension library, you can ignore this warning.");
+#endif
 }
 
 static void internals_fetch() {
-    PyObject *dict = PyInterpreterState_GetDict(NB_INTERPRETER_STATE_GET());
-    if (!dict)
-        fail("nanobind::detail::internals_fetch(): PyInterpreterState_GetDict() failed!");
+    PyObject *dict = internals_dict();
 
     const char *internals_id = NB_INTERNALS_ID;
     PyObject *capsule = PyDict_GetItemString(dict, internals_id);

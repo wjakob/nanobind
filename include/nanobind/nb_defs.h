@@ -93,14 +93,12 @@
 #endif
 
 #if PY_VERSION_HEX < 0x03090000
-#  define NB_INTERPRETER_STATE_GET _PyInterpreterState_Get
 #  define NB_TYPING_DICT "Dict"
 #  define NB_TYPING_LIST "List"
 #  define NB_TYPING_SET "Set"
 #  define NB_TYPING_TUPLE "Tuple"
 #  define NB_TYPING_TYPE "Type"
 #else
-#  define NB_INTERPRETER_STATE_GET PyInterpreterState_Get
 #  define NB_TYPING_DICT "dict"
 #  define NB_TYPING_LIST "list"
 #  define NB_TYPING_SET "set"

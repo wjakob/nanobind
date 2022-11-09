@@ -131,23 +131,37 @@ PyObject *module_import(const char *name) {
 
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
+    PyObject *name_py, *res;
 
-    PyObject *base_name = PyModule_GetNameObject(base),
-             *name_py, *res;
+#if !defined(PYPY_VERSION)
+    PyObject *base_name = PyModule_GetNameObject(base);
     if (!base_name)
         goto fail;
 
     name_py = PyUnicode_FromFormat("%U.%s", base_name, name);
+#else
+    const char *base_name = PyModule_GetName(base);
+    if (!base_name)
+        goto fail;
+
+    name_py = PyUnicode_FromFormat("%s.%s", base_name, name);
+#endif
     if (!name_py)
         goto fail;
 
+#if !defined(PYPY_VERSION)
     res = PyImport_AddModuleObject(name_py);
+#else
+    res = PyImport_AddModule(PyUnicode_AsUTF8(name_py));
+#endif
+
     if (doc) {
         PyObject *doc_py = PyUnicode_FromString(doc);
         if (!doc_py || PyObject_SetAttrString(res, "__doc__", doc_py))
             goto fail;
         Py_DECREF(doc_py);
     }
+
     Py_DECREF(name_py);
     Py_DECREF(base_name);
 
@@ -222,7 +236,7 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
         }
     }
 
-#if PY_VERSION_HEX < 0x03090000
+#if PY_VERSION_HEX < 0x03090000 || defined(PYPY_VERSION)
     if (method_call) {
         PyObject *self = PyObject_GetAttr(args[0], /* name = */ base);
         if (self) {
@@ -468,7 +482,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
        goes wrong, it fails gracefully without reporting errors. Other
        overloads will then be tried. */
 
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     if (PyTuple_CheckExact(seq)) {
         size = (size_t) PyTuple_GET_SIZE(seq);
         result = ((PyTupleObject *) seq)->ob_item;
@@ -561,7 +575,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
     PyObject *temp = nullptr,
              **result = nullptr;
 
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     if (PyTuple_CheckExact(seq)) {
         if (size == (size_t) PyTuple_GET_SIZE(seq)) {
             result = ((PyTupleObject *) seq)->ob_item;
@@ -755,7 +769,7 @@ template <typename T>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
         // Fast path for integers that aren't too large (max. one 15- or 30-bit "digit")
-        #if !defined(Py_LIMITED_API)
+        #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
             PyLongObject *lo = (PyLongObject *) o;
             int size = Py_SIZE(o);
 

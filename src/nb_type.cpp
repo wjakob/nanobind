@@ -467,10 +467,14 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     PyHeapTypeObject *temp_ht = (PyHeapTypeObject *) temp;
     PyTypeObject *temp_tp = &temp_ht->ht_type;
 
-    Py_INCREF(temp_ht->ht_name);
-    Py_INCREF(temp_ht->ht_qualname);
-    Py_INCREF(temp_tp->tp_base);
+    Py_INCREF (temp_ht->ht_name);
+    Py_INCREF (temp_ht->ht_qualname);
     Py_XINCREF(temp_ht->ht_slots);
+    Py_INCREF (temp_tp->tp_base);
+
+#if PY_VERSION_HEX >= 0x03090000
+    Py_XINCREF(temp_ht->ht_module);
+#endif
 
     char *tp_doc = nullptr;
     if (temp_tp->tp_doc) {
@@ -487,34 +491,82 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     PyHeapTypeObject *ht = (PyHeapTypeObject *) result;
     PyTypeObject *tp = &ht->ht_type;
 
-    memcpy(ht, temp_ht, sizeof(PyHeapTypeObject));
+    ht->ht_name = temp_ht->ht_name;
+    ht->ht_qualname = temp_ht->ht_qualname;
+    ht->ht_slots = temp_ht->ht_slots;
 
-    tp->ob_base.ob_base.ob_type = metaclass;
-    tp->ob_base.ob_base.ob_refcnt = 1;
-    tp->ob_base.ob_size = 0;
-    tp->tp_as_async = &ht->as_async;
-    tp->tp_as_number = &ht->as_number;
-    tp->tp_as_sequence = &ht->as_sequence;
-    tp->tp_as_mapping = &ht->as_mapping;
-    tp->tp_as_buffer = &ht->as_buffer;
+#if PY_VERSION_HEX >= 0x03090000
+    ht->ht_module = temp_ht->ht_module;
+#endif
+
     tp->tp_name = name_copy;
     tp->tp_doc = tp_doc;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
+
     if (temp_tp->tp_flags & Py_TPFLAGS_HAVE_GC)
         tp->tp_flags |= Py_TPFLAGS_HAVE_GC;
+
+    /* The following fields remain intentionally null-initialized
+       following the call to PyType_GenericAlloc(): tp_dict, tp_bases, tp_mro,
+       tp_cache, tp_subclasses, tp_weaklist. */
+
+    #define COPY_FIELD(name) \
+        tp->name = temp_tp->name;
+
+    COPY_FIELD(tp_basicsize);
+    COPY_FIELD(tp_itemsize);
+    COPY_FIELD(tp_dealloc);
+    COPY_FIELD(tp_vectorcall_offset);
+    COPY_FIELD(tp_getattr);
+    COPY_FIELD(tp_setattr);
+    COPY_FIELD(tp_repr);
+    COPY_FIELD(tp_hash);
+    COPY_FIELD(tp_call);
+    COPY_FIELD(tp_str);
+    COPY_FIELD(tp_getattro);
+    COPY_FIELD(tp_setattro);
+    COPY_FIELD(tp_traverse);
+    COPY_FIELD(tp_clear);
+    COPY_FIELD(tp_richcompare);
+    COPY_FIELD(tp_weaklistoffset);
+    COPY_FIELD(tp_iter);
+    COPY_FIELD(tp_iternext);
+    COPY_FIELD(tp_methods);
+    COPY_FIELD(tp_members);
+    COPY_FIELD(tp_getset);
+    COPY_FIELD(tp_base);
+    COPY_FIELD(tp_descr_get);
+    COPY_FIELD(tp_descr_set);
+    COPY_FIELD(tp_dictoffset);
+    COPY_FIELD(tp_init);
+    COPY_FIELD(tp_alloc);
+    COPY_FIELD(tp_new);
+    COPY_FIELD(tp_free);
+    COPY_FIELD(tp_is_gc);
+    COPY_FIELD(tp_del);
+    COPY_FIELD(tp_finalize);
+    COPY_FIELD(tp_vectorcall);
+
+    #undef COPY_FIELD
+
+    ht->as_async = temp_ht->as_async;
+    tp->tp_as_async = &ht->as_async;
+
+    ht->as_number = temp_ht->as_number;
+    tp->tp_as_number = &ht->as_number;
+
+    ht->as_sequence = temp_ht->as_sequence;
+    tp->tp_as_sequence = &ht->as_sequence;
+
+    ht->as_mapping = temp_ht->as_mapping;
+    tp->tp_as_mapping = &ht->as_mapping;
+
+    ht->as_buffer = temp_ht->as_buffer;
+    tp->tp_as_buffer = &ht->as_buffer;
 
 #if PY_VERSION_HEX < 0x03090000
     if (has_dynamic_attr)
         tp->tp_dictoffset = (Py_ssize_t) (basicsize - ptr_size);
-#endif
-
-    tp->tp_dict = tp->tp_bases = tp->tp_mro = tp->tp_cache = nullptr;
-    tp->tp_subclasses = tp->tp_weaklist = nullptr;
-    ht->ht_cached_keys = nullptr;
-    tp->tp_version_tag = 0;
-
-#if PY_VERSION_HEX >= 0x030B0000
-    ht->_ht_tpname = nullptr;
 #endif
 
     PyType_Ready(tp);
@@ -1140,6 +1192,7 @@ type_data *nb_type_data_static(PyTypeObject *o) noexcept {
 PyObject *nb_type_name(PyTypeObject *tp) noexcept {
     PyObject *name = PyObject_GetAttrString((PyObject *) tp, "__name__");
 
+#if !defined(PYPY_VERSION)
     if (PyType_HasFeature(tp, Py_TPFLAGS_HEAPTYPE)) {
         PyObject *mod      = PyObject_GetAttrString((PyObject *) tp, "__module__"),
                  *combined = PyUnicode_FromFormat("%U.%U", mod, name);
@@ -1148,6 +1201,7 @@ PyObject *nb_type_name(PyTypeObject *tp) noexcept {
         Py_DECREF(name);
         name = combined;
     }
+#endif
 
     return name;
 }

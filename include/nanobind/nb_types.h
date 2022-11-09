@@ -342,7 +342,7 @@ class tuple : public object {
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
 
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
 #endif
@@ -362,7 +362,7 @@ class list : public object {
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
 
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
 #endif
@@ -615,7 +615,7 @@ NAMESPACE_END(detail)
 inline detail::dict_iterator dict::begin() const { return { *this }; }
 inline detail::dict_iterator dict::end() const { return { }; }
 
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
 inline detail::fast_iterator tuple::begin() const {
     return ((PyTupleObject *) m_ptr)->ob_item;
 }

@@ -81,7 +81,7 @@ const char *python_error::what() const noexcept {
             PyErr_Clear();
     }
 
-#if defined(Py_LIMITED_API)
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
     object mod = module_::import_("traceback"),
            result = mod.attr("format_exception")(handle(m_type), handle(m_value), handle(m_trace));
     m_what = NB_STRDUP(borrow<str>(str("\n").attr("join")(result)).c_str());

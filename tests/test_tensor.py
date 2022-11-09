@@ -1,8 +1,8 @@
 import test_tensor_ext as t
 import pytest
 import warnings
-import gc
 import importlib
+from common import collect
 
 try:
     import numpy as np
@@ -31,6 +31,7 @@ try:
         return x
 except:
     needs_jax = pytest.mark.skip(reason="JAX is required")
+
 
 
 @needs_numpy
@@ -234,18 +235,18 @@ def test12_implicit_conversion_jax():
 
 
 def test13_destroy_capsule():
-    gc.collect()
+    collect()
     dc = t.destruct_count()
     a = t.return_dlpack()
     assert dc == t.destruct_count()
     del a
-    gc.collect()
+    collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
 def test14_consume_numpy():
-    gc.collect()
+    collect()
     class wrapper:
         def __init__(self, value):
             self.value = value
@@ -261,18 +262,18 @@ def test14_consume_numpy():
         pytest.skip('your version of numpy is too old')
 
     del a
-    gc.collect()
+    collect()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     assert dc == t.destruct_count()
     del x
-    gc.collect()
+    collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
 def test15_passthrough():
-    gc.collect()
+    collect()
     class wrapper:
         def __init__(self, value):
             self.value = value
@@ -290,24 +291,24 @@ def test15_passthrough():
 
     del a
     del b
-    gc.collect()
+    collect()
     assert dc == t.destruct_count()
     assert y.shape == (2, 4)
     assert np.all(y == [[1, 2, 3, 4], [5, 6, 7, 8]])
     del y
-    gc.collect()
+    collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
 def test16_return_numpy():
-    gc.collect()
+    collect()
     dc = t.destruct_count()
     x = t.ret_numpy()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     del x
-    gc.collect()
+    collect()
     assert t.destruct_count() - dc == 1
 
 
@@ -317,21 +318,21 @@ def test17_return_pytorch():
         c = torch.zeros(3, 5)
     except:
         pytest.skip('pytorch is missing')
-    gc.collect()
+    collect()
     dc = t.destruct_count()
     x = t.ret_pytorch()
     assert x.shape == (2, 4)
     assert torch.all(x == torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]]))
     del x
-    gc.collect()
+    collect()
     assert t.destruct_count() - dc == 1
 
 @needs_numpy
 def test18_return_array_scalar():
-    gc.collect()
+    collect()
     dc = t.destruct_count()
     x = t.ret_array_scalar()
     assert np.array_equal(x, np.array(1))
     del x
-    gc.collect()
+    collect()
     assert t.destruct_count() - dc == 1

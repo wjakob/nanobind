@@ -1,10 +1,11 @@
 import test_holders_ext as t
 import pytest
-import gc
+from common import collect
+
 
 @pytest.fixture
 def clean():
-    gc.collect()
+    collect()
     t.reset()
 
 # ------------------------------------------------------------------
@@ -15,7 +16,7 @@ def test01_create(clean):
     assert t.query_shared_1(e) == 123
     assert t.query_shared_2(e) == 123
     del e
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)
 
 
@@ -24,19 +25,19 @@ def test02_sharedptr_from_python(clean):
     w = t.SharedWrapper(e)
     assert w.ptr is e
     del e
-    gc.collect()
+    collect()
     assert t.stats() == (1, 0)
     del w
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)
 
     w = t.SharedWrapper(t.Example(234))
     assert t.stats() == (2, 1)
     w.ptr = t.Example(0)
-    gc.collect()
+    collect()
     assert t.stats() == (3, 2)
     del w
-    gc.collect()
+    collect()
     assert t.stats() == (3, 3)
 
 
@@ -72,7 +73,7 @@ def test04_uniqueptr_from_cpp(clean):
     assert a.value == 1
     assert b.value == 2
     del a, b
-    gc.collect()
+    collect()
     assert t.stats() == (2, 2)
 
 
@@ -92,7 +93,7 @@ def test05_uniqueptr_from_cpp(clean):
         assert 'incompatible function arguments' in str(excinfo.value)
     del a, b
     del wa, wb
-    gc.collect()
+    collect()
     assert t.stats() == (2, 2)
 
     t.reset()
@@ -108,7 +109,7 @@ def test05_uniqueptr_from_cpp(clean):
     assert a.value == 1 and b.value == 2
     assert t.stats() == (2, 0)
     del a, b, a2, b2
-    gc.collect()
+    collect()
     assert t.stats() == (2, 2)
 
 
@@ -126,7 +127,7 @@ def test06_uniqueptr_from_py(clean):
     a2 = wa.get()
     assert a2.value == 1 and a is a2
     del a, a2
-    gc.collect()
+    collect()
     assert t.stats() == (1, 1)
 
 def test07_uniqueptr_passthrough(clean):
@@ -134,7 +135,7 @@ def test07_uniqueptr_passthrough(clean):
     assert t.passthrough_unique(t.unique_from_cpp_2()).value == 2
     assert t.passthrough_unique_2(t.unique_from_cpp()).value == 1
     assert t.passthrough_unique_2(t.unique_from_cpp_2()).value == 2
-    gc.collect()
+    collect()
     assert t.stats() == (4, 4)
     t.reset()
 

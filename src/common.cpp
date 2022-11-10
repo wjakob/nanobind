@@ -765,7 +765,7 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     return false;
 }
 
-template <typename T>
+template <typename T, bool Recurse = true>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
         // Fast path for integers that aren't too large (max. one 15- or 30-bit "digit")
@@ -819,10 +819,10 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
 
         *out = value;
         return true;
-    } else if ((flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
+    } else if (Recurse && (flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
         PyObject *temp = PyNumber_Long(o);
         if (temp) {
-            bool result = load_int<T>(temp, 0, out);
+            bool result = load_int<T, false>(temp, 0, out);
             Py_DECREF(temp);
             return result;
         } else {

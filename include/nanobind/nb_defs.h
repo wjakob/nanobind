@@ -107,7 +107,7 @@
 #endif
 
 #if defined(Py_LIMITED_API)
-#  if PY_VERSION_HEX < 0x030C0000
+#  if PY_VERSION_HEX < 0x030C0000 || PYPY_VERSION
 #    error "nanobind can target Python's limited API, but this requires CPython >= 3.12"
 #  endif
 #  define NB_TUPLE_GET_SIZE PyTuple_Size
@@ -125,6 +125,10 @@
 #  define NB_LIST_GET_ITEM PyList_GET_ITEM
 #  define NB_LIST_SET_ITEM PyList_SET_ITEM
 #  define NB_DICT_GET_SIZE PyDict_GET_SIZE
+#endif
+
+#if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x07030a00
+#    error "nanobind requires a newer PyPy version (>= 7.3.10)"
 #endif
 
 #define NB_MODULE(name, variable)                                              \

@@ -32,6 +32,7 @@ def test02_sharedptr_from_python(clean):
     assert t.stats() == (1, 1)
 
     w = t.SharedWrapper(t.Example(234))
+    collect()
     assert t.stats() == (2, 1)
     w.ptr = t.Example(0)
     collect()
@@ -63,6 +64,7 @@ def test03_sharedptr_from_cpp(clean):
     assert e is not w.value
     assert w.value == 6
     del w, e
+    collect()
     assert t.stats() == (2, 2)
 
 # ------------------------------------------------------------------
@@ -107,6 +109,7 @@ def test05_uniqueptr_from_cpp(clean):
     assert a2.value == 1 and b2.value == 2
     assert a2 is a and b2 is b
     assert a.value == 1 and b.value == 2
+    collect()
     assert t.stats() == (2, 0)
     del a, b, a2, b2
     collect()
@@ -143,4 +146,5 @@ def test07_uniqueptr_passthrough(clean):
         with pytest.raises(TypeError):
             assert t.passthrough_unique(t.Example(1)).value == 1
     assert t.passthrough_unique_2(t.Example(1)).value == 1
+    collect()
     assert t.stats() == (2, 2)

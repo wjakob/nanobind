@@ -1,7 +1,7 @@
 import test_stl_ext as t
 import pytest
 import sys
-from common import collect
+from common import collect, skip_on_pypy
 
 
 @pytest.fixture
@@ -298,6 +298,7 @@ def test28_vec_movable_in_rvalue_ref(clean):
         destructed=20
     )
 
+
 def test29_opaque_vector():
     f = t.float_vec()
     assert f.size() == 0
@@ -326,12 +327,15 @@ def test30_std_function():
     f2()
     assert l == [1]
 
+
 def test31_std_function_roundtrip():
     def f():
         l.append(1)
     f2 = t.return_void_function(f)
     assert f2 is f
 
+
+@skip_on_pypy("cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849")
 def test32_std_function_gc():
     class A(t.FuncWrapper):
         pass
@@ -339,6 +343,7 @@ def test32_std_function_gc():
     a = A()
     assert t.FuncWrapper.alive == 1
     del a
+    collect()
     assert t.FuncWrapper.alive == 0
 
     # A class -> function -> class cyclic reference
@@ -353,13 +358,14 @@ def test32_std_function_gc():
     b = B()
     assert t.FuncWrapper.alive == 1
     del b
-    import gc
     collect()
     assert t.FuncWrapper.alive == 0
+
 
 def test33_vec_type_check():
     with pytest.raises(TypeError) as excinfo:
         t.vec_moveable_in_value(0)
+
 
 def test34_list():
     assert t.identity_list([]) == []
@@ -382,6 +388,7 @@ def test35_string_and_string_view():
     assert t.identity_string_view("البرتقالي") == "البرتقالي"
     assert t.identity_string_view("🍊") == "🍊"
 
+
 def test36_std_optional_copyable(clean):
     t.optional_copyable(t.Copyable())
     assert t.optional_copyable.__doc__ == (
@@ -403,8 +410,10 @@ def test37_std_optional_copyable_ptr(clean):
         destructed=1
     )
 
+
 def test38_std_optional_none():
     t.optional_none(None)
+
 
 def test39_std_optional_ret_opt_movable(clean):
     assert t.optional_ret_opt_movable().value == 5
@@ -424,8 +433,10 @@ def test40_std_optional_ret_opt_movable_ptr(clean):
         destructed=1
     )
 
+
 def test41_std_optional_ret_opt_none():
     assert t.optional_ret_opt_none() is None
+
 
 def test42_std_optional_unbound_type():
     assert t.optional_unbound_type(3) == 3
@@ -434,6 +445,7 @@ def test42_std_optional_unbound_type():
     assert t.optional_unbound_type.__doc__ == (
         "optional_unbound_type(x: Optional[int] = None) -> Optional[int]"
     )
+
 
 def test43_std_variant_copyable(clean):
     t.variant_copyable(t.Copyable())
@@ -446,6 +458,7 @@ def test43_std_variant_copyable(clean):
         copy_assigned=1,
         destructed=3
     )
+
 
 def test44_std_variant_copyable_none(clean):
     t.variant_copyable_none(t.Copyable())
@@ -460,6 +473,7 @@ def test44_std_variant_copyable_none(clean):
         destructed=2
     )
 
+
 def test45_std_variant_copyable_ptr(clean):
     t.variant_copyable_ptr(t.Copyable())
     t.variant_copyable_ptr(5)
@@ -470,6 +484,7 @@ def test45_std_variant_copyable_ptr(clean):
         default_constructed=1,
         destructed=1
     )
+
 
 def test46_std_variant_copyable_ptr_none(clean):
     t.variant_copyable_ptr_none(t.Copyable())
@@ -489,11 +504,13 @@ def test47_std_variant_ret_var_copyable():
         "variant_ret_var_copyable() -> Union[test_stl_ext.Copyable, int]"
     )
 
+
 def test48_std_variant_ret_var_none():
     assert t.variant_ret_var_none() is None
     assert t.variant_ret_var_none.__doc__ == (
         "variant_ret_var_none() -> Union[None, test_stl_ext.Copyable, int]"
     )
+
 
 def test49_std_variant_unbound_type():
     assert t.variant_unbound_type() is None
@@ -519,6 +536,7 @@ def test50_map_return_movable_value():
             "map_return_movable_value() -> dict[str, test_stl_ext.Movable]"
         )
 
+
 def test51_map_return_copyable_value():
     for i, (k, v) in enumerate(sorted(t.map_return_copyable_value().items())):
         assert k == chr(ord("a") + i)
@@ -543,6 +561,7 @@ def test52_map_movable_in_value():
             "map_movable_in_value(x: dict[str, test_stl_ext.Movable]) -> None"
         )
 
+
 def test53_map_copyable_in_value():
     t.map_copyable_in_value(dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)]))
     if sys.version_info < (3, 9):
@@ -553,6 +572,7 @@ def test53_map_copyable_in_value():
         assert t.map_copyable_in_value.__doc__ == (
             "map_copyable_in_value(x: dict[str, test_stl_ext.Copyable]) -> None"
         )
+
 
 def test54_map_movable_in_lvalue_ref():
     t.map_movable_in_lvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
@@ -565,6 +585,7 @@ def test54_map_movable_in_lvalue_ref():
             "map_movable_in_lvalue_ref(x: dict[str, test_stl_ext.Movable]) -> None"
         )
 
+
 def test55_map_movable_in_rvalue_ref():
     t.map_movable_in_rvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
     if sys.version_info < (3, 9):
@@ -575,6 +596,7 @@ def test55_map_movable_in_rvalue_ref():
         assert t.map_movable_in_rvalue_ref.__doc__ == (
             "map_movable_in_rvalue_ref(x: dict[str, test_stl_ext.Movable]) -> None"
         )
+
 
 def test56_map_movable_in_ptr():
     t.map_movable_in_ptr(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
@@ -587,6 +609,7 @@ def test56_map_movable_in_ptr():
             "map_movable_in_ptr(x: dict[str, test_stl_ext.Movable]) -> None"
         )
 
+
 def test57_map_return_readonly_value():
     for i, (k, v) in enumerate(sorted(t.map_return_readonly_value().map.items())):
         assert k == chr(ord("a") + i)
@@ -594,6 +617,7 @@ def test57_map_return_readonly_value():
     assert t.map_return_readonly_value.__doc__ == (
         "map_return_readonly_value() -> test_stl_ext.StructWithReadonlyMap"
     )
+
 
 def test58_array():
     o = t.array_out()
@@ -608,6 +632,7 @@ def test59_map_movable_in_failure():
     with pytest.raises(TypeError) as excinfo:
         t.map_copyable_in_value({1:2})
     assert 'incompatible function arguments' in str(excinfo.value)
+
 
 def test60_set_return_value():
     for i, k in enumerate(sorted(t.set_return_value())):
@@ -639,6 +664,7 @@ def test61_set_in_value():
         assert t.unordered_set_in_value.__doc__ == (
             "unordered_set_in_value(x: set[str]) -> None")
 
+
 def test62_set_in_lvalue_ref():
     t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     if sys.version_info < (3, 9):
@@ -661,10 +687,12 @@ def test63_set_in_rvalue_ref():
             "set_in_rvalue_ref(x: set[str]) -> None"
         )
 
+
 def test64_set_in_failure():
     with pytest.raises(TypeError) as excinfo:
         t.set_in_value(set([i for i in range(10)]))
     assert 'incompatible function arguments' in str(excinfo.value)
+
 
 def test65_class_with_movable_field(clean):
     cwmf = t.ClassWithMovableField()

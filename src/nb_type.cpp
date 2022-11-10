@@ -371,7 +371,6 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         if (base_basicsize > basicsize)
             basicsize = base_basicsize;
     }
-
     char *name_copy = NB_STRDUP(name.c_str());
 
     constexpr size_t nb_enum_max_slots = 21,
@@ -483,6 +482,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         memcpy(tp_doc, temp_tp->tp_doc, size);
     }
 
+    const char *tp_name = PyUnicode_AsUTF8AndSize(temp_ht->ht_name, nullptr);
+
     PyObject *result = PyType_GenericAlloc(metaclass, 0);
     if (!temp || !result)
         fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed!",
@@ -499,7 +500,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     ht->ht_module = temp_ht->ht_module;
 #endif
 
-    tp->tp_name = name_copy;
+    tp->tp_name = tp_name;
     tp->tp_doc = tp_doc;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
 
@@ -992,17 +993,18 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
 
     if (cpp_delete) {
         if (!inst->cpp_delete || !inst->destruct || inst->internal) {
+            PyObject *name = nb_inst_name(o);
             PyErr_WarnFormat(
                 PyExc_RuntimeWarning, 1,
                 "nanobind::detail::nb_relinquish_ownership(): could not "
-                "transfer ownership of a Python instance of type '%s' to C++. "
+                "transfer ownership of a Python instance of type '%U' to C++. "
                 "This is only possible when the instance was previously "
                 "constructed on the C++ side and is now owned by Python, which "
                 "was not the case here. You could change the unique pointer "
                 "signature to std::unique_ptr<T, nb::deleter<T>> to work around "
-                "this issue.",
-                PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
+                "this issue.", name);
 
+            Py_DECREF(name);
             raise_next_overload();
         }
 
@@ -1192,7 +1194,6 @@ type_data *nb_type_data_static(PyTypeObject *o) noexcept {
 PyObject *nb_type_name(PyTypeObject *tp) noexcept {
     PyObject *name = PyObject_GetAttrString((PyObject *) tp, "__name__");
 
-#if !defined(PYPY_VERSION)
     if (PyType_HasFeature(tp, Py_TPFLAGS_HEAPTYPE)) {
         PyObject *mod      = PyObject_GetAttrString((PyObject *) tp, "__module__"),
                  *combined = PyUnicode_FromFormat("%U.%U", mod, name);
@@ -1201,7 +1202,6 @@ PyObject *nb_type_name(PyTypeObject *tp) noexcept {
         Py_DECREF(name);
         name = combined;
     }
-#endif
 
     return name;
 }

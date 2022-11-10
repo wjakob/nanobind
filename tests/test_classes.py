@@ -539,6 +539,7 @@ def test30_property_assignment_instance():
     assert s2.value() == 456
 
 
+@skip_on_pypy("cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849")
 def test31_cycle():
     a = t.Wrapper()
     a.value = a

@@ -236,7 +236,7 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
         }
     }
 
-#if PY_VERSION_HEX < 0x03090000 || defined(PYPY_VERSION)
+#if PY_VERSION_HEX < 0x03090000
     if (method_call) {
         PyObject *self = PyObject_GetAttr(args[0], /* name = */ base);
         if (self) {

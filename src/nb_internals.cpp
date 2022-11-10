@@ -97,9 +97,9 @@ extern PyObject *nb_tensor_new(PyTypeObject *, PyObject *, PyObject *);
 static PyObject *nb_static_property_get(PyObject *, PyObject *, PyObject *);
 
 #if PY_VERSION_HEX >= 0x03090000
-#  define NB_HAVE_VECTORCALL_MAYBE NB_HAVE_VECTORCALL
+#  define NB_HAVE_VECTORCALL_PY39_OR_NEWER NB_HAVE_VECTORCALL
 #else
-#  define NB_HAVE_VECTORCALL_MAYBE 0
+#  define NB_HAVE_VECTORCALL_PY39_OR_NEWER 0
 #endif
 
 static PyMemberDef nb_func_members[] = {
@@ -125,7 +125,7 @@ static PyType_Slot nb_func_slots[] = {
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
-    { Py_tp_traverse, (void *) nb_func_traverse},
+    { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_new, (void *) PyType_GenericNew },
     { Py_tp_call, (void *) PyVectorcall_Call },
     { 0, nullptr }
@@ -135,7 +135,8 @@ static PyType_Spec nb_func_spec = {
     .name = "nanobind.nb_func",
     .basicsize = (int) sizeof(nb_func),
     .itemsize = (int) sizeof(func_data),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | NB_HAVE_VECTORCALL_MAYBE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
+        | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     .slots = nb_func_slots
 };
 
@@ -158,8 +159,9 @@ static PyType_Spec nb_method_spec = {
     .name = "nanobind.nb_method",
     .basicsize = (int) sizeof(nb_func),
     .itemsize = (int) sizeof(func_data),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | NB_HAVE_VECTORCALL_MAYBE
-        | Py_TPFLAGS_METHOD_DESCRIPTOR,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
+        | Py_TPFLAGS_METHOD_DESCRIPTOR
+        | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     .slots = nb_method_slots
 };
 
@@ -182,7 +184,8 @@ static PyType_Slot nb_bound_method_slots[] = {
 static PyType_Spec nb_bound_method_spec = {
     .name = "nanobind.nb_bound_method",
     .basicsize = (int) sizeof(nb_bound_method),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | NB_HAVE_VECTORCALL_MAYBE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
+        | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     .slots = nb_bound_method_slots
 };
 
@@ -478,6 +481,7 @@ static void internals_make() {
 
     register_exception_translator(default_exception_translator, nullptr);
 
+#if !defined(PYPY_VERSION)
     /* The implementation of typing.py tends to introduce spurious reference
        leaks that upset nanobind's leak checker. The following band-aid,
        installs an 'atexit' handler that clears LRU caches used in typing.py.
@@ -509,7 +513,6 @@ static void internals_make() {
         PyErr_Clear();
     }
 
-#if !defined(PYPY_VERSION)
     // Install the memory leak checker
     if (Py_AtExit(internals_cleanup))
         fprintf(stderr,

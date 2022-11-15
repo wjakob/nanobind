@@ -186,7 +186,7 @@ long-standing performance issues in _pybind11_:
 
 ### Other improvements
 
-Besides performance improvements, _nanobind_ includes a quality-of-live
+Besides performance improvements, _nanobind_ includes several quality-of-live
 improvements for developers:
 
 - _nanobind_ has [greatly
@@ -209,9 +209,14 @@ improvements for developers:
   terminates, which avoids memory leak reports in tools like _valgrind_.
 
 - In _pybind11_, function docstrings are pre-rendered while the binding code
-  runs (`.def(...)`). This can create confusing signatures containing C++ types
-  when the binding code of those C++ types hasn't yet run. _nanobind_ does not
-  pre-render function docstrings: they are created on the fly when queried.
+  runs. In other words, every call to `.def(...)` to bind a function
+  immediately creates the underlying docstring. When a function takes a C++
+  type as parameter that is not yet registered in pybind11, the docstring will
+  include the C++ type name (e.g. `std::vector<int, std::allocator<int>>`),
+  which can look rather awkward. Avoiding this issue in pybind11 requires
+  careful arrangement of binding declarations. _nanobind_ avoids this issue by
+  not pre-rendering function docstrings: they are created on the fly when
+  queried.
 
 - _nanobind_ docstrings have improved out-of-the-box compatibility with tools
   like [Sphinx](https://www.sphinx-doc.org/en/master/).
@@ -222,17 +227,18 @@ _nanobind_ depends on recent versions of everything:
 
 - **C++17**: The `if constexpr` feature was crucial to simplify the internal
   meta-templating of this library.
-- **Python 3.8+**: _nanobind_ heavily relies on [PEP 590 vector
+- **Python 3.8+** or **PyPy 7.3.10+** (either the 3.8 or 3.9 flavors):
+  _nanobind_ heavily relies on [PEP 590 vector
   calls](https://www.python.org/dev/peps/pep-0590) that were introduced in
   CPython version 3.8. Nanobind also works with recent versions of PyPy subject
   to [certain
-  limitations](https://github.com/wjakob/nanobind/blob/master/docs/pypy.md).
+  limitations](https://github.com/wjakob/nanobind/blob/master/docs/pypy.rst).
 - **CMake 3.15+**: Recent CMake versions include important improvements to
   `FindPython` that this project depends on.
 - **Supported compilers**: Clang 7, GCC 8, MSVC2019 (or newer) are officially
   supported.
 
-  Other compilers like MinGW, Intel (icpc, oneAPI), NVIDIA (PGI, nvcc) may or
+  Other compilers like MinGW, Intel (icpc, dpc++), NVIDIA (PGI, nvcc) may or
   may not work but aren't officially supported. Pull requests to work around
   bugs in these compilers will not be accepted, as similar changes introduced
   significant complexity in _pybind11_. Instead, please file bugs with the
@@ -258,8 +264,8 @@ documentation](https://pybind11.readthedocs.io/en/stable) is the main source of
 documentation for this project. A number of simplifications and noteworthy
 changes are detailed below.
 
-- **Namespace**. _nanobind_ types and functions are located in the `nanobind` namespace. The
-  `namespace nb = nanobind;` shorthand alias is recommended.
+- **Namespace**. _nanobind_ types and functions are located in the `nanobind`
+  namespace. The `namespace nb = nanobind;` shorthand alias is recommended.
 
 - **Macros**. The `PYBIND11_*` macros (e.g., `PYBIND11_OVERRIDE(..)`) were
   renamed to `NB_*` (e.g., `NB_OVERRIDE(..)`).
@@ -273,20 +279,6 @@ changes are detailed below.
   nitty-gritty details on shared and unique pointers. Classes with _intrusive_
   reference counting also continue to be supported, please see the [linked
   page](docs/intrusive.md) for details.
-
-  The gist is that use of shared/unique pointers requires one or both of the
-  following optional header files:
-
-  - [`nanobind/stl/unique_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/unique_ptr.h)
-  - [`nanobind/stl/shared_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/shared_ptr.h)
-
-  Binding functions that take ``std::unique_ptr<T>`` arguments involves some
-  limitations that can be avoided by changing their signatures to use
-  ``std::unique_ptr<T, nb::deleter<T>>`` instead. Usage of
-  ``std::enable_shared_from_this<T>`` is prohibited and will raise a
-  compile-time assertion. This is consistent with the philosophy of this
-  library: _the codebase has to adapt to the binding tool and not the other way
-  around_.
 
   It is no longer necessary to specify holder types in the type declaration:
 
@@ -302,17 +294,32 @@ changes are detailed below.
     ...
   ```
 
+  Instead, use of shared/unique pointers requires including one or both of the
+  following optional header files:
+
+  - [`nanobind/stl/unique_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/unique_ptr.h)
+  - [`nanobind/stl/shared_ptr.h`](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/shared_ptr.h)
+
+  Binding functions that take `std::unique_ptr<T>` arguments involves some
+  limitations that can be avoided by changing their signatures to use
+  `std::unique_ptr<T, nb::deleter<T>>` instead. Usage of
+  `std::enable_shared_from_this<T>` is *prohibited* and will raise a
+  compile-time assertion. This is consistent with the philosophy of this
+  library: _the codebase has to adapt to the binding tool and not the other way
+  around_.
+
+
 - **Null pointers**. In contrast to _pybind11_, _nanobind_ by default does
-  _not_ permit ``None``-valued arguments during overload resolution. They need
-  to be enabled explicitly using the ``.none()`` member of an argument
+  _not_ permit `None`-valued arguments during overload resolution. They need
+  to be enabled explicitly using the `.none()` member of an argument
   annotation.
 
   ```cpp
       .def("func", &func, "arg"_a.none());
   ```
 
-  It is also possible to set a ``None`` default value as follows (the
-  ``.none()`` annotation can be omitted in this special case):
+  It is also possible to set a `None` default value as follows (the
+  `.none()` annotation can be omitted in this special case):
 
   ```cpp
       .def("func", &func, "arg"_a = nb::none());
@@ -397,29 +404,30 @@ changes are detailed below.
     which need to be deallocated after a function call has taken place. `flags`
     and `cleanup` should be passed to any recursive usage of
     `type_caster::from_python()`. If casting fails due to a Python exception,
-    the function should clear it (`PyErr_Clear()`) and return false. If a
+    the function should clear it (`PyErr_Clear()`) and return `false`. If a
     severe error condition arises that should be reported, use Python warning
     API calls for this, e.g. `PyErr_WarnFormat()`.
 
   - `cast()` was renamed to `from_cpp()`. The function takes a return value
     policy (as before) and a `cleanup_list *` pointer. If casting fails due to
     a Python exception, the function should *leave the error set* (note the
-    asymmetry compared to ``from_python()``) and return ``nullptr``.
+    asymmetry compared to `from_python()`) and return `nullptr`.
 
   Both functions must be marked as `noexcept`.
 
   Note that the cleanup list is only available when `from_python()` or
   `from_cpp()` are called as part of function dispatch, while usage by
   `nanobind::cast()` sets `cleanup` to `nullptr`. This case should be handled
-  gracefully by refusing the conversion if the cleanup list is absolutely required.
+  gracefully by refusing the conversion if the cleanup list is absolutely
+  required.
 
   The [std::pair<..> type
   caster](https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/pair.h)
   may be useful as a reference for these changes.
 
-- Use of the ``nb::make_iterator()``, ``nb::make_key_iterator()``, and
-  ``nb::make_value_iterator()`` requires including the additional header file
-  ``nanobind/make_iterator.h``. The interface of these functions has also
+- Use of the `nb::make_iterator()`, `nb::make_key_iterator()`, and
+  `nb::make_value_iterator()` requires including the additional header file
+  `nanobind/make_iterator.h`. The interface of these functions has also
   slightly changed: all take a Python scope and a name as first and second
   arguments, which are used to permanently "install" the iterator type (which
   is created on demand). See the [test
@@ -495,28 +503,27 @@ changes are detailed below.
 
   - **Finding Python objects associated with a C++ instance**: In addition to
     all of the return value policies supported by pybind11, _nanobind_ provides
-    one additional policy named ``nb::rv_policy::none`` that _only_ succeeds
+    one additional policy named `nb::rv_policy::none` that _only_ succeeds
     when the return value is already a known/registered Python object. In other
     words, this policy will never attempt to move, copy, or reference a C++
     instance by constructing a new Python object.
 
-    The new ``nb::find()`` function encapsulates this behavior. It resembles
-    ``nb::cast()`` in the sense that it returns the Python object associated
-    with a C++ instance. But while ``nb::cast()`` will create that Python
-    object if it doesn't yet exist, ``nb::find()`` will return a ``nullptr``
-    object.
+    The new `nb::find()` function encapsulates this behavior. It resembles
+    `nb::cast()` in the sense that it returns the Python object associated with
+    a C++ instance. But while `nb::cast()` will create that Python object if it
+    doesn't yet exist, `nb::find()` will return a `nullptr` object.
 
-  - **Customizing types**: The pybind11 ``custom_type_setup`` annotation that
+  - **Customizing types**: The pybind11 `custom_type_setup` annotation that
     enabled ad-hoc write access to a constructed Python type object was
-    replaced with the limited API-compatible ``nb::type_slots`` interface. For
-    an example of using this feature to fully integrate _nanobind_ with
-    Python's cyclic garbage collector, see the [separate
+    replaced with the limited API-compatible `nb::type_slots` interface. For an
+    example of using this feature to fully integrate _nanobind_ with Python's
+    cyclic garbage collector, see the [separate
     page](https://github.com/wjakob/nanobind/blob/master/docs/typeslots_and_gc.md)
     on this topic.
 
   - **Raw docstrings**: In cases where absolute control over docstrings is
     required (for example, so that complex cases can be parsed by a tool like
-    [Sphinx](https://www.sphinx-doc.org)), the ``nb::raw_doc`` attribute can be
+    [Sphinx](https://www.sphinx-doc.org)), the `nb::raw_doc` attribute can be
     specified to functions. In this case, _nanobind_ will _skip_ generation of
     a combined docstring that enumerates overloads along with type information.
 
@@ -542,7 +549,7 @@ changes are detailed below.
 
 ## How to cite this project?
 
-Please use the following BibTeX template to cite nanobind in scientific
+Please use the following BibTeX template to cite _nanobind_ in scientific
 discourse:
 
 ```bibtex

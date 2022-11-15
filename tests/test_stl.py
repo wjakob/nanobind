@@ -335,7 +335,8 @@ def test31_std_function_roundtrip():
     assert f2 is f
 
 
-@skip_on_pypy("cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849")
+# cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849
+@skip_on_pypy
 def test32_std_function_gc():
     class A(t.FuncWrapper):
         pass

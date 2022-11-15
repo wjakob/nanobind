@@ -1,17 +1,17 @@
 PyPy support
 ------------
 
-_nanobind_ supports PyPy 7.3.10 and newer versions. There are two limitations:
+*nanobind* supports PyPy 7.3.10 and newer versions. There are two limitations:
 
-1. When _nanobind_ types occur in reference cycles, then those cycles are not
+1. When *nanobind* types occur in reference cycles, then those cycles are not
    collectable and will be leaked. This is a limitation of PyPy's cpyext layer
    that was reported in `PyPy issue #3849
    <https://foss.heptapod.net/pypy/pypy/-/issues/3849>`_. Note that this would
    only affects users that use the ``nb::type_slots()`` feature to implement a
    custom ``Py_tp_traverse`` or ``Py_tp_clear`` slot.
 
-2. _nanobind_ normally complains about any reference leaks involving instances,
+2. *nanobind* normally complains about any reference leaks involving instances,
    functions, and types when the interpreter shuts down. PyPy lacks the final
-   garbage collection" step that is needed to identify such leaks See `PyPy
+   garbage collection step that is needed to identify such leaks See `PyPy
    issue #3855 <https://foss.heptapod.net/pypy/pypy/-/issues/3855>`_. As a
    workaround, those checks are disabled when compiling for PyPy.

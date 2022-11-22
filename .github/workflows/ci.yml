@@ -1,4 +1,4 @@
-name: Continuous Integration
+name: Tests
 
 on:
   workflow_dispatch:
@@ -20,15 +20,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-latest, windows-2022, macos-latest]
-        python:
-        - '3.8'
-        - '3.9'
-        - '3.10'
-        - '3.11'
+        os: ['ubuntu-latest', 'windows-2022', 'macos-latest']
+        python: ['3.8', '3.9', '3.10', '3.11', 'pypy-3.9-nightly']
+        exclude:
+          - os: 'macos-latest'
+            python: 'pypy-3.9-nightly'
 
-    name: "Python ${{ matrix.python }} / ${{ matrix.runs-on }}"
-    runs-on: ${{ matrix.runs-on }}
+    name: "Python ${{ matrix.python }} / ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
@@ -43,9 +42,14 @@ jobs:
     - name: Update CMake
       uses: jwlawson/actions-setup-cmake@v1.13
 
-    - name: Install Python dependencies
+    - name: Install PyTest
       run: |
-        python -m pip install pytest pytest-github-actions-annotate-failures numpy
+        python -m pip install pytest pytest-github-actions-annotate-failures
+
+    - name: Install NumPy
+      if: matrix.python != 'pypy-3.9-nightly'
+      run: |
+        python -m pip install numpy
 
     - name: Configure
       run: >

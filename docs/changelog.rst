@@ -11,8 +11,12 @@ inconvenience whenever possible.
 Version 0.0.9 (TBA)
 ----------------------------
 
-* Fixed a reference leak in ``python_error::what()`` (commit `61393ad
-  <https://github.com/wjakob/nanobind/commit/61393ad3ce3bc68d195a1496422df43d5fb45ec0>`_).
+* PyPy 7.3.10 or newer is now supported subject to `certain limitations
+  <https://github.com/wjakob/nanobind/blob/master/docs/pypy.rst>`_. (commits
+  `f935f93
+  <https://github.com/wjakob/nanobind/commit/f935f93b9d532a5ef1f385445f328d61eb2af97f>`_
+  and `b343bbd
+  <https://github.com/wjakob/nanobind/commit/b343bbd11c12b55bbc00492445c743cae18b298f>`_).
 * Three changes that reduce the binary size and improve runtime performance of
   binding libraries. (commits `07b4e1fc
   <https://github.com/wjakob/nanobind/commit/07b4e1fc9e94eeaf5e9c2f4a63bdb275a25c82c6>`_,
@@ -20,11 +24,15 @@ Version 0.0.9 (TBA)
   <https://github.com/wjakob/nanobind/commit/9a803796cb05824f9df7593edb984130d20d3755>`_,
   and `cba4d285
   <https://github.com/wjakob/nanobind/commit/cba4d285f4e23b888dfcccc656c221414138a2b7>`_).
+* Fixed a reference leak in ``python_error::what()`` (commit `61393ad
+  <https://github.com/wjakob/nanobind/commit/61393ad3ce3bc68d195a1496422df43d5fb45ec0>`_).
+* Adopted a new policy for function type annotations. (commit `c855c90 <https://github.com/wjakob/nanobind/commit/c855c90fc91d180f7c904c612766af6a84c017e3>`_).
 * Improved the effectiveness of link-time-optimization when building extension modules
   with the ``NB_STATIC`` flag. This leads to smaller binaries. (commit `f64d2b9
   <https://github.com/wjakob/nanobind/commit/f64d2b9bb558afe28cf6909e4fa47ebf720f62b3>`_).
-* Nanobind now relies on standard mechanism to inherit the ``tp_traverse`` and
-  ``tp_clear`` type slots (commit `efa09a6b
+* Nanobind now relies on standard mechanisms to inherit the ``tp_traverse`` and
+  ``tp_clear`` type slots instead of trying to reimplement the underlying
+  CPython logic (commit `efa09a6b
   <https://github.com/wjakob/nanobind/commit/efa09a6bf6ac27f790b2c96389c2da42d4bc176b>`_).
 * Moved nanobind internal data structures from ``builtins`` to Python
   interpreter state dictionary. (issue `#96

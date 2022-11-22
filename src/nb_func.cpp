@@ -729,7 +729,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
     for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
         for (int i = 0; i < NB_MAXARGS_SIMPLE; ++i)
-            args_flags[i] = pass;
+            args_flags[i] = (uint8_t) pass;
 
         if (is_constructor)
             args_flags[0] = (uint8_t) cast_flags::construct;

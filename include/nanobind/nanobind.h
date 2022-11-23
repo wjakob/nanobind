@@ -23,7 +23,7 @@
 
 #define NB_VERSION_MAJOR 0
 #define NB_VERSION_MINOR 0
-#define NB_VERSION_PATCH 8
+#define NB_VERSION_PATCH 9
 
 // Core C++ headers that nanobind depends on
 #include <cstdint>

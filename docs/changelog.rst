@@ -8,7 +8,12 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.0.9 (TBA)
+Version 0.1.0 (TBA)
+----------------------------
+
+* .. TBA ..
+
+Version 0.0.9 (Nov 23, 2020)
 ----------------------------
 
 * PyPy 7.3.10 or newer is now supported subject to `certain limitations
@@ -39,9 +44,6 @@ Version 0.0.9 (TBA)
   <https://github.com/wjakob/nanobind/issues/96>`_, commit `ca23da7
   <https://github.com/wjakob/nanobind/commit/ca23da72ce71a45318f1e59474c9c2906fce5154>`_).
 * Various minor fixes and improvements.
-
-
-- ... TBA ...
 
 
 Version 0.0.8 (Oct 27, 2022)

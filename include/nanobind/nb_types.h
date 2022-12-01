@@ -12,11 +12,11 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 /// Macro defining functions/constructors for nanobind::handle subclasses
 #define NB_OBJECT(Type, Parent, Str, Check)                                    \
 public:                                                                        \
-    static constexpr auto Name = detail::const_name(Str);                      \
-    NB_INLINE Type(handle h, detail::borrow_t)                                 \
-        : Parent(h, detail::borrow_t{}) {}                                     \
-    NB_INLINE Type(handle h, detail::steal_t)                                  \
-        : Parent(h, detail::steal_t{}) {}                                      \
+    static constexpr auto Name = ::nanobind::detail::const_name(Str);          \
+    NB_INLINE Type(handle h, ::nanobind::detail::borrow_t)                     \
+        : Parent(h, ::nanobind::detail::borrow_t{}) {}                         \
+    NB_INLINE Type(handle h, ::nanobind::detail::steal_t)                      \
+        : Parent(h, ::nanobind::detail::steal_t{}) {}                          \
     NB_INLINE static bool check_(handle h) {                                   \
         return Check(h.ptr());                                                 \
     }

@@ -1,4 +1,5 @@
 #include "object.h"
+#include <cstdio>
 #include <stdexcept>
 
 static void (*object_inc_ref_py)(PyObject *) noexcept = nullptr;

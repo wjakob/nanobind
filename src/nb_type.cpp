@@ -19,22 +19,33 @@ NAMESPACE_BEGIN(detail)
 static PyObject **nb_dict_ptr(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
 #if !defined(Py_LIMITED_API)
-    return (PyObject **) ((uint8_t *) self + tp->tp_dictoffset);
+    Py_ssize_t dictoffset = tp->tp_dictoffset;
 #else
-    return (PyObject **) ((uint8_t *) self + nb_type_data(tp)->dictoffset);
+    Py_ssize_t dictoffset = nb_type_data(tp)->dictoffset;
+#endif
+    return dictoffset ? (PyObject **) ((uint8_t *) self + dictoffset) : nullptr;
+}
+
+static PyObject **nb_weaklist_ptr(PyObject *self) {
+    PyTypeObject *tp = Py_TYPE(self);
+#if !defined(Py_LIMITED_API)
+    return (PyObject **) ((uint8_t *) self + tp->tp_weaklistoffset);
+#else
+    return (PyObject **) ((uint8_t *) self + nb_type_data(tp)->weaklistoffset);
 #endif
 }
 
 static int inst_clear(PyObject *self) {
-    PyObject *&dict = *nb_dict_ptr(self);
-    Py_CLEAR(dict);
+    PyObject **dict = nb_dict_ptr(self);
+    if (dict)
+        Py_CLEAR(*dict);
     return 0;
 }
 
 static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
-    PyObject *&dict = *nb_dict_ptr(self);
+    PyObject **dict = nb_dict_ptr(self);
     if (dict)
-        Py_VISIT(dict);
+        Py_VISIT(*dict);
 #if PY_VERSION_HEX >= 0x03090000
     Py_VISIT(Py_TYPE(self));
 #endif
@@ -57,6 +68,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
     if (!gc) {
         size_t size = sizeof(nb_inst);
+
         if (!value) {
             // Internal storage: space for the object and padding for alignment
             size += t->size;
@@ -142,6 +154,9 @@ static void inst_dealloc(PyObject *self) {
         PyObject *&dict = *nb_dict_ptr(self);
         Py_CLEAR(dict);
     }
+    if (t->flags & (uint32_t) type_flags::is_weak_referenceable &&
+        nb_weaklist_ptr(self) != nullptr)
+        PyObject_ClearWeakRefs(self);
 
     nb_inst *inst = (nb_inst *) self;
     void *p = inst_ptr(inst);
@@ -297,18 +312,19 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_data *t) noexcept {
-    bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
-         is_unsigned_enum  = t->flags & (uint32_t) type_flags::is_unsigned_enum,
-         is_arithmetic     = t->flags & (uint32_t) type_flags::is_arithmetic,
-         is_enum           = is_signed_enum || is_unsigned_enum,
-         has_scope         = t->flags & (uint32_t) type_flags::has_scope,
-         has_doc           = t->flags & (uint32_t) type_flags::has_doc,
-         has_base          = t->flags & (uint32_t) type_flags::has_base,
-         has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
-         has_type_slots    = t->flags & (uint32_t) type_flags::has_type_slots,
-         has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
-         has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
-         intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
+    bool is_signed_enum        = t->flags & (uint32_t) type_flags::is_signed_enum,
+         is_unsigned_enum      = t->flags & (uint32_t) type_flags::is_unsigned_enum,
+         is_arithmetic         = t->flags & (uint32_t) type_flags::is_arithmetic,
+         is_enum               = is_signed_enum || is_unsigned_enum,
+         has_scope             = t->flags & (uint32_t) type_flags::has_scope,
+         has_doc               = t->flags & (uint32_t) type_flags::has_doc,
+         has_base              = t->flags & (uint32_t) type_flags::has_base,
+         has_base_py           = t->flags & (uint32_t) type_flags::has_base_py,
+         has_type_slots        = t->flags & (uint32_t) type_flags::has_type_slots,
+         has_supplement        = t->flags & (uint32_t) type_flags::has_supplement,
+         has_dynamic_attr      = t->flags & (uint32_t) type_flags::has_dynamic_attr,
+         is_weak_referenceable = t->flags & (uint32_t) type_flags::is_weak_referenceable,
+         intrusive_ptr         = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
     nb_internals &internals = internals_get();
     str name(t->name), qualname = name;
@@ -362,6 +378,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         tb = nb_type_data((PyTypeObject *) base);
         if (tb->flags & (uint32_t) type_flags::has_dynamic_attr)
             has_dynamic_attr = true;
+        if (tb->flags & (uint32_t) type_flags::is_weak_referenceable)
+            is_weak_referenceable = true;
 
         /* Handle a corner case (base class larger than derived class)
            which can arise when extending trampoline base classes */
@@ -380,7 +398,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
                                       nb_type_max_slots +
                                       nb_extra_slots + 1;
 
-    PyMemberDef members[2] { };
+    PyMemberDef members[3] { };
     PyType_Slot slots[nb_total_slots], *s = slots;
     PyType_Spec spec = {
         .name = name_copy,
@@ -418,17 +436,43 @@ PyObject *nb_type_new(const type_data *t) noexcept {
             has_traverse = true;
     }
 
-    if (has_dynamic_attr) {
-        // realign to sizeof(void*), add one pointer
+    Py_ssize_t dictoffset = 0;
+    Py_ssize_t weaklistoffset = 0;
+    int num_members = 0;
+    if (has_dynamic_attr || is_weak_referenceable) {
+        // realign to sizeof(void*)
         basicsize = (basicsize + ptr_size - 1) / ptr_size * ptr_size;
+    }
+    if (has_dynamic_attr) {
+        dictoffset = (Py_ssize_t) basicsize;
         basicsize += ptr_size;
 
-        members[0] = PyMemberDef{ "__dictoffset__", T_PYSSIZET,
-                                  (Py_ssize_t) (basicsize - ptr_size), READONLY,
-                                  nullptr };
-        *s++ = { Py_tp_members, (void *) members };
+        members[num_members] = PyMemberDef{ "__dictoffset__", T_PYSSIZET,
+                                            dictoffset, READONLY,
+                                            nullptr };
+        ++num_members;
 
         // Install GC traverse and clear routines if not inherited/overridden
+        if (!has_traverse) {
+            *s++ = { Py_tp_traverse, (void *) inst_traverse };
+            *s++ = { Py_tp_clear, (void *) inst_clear };
+            has_traverse = true;
+        }
+        spec.basicsize = (int) basicsize;
+    }
+    if (is_weak_referenceable) {
+        weaklistoffset = (Py_ssize_t) basicsize;
+        basicsize += ptr_size;
+
+        members[num_members] = PyMemberDef{ "__weaklistoffset__", T_PYSSIZET,
+                                            weaklistoffset, READONLY,
+                                            nullptr };
+        ++num_members;
+
+        // Install GC traverse and clear routines if not inherited/overridden
+        // Technically having weak references does not imply we need GC. However
+        // enabling GC avoids the fast path in inst_new_impl which would not
+        // leave space for the weaklistoffset field.
         if (!has_traverse) {
             *s++ = { Py_tp_traverse, (void *) inst_traverse };
             *s++ = { Py_tp_clear, (void *) inst_clear };
@@ -437,6 +481,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
         spec.basicsize = (int) basicsize;
     }
+    if (num_members > 0)
+        *s++ = { Py_tp_members, (void *) members };
 
     if (has_traverse && (!base || (PyType_GetFlags((PyTypeObject *) base) &
                                    Py_TPFLAGS_HAVE_GC) == 0)) {
@@ -570,8 +616,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     tp->tp_as_buffer = &ht->as_buffer;
 
 #if PY_VERSION_HEX < 0x03090000
-    if (has_dynamic_attr)
-        tp->tp_dictoffset = (Py_ssize_t) (basicsize - ptr_size);
+    tp->tp_dictoffset = dictoffset;
+    tp->tp_weaklistoffset = weaklistoffset;
 #endif
 
     PyType_Ready(tp);
@@ -604,7 +650,13 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     if (has_dynamic_attr) {
         to->flags |= (uint32_t) type_flags::has_dynamic_attr;
         #if defined(Py_LIMITED_API)
-            to->dictoffset = (Py_ssize_t) (basicsize - ptr_size);
+            to->dictoffset = dictoffset;
+        #endif
+    }
+    if (is_weak_referenceable) {
+        to->flags |= (uint32_t) type_flags::is_weak_referenceable;
+        #if defined(Py_LIMITED_API)
+            to->weaklistoffset = weaklistoffset;
         #endif
     }
 

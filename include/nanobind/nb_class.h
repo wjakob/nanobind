@@ -72,7 +72,11 @@ enum class type_flags : uint32_t {
     intrusive_ptr            = (1 << 20),
 
     /// Is this a trampoline class meant to be overloaded in Python?
-    is_trampoline            = (1 << 21)
+    is_trampoline            = (1 << 21),
+
+    /// Instances of this type support weak references.
+    is_weak_referenceable    = (1 << 22),
+
 };
 
 struct type_data {
@@ -96,6 +100,7 @@ struct type_data {
     void (*set_self_py)(void *, PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
     size_t dictoffset;
+    size_t weaklistoffset;
 #endif
 };
 
@@ -137,6 +142,10 @@ NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
 
 NB_INLINE void type_extra_apply(type_data &t, dynamic_attr) {
     t.flags |= (uint32_t) type_flags::has_dynamic_attr;
+}
+
+NB_INLINE void type_extra_apply(type_data &t, weak_referenceable) {
+    t.flags |= (uint32_t) type_flags::is_weak_referenceable;
 }
 
 template <typename T>

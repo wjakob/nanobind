@@ -424,4 +424,13 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<Wrapper>(m, "Wrapper", nb::type_slots(wrapper_slots))
         .def(nb::init<>())
         .def_readwrite("value", &Wrapper::value);
+
+    // test32_weak_referenceable
+    struct StructWithWeakrefs : Struct { };
+    nb::class_<StructWithWeakrefs, Struct>(m, "StructWithWeakrefs", nb::weak_referenceable())
+        .def(nb::init<int>());
+    struct StructWithWeakrefsAndDynamicAttrs : Struct { };
+    nb::class_<StructWithWeakrefsAndDynamicAttrs, Struct>(m, "StructWithWeakrefsAndDynamicAttrs",
+               nb::weak_referenceable(), nb::dynamic_attr())
+        .def(nb::init<int>());
 }

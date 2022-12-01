@@ -1,4 +1,6 @@
+import gc
 import sys
+import weakref
 import test_classes_ext as t
 import pytest
 from common import skip_on_pypy, collect
@@ -545,3 +547,22 @@ def test31_cycle():
     a = t.Wrapper()
     a.value = a
     del a
+
+
+def test32_weak_references():
+    o = t.StructWithWeakrefs(42)
+    w = weakref.ref(o)
+    assert w() is o
+    del o
+    gc.collect()
+    assert w() is None
+
+    p = t.StructWithWeakrefsAndDynamicAttrs(43)
+    p.a_dynamic_attr = 101
+    w = weakref.ref(p)
+    assert w() is p
+    assert w().a_dynamic_attr == 101
+    del p
+    gc.collect()
+    assert w() is None
+

@@ -484,7 +484,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     const char *tp_name = PyUnicode_AsUTF8AndSize(temp_ht->ht_name, nullptr);
 
-    PyObject *result = PyType_GenericAlloc(metaclass, 0);
+    PyObject *result = PyType_GenericAlloc(metaclass, Py_SIZE(temp_tp));
     if (!temp || !result)
         fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed!",
              t->name);
@@ -533,7 +533,6 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     COPY_FIELD(tp_iter);
     COPY_FIELD(tp_iternext);
     COPY_FIELD(tp_methods);
-    COPY_FIELD(tp_members);
     COPY_FIELD(tp_getset);
     COPY_FIELD(tp_base);
     COPY_FIELD(tp_descr_get);
@@ -549,6 +548,11 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     COPY_FIELD(tp_vectorcall);
 
     #undef COPY_FIELD
+
+    if (temp_tp->tp_members) {
+        tp->tp_members = (PyMemberDef*)((char *)tp + tp->tp_basicsize);
+        std::memcpy(tp->tp_members, temp_tp->tp_members, tp->tp_itemsize * Py_SIZE(temp_tp));
+    }
 
     ht->as_async = temp_ht->as_async;
     tp->tp_as_async = &ht->as_async;

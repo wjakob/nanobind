@@ -327,6 +327,7 @@ def test17_return_pytorch():
     collect()
     assert t.destruct_count() - dc == 1
 
+
 @needs_numpy
 def test18_return_array_scalar():
     collect()
@@ -336,3 +337,36 @@ def test18_return_array_scalar():
     del x
     collect()
     assert t.destruct_count() - dc == 1
+
+
+@needs_numpy
+@pytest.mark.skip("Unexpected 'incompatible function arguments' error.")
+def test19_default_valid():
+    collect()
+    a = t.default_valid(np.array([[1, 2]]))
+    assert np.all(a == [[1, 2]])
+    collect()
+    a = t.default_valid()
+    assert np.all(a == [42, 43, 44])
+
+
+@needs_numpy
+@pytest.mark.skip("Binding is disabled due to a segfault")
+def test20_default_invalid():
+    collect()
+    valid = t.default_invalid(np.array([0]))
+    assert valid == True
+    collect()
+    valid = t.default_invalid()
+    assert valid == False
+
+
+@needs_numpy
+@pytest.mark.skip("Unexpected 'incompatible function arguments' error.")
+def test21_default_none():
+    collect()
+    valid = t.default_none(np.array([0]))
+    assert valid == True
+    collect()
+    valid = t.default_none()
+    assert valid == False

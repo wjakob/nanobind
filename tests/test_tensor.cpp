@@ -8,6 +8,9 @@ using namespace nb::literals;
 
 int destruct_count = 0;
 
+const size_t default_shape[1] = {3};
+int default_content[3] = {42, 43, 44};
+
 NB_MODULE(test_tensor_ext, m) {
     m.def("get_shape", [](const nb::tensor<> &t) {
         nb::list l;
@@ -137,4 +140,19 @@ NB_MODULE(test_tensor_ext, m) {
 
             return nb::tensor<nb::numpy, float>(f, 0, shape, deleter);
         });
+
+    m.def("default_valid", [](const nb::tensor<nb::numpy> &t) {
+        return t;
+    }, "array"_a = nb::tensor<nb::numpy, int, nb::shape<3>>(default_content, 1,
+                                                            default_shape));
+
+    // Enabling this binding yields a segmentation fault when loading it.
+    //m.def("default_invalid", [](const nb::tensor<> &t) {
+    //    return t.is_valid();
+    //}, "array"_a.none() = nb::tensor<>());
+
+    m.def("default_none", [](const nb::tensor<> &t) {
+        return t.is_valid();
+    }, "array"_a = nb::none());
+
 }

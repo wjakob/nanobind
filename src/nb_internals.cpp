@@ -481,13 +481,14 @@ static void internals_make() {
 
     register_exception_translator(default_exception_translator, nullptr);
 
-#if !defined(PYPY_VERSION)
-    /* The implementation of typing.py tends to introduce spurious reference
-       leaks that upset nanobind's leak checker. The following band-aid,
-       installs an 'atexit' handler that clears LRU caches used in typing.py.
-       To be resilient to potential future changes in typing.py, the
-       implementation fails silently if any step goes wrong. For context on the
-       original issue, see https://github.com/python/cpython/issues/98253. */
+#if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)
+    /* The implementation of typing.py on CPython <3.12 tends to introduce
+       spurious reference leaks that upset nanobind's leak checker. The
+       following band-aid, installs an 'atexit' handler that clears LRU caches
+       used in typing.py. To be resilient to potential future changes in
+       typing.py, the implementation fails silently if any step goes wrong. For
+       context, see https://github.com/python/cpython/issues/98253. */
+
     const char *str =
         "def cleanup():\n"
         "    try:\n"
@@ -512,8 +513,11 @@ static void internals_make() {
     } else {
         PyErr_Clear();
     }
+#endif
 
-    // Install the memory leak checker
+#if !defined(PYPY_VERSION)
+    /* Install the memory leak checker. This feature is unsupported on
+       PyPy, see https://foss.heptapod.net/pypy/pypy/-/issues/3855 */
     if (Py_AtExit(internals_cleanup))
         fprintf(stderr,
                 "Warning: could not install the nanobind cleanup handler! This "

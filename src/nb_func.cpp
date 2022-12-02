@@ -408,8 +408,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
     func_data *fr = nb_func_data(self);
 
-    const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const bool is_method = fr->flags & (uint32_t) func_flags::is_method;
+    bool is_constructor = false;
 
     uint32_t self_flags = 0;
 
@@ -421,28 +421,20 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
         if (!nb_type_cache)
             nb_type_cache = internals_get().nb_type;
 
-        if (self_arg && Py_TYPE((PyObject *) Py_TYPE(self_arg)) != nb_type_cache)
-            self_arg = nullptr;
+        if (self_arg && Py_TYPE((PyObject *) Py_TYPE(self_arg)) == nb_type_cache) {
+            self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
+            if (self_flags & (uint32_t) type_flags::is_trampoline)
+                current_method_data = current_method{ fr->name, self_arg };
 
-        if (!self_arg) {
-            PyErr_SetString(
-                PyExc_RuntimeError,
-                "nanobind::detail::nb_func_vectorcall(): the 'self' argument "
-                "of a method call should be a nanobind class.");
-            return nullptr;
-        }
-
-        self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
-        if (self_flags & (uint32_t) type_flags::is_trampoline)
-            current_method_data = current_method{ fr->name, self_arg };
-
-        if (is_constructor) {
-            if (((nb_inst *) self_arg)->ready) {
-                PyErr_SetString(
-                    PyExc_RuntimeError,
-                    "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                    "method should not be called on an initialized object!");
-                return nullptr;
+            is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+            if (is_constructor) {
+                if (((nb_inst *) self_arg)->ready) {
+                    PyErr_SetString(
+                        PyExc_RuntimeError,
+                        "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                        "method should not be called on an initialized object!");
+                    return nullptr;
+                }
             }
         }
     }
@@ -674,8 +666,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     const size_t count         = (size_t) Py_SIZE(self),
                  nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
-    const bool is_method = fr->flags & (uint32_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const bool is_method = fr->flags & (uint32_t) func_flags::is_method;
+    bool is_constructor = false;
 
     uint32_t self_flags = 0;
 
@@ -687,25 +679,20 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
         if (NB_UNLIKELY(!nb_type_cache))
             nb_type_cache = internals_get().nb_type;
 
-        if (NB_UNLIKELY(!self_arg || Py_TYPE((PyObject *) Py_TYPE(self_arg)) != nb_type_cache)) {
-            PyErr_SetString(
-                PyExc_RuntimeError,
-                "nanobind::detail::nb_func_vectorcall_simple(): the 'self' "
-                "argument of a method call should be a nanobind class.");
-            return nullptr;
-        }
+        if (NB_LIKELY(self_arg && Py_TYPE((PyObject *) Py_TYPE(self_arg)) == nb_type_cache)) {
+            self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
+            if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::is_trampoline))
+                current_method_data = current_method{ fr->name, self_arg };
 
-        self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
-        if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::is_trampoline))
-            current_method_data = current_method{ fr->name, self_arg };
-
-        if (is_constructor) {
-            if (NB_UNLIKELY(((nb_inst *) self_arg)->ready)) {
-                PyErr_SetString(PyExc_RuntimeError,
-                                "nanobind::detail::nb_func_vectorcall_simple():"
-                                " the __init__ method should not be called on "
-                                "an initialized object!");
-                return nullptr;
+            is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+            if (is_constructor) {
+                if (NB_UNLIKELY(((nb_inst *) self_arg)->ready)) {
+                    PyErr_SetString(PyExc_RuntimeError,
+                                    "nanobind::detail::nb_func_vectorcall_simple():"
+                                    " the __init__ method should not be called on "
+                                    "an initialized object!");
+                    return nullptr;
+                }
             }
         }
     }
@@ -807,11 +794,12 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
         result = mb->func->vectorcall((PyObject *) mb->func, args_tmp, nargs + 1, kwargs_in);
         args_tmp[0] = tmp;
     } else {
-        PyObject **args_tmp = (PyObject **) PyObject_Malloc((nargs + 1) * sizeof(PyObject *));
+        size_t nkwargs_in = kwargs_in ? (size_t) NB_TUPLE_GET_SIZE(kwargs_in) : 0;
+        PyObject **args_tmp = (PyObject **) PyObject_Malloc((nargs + nkwargs_in + 1) * sizeof(PyObject *));
         if (!args_tmp)
             return PyErr_NoMemory();
         args_tmp[0] = mb->self;
-        for (size_t i = 0; i < nargs; ++i)
+        for (size_t i = 0; i < nargs + nkwargs_in; ++i)
             args_tmp[i + 1] = args_in[i];
         result = mb->func->vectorcall((PyObject *) mb->func, args_tmp, nargs + 1, kwargs_in);
         PyObject_Free(args_tmp);

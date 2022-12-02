@@ -291,3 +291,13 @@ def test31_range(func):
         else:
             value_out = func(value)
             assert value_out == value
+
+def test33_method_on_non_nanobind_class():
+    class AClass:
+        def __init__(self):
+            self.x = 42
+    AClass.simple_method = t.test_33
+    AClass.complex_method = t.test_34
+    a = AClass()
+    assert a.simple_method(7) == 49
+    assert a.complex_method(y=2) == 84

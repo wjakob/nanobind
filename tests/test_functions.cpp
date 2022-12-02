@@ -192,4 +192,11 @@ NB_MODULE(test_functions_ext, m) {
     m.def("identity_u32", [](uint32_t i) { return i; });
     m.def("identity_i64", [](int64_t  i) { return i; });
     m.def("identity_u64", [](uint64_t i) { return i; });
+
+    m.attr("test_33") = nb::cpp_function([](nb::object self, int y) {
+        return nb::cast<int>(self.attr("x")) + y;
+    }, nb::is_method());
+    m.attr("test_34") = nb::cpp_function([](nb::object self, int y) {
+        return nb::cast<int>(self.attr("x")) * y;
+    }, nb::arg("y"), nb::is_method());
 }

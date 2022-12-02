@@ -550,7 +550,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     #undef COPY_FIELD
 
     if (temp_tp->tp_members) {
-        tp->tp_members = (PyMemberDef*)((char *)tp + tp->tp_basicsize);
+        tp->tp_members = (PyMemberDef*)((char *)tp + Py_TYPE(tp)->tp_basicsize);
         std::memcpy(tp->tp_members, temp_tp->tp_members, tp->tp_itemsize * Py_SIZE(temp_tp));
     }
 

@@ -136,5 +136,5 @@ NB_MODULE(test_tensor_ext, m) {
             });
 
             return nb::tensor<nb::numpy, float>(f, 0, shape, deleter);
-        });
+    });
 }

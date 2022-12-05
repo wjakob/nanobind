@@ -373,7 +373,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     }
     char *name_copy = NB_STRDUP(name.c_str());
 
-    constexpr size_t nb_enum_max_slots = 21,
+    constexpr size_t nb_enum_max_slots = 22,
                      nb_type_max_slots = 10,
                      nb_extra_slots = 80,
                      nb_total_slots = nb_enum_max_slots +

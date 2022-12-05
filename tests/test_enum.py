@@ -27,6 +27,9 @@ def test01_unsigned_enum():
     assert t.to_enum(0) == t.Enum.A
     assert t.to_enum(1) == t.Enum.B
     assert t.to_enum(0xffffffff) == t.Enum.C
+    assert hash(t.Enum.A) == 0
+    assert hash(t.Enum.B) == 1
+    assert hash(t.Enum.C) == -2 # -1 is an invalid hash value.
 
     with pytest.raises(RuntimeError) as excinfo:
         t.to_enum(5).__name__
@@ -51,6 +54,9 @@ def test02_signed_enum():
   assert t.from_enum(t.SEnum.A) == 0
   assert t.from_enum(t.SEnum.B) == 1
   assert t.from_enum(t.SEnum.C) == -1
+  assert hash(t.SEnum.A) == 0
+  assert hash(t.SEnum.B) == 1
+  assert hash(t.SEnum.C) == -2 # -1 is an invalid hash value.
 
 
 def test03_enum_arithmetic():

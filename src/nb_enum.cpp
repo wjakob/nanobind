@@ -200,6 +200,33 @@ int nb_enum_traverse(PyObject *o, visitproc visit, void *arg) {
     return 0;
 }
 
+Py_hash_t nb_enum_hash(PyObject *o) {
+    Py_hash_t value = 0;
+    type_data *t = nb_type_data(Py_TYPE(o));
+    if (t->flags & (uint32_t(type_flags::is_unsigned_enum) |
+                    uint32_t(type_flags::is_signed_enum))) {
+        const void *p = inst_ptr((nb_inst *) o);
+        switch (t->size) {
+            case 1: value = *(const int8_t *)  p; break;
+            case 2: value = *(const int16_t *) p; break;
+            case 4: value = *(const int32_t *) p; break;
+            case 8: value = *(const int64_t *) p; break;
+            default:
+                PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
+                return -1;
+        }
+    } else {
+        PyErr_SetString(PyExc_TypeError, "nb_enum: input is not an enumeration!");
+        return -1;
+    }
+
+    // Hash functions should return -1 when an error occurred.
+    // Return -2 that case, since hash(-1) also yields -2.
+    if (value == -1) value = -2;
+
+    return value;
+}
+
 void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
     PyType_Slot *t = *s;
 
@@ -214,6 +241,7 @@ void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
     *t++ = { Py_tp_getset, (void *) nb_enum_getset };
     *t++ = { Py_tp_traverse, (void *) nb_enum_traverse };
     *t++ = { Py_tp_clear, (void *) nb_enum_clear };
+    *t++ = { Py_tp_hash, (void *) nb_enum_hash };
 
     if (is_arithmetic) {
         *t++ = { Py_nb_add, (void *) nb_enum_add };

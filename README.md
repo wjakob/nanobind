@@ -204,8 +204,8 @@ improvements for developers:
 - When the python interpreter shuts down, _nanobind_ reports instance, type,
   and function leaks related to bindings, which is useful for tracking down
   reference counting issues.  
-  If these warnings are undesired, define the variable `NB_SUPPRESS_LEAK_WARN`
-  during compilation of the nanobind module.
+  If these warnings are undesired, call `nb::set_leak_warnings(false)` from
+  any one of the loaded extension modules.
 
 - _nanobind_ deletes its internal data structures when the Python interpreter
   terminates, which avoids memory leak reports in tools like _valgrind_.

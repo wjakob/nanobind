@@ -54,4 +54,6 @@ template <typename T> struct deleter {
     PyObject *o{nullptr};
 };
 
+void set_leak_warnings(bool print_leak_warnings) noexcept;
+
 NAMESPACE_END(NB_NAMESPACE)

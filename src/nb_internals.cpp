@@ -325,51 +325,51 @@ static void internals_cleanup() {
     bool leak = false;
 
     if (!internals_p->inst_c2p.empty()) {
-#if !defined(NB_SUPPRESS_LEAK_WARN)
-        fprintf(stderr, "nanobind: leaked %zu instances!\n",
-                internals_p->inst_c2p.size());
-#endif
+        if (internals_p->print_leak_warnings) {
+            fprintf(stderr, "nanobind: leaked %zu instances!\n",
+                    internals_p->inst_c2p.size());
+        }
         leak = true;
     }
 
     if (!internals_p->keep_alive.empty()) {
-#if !defined(NB_SUPPRESS_LEAK_WARN)
-        fprintf(stderr, "nanobind: leaked %zu keep_alive records!\n",
-                internals_p->keep_alive.size());
-#endif
+        if (internals_p->print_leak_warnings) {
+            fprintf(stderr, "nanobind: leaked %zu keep_alive records!\n",
+                    internals_p->keep_alive.size());
+        }
         leak = true;
     }
 
     if (!internals_p->type_c2p.empty()) {
-#if !defined(NB_SUPPRESS_LEAK_WARN)
-        fprintf(stderr, "nanobind: leaked %zu types!\n",
-                internals_p->type_c2p.size());
-        int ctr = 0;
-        for (const auto &kv : internals_p->type_c2p) {
-            fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
-            if (ctr++ == 10) {
-                fprintf(stderr, " - ... skipped remainder\n");
-                break;
+        if (internals_p->print_leak_warnings) {
+            fprintf(stderr, "nanobind: leaked %zu types!\n",
+                    internals_p->type_c2p.size());
+            int ctr = 0;
+            for (const auto &kv : internals_p->type_c2p) {
+                fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
+                if (ctr++ == 10) {
+                    fprintf(stderr, " - ... skipped remainder\n");
+                    break;
+                }
             }
         }
-#endif
         leak = true;
     }
 
     if (!internals_p->funcs.empty()) {
-#if !defined(NB_SUPPRESS_LEAK_WARN)
-        fprintf(stderr, "nanobind: leaked %zu functions!\n",
-                internals_p->funcs.size());
-        int ctr = 0;
-        for (void *f : internals_p->funcs) {
-            fprintf(stderr, " - leaked function \"%s\"\n",
-                    nb_func_data(f)->name);
-            if (ctr++ == 10) {
-                fprintf(stderr, " - ... skipped remainder\n");
-                break;
+        if (internals_p->print_leak_warnings) {
+            fprintf(stderr, "nanobind: leaked %zu functions!\n",
+                    internals_p->funcs.size());
+            int ctr = 0;
+            for (void *f : internals_p->funcs) {
+                fprintf(stderr, " - leaked function \"%s\"\n",
+                        nb_func_data(f)->name);
+                if (ctr++ == 10) {
+                    fprintf(stderr, " - ... skipped remainder\n");
+                    break;
+                }
             }
         }
-#endif
         leak = true;
     }
 
@@ -377,10 +377,10 @@ static void internals_cleanup() {
         delete internals_p;
         internals_p = nullptr;
     } else {
-#if !defined(NB_SUPPRESS_LEAK_WARN)
-        fprintf(stderr, "nanobind: this is likely caused by a reference "
-                        "counting issue in the binding code.\n");
-#endif
+        if (internals_p->print_leak_warnings) {
+            fprintf(stderr, "nanobind: this is likely caused by a reference "
+                            "counting issue in the binding code.\n");
+        }
 
 #if NB_ABORT_ON_LEAK == 1
         abort(); // Extra-strict behavior for the CI server

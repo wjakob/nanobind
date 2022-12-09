@@ -398,5 +398,13 @@ NB_CORE bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept;
 NB_CORE bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept;
 NB_CORE bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept;
 
+// ========================================================================
+
+/// Increase the reference count of 'o', and check that the GIL is held
+NB_CORE void incref_checked(PyObject *o) noexcept;
+
+/// Decrease the reference count of 'o', and check that the GIL is held
+NB_CORE void decref_checked(PyObject *o) noexcept;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

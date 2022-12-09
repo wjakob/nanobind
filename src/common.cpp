@@ -865,5 +865,26 @@ bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
+
+// ========================================================================
+
+void incref_checked(PyObject *o) noexcept {
+    if (!o)
+        return;
+    if (!PyGILState_Check())
+        fail("nanobind::detail::incref_check(): attempted to change the "
+             "reference count of a Python object while the GIL was not held.");
+    Py_INCREF(o);
+}
+
+void decref_checked(PyObject *o) noexcept {
+    if (!o)
+        return;
+    if (!PyGILState_Check())
+        fail("nanobind::detail::decref_check(): attempted to change the "
+             "reference count of a Python object while the GIL was not held.");
+    Py_DECREF(o);
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

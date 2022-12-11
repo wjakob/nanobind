@@ -870,7 +870,7 @@ NAMESPACE_END(detail)
 // ========================================================================
 
 void set_leak_warnings(bool print_leak_warnings) noexcept {
-    const nb_internals &internals = internals_get();
+    const detail::nb_internals &internals = internals_get();
     internals.print_leak_warnings = print_leak_warnings;
 }
 

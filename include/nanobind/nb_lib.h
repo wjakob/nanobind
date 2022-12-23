@@ -400,6 +400,14 @@ NB_CORE bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept;
 
 // ========================================================================
 
+/// Increase the reference count of 'o', and check that the GIL is held
+NB_CORE void incref_checked(PyObject *o) noexcept;
+
+/// Decrease the reference count of 'o', and check that the GIL is held
+NB_CORE void decref_checked(PyObject *o) noexcept;
+
+// ========================================================================
+
 void set_leak_warnings(bool print_leak_warnings) noexcept;
 
 NAMESPACE_END(detail)

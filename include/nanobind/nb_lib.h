@@ -408,7 +408,7 @@ NB_CORE void decref_checked(PyObject *o) noexcept;
 
 // ========================================================================
 
-void set_leak_warnings(bool print_leak_warnings) noexcept;
+NB_CORE void set_leak_warnings(bool print_leak_warnings) noexcept;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

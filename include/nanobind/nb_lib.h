@@ -398,5 +398,9 @@ NB_CORE bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept;
 NB_CORE bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept;
 NB_CORE bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept;
 
+// ========================================================================
+
+void set_leak_warnings(bool print_leak_warnings) noexcept;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -865,15 +865,17 @@ bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-NAMESPACE_END(detail)
-
 // ========================================================================
 
 void set_leak_warnings(bool print_leak_warnings) noexcept {
-    const detail::nb_internals &internals = internals_get();
+    nb_internals &internals = internals_get();
     internals.print_leak_warnings = print_leak_warnings;
 }
 
-// ========================================================================
+NAMESPACE_END(detail)
+
+void set_leak_warnings(bool print_leak_warnings) noexcept {
+    detail::set_leak_warnings(print_leak_warnings);
+}
 
 NAMESPACE_END(NB_NAMESPACE)

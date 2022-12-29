@@ -406,5 +406,9 @@ NB_CORE void incref_checked(PyObject *o) noexcept;
 /// Decrease the reference count of 'o', and check that the GIL is held
 NB_CORE void decref_checked(PyObject *o) noexcept;
 
+// ========================================================================
+
+NB_CORE void set_leak_warnings(bool value) noexcept;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

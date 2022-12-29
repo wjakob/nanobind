@@ -865,7 +865,6 @@ bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-
 // ========================================================================
 
 void incref_checked(PyObject *o) noexcept {
@@ -886,5 +885,12 @@ void decref_checked(PyObject *o) noexcept {
     Py_DECREF(o);
 }
 
+// ========================================================================
+
+void set_leak_warnings(bool value) noexcept {
+    internals_get().print_leak_warnings = value;
+}
+
 NAMESPACE_END(detail)
+
 NAMESPACE_END(NB_NAMESPACE)

@@ -200,6 +200,9 @@ struct nb_internals {
 
     /// Registered C++ -> Python exception translators
     std::vector<std::pair<exception_translator, void *>> exception_translators;
+
+    /// Boolean specifying whether to print leak warnings on exit
+    bool print_leak_warnings{true};
 };
 
 struct current_method {

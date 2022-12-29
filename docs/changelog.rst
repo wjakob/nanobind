@@ -11,7 +11,20 @@ inconvenience whenever possible.
 Version 0.1.0 (TBA)
 ----------------------------
 
-* .. TBA ..
+* Allow nanobind methods on non-nanobind classes. (PR `#104
+  <https://github.com/wjakob/nanobind/pull/104>`_).
+* Fix dangling `tp_members` pointer in type initialization. (PR `#99
+  <https://github.com/wjakob/nanobind/pull/99>`_).
+* Added a runtime setting to suppress leak warnings. (PR `#109
+  <https://github.com/wjakob/nanobind/pull/109>`_).
+* Support hashing of ``nb::enum_<..>`` instances. (PR `#106
+  <https://github.com/wjakob/nanobind/pull/106>`_).
+* Double-check GIL status when performing reference counting
+  operations in debug mode. (commit `a1b245 <https://github.com/wjakob/nanobind/commit/a1b245fcf210fbfb10d7eb19dc2dc31255d3f561>`_).
+* Fixed a reference leak that occurred when module initialization fails. (commit `adfa9e <https://github.com/wjakob/nanobind/commit/adfa9e547be5575f025d92abeae2e649a690760a>`_).
+* Improved robustness of ``nb::tensor<..>`` caster.
+  (commit `633672 <https://github.com/wjakob/nanobind/commit/633672cd154c0ef13f96fee84c2291562f4ce3d3>`_).
+* Various minor fixes and improvements.
 
 Version 0.0.9 (Nov 23, 2020)
 ----------------------------

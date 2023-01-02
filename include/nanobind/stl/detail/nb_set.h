@@ -1,5 +1,5 @@
 /*
-    nanobind/stl/details/nb_set.h: base class of set casters
+    nanobind/stl/detail/nb_set.h: base class of set casters
 
     Copyright (c) 2022 Raymond Yun Fei and Wenzel Jakob
 

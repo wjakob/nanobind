@@ -1,5 +1,5 @@
 /*
-    nanobind/nb_enum.h: enumerations used in nanobind (just rv_policy atm.)
+    nanobind/nb_enums.h: enumerations used in nanobind (just rv_policy atm.)
 
     Copyright (c) 2022 Wenzel Jakob
 

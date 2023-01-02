@@ -1,5 +1,5 @@
 /*
-    nanobind/stl/function.h: type caster for std::list<...>
+    nanobind/stl/list.h: type caster for std::list<...>
 
     Copyright (c) 2022 Wenzel Jakob
 

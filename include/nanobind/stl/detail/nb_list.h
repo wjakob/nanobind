@@ -1,5 +1,5 @@
 /*
-    nanobind/stl/details/nb_list.h: base class of list casters
+    nanobind/stl/detail/nb_list.h: base class of list casters
 
     Copyright (c) 2022 Wenzel Jakob
 

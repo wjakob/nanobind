@@ -8,8 +8,8 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.1.0 (TBA)
-----------------------------
+Version 0.1.0 (January 3, 2022)
+-------------------------------
 
 * Allow nanobind methods on non-nanobind classes. (PR `#104
   <https://github.com/wjakob/nanobind/pull/104>`_).
@@ -17,16 +17,26 @@ Version 0.1.0 (TBA)
   <https://github.com/wjakob/nanobind/pull/99>`_).
 * Added a runtime setting to suppress leak warnings. (PR `#109
   <https://github.com/wjakob/nanobind/pull/109>`_).
-* Support hashing of ``nb::enum_<..>`` instances. (PR `#106
+* Added the ability to hash ``nb::enum_<..>`` instances (PR `#106
   <https://github.com/wjakob/nanobind/pull/106>`_).
-* Double-check GIL status when performing reference counting
-  operations in debug mode. (commit `a1b245 <https://github.com/wjakob/nanobind/commit/a1b245fcf210fbfb10d7eb19dc2dc31255d3f561>`_).
-* Fixed a reference leak that occurred when module initialization fails. (commit `adfa9e <https://github.com/wjakob/nanobind/commit/adfa9e547be5575f025d92abeae2e649a690760a>`_).
-* Improved robustness of ``nb::tensor<..>`` caster.
-  (commit `633672 <https://github.com/wjakob/nanobind/commit/633672cd154c0ef13f96fee84c2291562f4ce3d3>`_).
+* Fixed the signature of ``nb::enum_<..>::export_values()``. (commit `714d17
+  <https://github.com/wjakob/nanobind/commit/714d17e71aa405c7633e0bd798a8bdb7b8916fa1>`_).
+* Double-check GIL status when performing reference counting operations in
+  debug mode. (commit `a1b245
+  <https://github.com/wjakob/nanobind/commit/a1b245fcf210fbfb10d7eb19dc2dc31255d3f561>`_).
+* Fixed a reference leak that occurred when module initialization fails.
+  (commit `adfa9e
+  <https://github.com/wjakob/nanobind/commit/adfa9e547be5575f025d92abeae2e649a690760a>`_).
+* Improved robustness of ``nb::tensor<..>`` caster. (commit `633672
+  <https://github.com/wjakob/nanobind/commit/633672cd154c0ef13f96fee84c2291562f4ce3d3>`_).
+* Upgraded the internally used ``tsl::robin_map<>`` hash table to address a
+  rare `overflow issue <https://github.com/Tessil/robin-map/issues/52>`_
+  discovered in this codebase. (commit `3b81b1
+  <https://github.com/wjakob/nanobind/commit/3b81b18577e243118a659b524d4de9500a320312>`_).
 * Various minor fixes and improvements.
+* Internals ABI version bump.
 
-Version 0.0.9 (Nov 23, 2020)
+Version 0.0.9 (Nov 23, 2022)
 ----------------------------
 
 * PyPy 7.3.10 or newer is now supported subject to `certain limitations

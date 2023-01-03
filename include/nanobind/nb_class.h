@@ -464,7 +464,7 @@ public:
         return *this;
     }
 
-    NB_INLINE void export_values() { detail::nb_enum_export(Base::m_ptr); }
+    NB_INLINE enum_ &export_values() { detail::nb_enum_export(Base::m_ptr); return *this; }
 };
 
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }

@@ -17,7 +17,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 5
+#  define NB_INTERNALS_VERSION 6
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!

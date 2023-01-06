@@ -1,14 +1,10 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/bind_map.h>
+#include <nanobind/stl/string.h>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/unordered_map.h>
 
 namespace nb = nanobind;
-
-NB_MAKE_OPAQUE(std::map<std::string, double>);
-NB_MAKE_OPAQUE(std::unordered_map<std::string, double>);
-NB_MAKE_OPAQUE(std::map<std::string, double const>);
-NB_MAKE_OPAQUE(std::unordered_map<std::string, double const>);
 
 NB_MODULE(test_bind_map_ext, m) {
     // test_map_string_double

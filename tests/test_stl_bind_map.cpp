@@ -1,8 +1,5 @@
-#include <nanobind/nanobind.h>
 #include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/string.h>
-#include <nanobind/stl/map.h>
-#include <nanobind/stl/unordered_map.h>
 
 namespace nb = nanobind;
 

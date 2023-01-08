@@ -771,7 +771,7 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
         // Fast path for integers that aren't too large (max. one 15- or 30-bit "digit")
         #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
             PyLongObject *lo = (PyLongObject *) o;
-            int size = Py_SIZE(o);
+            Py_ssize_t size = Py_SIZE(o);
 
             if (size == 0 || size == 1) {
                 digit value_d = lo->ob_digit[0];

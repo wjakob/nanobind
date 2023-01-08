@@ -1,8 +1,10 @@
 #if defined(__GNUC__)
-/// Don't warn about missing fields in PyTypeObject declarations
+// Don't warn about missing fields in PyTypeObject declarations
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #elif defined(_MSC_VER)
-#  pragma warning(disable: 4127) // conditional expression is constant (in robin_*.h)
+// Silence warnings that MSVC reports in robin_*.h
+#  pragma warning(disable: 4127) // conditional expression is constant
+#  pragma warning(disable: 4324) // structure was padded due to alignment specifier
 #endif
 
 #include <nanobind/nanobind.h>

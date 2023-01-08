@@ -6,6 +6,8 @@
 #include <nanobind/stl/shared_ptr.h>
 #include <memory>
 #include <cstring>
+#include <vector>
+#include <nanobind/stl/detail/traits.h>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -424,4 +426,13 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<Wrapper>(m, "Wrapper", nb::type_slots(wrapper_slots))
         .def(nb::init<>())
         .def_readwrite("value", &Wrapper::value);
+
+    // The following isn't tested on the Python side, we just want to make sure it compiles
+    struct NonCopyable {
+        NonCopyable() = default;
+        NonCopyable(const NonCopyable&) = delete;
+    };
+
+    using NonCopyableVec = std::vector<NonCopyable>;
+    nb::class_<NonCopyableVec>(m, "NonCopyableVec");
 }

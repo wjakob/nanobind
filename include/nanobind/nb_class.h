@@ -235,6 +235,10 @@ enum op_type : int;
 struct undefined_t;
 template <op_id id, op_type ot, typename L = undefined_t, typename R = undefined_t> struct op_;
 
+// The header file include/nanobind/stl/detail/traits.h extends this type trait
+template <typename T, typename SFINAE = int>
+struct is_copy_constructible : std::is_copy_constructible<T> { };
+
 NAMESPACE_END(detail)
 
 template <typename T, typename... Ts>
@@ -271,7 +275,7 @@ public:
         if constexpr (!std::is_same_v<Alias, T>)
             d.flags |= (uint32_t) detail::type_flags::is_trampoline;
 
-        if constexpr (std::is_copy_constructible_v<T>) {
+        if constexpr (detail::is_copy_constructible<T>::value) {
             d.flags |= (uint32_t) detail::type_flags::is_copy_constructible;
 
             if constexpr (!std::is_trivially_copy_constructible_v<T>) {
@@ -280,7 +284,7 @@ public:
             }
         }
 
-        if constexpr (std::is_move_constructible_v<T>) {
+        if constexpr (std::is_move_constructible<T>::value) {
             d.flags |= (uint32_t) detail::type_flags::is_move_constructible;
 
             if constexpr (!std::is_trivially_move_constructible_v<T>) {

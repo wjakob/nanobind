@@ -239,6 +239,9 @@ template <op_id id, op_type ot, typename L = undefined_t, typename R = undefined
 template <typename T, typename SFINAE = int>
 struct is_copy_constructible : std::is_copy_constructible<T> { };
 
+template <typename T>
+constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
+
 NAMESPACE_END(detail)
 
 template <typename T, typename... Ts>
@@ -275,7 +278,7 @@ public:
         if constexpr (!std::is_same_v<Alias, T>)
             d.flags |= (uint32_t) detail::type_flags::is_trampoline;
 
-        if constexpr (detail::is_copy_constructible<T>::value) {
+        if constexpr (detail::is_copy_constructible_v<T>) {
             d.flags |= (uint32_t) detail::type_flags::is_copy_constructible;
 
             if constexpr (!std::is_trivially_copy_constructible_v<T>) {

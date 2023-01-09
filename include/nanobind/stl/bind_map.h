@@ -9,6 +9,7 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/make_iterator.h>
+#include <nanobind/stl/detail/traits.h>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -139,10 +140,10 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args)
     cl.def("__contains__", [](const Map &, handle) -> bool { return false; });
 
     // Assignment provided only if the type is copyable
-    if constexpr(std::is_copy_assignable_v<MappedType> ||
-                 std::is_copy_constructible_v<MappedType>){
+    if constexpr(detail::is_copy_assignable_v<MappedType> ||
+                 detail::is_copy_constructible_v<MappedType>){
         // Map assignment when copy-assignable: just copy the value
-        if constexpr(std::is_copy_assignable_v<MappedType>){
+        if constexpr(detail::is_copy_assignable_v<MappedType>){
             cl.def("__setitem__", [](Map &m, const KeyType &k, const MappedType &v)
             {
                 auto it = m.find(k);

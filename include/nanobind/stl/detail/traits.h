@@ -31,12 +31,33 @@ struct is_copy_constructible<
         is_copy_constructible<typename T::value_type>::value;
 };
 
+// std::pair is copy-constructible <=> both constituents are copy-constructible
 template <typename T1, typename T2>
 struct is_copy_constructible<std::pair<T1, T2>> {
     static constexpr bool value =
-        is_copy_constructible<T1>::value ||
+        is_copy_constructible<T1>::value &&
         is_copy_constructible<T2>::value;
 };
+
+// The header file include/nanobind/stl/detail/traits.h extends this type trait
+template <typename T, typename SFINAE = int>
+struct is_copy_assignable : std::is_copy_assignable<T> { };
+
+template <typename T>
+struct is_copy_assignable<T,
+                          enable_if_t<std::is_copy_assignable_v<T> &&
+                                      std::is_same_v<typename T::value_type &,
+                                                     typename T::reference>>> {
+    static constexpr bool value = is_copy_assignable<typename T::value_type>::value;
+};
+
+template <typename T1, typename T2>
+struct is_copy_assignable<std::pair<T1, T2>> {
+    static constexpr bool value = is_copy_assignable<T1>::value && is_copy_assignable<T2>::value;
+};
+
+template <typename T>
+constexpr bool is_copy_assignable_v = is_copy_assignable<T>::value;
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

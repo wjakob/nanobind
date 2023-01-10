@@ -788,12 +788,8 @@ static PyMethodDef keep_alive_callback_def = {
 
 
 void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
-    if (!patient || patient == Py_None)
+    if (!patient || !nurse || patient == Py_None)
         return;
-
-    if (!nurse)
-        fail("nanobind::detail::keep_alive(): the 'nurse' argument must be "
-             "provided!");
 
     nb_internals &internals = internals_get();
     PyTypeObject *metaclass = Py_TYPE((PyObject *) Py_TYPE(nurse));

@@ -39,7 +39,7 @@ struct is_copy_constructible<std::pair<T1, T2>> {
         is_copy_constructible<T2>::value;
 };
 
-// The header file include/nanobind/stl/detail/traits.h extends this type trait
+// Analogous template for checking copy-assignability
 template <typename T, typename SFINAE = int>
 struct is_copy_assignable : std::is_copy_assignable<T> { };
 
@@ -53,7 +53,9 @@ struct is_copy_assignable<T,
 
 template <typename T1, typename T2>
 struct is_copy_assignable<std::pair<T1, T2>> {
-    static constexpr bool value = is_copy_assignable<T1>::value && is_copy_assignable<T2>::value;
+    static constexpr bool value =
+            is_copy_assignable<T1>::value &&
+            is_copy_assignable<T2>::value;
 };
 
 template <typename T>

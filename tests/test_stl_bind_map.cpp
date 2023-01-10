@@ -4,6 +4,8 @@
 #include <vector>
 
 #include <nanobind/stl/bind_map.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
 

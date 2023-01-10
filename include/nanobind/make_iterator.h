@@ -33,12 +33,12 @@ template <typename Iterator> struct iterator_access {
 };
 
 template <typename Iterator> struct iterator_key_access {
-    using result_type = decltype((*std::declval<Iterator &>()).first);
+    using result_type = const decltype((*std::declval<Iterator &>()).first) &;
     result_type operator()(Iterator &it) const { return (*it).first; }
 };
 
 template <typename Iterator> struct iterator_value_access {
-    using result_type = decltype((*std::declval<Iterator &>()).second);
+    using result_type = const decltype((*std::declval<Iterator &>()).second) &;
     result_type operator()(Iterator &it) const { return (*it).second; }
 };
 

@@ -357,7 +357,8 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
 
         if (t.strides) {
             for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
-                if (strides[i] != t.strides[i]) {
+                if (!((strides[i] == t.strides[i]) ||
+                      (t.shape[i] == 1 && t.strides[i] == 0))) {
                     pass_order = false;
                     break;
                 }

@@ -10,8 +10,27 @@ def test_map_string_double():
 
     assert list(mm) == ["a", "b"]
     assert "b" in mm
-    assert "c" not in mm
     assert 123 not in mm
+    assert mm["b"] == 2.5
+
+    assert "c" not in mm
+    with pytest.raises(KeyError):
+        mm["c"]
+    assert "c" not in mm
+
+    # Copy constructor
+    mm2 = t.MapStringDouble(mm)
+    assert list(mm2) == ["a", "b"]
+    assert "b" in mm2
+    assert "c" not in mm2
+    assert 123 not in mm2
+    assert mm2["b"] == 2.5
+
+    # Construction from an iterable
+    mm3 = t.MapStringDouble(
+        { "a" : 1, "b" : 2.5 })
+    assert list(mm3) == ["a", "b"]
+    assert mm3["b"] == 2.5
 
     # Check that keys, values, items are views, not merely iterable
     keys = mm.keys()
@@ -50,6 +69,25 @@ def test_map_string_double():
     assert type(keys).__qualname__ == 'MapStringDouble.KeyView'
     assert type(values).__qualname__ == 'MapStringDouble.ValueView'
     assert type(items).__qualname__ == 'MapStringDouble.ItemView'
+
+    assert t.MapStringDouble.__init__.__doc__ == \
+"""__init__(self) -> None
+__init__(self, arg: test_bind_map_ext.MapStringDouble, /) -> None
+__init__(self, arg: dict[str, float], /) -> None
+
+Overloaded function.
+
+1. ``__init__(self) -> None``
+
+Default constructor
+
+2. ``__init__(self, arg: test_bind_map_ext.MapStringDouble, /) -> None``
+
+Copy constructor
+
+3. ``__init__(self, arg: dict[str, float], /) -> None``
+
+Construct from a Python dictionary"""
 
 
 def test_map_string_double_const():

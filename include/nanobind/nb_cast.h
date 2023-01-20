@@ -209,6 +209,25 @@ template <> struct type_caster<char> {
     }
 };
 
+template <typename T, typename X> struct type_caster<typed<T, X>> {
+    using Caster = detail::make_caster<T>;
+    using T2 = typed<T, X>;
+    NB_TYPE_CASTER(T2, X::Name)
+
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        Caster c;
+        if (!c.from_python(src, flags, cleanup))
+            return false;
+        value = T2{ (T &&) c.value };
+        return true;
+    }
+
+    static handle from_cpp(const T &src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(src.value, policy, cleanup);
+    }
+};
+
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
 public:

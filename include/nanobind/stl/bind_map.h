@@ -12,6 +12,15 @@
 #include <nanobind/stl/detail/traits.h>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+
+template <typename Key, typename Value> struct dict_type_id {
+    static constexpr auto Name =
+        const_name(NB_TYPING_DICT "[") + make_caster<Key>::Name +
+        const_name(", ") + make_caster<Value>::Name + const_name("]");
+};
+
+NAMESPACE_END(detail)
 
 template <typename Map, typename... Args>
 class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
@@ -19,7 +28,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Value = typename Map::mapped_type;
 
     auto cl = class_<Map>(scope, name, std::forward<Args>(args)...)
-        .def(init<>())
+        .def(init<>(), "Default constructor")
 
         .def("__len__", &Map::size)
 
@@ -58,6 +67,16 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                 m.erase(it);
             }
         );
+
+    if constexpr (detail::is_copy_constructible_v<Map>) {
+        cl.def(init<const Map &>(), "Copy constructor");
+
+        cl.def("__init__", [](Map *m, typed<dict, detail::dict_type_id<Key, Value>> &d) {
+            new (m) Map();
+            for (auto [k, v] : d.value)
+                m->emplace(cast<Key>(k), cast<Value>(v));
+        }, "Construct from a Python dictionary");
+    }
 
     // Assignment operator for copy-assignable/copy-constructible types
     if constexpr (detail::is_copy_assignable_v<Value> ||

@@ -542,6 +542,7 @@ public:
     }
 };
 
+template <typename T, typename X> struct typed { T value; };
 
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() const {

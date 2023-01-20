@@ -383,10 +383,11 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     PyMemberDef members[2] { };
     PyType_Slot slots[nb_total_slots], *s = slots;
     PyType_Spec spec = {
-        .name = name_copy,
-        .basicsize = (int) basicsize,
-        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-        .slots = slots
+        /*.name = */name_copy,
+        /*.basicsize = */(int) basicsize,
+        /*.itemsize = */0,
+        /*.flags = */Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+        /*.slots = */slots
     };
 
     if (base)

@@ -460,6 +460,7 @@ NB_INLINE bool isinstance(handle obj) noexcept {
 
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
 NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
+NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return NB_TUPLE_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &t) { return NB_LIST_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const dict &t) { return NB_DICT_GET_SIZE(t.ptr()); }

@@ -184,6 +184,15 @@ size_t obj_len(PyObject *o) {
     return (size_t) res;
 }
 
+size_t obj_len_hint(PyObject *o) {
+    Py_ssize_t res = PyObject_LengthHint(o, 0);
+    if (res < 0) {
+        PyErr_Clear();
+        res = 0;
+    }
+    return (size_t) res;
+}
+
 PyObject *obj_repr(PyObject *o) {
     PyObject *res = PyObject_Repr(o);
     if (!res)

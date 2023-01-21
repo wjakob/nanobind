@@ -573,7 +573,9 @@ template <typename Derived> iterator api<Derived>::end() const {
 struct fast_iterator {
     using value_type = handle;
     using reference = const value_type;
+    using difference_type = std::ptrdiff_t;
 
+    fast_iterator() = default;
     fast_iterator(PyObject **value) : value(value) { }
 
     fast_iterator& operator++() { value++; return *this; }

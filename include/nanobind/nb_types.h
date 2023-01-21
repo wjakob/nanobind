@@ -450,6 +450,11 @@ private:
     mutable object m_value;
 };
 
+class iterable : public object {
+public:
+    NB_OBJECT_DEFAULT(iterable, object, "Iterable", detail::iterable_check)
+};
+
 template <typename T>
 NB_INLINE bool isinstance(handle obj) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)

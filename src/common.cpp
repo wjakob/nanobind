@@ -902,7 +902,17 @@ void set_leak_warnings(bool value) noexcept {
 
 // ========================================================================
 
-NB_CORE bool iterable_check(PyObject *o) noexcept {
+void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
+                      Py_ssize_t &stop, Py_ssize_t &step,
+                      size_t &slice_length) {
+    if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
+        detail::raise_python_error();
+    Py_ssize_t slice_length_ =
+        PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
+    slice_length = (size_t) slice_length_;
+}
+
+bool iterable_check(PyObject *o) noexcept {
 #if !defined(Py_LIMITED_API)
     return Py_TYPE(o)->tp_iter != nullptr || PySequence_Check(o);
 #else
@@ -917,18 +927,5 @@ NB_CORE bool iterable_check(PyObject *o) noexcept {
 #endif
 }
 
-// ========================================================================
-
-void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
-                      Py_ssize_t &stop, Py_ssize_t &step,
-                      size_t &slice_length) {
-    if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
-        detail::raise_python_error();
-    Py_ssize_t slice_length_ =
-        PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
-    slice_length = (size_t) slice_length_;
-}
-
 NAMESPACE_END(detail)
-
 NAMESPACE_END(NB_NAMESPACE)

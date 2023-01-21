@@ -477,6 +477,22 @@ public:
 template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }
 template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { return { }; }
 
+template <typename Source, typename Target> void implicitly_convertible() {
+    using Caster = detail::make_caster<Source>;
+
+    if constexpr (Caster::IsClass) {
+        detail::implicitly_convertible(&typeid(Source), &typeid(Target));
+    } else {
+        detail::implicitly_convertible(
+            [](PyTypeObject *, PyObject *src,
+               detail::cleanup_list *cleanup) noexcept -> bool {
+                return Caster().from_python(src, detail::cast_flags::convert,
+                                            cleanup);
+            },
+            &typeid(Target));
+    }
+}
+
 // Low level access to nanobind type objects
 inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }
 inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }

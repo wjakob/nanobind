@@ -25,6 +25,20 @@ def test_map_string_double():
     assert "c" not in mm2
     assert 123 not in mm2
     assert mm2["b"] == 2.5
+    assert mm == mm2
+    assert not (mm != mm2)
+    del mm2["b"]
+    assert not (mm == mm2)
+    assert mm != mm2
+    assert len(mm2) == 1
+    mm2.clear()
+    assert len(mm2) == 0
+
+    with pytest.warns(RuntimeWarning, match="implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed"):
+        with pytest.raises(TypeError):
+            mm2.update({"a" : "b"})
+    mm2.update({"a" : 2.5})
+    assert len(mm2) == 1
 
     # Construction from an iterable
     mm3 = t.MapStringDouble(
@@ -50,6 +64,7 @@ def test_map_string_double():
     assert len(values) == 2
     assert 1 in values
     assert 2 not in values
+
     # Check that views update when the map is updated
     mm["c"] = -1
     assert list(keys) == ["a", "b", "c"]
@@ -87,7 +102,7 @@ Copy constructor
 
 3. ``__init__(self, arg: dict[str, float], /) -> None``
 
-Construct from a Python dictionary"""
+Construct from a dictionary"""
 
 
 def test_map_string_double_const():

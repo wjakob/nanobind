@@ -500,6 +500,13 @@ public:
     slice(T start, T stop) : slice(int_(start), int_(stop), Py_None) {}
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
     slice(T start, T stop, T step) : slice(int_(start), int_(stop), int_(step)) {}
+
+    detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const {
+        Py_ssize_t start, stop, step;
+        size_t slice_length;
+        detail::slice_compute(m_ptr, size, start, stop, step, slice_length);
+        return detail::tuple(start, stop, step, slice_length);
+    }
 };
 
 class ellipsis : public object {

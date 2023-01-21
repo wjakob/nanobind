@@ -9,6 +9,7 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/make_iterator.h>
+#include <nanobind/operators.h>
 #include <nanobind/stl/detail/traits.h>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -20,6 +21,20 @@ template <typename Key, typename Value> struct dict_type_id {
         const_name(", ") + make_caster<Value>::Name + const_name("]");
 };
 
+template <typename Map, typename Key, typename Value>
+inline void map_set(Map &m, const Key &k, const Value &v) {
+    if constexpr (detail::is_copy_assignable_v<Value>) {
+        m[k] = v;
+    } else {
+        auto r = m.emplace(k, v);
+        if (!r.second) {
+            // Value is not copy-assignable. Erase and retry
+            m.erase(r.first);
+            m.emplace(k, v);
+        }
+    }
+}
+
 NAMESPACE_END(detail)
 
 template <typename Map, typename... Args>
@@ -28,7 +43,8 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Value = typename Map::mapped_type;
 
     auto cl = class_<Map>(scope, name, std::forward<Args>(args)...)
-        .def(init<>(), "Default constructor")
+        .def(init<>(),
+             "Default constructor")
 
         .def("__len__", &Map::size)
 
@@ -66,7 +82,11 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                     throw key_error();
                 m.erase(it);
             }
-        );
+        )
+
+        .def("clear", [](Map &m) { m.clear(); },
+             "Remove all items");
+
 
     if constexpr (detail::is_copy_constructible_v<Map>) {
         cl.def(init<const Map &>(), "Copy constructor");
@@ -75,24 +95,28 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
             new (m) Map();
             for (auto [k, v] : d.value)
                 m->emplace(cast<Key>(k), cast<Value>(v));
-        }, "Construct from a Python dictionary");
+        }, "Construct from a dictionary");
+
+        implicitly_convertible<dict, Map>();
     }
 
     // Assignment operator for copy-assignable/copy-constructible types
     if constexpr (detail::is_copy_assignable_v<Value> ||
                   detail::is_copy_constructible_v<Value>) {
         cl.def("__setitem__", [](Map &m, const Key &k, const Value &v) {
-            if constexpr (detail::is_copy_assignable_v<Value>) {
-                m[k] = v;
-            } else {
-                auto r = m.emplace(k, v);
-                if (!r.second) {
-                    // Value is not copy-assignable. Erase and retry
-                    m.erase(r.first);
-                    m.emplace(k, v);
-                }
-            }
+            detail::map_set<Map, Key, Value>(m, k, v);
         });
+
+        cl.def("update", [](Map &m, const Map &m2) {
+            for (auto &kv : m2)
+                detail::map_set<Map, Key, Value>(m, kv.first, kv.second);
+        },
+        "Update the map with element from `arg`");
+    }
+
+    if constexpr (detail::is_equality_comparable_v<Map>) {
+        cl.def(self == self)
+          .def(self != self);
     }
 
     // Item, value, and key views
@@ -129,9 +153,12 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
              },
              keep_alive<0, 1>());
 
-    cl.def("keys", [](Map &m)   { return new KeyView{m}; }, keep_alive<0, 1>());
-    cl.def("values", [](Map &m) { return new ValueView{m}; }, keep_alive<0, 1>());
-    cl.def("items", [](Map &m)  { return new ItemView{m}; }, keep_alive<0, 1>());
+    cl.def("keys",   [](Map &m) { return new KeyView{m};   }, keep_alive<0, 1>(),
+           "Returns an iterable view of the map's keys.");
+    cl.def("values", [](Map &m) { return new ValueView{m}; }, keep_alive<0, 1>(),
+           "Returns an iterable view of the map's values.");
+    cl.def("items",  [](Map &m) { return new ItemView{m};  }, keep_alive<0, 1>(),
+           "Returns an iterable view of the map's items.");
 
     return cl;
 }

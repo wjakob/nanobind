@@ -900,6 +900,35 @@ void set_leak_warnings(bool value) noexcept {
     internals_get().print_leak_warnings = value;
 }
 
+// ========================================================================
+
+NB_CORE bool iterable_check(PyObject *o) noexcept {
+#if !defined(Py_LIMITED_API)
+    return Py_TYPE(o)->tp_iter != nullptr || PySequence_Check(o);
+#else
+    PyObject *it = PyObject_GetIter(o);
+    if (it) {
+        Py_DECREF(it);
+        return true;
+    } else {
+        PyErr_Clear();
+        return false;
+    }
+#endif
+}
+
+// ========================================================================
+
+void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
+                      Py_ssize_t &stop, Py_ssize_t &step,
+                      size_t &slice_length) {
+    if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
+        detail::raise_python_error();
+    Py_ssize_t slice_length_ =
+        PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
+    slice_length = (size_t) slice_length_;
+}
+
 NAMESPACE_END(detail)
 
 NAMESPACE_END(NB_NAMESPACE)

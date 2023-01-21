@@ -413,5 +413,13 @@ NB_CORE void decref_checked(PyObject *o) noexcept;
 
 NB_CORE void set_leak_warnings(bool value) noexcept;
 
+// ========================================================================
+
+NB_CORE bool iterable_check(PyObject *o) noexcept;
+
+NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,
+                           Py_ssize_t &start, Py_ssize_t &stop,
+                           Py_ssize_t &step, size_t &slice_length);
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

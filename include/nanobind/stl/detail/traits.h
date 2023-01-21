@@ -61,6 +61,32 @@ struct is_copy_assignable<std::pair<T1, T2>> {
 template <typename T>
 constexpr bool is_copy_assignable_v = is_copy_assignable<T>::value;
 
+// Analogous template for checking comparability
+template<typename T> using comparable_test = decltype(std::declval<T>() == std::declval<T>());
+
+template <typename T, typename SFINAE = int>
+struct is_equality_comparable {
+    static constexpr bool value = is_detected_v<comparable_test, T>;
+};
+
+template <typename T>
+struct is_equality_comparable<T, enable_if_t<is_detected_v<comparable_test, T> &&
+                                      std::is_same_v<typename T::value_type &,
+                                                     typename T::reference>>> {
+    static constexpr bool value = is_equality_comparable<typename T::value_type>::value;
+};
+
+template <typename T1, typename T2>
+struct is_equality_comparable<std::pair<T1, T2>> {
+    static constexpr bool value =
+            is_equality_comparable<T1>::value &&
+            is_equality_comparable<T2>::value;
+};
+
+
+template <typename T>
+constexpr bool is_equality_comparable_v = is_equality_comparable<T>::value;
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 

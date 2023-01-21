@@ -1,4 +1,5 @@
 import pytest
+import sys
 
 import test_bind_map_ext as t
 
@@ -85,10 +86,15 @@ def test_map_string_double():
     assert type(values).__qualname__ == 'MapStringDouble.ValueView'
     assert type(items).__qualname__ == 'MapStringDouble.ItemView'
 
+    if sys.version_info < (3, 9):
+        d = "Dict"
+    else:
+        d = "dict"
+
     assert t.MapStringDouble.__init__.__doc__ == \
 """__init__(self) -> None
 __init__(self, arg: test_bind_map_ext.MapStringDouble, /) -> None
-__init__(self, arg: dict[str, float], /) -> None
+__init__(self, arg: %s[str, float], /) -> None
 
 Overloaded function.
 
@@ -100,9 +106,9 @@ Default constructor
 
 Copy constructor
 
-3. ``__init__(self, arg: dict[str, float], /) -> None``
+3. ``__init__(self, arg: %s[str, float], /) -> None``
 
-Construct from a dictionary"""
+Construct from a dictionary""" % (d, d)
 
 
 def test_map_string_double_const():

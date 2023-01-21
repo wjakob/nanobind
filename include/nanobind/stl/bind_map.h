@@ -46,7 +46,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
         .def(init<>(),
              "Default constructor")
 
-        .def("__len__", &Map::size)
+        .def("__len__", [](const Map &m) { return m.size(); })
 
         .def("__bool__",
              [](const Map &m) { return !m.empty(); },

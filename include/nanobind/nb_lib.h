@@ -149,7 +149,7 @@ NB_CORE void setitem(PyObject *obj, PyObject *key, PyObject *value);
 NB_CORE size_t obj_len(PyObject *o);
 
 /// Try to roughly determine the length of a Python object
-NB_CORE size_t obj_len_hint(PyObject *o);
+NB_CORE size_t obj_len_hint(PyObject *o) noexcept;
 
 /// Obtain a string representation of a Python object
 NB_CORE PyObject* obj_repr(PyObject *o);

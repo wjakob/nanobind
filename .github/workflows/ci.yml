@@ -21,10 +21,12 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'windows-2022', 'macos-latest']
-        python: ['3.8', '3.9', '3.10', '3.11', 'pypy-3.9-nightly']
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12.0-alpha.4', 'pypy-3.9-nightly']
         exclude:
           - os: 'macos-latest'
             python: 'pypy-3.9-nightly'
+          - os: 'windows-2022'
+            python: '3.12.0-alpha.4'
 
     name: "Python ${{ matrix.python }} / ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
@@ -47,13 +49,13 @@ jobs:
         python -m pip install pytest pytest-github-actions-annotate-failures
 
     - name: Install NumPy
-      if: matrix.python != 'pypy-3.9-nightly'
+      if: matrix.python != 'pypy-3.9-nightly' && matrix.python != '3.12.0-alpha.4'
       run: |
         python -m pip install numpy
 
     - name: Configure
       run: >
-        cmake -S . -B build "-DPython_EXECUTABLE=$(python3 -c 'import sys; print(sys.executable)')"
+        cmake -S . -B build "-DPython_EXECUTABLE=$(python3 -c 'import sys; print(sys.executable)')" -DNB_TEST_STABLE_ABI=ON
 
     - name: Build C++
       run: cmake --build build -j 2

@@ -184,13 +184,35 @@ size_t obj_len(PyObject *o) {
     return (size_t) res;
 }
 
-size_t obj_len_hint(PyObject *o) {
+size_t obj_len_hint(PyObject *o) noexcept {
+#if !defined(Py_LIMITED_API)
     Py_ssize_t res = PyObject_LengthHint(o, 0);
     if (res < 0) {
         PyErr_Clear();
         res = 0;
     }
     return (size_t) res;
+#else
+    PyTypeObject *tp = Py_TYPE(o);
+    lenfunc l = (lenfunc) PyType_GetSlot(tp, Py_sq_length);
+    if (!l)
+        l = (lenfunc) PyType_GetSlot(tp, Py_mp_length);
+
+    if (l) {
+        Py_ssize_t res = l(o);
+        if (res < 0) {
+            PyErr_Clear();
+            res = 0;
+        }
+        return (size_t) res;
+    }
+
+    try {
+        return cast<size_t>(handle(o).attr("__length_hint__")());
+    } catch (...) {
+        return 0;
+    }
+#endif
 }
 
 PyObject *obj_repr(PyObject *o) {
@@ -884,18 +906,22 @@ bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept {
 void incref_checked(PyObject *o) noexcept {
     if (!o)
         return;
+#if !defined(Py_LIMITED_API)
     if (!PyGILState_Check())
         fail("nanobind::detail::incref_check(): attempted to change the "
              "reference count of a Python object while the GIL was not held.");
+#endif
     Py_INCREF(o);
 }
 
 void decref_checked(PyObject *o) noexcept {
     if (!o)
         return;
+#if !defined(Py_LIMITED_API)
     if (!PyGILState_Check())
         fail("nanobind::detail::decref_check(): attempted to change the "
              "reference count of a Python object while the GIL was not held.");
+#endif
     Py_DECREF(o);
 }
 

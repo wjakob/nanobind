@@ -132,12 +132,12 @@ static PyType_Slot nb_func_slots[] = {
 };
 
 static PyType_Spec nb_func_spec = {
-    .name = "nanobind.nb_func",
-    .basicsize = (int) sizeof(nb_func),
-    .itemsize = (int) sizeof(func_data),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
-        | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
-    .slots = nb_func_slots
+    /* .name = */ "nanobind.nb_func",
+    /* .basicsize = */ (int) sizeof(nb_func),
+    /* .itemsize = */ (int) sizeof(func_data),
+    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+    /* .slots = */ nb_func_slots
 };
 
 static PyType_Slot nb_method_slots[] = {
@@ -156,13 +156,13 @@ static PyType_Slot nb_method_slots[] = {
 };
 
 static PyType_Spec nb_method_spec = {
-    .name = "nanobind.nb_method",
-    .basicsize = (int) sizeof(nb_func),
-    .itemsize = (int) sizeof(func_data),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
+    /*.name = */"nanobind.nb_method",
+    /*.basicsize = */(int) sizeof(nb_func),
+    /*.itemsize = */(int) sizeof(func_data),
+    /*.flags = */Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
         | Py_TPFLAGS_METHOD_DESCRIPTOR
         | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
-    .slots = nb_method_slots
+    /*.slots = */nb_method_slots
 };
 
 static PyMemberDef nb_bound_method_members[] = {
@@ -182,11 +182,12 @@ static PyType_Slot nb_bound_method_slots[] = {
 };
 
 static PyType_Spec nb_bound_method_spec = {
-    .name = "nanobind.nb_bound_method",
-    .basicsize = (int) sizeof(nb_bound_method),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
-        | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
-    .slots = nb_bound_method_slots
+    /* .name = */ "nanobind.nb_bound_method",
+    /* .basicsize = */ (int) sizeof(nb_bound_method),
+    /* .itemsize = */ 0,
+    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+    /* .slots = */ nb_bound_method_slots
 };
 
 static PyType_Slot nb_type_slots[] = {
@@ -198,9 +199,11 @@ static PyType_Slot nb_type_slots[] = {
 };
 
 static PyType_Spec nb_type_spec = {
-    .name = "nanobind.nb_type",
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .slots = nb_type_slots
+    /* .name = */ "nanobind.nb_type",
+    /* .basicsize = */ 0,
+    /* .itemsize = */ 0,
+    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /* .slots = */ nb_type_slots
 };
 
 static PyType_Slot nb_enum_slots[] = {
@@ -209,9 +212,11 @@ static PyType_Slot nb_enum_slots[] = {
 };
 
 static PyType_Spec nb_enum_spec = {
-    .name = "nanobind.nb_enum",
-    .flags = Py_TPFLAGS_DEFAULT,
-    .slots = nb_enum_slots
+    /*.name = */"nanobind.nb_enum",
+    /*.basicsize = */0,
+    /*.itemsize = */0,
+    /*.flags = */Py_TPFLAGS_DEFAULT,
+    /*.slots = */nb_enum_slots
 };
 
 
@@ -230,9 +235,11 @@ static PyType_Slot nb_static_property_slots[] = {
 };
 
 static PyType_Spec nb_static_property_spec = {
-    .name = "nanobind.nb_static_property",
-    .flags = Py_TPFLAGS_DEFAULT,
-    .slots = nb_static_property_slots
+    /* .name = */ "nanobind.nb_static_property",
+    /* .basicsize = */ 0,
+    /* .itemsize = */ 0,
+    /* .flags = */ Py_TPFLAGS_DEFAULT,
+    /* .slots = */ nb_static_property_slots
 };
 
 static PyMethodDef nb_tensor_methods[] = {
@@ -252,10 +259,11 @@ static PyType_Slot nb_tensor_slots[] = {
 };
 
 static PyType_Spec nb_tensor_spec = {
-    .name = "nanobind.nb_tensor",
-    .basicsize = (int) sizeof(nb_tensor),
-    .flags = Py_TPFLAGS_DEFAULT,
-    .slots = nb_tensor_slots
+    /* .name = */ "nanobind.nb_tensor",
+    /* .basicsize = */ (int) sizeof(nb_tensor),
+    /* .itemsize = */ 0,
+    /* .flags = */ Py_TPFLAGS_DEFAULT,
+    /* .slots = */ nb_tensor_slots
 };
 
 /// `nb_static_property_property.__get__()`: Always pass the class instead of the instance.

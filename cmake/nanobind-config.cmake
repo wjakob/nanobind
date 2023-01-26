@@ -117,14 +117,12 @@ function (nanobind_build_library TARGET_NAME TARGET_TYPE)
     POSITION_INDEPENDENT_CODE ON)
 
   if (MSVC)
-    # C++20 needed for designated initializers on MSVC..
-    target_compile_features(${TARGET_NAME} PRIVATE cxx_std_20)
     # Do not complain about vsnprintf
     target_compile_definitions(${TARGET_NAME} PRIVATE -D_CRT_SECURE_NO_WARNINGS)
   else()
-    target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
     target_compile_options(${TARGET_NAME} PRIVATE -fno-strict-aliasing)
   endif()
+  target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
 
   if (WIN32)
     target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)

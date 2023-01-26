@@ -828,14 +828,19 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
 
         *out = value;
         return true;
-    } else if (Recurse && (flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
-        PyObject *temp = PyNumber_Long(o);
-        if (temp) {
-            bool result = load_int<T, false>(temp, 0, out);
-            Py_DECREF(temp);
-            return result;
-        } else {
-            PyErr_Clear();
+    }
+
+    if constexpr (Recurse) {
+        if ((flags & (uint8_t)cast_flags::convert) && !PyFloat_Check(o)) {
+            PyObject* temp = PyNumber_Long(o);
+            if (temp) {
+                bool result = load_int<T, false>(temp, 0, out);
+                Py_DECREF(temp);
+                return result;
+            }
+            else {
+                PyErr_Clear();
+            }
         }
     }
 

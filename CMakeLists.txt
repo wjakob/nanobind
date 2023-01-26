@@ -56,7 +56,12 @@ endif()
 
 if (NOT TARGET Python::Module OR NOT TARGET Python::Interpreter)
     set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
-    find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
+
+    if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
+      find_package(Python 3.8 COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)
+    else()
+      find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

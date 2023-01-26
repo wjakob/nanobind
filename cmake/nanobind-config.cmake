@@ -104,7 +104,6 @@ function (nanobind_build_library TARGET_NAME TARGET_TYPE)
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
     nanobind_strip(${TARGET_NAME})
-
   endif()
 
   if ((TARGET_TYPE STREQUAL "SHARED") OR (TARGET_NAME MATCHES "-lto"))
@@ -125,7 +124,18 @@ function (nanobind_build_library TARGET_NAME TARGET_TYPE)
   target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
 
   if (WIN32)
-    target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
+    if (${TARGET_NAME} MATCHES "abi3")
+      if (NOT TARGET Python::SABIModule)
+        if (CMAKE_VERSION VERSION_LESS 3.26)
+          message(FATAL_ERROR "To build stable ABI packages on Windows, you must use CMake version 3.26 or newer!")
+        else()
+          message(FATAL_ERROR "To build stable ABI packages on Windows, you must invoke 'find_package(Python COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)' prior to including nanobind.")
+        endif()
+      endif()
+        target_link_libraries(${TARGET_NAME} PUBLIC Python::SABIModule)
+    else()
+        target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
+    endif()
   endif()
 
   target_include_directories(${TARGET_NAME} PRIVATE

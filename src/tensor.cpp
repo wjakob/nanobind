@@ -333,10 +333,10 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
     }
 
     scoped_pymalloc<int64_t> strides(t.ndim);
-    if ((req->req_order || t.strides == nullptr) && t.ndim > 0) {
+    if ((req->req_order || !t.strides) && t.ndim > 0) {
         size_t accum = 1;
 
-        if (req->req_order == 'C' || t.strides == nullptr) {
+        if (req->req_order == 'C' || !t.strides) {
             for (uint32_t i = (uint32_t) (t.ndim - 1);;) {
                 strides[i] = accum;
                 accum *= t.shape[i];
@@ -345,8 +345,6 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
                 --i;
             }
         } else if (req->req_order == 'F') {
-            pass_order &= t.strides != nullptr;
-
             for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
                 strides[i] = accum;
                 accum *= t.shape[i];
@@ -355,12 +353,17 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
             pass_order = false;
         }
 
-        if (t.strides) {
-            for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
-                if (!((strides[i] == t.strides[i]) ||
-                      (t.shape[i] == 1 && t.strides[i] == 0))) {
-                    pass_order = false;
-                    break;
+        if (req->req_order) {
+            if (!t.strides) {
+                // c-style strides assumed
+                pass_order = req->req_order == 'C';
+            } else {
+                for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
+                    if (!((strides[i] == t.strides[i]) ||
+                          (t.shape[i] == 1 && t.strides[i] == 0))) {
+                        pass_order = false;
+                        break;
+                    }
                 }
             }
         }

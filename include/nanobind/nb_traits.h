@@ -144,4 +144,14 @@ constexpr bool is_detected_v = detail::detector<void, Op, Arg>::value;
 template <typename T>
 using remove_opt_mono_t = typename detail::remove_opt_mono<T>::type;
 
+template <template <typename> typename Base, typename T>
+std::true_type is_base_of_template(const Base<T>*);
+
+template <template <typename> typename Base>
+std::false_type is_base_of_template(...);
+
+template <typename T, template <typename> typename Base>
+constexpr bool is_base_of_template_v =
+    decltype(is_base_of_template<Base>(std::declval<T *>()))::value;
+
 NAMESPACE_END(NB_NAMESPACE)

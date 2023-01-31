@@ -170,6 +170,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
             default:
                 fail = true;
         }
+
         dt.lanes = 1;
         dt.bits = (uint8_t) (view->itemsize * 8);
     }

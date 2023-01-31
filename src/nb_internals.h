@@ -76,7 +76,7 @@ struct nb_func {
 /// Python object representing a `nb_tensor` (which wraps a DLPack tensor)
 struct nb_tensor {
     PyObject_HEAD
-    PyObject *capsule;
+    tensor_handle *th;
 };
 
 /// Python object representing an `nb_method` bound to an instance (analogous to non-public PyMethod_Type)

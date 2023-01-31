@@ -17,7 +17,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 6
+#  define NB_INTERNALS_VERSION 7
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!
@@ -93,7 +93,6 @@ extern PyObject *nb_tensor_get(PyObject *, PyObject *);
 extern int nb_tensor_getbuffer(PyObject *exporter, Py_buffer *view, int);
 extern void nb_tensor_releasebuffer(PyObject *, Py_buffer *);
 extern void nb_tensor_dealloc(PyObject *self);
-extern PyObject *nb_tensor_new(PyTypeObject *, PyObject *, PyObject *);
 static PyObject *nb_static_property_get(PyObject *, PyObject *, PyObject *);
 
 #if PY_VERSION_HEX >= 0x03090000
@@ -242,15 +241,8 @@ static PyType_Spec nb_static_property_spec = {
     /* .slots = */ nb_static_property_slots
 };
 
-static PyMethodDef nb_tensor_methods[] = {
-    { "__dlpack__", (PyCFunction) nb_tensor_get, METH_NOARGS, nullptr },
-    { nullptr, nullptr, 0, nullptr}
-};
-
 static PyType_Slot nb_tensor_slots[] = {
     { Py_tp_dealloc, (void *) nb_tensor_dealloc },
-    { Py_tp_methods, (void *) nb_tensor_methods },
-    { Py_tp_new, (void *) nb_tensor_new },
 #if PY_VERSION_HEX >= 0x03090000
     { Py_bf_getbuffer, (void *) nb_tensor_getbuffer },
     { Py_bf_releasebuffer, (void *) nb_tensor_releasebuffer },

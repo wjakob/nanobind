@@ -22,28 +22,8 @@ struct tensor_handle {
     bool call_deleter;
 };
 
-PyObject *nb_tensor_new(PyTypeObject *tp, PyObject *args,
-                        PyObject *kwargs) {
-
-    allocfunc tp_alloc;
-#if defined(Py_LIMITED_API)
-    tp_alloc = (allocfunc) PyType_GetSlot(tp, Py_tp_alloc);
-#else
-    tp_alloc = tp->tp_alloc;
-#endif
-
-    PyObject* result = tp_alloc(tp, 0);
-    if (NB_TUPLE_GET_SIZE(args) != 1 || kwargs)
-        fail("nanobind::detail::nb_tensor_new(): internal error!");
-
-    PyObject *capsule = NB_TUPLE_GET_ITEM(args, 0);
-    ((nb_tensor *) result)->capsule = capsule;
-    Py_INCREF(capsule);
-    return result;
-}
-
 void nb_tensor_dealloc(PyObject *self) {
-    Py_DECREF(((nb_tensor *) self)->capsule);
+    tensor_dec_ref(((nb_tensor *) self)->th);
 
     freefunc tp_free;
 #if defined(Py_LIMITED_API)
@@ -55,20 +35,10 @@ void nb_tensor_dealloc(PyObject *self) {
     tp_free(self);
 }
 
-PyObject *nb_tensor_get(PyObject *self, PyObject *) {
-    PyObject *result = ((nb_tensor *) self)->capsule;
-    Py_INCREF(result);
-    return result;
-}
-
 int nb_tensor_getbuffer(PyObject *exporter, Py_buffer *view, int) {
     nb_tensor *self = (nb_tensor *) exporter;
 
-    void *ptr = PyCapsule_GetPointer(self->capsule, "dltensor");
-    if (!ptr)
-        fail("nanobind::tensor::nb_tensor_getbuffer(): internal error!");
-
-    dlpack::tensor &t = ((managed_tensor *) ptr)->dl_tensor;
+    dlpack::tensor &t = self->th->tensor->dl_tensor;
 
     if (t.device.device_type != device::cpu::value) {
         PyErr_SetString(PyExc_BufferError, "Only CPU-allocated tensors can be "
@@ -555,23 +525,36 @@ static void tensor_capsule_destructor(PyObject *o) {
         PyErr_Clear();
 }
 
-PyObject *tensor_wrap(tensor_handle *th, int framework) noexcept {
+PyObject *tensor_wrap(tensor_handle *th, int framework, rv_policy policy) noexcept {
     if (!th)
         return none().release().ptr();
 
-    tensor_inc_ref(th);
-    object o = steal(PyCapsule_New(th->tensor, "dltensor",
-                                   tensor_capsule_destructor)),
-           package;
+    bool copy = policy == rv_policy::copy || policy == rv_policy::move;
 
+    if ((tensor_framework) framework == tensor_framework::numpy) {
+        try {
+            object o = steal(PyType_GenericAlloc(internals_get().nb_tensor, 0));
+            if (!o.is_valid())
+                return nullptr;
+            ((nb_tensor *) o.ptr())->th = th;
+            tensor_inc_ref(th);
+
+            return module_::import_("numpy")
+                .attr("array")(o, arg("copy") = copy)
+                .release()
+                .ptr();
+        } catch (const std::exception &e) {
+            PyErr_Format(PyExc_RuntimeError,
+                         "nanobind::detail::tensor_wrap(): could not "
+                         "convert tensor to NumPy array: %s", e.what());
+            return nullptr;
+        }
+    }
+
+    object package;
     try {
         switch ((tensor_framework) framework) {
             case tensor_framework::none:
-                break;
-
-            case tensor_framework::numpy:
-                package = module_::import_("numpy");
-                o = handle(internals_get().nb_tensor)(o);
                 break;
 
             case tensor_framework::pytorch:
@@ -594,29 +577,35 @@ PyObject *tensor_wrap(tensor_handle *th, int framework) noexcept {
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_RuntimeError,
-                     "Could not import tensor framework: %s", e.what());
+                     "nanobind::detail::tensor_wrap(): could not import tensor "
+                     "framework: %s", e.what());
         return nullptr;
     }
+
+    object o = steal(PyCapsule_New(th->tensor, "dltensor",
+                                   tensor_capsule_destructor));
+
+       tensor_inc_ref(th);
 
     if (package.is_valid()) {
         try {
             o = package.attr("from_dlpack")(o);
-        } catch (...) {
-            if ((tensor_framework) framework == tensor_framework::numpy) {
-                try {
-                    // Older numpy versions
-                    o = package.attr("_from_dlpack")(o);
-                } catch (...) {
-                    try {
-                        // Yet older numpy versions
-                        o = package.attr("asarray")(o);
-                    } catch (...) {
-                        return nullptr;
-                    }
-                }
-            } else {
-                return nullptr;
-            }
+        } catch (const std::exception &e) {
+            PyErr_Format(PyExc_RuntimeError,
+                         "nanobind::detail::tensor_wrap(): could not "
+                         "import tensor: %s", e.what());
+            return nullptr;
+        }
+    }
+
+    if (copy) {
+        try {
+            o = o.attr("copy")();
+        } catch (std::exception &e) {
+            PyErr_Format(PyExc_RuntimeError,
+                         "nanobind::detail::tensor_wrap(): copy failed: %s",
+                         e.what());
+            return nullptr;
         }
     }
 

@@ -328,9 +328,9 @@ template <typename... Args> struct type_caster<tensor<Args...>> {
         return value.is_valid();
     }
 
-    static handle from_cpp(const tensor<Args...> &tensor, rv_policy,
+    static handle from_cpp(const tensor<Args...> &tensor, rv_policy policy,
                            cleanup_list *) noexcept {
-        return tensor_wrap(tensor.handle(), int(Value::Info::framework));
+        return tensor_wrap(tensor.handle(), int(Value::Info::framework), policy);
     }
 };
 

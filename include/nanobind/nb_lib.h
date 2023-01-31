@@ -371,7 +371,8 @@ NB_CORE dlpack::tensor *tensor_inc_ref(tensor_handle *) noexcept;
 NB_CORE void tensor_dec_ref(tensor_handle *) noexcept;
 
 /// Wrap a tensor_handle* into a PyCapsule
-NB_CORE PyObject *tensor_wrap(tensor_handle *, int framework) noexcept;
+NB_CORE PyObject *tensor_wrap(tensor_handle *, int framework,
+                              rv_policy policy) noexcept;
 
 // ========================================================================
 

@@ -439,4 +439,13 @@ NB_MODULE(test_classes_ext, m) {
     m.def("is_int_1", [](nb::handle h) { return nb::isinstance<int>(h); });
     m.def("is_int_2", [](nb::handle h) { return nb::isinstance<nb::int_>(h); });
     m.def("is_struct", [](nb::handle h) { return nb::isinstance<Struct>(h); });
+
+    // test33_deference
+    struct Deferential {nb::object target; };
+    nb::class_<Deferential>(m, "Deferential")
+        .def(nb::init<nb::object>())
+        .def("__eq__", [](const Deferential &self, nb::object other){
+            return self.target.equal(other);
+        })
+        .def("__hash__", [](const Deferential &self){ return nb::hash(self.target); });
 }

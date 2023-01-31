@@ -219,6 +219,13 @@ size_t obj_len_hint(PyObject *o) noexcept {
 #endif
 }
 
+Py_hash_t obj_hash(PyObject *o) {
+    Py_hash_t res = PyObject_Hash(o);
+    if (res == -1)
+        raise_python_error();
+    return res;
+}
+
 PyObject *obj_repr(PyObject *o) {
     PyObject *res = PyObject_Repr(o);
     if (!res)

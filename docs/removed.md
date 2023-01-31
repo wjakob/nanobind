@@ -16,7 +16,7 @@ Removed features include:
 - ○ _nanobind_ instances co-locate instance data with a Python object instead
   of accessing it via a _holder_ type. This is a major difference compared to
   _pybind11_, which has implications on object ownership. Shared/unique
-  pointers are still supported with some restrictions, see below for details.
+  pointers are still supported with some restrictions.
 - ○ Binding does not support C++ classes with overloaded or deleted `operator
   new` / `operator delete`.
 - ○ The ability to run several independent Python interpreters in the same
@@ -28,10 +28,6 @@ Removed features include:
   will not be reintroduced.
 - ○ Module-local types and exceptions are unsupported.
 - ○ Custom metaclasses are unsupported.
-- ● Many STL type caster have not yet been ported.
-- ● PyPy support is gone. (PyPy requires many workaround in _pybind11_ that
-  complicate the its internals. Making PyPy interoperate with _nanobind_ will
-  likely require changes to the PyPy CPython emulation layer.)
 - ◑ NumPy integration was replaced by a more general ``nb::tensor<>``
   integration that supports CPU/GPU tensors produced by various frameworks
   (NumPy, PyTorch, TensorFlow, JAX, ..).

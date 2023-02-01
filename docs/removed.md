@@ -31,8 +31,8 @@ Removed features include:
 - ◑ NumPy integration was replaced by a more general ``nb::tensor<>``
   integration that supports CPU/GPU tensors produced by various frameworks
   (NumPy, PyTorch, TensorFlow, JAX, ..).
-- ◑ Eigen integration was removed.
-- ◑ Buffer protocol functionality was removed.
+- ◑ Buffer protocol functionality (`.def_buffer()`) was removed, please use the
+  `nb::tensor` interface instead.
 - ◑ Nested exceptions are not supported.
 - ◑ Features to facilitate pickling and unpickling were removed.
 - ◑ Support for embedding the interpreter and evaluating Python code

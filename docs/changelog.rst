@@ -34,6 +34,9 @@ Version 0.1.1 (TBA)
 * Updated ``nb::make*_iterator<..>()`` so that it returns references of elements, not
   copies. (commit `8916f5
   <https://github.com/wjakob/nanobind/commit/8916f51ad1a25318b5c9fcb07c153f6b72a43bd2>`_).
+* Changed the CMake build system so that the library component
+  (``libnanobind``) is now compiled statically by default. (commit `8418a4
+  <https://github.com/wjakob/nanobind/commit/8418a4aa93d19d7b9714b8d9473539b46cbed508>`_).
 * Various minor fixes and improvements.
 * Internals ABI version bump.
 

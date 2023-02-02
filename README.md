@@ -11,8 +11,8 @@ versa. It is reminiscent of
 _[Boost.Python](https://www.boost.org/doc/libs/1_64_0/libs/python/doc/html)_
 and _[pybind11](http://github.com/pybind/pybind11)_ and uses near-identical
 syntax. In contrast to these existing tools, _nanobind_ is more _efficient_:
-bindings compile in a shorter amount of time, producing smaller binaries with
-better runtime performance.
+bindings compile in a shorter amount of time, produce smaller binaries, and
+have better runtime performance.
 
 ## Why _yet another_ binding library?
 
@@ -43,11 +43,10 @@ endless cycle.
 The following experiments analyze the performance of a very large
 function-heavy (`func`) and class-heavy (`class`) binding microbenchmark
 compiled using _Boost.Python_, _pybind11_, and _nanobind_ in both `debug` and
-size-optimized (`opt`) modes.
-A comparison with [cppyy](https://cppyy.readthedocs.io/en/latest/) (which uses
-dynamic compilation) is also shown later.
-Details on the experimental setup can be found
-[here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md).
+size-optimized (`opt`) modes. A comparison with
+[cppyy](https://cppyy.readthedocs.io/en/latest/) (which uses dynamic
+compilation) is also shown later. Details on the experimental setup can be
+found [here](https://github.com/wjakob/nanobind/blob/master/docs/benchmark.md).
 
 The first plot contrasts the **compilation time**, where "_number_ ×"
 annotations denote the amount of time spent relative to _nanobind_. As shown

@@ -1,4 +1,4 @@
-#include <nanobind/eigen.h>
+#include <nanobind/eigen/dense.h>
 
 namespace nb = nanobind;
 
@@ -82,6 +82,11 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("addMXu_4",
           [](const MatrixXuR &a,
              const MatrixXuC &b) -> MatrixXuR { return a + b; });
+
+    m.def("addMXu_5",
+          [](const nb::EigenDRef<const MatrixXuC> &a,
+             const nb::EigenDRef<const MatrixXuC> &b) -> MatrixXuC { return a + b; },
+          "a"_a.noconvert(), "b"_a.noconvert());
 
     m.def("updateV3i", [](Eigen::Ref<Eigen::Vector3i> a) { a[2] = 123; });
     m.def("updateVXi", [](Eigen::Ref<Eigen::VectorXi> a) { a[2] = 123; });

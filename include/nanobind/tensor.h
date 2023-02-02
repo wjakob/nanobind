@@ -71,6 +71,7 @@ template <size_t... Is> struct shape {
 
 struct c_contig { };
 struct f_contig { };
+struct any_contig { };
 struct numpy { };
 struct tensorflow { };
 struct pytorch { };
@@ -168,6 +169,12 @@ template <> struct tensor_arg<f_contig> {
     static constexpr size_t size = 0;
     static constexpr auto name = const_name("order='F'");
     static void apply(tensor_req &tr) { tr.req_order = 'F'; }
+};
+
+template <> struct tensor_arg<any_contig> {
+    static constexpr size_t size = 0;
+    static constexpr auto name = const_name("order='*'");
+    static void apply(tensor_req &tr) { tr.req_order = '\0'; }
 };
 
 template <typename T> struct tensor_arg<T, enable_if_t<T::is_device>> {

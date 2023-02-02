@@ -1,15 +1,15 @@
-import test_eigen_ext as t
 import pytest
 import gc
 
 try:
     import numpy as np
-    def needs_numpy(x):
+    import test_eigen_ext as t
+    def needs_numpy_and_eigen(x):
         return x
 except:
-    needs_numpy = pytest.mark.skip(reason="NumPy is required")
+    needs_numpy_and_eigen = pytest.mark.skip(reason="NumPy and Eigen are required")
 
-@needs_numpy
+@needs_numpy_and_eigen
 def test01_vector_fixed():
     a  = np.array([1, 2, 3],    dtype=np.int32)
     b  = np.array([0, 1, 2],    dtype=np.int32)
@@ -59,7 +59,7 @@ def test01_vector_fixed():
     assert 'incompatible function arguments' in str(e)
 
 
-@needs_numpy
+@needs_numpy_and_eigen
 def test02_vector_dynamic():
     a  = np.array([1, 2, 3],    dtype=np.int32)
     b  = np.array([0, 1, 2],    dtype=np.int32)
@@ -77,7 +77,7 @@ def test02_vector_dynamic():
     r = np.all(t.addVXi(x, x) == 2*x)
 
 
-@needs_numpy
+@needs_numpy_and_eigen
 def test03_update_map():
     a = np.array([1, 2, 3], dtype=np.int32)
     b = np.array([1, 2, 123], dtype=np.int32)
@@ -90,7 +90,7 @@ def test03_update_map():
     assert np.all(c == b)
 
 
-@needs_numpy
+@needs_numpy_and_eigen
 def test04_matrix():
     A = np.vander((1, 2, 3, 4,))
     At = A.T
@@ -116,7 +116,7 @@ def test04_matrix():
     assert np.all(t.addMXu_4(At, At) == At2)
 
 
-@needs_numpy
+@needs_numpy_and_eigen
 @pytest.mark.parametrize("start", (0, 10))
 def test05_matrix_large_nonsymm(start):
     A = np.uint32(np.vander(np.arange(80)))
@@ -127,6 +127,7 @@ def test05_matrix_large_nonsymm(start):
     assert np.all(t.addMXu_2(A, A) == A2)
     assert np.all(t.addMXu_3(A, A) == A2)
     assert np.all(t.addMXu_4(A, A) == A2)
+    assert np.all(t.addMXu_5(A, A) == A2)
 
     A = np.ascontiguousarray(A)
     assert A.flags['C_CONTIGUOUS']
@@ -142,9 +143,10 @@ def test05_matrix_large_nonsymm(start):
     assert np.all(t.addMXu_2(A, A) == A2)
     assert np.all(t.addMXu_3(A, A) == A2)
     assert np.all(t.addMXu_4(A, A) == A2)
+    assert np.all(t.addMXu_5(A, A) == A2)
 
 
-@needs_numpy
+@needs_numpy_and_eigen
 def test06_map():
     b = t.Buffer()
     m = b.map()

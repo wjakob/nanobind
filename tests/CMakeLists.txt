@@ -44,17 +44,19 @@ target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
 set(TEST_FILES
   common.py
-  test_functions.py
   test_classes.py
+  test_eigen.py
+  test_enum.py
+  test_exception.py
+  test_functions.py
   test_holders.py
+  test_inter_module.py
+  test_intrusive.py
+  test_make_iterator.py
   test_stl.py
   test_stl_bind_map.py
-  test_enum.py
+  test_stl_bind_vector.py
   test_tensor.py
-  test_intrusive.py
-  test_exception.py
-  test_make_iterator.py
-  test_inter_module.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

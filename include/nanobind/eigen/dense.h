@@ -1,7 +1,5 @@
 /*
-    nanobind/eigen.h: type casters for the Eigen library
-
-    The type casters in this header file can pass dense Eigen
+    nanobind/eigen/dense.h: type casters for dense Eigen
     vectors and matrices
 
     Copyright (c) 2023 Wenzel Jakob
@@ -19,6 +17,12 @@ static_assert(EIGEN_VERSION_AT_LEAST(3, 2, 7),
               "Eigen matrix support in pybind11 requires Eigen >= 3.2.7");
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
+
+/// Types for func. arguments that are compatible with various flavors of arrays
+using EigenDStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>;
+template <typename T> using EigenDRef = Eigen::Ref<T, 0, EigenDStride>;
+template <typename T> using EigenDMap = Eigen::Map<T, 0, EigenDStride>;
+
 NAMESPACE_BEGIN(detail)
 
 template <typename T>
@@ -31,8 +35,14 @@ using tensor_for_eigen_t = tensor<
         shape<(size_t) T::RowsAtCompileTime,
               (size_t) T::ColsAtCompileTime>>,
     std::conditional_t<
-        T::IsRowMajor || T::NumDimensions == 1,
-        c_contig, f_contig>
+        T::InnerStrideAtCompileTime == Eigen::Dynamic,
+        any_contig,
+        std::conditional_t<
+            T::IsRowMajor || T::NumDimensions == 1,
+            c_contig,
+            f_contig
+        >
+    >
 >;
 
 /// Any kind of Eigen class
@@ -154,9 +164,9 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_xpr_v<T>>> {
 };
 
 /// Caster for Eigen::Map<T>
-template <typename T, int MapOptions, typename StrideType>
-struct type_caster<Eigen::Map<T, MapOptions, StrideType>> {
-    using Map = Eigen::Map<T, MapOptions, StrideType>;
+template <typename T, int Options, typename StrideType>
+struct type_caster<Eigen::Map<T, Options, StrideType>> {
+    using Map = Eigen::Map<T, Options, StrideType>;
     using Tensor = tensor_for_eigen_t<Map>;
     using TensorCaster = type_caster<Tensor>;
     static constexpr auto Name = TensorCaster::Name;
@@ -188,16 +198,35 @@ struct type_caster<Eigen::Map<T, MapOptions, StrideType>> {
             rv_policy::reference, cleanup);
     }
 
+    StrideType strides() const {
+        constexpr int IS = StrideType::InnerStrideAtCompileTime,
+                      OS = StrideType::OuterStrideAtCompileTime;
+
+        int64_t inner = caster.value.stride(0),
+                outer = caster.value.stride(1);
+
+        if constexpr (T::IsRowMajor)
+            std::swap(inner, outer);
+
+        if constexpr (std::is_same_v<StrideType, Eigen::InnerStride<IS>>)
+            return StrideType(inner);
+        else if constexpr (std::is_same_v<StrideType, Eigen::OuterStride<OS>>)
+            return StrideType(outer);
+        else
+            return StrideType(outer, inner);
+    }
+
     operator Map() {
         Tensor &t = caster.value;
-        return Map(t.data(), t.shape(0), t.shape(1));
+        return Map(t.data(), t.shape(0), t.shape(1), strides());
     }
 };
 
 /// Caster for Eigen::Ref<T>
-template <typename T> struct type_caster<Eigen::Ref<T>> {
-    using Ref = Eigen::Ref<T>;
-    using Map = Eigen::Map<T>;
+template <typename T, int Options, typename StrideType>
+struct type_caster<Eigen::Ref<T, Options, StrideType>> {
+    using Ref = Eigen::Ref<T, Options, StrideType>;
+    using Map = Eigen::Map<T, Options, StrideType>;
     using MapCaster = make_caster<Map>;
     static constexpr auto Name = MapCaster::Name;
     template <typename T_> using Cast = Ref;
@@ -213,4 +242,5 @@ template <typename T> struct type_caster<Eigen::Ref<T>> {
 };
 
 NAMESPACE_END(detail)
+
 NAMESPACE_END(NB_NAMESPACE)

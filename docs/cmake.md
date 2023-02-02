@@ -67,7 +67,8 @@ it performs the following steps to produce efficient bindings.
   various data structures directly.
 
 - It statically or dynamically links against `libnanobind` depending on whether
-  the optional `NB_STATIC` parameter is provided to `nanobind_add_module()`. 
+  the optional `NB_STATIC` or `NB_SHARED` parameter are provided to
+  `nanobind_add_module()`. The default is a static build.
 
 
 ## Tutorial project

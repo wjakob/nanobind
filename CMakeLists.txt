@@ -13,7 +13,7 @@ endif()
 
 option(NB_TEST              "Compile nanobind tests?" ${NB_TEST_DEFAULT})
 option(NB_TEST_STABLE_ABI   "Test the stable ABI interface?" OFF)
-option(NB_TEST_STATIC_BUILD "Build the nanobind library statically for the test suite?" OFF)
+option(NB_TEST_SHARED_BUILD "Build a shared nanobind library for the test suite?" OFF)
 
 # ---------------------------------------------------------------------------
 # Do a release build if nothing was specified

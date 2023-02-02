@@ -218,6 +218,12 @@ function(nanobind_add_module name)
   nanobind_msvc(${name})
   nanobind_headers(${name})
 
+  if (ARG_NB_SHARED AND ARG_NB_STATIC)
+    message(FATAL_ERROR "NB_SHARED and NB_STATIC cannot be specified at the same time!")
+  elseif (NOT ARG_NB_SHARED)
+    set(ARG_NB_STATIC TRUE)
+  endif()
+
   # Limited API interface only supported in Python >= 3.12
   if ((Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 12))
     set(ARG_STABLE_ABI OFF)

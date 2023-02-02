@@ -59,7 +59,7 @@ jobs:
 
     - name: Configure
       run: >
-        cmake -S . -B build "-DPython_EXECUTABLE=$(python3 -c 'import sys; print(sys.executable)')" -DNB_TEST_STABLE_ABI=ON
+        cmake -S . -B build -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
 
     - name: Build C++
       run: cmake --build build -j 2

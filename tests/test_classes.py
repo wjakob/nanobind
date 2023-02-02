@@ -546,7 +546,6 @@ def test31_cycle():
     a.value = a
     del a
 
-
 def test32_type_checks():
     v1 = 5
     v2 = t.Struct()
@@ -554,3 +553,6 @@ def test32_type_checks():
     assert t.is_int_1(v1) and not t.is_int_1(v2)
     assert t.is_int_2(v1) and not t.is_int_2(v2)
     assert not t.is_struct(v1) and t.is_struct(v2)
+
+def test33_cycle_with_type():
+    t.Struct.foo = t.Struct()

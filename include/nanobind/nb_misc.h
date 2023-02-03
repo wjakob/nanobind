@@ -58,4 +58,8 @@ inline void set_leak_warnings(bool value) noexcept {
     detail::set_leak_warnings(value);
 }
 
+inline void set_implicit_cast_warnings(bool value) noexcept {
+    detail::set_implicit_cast_warnings(value);
+}
+
 NAMESPACE_END(NB_NAMESPACE)

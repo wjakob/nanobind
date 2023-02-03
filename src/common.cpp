@@ -931,6 +931,10 @@ void set_leak_warnings(bool value) noexcept {
     internals_get().print_leak_warnings = value;
 }
 
+void set_implicit_cast_warnings(bool value) noexcept {
+    internals_get().print_implicit_cast_warnings = value;
+}
+
 // ========================================================================
 
 void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,

@@ -10,6 +10,7 @@ def test01_vector_int():
     # test construction from a generator
     v_int1 = t.VectorInt(x for x in range(5))
     assert t.VectorInt(v_int1) == t.VectorInt([0, 1, 2, 3, 4])
+    assert repr(v_int1) == "test_bind_vector_ext.VectorInt([0, 1, 2, 3, 4])"
 
     v_int2 = t.VectorInt([0, 0])
     assert v_int == v_int2
@@ -121,8 +122,6 @@ def test05_vector_slicing():
         del l1c[s]
         del l2c[s]
         l2c = list(l2c)
-        print(repr(l1c))
-        print(repr(l2c))
         assert l1c == l2c
 
     check_same(slice(1, 13, 4))

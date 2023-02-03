@@ -52,6 +52,11 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
              [](const Map &m) { return !m.empty(); },
              "Check whether the map is nonempty")
 
+        .def("__repr__",
+             [](handle_t<Map> h) {
+                return steal<str>(detail::repr_map(h.ptr()));
+             })
+
         .def("__contains__",
              [](const Map &m, const Key &k) { return m.find(k) != m.end(); })
 

@@ -419,9 +419,16 @@ NB_CORE void set_implicit_cast_warnings(bool value) noexcept;
 
 NB_CORE bool iterable_check(PyObject *o) noexcept;
 
+// ========================================================================
+
 NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,
                            Py_ssize_t &start, Py_ssize_t &stop,
                            Py_ssize_t &step, size_t &slice_length);
+
+// ========================================================================
+
+NB_CORE PyObject *repr_list(PyObject *o);
+NB_CORE PyObject *repr_map(PyObject *o);
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

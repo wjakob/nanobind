@@ -51,6 +51,10 @@ public:                                                                        \
             detail::obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
     }
 
+#define NB_API_OP_2_IO(name)                                                   \
+    template <typename T> NB_INLINE decltype(auto) name(const api<T> &o) {     \
+        return operator=(handle::name(o));                                     \
+    }
 
 // A few forward declarations
 class object;
@@ -220,6 +224,16 @@ public:
         temp.dec_ref();
         return *this;
     }
+
+    NB_API_OP_2_IO(operator+=)
+    NB_API_OP_2_IO(operator-=)
+    NB_API_OP_2_IO(operator*=)
+    NB_API_OP_2_IO(operator/=)
+    NB_API_OP_2_IO(operator|=)
+    NB_API_OP_2_IO(operator&=)
+    NB_API_OP_2_IO(operator^=)
+    NB_API_OP_2_IO(operator<<=)
+    NB_API_OP_2_IO(operator>>=)
 };
 
 template <typename T> NB_INLINE T borrow(handle h) {
@@ -670,3 +684,4 @@ NAMESPACE_END(NB_NAMESPACE)
 #undef NB_API_OP_1
 #undef NB_API_OP_2
 #undef NB_API_OP_2_I
+#undef NB_API_OP_2_IO

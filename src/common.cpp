@@ -962,5 +962,34 @@ bool iterable_check(PyObject *o) noexcept {
 #endif
 }
 
+// ========================================================================
+
+NB_CORE PyObject *repr_list(PyObject *o) {
+    object s = steal(nb_inst_name(o));
+    s += str("([");
+    size_t len = obj_len(o);
+    for (size_t i = 0; i < len; ++i) {
+        s += repr(handle(o)[i]);
+        if (i + 1 < len)
+            s += str(", ");
+    }
+    s += str("])");
+    return s.release().ptr();
+}
+
+NB_CORE PyObject *repr_map(PyObject *o) {
+    object s = steal(nb_inst_name(o));
+    s += str("({");
+    bool first = true;
+    for (handle kv : handle(o).attr("items")()) {
+        if (!first)
+            s += str(", ");
+        s += repr(kv[0]) + str(": ") + repr(kv[1]);
+        first = false;
+    }
+    s += str("})");
+    return s.release().ptr();
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -57,6 +57,11 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
              [](const Vector &v) { return !v.empty(); },
              "Check whether the vector is nonempty")
 
+        .def("__repr__",
+             [](handle_t<Vector> h) {
+                return steal<str>(detail::repr_list(h.ptr()));
+             })
+
         .def("__iter__",
              [](Vector &v) {
                  return make_iterator(type<Vector>(), "Iterator",

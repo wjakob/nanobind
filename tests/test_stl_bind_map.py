@@ -34,6 +34,7 @@ def test_map_string_double():
     assert len(mm2) == 1
     mm2.clear()
     assert len(mm2) == 0
+    assert repr(mm) == "test_bind_map_ext.MapStringDouble({'a': 1.0, 'b': 2.5})"
 
     with pytest.warns(RuntimeWarning, match="implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed"):
         with pytest.raises(TypeError):
@@ -80,7 +81,6 @@ def test_map_string_double():
     assert list(um.keys()) == list(um)
     assert sorted(list(um.items())) == [("ua", 1.1), ("ub", 2.6)]
     assert list(zip(um.keys(), um.values())) == list(um.items())
-    assert "UnorderedMapStringDouble" in str(um)
 
     assert type(keys).__qualname__ == 'MapStringDouble.KeyView'
     assert type(values).__qualname__ == 'MapStringDouble.ValueView'

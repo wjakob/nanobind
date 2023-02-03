@@ -157,6 +157,10 @@ template <typename D> accessor<str_attr> api<D>::attr(const char *key) const {
     return { derived(), key };
 }
 
+template <typename D> accessor<str_attr> api<D>::doc() const {
+    return { derived(), "__doc__" };
+}
+
 template <typename D> accessor<obj_item> api<D>::operator[](handle key) const {
     return { derived(), borrow(key) };
 }

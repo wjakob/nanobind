@@ -96,6 +96,7 @@ public:
 
     accessor<obj_attr> attr(handle key) const;
     accessor<str_attr> attr(const char *key) const;
+    accessor<str_attr> doc() const;
 
     accessor<obj_item> operator[](handle key) const;
     accessor<str_item> operator[](const char *key) const;

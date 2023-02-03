@@ -15,6 +15,8 @@ struct my_call_guard {
 int test_31(int i) noexcept { return i; }
 
 NB_MODULE(test_functions_ext, m) {
+    m.doc() = "function testcase";
+
     // Function without inputs/outputs
     m.def("test_01", []() { });
 

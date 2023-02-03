@@ -33,7 +33,6 @@ def test04_overloads():
     assert t.test_05(0) == 1
     assert t.test_05(0.0) == 2
 
-
 def test05_signature():
     assert t.test_01.__doc__ == 'test_01() -> None'
     assert t.test_02.__doc__ == 'test_02(j: int = 8, k: int = 1) -> int'
@@ -301,3 +300,7 @@ def test33_method_on_non_nanobind_class():
     a = AClass()
     assert a.simple_method(7) == 49
     assert a.complex_method(y=2) == 84
+
+
+def test34_module_docstring():
+    assert t.__doc__ == 'function testcase'

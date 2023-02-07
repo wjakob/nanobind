@@ -204,7 +204,7 @@ public:
       return temp;
     }
 
-    void clear() {
+    void reset() {
         dec_ref();
         m_ptr = nullptr;
     }

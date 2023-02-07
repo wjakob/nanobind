@@ -63,7 +63,7 @@ template <typename Value_, typename Entry> struct list_caster {
                 handle h = Caster::from_cpp(forward_like<T>(value), policy, cleanup);
 
                 if (!h.is_valid()) {
-                    ret.clear();
+                    ret.reset();
                     break;
                 }
 

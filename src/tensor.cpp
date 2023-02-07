@@ -256,7 +256,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
                 if (package.is_valid())
                     capsule = package.attr("to_dlpack")(handle(o));
             } catch (...) {
-                capsule.clear();
+                capsule.reset();
             }
         }
 
@@ -380,7 +380,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
             } else if (strncmp(module_name, "jaxlib", 6) == 0) {
                 converted = handle(o).attr("astype")(dtype);
             }
-        } catch (...) { converted.clear(); }
+        } catch (...) { converted.reset(); }
 
         // Potentially try again recursively
         if (!converted.is_valid())

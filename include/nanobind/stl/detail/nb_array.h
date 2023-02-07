@@ -47,7 +47,7 @@ template <typename Value_, typename Entry, size_t Size> struct array_caster {
                 handle h = Caster::from_cpp(forward_like<T>(value), policy, cleanup);
 
                 if (!h.is_valid()) {
-                    ret.clear();
+                    ret.reset();
                     break;
                 }
 

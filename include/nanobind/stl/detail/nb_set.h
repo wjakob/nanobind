@@ -62,7 +62,7 @@ template <typename Value_, typename Key> struct set_caster {
                     KeyCaster::from_cpp(forward_like<T>(key), policy, cleanup));
 
                 if (!k.is_valid() || PySet_Add(ret.ptr(), k.ptr()) != 0) {
-                    ret.clear();
+                    ret.reset();
                     break;
                 }
             }

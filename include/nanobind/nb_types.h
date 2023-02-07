@@ -298,13 +298,13 @@ public:
 class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, "capsule", PyCapsule_CheckExact)
 
-    capsule(const void *ptr, void (*free)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, nullptr, free);
+    capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
+        m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
     }
 
     capsule(const void *ptr, const char *name,
-            void (*free)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, name, free);
+            void (*cleanup)(void *) noexcept = nullptr) {
+        m_ptr = detail::capsule_new(ptr, name, cleanup);
     }
 
     void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }
@@ -340,11 +340,11 @@ class str : public object {
     explicit str(handle h)
         : object(detail::str_from_obj(h.ptr()), detail::steal_t{}) { }
 
-    explicit str(const char *c)
-        : object(detail::str_from_cstr(c), detail::steal_t{}) { }
+    explicit str(const char *s)
+        : object(detail::str_from_cstr(s), detail::steal_t{}) { }
 
-    explicit str(const char *c, size_t n)
-        : object(detail::str_from_cstr_and_size(c, n), detail::steal_t{}) { }
+    explicit str(const char *s, size_t n)
+        : object(detail::str_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
     const char *c_str() { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };
@@ -355,11 +355,11 @@ class bytes : public object {
     explicit bytes(handle h)
         : object(detail::bytes_from_obj(h.ptr()), detail::steal_t{}) { }
 
-    explicit bytes(const char *c)
-        : object(detail::bytes_from_cstr(c), detail::steal_t{}) { }
+    explicit bytes(const char *s)
+        : object(detail::bytes_from_cstr(s), detail::steal_t{}) { }
 
-    explicit bytes(const char *c, size_t n)
-        : object(detail::bytes_from_cstr_and_size(c, n), detail::steal_t{}) { }
+    explicit bytes(const char *s, size_t n)
+        : object(detail::bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
     const char *c_str() { return PyBytes_AsString(m_ptr); }
 
@@ -482,8 +482,8 @@ NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
 NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
 NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return NB_TUPLE_GET_SIZE(t.ptr()); }
-NB_INLINE size_t len(const list &t) { return NB_LIST_GET_SIZE(t.ptr()); }
-NB_INLINE size_t len(const dict &t) { return NB_DICT_GET_SIZE(t.ptr()); }
+NB_INLINE size_t len(const list &l) { return NB_LIST_GET_SIZE(l.ptr()); }
+NB_INLINE size_t len(const dict &d) { return NB_DICT_GET_SIZE(d.ptr()); }
 
 inline void print(handle value, handle end = handle(), handle file = handle()) {
     detail::print(value.ptr(), end.ptr(), file.ptr());
@@ -622,9 +622,9 @@ public:
     using value_type = std::pair<handle, handle>;
     using reference = const value_type;
 
-    dict_iterator() : obj(handle()), pos(-1) { }
+    dict_iterator() : h(), pos(-1) { }
 
-    dict_iterator(handle obj) : obj(obj), pos(0) {
+    dict_iterator(handle h) : h(h), pos(0) {
         increment();
     }
 
@@ -640,7 +640,7 @@ public:
     }
 
     void increment() {
-        if (PyDict_Next(obj.ptr(), &pos, &key, &value) == 0)
+        if (PyDict_Next(h.ptr(), &pos, &key, &value) == 0)
             pos = -1;
     }
 
@@ -650,7 +650,7 @@ public:
     friend bool operator!=(const dict_iterator &a, const dict_iterator &b) { return a.pos != b.pos; }
 
 private:
-    handle obj;
+    handle h;
     Py_ssize_t pos;
     PyObject *key = nullptr, *value = nullptr;
 };

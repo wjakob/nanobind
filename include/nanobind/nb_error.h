@@ -27,9 +27,9 @@ public:
     /// Move the error back into the Python domain
     void restore() noexcept;
 
-    const handle type() const { return m_type; }
-    const handle value() const { return m_value; }
-    const handle trace() const { return m_trace; }
+    handle type() const { return m_type; }
+    handle value() const { return m_value; }
+    handle trace() const { return m_trace; }
 
     const char *what() const noexcept override;
 
@@ -82,8 +82,8 @@ template <typename T>
 class exception : public object {
     NB_OBJECT_DEFAULT(exception, object, "Exception", PyExceptionClass_Check)
 
-    exception(handle mod, const char *name, handle base = PyExc_Exception)
-        : object(detail::exception_new(mod.ptr(), name, base.ptr()),
+    exception(handle scope, const char *name, handle base = PyExc_Exception)
+        : object(detail::exception_new(scope.ptr(), name, base.ptr()),
                  detail::steal_t()) {
         detail::register_exception_translator(
             [](const std::exception_ptr &p, void *payload) {

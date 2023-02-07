@@ -56,19 +56,19 @@ void fail(const char *fmt, ...) noexcept {
 }
 
 PyObject *capsule_new(const void *ptr, const char *name,
-        void (*free)(void *) noexcept) noexcept {
-    auto capsule_free = [](PyObject *o) {
-        auto free_2 = (void (*)(void *))(PyCapsule_GetContext(o));
-        if (free_2)
-            free_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
+        void (*cleanup)(void *) noexcept) noexcept {
+    auto capsule_cleanup = [](PyObject *o) {
+        auto cleanup_2 = (void (*)(void *))(PyCapsule_GetContext(o));
+        if (cleanup_2)
+            cleanup_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
     };
 
-    PyObject *c = PyCapsule_New((void *) ptr, name, capsule_free);
+    PyObject *c = PyCapsule_New((void *) ptr, name, capsule_cleanup);
 
     if (!c)
         fail("nanobind::detail::capsule_new(): allocation failed!");
 
-    if (PyCapsule_SetContext(c, (void *) free) != 0)
+    if (PyCapsule_SetContext(c, (void *) cleanup) != 0)
         fail("nanobind::detail::capsule_new(): could not set context!");
 
     return c;

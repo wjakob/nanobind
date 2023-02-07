@@ -44,9 +44,15 @@ endfunction()
 # Create shared/static library targets for nanobind's non-templated core
 # ---------------------------------------------------------------------------
 
-function (nanobind_build_library TARGET_NAME TARGET_TYPE)
+function (nanobind_build_library TARGET_NAME)
   if (TARGET ${TARGET_NAME})
     return()
+  endif()
+
+  if (TARGET_NAME MATCHES "-static")
+    set (TARGET_TYPE STATIC)
+  else()
+    set (TARGET_TYPE SHARED)
   endif()
 
   add_library(${TARGET_NAME} ${TARGET_TYPE}
@@ -121,27 +127,23 @@ function (nanobind_build_library TARGET_NAME TARGET_TYPE)
   else()
     target_compile_options(${TARGET_NAME} PRIVATE -fno-strict-aliasing)
   endif()
-  target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
 
   if (WIN32)
     if (${TARGET_NAME} MATCHES "abi3")
-      if (NOT TARGET Python::SABIModule)
-        if (CMAKE_VERSION VERSION_LESS 3.26)
-          message(FATAL_ERROR "To build stable ABI packages on Windows, you must use CMake version 3.26 or newer!")
-        else()
-          message(FATAL_ERROR "To build stable ABI packages on Windows, you must invoke 'find_package(Python COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)' prior to including nanobind.")
-        endif()
-      endif()
-        target_link_libraries(${TARGET_NAME} PUBLIC Python::SABIModule)
+      target_link_libraries(${TARGET_NAME} PUBLIC Python::SABIModule)
     else()
-        target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
+      target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
     endif()
   endif()
 
   target_include_directories(${TARGET_NAME} PRIVATE
-    ${NB_DIR}/include
-    ${NB_DIR}/ext/robin_map/include
-    ${Python_INCLUDE_DIRS})
+    ${NB_DIR}/ext/robin_map/include)
+
+  target_include_directories(${TARGET_NAME} PUBLIC
+    ${Python_INCLUDE_DIRS}
+    ${NB_DIR}/include)
+
+  target_compile_features(${TARGET_NAME} PUBLIC cxx_std_17)
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -182,41 +184,32 @@ function(nanobind_extension_abi3 name)
   set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ".abi3${ext}")
 endfunction()
 
-function (nanobind_cpp17 name)
-  target_compile_features(${name} PRIVATE cxx_std_17)
-  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
-endfunction()
-
-function (nanobind_msvc)
-  if (MSVC)
-    target_compile_options(${name} PRIVATE /bigobj /MP)
-  endif()
-endfunction()
-
 function (nanobind_lto name)
   set_target_properties(${name} PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
     INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 endfunction()
 
-function (nanobind_headers name)
-  target_include_directories(${name} PRIVATE ${NB_DIR}/include)
+function (nanobind_compile_options)
+  if (MSVC)
+    target_compile_options(${name} PRIVATE /bigobj /MP)
+  endif()
+endfunction()
+
+function (nanobind_link_options name)
+  if (APPLE)
+    target_link_options(${name} PRIVATE -undefined suppress -flat_namespace)
+  endif()
 endfunction()
 
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;STABLE_ABI;NOSTRIP;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO" "" "")
 
-  if (APPLE)
-    add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
-    target_include_directories(${name} PUBLIC ${Python_INCLUDE_DIRS})
-    target_link_options(${name} PRIVATE -undefined suppress -flat_namespace)
-  else()
-    Python_add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
-  endif()
+  add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
-  nanobind_cpp17(${name})
-  nanobind_msvc(${name})
-  nanobind_headers(${name})
+  nanobind_compile_options(${name})
+  nanobind_link_options(${name})
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
   if (ARG_NB_SHARED AND ARG_NB_STATIC)
     message(FATAL_ERROR "NB_SHARED and NB_STATIC cannot be specified at the same time!")
@@ -224,36 +217,46 @@ function(nanobind_add_module name)
     set(ARG_NB_STATIC TRUE)
   endif()
 
-  # Limited API interface only supported in Python >= 3.12
-  if ((Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 12))
+  # Stable ABI interface requires Python >= 3.12
+  if (ARG_STABLE_ABI AND (Python_VERSION_MAJOR EQUAL 3) AND (Python_VERSION_MINOR LESS 12))
     set(ARG_STABLE_ABI OFF)
   endif()
 
-  if (ARG_STABLE_ABI)
-    if (ARG_NB_STATIC)
-      nanobind_build_library(nanobind-static-abi3 STATIC)
-      set(libname nanobind-static-abi3)
-    else()
-      nanobind_build_library(nanobind-abi3 SHARED)
-      set(libname nanobind-abi3)
-    endif()
+  # Stable API interface requires CPython (PyPy isn't supported)
+  if (ARG_STABLE_ABI AND NOT (Python_INTERPRETER_ID STREQUAL "Python"))
+    set(ARG_STABLE_ABI OFF)
+  endif()
 
+  # On Windows, use of the stable ABI requires a very recent CMake version
+  if (ARG_STABLE_API AND WIN32 AND NOT TARGET Python::SABIModule)
+    if (CMAKE_VERSION VERSION_LESS 3.26)
+      message(WARNING "To build stable ABI packages on Windows, you must use CMake version 3.26 or newer!")
+    else()
+      message(WARNING "To build stable ABI packages on Windows, you must invoke 'find_package(Python COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)' prior to including nanobind.")
+    endif()
+    set(ARG_STABLE_ABI OFF)
+  endif()
+
+  set(libname "nanobind")
+  if (ARG_NB_STATIC)
+    set(libname "${libname}-static")
+  endif()
+
+  if (ARG_STABLE_ABI)
+    set(libname "${libname}-abi3")
+  endif()
+
+  # Shared builds always use LTO for release builds of the library component
+  if (ARG_LTO AND NOT ARG_NB_STATIC)
+    set(libname "${libname}-lto")
+  endif()
+
+  nanobind_build_library(${libname})
+
+  if (ARG_STABLE_ABI)
     target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
     nanobind_extension_abi3(${name})
   else()
-    if (ARG_NB_STATIC)
-      if (ARG_LTO)
-        nanobind_build_library(nanobind-static-lto STATIC)
-        set(libname nanobind-static-lto)
-      else()
-        nanobind_build_library(nanobind-static STATIC)
-        set(libname nanobind-static)
-      endif()
-    else()
-      nanobind_build_library(nanobind SHARED)
-      set(libname nanobind)
-    endif()
-
     nanobind_extension(${name})
   endif()
 

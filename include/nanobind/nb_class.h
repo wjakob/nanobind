@@ -147,56 +147,6 @@ NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
     t.supplement = (void *) malloc(sizeof(T));
 }
 
-template <typename... Args> struct init {
-    template <typename Class, typename... Extra>
-    NB_INLINE static void execute(Class &cl, const Extra&... extra) {
-        using Type = typename Class::Type;
-        using Alias = typename Class::Alias;
-        static_assert(
-            make_caster<Type>::IsClass,
-            "Attempted to create a constructor for a type that won't be "
-            "handled by the nanobind's class type caster. Is it possible that "
-            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
-
-        cl.def(
-            "__init__",
-            [](Type *v, Args... args) {
-                new ((Alias *) v) Alias{ (forward_t<Args>) args... };
-            },
-            extra...);
-    }
-};
-
-template <typename Arg> struct init_implicit {
-    template <typename Class, typename... Extra>
-    NB_INLINE static void execute(Class &cl, const Extra&... extra) {
-        using Type = typename Class::Type;
-        using Alias = typename Class::Alias;
-        using Caster = make_caster<Arg>;
-        static_assert(
-            make_caster<Type>::IsClass,
-            "Attempted to create a constructor for a type that won't be "
-            "handled by the nanobind's class type caster. Is it possible that "
-            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
-
-        cl.def(
-            "__init__",
-            [](Type *v, Arg arg) {
-                new ((Alias *) v) Alias{ (forward_t<Arg>) arg };
-            }, is_implicit(), extra...);
-
-        if constexpr (!Caster::IsClass) {
-            implicitly_convertible(
-                [](PyTypeObject *, PyObject *src,
-                   cleanup_list *cleanup) noexcept -> bool {
-                    return Caster().from_python(src, cast_flags::convert,
-                                                cleanup);
-                },
-                &typeid(Type));
-        }
-    }
-};
-
 template <typename T> void wrap_copy(void *dst, const void *src) {
     new ((T *) dst) T(*(const T *) src);
 }
@@ -243,6 +193,64 @@ template <typename T>
 constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
 
 NAMESPACE_END(detail)
+
+template <typename... Args> struct init {
+    template <typename T, typename... Ts> friend class class_;
+    NB_INLINE init() {}
+
+private:
+    template <typename Class, typename... Extra>
+    NB_INLINE static void execute(Class &cl, const Extra&... extra) {
+        using Type = typename Class::Type;
+        using Alias = typename Class::Alias;
+        static_assert(
+            detail::make_caster<Type>::IsClass,
+            "Attempted to create a constructor for a type that won't be "
+            "handled by the nanobind's class type caster. Is it possible that "
+            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
+
+        cl.def(
+            "__init__",
+            [](Type *v, Args... args) {
+                new ((Alias *) v) Alias{ (detail::forward_t<Args>) args... };
+            },
+            extra...);
+    }
+};
+
+template <typename Arg> struct init_implicit {
+    template <typename T, typename... Ts> friend class class_;
+    NB_INLINE init_implicit() { }
+
+private:
+    template <typename Class, typename... Extra>
+    NB_INLINE static void execute(Class &cl, const Extra&... extra) {
+        using Type = typename Class::Type;
+        using Alias = typename Class::Alias;
+        using Caster = detail::make_caster<Arg>;
+        static_assert(
+            detail::make_caster<Type>::IsClass,
+            "Attempted to create a constructor for a type that won't be "
+            "handled by the nanobind's class type caster. Is it possible that "
+            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
+
+        cl.def(
+            "__init__",
+            [](Type *v, Arg arg) {
+                new ((Alias *) v) Alias{ (detail::forward_t<Arg>) arg };
+            }, is_implicit(), extra...);
+
+        if constexpr (!Caster::IsClass) {
+            detail::implicitly_convertible(
+                [](PyTypeObject *, PyObject *src,
+                   detail::cleanup_list *cleanup) noexcept -> bool {
+                    return Caster().from_python(
+                        src, detail::cast_flags::convert, cleanup);
+                },
+                &typeid(Type));
+        }
+    }
+};
 
 template <typename T, typename... Ts>
 class class_ : public object {
@@ -318,14 +326,13 @@ public:
     }
 
     template <typename... Args, typename... Extra>
-    NB_INLINE class_ &def(detail::init<Args...> init, const Extra &... extra) {
+    NB_INLINE class_ &def(init<Args...> &&init, const Extra &... extra) {
         init.execute(*this, extra...);
         return *this;
     }
 
-    template <typename... Args, typename... Extra>
-    NB_INLINE class_ &def(detail::init_implicit<Args...> init,
-                          const Extra &... extra) {
+    template <typename Arg, typename... Extra>
+    NB_INLINE class_ &def(init_implicit<Arg> &&init, const Extra &... extra) {
         init.execute(*this, extra...);
         return *this;
     }
@@ -473,9 +480,6 @@ public:
 
     NB_INLINE enum_ &export_values() { detail::nb_enum_export(Base::m_ptr); return *this; }
 };
-
-template <typename... Args> NB_INLINE detail::init<Args...> init() { return { }; }
-template <typename Arg> NB_INLINE detail::init_implicit<Arg> init_implicit() { return { }; }
 
 template <typename Source, typename Target> void implicitly_convertible() {
     using Caster = detail::make_caster<Source>;

@@ -130,9 +130,13 @@ NB_CORE PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept;
 NB_CORE void getattr_or_raise(PyObject *obj, const char *key, PyObject **out);
 NB_CORE void getattr_or_raise(PyObject *obj, PyObject *key, PyObject **out);
 
-/// Set an object attribute / item
+/// Set an object attribute or raise an exception
 NB_CORE void setattr(PyObject *obj, const char *key, PyObject *value);
 NB_CORE void setattr(PyObject *obj, PyObject *key, PyObject *value);
+
+/// Delete an object attribute or raise an exception
+NB_CORE void delattr(PyObject *obj, const char *key);
+NB_CORE void delattr(PyObject *obj, PyObject *key);
 
 // ========================================================================
 

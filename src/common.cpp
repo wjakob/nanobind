@@ -384,6 +384,18 @@ void setattr(PyObject *obj, PyObject *key, PyObject *value) {
         raise_python_error();
 }
 
+void delattr(PyObject *obj, const char *key) {
+    int rv = PyObject_DelAttrString(obj, key);
+    if (rv)
+        raise_python_error();
+}
+
+void delattr(PyObject *obj, PyObject *key) {
+    int rv = PyObject_DelAttr(obj, key);
+    if (rv)
+        raise_python_error();
+}
+
 // ========================================================================
 
 void getitem_or_raise(PyObject *obj, Py_ssize_t key, PyObject **out) {

@@ -244,36 +244,44 @@ template <typename T> NB_INLINE T steal(handle h) {
     return { h, detail::steal_t() };
 }
 
-inline bool hasattr(handle obj, const char *key) noexcept {
-    return PyObject_HasAttrString(obj.ptr(), key);
+inline bool hasattr(handle h, const char *key) noexcept {
+    return PyObject_HasAttrString(h.ptr(), key);
 }
 
-inline bool hasattr(handle obj, handle key) noexcept {
-    return PyObject_HasAttr(obj.ptr(), key.ptr());
+inline bool hasattr(handle h, handle key) noexcept {
+    return PyObject_HasAttr(h.ptr(), key.ptr());
 }
 
-inline object getattr(handle obj, const char *key) {
-    return steal(detail::getattr(obj.ptr(), key));
+inline object getattr(handle h, const char *key) {
+    return steal(detail::getattr(h.ptr(), key));
 }
 
-inline object getattr(handle obj, handle key) {
-    return steal(detail::getattr(obj.ptr(), key.ptr()));
+inline object getattr(handle h, handle key) {
+    return steal(detail::getattr(h.ptr(), key.ptr()));
 }
 
-inline object getattr(handle obj, const char *key, handle def) noexcept {
-    return steal(detail::getattr(obj.ptr(), key, def.ptr()));
+inline object getattr(handle h, const char *key, handle def) noexcept {
+    return steal(detail::getattr(h.ptr(), key, def.ptr()));
 }
 
-inline object getattr(handle obj, handle key, handle value) noexcept {
-    return steal(detail::getattr(obj.ptr(), key.ptr(), value.ptr()));
+inline object getattr(handle h, handle key, handle value) noexcept {
+    return steal(detail::getattr(h.ptr(), key.ptr(), value.ptr()));
 }
 
-inline void setattr(handle obj, const char *key, handle value) {
-    detail::setattr(obj.ptr(), key, value.ptr());
+inline void setattr(handle h, const char *key, handle value) {
+    detail::setattr(h.ptr(), key, value.ptr());
 }
 
-inline void setattr(handle obj, handle key, handle value) {
-    detail::setattr(obj.ptr(), key.ptr(), value.ptr());
+inline void setattr(handle h, handle key, handle value) {
+    detail::setattr(h.ptr(), key.ptr(), value.ptr());
+}
+
+inline void delattr(handle h, const char *key) {
+    detail::delattr(h.ptr(), key);
+}
+
+inline void delattr(handle h, handle key) {
+    detail::delattr(h.ptr(), key.ptr());
 }
 
 class module_ : public object {

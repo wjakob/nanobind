@@ -86,6 +86,9 @@ NB_CORE void raise_python_error();
 /// Raise nanobind::next_overload
 NB_CORE void raise_next_overload();
 
+/// Raise nanobind::cast_error
+NB_CORE void raise_cast_error();
+
 // ========================================================================
 
 /// Convert a Python object into a Python unicode string

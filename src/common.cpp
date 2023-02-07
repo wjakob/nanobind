@@ -86,6 +86,10 @@ void raise_next_overload() {
     throw next_overload();
 }
 
+void raise_cast_error() {
+    throw cast_error();
+}
+
 // ========================================================================
 
 void cleanup_list::release() noexcept {
@@ -718,8 +722,7 @@ void property_install(PyObject *scope, const char *name, bool is_static,
 void tuple_check(PyObject *tuple, size_t nargs) {
     for (size_t i = 0; i < nargs; ++i) {
         if (!NB_TUPLE_GET_ITEM(tuple, i))
-            raise("nanobind::detail::tuple_check(...): conversion of argument "
-                  "%zu failed!", i + 1);
+            raise_cast_error();
     }
 }
 

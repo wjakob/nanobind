@@ -155,6 +155,11 @@ void python_error::restore() noexcept {
 
 next_overload::next_overload() : std::exception() { }
 next_overload::~next_overload() = default;
+const char *next_overload::what() const noexcept { return "nanobind::next_overload"; }
+
+cast_error::cast_error() : std::exception() { }
+cast_error::~cast_error() = default;
+const char *cast_error::what() const noexcept { return "nanobind::cast_error"; }
 
 #define NB_EXCEPTION(name, type)                                               \
     name::name() : builtin_exception("") { }                                   \

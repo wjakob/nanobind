@@ -332,7 +332,7 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
         if (!caster.from_python(value.derived().ptr(),
                                 convert ? (uint8_t) detail::cast_flags::convert
                                         : (uint8_t) 0, nullptr))
-            detail::raise("nanobind::cast(...): conversion failed!");
+            detail::raise_cast_error();
 
         if constexpr (std::is_same_v<T, const char *>) {
             return caster.operator const char *();
@@ -354,7 +354,7 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
     handle h = detail::make_caster<T>::from_cpp(
         (detail::forward_t<T>) value, detail::infer_policy<T>(policy), nullptr);
     if (!h.is_valid())
-        detail::raise("nanobind::cast(...): conversion failed!");
+        detail::raise_cast_error();
     return steal(h);
 }
 

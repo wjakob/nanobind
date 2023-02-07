@@ -198,6 +198,7 @@ NB_MODULE(test_functions_ext, m) {
     m.attr("test_33") = nb::cpp_function([](nb::object self, int y) {
         return nb::cast<int>(self.attr("x")) + y;
     }, nb::is_method());
+
     m.attr("test_34") = nb::cpp_function([](nb::object self, int y) {
         return nb::cast<int>(self.attr("x")) * y;
     }, nb::arg("y"), nb::is_method());

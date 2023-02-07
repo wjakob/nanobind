@@ -88,8 +88,7 @@ def test09_maketuple():
     assert t.test_tuple() == ("Hello", 123)
     with pytest.raises(RuntimeError) as excinfo:
         assert t.test_bad_tuple()
-    assert str(excinfo.value) == (
-        "nanobind::detail::tuple_check(...): conversion of argument 2 failed!")
+    assert str(excinfo.value) == "nanobind::cast_error"
 
 
 def test10_cpp_call_simple():

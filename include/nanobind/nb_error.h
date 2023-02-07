@@ -45,6 +45,15 @@ class NB_EXPORT next_overload : public std::exception {
 public:
     next_overload();
     ~next_overload() override;
+    const char *what() const noexcept override;
+};
+
+/// Thrown by nanobind::cast when casting fails
+class NB_EXPORT cast_error : public std::exception {
+public:
+    cast_error();
+    ~cast_error() override;
+    const char *what() const noexcept override;
 };
 
 // Base interface used to expose common Python exceptions in C++

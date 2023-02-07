@@ -27,33 +27,6 @@ private:
     PyThreadState *state;
 };
 
-// Deleter for std::unique_ptr<T> (handles ownership by both C++ and Python)
-template <typename T> struct deleter {
-    /// Instance should be cleared using a delete expression
-    deleter()  = default;
-
-    /// Instance owned by Python, reduce reference count upon deletion
-    deleter(handle h) : o(h.ptr()) { }
-
-    /// Does Python own storage of the underlying object
-    bool owned_by_python() const { return o != nullptr; }
-
-    /// Does C++ own storage of the underlying object
-    bool owned_by_cpp() const { return o == nullptr; }
-
-    /// Perform the requested deletion operation
-    void operator()(void *p) noexcept {
-        if (o) {
-            gil_scoped_acquire guard;
-            Py_DECREF(o);
-        } else {
-            delete (T *) p;
-        }
-    }
-
-    PyObject *o{nullptr};
-};
-
 inline void set_leak_warnings(bool value) noexcept {
     detail::set_leak_warnings(value);
 }

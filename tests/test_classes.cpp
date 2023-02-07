@@ -435,4 +435,8 @@ NB_MODULE(test_classes_ext, m) {
 
     using NonCopyableVec = std::vector<NonCopyable>;
     nb::class_<NonCopyableVec>(m, "NonCopyableVec");
+
+    m.def("is_int_1", [](nb::handle h) { return nb::isinstance<int>(h); });
+    m.def("is_int_2", [](nb::handle h) { return nb::isinstance<nb::int_>(h); });
+    m.def("is_struct", [](nb::handle h) { return nb::isinstance<Struct>(h); });
 }

@@ -480,12 +480,19 @@ public:
     NB_OBJECT_DEFAULT(iterable, object, "Iterable", detail::iterable_check)
 };
 
+/// Retrieve the Python type object associated with a C++ class
+template <typename T> handle type() noexcept {
+    return detail::nb_type_lookup(&typeid(detail::intrinsic_t<T>));
+}
+
 template <typename T>
-NB_INLINE bool isinstance(handle obj) noexcept {
+NB_INLINE bool isinstance(handle h) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
-        return T::check_(obj);
+        return T::check_(h);
+    else if constexpr (detail::make_caster<T>::IsClass)
+        return detail::nb_type_isinstance(h.ptr(), &typeid(detail::intrinsic_t<T>));
     else
-        return detail::nb_type_isinstance(obj.ptr(), &typeid(detail::intrinsic_t<T>));
+        return detail::make_caster<T>().from_python(h, 0, nullptr);
 }
 
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
@@ -501,11 +508,6 @@ inline void print(handle value, handle end = handle(), handle file = handle()) {
 
 inline void print(const char *str, handle end = handle(), handle file = handle()) {
     print(nanobind::str(str), end, file);
-}
-
-/// Retrieve the Python type object associated with a C++ class
-template <typename T> handle type() {
-    return detail::nb_type_lookup(&typeid(detail::intrinsic_t<T>));
 }
 
 inline object none() { return borrow(Py_None); }

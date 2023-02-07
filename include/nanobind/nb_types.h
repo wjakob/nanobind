@@ -119,7 +119,7 @@ public:
     NB_API_COMP(operator>,  Py_GT)
     NB_API_COMP(operator>=, Py_GE)
     NB_API_OP_1(operator-,  PyNumber_Negative)
-    NB_API_OP_1(operator!,  PyNumber_Invert)
+    NB_API_OP_1(operator~,  PyNumber_Invert)
     NB_API_OP_2(operator+,  PyNumber_Add)
     NB_API_OP_2(operator-,  PyNumber_Subtract)
     NB_API_OP_2(operator*,  PyNumber_Multiply)

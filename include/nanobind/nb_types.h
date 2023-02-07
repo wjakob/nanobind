@@ -315,7 +315,9 @@ class capsule : public object {
         m_ptr = detail::capsule_new(ptr, name, cleanup);
     }
 
-    void *data() const { return PyCapsule_GetPointer(m_ptr, nullptr); }
+    const char *name() const { return PyCapsule_GetName(m_ptr); }
+
+    void *data() const { return PyCapsule_GetPointer(m_ptr, name()); }
 };
 
 class int_ : public object {

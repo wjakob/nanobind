@@ -1,5 +1,7 @@
 .. _changelog:
 
+.. cpp:namespace:: nanobind
+
 Changelog
 #########
 
@@ -10,28 +12,31 @@ inconvenience whenever possible.
 
 Version 0.1.1 (TBA)
 -------------------------------
+* Nanobind now features documentation on `readthedocs
+  <https://nanobind.readthedocs.io>`_.
 * Added casters for dense matrix/array types from the `Eigen library
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`_. (PR `#120
   <https://github.com/wjakob/nanobind/pull/120>`_).
-* Implemented ``nb::bind_vector<T>()`` analogous to similar functionality in
-  *pybind11*. (commit `f2df8a
+* Implemented `nb::bind_vector\<T\>() <bind_vector>` analogous to similar
+  functionality in *pybind11*. (commit `f2df8a
   <https://github.com/wjakob/nanobind/commit/f2df8a90fbfb06ee03a79b0dd85fa0e266efeaa9>`_).
-* Implemented ``nb::bind_map<T>()`` analogous to similar functionality in
-  *pybind11*. (PR `#114 <https://github.com/wjakob/nanobind/pull/114>`_).
-* Updated tuple/list iterator to satisfy the `std::forward_iterator` concept.
+* Implemented :cpp:func:`nb::bind_map\<T\>() <bind_map>` analogous to
+  similar functionality in *pybind11*. (PR `#114
+  <https://github.com/wjakob/nanobind/pull/114>`_).
+* Updated tuple/list iterator to satisfy the ``std::forward_iterator`` concept.
   (PR `#117 <https://github.com/wjakob/nanobind/pull/117>`_).
 * Fixed issues with non-writeable tensors in NumPy. (commit `25cc3c
   <https://github.com/wjakob/nanobind/commit/25cc3ccbd1174e7cfc4eef1d1e7206cc38e854ca>`_).
 * Removed use of some C++20 features from the codebase. This now makes it
   possible to use *nanobind* on  Visual Studio 2017 and GCC 7.3.1 (used on RHEL 7).
   (PR `#115 <https://github.com/wjakob/nanobind/pull/115>`_).
-* Added the ``nb::typed<...>`` wrapper to override the type signature of an
+* Added the :cpp:class:`nb::typed\<...\> <typed>` wrapper to override the type signature of an
   argument in a bound function in the generated docstring. (commit `b3404c4
   <https://github.com/wjakob/nanobind/commit/b3404c4f347981bce7f4c7a9bac762656bed8385>`_).
-* Added an ``nb::implicit_convertible<A, B>()`` function analogous to the one in
+* Added an :cpp:func:`nb::implicit_convertible\<A, B\>() <implicitly_convertible>` function analogous to the one in
   *pybind11*. (commit `aba4af
   <https://github.com/wjakob/nanobind/commit/aba4af06992f14e21e5b7b379e7986e939316da4>`_).
-* Updated ``nb::make*_iterator<..>()`` so that it returns references of elements, not
+* Updated :cpp:func:`nb::make*_iterator\<..\>() <make_iterator>` so that it returns references of elements, not
   copies. (commit `8916f5
   <https://github.com/wjakob/nanobind/commit/8916f51ad1a25318b5c9fcb07c153f6b72a43bd2>`_).
 * Changed the CMake build system so that the library component

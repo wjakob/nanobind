@@ -1,0 +1,2007 @@
+.. _api:
+
+.. cpp:namespace:: nanobind
+
+C++ API Reference (Core)
+========================
+
+Macros
+------
+
+.. c:macro:: NB_MODULE(name, variable)
+
+   This macro creates the entry point that will be invoked when the Python
+   interpreter imports an extension module. The module name is given as the
+   fist argument and it should not be in quotes. It **must** match the module
+   name given to the :cmake:command:`nanobind_add_module()` function in the
+   CMake build system.
+
+   The second macro argument defines a variable of type :cpp:class:`module_`.
+   The body of the declaration typically contains a sequence of operations
+   that populate the module variable with contents.
+
+   .. code-block:: cpp
+
+       NB_MODULE(example, m) {
+           m.doc() = "Example module";
+
+           // Add bindings here
+           m.def("add", []() {
+               return "Hello, World!";
+           });
+       }
+
+.. c:macro:: NB_TRAMPOLINE(base, size)
+
+   Install a trampoline in an alias class to enable dispatching C++ virtual
+   function calls to a Python implementation. Refer to the documentation on
+   :ref:`trampolines <trampoline>` to see how this macro can be used.
+
+.. c:macro:: NB_OVERRIDE(ret_type, base_type, func, ...)
+
+   Dispatch the call to a Python method named ``"func"`` if it is overloaded on
+   the Python side. The method should return a result of type ``ret_type``.
+   Otherwise, call the C++ function ``base_type::func(...)``. Refer to the
+   documentation on :ref:`trampolines <trampoline>` to see how this macro can
+   be used.
+
+.. c:macro:: NB_OVERRIDE_PURE(ret_type, base_type, func, ...)
+
+   Dispatch the call to a Python method named ``"func"`` if it is overloaded on
+   the Python side. The method should return a result of type ``ret_type``.
+   Otherwise, raise an exception. This macro should be used when the C++
+   function is pure virtual. Refer to the documentation on :ref:`trampolines
+   <trampoline>` to see how this macro can be used.
+
+.. c:macro:: NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)
+
+   Dispatch the call to a Python method with custom identifier ``name`` if it is
+   overloaded on the Python side. The method should return a result of type
+   ``ret_type``. Otherwise, call the C++ function ``base_type::func(...)``. Refer
+   to the documentation on :ref:`trampolines <trampoline>` to see how this
+   macro can be used.
+
+.. c:macro:: NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)
+
+   Dispatch the call to a Python method with the custom identifier ``name`` if it
+   is overloaded on the Python side. The method should return a result of type
+   ``ret_type``. Otherwise, raise an exception. This macro should be used when
+   the C++ function is pure virtual. Refer to the documentation on
+   :ref:`trampolines <trampoline>` to see how this macro can be used.
+
+
+Python object API
+-----------------
+
+Nanobind ships with a wide range of Python wrapper classes like
+:cpp:class:`object`, :cpp:class:`list`, etc. Besides class-specific operations
+(e.g., :cpp:func:`list::append`), these classes also implement core operations
+that can be performed on *any* Python object. Since it would be tedious to
+implement this functionality over and over again, it is realized by the
+following mixin class that lives in the ``nanobind::detail`` namespace.
+
+.. cpp:namespace:: nanobind::detail
+
+.. cpp:class:: template <typename Derived> api
+
+   This mixin class adds common functionality to various nanobind types using
+   the `curiously recurring template pattern
+   <https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern>`_
+   (CRTP). The only requirement for the `Derived` template parameter is that it
+   implements the member function ``PyObject *ptr() const`` that gives access
+   to the underlying Python object pointer.
+
+   .. cpp:function:: Derived &derived()
+
+      Obtain a mutable reference to the derived class.
+
+   .. cpp:function:: const Derived &derived() const
+
+      Obtain a const reference to the derived class.
+
+   .. cpp:function:: handle inc_ref() const noexcept
+
+      Increases the reference count and returns a reference to the Python object.
+
+   .. cpp:function:: handle ref_ref() const noexcept
+
+      Decreases the reference count and returns a reference to the Python object.
+
+   .. cpp:function:: iterator begin() const
+
+      Return a forward iterator analogous to ``iter()`` in Python. The object
+      must be a collection that supports the iteration protocol. This interface
+      provides a generic iterator that works any type of Python object. The
+      :cpp:class:`tuple`, :cpp:class:`list`, and :cpp:class:`dict` wrappers
+      provide more efficient specialized alternatives.
+
+   .. cpp:function:: iterator end() const
+
+      Return a sentinel that ends the iteration.
+
+   .. cpp:function:: handle type() const
+
+      Return a :cpp:class:`handle` to the underlying Python type object.
+
+   .. cpp:function:: operator handle() const
+
+      Return a :cpp:class:`handle` wrapping the underlying ``PyObject*`` pointer.
+
+   .. cpp:function:: detail::accessor<obj_attr> attr(handle key) const
+
+      Analogous to ``self.key`` in Python, where ``key`` is a Python object.
+      The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
+      that it can be read and written.
+
+   .. cpp:function:: detail::accessor<str_attr> attr(const char * key) const
+
+      Analogous to ``self.key`` in Python, where ``key`` is a C-style string.
+      The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
+      that it can be read and written.
+
+   .. cpp:function:: detail::accessor<str_attr> doc() const
+
+       Analogous to ``self.__doc__``. The result is wrapped in an
+       :cpp:class:`accessor <detail::accessor>` so that it can be read and
+       written.
+
+   .. cpp:function:: detail::accessor<obj_item> operator[](handle key) const
+
+      Analogous to ``self[key]`` in Python, where ``key`` is a Python object.
+      The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so that it can be read and
+      written.
+
+   .. cpp:function:: detail::accessor<str_item> operator[](const char * key) const
+
+      Analogous to ``self[key]`` in Python, where ``key`` is a C-style string.
+      The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so that it can be read and
+      written.
+
+   .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item> operator[](T key) const
+
+      Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic
+      type (e.g., an integer). The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
+      that it can be read and written.
+
+   .. cpp:function:: template <rv_policy policy = rv_policy::automatic_reference, typename... Args> object operator()(Args &&...args) const
+
+      Assuming the Python object is a function or implements the ``__call__``
+      protocol, `operator()` invokes the underlying function, passing an
+      arbitrary set of parameters, while expanding any detected variable length
+      argument and keyword argument packs. The result is returned as an
+      :cpp:class:`object` and may need to be converted back into a Python
+      object using :cpp:func:`cast()`.
+
+      Type conversion is performed using the return value policy `policy` When
+      some of the arguments cannot be converted to Python objects, the function
+      raises a ``std::runtime_error``. When the Python function call fails, it
+      instead raises a :cpp:class:`python_error`.
+
+   .. cpp:function:: args_proxy operator*() const
+
+      Given a a tuple or list, this helper function performs variable argument
+      list unpacking in function calls resembling the ``*`` operator in Python.
+      Applying `operator*()` twice yields ``**`` keyword argument
+      unpacking for dictionaries.
+
+   .. cpp:function:: bool is(handle value) const
+
+      Analogous to ``self is value`` in Python.
+
+   .. cpp:function:: bool is_none() const
+
+      Analogous to ``self is None`` in Python.
+
+   .. cpp:function:: bool is_type() const
+
+      Analogous to ``isinstance(self, type)`` in Python.
+
+   .. cpp:function:: bool is_valid() const
+
+      Checks if this wrapper contains a valid Python object (in the sense that
+      the ``PyObject *`` pointer is non-null).
+
+   .. cpp:function:: template <typename T> bool equal(const api<T> &other)
+
+      Equivalent to ``self == other`` in Python.
+
+   .. cpp:function:: template <typename T> bool not_equal(const api<T> &other)
+
+      Equivalent to ``self != other`` in Python.
+
+   .. cpp:function:: template <typename T> bool operator<(const api<T> &other)
+
+      Equivalent to ``self < other`` in Python.
+
+   .. cpp:function:: template <typename T> bool operator<=(const api<T> &other)
+
+      Equivalent to ``self <= other`` in Python.
+
+   .. cpp:function:: template <typename T> bool operator>(const api<T> &other)
+
+      Equivalent to ``self > other`` in Python.
+
+   .. cpp:function:: template <typename T> bool operator>=(const api<T> &other)
+
+      Equivalent to ``self >= other`` in Python.
+
+   .. cpp:function:: object operator-()
+
+      Equivalent to ``-self`` in Python.
+
+   .. cpp:function:: object operator~()
+
+      Equivalent to ``~self`` in Python.
+
+   .. cpp:function:: template <typename T> object operator+(const api<T> &other)
+
+      Equivalent to ``self + other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator-(const api<T> &other)
+
+      Equivalent to ``self - other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator*(const api<T> &other)
+
+      Equivalent to ``self * other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator/(const api<T> &other)
+
+      Equivalent to ``self / other`` in Python.
+
+   .. cpp:function:: template <typename T> object floor_div(const api<T> &other)
+
+      Equivalent to ``self // other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator|(const api<T> &other)
+
+      Equivalent to ``self | other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator&(const api<T> &other)
+
+      Equivalent to ``self & other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator^(const api<T> &other)
+
+      Equivalent to ``self ^ other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator<<(const api<T> &other)
+
+      Equivalent to ``self << other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator>>(const api<T> &other)
+
+      Equivalent to ``self >> other`` in Python.
+
+   .. cpp:function:: template <typename T> object operator+=(const api<T> &other)
+
+      Equivalent to ``self += other`` in Python. Note that the `api<T>` version
+      of the in-place operator does not update the ``self`` reference, which
+      may lead to unexpected results when working with immutable types that
+      return their result instead of updating ``self``.
+
+      The :cpp:class:`object` class and subclasses override the in-place
+      operators to achieve more intuitive behavior.
+
+   .. cpp:function:: template <typename T> object operator-=(const api<T> &other)
+
+       Equivalent to ``self -= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator*=(const api<T> &other)
+
+       Equivalent to ``self *= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator/=(const api<T> &other)
+
+       Equivalent to ``self /= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator|=(const api<T> &other)
+
+       Equivalent to ``self |= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator&=(const api<T> &other)
+
+       Equivalent to ``self &= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator^=(const api<T> &other)
+
+       Equivalent to ``self ^= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator<<=(const api<T> &other)
+
+       Equivalent to ``self <<= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+   .. cpp:function:: template <typename T> object operator>>=(const api<T> &other)
+
+       Equivalent to ``self >>= other`` in Python. See :cpp:func:`operator+=` for limitations.
+
+.. cpp:class:: template <typename Impl> accessor
+
+   This helper class facilitates attribute and item access. Casting an
+   :cpp:class:`accessor` to a :cpp:class:`handle` or :cpp:class:`object`
+   subclass causes a corresponding call to ``__getitem__`` or ``__getattr__``
+   depending on the template argument `Impl`. Assigning a
+   :cpp:class:`handle` or :cpp:class:`object` subclass causes a call to
+   ``__setitem__`` or ``__setattr__``.
+
+.. cpp:namespace:: nanobind
+
+Handles and objects
+-------------------
+
+nanobind provides two styles of Python object wrappers: classes without
+reference counting deriving from :cpp:class:`handle`, and reference-counted
+wrappers deriving from :cpp:class:`object`. Reference counting bugs can be
+really tricky to track down, hence it is recommended that you always prefer
+:cpp:class:`object`-style wrappers unless there are specific reasons that
+warrant the use of raw handles.
+
+Without reference counting
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. cpp:class:: handle: public detail::api<handle>
+
+   This class provides a thin wrapper around a raw ``PyObject *`` pointer. Its
+   main purpose is to intercept various C++ operations and convert them into
+   Python C API calls. It does *not* do any reference counting and can be
+   somewhat unsafe to use.
+
+   .. cpp:function:: handle() = default
+
+      Default constructor. Creates an invalid handle wrapping a null pointer.
+      (:cpp:func:`detail::api::is_valid()` is ``false``)
+
+   .. cpp:function:: handle(const handle &) = default
+
+      Default copy constructor.
+
+   .. cpp:function:: handle(handle &&) = default
+
+      Default move constructor.
+
+   .. cpp:function:: handle(const PyObject * o)
+
+      Initialize a handle from a Python object pointer. Does not change the reference count of `o`.
+
+   .. cpp:function:: handle(const PyTypeObject * o)
+
+      Initialize a handle from a Python type object pointer. Does not change the reference count of `o`.
+
+   .. cpp:function:: handle &operator=(const handle &) = default
+
+      Default copy assignment operator.
+
+   .. cpp:function:: handle &operator=(handle &&) = default
+
+      Default move assignment operator.
+
+   .. cpp:function:: operator bool() const
+
+      Check if the handle refers to a valid Python object. Equivalent to
+      :cpp:func:`detail::api::is_valid()`
+
+   .. cpp:function:: PyObject * ptr() const
+
+      Return the underlying ``PyObject*`` pointer.
+
+With reference counting
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. cpp:class:: object: public handle
+
+   This class provides a convenient `RAII
+   <https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization>`_
+   wrapper around a ``PyObject*`` pointer. Like :cpp:class:`handle`, it
+   intercepts various C++ operations and converts them into Python C API calls.
+
+   The main difference to :cpp:class:`handle` is that it uses reference
+   counting to keep the underlying Python object alive.
+
+   Use the :cpp:func:`borrow()` and :cpp:func:`steal()` functions to create an
+   :cpp:class:`object` from a :cpp:class:`handle` or ``PyObject*`` pointer.
+
+   .. cpp:function:: object() = default
+
+      Default constructor. Creates an invalid object wrapping a null pointer.
+      (:cpp:func:`detail::api::is_valid()` is ``false``)
+
+   .. cpp:function:: object(object &&o)
+
+      Move constructor. Steals the object from `o` without
+      changing its reference count.
+
+   .. cpp:function:: object(const object &o)
+
+      Copy constructor. Acquires a new reference to `o` (if valid).
+
+   .. cpp:function:: ~object()
+
+      Decrease the reference count of the referenced Python object (if valid).
+
+   .. cpp:function:: object& operator=(object &&o)
+
+      Move assignment operator. Decreases the reference count of the currently
+      held object (if valid) and steals the object from `o` without
+      changing its reference count.
+
+   .. cpp:function:: object& operator=(const object &o)
+
+      Copy assignment operator. Decreases the reference count of the currently
+      held object (if valid) and acquires a new reference to the object
+      `o` (if valid).
+
+   .. cpp:function:: void reset()
+
+      Decreases the reference count of the currently held object (if valid) and
+      resets the internal pointer to ``nullptr``.
+
+   .. cpp:function:: handle release()
+
+      Resets the internal pointer to ``nullptr`` and returns its previous
+      contents as a :cpp:class:`handle`. This operation does not change
+      the object's reference count and should be used carefully.
+
+   .. cpp:function:: template <typename T> object& operator+=(const api<T> &other)
+
+      Equivalent to ``self += other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator-=(const api<T> &other)
+
+       Equivalent to ``self -= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator*=(const api<T> &other)
+
+       Equivalent to ``self *= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator/=(const api<T> &other)
+
+       Equivalent to ``self /= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator|=(const api<T> &other)
+
+       Equivalent to ``self |= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator&=(const api<T> &other)
+
+       Equivalent to ``self &= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator^=(const api<T> &other)
+
+       Equivalent to ``self ^= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator<<=(const api<T> &other)
+
+       Equivalent to ``self <<= other`` in Python.
+
+   .. cpp:function:: template <typename T> object& operator>>=(const api<T> &other)
+
+       Equivalent to ``self >>= other`` in Python.
+
+
+.. cpp:function:: template <typename T = object> T borrow(handle h)
+
+   Create a reference-counted Python object wrapper of type `T` from a raw
+   handle or ``PyObject *`` pointer. The target type `T` must be
+   :cpp:class:`object` (the default) or one of its derived classes. The
+   function does not perform any conversions or checks---it is up to the user
+   to make sure that the target type is correct.
+
+   The function *borrows* a reference, which means that it will increase the
+   reference count while constructing ``T``.
+
+   For example, consider the Python C API function `PyList_GetItem()
+   <https://docs.python.org/3/c-api/list.html#c.PyList_GetItem>`_, whose
+   documentation states that it returns a borrowed reference. An interface
+   between this API and nanobind could look as follows:
+
+   .. code-block:: cpp
+
+
+       PyObject* list = ...;
+       Py_ssize_t index = ...;
+       nb::object o = nb::borrow(PyList_GetItem(obj, index));
+
+   Using :cpp:func:`steal()` in this setting is incorrect and would lead to a
+   reference underflow.
+
+.. cpp:function:: template <typename T = object> T steal(handle h)
+
+   Create a reference-counted Python object wrapper of type `T` from a raw
+   handle or ``PyObject *`` pointer. The target type `T` must be
+   :cpp:class:`object` (the default) or one of its derived classes. The
+   function does not perform any conversions or checks---it is up to the user
+   to make sure that the target type is correct.
+
+   The function *steals* a reference, which means that constructing ``T``
+   leaves the object's reference count unchanged.
+
+   For example, consider the Python C API function `PyObject_Str()
+   <https://docs.python.org/3/c-api/object.html#c.PyObject_Str>`_, whose
+   documentation states that it returns a *new reference*. An interface
+   between this API and nanobind could look as follows:
+
+   .. code-block:: cpp
+
+       PyObject* value = ...;
+       nb::object o = nb::steal(PyObject_Str(value));
+
+   Using :cpp:func:`borrow()` in this setting is incorrect and would lead to a
+   reference leak.
+
+
+Attribute access
+----------------
+
+.. cpp:function:: bool hasattr(handle h, const char * key) noexcept
+
+   Check if the given object has an attribute string ``key``. The function never
+   raises an exception and returns ``false`` in case of an internal error.
+
+   Equivalent to ``hasattr(h, key)`` in Python.
+
+.. cpp:function:: bool hasattr(handle h, handle key) noexcept
+
+   Check if the given object has a attribute represented by the Python object
+   ``key``. The function never raises an exception and returns ``false`` in
+   case of an internal error.
+
+   Equivalent to ``hasattr(h, key)`` in Python.
+
+.. cpp:function:: object getattr(handle h, const char * key)
+
+   Equivalent to ``h.key`` and ``getattr(h, key)`` in Python.
+   Raises :cpp:class:`python_error` if the operation fails.
+
+.. cpp:function:: object getattr(handle h, handle key)
+
+   Equivalent to ``h.key`` and ``getattr(h, key)`` in Python.
+   Raises :cpp:class:`python_error` if the operation fails.
+
+.. cpp:function:: object getattr(handle h, const char * key, handle def) noexcept
+
+   Equivalent to ``getattr(h, key, def)`` in Python. Never raises an
+   exception and returns ``def`` when the operation fails, or when the desired
+   attribute could not be found.
+
+.. cpp:function:: object getattr(handle h, handle key, handle def) noexcept
+
+   Equivalent to ``getattr(h, key, def)`` in Python. Never raises an
+   exception and returns ``def`` when the operation fails, or when the desired
+   attribute could not be found.
+
+.. cpp:function:: void setattr(handle h, const char * key, handle value)
+
+   Equivalent to ``h.key = value`` and ``setattr(h, key, value)`` in Python.
+   Raises :cpp:class:`python_error` if the operation fails.
+
+.. cpp:function:: void setattr(handle h, handle key, handle value)
+
+   Equivalent to ``h.key = value`` and ``setattr(h, key, value)`` in Python.
+   Raises :cpp:class:`python_error` if the operation fails.
+
+.. cpp:function:: void delattr(handle h, const char * key)
+
+   Equivalent to ``del h.key`` and ``delattr(h, key)`` in Python.
+   Raises :cpp:class:`python_error` if the operation fails.
+
+.. cpp:function:: void delattr(handle h, handle key)
+
+   Equivalent to ``del h.key`` and ``delattr(h, key)`` in Python.
+   Raises :cpp:class:`python_error` if the operation fails.
+
+Size queries
+------------
+
+.. cpp:function:: size_t len(handle h)
+
+   Equivalent to ``len(h)`` in Python. Raises :cpp:class:`python_error` if the
+   operation fails.
+
+.. cpp:function:: size_t len(const tuple &t)
+
+   Equivalent to ``len(t)`` in Python. Optimized variant for tuples.
+
+.. cpp:function:: size_t len(const list &l)
+
+   Equivalent to ``len(l)`` in Python. Optimized variant for lists.
+
+.. cpp:function:: size_t len(const dict &d)
+
+   Equivalent to ``len(d)`` in Python. Optimized variant for dictionaries.
+
+.. cpp:function:: size_t len_hint(handle h)
+
+   Equivalent to ``operator.length_hint(h)`` in Python. Raises
+   :cpp:class:`python_error` if the operation fails.
+
+Type queries
+------------
+
+.. cpp:function:: template <typename T> isinstance(handle h)
+
+   Checks if the Python object `h` represents a valid instance of the C++ type
+   `T`. This works for bound C++ classes, basic types (``int``, ``bool``,
+   etc.), and Python type wrappers ( :cpp:class:`list`, :cpp:class:`dict`,
+   :cpp:class:`module_`, etc.).
+
+   *Note*: the check even works when `T` involves a type caster (e.g., an STL
+   types like ``std::vector<float>``). However, this involve a wasteful attempt
+   to convert the object to C++. It may be more efficient to just perform the
+   conversion using :cpp:func:`cast` and catch potential raised exceptions.
+
+.. cpp:function:: template <typename T> handle type() noexcept
+
+   Returns the Python type object associated with the C++ type `T`. When the
+   type not been bound via nanobind, the function returns an invalid handle
+   (:cpp:func:`detail::api::is_valid()` is ``false``).
+
+   *Note*: in contrast to the :cpp:func:`isinstance()` function above, builtin
+   types, type wrappers, and types handled using type casters, are *not*
+   supported.
+
+Wrapper classes
+---------------
+
+.. cpp:class:: tuple: public object
+
+   Wrapper class representing Python ``tuple`` instances.
+
+   .. cpp:function:: size_t size() const
+
+      Return the number of tuple elements.
+
+   .. cpp:function:: detail::fast_iterator begin() const
+
+      Return a forward iterator analogous to ``iter()`` in Python. The function
+      overrides a generic version in :cpp:class:`detail::api` and is more
+      efficient for tuples.
+
+   .. cpp:function:: detail::fast_iterator end() const
+
+      Return a sentinel that ends the iteration.
+
+   .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_tuple> operator[](T key) const
+
+      Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic
+      type (e.g., an integer). The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
+      that it can be read and written.
+
+      The function overrides the generic version in :cpp:class:`detail::api`
+      and is more efficient for tuples.
+
+
+.. cpp:class:: list : public object
+
+   Wrapper class representing Python ``list`` instances.
+
+   .. cpp:function:: size_t size() const
+
+      Return the number of list elements.
+
+   .. cpp:function:: template <typename T> void append(T &&value)
+
+      Append an element to the list. When `T` does not already represent a
+      wrapped Python object, the function performs a cast.
+
+   .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_list> operator[](T key) const
+
+      Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic
+      type (e.g., an integer). The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
+      that it can be read and written.
+
+      The function overrides the generic version in :cpp:class:`detail::api`
+      and is more efficient for lists.
+
+   .. cpp:function:: detail::fast_iterator begin() const
+
+      Return a forward iterator analogous to ``iter()`` in Python. The operator
+      provided here overrides the generic version in :cpp:class:`detail::api`
+      and is more efficient for lists.
+
+   .. cpp:function:: detail::fast_iterator end() const
+
+      Return a sentinel that ends the iteration.
+
+
+.. cpp:class:: dict: public object
+
+   Wrapper class representing Python ``dict`` instances.
+
+   .. cpp:function:: dict()
+
+      Create an empty dictionary
+
+   .. cpp:function:: size_t size() const
+
+      Return the number of dictionary elements.
+
+   .. cpp:function:: detail::dict_iterator begin() const
+
+      Return an item iterator that returns ``std::pair<handle, handle>``
+      key-value pairs analogous to ``iter(dict.items())`` in Python.
+
+   .. cpp:function:: detail::dict_iterator end() const
+
+      Return a sentinel that ends the iteration.
+
+   .. cpp:function:: list keys() const
+
+      Return a list containing all dictionary keys.
+
+   .. cpp:function:: list values() const
+
+      Return a list containing all dictionary values.
+
+   .. cpp:function:: list items() const
+
+      Return a list containing all dictionary items as ``(key, value)`` pairs.
+
+
+.. cpp:class:: module_: public object
+
+   Wrapper class representing Python ``module`` instances. The underscore at
+   the end disambiguates the class name from the C++20 ``module`` declaration.
+
+   .. cpp:function:: template <typename Func, typename... Extra> module_ &def(const char * name, Func &&f, const Extra &...extra)
+
+      Bind the function `f` to the identifier `name` within the module. Returns
+      a reference to ``*this`` so that longer sequences of binding declarations
+      can be chained, as in ``m.def(...).def(...);``. The variable length
+      `extra` parameter can be used to pass docstrings and other :ref:`function
+      binding annotations <function_binding_annotations>`.
+
+      Example syntax:
+
+      .. code-block:: cpp
+
+         void test() { printf("Hello world!"); }
+
+         NB_MODULE(example, m) {
+             // here, "m" is variable of type 'module_'.
+             m.def("test", &test, "A test function")
+              .def(...); // more binding declarations
+         }
+
+
+   .. cpp:function:: module_ import_(const char * name)
+
+      Import the Python module with the specified name and return a reference
+      to it. The underscore at the end disambiguates the function name from the
+      C++20 ``import`` statement.
+
+      Example usage:
+
+      .. code-block:: cpp
+
+         nb::module_ np = nb::module_::import_("numpy");
+         nb::object np_array = np.attr("array");
+
+   .. cpp:function:: module_ def_submodule(const char * name, const char * doc = nullptr)
+
+      Create a Python submodule within an existing module and return a
+      reference to it. Can be chained recursively.
+
+      Example usage:
+
+      .. code-block:: cpp
+
+         NB_MODULE(example, m) {
+             nb::module_ m2 = m.def_submodule("sub", "A submodule of 'example'");
+             nb::module_ m3 = m2.def_submodule("subsub", "A submodule of 'example.sub'");
+         }
+
+.. cpp:class:: capsule: public object
+
+   Capsules are small opaque Python objects that wrap a C or C++ pointer and a cleanup routine.
+
+   .. cpp:function:: capsule(const void * ptr, void (* cleanup)(void*) noexcept = nullptr)
+
+      Construct an *unnamed* capsule wrapping the pointer `p`. When the
+      capsule is garbage collected, Python will call the destructor `cleanup`
+      (if provided) with the value of `p`.
+
+   .. cpp:function:: capsule(const void * ptr, const char * name, void (* cleanup)(void*) noexcept = nullptr)
+
+      Construct a *named* capsule with name `name` wrapping the pointer `p`.
+      When the capsule is garbage collected, Python will call the destructor
+      `cleanup` (if provided) with the value of `p`.
+
+   .. cpp:function:: const char * name() const
+
+      Return the capsule name (or ``nullptr`` when the capsule is unnamed)
+
+   .. cpp:function:: void * data() const
+
+      Return the pointer wrapped by the capsule.
+
+
+.. cpp:class:: int_: public object
+
+   This wrapper class represents Python ``int`` instances. It can handle large
+   numbers requiring more than 64 bits of storage.
+
+   .. cpp:function:: int_(handle h)
+
+      Performs an integer cast within Python. This is equivalent to the Python
+      expression ``int(h)``.
+
+   .. cpp:function:: template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0> explicit int_(T value)
+
+      Convert an C++ arithmetic type into a Python integer.
+
+   .. cpp:function:: template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0> explicit operator T() const
+
+      Convert a Python integer into a C++ arithmetic type.
+
+
+.. cpp:class:: str: public object
+
+   This wrapper class represents Python unicode ``str`` instances.
+
+   .. cpp:function:: str(handle h)
+
+      Performs a string cast within Python. This is equivalent equivalent to
+      the Python expression ``str(h)``.
+
+   .. cpp:function:: str(const char * s)
+
+      Convert a null-terminated C-style string in UTF-8 encoding into a Python string.
+
+   .. cpp:function:: str(const char * s, size_t n)
+
+      Convert a C-style string in UTF-8 encoding of length ``n`` bytes into a Python string.
+
+   .. cpp:function:: const char * c_str()
+
+      Convert a Python string into a null-terminated C-style string with UTF-8
+      encoding.
+
+      *Note*: The C string will be deleted when the `str` instance is garbage
+      collected.
+
+
+.. cpp:class:: bytes: public object
+
+   This wrapper class represents Python unicode ``bytes`` instances.
+
+   .. cpp:function:: bytes(handle h)
+
+      Performs a cast within Python. This is equivalent equivalent to
+      the Python expression ``bytes(h)``.
+
+   .. cpp:function:: bytes(const char * s)
+
+      Convert a null-terminated C-style string encoding into a Python ``bytes`` object.
+
+   .. cpp:function:: bytes(const char * s, size_t n)
+
+      Convert a null-terminated C-style string encoding of length ``n`` bytes into a Python ``bytes`` object.
+
+   .. cpp:function:: const char * c_str()
+
+      Convert a Python bytes object into a null-terminated C-style string.
+
+   .. cpp:function:: size_t size() const
+
+      Return the size in bytes.
+
+
+.. cpp:class:: type_object: public object
+
+   Wrapper class representing Python ``type`` instances.
+
+.. cpp:class:: sequence: public object
+
+   Wrapper class representing arbitrary Python sequence types.
+
+.. cpp:class:: mapping : public object
+
+   Wrapper class representing arbitrary Python mapping types.
+
+   .. cpp:function:: list keys() const
+
+      Return a list containing all of the map's keys.
+
+   .. cpp:function:: list values() const
+
+      Return a list containing all of the map's values.
+
+   .. cpp:function:: list items() const
+
+      Return a list containing all of the map's items as ``(key, value)`` pairs.
+
+.. cpp:class:: iterator : public object
+
+   Wrapper class representing a Python iterator.
+
+   .. cpp:function:: iterator& operator++()
+
+      Advance to the next element (pre-increment form).
+
+   .. cpp:function:: iterator& operator++(int)
+
+      Advance to the next element (post-increment form).
+
+   .. cpp:function:: handle operator*() const
+
+      Return the item at the current position.
+
+   .. cpp:function:: handle operator->() const
+
+      Convenience routine for pointer-style access.
+
+   .. static iterator sentinel();
+
+      Return a sentinel that ends the iteration.
+
+   .. cpp:function:: friend bool operator==(const iterator &a, const iterator &b);
+
+      Iterator equality comparison operator.
+
+   .. cpp:function:: friend bool operator!=(const iterator &a, const iterator &b);
+
+      Iterator inequality comparison operator.
+
+.. cpp:class:: iterable : public object
+
+   Wrapper class representing an object that can be iterated upon (in the sense
+   that calling :cpp:func:`iter()` is valid).
+
+.. cpp:class:: slice : public object
+
+   Wrapper class representing a Python slice object.
+
+   .. cpp:function:: slice(handle start, handle stop, handle step)
+
+      Create the slice object given by ``slice(start, stop, step)`` in Python.
+
+   .. cpp:function:: template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0> slice(T stop)
+
+      Create the slice object ``slice(stop)``, where `stop` is represented by a
+      C++ integer type.
+
+   .. cpp:function:: template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0> slice(T start, T stop)
+
+      Create the slice object ``slice(start, stop)``, where `start` and `stop`
+      are represented by a C++ integer type.
+
+   .. cpp:function:: template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0> slice(T start, T stop, T step)
+
+      Create the slice object ``slice(start, stop, step)``, where `start`,
+      `stop`, and `step` are represented by a C++ integer type.
+
+   .. cpp:function:: detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const
+
+      Adjust the slice to the `size` value of a given container. Returns a tuple containing
+      ``(start, stop, step, slice_length)``.
+
+.. cpp:class:: ellipsis: public object
+
+   Wrapper class representing a Python ellipsis (``...``) object.
+
+   .. cpp:function:: ellipsis()
+
+      Create a wrapper referencing the unique Python `Ellipsis` object.
+
+.. cpp:class:: callable: public object
+
+   Wrapper class representing a callable Python object.
+
+.. cpp:class:: args : public tuple
+
+   Variable argument keyword list for use in function argument declarations.
+
+.. cpp:class:: kwargs : public dict
+
+   Variable keyword argument keyword list for use in function argument declarations.
+
+Parameterized wrapper classes
+-----------------------------
+
+.. cpp:class:: template <typename T> handle_t : public handle
+
+   Wrapper class representing a handle to a subclass of the C++ type `T`. It
+   can be used to bind functions that take the associated Python object in its
+   wrapped form, while rejecting objects with a different type (i.e., it is
+   more discerning than :cpp:class:`handle`, which accepts *any* Python object).
+
+   .. code-block:: cpp
+
+      // Bind the class A
+      class A { int value; };
+      nb::class_<A>(m, "A");
+
+      // Bind a function that takes a Python object representing a 'A' instance
+      m.def("process_a", [](nb::handle_t<A> h) {
+         PyObject * a_py = h.ptr();   // PyObject* pointer to wrapper
+         A &a_cpp = nb::cast<A &>(h); // Reference to C++ instance
+      });
+
+.. cpp:class:: template <typename T> type_object_t : public type_object
+
+   Wrapper class representing a Python type object that is a subtype of the C++
+   type `T`. It can be used to bind functions that only accept type objects
+   satisfying this criterion (i.e., it is more discerning than
+   :cpp:class:`type_object`, which accepts *any* Python type object).
+
+Error management
+----------------
+
+nanobind provides a range of functionality to convert C++ exceptions into
+equivalent Python exceptions and raise captured Python error state in C++. The
+:cpp:class:`exception` class is also relevant in this context, but is listed in
+the reference section on :ref:`class binding <class_binding>`.
+
+.. cpp:struct:: error_scope
+
+   RAII helper class that temporarily stashes any existing Python error status.
+   This is important when running Python code in the context of an existing
+   failure that must be processed (e.g., to generate an error message).
+
+   .. cpp:function:: error_scope()
+
+      Stash the current error status (if any)
+
+   .. cpp:function:: ~error_scope()
+
+      Restore the stashed error status (if any)
+
+.. cpp:struct:: python_error : public std::exception
+
+   Exception that represents a detected Python error status.
+
+   .. cpp:function:: python_error()
+
+      This constructor may only be called when a Python error has occurred
+      (``PyErr_Occurred()`` must be ``true``). It creates a C++ exception
+      object that represents this error and clears the Python error status.
+
+   .. cpp:function:: python_error(const python_error &)
+
+      Copy constructor
+
+   .. cpp:function:: python_error(python_error &&) noexcept
+
+      Move constructor
+
+   .. cpp:function:: const char * what() noexcept
+
+      Return a stringified version of the exception. nanobind internally
+      normalizes the exception and generates a traceback that is included
+      as part of this string.
+
+   .. cpp:function:: void restore() noexcept
+
+      Restore the error status in Python and clear the `python_error` contents.
+
+   .. cpp:function:: handle type() const
+
+      Returns a handle to the exception type
+
+   .. cpp:function:: handle value() const
+
+      Returns a handle to the exception value
+
+   .. cpp:function:: handle traceback() const
+
+      Returns a handle to the exception's traceback object
+
+.. cpp:class:: cast_error
+
+   The function :cpp:func:`cast` raises this exception to indicate that a cast
+   was unsuccessful.
+
+   .. cpp:function:: next_overload()
+
+      Constructor
+
+.. cpp:class:: next_overload
+
+   This special exception can be used to inform nanobind that a function
+   overload detected incompatible inputs. nanobind will then try other
+   overloads before reporting an error.
+
+   This feature is useful when a multiple overloads of a function accept
+   overlapping or identical input types (e.g. :cpp:class:`object`) and must run
+   code at runtime to select the right overload.
+
+   .. cpp:function:: next_overload()
+
+      Constructor
+
+.. cpp:class:: builtin_exception : public std::runtime_error
+
+   Base class of C++ versions of builtin Python exceptions (see below)
+
+.. cpp:class:: stop_iteration : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``StopIteration`` exception in Python.
+
+.. cpp:class:: index_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``IndexError`` exception in Python.
+
+.. cpp:class:: key_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``KeyError`` exception in Python.
+
+.. cpp:class:: value_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``ValueError`` exception in Python.
+
+.. cpp:class:: type_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``TypeError`` exception in Python.
+
+.. cpp:class:: buffer_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``BufferError`` exception in Python.
+
+.. cpp:class:: import_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``ImportError`` exception in Python.
+
+.. cpp:class:: attribute_error : public builtin_exception
+
+   When thrown in C++ code called from Python, nanobind will raise a
+   ``AttributeError`` exception in Python.
+
+.. cpp:function:: void register_exception_translator(void (* exception_translator)(const std::exception_ptr &, void*), void * payload = nullptr)
+
+   Install an exception translator callback that will be invoked whenever
+   nanobind's function call dispatcher catches a previously unknown C++
+   exception. This exception translator should follow a standard structure of
+   re-throwing an exception, catching a specific type, and converting this into
+   a Python error status upon "success".
+
+   Here is an example for a hypothetical ``ZeroDivisionException``.
+
+   .. code-block:: cpp
+
+      register_exception_translator(
+          [](const std::exception_ptr &p, void * /*payload*/) {
+              try {
+                  std::rethrow_exception(p);
+              } catch (const ZeroDivisionException &e) {
+                  PyErr_SetString(PyExc_ZeroDivisionError, e.what());
+              }
+          }, nullptr /*payload*/);
+
+   Generally, you will want to use the more convenient exception binding
+   interface provided by :cpp:class:`exception` class. This function provides
+   an escape hatch for more specialized use cases.
+
+
+Return value policies
+---------------------
+
+.. cpp:enum-class:: rv_policy
+
+   A return value policy clarifies questions related to ownership when a
+   previously unknown C++ instance is first cast into a Python object.
+
+   You don't need to specify a return value policy when the C++ type uses some
+   kind of smart pointer like ``std::unique_ptr<T>``, ``std::shared_ptr<T>``,
+   or an :ref:`intrusive pointer <intrusive>`.
+
+   The following policies are available:
+
+   .. cpp:enumerator:: take_ownership
+
+      Create a Python object that wraps the existing C++ instance and takes
+      full ownership of it. No copies are made. Python will call the C++
+      destructor and ``delete`` operator when the Python wrapper is garbage
+      collected at some later point. The C++ side *must* relinquish ownership
+      and is not allowed to destruct the instance, or undefined behavior will
+      ensue.
+
+      Below is an example use of this return value policy: a bound function
+      returns a newly allocated instance on the heap and transfers ownership
+      to Python that will release this memory when the instance is no longer
+      needed.
+
+      .. code-block:: cpp
+
+         m.def("make_a", []() -> A* { return new A(); }, nb::rv_policy::take_ownership)
+
+      Note that the return value policy declaration could actually be omitted
+      above, since `take_ownership` is the default choice for pointer return values
+      (see `automatic` for details).
+
+   .. cpp:enumerator:: copy
+
+      Copy-construct a new Python object from the C++ instance. The new copy
+      will be owned by Python, while C++ retains ownership of the original.
+
+      Below is an example use of this return value policy: a bound function
+      returns a reference to a C++ instance. It may not be clear who owns this
+      instance and how long it will be alive, so the safest route is to make a
+      copy.
+
+      .. code-block:: cpp
+
+         struct A {
+            const B &b() {
+                // .. unknown code ..
+            }
+         };
+
+         m.def("get_b", [](A &a) { return a.b(); }, nb::rv_policy::copy)
+
+      Note that the return value policy declaration could actually be omitted
+      above, since `copy` is the default choice whenever a function returns an
+      lvalue reference (see `automatic` for details).
+
+   .. cpp:enumerator:: move
+
+      Move-construct a new Python object from the C++ instance. The new object
+      will be owned by Python, while C++ retains ownership of the original
+      (whose contents were likely invalidated by the move operation).
+
+      Below is an example use of this return value policy: a bound function
+      returns a C++ instance by value. The `copy` operation mentioned above
+      would be safe to use in this case, but move construction has the potential
+      of being far more efficient.
+
+      .. code-block:: cpp
+
+         struct A {
+            B b() {
+                return B { ... };
+            }
+         };
+
+         m.def("get_b", [](A &a) { return a.b(); }, nb::rv_policy::move)
+
+      Note that the return value policy declaration could actually be omitted
+      above, since `move` is the default choice for functions that return by
+      value (see `automatic` for details).
+
+   .. cpp:enumerator:: reference
+
+      Create a Python object that wraps the existing C++ instance *without
+      taking ownership* of it. No copies are made. Python will never call the
+      destructor or ``delete`` operator, even when the Python wrapper is
+      garbage collected. The C++ side is responsible for destructing the C++
+      instance.
+
+      This return value policy is *dangerous and should be used cautiously*.
+      Undefined behavior will ensue when the C++ side deletes the instance too
+      early (i.e., while it is still being used by Python). If need to use this
+      policy, combine it with a :cpp:struct:`keep_alive` function binding
+      annotation to manage the lifetime. Or use the simple and safe
+      `reference_internal` alternative described next.
+
+      Below is an example use of this return value policy to reference a
+      global variable that does not need ownership and lifetime management.
+
+      .. code-block:: cpp
+
+         A a; // This is a global variable
+
+         m.def("get_a", []() -> A* { return &a; }, nb::rv_policy::reference)
+
+
+
+   .. cpp:enumerator:: reference_internal
+
+      A safe extension of the `reference` policy for methods that implement
+      some form of attribute access. It creates a Python object that wraps the
+      existing C++ instance *without taking ownership* of it. Additionally, it
+      adjusts reference counts to keeps the method's implicit ``self`` argument
+      alive until the newly created object has been garbage collected.
+
+      Below is an example use of this return value policy: a getter function
+      returns a reference to an internal field. Wrapping this getter using
+      `reference_internal` permits mutable access to the field. nanobind
+      ensures that the parent `A` instance is kept alive until the `B` field
+      reference has been garbage collected.
+
+      .. code-block:: cpp
+
+          struct A {
+              B b;
+              B &get_b() { return b; }
+          };
+
+          nb::class_<A>(m, "A")
+             .def("get_b", &A::get_b, nb::rv_policy::reference_internal);
+
+      More advanced variations of this scheme are also possible using
+      combinations of `reference` and the :cpp:struct:`keep_alive` function
+      binding annotation.
+
+   .. cpp:enumerator:: none
+
+      This is the most conservative policy: it simply refuse the cast unless
+      the C++ instance already has a corresponding Python object, in which case
+      the question of ownership becomes moot.
+
+   .. cpp:enumerator:: automatic
+
+      This is the default return value policy, which falls back to
+      `take_ownership` when the return value is a pointer, `move`  when it is a
+      rvalue reference, and `copy` when it is a lvalue reference.
+
+   .. cpp:enumerator:: automatic_reference
+
+      This policy matches `automatic` but falls back to `reference` when the
+      return value is a pointer. It is the default for function arguments when
+      calling Python functions from C++ code via
+      :cpp:func:`detail::api::operator()`. You probably won't need to use it in
+      your own code.
+
+
+Casting
+-------
+
+.. cpp:function:: template <typename T, typename Derived> T cast(const detail::api<Derived> &value, bool convert = true)
+
+   Convert the Python object `value` (typically a :cpp:class:`handle` or a
+   :cpp:class:`object` subclass) into a C++ object of type `T`.
+
+   When the `convert` argument is set to ``true`` (the default), the
+   implementation may also attempt *implicit conversions* to perform the cast.
+
+   The function raises a :cpp:class:`cast_error` when the conversion fails.
+
+.. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy = rv_policy::automatic_reference)
+
+   Convert the C++ object ``value`` into a Python object. The return value
+   policy `policy` is used to handle ownership-related questions when a new
+   Python object must be created.
+
+   The function raises a :cpp:class:`cast_error` when the conversion fails.
+
+.. cpp:function:: template <typename T> object find(const T &value) noexcept
+
+   Return the Python object associated with the C++ instance `value`. When no
+   such object can be found, the function it returns an invalid object
+   (:cpp:func:`detail::api::is_valid()` is ``false``).
+
+.. cpp:function:: template <rv_policy policy = rv_policy::automatic, typename... Args> tuple make_tuple(Args&&... args)
+
+   Create a Python tuple from a sequence of C++ objects ``args...``. The return
+   value policy `policy` is used to handle ownership-related questions when a
+   new Python objects must be created.
+
+   The function raises a :cpp:class:`cast_error` when the conversion fails.
+
+Common binding annotations
+--------------------------
+
+The following annotations can be specified in both function and class bindings.
+
+.. cpp:struct:: scope
+
+   .. cpp:function:: scope(handle value)
+
+      Captures the Python scope (e.g., a :cpp:class:`module_` or
+      :cpp:class:`type_object`) in which the function or class should be
+      registered.
+
+.. cpp:struct:: name
+
+   .. cpp:function:: name(const char * value)
+
+      Captures the name of the function or class.
+
+.. _function_binding_annotations:
+
+Function binding annotations
+----------------------------
+
+The following annotations can be specified using the variable-length ``Extra``
+parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
+:cpp:func:`cpp_function`, etc.
+
+.. cpp:struct:: arg
+
+   Function argument annotation to enable keyword-based calling, default
+   arguments, passing ``None``, and implicit conversion hints. Note that when a
+   function argument should be annotated, you *must* specify annotations for
+   arguments of that function.
+
+   Example use:
+
+   .. code-block:: cpp
+
+       m.def("add", [](int a, int b) { return a + b; }, nb::arg("a"), nb::arg("b"));
+
+   It is usually convenient to add the following ``using`` declaration to your binding code.
+
+   .. code-block:: cpp
+
+       using namespace nb::literals;
+
+   In this case, the argument annotations can be shortened:
+
+   .. code-block:: cpp
+
+       m.def("add", [](int a, int b) { return a + b; }, "a"_a, "b"_a);
+
+   .. cpp:function:: explicit arg(const char * name = nullptr)
+
+      Create a function argument annotation. The name is optional.
+
+   .. cpp:function:: template <typename T> arg_v operator=(T &&value) const
+
+      Assign a default value to the argument.
+
+   .. cpp:function:: arg &none(bool value = true)
+
+      Set a flag noting that the function argument accepts ``None``. Can only
+      be used for python wrapper types (e.g. :cpp:class:`handle`,
+      :cpp:class:`int_`) and types that have been bound using
+      :cpp:class:`class_`. You cannot use this to implement functions that
+      accept null pointers to builtin C++ types like ``int *i = nullptr``.
+
+   .. cpp:function:: arg &noconvert(bool value = true)
+
+      Set a flag noting that implicit conversion should never be performed for
+      this function argument.
+
+.. cpp:struct:: is_method
+
+   Indicate that the bound function is a method.
+
+.. cpp:struct:: is_operator
+
+   Indicate that the bound operator represents a magic operator like
+   ``__add__``, ``__radd__``, etc.
+
+.. cpp:struct:: is_implicit
+
+   Indicate that the bound constructor can be used to perform implicit conversions.
+
+.. cpp:struct:: template <typename... Ts> call_guard
+
+   Invoke the call guard(s) `Ts` when the bound function executes. The RAII
+   helper :cpp:struct:`gil_scoped_release` is often combined with this feature.
+
+.. cpp:struct:: template <size_t Nurse, size_t Patient> keep_alive
+
+   Following the call, keep object ``Patient`` alive while the object ``Nurse``
+   exists. Index ``0`` refers to the return value, index ``1`` is the first
+   function argument, etc.
+
+.. cpp:struct:: raw_doc
+
+   .. cpp:function:: raw_doc(const char * value)
+
+      Take complete control over the docstring of a bound function and replace it with `value`.
+
+.. _class_binding_annotations:
+
+Class binding annotations
+-------------------------
+
+The following annotations can be specified using the variable-length ``Extra``
+parameter of the constructor :cpp:func:`class_::class_` and
+:cpp:func:`enum_::enum_`.
+
+.. cpp:struct:: is_final
+
+   Indicate that a type cannot be subclassed.
+
+.. cpp:struct:: dynamic_attr
+
+   Indicate that a type requires a Python dictionary to support the dynamic addition of attributes.
+
+.. cpp:struct:: is_enum
+
+   .. cpp:function:: is_enum(bool is_signed)
+
+      Mark the bound class as an enumeration backed by a signed or unsigned integer type.
+
+.. cpp:struct:: is_arithmetic
+
+   Indicate that the enumeration may be used as part of arithmetic operations.
+
+.. cpp:struct:: template <typename T> supplement
+
+   Indicate that ``sizeof(T)`` bytes of memory should be set aside to store supplemental data in the type object.
+
+.. cpp:struct:: type_slots
+
+   .. cpp:function:: type_slots(PyType_Slot * value)
+
+   nanobind uses the ``PyType_FromSpec`` Python C API interface to construct
+   types. In certain advanced use cases, it may be helpful to append additional
+   type slots during type construction. This class binding annotation can be
+   used to accomplish this. The provided list should be followed by a
+   zero-initialized ``PyType_Slot`` element.
+
+.. cpp:struct:: template <typename T> intrusive_ptr
+
+   nanobind provides a custom interface for intrusive reference-counted C++
+   types that nicely integrate with Python reference counting. See the
+   :ref:`separate section <intrusive>` on this topic. This annotation
+   marks a type as compatible with this interface.
+
+   .. cpp:function:: intrusive_ptr(void (* set_self_py)(T*, PyObject*) noexcept)
+
+      Declares a callback that will be invoked when a C++ instance is first
+      cast into a Python object.
+
+Function binding
+----------------
+
+.. cpp:function:: object cpp_function(Func &&f, const Extra&... extra)
+
+   Convert the function `f` into a Python callable. This function has
+   a few overloads (not shown here) to separately deal with function/method
+   pointers and lambda functions.
+
+   The variable length `extra` parameter can be used to pass a docstring and
+   other :ref:`function binding annotations <function_binding_annotations>`.
+
+.. class_binding:
+
+Class binding
+-------------
+
+.. cpp:class:: template <typename T, typename... Ts> class_ : public object
+
+   Class to bind a custom C++ type `T` to Python. The variable length parameter
+   `Ts` is optional and  can be used to specify the base class of `T` and/or an
+   alias needed to realize :ref:`trampoline classes <trampolines>`.
+
+   .. cpp:function:: template <typename... Extra> class_(handle scope, const char * name, const Extra &... extra)
+
+      Bind the type `T` to the identifier `name` within the scope `scope`. The
+      variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`class binding annotations <class_binding_annotations>`.
+
+   .. cpp:function:: template <typename Func, typename... Extra> class_ &def(const char * name, Func &&f, const Extra &... extra)
+
+      Bind the method `f` to the identifier `name`. The variable length `extra`
+      parameter can be used to pass a docstring and other :ref:`function
+      binding annotations <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename Func, typename... Extra> class_ &def_static(const char * name, Func &&f, const Extra &... extra)
+
+      Bind the static function `f` to the identifier `name`. The variable
+      length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> init, const Extra &... extra)
+
+      Bind a constructor. The variable length `extra` parameter can be used to
+      pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> init, const Extra &... extra)
+
+      Bind a constructor that may be used for implicit type conversions. The
+      variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename Getter, typename Setter, typename... Extra> class_ &def_property(const char * name, Getter &&getter, Setter &&setter, const Extra &...extra)
+
+      Bind a Python ``property`` represented by `getter` and `setter` functions
+      to the identifier `name`. The variable length `extra` parameter can be
+      used to pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename Getter, typename Setter, typename... Extra> class_ &def_property_static(const char * name, Getter &&getter, Setter &&setter, const Extra &...extra)
+
+      Bind a *static* Python ``property`` represented by `getter` and `setter`
+      functions to the identifier `name`. The variable length `extra` parameter
+      can be used to pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename Getter, typename... Extra> class_ &def_property_readonly(const char * name, Getter &&getter, const Extra &...extra)
+
+      Bind a read-only Python ``property`` represented by a `getter` function
+      to the identifier `name`. The variable length `extra` parameter can be
+      used to pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename Getter, typename... Extra> class_ &def_property_readonly_static(const char * name, Getter &&getter, const Extra &...extra)
+
+      Bind a read-only *static* Python ``property`` represented by a `getter`
+      function to the identifier `name`. The variable length `extra` parameter
+      can be used to pass a docstring and other :ref:`function binding
+      annotations <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_readwrite(const char * name, D C::* pm, const Extra &...extra)
+
+      Bind a *static* Python ``property`` represented by a `getter` function to
+      the identifier `name`. The variable length `extra` parameter can be used
+      to pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename D, typename... Extra> class_ &def_readwrite_static(const char * name, D* pm, const Extra &...extra)
+
+      Bind a Python ``property`` represented by the instance field `pm` to the
+      identifier `name`. The variable length `extra` parameter can be used to
+      pass a docstring andother  :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_readonly(const char * name, D C::* pm, const Extra &...extra)
+
+      Bind a read-only Python ``property`` represented by the instance field
+      `pm` to the identifier `name`. The variable length `extra` parameter can
+      be used to pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <typename D, typename... Extra> class_ &def_readonly_static(const char * name, D * pm, const Extra &...extra)
+
+      Bind a read-only *static* Python ``property`` represented by the instance field
+      `pm` to the identifier `name`. The variable length `extra` parameter can
+      be used to pass a docstring and other :ref:`function binding annotations
+      <function_binding_annotations>`.
+
+   .. cpp:function:: template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra> class_ &def(const detail::op_<id, ot, L, R> &op, const Extra&... extra)
+
+      Bind an arithmetic or comparison operator expressed in short-hand form (e.g., ``.def(nb::self + nb::self)``).
+
+   .. cpp:function:: template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra> class_ &def_cast(const detail::op_<id, ot, L, R> &op, const Extra&... extra)
+
+      Like the above ``.def()`` variant, but furthermore cast the result of the operation back to `T`.
+
+
+.. cpp:class:: template <typename T> enum_ : public class_<T>
+
+   Class binding helper for scoped and unscoped C++ enumerations.
+
+   .. cpp:function:: template <typename... Extra> NB_INLINE enum_(handle scope, const char * name, const Extra &...extra)
+
+      Bind the enumeration of type `T` to the identifier `name` within the
+      scope `scope`. The variable length `extra` parameter can be used to pass
+      a docstring and other :ref:`class binding annotations
+      <class_binding_annotations>` such as :cpp:class:`is_arithmetic`.
+
+   .. cpp:function:: enum_ &value(const char * name, T value, const char * doc = nullptr)
+
+      Add the entry `value` to the enumeration using the identifier `name`,
+      potentially with a docstring provided via `doc` (optional).
+
+   .. cpp:function:: enum_ &export_values()
+
+      Export all entries of the enumeration into the parent scope.
+
+.. cpp:class:: template <typename T> exception : public object
+
+   Class binding helper for declaring new Python exception types
+
+   .. cpp:function:: exception(handle scope, const char * name, handle base = PyExc_Exception)
+
+      Create a new exception type identified by `name` that derives from
+      `base`, and install it in `scope`. The constructor also calls
+      :cpp:func:`register_exception_translator()` to register a new exception
+      translator that converts caught C++ exceptions of type `T` into the
+      newly created Python equivalent.
+
+.. cpp:struct:: template <typename... Args> init
+
+   nanobind uses this simple helper class to capture the signature of a
+   constructor. It is only meant to be used in binding declarations done via
+   :cpp:func:`class_::def()`.
+
+   Sometimes, it is necessary to bind constructors that don't exist in the
+   underlying C++ type (meaning that they are specific to the Python bindings).
+   Because `init` only works for existing C++ constructors, this requires
+   a manual workaround noting that
+
+   .. code-block:: cpp
+
+      nb::class_<MyType>(m, "MyType")
+          .def(nb::init<const char*, int>());
+
+   is syntax sugar for the following lower-level implementation using
+   "`placement new <https://en.wikipedia.org/wiki/Placement_syntax>`_":
+
+   .. code-block:: cpp
+
+      nb::class_<MyType>(m, "MyType")
+          .def("__init__",
+               [](MyType* t, const char* arg0, int arg1) {
+                   new (t) MyType(arg0, arg1);
+               });
+
+   The provided lambda function will be called with a pointer to uninitialized
+   memory that has already been allocated (this memory region is co-located
+   with the Python object for reasons of efficiency). The lambda function can
+   then either run an in-place constructor and return normally (in which case
+   the instance is assumed to be correctly constructed) or fail by raising an
+   exception.
+
+.. cpp:struct:: template <typename Arg> init_implicit
+
+   See :cpp:class:`init` for detail on binding constructorts. The main
+   difference between :cpp:class:`init`  and `init_implicit` is that the latter
+   only supports constructors taking a single argument `Arg`, and that it marks
+   the constructor as usable for implicit conversions from `Arg`.
+
+   Sometimes, it is necessary to bind implicit conversion-capable constructors
+   that don't exist in the underlying C++ type (meaning that they are specific
+   to the Python bindings). This can be done manually noting that
+
+   .. code-block:: cpp
+
+      nb::class_<MyType>(m, "MyType")
+          .def(nb::init_implicit<const char*, int>());
+
+   can be replaced by the lower-level code
+
+   .. code-block:: cpp
+
+       nb::class_<MyType>(m, "MyType")
+           .def("__init__",
+                [](MyType* t, const char* arg0) {
+                    new (t) MyType(arg0);
+                });
+
+       nb::implicitly_convertible<const char*, MyType>();
+
+
+GIL Management
+--------------
+
+These two `RAII
+<https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization>`_ helper
+classes acquire and release the *Global Interpreter Lock* (GIL) in a given
+scope. The :cpp:struct:`gil_scoped_release` helper is often combined with the
+:cpp:struct:`call_guard`, as in
+
+.. code-block:: cpp
+
+    m.def("expensive", &expensive, nb::call_guard<nb::gil_scoped_release>());
+
+This releases the interpreter lock while `expensive` is running, which permits
+running it in parallel from multiple Python threads.
+
+.. cpp:struct:: gil_scoped_acquire
+
+   .. cpp:function:: gil_scoped_acquire()
+
+      Acquire the GIL
+
+   .. cpp:function:: ~gil_scoped_acquire()
+
+      Release the GIL
+
+.. cpp:struct:: gil_scoped_release
+
+   .. cpp:function:: gil_scoped_release()
+
+      Release the GIL (**must** be currently held)
+
+   .. cpp:function:: ~gil_scoped_release()
+
+      Reacquire the GIL
+
+Low-level type and instance access
+----------------------------------
+
+nanobind exposes a low-level interface to provide fine-grained control over
+the sequence of steps that instantiates a Python object wrapping a C++
+instance. An thorough explanation of these features is provided in a
+:ref:`separate section <lowlevel>`. The function listing below merely
+summarizes their signatures.
+
+Type objects
+^^^^^^^^^^^^
+
+.. cpp:function:: bool type_check(handle h)
+
+   Returns ``true`` if ``h`` is a type that was previously bound via
+   :cpp:class:`class_`.
+
+.. cpp:function:: size_t type_size(handle h)
+
+   Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
+   return its size in bytes.
+
+.. cpp:function:: size_t type_align(handle h)
+
+   Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
+   return its alignment in bytes.
+
+.. cpp:function:: const std::type_info& type_info(handle h)
+
+   Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
+   return its C++ RTTI record.
+
+.. cpp:function:: template <typename T> T &type_supplement(handle h)
+
+   Return a reference to supplemental data stashed in a type object. See
+   :cpp:class:`supplement`.
+
+Instances
+^^^^^^^^^
+
+
+Low-level instance access
+-------------------------
+.. cpp:function:: bool inst_check(handle h)
+
+   Returns ``true`` if `h` represents an instance of a type that was
+   previously bound via :cpp:class:`class_`.
+
+.. cpp:function:: template <typename T> T * inst_ptr(handle h)
+
+   Assuming that `h` represents an instance of a type that was previously bound
+   via :cpp:class:`class_`, return a pointer to the C++ instance.
+
+   The function *does not check* that `T` is consistent with the type of `h`.
+
+.. cpp:function:: object inst_alloc(handle h)
+
+   Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
+   allocate an uninitialized Python object of type `h` and return it.
+
+.. cpp:function:: object inst_wrap(handle h, void * p)
+
+   Assuming that `h` represents an instance of a type that was previously bound
+   via :cpp:class:`class_`, create an object of type `h` that wraps an existing
+   C++ instace `p`.
+
+.. cpp:function:: void inst_zero(handle h)
+
+   Zero-initialize the contents of `h`.
+
+.. cpp:function:: bool inst_ready(handle h)
+
+   Query the *ready* field of the object `h`.
+
+.. cpp:function:: void inst_mark_ready(handle h)
+
+   Mark the object `h` as *ready*.
+
+.. cpp:function:: std::pair<bool, bool> inst_state(handle h)
+
+   Query the *ready* and *destruct* fields of the object `h`.
+
+.. cpp:function:: void inst_set_state(handle h, bool ready, bool destruct)
+
+   Set the *ready* and *destruct* fields of the object `h`.
+
+.. cpp:function:: void inst_destruct(handle h)
+
+   Destruct the object `h`.
+
+.. cpp:function:: void inst_copy(handle dst, handle src)
+
+   Move-construct the contents of `src` into `dst` and mark `dst` as *ready*.
+
+.. cpp:function:: void inst_move(handle dst, handle src)
+
+   Copy-construct the contents of `src` into `dst` and mark `dst` as *ready*.
+
+
+Global flags
+------------
+
+.. cpp:function:: void set_leak_warnings(bool value) noexcept
+
+   By default, nanobind loudly complains when any nanobind instances, types, or
+   functions are still alive when the Python interpreter shuts down. Call this
+   function to disable or re-enable leak warnings.
+
+.. cpp:function:: void set_implicit_cast_warnings(bool value) noexcept
+
+   By default, nanobind loudly complains when it attempts to perform an
+   implicit conversion, and when that conversion is not successful. Call this
+   function to disable or re-enable the warnings.
+
+
+Miscellaneous
+-------------
+
+.. cpp:function:: str repr(handle h)
+
+   Return a stringified version of the provided Python object.
+   Equivalent to ``repr(h)`` in Python.
+
+.. cpp:function:: void print(handle value, handle end = handle(), handle file = handle())
+
+   Invoke the Python ``print()`` function to print the object `value`. If desired,
+   a line ending `end` and file handle `file` can be specified.
+
+.. cpp:function:: void print(const char * str, handle end = handle(), handle file = handle())
+
+   Invoke the Python ``print()`` function to print the null-terminated C-style
+   string `str` that is encoded using UTF-8 encoding.  If desired, a line
+   ending `end` and file handle `file` can be specified.
+
+.. cpp:function:: iterator iter(handle h)
+
+   Equivalent to ``iter(h)`` in Python.
+
+.. cpp:function:: object none()
+
+   Return an object representing the value ``None``.
+
+.. cpp:function:: dict builtins()
+
+   Return the ``__builtins__`` dictionary.
+
+.. cpp:function:: template <typename Source, typename Target> void implicitly_convertible()
+
+   Indicate that the type `Source` is implicitly convertible into `Target`
+   (which must refer to a type that was previously bound via
+   :cpp:class:`class_`).
+
+   *Note*: the :cpp:struct:`init_implicit` interface generates more compact
+   code and should be preferred, i.e., use
+
+   .. code-block:: cpp
+
+      nb::class_<Target>(m, "Target")
+          .def(nb::init_implicit<Source>());
+
+   instead of
+
+   .. code-block:: cpp
+
+      nb::class_<Target>(m, "Target")
+          .def(nb::init<Source>());
+
+      nb::implicitly_convertible<Target, Source>();
+
+   The function is provided for reasons of compatibility with pybind11, and as
+   an escape hatch to enable use cases where :cpp:struct:`init_implicit`
+   is not available (e.g., for custom binding-specific constructors that don't
+   exist in `Target` type).
+
+.. cpp:struct:: template <typename T, typename D> typed
+
+    This helper class provides an an API for overriding the type annotation of
+    a function argument in generated docstrings. It is particularly helpful
+    when the type signature is not obvious and must be computed at compile time.
+    Otherwise, the :cpp:class:`raw_doc` attribute provides a simpler
+    alternative for taking full control of docstrings and type annotations.
+
+    Consider the following binding that iterates over a Python list.
+
+    .. code-block:: cpp
+
+       m.def("f", [](nb::list l) {
+           for (handle h : l) {
+               // ...
+           }
+       });
+
+    Suppose that ``f`` expects a list of ``Foo`` objects, which is not clear
+    from the signature. To improve the function signature, use the
+    ``nb::typed<T, D>`` wrapper class to pass the argument.
+
+    The template argument `T` should be set to the original argument type, and
+    `D` points to a helper class that will be used to compute the type name at
+    compile time. Any access to the list ``l`` must be replaced by ``l.value``:
+
+    .. code-block:: cpp
+
+       m.def("f", [](nb::typed<nb::list, FooListName> l) {
+           for (nb::handle h : l.value) {
+               // ...
+           }
+       });
+
+    In this simple example, the ``FooListName`` type can be defined as follows:
+
+    .. code-block:: cpp
+
+       struct FooListName {
+           static constexpr auto Name =
+               nb::detail::const_name("list[") +
+               nb::detail::const_name<Foo>() +
+               nb::detail::const_name("]");
+       };
+
+    More generally, `D` can be a templated class with partial overloads,
+    which allows for advanced constructions.
+
+    .. cpp:member:: T value
+
+       Wrapped value of the `typed` parameter.

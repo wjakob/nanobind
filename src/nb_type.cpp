@@ -456,10 +456,10 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed!", t->name);
 #else
     /* The fallback code below is cursed. It provides an alternative when
-       PyType_FromMetaclass() is not available we are furthermore *not*
-       targeting the stable ABI interface. It calls PyType_FromSpec() to create
-       a tentative type, copies its contents into a larger type with a
-       different metaclass, then lets the original type expire. */
+       PyType_FromMetaclass() is not available (i.e., on Python < 3.12). It
+       calls PyType_FromSpec() to create a tentative type, copies its contents
+       into a larger type with a different metaclass, then lets the original
+       type expire. This approach is incompatible with stable ABI builds. */
 
     (void) mod;
 
@@ -503,72 +503,126 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     tp->tp_name = tp_name;
     tp->tp_doc = tp_doc;
+    tp->tp_basicsize = temp_tp->tp_basicsize;
+    tp->tp_itemsize = temp_tp->tp_itemsize;
+    tp->tp_vectorcall_offset = temp_tp->tp_vectorcall_offset;
+    tp->tp_weaklistoffset = temp_tp->tp_weaklistoffset;
+    tp->tp_dictoffset = temp_tp->tp_dictoffset;
+    tp->tp_vectorcall = temp_tp->tp_vectorcall;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
-
     if (temp_tp->tp_flags & Py_TPFLAGS_HAVE_GC)
         tp->tp_flags |= Py_TPFLAGS_HAVE_GC;
 
-    /* The following fields remain intentionally null-initialized
-       following the call to PyType_GenericAlloc(): tp_dict, tp_bases, tp_mro,
-       tp_cache, tp_subclasses, tp_weaklist. */
+    PyAsyncMethods    *am = tp->tp_as_async = &ht->as_async;
+    PyNumberMethods   *nb = tp->tp_as_number = &ht->as_number;
+    PySequenceMethods *sq = tp->tp_as_sequence = &ht->as_sequence;
+    PyMappingMethods  *mp = tp->tp_as_mapping = &ht->as_mapping;
+    PyBufferProcs     *bf = tp->tp_as_buffer = &ht->as_buffer;
 
-    #define COPY_FIELD(name) \
-        tp->name = temp_tp->name;
+    #define CASE(tp, name) \
+        case Py_##tp##_##name: \
+            tp->tp##_##name = (decltype(tp->tp##_##name)) ts->pfunc; \
+            break;
 
-    COPY_FIELD(tp_basicsize);
-    COPY_FIELD(tp_itemsize);
-    COPY_FIELD(tp_dealloc);
-    COPY_FIELD(tp_vectorcall_offset);
-    COPY_FIELD(tp_getattr);
-    COPY_FIELD(tp_setattr);
-    COPY_FIELD(tp_repr);
-    COPY_FIELD(tp_hash);
-    COPY_FIELD(tp_call);
-    COPY_FIELD(tp_str);
-    COPY_FIELD(tp_getattro);
-    COPY_FIELD(tp_setattro);
-    COPY_FIELD(tp_traverse);
-    COPY_FIELD(tp_clear);
-    COPY_FIELD(tp_richcompare);
-    COPY_FIELD(tp_weaklistoffset);
-    COPY_FIELD(tp_iter);
-    COPY_FIELD(tp_iternext);
-    COPY_FIELD(tp_methods);
-    COPY_FIELD(tp_getset);
-    COPY_FIELD(tp_base);
-    COPY_FIELD(tp_descr_get);
-    COPY_FIELD(tp_descr_set);
-    COPY_FIELD(tp_dictoffset);
-    COPY_FIELD(tp_init);
-    COPY_FIELD(tp_alloc);
-    COPY_FIELD(tp_new);
-    COPY_FIELD(tp_free);
-    COPY_FIELD(tp_is_gc);
-    COPY_FIELD(tp_del);
-    COPY_FIELD(tp_finalize);
-    COPY_FIELD(tp_vectorcall);
+    for (PyType_Slot *ts = slots; ts != s; ++ts) {
+        switch (ts->slot) {
+            CASE(tp, dealloc)
+            CASE(tp, getattr)
+            CASE(tp, setattr)
+            CASE(tp, repr)
+            CASE(tp, hash)
+            CASE(tp, call)
+            CASE(tp, str)
+            CASE(tp, getattro)
+            CASE(tp, setattro)
+            CASE(tp, traverse)
+            CASE(tp, clear)
+            CASE(tp, richcompare)
+            CASE(tp, iter)
+            CASE(tp, iternext)
+            CASE(tp, methods)
+            CASE(tp, getset)
+            CASE(tp, base)
+            CASE(tp, descr_get)
+            CASE(tp, descr_set)
+            CASE(tp, init)
+            CASE(tp, alloc)
+            CASE(tp, new)
+            CASE(tp, free)
+            CASE(tp, is_gc)
+            CASE(tp, del)
+            CASE(tp, finalize)
 
-    #undef COPY_FIELD
+            #if PY_VERSION_HEX < 0x03090000
+            #  define Py_bf_getbuffer 1
+            #  define Py_bf_releasebuffer 2
+            #endif
+
+            CASE(bf, getbuffer)
+            CASE(bf, releasebuffer)
+
+            CASE(mp, ass_subscript)
+            CASE(mp, length)
+            CASE(mp, subscript)
+
+            CASE(nb, absolute)
+            CASE(nb, add)
+            CASE(nb, and)
+            CASE(nb, bool)
+            CASE(nb, divmod)
+            CASE(nb, float)
+            CASE(nb, floor_divide)
+            CASE(nb, index)
+            CASE(nb, inplace_add)
+            CASE(nb, inplace_and)
+            CASE(nb, inplace_floor_divide)
+            CASE(nb, inplace_lshift)
+            CASE(nb, inplace_multiply)
+            CASE(nb, inplace_or)
+            CASE(nb, inplace_power)
+            CASE(nb, inplace_remainder)
+            CASE(nb, inplace_rshift)
+            CASE(nb, inplace_subtract)
+            CASE(nb, inplace_true_divide)
+            CASE(nb, inplace_xor)
+            CASE(nb, int)
+            CASE(nb, invert)
+            CASE(nb, lshift)
+            CASE(nb, multiply)
+            CASE(nb, negative)
+            CASE(nb, or)
+            CASE(nb, positive)
+            CASE(nb, power)
+            CASE(nb, remainder)
+            CASE(nb, rshift)
+            CASE(nb, subtract)
+            CASE(nb, true_divide)
+            CASE(nb, xor)
+            CASE(nb, matrix_multiply)
+            CASE(nb, inplace_matrix_multiply)
+
+            CASE(sq, ass_item)
+            CASE(sq, concat)
+            CASE(sq, contains)
+            CASE(sq, inplace_concat)
+            CASE(sq, inplace_repeat)
+            CASE(sq, item)
+            CASE(sq, length)
+            CASE(sq, repeat)
+
+            CASE(am, await)
+            CASE(am, aiter)
+            CASE(am, anext)
+#if PY_VERSION_HEX >= 0x030A0000
+            CASE(am, send)
+#endif
+        }
+    }
 
     if (temp_tp->tp_members) {
         tp->tp_members = (PyMemberDef*)((char *)tp + Py_TYPE(tp)->tp_basicsize);
         std::memcpy(tp->tp_members, temp_tp->tp_members, tp->tp_itemsize * Py_SIZE(temp_tp));
     }
-
-    ht->as_async = temp_ht->as_async;
-    tp->tp_as_async = &ht->as_async;
-
-    ht->as_number = temp_ht->as_number;
-    tp->tp_as_number = &ht->as_number;
-
-    ht->as_sequence = temp_ht->as_sequence;
-    tp->tp_as_sequence = &ht->as_sequence;
-
-    ht->as_mapping = temp_ht->as_mapping;
-    tp->tp_as_mapping = &ht->as_mapping;
-
-    ht->as_buffer = temp_ht->as_buffer;
-    tp->tp_as_buffer = &ht->as_buffer;
 
 #if PY_VERSION_HEX < 0x03090000
     if (has_dynamic_attr)

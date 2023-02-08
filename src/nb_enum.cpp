@@ -191,15 +191,6 @@ NB_ENUM_UNOP(neg, PyNumber_Negative)
 NB_ENUM_UNOP(inv, PyNumber_Invert)
 NB_ENUM_UNOP(abs, PyNumber_Absolute)
 
-int nb_enum_clear(PyObject *) {
-    return 0;
-}
-
-int nb_enum_traverse(PyObject *o, visitproc visit, void *arg) {
-    Py_VISIT(Py_TYPE(o));
-    return 0;
-}
-
 Py_hash_t nb_enum_hash(PyObject *o) {
     Py_hash_t value = 0;
     type_data *t = nb_type_data(Py_TYPE(o));
@@ -239,8 +230,6 @@ void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
     *t++ = { Py_nb_int, (void *) nb_enum_int };
     *t++ = { Py_nb_index, (void *) nb_enum_int };
     *t++ = { Py_tp_getset, (void *) nb_enum_getset };
-    *t++ = { Py_tp_traverse, (void *) nb_enum_traverse };
-    *t++ = { Py_tp_clear, (void *) nb_enum_clear };
     *t++ = { Py_tp_hash, (void *) nb_enum_hash };
 
     if (is_arithmetic) {

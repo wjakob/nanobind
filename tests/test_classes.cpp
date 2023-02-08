@@ -94,6 +94,10 @@ int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
     // Inform the Python GC about it
     Py_VISIT(value.ptr());
 
+    // And inform Python GC about our type (bpo-40217)
+    #if PY_VERSION_HEX >= 0x03090000
+        Py_VISIT(Py_TYPE(self));
+    #endif
     return 0;
 }
 

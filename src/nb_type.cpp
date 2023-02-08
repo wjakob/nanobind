@@ -25,16 +25,27 @@ static PyObject **nb_dict_ptr(PyObject *self) {
 #endif
 }
 
-static int inst_clear(PyObject *self) {
+static int inst_dict_clear(PyObject *self) {
     PyObject *&dict = *nb_dict_ptr(self);
     Py_CLEAR(dict);
     return 0;
 }
 
-static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
+static int inst_dict_traverse(PyObject *self, visitproc visit, void *arg) {
+#if PY_VERSION_HEX >= 0x03090000
+    Py_VISIT(Py_TYPE(self));
+#endif
     PyObject *&dict = *nb_dict_ptr(self);
     if (dict)
         Py_VISIT(dict);
+    return 0;
+}
+
+static int inst_nodict_clear(PyObject *self) {
+    return 0;
+}
+
+static int inst_nodict_traverse(PyObject *self, visitproc visit, void *arg) {
 #if PY_VERSION_HEX >= 0x03090000
     Py_VISIT(Py_TYPE(self));
 #endif
@@ -386,7 +397,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         /* .name = */ name_copy,
         /* .basicsize = */ (int) basicsize,
         /* .itemsize = */ 0,
-        /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+        /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
         /* .slots = */ slots
     };
 
@@ -431,17 +442,20 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
         // Install GC traverse and clear routines if not inherited/overridden
         if (!has_traverse) {
-            *s++ = { Py_tp_traverse, (void *) inst_traverse };
-            *s++ = { Py_tp_clear, (void *) inst_clear };
+            *s++ = { Py_tp_traverse, (void *) inst_dict_traverse };
+            *s++ = { Py_tp_clear, (void *) inst_dict_clear };
             has_traverse = true;
         }
 
         spec.basicsize = (int) basicsize;
     }
-
-    if (has_traverse && (!base || (PyType_GetFlags((PyTypeObject *) base) &
-                                   Py_TPFLAGS_HAVE_GC) == 0)) {
-        spec.flags |= Py_TPFLAGS_HAVE_GC;
+    if (!has_traverse){
+        // Install the basic tp_traverse and tp_clear to register the relationship
+        // between instances of this type and the type itself. Otherwise they are
+        // uncollectable garbage. See bpo-40217, but all types created with
+        // PyType_FromSpec need a tp_traverse that call Py_VISIT(Py_TYPE(self))
+        *s++ = { Py_tp_traverse, (void *) inst_nodict_traverse };
+        *s++ = { Py_tp_clear, (void *) inst_nodict_clear };
     }
 
     *s++ = { 0, nullptr };

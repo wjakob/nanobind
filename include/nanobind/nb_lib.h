@@ -164,7 +164,6 @@ NB_CORE PyObject* obj_repr(PyObject *o);
 /// Obtain a hash value of a Python object
 NB_CORE Py_hash_t obj_hash(PyObject *o);
 
-
 /// Perform a comparison between Python objects and handle errors
 NB_CORE bool obj_comp(PyObject *a, PyObject *b, int value);
 

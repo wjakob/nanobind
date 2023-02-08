@@ -554,8 +554,8 @@ def test32_type_checks():
     assert t.is_int_2(v1) and not t.is_int_2(v2)
     assert not t.is_struct(v1) and t.is_struct(v2)
 
-def test33_deference():
-    deferent = "my_val"
-    deferential = t.Deferential(deferent)
-    assert hash(deferential) == hash(deferent)
-    assert deferential == deferent
+def test33_indirect_hashing():
+    direct = "my_val"
+    indirect = t.Indirect(direct)
+    assert hash(indirect) == hash(direct)
+    assert indirect == direct

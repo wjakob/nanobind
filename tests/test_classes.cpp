@@ -440,12 +440,12 @@ NB_MODULE(test_classes_ext, m) {
     m.def("is_int_2", [](nb::handle h) { return nb::isinstance<nb::int_>(h); });
     m.def("is_struct", [](nb::handle h) { return nb::isinstance<Struct>(h); });
 
-    // test33_deference
-    struct Deferential {nb::object target; };
-    nb::class_<Deferential>(m, "Deferential")
+    // test33_indirect_hashing
+    struct Indirect { nb::object target; };
+    nb::class_<Indirect>(m, "Indirect")
         .def(nb::init<nb::object>())
-        .def("__eq__", [](const Deferential &self, nb::object other){
+        .def("__eq__", [](const Indirect &self, nb::object other) {
             return self.target.equal(other);
         })
-        .def("__hash__", [](const Deferential &self){ return nb::hash(self.target); });
+        .def("__hash__", [](const Indirect &self) { return nb::hash(self.target); });
 }

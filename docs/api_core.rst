@@ -1918,6 +1918,10 @@ Miscellaneous
 
    Equivalent to ``iter(h)`` in Python.
 
+.. cpp:function:: Py_hash_t hash(handle h)
+
+   Equivalent to ``hash(h)`` in Python.
+
 .. cpp:function:: object none()
 
    Return an object representing the value ``None``.

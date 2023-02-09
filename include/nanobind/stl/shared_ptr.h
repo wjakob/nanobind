@@ -28,6 +28,9 @@ inline NB_NOINLINE std::shared_ptr<void>
 shared_from_python(void *ptr, handle h) noexcept {
     struct py_deleter {
         void operator()(void *) noexcept {
+            // Don't run the deleter if the interpreter has been shut down
+            if (!Py_IsInitialized())
+                return;
             gil_scoped_acquire guard;
             Py_DECREF(o);
         }
@@ -62,10 +65,11 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                   "Binding 'shared_ptr<T>' requires that 'T' can also be bound "
                   "by nanobind. It appears that you specified a type which "
                   "would undergo conversion/copying, which is not allowed.");
-    static_assert(
-        !uses_shared_from_this<T>::value,
-        "nanobind does not permit use of std::shared_from_this, which can "
-        "cause undefined behavior. (Refer to docs/ownership.md for details.)");
+    static_assert(!uses_shared_from_this<T>::value,
+                  "nanobind does not permit use of std::shared_from_this, "
+                  "which can cause undefined behavior. (Refer to "
+                  "https://nanobind.readthedocs.io/en/latest/ownership.html "
+                  "for details.)");
 
     static constexpr auto Name = Caster::Name;
     static constexpr bool IsClass = true;

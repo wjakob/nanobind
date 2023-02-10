@@ -303,3 +303,7 @@ def test33_method_on_non_nanobind_class():
 
 def test34_module_docstring():
     assert t.__doc__ == 'function testcase'
+
+def test35_return_capture():
+    x = t.test_35()
+    assert x() == 'Test Foo'

@@ -202,4 +202,14 @@ NB_MODULE(test_functions_ext, m) {
     m.attr("test_34") = nb::cpp_function([](nb::object self, int y) {
         return nb::cast<int>(self.attr("x")) * y;
     }, nb::arg("y"), nb::is_method());
+
+    m.def("test_35", []() {
+        const char *name = "Foo";
+
+        auto callback = [=]() {
+            return nb::str("Test {}").format(name);
+        };
+
+        return nb::cpp_function(callback);
+    });
 }

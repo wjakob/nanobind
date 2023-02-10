@@ -187,4 +187,9 @@ detail::accessor<detail::num_item_tuple> tuple::operator[](T index) const {
     return { derived(), (Py_ssize_t) index };
 }
 
+template <typename... Args> str str::format(Args&&... args) {
+    return steal<str>(
+        derived().attr("format")((detail::forward_t<Args>) args...).release());
+}
+
 NAMESPACE_END(NB_NAMESPACE)

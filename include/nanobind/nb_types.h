@@ -356,6 +356,8 @@ class str : public object {
     explicit str(const char *s, size_t n)
         : object(detail::str_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
+    template <typename... Args> str format(Args&&... args);
+
     const char *c_str() { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };
 

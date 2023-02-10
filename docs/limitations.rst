@@ -1,3 +1,6 @@
+Limitations
+===========
+
 nanobind strives to be a general solution to binding generation, but it also
 has certain limitations:
 

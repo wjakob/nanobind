@@ -1184,166 +1184,6 @@ the reference section on :ref:`class binding <class_binding>`.
    an escape hatch for more specialized use cases.
 
 
-Return value policies
----------------------
-
-.. cpp:enum-class:: rv_policy
-
-   A return value policy clarifies questions related to ownership when a
-   previously unknown C++ instance is first cast into a Python object.
-
-   You don't need to specify a return value policy when the C++ type uses some
-   kind of smart pointer like ``std::unique_ptr<T>``, ``std::shared_ptr<T>``,
-   or an :ref:`intrusive pointer <intrusive>`.
-
-   The following policies are available:
-
-   .. cpp:enumerator:: take_ownership
-
-      Create a Python object that wraps the existing C++ instance and takes
-      full ownership of it. No copies are made. Python will call the C++
-      destructor and ``delete`` operator when the Python wrapper is garbage
-      collected at some later point. The C++ side *must* relinquish ownership
-      and is not allowed to destruct the instance, or undefined behavior will
-      ensue.
-
-      Below is an example use of this return value policy: a bound function
-      returns a newly allocated instance on the heap and transfers ownership
-      to Python that will release this memory when the instance is no longer
-      needed.
-
-      .. code-block:: cpp
-
-         m.def("make_a", []() -> A* { return new A(); }, nb::rv_policy::take_ownership)
-
-      Note that the return value policy declaration could actually be omitted
-      above, since `take_ownership` is the default choice for pointer return values
-      (see `automatic` for details).
-
-   .. cpp:enumerator:: copy
-
-      Copy-construct a new Python object from the C++ instance. The new copy
-      will be owned by Python, while C++ retains ownership of the original.
-
-      Below is an example use of this return value policy: a bound function
-      returns a reference to a C++ instance. It may not be clear who owns this
-      instance and how long it will be alive, so the safest route is to make a
-      copy.
-
-      .. code-block:: cpp
-
-         struct A {
-            const B &b() {
-                // .. unknown code ..
-            }
-         };
-
-         m.def("get_b", [](A &a) { return a.b(); }, nb::rv_policy::copy)
-
-      Note that the return value policy declaration could actually be omitted
-      above, since `copy` is the default choice whenever a function returns an
-      lvalue reference (see `automatic` for details).
-
-   .. cpp:enumerator:: move
-
-      Move-construct a new Python object from the C++ instance. The new object
-      will be owned by Python, while C++ retains ownership of the original
-      (whose contents were likely invalidated by the move operation).
-
-      Below is an example use of this return value policy: a bound function
-      returns a C++ instance by value. The `copy` operation mentioned above
-      would be safe to use in this case, but move construction has the potential
-      of being far more efficient.
-
-      .. code-block:: cpp
-
-         struct A {
-            B b() {
-                return B { ... };
-            }
-         };
-
-         m.def("get_b", [](A &a) { return a.b(); }, nb::rv_policy::move)
-
-      Note that the return value policy declaration could actually be omitted
-      above, since `move` is the default choice for functions that return by
-      value (see `automatic` for details).
-
-   .. cpp:enumerator:: reference
-
-      Create a Python object that wraps the existing C++ instance *without
-      taking ownership* of it. No copies are made. Python will never call the
-      destructor or ``delete`` operator, even when the Python wrapper is
-      garbage collected. The C++ side is responsible for destructing the C++
-      instance.
-
-      This return value policy is *dangerous and should be used cautiously*.
-      Undefined behavior will ensue when the C++ side deletes the instance too
-      early (i.e., while it is still being used by Python). If need to use this
-      policy, combine it with a :cpp:struct:`keep_alive` function binding
-      annotation to manage the lifetime. Or use the simple and safe
-      `reference_internal` alternative described next.
-
-      Below is an example use of this return value policy to reference a
-      global variable that does not need ownership and lifetime management.
-
-      .. code-block:: cpp
-
-         A a; // This is a global variable
-
-         m.def("get_a", []() -> A* { return &a; }, nb::rv_policy::reference)
-
-
-
-   .. cpp:enumerator:: reference_internal
-
-      A safe extension of the `reference` policy for methods that implement
-      some form of attribute access. It creates a Python object that wraps the
-      existing C++ instance *without taking ownership* of it. Additionally, it
-      adjusts reference counts to keeps the method's implicit ``self`` argument
-      alive until the newly created object has been garbage collected.
-
-      Below is an example use of this return value policy: a getter function
-      returns a reference to an internal field. Wrapping this getter using
-      `reference_internal` permits mutable access to the field. nanobind
-      ensures that the parent `A` instance is kept alive until the `B` field
-      reference has been garbage collected.
-
-      .. code-block:: cpp
-
-          struct A {
-              B b;
-              B &get_b() { return b; }
-          };
-
-          nb::class_<A>(m, "A")
-             .def("get_b", &A::get_b, nb::rv_policy::reference_internal);
-
-      More advanced variations of this scheme are also possible using
-      combinations of `reference` and the :cpp:struct:`keep_alive` function
-      binding annotation.
-
-   .. cpp:enumerator:: none
-
-      This is the most conservative policy: it simply refuse the cast unless
-      the C++ instance already has a corresponding Python object, in which case
-      the question of ownership becomes moot.
-
-   .. cpp:enumerator:: automatic
-
-      This is the default return value policy, which falls back to
-      `take_ownership` when the return value is a pointer, `move`  when it is a
-      rvalue reference, and `copy` when it is a lvalue reference.
-
-   .. cpp:enumerator:: automatic_reference
-
-      This policy matches `automatic` but falls back to `reference` when the
-      return value is a pointer. It is the default for function arguments when
-      calling Python functions from C++ code via
-      :cpp:func:`detail::api::operator()`. You probably won't need to use it in
-      your own code.
-
-
 Casting
 -------
 
@@ -1483,6 +1323,73 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
       Take complete control over the docstring of a bound function and replace it with `value`.
 
+.. cpp:enum-class:: rv_policy
+
+   A return value policy determines the question of *ownership* when a bound
+   function returns a previously unknown C++ instance that must now be
+   converted into a Python object.
+
+   A return value policy is unnecessary when the type itself clarifies
+   ownership (e.g., ``std::unique_ptr<T>``, ``std::shared_ptr<T>``, a type with
+   :ref:`intrusive reference counting <intrusive>`).
+
+   The following policies are available (where `automatic` is the default).
+   Please refer to the :ref:`return value policy section <rvp>` of the main
+   documentation, which clarifies the list below using concrete examples.
+
+   .. cpp:enumerator:: take_ownership
+
+      Create a Python object that wraps the existing C++ instance and takes
+      full ownership of it. No copies are made. Python will call the C++
+      destructor and ``delete`` operator when the Python wrapper is garbage
+      collected at some later point. The C++ side *must* relinquish ownership
+      and is not allowed to destruct the instance, or undefined behavior will
+      ensue.
+
+   .. cpp:enumerator:: copy
+
+      Copy-construct a new Python object from the C++ instance. The new copy
+      will be owned by Python, while C++ retains ownership of the original.
+
+   .. cpp:enumerator:: move
+
+      Move-construct a new Python object from the C++ instance. The new object
+      will be owned by Python, while C++ retains ownership of the original
+      (whose contents were likely invalidated by the move operation).
+
+   .. cpp:enumerator:: reference
+
+      Create a Python object that wraps the existing C++ instance *without
+      taking ownership* of it. No copies are made. Python will never call the
+      destructor or ``delete`` operator, even when the Python wrapper is
+      garbage collected.
+
+   .. cpp:enumerator:: reference_internal
+
+      A safe extension of the `reference` policy for methods that implement
+      some form of attribute access. It creates a Python object that wraps the
+      existing C++ instance *without taking ownership* of it. Additionally, it
+      adjusts reference counts to keeps the method's implicit ``self`` argument
+      alive until the newly created object has been garbage collected.
+
+   .. cpp:enumerator:: none
+
+      This is the most conservative policy: it simply refuses the cast unless
+      the C++ instance already has a corresponding Python object, in which case
+      the question of ownership becomes moot.
+
+   .. cpp:enumerator:: automatic
+
+      This is the default return value policy, which falls back to
+      `take_ownership` when the return value is a pointer, `move`  when it is a
+      rvalue reference, and `copy` when it is a lvalue reference.
+
+   .. cpp:enumerator:: automatic_reference
+
+      This policy matches `automatic` but falls back to `reference` when the
+      return value is a pointer.
+
+
 .. _class_binding_annotations:
 
 Class binding annotations
@@ -1573,7 +1480,7 @@ Class binding
 
    .. cpp:function:: template <typename Func, typename... Extra> class_ &def_static(const char * name, Func &&f, const Extra &... extra)
 
-      Bind the static function `f` to the identifier `name`. The variable
+      Bind the *static* function `f` to the identifier `name`. The variable
       length `extra` parameter can be used to pass a docstring and
       other :ref:`function binding annotations <function_binding_annotations>`.
 
@@ -1619,14 +1526,14 @@ Class binding
 
    .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_readwrite(const char * name, D C::* pm, const Extra &...extra)
 
-      Bind a *static* Python ``property`` represented by a `getter` function to
+      Bind a Python ``property`` represented by a `getter` function to
       the identifier `name`. The variable length `extra` parameter can be used
       to pass a docstring and other :ref:`function binding annotations
       <function_binding_annotations>`.
 
    .. cpp:function:: template <typename D, typename... Extra> class_ &def_readwrite_static(const char * name, D* pm, const Extra &...extra)
 
-      Bind a Python ``property`` represented by the instance field `pm` to the
+      Bind a *static* Python ``property`` represented by the instance field `pm` to the
       identifier `name`. The variable length `extra` parameter can be used to
       pass a docstring andother  :ref:`function binding annotations
       <function_binding_annotations>`.

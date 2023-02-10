@@ -63,15 +63,15 @@ Table of contents
    :caption: Intermediate
    :maxdepth: 1
 
+   exchanging
+   ownership
    classes
-   interop
    packaging
 
 .. toctree::
    :caption: Advanced
    :maxdepth: 1
 
-   ownership
    intrusive
    lowlevel
    typeslots

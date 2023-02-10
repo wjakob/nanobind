@@ -228,6 +228,8 @@ way.
 
     m.attr("the_answer") = 42;
 
+.. _docstrings:
+
 Docstrings
 ----------
 
@@ -268,17 +270,162 @@ The automatically generated documentation covers functions, classes,
 parameter and return value type information, argument names, and default
 arguments.
 
-Lambda functions
-----------------
+.. _binding_types:
 
-All nanobind features that expect functions also work for *stateless* and
-*stateful* lambda functions (i.e., lambdas with with captured variable
-state). For example, the following binding declaration is valid:
+Binding a custom type
+---------------------
+
+Let's now turn to an object oriented example. We will create bindings for a
+simple C++ type named ``Dog`` defined as follows:
 
 .. code-block:: cpp
 
-   int amount = 3;
+   #include <string>
 
-   m.def("scale",
-         [=amount](int a) { return a * amount; });
+   class Dog {
+   public:
+       Dog() = default;
+       Dog(const std::string &name) : m_name(name) { }
+       void set_name(const std::string &name) { m_name = name; }
+       const std::string &name() const { return m_name; }
 
+   private:
+       std::string m_name;
+   };
+
+The ``Dog`` bindings look as follows:
+
+.. code-block:: cpp
+
+   #include <nanobind/nanobind.h>
+   #include <nanobind/stl/string.h>
+
+   namespace nb = nanobind;
+
+   NB_MODULE(my_ext, m) {
+       nb::class_<Dog>(m, "Dog")
+           .def(nb::init<>())
+           .def(nb::init<const std::string &>())
+           .def("set_name", &Dog::set_name)
+           .def("name", &Dog::name);
+   }
+
+Let's look at selected lines of this example, starting with the added include directive:
+
+.. code-block:: cpp
+
+   #include <nanobind/nanobind.h>
+
+nanobind has a minimal core and initially doesn't know how to deal with STL
+types like ``std::string``. This line imports a *type caster* that realizes a
+bidirectional conversion (C++ ``std::string`` ↔ Python ``str``) to make the
+example usable. An :ref:`upcoming documentation section <type_casters>`
+contrasts type casters and other alternatives.
+
+The class binding declaration :class:`nb::class_\<T\>() <class_>` supports both
+``class`` and ``struct``-style data structures.
+
+.. code-block:: cpp
+
+   nb::class_<Dog>(m, "Dog")
+
+Here, it associates the C++ type ``Dog`` with a new Python type named ``"Dog"``
+and installs it in the :cpp:class:`nb::module_ <module_>` ``m``.
+
+Initially, this type is completely empty---it has no members and cannot be
+instantiated. The subsequent chain of :cpp:func:`.def(..) <class_::def>`
+declarations adds constructors and methods.
+
+.. code-block:: cpp
+
+   .def(nb::init<>())
+   .def(nb::init<const std::string &>())
+
+The first two use :cpp:class:`nb::init\<...\>() <init>` to bind constructor
+overloads followed by the remaining methods. An interactive Python session
+demonstrating this example is shown below:
+
+.. code-block:: pycon
+
+   Python 3.11.1 (main, Dec 23 2022, 09:28:24) [Clang 14.0.0 (clang-1400.0.29.202)] on darwin
+   Type "help", "copyright", "credits" or "license" for more information.
+   >>> import my_ext
+   >>> d = my_ext.Dog("Max")
+   >>> print(d)
+   <my_ext.Dog object at 0x1044540f0>
+   >>> d.name()
+   'Max'
+   >>> d.set_name("Charlie")
+   >>> d.name()
+   'Charlie'
+
+.. note::
+
+    Constructors and methods support :ref:`docstrings <docstrings>`,
+    :ref:`keyword, and default argument <keyword_and_default_args>` annotations
+    as before.
+
+.. _binding_lambdas:
+
+Lambda functions
+----------------
+
+Note how ``print(d)`` produced a rather useless summary in the example above:
+
+.. code-block:: pycon
+
+    >>> print(d)
+    <my_ext.Dog object at 0x1044540f0>
+
+To address this, we must add a special method named ``__repr__`` that returns a
+human-readable summary. Unfortunately, a function with such functionality does
+not exist in the ``Dog`` type, and it would be nice if we did not have to
+modify it. To accomplish this goal, we can instead bind a *lambda function*:
+
+.. code-block:: cpp
+
+   nb::class_<Dog>(m, "Dog")
+       // ... skipped ...
+       .def("__repr__",
+           [](const Dog &p) { return "<my_ext.Dog named '" + p.name + "'>"; });
+
+nanobind supports both stateless [#f1]_ and stateful lambda closures.
+
+Higher order functions
+----------------------
+
+Nanobind's support for higher-order functions [#f2]_ further blurs the language
+boundary. The snippet below extends the ``Dog`` class with higher-order
+function ``bark_async()`` that calls :cpp:func:`nb::cpp_function()
+<cpp_function>` to convert and return a *stateful* lambda function
+(``callback``) as a Python function object.
+
+.. code-block:: cpp
+
+   nb::class_<Dog>(m, "Dog")
+       // ... skipped ...
+       .def("bark_async", [](const Dog &p) {
+           auto callback = [name = p.name()] {
+               nb::print(nb::str("{}: woof!").format(name));
+           };
+           return nb::cpp_function(callback);
+       });
+
+The converted lambda function captures the ``Dog::name()`` property and in turn
+calls Python functions (:cpp:func:`nb::print() <print>`,
+:cpp:func:`nb::str::format() <str::format>`) to print a string on the console.
+Here is an example usage in Python:
+
+.. code-block:: pycon
+
+   >>> f = d.bark_async()
+   >>> f
+   <nanobind.nb_func object at 0x10537c140>
+   >>> f()
+   Charlie: woof!
+
+.. [#f1] Stateless closures are those with an empty pair of brackets ``[]`` as
+   the capture object.
+
+.. [#f2] Higher-order functions are functions that take functions as arguments
+   and/or return them.

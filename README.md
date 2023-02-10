@@ -20,9 +20,7 @@ More concretely,
 **~2-3× faster** compile time, **~3× smaller** binaries, and up to **~8×
 lower** runtime overheads compared to pybind11.
 
-
 ## Documentation
 
-Please refer to the [documentation on
-readthedocs](https://nanobind.readthedocs.io/en/latest/) for tutorials and
-detailed reference documentation.
+nanobind's [readthedocs page](https://nanobind.readthedocs.io/en/latest/)
+provides tutorials and detailed reference documentation.

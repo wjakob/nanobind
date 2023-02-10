@@ -11,68 +11,6 @@ Object-oriented code
    <https://pybind11.readthedocs.io/en/stable/advanced/classes.html>`_ since it
    uses the same API.
 
-Creating bindings for a custom type
------------------------------------
-
-Let's now look at a more complex example, in which we will create bindings
-for a custom C++ data structure named ``Pet``. Its definition is given
-below:
-
-.. code-block:: cpp
-
-    struct Pet {
-        Pet(const std::string &name) : m_name(name) { }
-        void set_name(const std::string &name) { m_name = name; }
-        const std::string &get_name() const { return m_name; }
-
-        std::string m_name;
-    };
-
-The binding code for ``Pet`` looks as follows:
-
-.. code-block:: cpp
-
-    #include <nanobind/nanobind.h>
-    #include <nanobind/stl/string.h>
-
-    namespace nb = nanobind;
-
-    NB_MODULE(my_ext, m) {
-        nb::class_<Pet>(m, "Pet")
-            .def(nb::init<const std::string &>())
-            .def("set_name", &Pet::set_name)
-            .def("get_name", &Pet::get_name);
-    }
-
-
-This example involves the STL type ``std::string``, which nanobind does not
-recognize by default. An extra include directive at the top imports the
-associated type caster (``nanobind/stl/string.h``).
-
-The class :class:`nb::class_\<T\> <class_>` creates bindings for both *class*
-and *struct* data structures. Calling :cpp:func:`nb::class_\<T\>::def()
-<class_::def>` with a :cpp:class:`nb::init\<...\>() <init>` declaration of
-argument types generates a binding of the associated constructor.
-
-An interactive Python session demonstrating this example is shown below:
-
-.. code-block:: pycon
-
-    % python
-    >>> import my_ext
-    >>> p = my_ext.Pet("Molly")
-    >>> print(p)
-    <my_ext.Pet object at 0x10cd98060>
-    >>> p.get_name()
-    'Molly'
-    >>> p.set_name("Charly")
-    >>> p.get_name()
-    'Charly'
-
-.. seealso::
-
-    Static member functions can be bound in the same way using
-    :cpp:func:`class_::def_static`.
 
 Keyword and default arguments
 -----------------------------
@@ -245,8 +183,8 @@ just brings them on par.
 
 .. _inheritance:
 
-Inheritance and automatic downcasting
--------------------------------------
+Inheritance
+-----------
 
 Suppose now that the example consists of two data structures with an
 inheritance relationship:
@@ -324,42 +262,6 @@ type behind a base pointer, Python only sees a ``Pet``. In C++, a type is only
 considered polymorphic if it has at least one virtual function and nanobind
 will automatically recognize this:
 
-.. code-block:: cpp
-
-    struct PolymorphicPet {
-        virtual ~PolymorphicPet() = default;
-    };
-
-    struct PolymorphicDog : PolymorphicPet {
-        std::string bark() const { return "woof!"; }
-    };
-
-    // Same binding code
-    nb::class_<PolymorphicPet>(m, "PolymorphicPet");
-    nb::class_<PolymorphicDog, PolymorphicPet>(m, "PolymorphicDog")
-        .def(nb::init<>())
-        .def("bark", &PolymorphicDog::bark);
-
-    // Again, return a base pointer to a derived instance
-    m.def("pet_store2", []() { return std::unique_ptr<PolymorphicPet>(new PolymorphicDog); });
-
-.. code-block:: pycon
-
-    >>> p = my_ext.pet_store2()
-    >>> type(p)
-    PolymorphicDog  # automatically downcast
-    >>> p.bark()
-    'woof!'
-
-Given a pointer to a polymorphic base, nanobind performs automatic downcasting
-to the actual derived type. Note that this goes beyond the usual situation in
-C++: we don't just get access to the virtual functions of the base, we get the
-concrete derived type including functions and attributes that the base type may
-not even be aware of.
-
-.. seealso::
-
-    For more information about polymorphic behavior see :ref:`overriding_virtuals`.
 
 
 Overloaded methods

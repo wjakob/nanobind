@@ -20,9 +20,9 @@ nanobinds depends on
 
 - **Python 3.8+** or **PyPy 7.3.10+** (either the 3.8 or 3.9 PyPy flavors).
 - **CMake 3.15+**.
-- **A C++17 compiler**: Only Clang 7, GCC 8, MSVC2019 (or newer) are officially
-  supported. Others (MinGW, Intel, NVIDIA, ..) may work as well but aren't
-  officially supported.
+- **A C++17 compiler**: Clang 7+, GCC 8+, and MSVC2019+ are officially
+  supported. Others (MinGW, Intel, NVIDIA, ..) may work as well but will not
+  receive support.
 
 How to cite this project?
 -------------------------
@@ -36,7 +36,7 @@ discourse:
        author = {Wenzel Jakob},
        year = {2022},
        note = {https://github.com/wjakob/nanobind},
-       title = {nanobind -- Seamless operability between C++17 and Python}
+       title = {nanobind---Seamless operability between C++17 and Python}
     }
 
 
@@ -52,18 +52,23 @@ Table of contents
    porting
 
 .. toctree::
-   :caption: The Basics
+   :caption: Basics
    :maxdepth: 1
 
    installing
    building
    basics
-   interop
+
+.. toctree::
+   :caption: Intermediate
+   :maxdepth: 1
+
    classes
+   interop
    packaging
 
 .. toctree::
-   :caption: Advanced Topics
+   :caption: Advanced
    :maxdepth: 1
 
    ownership
@@ -71,6 +76,7 @@ Table of contents
    lowlevel
    typeslots
    tensors
+   limitations
 
 .. toctree::
    :caption: API Reference

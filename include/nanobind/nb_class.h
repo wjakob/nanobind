@@ -349,8 +349,8 @@ public:
     }
 
     template <typename Getter, typename Setter, typename... Extra>
-    NB_INLINE class_ &def_property(const char *name_, Getter &&getter,
-                                   Setter &&setter, const Extra &...extra) {
+    NB_INLINE class_ &def_prop_rw(const char *name_, Getter &&getter,
+                                  Setter &&setter, const Extra &...extra) {
         object get_p, set_p;
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
@@ -368,9 +368,9 @@ public:
     }
 
     template <typename Getter, typename Setter, typename... Extra>
-    NB_INLINE class_ &def_property_static(const char *name_, Getter &&getter,
-                                          Setter &&setter,
-                                          const Extra &...extra) {
+    NB_INLINE class_ &def_prop_rw_static(const char *name_, Getter &&getter,
+                                         Setter &&setter,
+                                         const Extra &...extra) {
         object get_p, set_p;
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
@@ -387,63 +387,63 @@ public:
     }
 
     template <typename Getter, typename... Extra>
-    NB_INLINE class_ &def_property_readonly(const char *name_, Getter &&getter,
-                                            const Extra &...extra) {
-        return def_property(name_, getter, nullptr, extra...);
+    NB_INLINE class_ &def_prop_ro(const char *name_, Getter &&getter,
+                                  const Extra &...extra) {
+        return def_prop_rw(name_, getter, nullptr, extra...);
     }
 
     template <typename Getter, typename... Extra>
-    NB_INLINE class_ &def_property_readonly_static(const char *name_,
-                                                   Getter &&getter,
-                                                   const Extra &...extra) {
-        return def_property_static(name_, getter, nullptr, extra...);
+    NB_INLINE class_ &def_prop_ro_static(const char *name_,
+                                         Getter &&getter,
+                                         const Extra &...extra) {
+        return def_prop_rw_static(name_, getter, nullptr, extra...);
     }
 
     template <typename C, typename D, typename... Extra>
-    NB_INLINE class_ &def_readwrite(const char *name, D C::*pm,
-                                    const Extra &...extra) {
+    NB_INLINE class_ &def_rw(const char *name, D C::*p,
+                             const Extra &...extra) {
         static_assert(std::is_base_of_v<C, T>,
-                      "def_readwrite() requires a (base) class member!");
+                      "def_rw() requires a (base) class member!");
 
         using Q = std::conditional_t<detail::make_caster<D>::IsClass, const D &, D &&>;
 
-        def_property(name,
-            [pm](const T &c) -> const D & { return c.*pm; },
-            [pm](T &c, Q value) { c.*pm = (Q) value; },
+        def_prop_rw(name,
+            [p](const T &c) -> const D & { return c.*p; },
+            [p](T &c, Q value) { c.*p = (Q) value; },
             extra...);
 
         return *this;
     }
 
     template <typename D, typename... Extra>
-    NB_INLINE class_ &def_readwrite_static(const char *name, D *pm,
-                                           const Extra &...extra) {
+    NB_INLINE class_ &def_rw_static(const char *name, D *p,
+                                    const Extra &...extra) {
         using Q = std::conditional_t<detail::make_caster<D>::IsClass, const D &, D &&>;
 
-        def_property_static(name,
-            [pm](handle) -> const D & { return *pm; },
-            [pm](handle, Q value) { *pm = (Q) value; }, extra...);
+        def_prop_rw_static(name,
+            [p](handle) -> const D & { return *p; },
+            [p](handle, Q value) { *p = (Q) value; }, extra...);
 
         return *this;
     }
 
     template <typename C, typename D, typename... Extra>
-    NB_INLINE class_ &def_readonly(const char *name, D C::*pm,
-                                   const Extra &...extra) {
+    NB_INLINE class_ &def_ro(const char *name, D C::*p,
+                             const Extra &...extra) {
         static_assert(std::is_base_of_v<C, T>,
-                      "def_readonly() requires a (base) class member!");
+                      "def_ro() requires a (base) class member!");
 
-        def_property_readonly(name,
-            [pm](const T &c) -> const D & { return c.*pm; }, extra...);
+        def_prop_ro(name,
+            [p](const T &c) -> const D & { return c.*p; }, extra...);
 
         return *this;
     }
 
     template <typename D, typename... Extra>
-    NB_INLINE class_ &def_readonly_static(const char *name, D *pm,
-                                          const Extra &...extra) {
-        def_property_readonly_static(name,
-            [pm](handle) -> const D & { return *pm; }, extra...);
+    NB_INLINE class_ &def_ro_static(const char *name, D *p,
+                                    const Extra &...extra) {
+        def_prop_ro_static(name,
+            [p](handle) -> const D & { return *p; }, extra...);
 
         return *this;
     }

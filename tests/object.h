@@ -4,9 +4,9 @@
  * dependency on Python or nanobind. It can therefore be used in codebases
  * where a Python interface is merely an optional component.
  *
- * The file 'docs/intrusive.md' explains the basic rationale of intrusive
- * reference counting, while comments in this file and 'object.cpp' explain
- * technical aspects.
+ * nanobind's documentation on object ownership explains the rationale of
+ * intrusive reference counting, while comments in this file and 'object.cpp'
+ * explain technical aspects.
  */
 
 #include <atomic>

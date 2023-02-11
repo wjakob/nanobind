@@ -30,7 +30,7 @@ struct UniqueWrapper2 { std::unique_ptr<Example, nb::deleter<Example>> value; };
 NB_MODULE(test_holders_ext, m) {
     nb::class_<Example>(m, "Example")
         .def(nb::init<int>())
-        .def_readwrite("value", &Example::value)
+        .def_rw("value", &Example::value)
         .def_static("make", &Example::make)
         .def_static("make_shared", &Example::make_shared);
 
@@ -38,11 +38,10 @@ NB_MODULE(test_holders_ext, m) {
 
     nb::class_<SharedWrapper>(m, "SharedWrapper")
         .def(nb::init<std::shared_ptr<Example>>())
-        .def_readwrite("ptr", &SharedWrapper::value)
-        .def_property("value",
+        .def_rw("ptr", &SharedWrapper::value)
+        .def_prop_rw("value",
             [](SharedWrapper &t) { return t.value->value; },
-            [](SharedWrapper &t, int value) { t.value->value = value; }
-        );
+            [](SharedWrapper &t, int value) { t.value->value = value; });
 
     m.def("query_shared_1", [](Example *shared) { return shared->value; });
     m.def("query_shared_2",

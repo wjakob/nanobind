@@ -18,7 +18,8 @@ Dependencies
 
 nanobinds depends on
 
-- **Python 3.8+** or **PyPy 7.3.10+** (either the 3.8 or 3.9 PyPy flavors).
+- **Python 3.8+** or **PyPy 7.3.10+** (the *3.8* and *3.9* PyPy flavors are
+  supported, though there are :ref:`some limitations <pypy_issues>`).
 - **CMake 3.15+**.
 - **A C++17 compiler**: Clang 7+, GCC 8+, and MSVC2019+ are officially
   supported. Others (MinGW, Intel, NVIDIA, ..) may work as well but will not
@@ -58,6 +59,7 @@ Table of contents
    installing
    building
    basics
+   further
 
 .. toctree::
    :caption: Intermediate
@@ -65,17 +67,16 @@ Table of contents
 
    exchanging
    ownership
-   classes
+   tensors
    packaging
 
 .. toctree::
    :caption: Advanced
    :maxdepth: 1
 
-   intrusive
+   ownership_adv
    lowlevel
    typeslots
-   tensors
    limitations
 
 .. toctree::

@@ -77,7 +77,7 @@ with associated bindings
 
    nb::class_<Wrapper>(m, "Wrapper")
        .def(nb::init<>())
-       .def_readwrite("value", &Wrapper::value);
+       .def_rw("value", &Wrapper::value);
 
 If we instantiate this class with a cycle, it can never be reclaimed (even
 when Python shuts down and is supposed to free up all memory):

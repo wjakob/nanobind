@@ -234,8 +234,8 @@ Docstrings
 ----------
 
 Let's add one more bit of flourish by assigning a docstring to the extension
-module itself. Add the following line anywhere in the body of the ``NB_MODULE()
-{...}`` declaration:
+module itself. Include the following line anywhere in the body of the
+``NB_MODULE() {...}`` declaration:
 
 .. code-block:: cpp
 
@@ -284,10 +284,10 @@ simple C++ type named ``Dog`` defined as follows:
    #include <string>
 
    struct Dog {
-       std::string m_name;
+       std::string name;
 
        std::string bark() const {
-           return m_name + ": woof!";
+           return name + ": woof!";
        }
    };
 
@@ -305,7 +305,7 @@ The ``Dog`` bindings look as follows:
            .def(nb::init<>())
            .def(nb::init<const std::string &>())
            .def("bark", &Dog::bark)
-           .def_readwrite("name", &Dog::name);
+           .def_rw("name", &Dog::name);
    }
 
 Let's look at selected lines of this example, starting with the added include directive:
@@ -317,8 +317,8 @@ Let's look at selected lines of this example, starting with the added include di
 nanobind has a minimal core and initially doesn't know how to deal with STL
 types like ``std::string``. This line imports a *type caster* that realizes a
 bidirectional conversion (C++ ``std::string`` ↔ Python ``str``) to make the
-example usable. An :ref:`upcoming documentation section <type_casters>`
-contrasts type casters and other alternatives.
+example usable. The next :ref:`documentation section <type_casters>` will
+provide more detail on type casters and other alternatives.
 
 The class binding declaration :class:`nb::class_\<T\>() <class_>` supports both
 ``class`` and ``struct``-style data structures.
@@ -333,15 +333,15 @@ and installs it in the :cpp:class:`nb::module_ <module_>` ``m``.
 Initially, this type is completely empty---it has no members and cannot be
 instantiated. The subsequent chain of binding declarations binds two
 constructor overloads (via :cpp:class:`nb::init\<...\>() <init>`), a method,
-and the ``name`` field (via :cpp:func:`.def_readwrite(..)
-<class_::def_readwrite>`).
+and the mutable ``name`` field (via :cpp:func:`.def_rw(..) <class_::def_rw>`,
+where ``rw`` stands for read/write access).
 
 .. code-block:: cpp
 
    .def(nb::init<>())
    .def(nb::init<const std::string &>())
    .def("bark", &Dog::bark)
-   .def_readwrite("name", &Dog::name);
+   .def_rw("name", &Dog::name);
 
 An interactive Python session demonstrating this example is shown below:
 
@@ -359,19 +359,43 @@ An interactive Python session demonstrating this example is shown below:
    >>> d.bark()
    'Charlie: woof!'
 
+The example showed how to bind constructors, methods, and mutable fields. Many
+other things can be bound using analogous :cpp:class:`nb::class_\<...\>
+<class_>` methods:
+
+.. list-table::
+  :widths: 40 60
+  :header-rows: 1
+
+  * - Type
+    - method
+  * - Methods & constructors
+    - :cpp:func:`.def() <class_::def>`
+  * - Fields
+    - :cpp:func:`.def_ro() <class_::def_ro>`,
+      :cpp:func:`.def_rw() <class_::def_rw>`
+  * - Properties
+    - :cpp:func:`.def_prop_ro() <class_::def_prop_ro>`,
+      :cpp:func:`.def_prop_rw() <class_::def_prop_rw>`
+  * - Static methods
+    - :cpp:func:`.def_static() <class_::def_static>`
+  * - Static fields
+    - :cpp:func:`.def_ro_static() <class_::def_ro_static>`,
+      :cpp:func:`.def_rw_static() <class_::def_rw_static>`
+  * - Static properties
+    - :cpp:func:`.def_prop_ro_static() <class_::def_prop_ro_static>`,
+      :cpp:func:`.def_prop_rw_static() <class_::def_prop_rw_static>`
+
 .. note::
 
-    Constructors and methods support :ref:`docstrings <docstrings>`,
+    All of these binding declarations support :ref:`docstrings <docstrings>`,
     :ref:`keyword, and default argument <keyword_and_default_args>` annotations
     as before.
 
-Binding fields
---------------
-
 .. _binding_lambdas:
 
-Lambda functions
-----------------
+Binding lambda functions
+------------------------
 
 Note how ``print(d)`` produced a rather useless summary in the example above:
 
@@ -380,10 +404,11 @@ Note how ``print(d)`` produced a rather useless summary in the example above:
     >>> print(d)
     <my_ext.Dog object at 0x1044540f0>
 
-To address this, we must add a special method named ``__repr__`` that returns a
-human-readable summary. Unfortunately, a function with such functionality does
-not exist in the ``Dog`` type, and it would be nice if we did not have to
-modify it. To accomplish this goal, we can instead bind a *lambda function*:
+To address this, we can add a special Python method named ``__repr__`` that
+returns a human-readable summary. Unfortunately, a corresponding function with
+such functionality does not currently exist in the C++ type, and it would be
+nice if we did not have to modify it. We can bind a *lambda function* to
+achieve both goals:
 
 .. code-block:: cpp
 

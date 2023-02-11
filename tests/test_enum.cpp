@@ -34,5 +34,5 @@ NB_MODULE(test_enum_ext, m) {
     // test for issue #39
     nb::class_<EnumProperty>(m, "EnumProperty")
         .def(nb::init<>())
-        .def_property_readonly("read_enum", &EnumProperty::get_enum);
+        .def_prop_ro("read_enum", &EnumProperty::get_enum);
 }

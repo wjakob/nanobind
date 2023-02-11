@@ -13,13 +13,11 @@ Namespace
 ---------
 
 nanobind types and functions are located in the ``nanobind`` namespace. The
-following shorthand alias is recommended and used throughout the
-documentation:
+following shorthand alias is recommended and used throughout the documentation:
 
 .. code-block:: cpp
 
    namespace nb = nanobind;
-
 
 Name changes
 ------------
@@ -47,6 +45,23 @@ The following macros, types, and functions were renamed:
     - :cpp:func:`borrow\<T\>(x) <borrow>`
   * - ``reinterpret_steal<T>(x)``
     - :cpp:func:`steal\<T\>(x) <steal>`
+  * - ``.def_readwrite(..)``
+    - :cpp:func:`.def_rw(..) <class_::def_rw>`
+  * - ``.def_readonly(..)``
+    - :cpp:func:`.def_ro(..) <class_::def_ro>`
+  * - ``.def_property(..)``
+    - :cpp:func:`.def_prop_rw(..) <class_::def_prop_rw>`
+  * - ``.def_property_readonly(..)``
+    - :cpp:func:`.def_prop_ro(..) <class_::def_prop_ro>`
+  * - ``.def_readwrite_static(..)``
+    - :cpp:func:`.def_rw_static(..) <class_::def_rw_static>`
+  * - ``.def_readonly_static(..)``
+    - :cpp:func:`.def_ro_static(..) <class_::def_ro_static>`
+  * - ``.def_property_static(..)``
+    - :cpp:func:`.def_prop_rw_static(..) <class_::def_prop_rw_static>`
+  * - ``.def_property_readonly_static(..)``
+    - :cpp:func:`.def_prop_ro_static(..) <class_::def_prop_ro_static>`
+
 
 None/null arguments
 -------------------
@@ -75,15 +90,21 @@ and :ref:`wrappers <wrappers>`, *but not* by :ref:`type casters
 Shared pointers and holders
 ---------------------------
 
-nanobind completely removes the concept of a *holder type*, which was
-responsible for some of the inefficiencies and complexities in pybind11. This
-has implications on object ownership, shared ownership, and interactions with
-C++ shared/unique pointers.
+When nanobind instantiates a C++ type within Python, the resulting instance
+data is stored *within* the created Python object ("``PyObject``").
+Alternatively, when an already existing C++ instance is transferred to Python
+via a function return value and :cpp:enumerator:`rv_policy::reference`,
+:cpp:enumerator:`rv_policy::reference_internal`, or
+:cpp:enumerator:`rv_policy::take_ownership`, nanobind creates a smaller wrapper
+``PyObject`` that only stores a pointer to the instance data.
 
-Please see the :ref:`separate section on ownership <ownership>` for the
-nitty-gritty details on shared and unique pointers. Classes with *intrusive*
-reference counting also continue to be supported, please see the
-:ref:`separate section <intrusive>` for details.
+This is *very different* from pybind11, where the instance ``PyObject``
+contained a *holder type* (typically ``std::unique_ptr<T>``) storing a pointer
+to the instance data. Dealing with holders caused inefficiencies and introduced
+complexity; they were therefore removed in nanobind. This has implications on
+object ownership, shared ownership, and interactions with C++ shared/unique
+pointers. The separate sections on :ref:`object ownership <ownership>` and
+:ref:`intrusive reference counting <intrusive>` provide further details.
 
 The gist is that it is no longer necessary to specify holder types in the type
 declaration:
@@ -217,7 +238,7 @@ The API of custom type casters has changed *significantly*. The following
 changes are needed:
 
 - ``load()`` was renamed to ``from_python()``. The function now takes an extra
-  ``uint8_t flags`` parameer (instead ``bool convert``, which is now
+  ``uint8_t flags`` parameter (instead ``bool convert``, which is now
   represented by the flag ``nb::detail::cast_flags::convert``). A
   ``cleanup_list *`` pointer keeps track of Python temporaries that are created
   by the conversion, and which need to be deallocated after a function call has
@@ -273,7 +294,7 @@ Removed features include:
   would require TLS lookups for nanobind data structures, which is undesirable.
 - ○ **Function binding annotations**: the ``kw_only`` / ``pos_only`` argument
   annotations were removed.
-- ○ **Metaclasses**: ceating types with custom metaclasses is unsupported.
+- ○ **Metaclasses**: creating types with custom metaclasses is unsupported.
 - ○ **Module-local bindings**: support was removed (both for types and exceptions).
 - ○ **Custom allocation**: C++ classes with an overloaded or deleted ``operator
   new`` / ``operator delete`` are not supported.

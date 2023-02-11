@@ -15,7 +15,7 @@ NB_MODULE(test_bind_vector_ext, m) {
 
     // test_vector_custom
     nb::class_<El>(m, "El").def(nb::init<int>())
-        .def_readwrite("a", &El::a);
+        .def_rw("a", &El::a);
     nb::bind_vector<std::vector<El>>(m, "VectorEl");
     nb::bind_vector<std::vector<std::vector<El>>>(m, "VectorVectorEl");
 
@@ -32,7 +32,7 @@ NB_MODULE(test_bind_vector_ext, m) {
     // test_noncopyable_containers
     nb::class_<E_nc>(m, "ENC")
         .def(nb::init<int>())
-        .def_readwrite("value", &E_nc::value);
+        .def_rw("value", &E_nc::value);
 
     nb::bind_vector<std::vector<E_nc>>(m, "VectorENC");
     m.def("get_vnc", [](int n) {

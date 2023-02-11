@@ -50,7 +50,7 @@ NB_MODULE(test_bind_map_ext, m) {
     nb::bind_map<std::unordered_map<std::string, double const>>(m,
                                                                 "UnorderedMapStringDoubleConst");
 
-    nb::class_<E_nc>(m, "ENC").def(nb::init<int>()).def_readwrite("value", &E_nc::value);
+    nb::class_<E_nc>(m, "ENC").def(nb::init<int>()).def_rw("value", &E_nc::value);
 
     nb::bind_map<std::map<int, E_nc>>(m, "MapENC");
     m.def("get_mnc", &times_ten<std::map<int, E_nc>>);

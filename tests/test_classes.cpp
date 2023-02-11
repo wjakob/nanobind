@@ -134,8 +134,8 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<PairStruct>(m, "PairStruct")
         .def(nb::init<>())
-        .def_readwrite("s1", &PairStruct::s1)
-        .def_readwrite("s2", &PairStruct::s2);
+        .def_rw("s1", &PairStruct::s1)
+        .def_rw("s2", &PairStruct::s2);
 
     m.def("stats", []{
         nb::dict d;
@@ -269,7 +269,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init_implicit<const B *>())
         .def(nb::init_implicit<int>())
         .def(nb::init_implicit<float>())
-        .def_readwrite("value", &D::value);
+        .def_rw("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });
 
@@ -311,7 +311,7 @@ NB_MODULE(test_classes_ext, m) {
 
     // test18_static_properties
     nb::class_<StaticProperties>(m, "StaticProperties")
-        .def_readwrite_static("value", &StaticProperties::value, "Static property docstring")
+        .def_rw_static("value", &StaticProperties::value, "Static property docstring")
         .def_static("get", []{ return StaticProperties::value; } );
 
     nb::class_<StaticProperties2, StaticProperties>(m, "StaticProperties2");
@@ -425,7 +425,7 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<Wrapper>(m, "Wrapper", nb::type_slots(wrapper_slots))
         .def(nb::init<>())
-        .def_readwrite("value", &Wrapper::value);
+        .def_rw("value", &Wrapper::value);
 
     // The following isn't tested on the Python side, we just want to make sure it compiles
     struct NonCopyable {

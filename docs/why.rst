@@ -17,7 +17,8 @@ complexity of the library grew tremendously, which had a negative impact on
 efficiency.
 
 Curiously, the situation now is reminiscent of 2015: binding generation with
-existing tools (Boost.Python, pybind11) is slow and produces enormous binaries
+existing tools (`Boost.Python <https://github.com/boostorg/python>`_, `pybind11
+<http://github.com/pybind/pybind11>`_) is slow and produces enormous binaries
 with overheads on runtime performance. At the same time, key improvements in
 C++17 and Python 3.8 provide opportunities for drastic simplifications.
 Therefore, I am starting *another* binding project. This time, the scope is
@@ -30,7 +31,7 @@ nanobind is highly related to pybind11 and inherits most of its conventions
 and syntax. The main difference is is a change in philosophy: pybind11 must
 deal with *all of C++* to bind legacy codebases, while nanobind targets
 a smaller C++ subset. *The codebase has to adapt to the binding tool and not
-the other way around!*, allowing nanobind to be simpler and faster. Pull
+the other way around*, which allows nanobind to be simpler and faster. Pull
 requests with extensions and generalizations to handle subtle fringe cases were
 welcomed in pybind11, but they will likely be rejected in this project.
 
@@ -138,12 +139,12 @@ nanobind includes a number of quality-of-live improvements for developers:
   immediately creates the underlying docstring. When a function takes a C++
   type as parameter that is not yet registered in pybind11, the docstring will
   include a C++ type name (e.g. ``std::vector<int, std::allocator<int>>``),
-  which can look rather ugly. Avoiding this issue in pybind11 requires careful
-  arrangement of binding declarations.
+  which can look rather ugly. pybind11 binding declarations must be arranged
+  very carefully to work around this issue.
 
-  nanobind avoids this issue by not pre-rendering function docstrings: they are
-  created on the fly when queried. nanobind also has improved out-of-the-box
-  compatibility with documentation generation tools like `Sphinx
+  nanobind avoids the issue altogether by not pre-rendering docstrings: they
+  are created on the fly when queried. nanobind also has improved
+  out-of-the-box compatibility with documentation generation tools like `Sphinx
   <https://www.sphinx-doc.org/en/master/>`_.
 
 - **Low-level API**: nanobind exposes an optional low-level API to provide

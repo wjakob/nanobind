@@ -7,8 +7,8 @@ Exchanging information
 
 nanobind offers three fundamentally different ways of exchanging information
 between Python and C++. Depending on the task at hand, one will usually be
-preferable over the others, hence it is important to be aware of the pros and
-cons of each approach.
+preferable over the others, hence it is important to be aware of their
+advantages and disadvantages.
 
 .. _type_casters:
 
@@ -127,11 +127,15 @@ The following table lists the currently available type casters:
     - ``#include <nanobind/eigen/dense.h>``
 
 
-**Con**: Every transition between the Python and C++ side will require a
+**Con**: Every transition between the Python and C++ side will generally require a
 conversion step (in this case, to re-create all list elements). This can be
 wasteful when the other side only needs to access a small part of the data.
 Conversely, the overhead should not be a problem when the data is fully
 "consumed" following conversion.
+
+Note that some type casters (e.g., those for ``std::unique_ptr<..>``,
+``std::shared_ptr<..>``, :cpp:class:`nb::tensor <tensor>`, and for ``Eigen::*``
+can perform a type conversion without copying the underlying data.)
 
 .. _type_caster_mutable:
 
@@ -263,10 +267,11 @@ special cases (vectors, ordered/unordered maps, iterators):
     - ``#include <nanobind/make_iterator.h>``
       (:ref:`docs <iterator_bindings>`)
   * - Other types
-    - See the :ref:`next section <bindings>`.
+    - See the previous example on :ref:`binding custom types <binding_types>`.
 
-In general, you will need to write the binding code yourself. The :ref:`next
-section <bindings>` explains how to do this for your own types.
+In general, you will need to write the binding code yourself. The previous
+section on :ref:`binding custom types <binding_types>` showed an example of
+such a type binding.
 
 .. _wrappers:
 

@@ -10,10 +10,37 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.1.1 (TBA)
+Version 0.2.0 (TBA)
 -------------------------------
 * Nanobind now features documentation on `readthedocs
   <https://nanobind.readthedocs.io>`_.
+* While writing the documentation, I realized how lengthy and inconsistently some of
+  the :cpp:func:`class_\<T\>::def* <class_::def>` members are named. nanobind
+  will from now on use the following API:
+
+  .. list-table::
+    :widths: 40 60
+    :header-rows: 1
+
+    * - Type
+      - method
+    * - Methods & constructors
+      - :cpp:func:`.def() <class_::def>`
+    * - Fields
+      - :cpp:func:`.def_ro() <class_::def_ro>`,
+        :cpp:func:`.def_rw() <class_::def_rw>`
+    * - Properties
+      - :cpp:func:`.def_prop_ro() <class_::def_prop_ro>`,
+        :cpp:func:`.def_prop_rw() <class_::def_prop_rw>`
+    * - Static methods
+      - :cpp:func:`.def_static() <class_::def_static>`
+    * - Static fields
+      - :cpp:func:`.def_ro_static() <class_::def_ro_static>`,
+        :cpp:func:`.def_rw_static() <class_::def_rw_static>`
+    * - Static properties
+      - :cpp:func:`.def_prop_ro_static() <class_::def_prop_ro_static>`,
+        :cpp:func:`.def_prop_rw_static() <class_::def_prop_rw_static>`
+
 * Added casters for dense matrix/array types from the `Eigen library
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`_. (PR `#120
   <https://github.com/wjakob/nanobind/pull/120>`_).

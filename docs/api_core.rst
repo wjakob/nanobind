@@ -35,14 +35,14 @@ Macros
 
    Install a trampoline in an alias class to enable dispatching C++ virtual
    function calls to a Python implementation. Refer to the documentation on
-   :ref:`trampolines <trampoline>` to see how this macro can be used.
+   :ref:`trampolines <trampolines>` to see how this macro can be used.
 
 .. c:macro:: NB_OVERRIDE(ret_type, base_type, func, ...)
 
    Dispatch the call to a Python method named ``"func"`` if it is overloaded on
    the Python side. The method should return a result of type ``ret_type``.
    Otherwise, call the C++ function ``base_type::func(...)``. Refer to the
-   documentation on :ref:`trampolines <trampoline>` to see how this macro can
+   documentation on :ref:`trampolines <trampolines>` to see how this macro can
    be used.
 
 .. c:macro:: NB_OVERRIDE_PURE(ret_type, base_type, func, ...)
@@ -51,14 +51,14 @@ Macros
    the Python side. The method should return a result of type ``ret_type``.
    Otherwise, raise an exception. This macro should be used when the C++
    function is pure virtual. Refer to the documentation on :ref:`trampolines
-   <trampoline>` to see how this macro can be used.
+   <trampolines>` to see how this macro can be used.
 
 .. c:macro:: NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)
 
    Dispatch the call to a Python method with custom identifier ``name`` if it is
    overloaded on the Python side. The method should return a result of type
    ``ret_type``. Otherwise, call the C++ function ``base_type::func(...)``. Refer
-   to the documentation on :ref:`trampolines <trampoline>` to see how this
+   to the documentation on :ref:`trampolines <trampolines>` to see how this
    macro can be used.
 
 .. c:macro:: NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)
@@ -67,7 +67,7 @@ Macros
    is overloaded on the Python side. The method should return a result of type
    ``ret_type``. Otherwise, raise an exception. This macro should be used when
    the C++ function is pure virtual. Refer to the documentation on
-   :ref:`trampolines <trampoline>` to see how this macro can be used.
+   :ref:`trampolines <trampolines>` to see how this macro can be used.
 
 
 Python object API
@@ -1455,16 +1455,19 @@ Function binding
    The variable length `extra` parameter can be used to pass a docstring and
    other :ref:`function binding annotations <function_binding_annotations>`.
 
-.. class_binding:
+.. _class_binding:
 
 Class binding
 -------------
 
 .. cpp:class:: template <typename T, typename... Ts> class_ : public object
 
-   Class to bind a custom C++ type `T` to Python. The variable length parameter
-   `Ts` is optional and  can be used to specify the base class of `T` and/or an
-   alias needed to realize :ref:`trampoline classes <trampolines>`.
+   Binding helper class to expose a custom C++ type `T` (declared using either the ``class`` or ``struct`` keyword)
+   in Python.
+
+   The variable length parameter `Ts` is optional and  can be used to specify
+   the base class of `T` and/or an alias needed to realize :ref:`trampoline
+   classes <trampolines>`.
 
    .. cpp:function:: template <typename... Extra> class_(handle scope, const char * name, const Extra &... extra)
 
@@ -1474,15 +1477,24 @@ Class binding
 
    .. cpp:function:: template <typename Func, typename... Extra> class_ &def(const char * name, Func &&f, const Extra &... extra)
 
-      Bind the method `f` to the identifier `name`. The variable length `extra`
-      parameter can be used to pass a docstring and other :ref:`function
-      binding annotations <function_binding_annotations>`.
-
-   .. cpp:function:: template <typename Func, typename... Extra> class_ &def_static(const char * name, Func &&f, const Extra &... extra)
-
-      Bind the *static* function `f` to the identifier `name`. The variable
-      length `extra` parameter can be used to pass a docstring and
+      Bind the function `f` and assign it to the class member `name`.
+      The variable length `extra` parameter can be used to pass a docstring and
       other :ref:`function binding annotations <function_binding_annotations>`.
+
+      This function has two overloads (listed just below) to handle constructor
+      binding declarations.
+
+      **Example**:
+
+      .. code-block:: cpp
+
+         struct A {
+             void f() { /*...*/ }
+         };
+
+         nb::class_<A>(m, "A")
+             .def(nb::init<>()) // Bind the default constructor
+             .def("f", &A::f);  // Bind the method A::f
 
    .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> init, const Extra &... extra)
 
@@ -1493,66 +1505,303 @@ Class binding
    .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> init, const Extra &... extra)
 
       Bind a constructor that may be used for implicit type conversions. The
-      variable length `extra` parameter can be used to pass a docstring and
+      constructor must take a single argument of an unspecified type `Arg`.
+
+      When nanobind later tries to dispatch a function call requiring an
+      argument of type `T` while `Arg` was actually provided, it will run this
+      constructor to perform the necessary conversion.
+
+      The variable length `extra` parameter can be used to pass a docstring and
       other :ref:`function binding annotations <function_binding_annotations>`.
 
-   .. cpp:function:: template <typename Getter, typename Setter, typename... Extra> class_ &def_property(const char * name, Getter &&getter, Setter &&setter, const Extra &...extra)
+      This constructor generates more compact code than a separate call to
+      :cpp:func:`implicitly_convertible`, but is otherwise equivalent.
 
-      Bind a Python ``property`` represented by `getter` and `setter` functions
-      to the identifier `name`. The variable length `extra` parameter can be
-      used to pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+   .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_rw(const char * name, D C::* p, const Extra &...extra)
 
-   .. cpp:function:: template <typename Getter, typename Setter, typename... Extra> class_ &def_property_static(const char * name, Getter &&getter, Setter &&setter, const Extra &...extra)
+      Bind the field `p` and assign it to the class member `name`. nanobind
+      constructs a ``property`` object with *read-write* access (hence the
+      ``rw`` suffix) to do so.
 
-      Bind a *static* Python ``property`` represented by `getter` and `setter`
-      functions to the identifier `name`. The variable length `extra` parameter
-      can be used to pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+      Every access from Python will read from or write to the C++ field while
+      performing a suitable conversion (using :ref:`type casters
+      <type_casters>`, :ref:`bindings <bindings>`, or :ref:`wrappers
+      <wrappers>`) as determined by its type.
 
-   .. cpp:function:: template <typename Getter, typename... Extra> class_ &def_property_readonly(const char * name, Getter &&getter, const Extra &...extra)
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`
+      that are forwarded to the anonymous functions used to construct the
+      property
 
-      Bind a read-only Python ``property`` represented by a `getter` function
-      to the identifier `name`. The variable length `extra` parameter can be
-      used to pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+      **Example**:
 
-   .. cpp:function:: template <typename Getter, typename... Extra> class_ &def_property_readonly_static(const char * name, Getter &&getter, const Extra &...extra)
+      .. code-block:: cpp
 
-      Bind a read-only *static* Python ``property`` represented by a `getter`
-      function to the identifier `name`. The variable length `extra` parameter
-      can be used to pass a docstring and other :ref:`function binding
-      annotations <function_binding_annotations>`.
+         struct A { int value; };
 
-   .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_readwrite(const char * name, D C::* pm, const Extra &...extra)
+         nb::class_<A>(m, "A")
+             .def_rw("value", &A::value); // Enable mutable access to the field A::value
 
-      Bind a Python ``property`` represented by a `getter` function to
-      the identifier `name`. The variable length `extra` parameter can be used
-      to pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+   .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_ro(const char * name, D C::* p, const Extra &...extra)
 
-   .. cpp:function:: template <typename D, typename... Extra> class_ &def_readwrite_static(const char * name, D* pm, const Extra &...extra)
+      Bind the field `p` and assign it to the class member `name`. nanobind
+      constructs a ``property`` object with *read only* access (hence the
+      ``ro`` suffix) to do so.
 
-      Bind a *static* Python ``property`` represented by the instance field `pm` to the
-      identifier `name`. The variable length `extra` parameter can be used to
-      pass a docstring andother  :ref:`function binding annotations
-      <function_binding_annotations>`.
+      Every access from Python will read the C++ field while performing a
+      suitable conversion (using :ref:`type casters <type_casters>`,
+      :ref:`bindings <bindings>`, or :ref:`wrappers <wrappers>`) as determined
+      by its type.
 
-   .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_readonly(const char * name, D C::* pm, const Extra &...extra)
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`
+      that are forwarded to the anonymous functions used to construct the
+      property.
 
-      Bind a read-only Python ``property`` represented by the instance field
-      `pm` to the identifier `name`. The variable length `extra` parameter can
-      be used to pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+      **Example**:
 
-   .. cpp:function:: template <typename D, typename... Extra> class_ &def_readonly_static(const char * name, D * pm, const Extra &...extra)
+      .. code-block:: cpp
 
-      Bind a read-only *static* Python ``property`` represented by the instance field
-      `pm` to the identifier `name`. The variable length `extra` parameter can
-      be used to pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+         struct A { int value; };
+
+         nb::class_<A>(m, "A")
+             .def_ro("value", &A::value);  // Enable read-only access to the field A::value
+
+   .. cpp:function:: template <typename Getter, typename Setter, typename... Extra> class_ &def_prop_rw(const char * name, Getter &&getter, Setter &&setter, const Extra &...extra)
+
+      Construct a *mutable* (hence the ``rw`` suffix) Python ``property`` and
+      assign it to the class member `name`. Every read access will call the
+      function ``getter``  with the `T` instance, and every write access will
+      call the ``setter`` with the `T` instance and value to be assigned.
+
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+      Note that this function implicitly assigns the
+      :cpp:enumerator:`rv_policy::reference_internal` return value policy to
+      `getter` (as opposed to the usual
+      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      policy as part of the `extra` argument to override this.
+
+      **Example**: the example below uses `def_prop_rw` to expose a C++
+      setter/getter pair as a more "Pythonic" property:
+
+      .. code-block:: cpp
+
+          class A {
+          public:
+              A(int value) : m_value(value) { }
+              void set_value(int value) { m_value = value; }
+              int value() const { return m_value; }
+          private:
+              int m_value;
+          };
+
+          nb::class_<A>(m, "A")
+              .def(nb::init<int>())
+              .def_prop_rw("value",
+                  [](A &t) { return t.value() ; },
+                  [](A &t, int value) { t.set_value(value); });
+
+   .. cpp:function:: template <typename Getter, typename... Extra> class_ &def_prop_ro(const char * name, Getter &&getter, const Extra &...extra)
+
+      Construct a *read-only* (hence the ``ro`` suffix) Python ``property`` and
+      assign it to the class member `name`. Every read access will call the
+      function ``getter``  with the `T` instance.
+
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+      Note that this function implicitly assigns the
+      :cpp:enumerator:`rv_policy::reference_internal` return value policy to
+      `getter` (as opposed to the usual
+      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      policy as part of the `extra` argument to override this.
+
+      **Example**: the example below uses `def_prop_ro` to expose a C++ getter
+      as a more "Pythonic" property:
+
+      .. code-block:: cpp
+
+          class A {
+          public:
+              A(int value) : m_value(value) { }
+              int value() const { return m_value; }
+          private:
+              int m_value;
+          };
+
+          nb::class_<A>(m, "A")
+              .def(nb::init<int>())
+              .def_prop_ro("value",
+                  [](A &t) { return t.value() ; });
+
+   .. cpp:function:: template <typename Func, typename... Extra> class_ &def_static(const char * name, Func &&f, const Extra &... extra)
+
+      Bind the *static* function `f` and assign it to the class member `name`.
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+      **Example**:
+
+      .. code-block:: cpp
+
+         struct A {
+             static void f() { /*...*/ }
+         };
+
+         nb::class_<A>(m, "A")
+             .def_static("f", &A::f);  // Bind the static method A::f
+
+   .. cpp:function:: template <typename D, typename... Extra> class_ &def_rw_static(const char * name, D* p, const Extra &...extra)
+
+      Bind the *static* field `p` and assign it to the class member `name`. nanobind
+      constructs a class ``property`` object with *read-write* access (hence the
+      ``rw`` suffix) to do so.
+
+      Every access from Python will read from or write to the static C++ field
+      while performing a suitable conversion (using :ref:`type casters
+      <type_casters>`, :ref:`bindings <bindings>`, or :ref:`wrappers
+      <wrappers>`) as determined by its type.
+
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`
+      that are forwarded to the anonymous functions used to construct the
+      property
+
+      **Example**:
+
+      .. code-block:: cpp
+
+         struct A { inline static int value = 5; };
+
+         nb::class_<A>(m, "A")
+             // Enable mutable access to the static field A::value
+             .def_rw_static("value", &A::value);
+
+   .. cpp:function:: template <typename D, typename... Extra> class_ &def_ro_static(const char * name, D* p, const Extra &...extra)
+
+      Bind the *static* field `p` and assign it to the class member `name`.
+      nanobind constructs a class ``property`` object with *read-only* access
+      (hence the ``ro`` suffix) to do so.
+
+      Every access from Python will read the static C++ field while performing
+      a suitable conversion (using :ref:`type casters <type_casters>`,
+      :ref:`bindings <bindings>`, or :ref:`wrappers <wrappers>`) as determined
+      by its type.
+
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`
+      that are forwarded to the anonymous functions used to construct the
+      property
+
+      **Example**:
+
+      .. code-block:: cpp
+
+         struct A { inline static int value = 5; };
+
+         nb::class_<A>(m, "A")
+             // Enable read-only access to the static field A::value
+             .def_ro_static("value", &A::value);
+
+   .. cpp:function:: template <typename Getter, typename Setter, typename... Extra> class_ &def_prop_rw_static(const char * name, Getter &&getter, Setter &&setter, const Extra &...extra)
+
+      Construct a *mutable* (hence the ``rw`` suffix) Python ``property`` and
+      assign it to the class member `name`. Every read access will call the
+      function ``getter``  with `T`'s Python type object, and every write access will
+      call the ``setter`` with `T`'s Python type object and value to be assigned.
+
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+      Note that this function implicitly assigns the
+      :cpp:enumerator:`rv_policy::reference` return value policy to
+      `getter` (as opposed to the usual
+      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      policy as part of the `extra` argument to override this.
+
+      **Example**: the example below uses `def_prop_rw_static` to expose a
+      static C++ setter/getter pair as a more "Pythonic" property:
+
+      .. code-block:: cpp
+
+         class A {
+         public:
+            static void set_value(int value) { s_value = value; }
+            static int value() { return s_value; }
+         private:
+            inline static int s_value = 5;
+         };
+
+         nb::class_<A>(m, "A")
+             .def_prop_rw_static("value",
+                 [](nb::handle /*unused*/) { return A::value() ; },
+                 [](nb::handle /*unused*/, int value) { A::set_value(value); });
+
+   .. cpp:function:: template <typename Getter, typename... Extra> class_ &def_prop_ro_static(const char * name, Getter &&getter, const Extra &...extra)
+
+      Construct a *read-only* (hence the ``ro`` suffix) Python ``property`` and
+      assign it to the class member `name`. Every read access will call the
+      function ``getter``  with `T`'s Python type object.
+
+      The variable length `extra` parameter can be used to pass a docstring and
+      other :ref:`function binding annotations <function_binding_annotations>`.
+
+      Note that this function implicitly assigns the
+      :cpp:enumerator:`rv_policy::reference` return value policy to
+      `getter` (as opposed to the usual
+      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      policy as part of the `extra` argument to override this.
+
+      **Example**: the example below uses `def_prop_ro_static` to expose a
+      static C++ getter as a more "Pythonic" property:
+
+      .. code-block:: cpp
+
+         class A {
+         public:
+            static int value() { return s_value; }
+         private:
+            inline static int s_value = 5;
+         };
+
+         nb::class_<A>(m, "A")
+             .def_prop_ro_static("value",
+                 [](nb::handle /*unused*/) { return A::value() ; });
 
    .. cpp:function:: template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra> class_ &def(const detail::op_<id, ot, L, R> &op, const Extra&... extra)
+
+      This interface provides convenient syntax sugar to replace relatively
+      length method bindings with shorter operator bindings. To use it, you
+      will need an extra include directive:
+
+      .. code-block:: cpp
+
+         #include <nanobind/operators.h>
+
+      Below is an example type with three arithmetic operators in C++ (unary
+      negation and 2 binary subtraction overloads) along with corresponding
+      bindings.
+
+      **Example**:
+
+      .. code-block:: cpp
+
+         struct A {
+            float value;
+
+            A operator-() const { return { -value }; }
+            A operator-(const A &o) const { return { value - o.value }; }
+            A operator-(float o) const { return { value - o }; }
+         };
+
+         nb::class_<A>(m, "A")
+             .def(nb::init<float>())
+             .def(-nb::self)
+             .def(nb::self - nb::self)
+             .def(nb::self - float());
+
 
       Bind an arithmetic or comparison operator expressed in short-hand form (e.g., ``.def(nb::self + nb::self)``).
 

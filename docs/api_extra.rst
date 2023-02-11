@@ -148,6 +148,41 @@ nanobind API and require an additional include directive:
       * - ``items(self, arg: Map) -> Map.ItemView``
         - Returns an iterable view of the map's items
 
+Unique pointer deleter
+----------------------
+
+The following *deleter* should be used to gain maximal flexibility in combination with
+``std::unique_ptr<..>``. It requires the following additional include directive:
+
+.. code-block:: cpp
+
+   #include <nanobind/stl/unique_ptr.h>
+
+See the two documentation sections on unique pointers for further detail
+(:ref:`#1 <unique_ptr>`, :ref:`#2 <unique_ptr_adv>`).
+
+.. cpp:struct:: template <typename T> deleter
+
+   .. cpp:function:: deleter() = default
+
+      Create a deleter that destroys the object using a ``delete`` expression.
+
+   .. cpp:function:: deleter(handle h)
+
+      Create a deleter that destroys the object by reducing the Python reference count.
+
+   .. cpp:function:: bool owned_by_python() const
+
+      Check if the object is owned by Python.
+
+   .. cpp:function:: bool owned_by_cpp() const
+
+      Check if the object is owned by C++.
+
+   .. cpp:function:: void operator()(void * p) noexcept
+
+      Destroy the object at address `p`.
+
 .. _iterator_bindings:
 
 Iterator bindings

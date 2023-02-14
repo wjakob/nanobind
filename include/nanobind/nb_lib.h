@@ -317,7 +317,7 @@ NB_CORE PyObject *get_override(void *ptr, const std::type_info *type,
 // ========================================================================
 
 // Ensure that 'patient' cannot be GCed while 'nurse' is alive
-NB_CORE void keep_alive(PyObject *nurse, PyObject *patient) noexcept;
+NB_CORE void keep_alive(PyObject *nurse, PyObject *patient);
 
 // Keep 'payload' alive until 'nurse' is GCed
 NB_CORE void keep_alive(PyObject *nurse, void *payload,

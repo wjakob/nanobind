@@ -844,8 +844,8 @@ static PyMethodDef keep_alive_callback_def = {
 };
 
 
-void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
-    if (!patient || !nurse || patient == Py_None)
+void keep_alive(PyObject *nurse, PyObject *patient) {
+    if (!patient || !nurse || nurse == Py_None || patient == Py_None)
         return;
 
     nb_internals &internals = internals_get();
@@ -867,13 +867,16 @@ void keep_alive(PyObject *nurse, PyObject *patient) noexcept {
     } else {
         PyObject *callback =
             PyCFunction_New(&keep_alive_callback_def, patient);
+        PyObject *weakref = PyWeakref_NewRef(nurse, callback);
+        if (!weakref) {
+            Py_DECREF(callback);
+            PyErr_Clear();
+            raise("nanobind::detail::keep_alive(): could not create a weak "
+                  "reference! Likely, the 'nurse' argument you specified is not "
+                  "a weak-referenceable type!");
+        }
         if (!callback)
             fail("nanobind::detail::keep_alive(): callback creation failed!");
-        PyObject *weakref = PyWeakref_NewRef(nurse, callback);
-        if (!weakref)
-            fail("nanobind::detail::keep_alive(): could not create a weak "
-                 "reference! Likely, the 'nurse' argument you specified is not "
-                 "a weak-referenceable type!");
 
         // Increase patient reference count, leak weak reference
         Py_INCREF(patient);

@@ -242,7 +242,7 @@ NB_INLINE void process_keep_alive(PyObject **, PyObject *, T *) {}
 template <size_t Nurse, size_t Patient>
 NB_INLINE void
 process_keep_alive(PyObject **args, PyObject *result,
-                   nanobind::keep_alive<Nurse, Patient> *) noexcept {
+                   nanobind::keep_alive<Nurse, Patient> *) {
     keep_alive(Nurse == 0 ? result : args[Nurse - 1],
                Patient == 0 ? result : args[Patient - 1]);
 }

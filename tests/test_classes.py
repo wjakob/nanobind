@@ -347,6 +347,13 @@ def test16_keep_alive_custom(clean):
     collect()
     assert constructed == 2 and destructed == 2
 
+    with pytest.raises(RuntimeError) as excinfo:
+        s = Struct()
+        x = 5
+        t.keep_alive_ret(x, s)
+
+    assert "nanobind::detail::keep_alive(): could not create a weak reference!" in str(excinfo.value)
+
 def f():
     pass
 

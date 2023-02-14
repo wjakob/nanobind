@@ -1,4 +1,5 @@
 #include <nanobind/eigen/dense.h>
+#include <nanobind/eigen/sparse.h>
 
 namespace nb = nanobind;
 
@@ -92,6 +93,23 @@ NB_MODULE(test_eigen_ext, m) {
 
     m.def("updateV3i", [](Eigen::Ref<Eigen::Vector3i> a) { a[2] = 123; });
     m.def("updateVXi", [](Eigen::Ref<Eigen::VectorXi> a) { a[2] = 123; });
+
+    using SparseMatrixR = Eigen::SparseMatrix<float, Eigen::RowMajor>;
+    using SparseMatrixC = Eigen::SparseMatrix<float>;
+    Eigen::MatrixXf mat(5, 6);
+    mat <<
+	 0, 3,  0, 0,  0, 11,
+	22, 0,  0, 0, 17, 11,
+	 7, 5,  0, 1,  0, 11,
+	 0, 0,  0, 0,  0, 11,
+	 0, 0, 14, 0,  8, 11;
+    m.def("sparse_r", [mat]() -> SparseMatrixR {
+        return Eigen::SparseView<Eigen::MatrixXf>(mat);
+    });
+    m.def("sparse_c",
+          [mat]() -> SparseMatrixC { return Eigen::SparseView<Eigen::MatrixXf>(mat); });
+    m.def("sparse_copy_r", [](const SparseMatrixR &m) -> SparseMatrixR { return m; });
+    m.def("sparse_copy_c", [](const SparseMatrixC &m) -> SparseMatrixC { return m; });
 
     struct Buffer {
         uint32_t x[30] { };

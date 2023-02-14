@@ -60,6 +60,9 @@ Version 0.2.0 (TBA)
 * Added casters for dense matrix/array types from the `Eigen library
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`__. (PR `#120
   <https://github.com/wjakob/nanobind/pull/120>`__).
+* Added casters for sparse matrix/array types from the `Eigen library
+  <https://eigen.tuxfamily.org/index.php?title=Main_Page>`__. (PR `#126
+  <https://github.com/wjakob/nanobind/pull/126>`_).
 * Implemented `nb::bind_vector\<T\>() <bind_vector>` analogous to similar
   functionality in pybind11. (commit `f2df8a
   <https://github.com/wjakob/nanobind/commit/f2df8a90fbfb06ee03a79b0dd85fa0e266efeaa9>`__).

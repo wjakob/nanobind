@@ -172,3 +172,28 @@ def test07_mutate_arg():
     A2 = A.copy()
     t.mutate_MXu(A)
     assert np.all(A == 2*A2)
+
+
+@needs_numpy_and_eigen
+def test_sparse():
+    pytest.importorskip("scipy")
+    ref = np.array(
+        [
+            [0.0, 3, 0, 0, 0, 11],
+            [22, 0, 0, 0, 17, 11],
+            [7, 5, 0, 1, 0, 11],
+            [0, 0, 0, 0, 0, 11],
+            [0, 0, 14, 0, 8, 11],
+        ]
+    )
+    def assert_equal_ref(mat):
+        nonlocal ref
+        np.testing.assert_array_equal(mat, ref)
+    def assert_sparse_equal_ref(sparse_mat):
+        assert_equal_ref(sparse_mat.toarray())
+    assert_sparse_equal_ref(t.sparse_r())
+    assert_sparse_equal_ref(t.sparse_c())
+    assert_sparse_equal_ref(t.sparse_copy_r(t.sparse_r()))
+    assert_sparse_equal_ref(t.sparse_copy_c(t.sparse_c()))
+    assert_sparse_equal_ref(t.sparse_copy_r(t.sparse_c()))
+    assert_sparse_equal_ref(t.sparse_copy_c(t.sparse_r()))

@@ -13,8 +13,8 @@
 #include <nanobind/ndarray.h>
 #include <Eigen/Core>
 
-static_assert(EIGEN_VERSION_AT_LEAST(3, 2, 7),
-              "Eigen matrix support in pybind11 requires Eigen >= 3.2.7");
+static_assert(EIGEN_VERSION_AT_LEAST(3, 3, 0),
+              "Eigen matrix support in nanobind requires Eigen >= 3.3.0");
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
@@ -53,9 +53,13 @@ is_base_of_template_v<T, Eigen::EigenBase>;
 template <typename T> constexpr bool is_eigen_plain_v =
 is_base_of_template_v<T, Eigen::PlainObjectBase>;
 
+/// Detect Eigen::SparseMatrix
+template <typename T> constexpr bool is_eigen_sparse_v =
+is_base_of_template_v<T, Eigen::SparseMatrixBase>;
+
 /// Detects expression templates
 template <typename T> constexpr bool is_eigen_xpr_v =
-    is_eigen_v<T> && !is_eigen_plain_v<T> &&
+    is_eigen_v<T> && !is_eigen_plain_v<T> && !is_eigen_sparse_v<T> &&
     !std::is_base_of_v<Eigen::MapBase<T, Eigen::ReadOnlyAccessors>, T>;
 
 template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {

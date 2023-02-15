@@ -19,6 +19,58 @@ matching module name in :cmake:command:`nanobind_add_module()` and
      File "<stdin>", line 1, in <module>
    ImportError: dynamic module does not define module export function (PyInit_my_ext)
 
+Importing fails due to missing ``[lib]nanobind.{dylib,so,dll}``
+---------------------------------------------------------------
+
+If importing the module fails as shown below, the extension cannot find the
+``nanobind`` shared library component.
+
+.. code-block:: pycon
+
+   >>> import my_ext
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   ImportError: dlopen(my_ext.cpython-311-darwin.so, 0x0002):
+   Library not loaded: '@rpath/libnanobind.dylib'
+
+This is really more of a general C++/CMake/build system issue than one of
+nanobind specifically. There are two solutions:
+
+1. Build the library component statically by specifying the ``NB_STATIC`` flag
+   in :cmake:command:`nanobind_add_module()` (this is the default starting with
+   nanobind 0.2.0).
+
+2. Ensure that the various shared libraries are installed in the right
+   destination, and that their `rpath <https://en.wikipedia.org/wiki/Rpath>`_
+   is set so that they can find each other.
+
+   You can control the build output directory of the shared library component
+   using the following CMake command:
+
+   .. code-block:: pycon
+
+      set_target_properties(nanobind
+        PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY                <path>
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE        <path>
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG          <path>
+        LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO <path>
+        LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL     <path>
+      )
+
+   Depending on the flags provided to :cmake:command:`nanobind_add_module()`,
+   the shared library component may have a different name following the pattern
+   ``nanobind[-abi3][-lto]``.
+
+   The following CMake commands may be useful to adjust the build and install
+   `rpath <https://en.wikipedia.org/wiki/Rpath>`_ of the extension:
+
+   .. code-block:: cmake
+
+      set_property(TARGET my_ext APPEND PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:nanobind>")
+      set_property(TARGET my_ext APPEND PROPERTY INSTALL_RPATH ".. ?? ..")
+
+
 Why are mutable reference arguments not being updated?
 ------------------------------------------------------
 

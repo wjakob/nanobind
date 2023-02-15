@@ -139,7 +139,7 @@ function (nanobind_build_library TARGET_NAME)
   target_include_directories(${TARGET_NAME} PRIVATE
     ${NB_DIR}/ext/robin_map/include)
 
-  target_include_directories(${TARGET_NAME} PUBLIC
+  target_include_directories(${TARGET_NAME} SYSTEM PUBLIC
     ${Python_INCLUDE_DIRS}
     ${NB_DIR}/include)
 

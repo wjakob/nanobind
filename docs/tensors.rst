@@ -229,7 +229,7 @@ values:
    metadata.
 
 Note that shape and order annotations like :cpp:class:`nb::shape <shape>`
-and :cpp:class:`nb::c_contig <c_contig>` enter into docstring, but nanobind
+and :cpp:class:`nb::c_contig <c_contig>` enter into the docstring, but nanobind
 won’t spend time on additional checks. It trusts that your method returns
 what it declares. Furthermore, non-CPU tensors must be explicitly indicate
 the device type and device ID using special parameters of the :cpp:func:`tensor() <tensor::tensor()>`

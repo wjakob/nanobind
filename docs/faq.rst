@@ -121,6 +121,14 @@ for ``T`` that says: "ignore ``T`` and don't use a type caster to handle it".
    same type) is not allowed, and cannot occur when following the
    recommendation.
 
+How can I preserve the ``const``-ness of values in bindings?
+------------------------------------------------------------
+
+This is a limitation of nanobind, which casts away ``const`` in function
+arguments and return values. This is in line with the Python language, which
+has no concept of const values. Additional care is therefore needed to avoid
+bugs that would be caught by the type checker in a traditional C++ program.
+
 How can I reduce the build time?
 --------------------------------
 

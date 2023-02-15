@@ -78,7 +78,6 @@ Table of contents
    ownership_adv
    lowlevel
    typeslots
-   limitations
 
 .. toctree::
    :caption: API Reference

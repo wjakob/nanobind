@@ -317,7 +317,7 @@ Let's look at selected lines of this example, starting with the added include di
 nanobind has a minimal core and initially doesn't know how to deal with STL
 types like ``std::string``. This line imports a *type caster* that realizes a
 bidirectional conversion (C++ ``std::string`` ↔ Python ``str``) to make the
-example usable. The next :ref:`documentation section <type_casters>` will
+example usable. An upcoming :ref:`documentation section <type_casters>` will
 provide more detail on type casters and other alternatives.
 
 The class binding declaration :class:`nb::class_\<T\>() <class_>` supports both
@@ -333,8 +333,8 @@ and installs it in the :cpp:class:`nb::module_ <module_>` ``m``.
 Initially, this type is completely empty---it has no members and cannot be
 instantiated. The subsequent chain of binding declarations binds two
 constructor overloads (via :cpp:class:`nb::init\<...\>() <init>`), a method,
-and the mutable ``name`` field (via :cpp:func:`.def_rw(..) <class_::def_rw>`,
-where ``rw`` stands for read/write access).
+and the mutable ``name`` field (via :cpp:func:`.def_rw(..)
+<class_::def_rw>`, where ``rw`` stands for read/write access).
 
 .. code-block:: cpp
 
@@ -452,8 +452,30 @@ console. Here is an example use of the binding in Python:
    >>> f()
    Charlie: woof!
 
+Wrap-up
+-------
+
+This concludes the basic part of the documentation, which provided a first
+taste of nanobind and typical steps needed to create a custom extension.
+
+The upcoming intermediate-level material covers performance and
+safety-critical points:
+
+- C++ and Python can exchange information in various different ways. 
+
+  *Which one is best for a particular task?*
+
+- A bound object can simultaneously exist in both C++ and Python.
+
+  *Who owns it?*
+  *When is it safe to delete it?*
+
+Following these topics, the documentation revisits function and class
+bindings in full detail.
+
 .. [#f1] Stateless closures are those with an empty pair of brackets ``[]`` as
    the capture object.
 
 .. [#f2] Higher-order functions are functions that take functions as arguments
    and/or return them.
+

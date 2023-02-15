@@ -2,7 +2,7 @@
 
 .. cpp:namespace:: nanobind
 
-Object ownership (advanced)
+Object ownership, continued
 ===========================
 
 This section covers intrusive reference counting as an alternative to shared

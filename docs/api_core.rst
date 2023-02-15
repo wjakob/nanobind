@@ -69,6 +69,17 @@ Macros
    the C++ function is pure virtual. Refer to the documentation on
    :ref:`trampolines <trampolines>` to see how this macro can be used.
 
+.. c:macro:: NB_MAKE_OPAQUE(T)
+
+   The macro registers a partial template specialization pattern for the type
+   `T` that marks it as *opaque*, mening that nanobind won't try to run its
+   type casting template machinery on it.
+
+   This is useful when trying to register a binding for `T` that is simultaneously
+   also covered by an existing type caster.
+
+   This macro should be used at the top level (outside of namespaces and
+   program code).
 
 Python object API
 -----------------

@@ -2,8 +2,8 @@
 
 .. cpp:namespace:: nanobind
 
-Low-level object interface
-==========================
+Low-level interface
+===================
 
 nanobind exposes a low-level interface to provide fine-grained control over
 the sequence of steps that instantiates a Python object wrapping a C++

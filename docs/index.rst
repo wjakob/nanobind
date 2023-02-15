@@ -51,6 +51,7 @@ Table of contents
    why
    benchmark
    porting
+   faq
 
 .. toctree::
    :caption: Basics
@@ -59,7 +60,6 @@ Table of contents
    installing
    building
    basics
-   further
 
 .. toctree::
    :caption: Intermediate
@@ -67,6 +67,7 @@ Table of contents
 
    exchanging
    ownership
+   functions
    tensors
    packaging
 

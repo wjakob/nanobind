@@ -18,7 +18,7 @@ Option 1: Type Casters
 A *type caster* translates C++ objects into equivalent Python
 objects and vice versa. The illustration below shows a translation between
 C++ (blue) and Python (green) worlds, where a ``std::vector<int>`` instance
-converts from/to a Python ``list`` containing ``int`` instances.
+converts from/to a Python ``list`` containing ``int`` objects.
 
 .. image:: images/caster-light.svg
   :width: 400
@@ -176,6 +176,23 @@ not update its argument once exposed in Python.
 
 This is because builtin types like ``int``, ``str``, ``bool``, etc., are
 all handled by type casters.
+
+A simple alternative to propagate updates while retaining the convenience of
+type casters is to bind a small wrapper lambda function that returns a tuple
+with all output arguments. An example:
+
+.. code-block:: cpp
+
+    int foo(int &in) { in *= 2; return std::sqrt(in); }
+
+And the binding code
+
+.. code-block:: cpp
+
+   m.def("foo", [](int i) { int rv = foo(i); return std::make_tuple(rv, i); });
+
+In this case, a type caster (``#include <nanobind/stl/variant.h``) must be
+included to handle the ``std::tuple<int, int>`` return value.
 
 .. _bindings:
 

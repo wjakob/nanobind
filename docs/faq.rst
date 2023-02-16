@@ -15,8 +15,6 @@ matching module name in :cmake:command:`nanobind_add_module()` and
 .. code-block:: pycon
 
    >>> import my_ext
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
    ImportError: dynamic module does not define module export function (PyInit_my_ext)
 
 Importing fails due to missing ``[lib]nanobind.{dylib,so,dll}``
@@ -28,8 +26,6 @@ If importing the module fails as shown below, the extension cannot find the
 .. code-block:: pycon
 
    >>> import my_ext
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
    ImportError: dlopen(my_ext.cpython-311-darwin.so, 0x0002):
    Library not loaded: '@rpath/libnanobind.dylib'
 

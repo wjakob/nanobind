@@ -153,8 +153,6 @@ arguments fails:
 .. code-block:: pycon
 
    >>> my_ext.add(a=1, b=2)
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
    TypeError: add(): incompatible function arguments. The following argument types are supported:
        1. add(arg0: int, arg1: int, /) -> int
 

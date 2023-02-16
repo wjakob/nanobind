@@ -65,8 +65,6 @@ an automatically generated docstring, type checks, and (if needed) error reporti
     [2, 4, 6]
 
     >>> my_ext.double_it([1, 2, 'foo'])
-    Traceback (most recent call last):
-      File "<stdin>", line 1, in <module>
     TypeError: double_it(): incompatible function arguments. The following argument types are supported:
         1. double_it(arg: list[int], /) -> list[int]
 

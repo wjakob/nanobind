@@ -68,6 +68,7 @@ Table of contents
    exchanging
    ownership
    functions
+   classes
    tensors
    packaging
 

@@ -275,8 +275,6 @@ Python object. nanobind will refuse further use of it:
    >>> my_ext.consume(x)
    <stdin>:1: RuntimeWarning: nanobind: attempted to access an uninitialized instance of type 'my_ext.Data'!
 
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
    TypeError: consume(): incompatible function arguments. The following argument types are supported:
        1. consume(arg: my_ext.Data, /) -> None
 

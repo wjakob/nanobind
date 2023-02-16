@@ -87,8 +87,6 @@ The same experiment now fails with a ``TypeError``:
 .. code-block:: pycon
 
     >>> my_ext.double(2)
-    Traceback (most recent call last):
-      File "<stdin>", line 1, in <module>
     TypeError: double(): incompatible function arguments. The following ↵
     argument types are supported:
         1. double(x: float) -> float
@@ -138,8 +136,6 @@ Calling the function with ``None`` raises an exception:
    >>> my_ext.bark(my_ext.Dog())
    'woof!'
    >>> my_ext.bark(None)
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
    TypeError: bark(): incompatible function arguments. The following ↵
    argument types are supported:
        1. bark(arg: my_ext.Dog, /) -> str
@@ -230,16 +226,11 @@ The class :cpp:class:`nb::args <args>` derives from :cpp:class:`nb::tuple
 <dict>`.
 
 You may also use them individually or even combine them with ordinary
-arguments. Note, however, that :cpp:class:`nb::kwargs <kwargs>` must always be
-the last argument of the function, and :cpp:class:`nb::args <args>` implies
-that any further arguments are keyword-only.
-
-.. note::
-
-    When combining \*args or \*\*kwargs with :ref:`keyword arguments
-    <keyword_and_default_args>` you should *not* include :cpp:class:`nb::arg
-    <arg>` or ``""_a`` tag for the :cpp:class:`nb::args <args>` and `nb::kwargs
-    <kwargs>` arguments.
+arguments. Note, however, that :cpp:class:`nb::args <args>` and
+:cpp:class:`nb::kwargs <kwargs>` must always be the last arguments of the
+function, and in that order if both are specified. This is a restriction
+compared to pybind11, which allowed more general arrangements. nanobind also
+lacks the ``kw_only`` and ``pos_only`` annotations available in pybind11.
 
 Expanding \*args and \*\*kwargs
 -------------------------------

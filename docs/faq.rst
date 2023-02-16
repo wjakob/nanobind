@@ -71,11 +71,11 @@ nanobind specifically. There are two solutions:
       set_property(TARGET my_ext APPEND PROPERTY INSTALL_RPATH ".. ?? ..")
 
 
-Why are mutable reference arguments not being updated?
-------------------------------------------------------
+Why are reference arguments not updated?
+----------------------------------------
 
 Functions like the following example can be exposed in Python, but they won't
-propagate updates to their arguments.
+propagate updates to mutable reference arguments.
 
 .. code-block:: stl
 
@@ -181,11 +181,11 @@ arguments and return values. This is in line with the Python language, which
 has no concept of const values. Additional care is therefore needed to avoid
 bugs that would be caught by the type checker in a traditional C++ program.
 
-How can I reduce the build time?
---------------------------------
+How can I reduce build time?
+----------------------------
 
-It's good practice to split binding code over multiple files, as in the
-following example:
+Large binding projects should be partitioned into multiple files, as shown in
+the following example:
 
 :file:`example.cpp`:
 

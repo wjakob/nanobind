@@ -107,7 +107,7 @@ The leaked ``Wrapper`` instance ``a`` references the ``Wrapper`` type, which in
 turn references function definitions, causing a longer sequence of warnings.
 
 Python provides a *cyclic garbage collector* that can in principle solve
-this problem. To function correctly, it requires information about how
+this problem. To operate correctly, it requires information about how
 objects are connected to each other.
 
 We can provide a ``tp_traverse`` type slot that walks through the object
@@ -147,9 +147,11 @@ reference cycles:
        { 0, nullptr }
    };
 
-The expression :cpp:func:`nb::inst_ptr\<Wrapper\>(self) <inst_ptr>`
-efficiently returns the C++ instance associated with a Python object and is
-documented as part of nanobind's :cpp:ref:`low level interface <lowlevel>`.
+The type ``visitproc`` and macro ``Py_VISIT()`` are part of the Python C API.
+
+The expression :cpp:func:`nb::inst_ptr\<Wrapper\>(self) <inst_ptr>` efficiently
+returns the C++ instance associated with a Python object and is explained in
+the documentation about nanobind's :cpp:ref:`low level interface <lowlevel>`.
 
 Note the use of the :cpp:func:`nb::find() <find>` function, which behaves like
 :cpp:func:`nb::cast() <cast>` by returning the Python object associated with a

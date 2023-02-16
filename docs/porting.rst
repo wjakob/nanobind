@@ -103,8 +103,8 @@ contained a *holder type* (typically ``std::unique_ptr<T>``) storing a pointer
 to the instance data. Dealing with holders caused inefficiencies and introduced
 complexity; they were therefore removed in nanobind. This has implications on
 object ownership, shared ownership, and interactions with C++ shared/unique
-pointers. The separate sections on :ref:`object ownership <ownership>` and
-:ref:`intrusive reference counting <intrusive>` provide further details.
+pointers. The :ref:`intermediate <ownership>` and :ref:`advanced
+<ownership_adv>` sections on object ownership provide further detail.
 
 The gist is that it is no longer necessary to specify holder types in the type
 declaration:
@@ -285,9 +285,9 @@ Removed features include:
   nanobind.
 - ○ **Holders**: nanobind instances co-locate instance data with a Python
   object instead of accessing it via a holder type. This is a major difference
-  compared to pybind11, which has :ref:`implications on object ownership
-  <ownership>` and may need tweaks to bind code that uses unique and shared
-  pointers.
+  compared to pybind11 and may need tweaks to bind code that uses unique and shared
+  pointers. The :ref:`intermediate <ownership>` and :ref:`advanced
+  <ownership_adv>` sections on object ownership provide further detail.
 - ○ **Multi-intepreter, Embedding**: The ability to embed Python in an
   executable or run several independent Python interpreters in the same process
   is unsupported. Nanobind caters to bindings only. Multi-interpreter support

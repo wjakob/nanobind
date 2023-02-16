@@ -31,44 +31,6 @@ Macros
            });
        }
 
-.. c:macro:: NB_TRAMPOLINE(base, size)
-
-   Install a trampoline in an alias class to enable dispatching C++ virtual
-   function calls to a Python implementation. Refer to the documentation on
-   :ref:`trampolines <trampolines>` to see how this macro can be used.
-
-.. c:macro:: NB_OVERRIDE(ret_type, base_type, func, ...)
-
-   Dispatch the call to a Python method named ``"func"`` if it is overloaded on
-   the Python side. The method should return a result of type ``ret_type``.
-   Otherwise, call the C++ function ``base_type::func(...)``. Refer to the
-   documentation on :ref:`trampolines <trampolines>` to see how this macro can
-   be used.
-
-.. c:macro:: NB_OVERRIDE_PURE(ret_type, base_type, func, ...)
-
-   Dispatch the call to a Python method named ``"func"`` if it is overloaded on
-   the Python side. The method should return a result of type ``ret_type``.
-   Otherwise, raise an exception. This macro should be used when the C++
-   function is pure virtual. Refer to the documentation on :ref:`trampolines
-   <trampolines>` to see how this macro can be used.
-
-.. c:macro:: NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)
-
-   Dispatch the call to a Python method with custom identifier ``name`` if it is
-   overloaded on the Python side. The method should return a result of type
-   ``ret_type``. Otherwise, call the C++ function ``base_type::func(...)``. Refer
-   to the documentation on :ref:`trampolines <trampolines>` to see how this
-   macro can be used.
-
-.. c:macro:: NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)
-
-   Dispatch the call to a Python method with the custom identifier ``name`` if it
-   is overloaded on the Python side. The method should return a result of type
-   ``ret_type``. Otherwise, raise an exception. This macro should be used when
-   the C++ function is pure virtual. Refer to the documentation on
-   :ref:`trampolines <trampolines>` to see how this macro can be used.
-
 .. c:macro:: NB_MAKE_OPAQUE(T)
 
    The macro registers a partial template specialization pattern for the type
@@ -1324,9 +1286,20 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
 .. cpp:struct:: template <size_t Nurse, size_t Patient> keep_alive
 
-   Following the call, keep object ``Patient`` alive while the object ``Nurse``
-   exists. Index ``0`` refers to the return value, index ``1`` is the first
-   function argument, etc.
+   Following the function evaluation, keep object ``Patient`` alive while the
+   object ``Nurse`` exists. The function uses the following indexing
+   convention:
+
+   - Index ``0`` refers to the return value of methods. (It should not be used in
+     constructors)
+
+   - Index ``1`` refers to the first argument. In methods and constructors, index ``1``
+     refers to the implicit ``this`` pointer, while regular arguments begin at index ``2``.
+
+    When the nurse or patient equal ``None``, the annotation does nothing. 
+
+    nanobind will raise an exception when the nurse object is neither a
+    nanobind-registered type nor weak-referenceable.
 
 .. cpp:struct:: raw_doc
 

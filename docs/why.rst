@@ -49,52 +49,54 @@ Performance improvements
 The :ref:`benchmark section <benchmarks>` evaluates the impact of the following
 performance improvements:
 
-- C++ objects are now co-located with the Python object whenever possible (less
-  pointer chasing compared to pybind11). The per-instance overhead for wrapping
-  a C++ type into a Python object shrinks by a factor of 2.3x. (pybind11: 56
-  bytes, nanobind: 24 bytes.)
+- **Compact objects**: C++ objects are now co-located with the Python object
+  whenever possible (less pointer chasing compared to pybind11). The
+  per-instance overhead for wrapping a C++ type into a Python object shrinks by
+  a factor of 2.3x. (pybind11: 56 bytes, nanobind: 24 bytes.)
 
-- C++ function binding information is now co-located with the Python
-  function object (less pointer chasing).
+- **Compact functions**: C++ function binding information is now co-located
+  with the Python function object (less pointer chasing).
 
-- C++ type binding information is now co-located with the Python type object
+- **Compact types**: C++ type binding information is now co-located with the Python type object
   (less pointer chasing, fewer hashtable lookups).
 
-- nanobind internally replaces ``std::unordered_map`` with a more efficient
-  hash table (`tsl::robin_map <https://github.com/Tessil/robin-map>`_, which
-  is included as a git submodule).
+- **Fast hash table**: nanobind upgrades several important internal
+  associative data structures that previously used ``std::unordered_map`` to a
+  more efficient alternative (`tsl::robin_map
+  <https://github.com/Tessil/robin-map>`_, which is included as a git
+  submodule).
 
-- function calls from/to Python are realized using `PEP 590 vector calls
-  <https://www.python.org/dev/peps/pep-0590>`_, which gives a nice speed
-  boost. The main function dispatch loop no longer allocates heap memory.
+- **Vector calls**: function calls from/to Python are realized using `PEP 590
+  vector calls <https://www.python.org/dev/peps/pep-0590>`_, which gives a nice
+  speed boost. The main function dispatch loop no longer allocates heap memory.
 
-- pybind11 was designed as a header-only library, which is generally a good
-  thing because it simplifies the compilation workflow. However, one major
-  downside of this is that a large amount of redundant code has to be
-  compiled in each binding file (e.g., the function dispatch loop and all of
-  the related internal data structures). nanobind compiles a separate shared
-  or static support library (``libnanobind``) and links it against the binding
-  code to avoid redundant compilation. When using the CMake
-  :cmake:command:`nanobind_add_module()` function, this all happens
-  transparently.
+- **Library component**: pybind11 was designed as a header-only library, which
+  is generally a good thing because it simplifies the compilation workflow.
+  However, one major downside of this is that a large amount of redundant code
+  has to be compiled in each binding file (e.g., the function dispatch loop and
+  all of the related internal data structures). nanobind compiles a separate
+  shared or static support library ("*libnanobind*") and links it against the
+  binding code to avoid redundant compilation. The CMake interface
+  :cmake:command:`nanobind_add_module()` fully automates these extra
+  steps.
 
-- ``#include <pybind11/pybind11.h>`` pulls in a large portion of the STL
-  (about 2.1 MiB of headers with Clang and libc++). nanobind minimizes STL
-  usage to avoid this problem. Type casters even for for basic types like
-  ``std::string`` require an explicit opt-in by including an extra header
-  file (e.g. ``#include <nanobind/stl/string.h>``).
+- **Smaller headers**: ``#include <pybind11/pybind11.h>`` pulls in a large
+  portion of the STL (about 2.1 MiB of headers with Clang and libc++). nanobind
+  minimizes STL usage to avoid this problem. Type casters even for for basic
+  types like ``std::string`` require an explicit opt-in by including an extra
+  header file (e.g. ``#include <nanobind/stl/string.h>``).
 
-- pybind11 is dependent on *link time optimization* (LTO) to produce
-  reasonably-sized bindings, which makes linking a build time bottleneck.
-  With nanobind's split into a precompiled core library and minimal
-  metatemplating, LTO is no longer such a big deal.
+- **Simpler compilation**: pybind11 was dependent on *link time optimization*
+  (LTO) to produce reasonably-sized bindings, which makes linking a build time
+  bottleneck. With nanobind's split into a precompiled library and minimal
+  metatemplating, LTO is no longer crucial and can be skipped.
 
-- nanobind maintains efficient internal data structures for lifetime management
-  (needed for :cpp:class:`nb::keep_alive <keep_alive>`,
-  :cpp:enumerator:`nb::rv_policy::reference_internal
+- **Lifetime management**: nanobind maintains efficient internal data
+  structures for lifetime management (needed for :cpp:class:`nb::keep_alive
+  <keep_alive>`, :cpp:enumerator:`nb::rv_policy::reference_internal
   <rv_policy::reference_internal>`, the ``std::shared_ptr`` interface, etc.).
-  With these changes, it is no longer necessary that bound types are
-  weak-referenceable, which saves a pointer per instance.
+  With these changes, bound types no longer need to be weak-referenceable,
+  which saves a pointer per instance.
 
 .. _major_additions:
 
@@ -139,8 +141,8 @@ nanobind includes a number of quality-of-live improvements for developers:
   immediately creates the underlying docstring. When a function takes a C++
   type as parameter that is not yet registered in pybind11, the docstring will
   include a C++ type name (e.g. ``std::vector<int, std::allocator<int>>``),
-  which can look rather ugly. pybind11 binding declarations must be arranged
-  very carefully to work around this issue.
+  which can look rather ugly. pybind11 binding declarations must be carefully
+  arranged to work around this issue.
 
   nanobind avoids the issue altogether by not pre-rendering docstrings: they
   are created on the fly when queried. nanobind also has improved
@@ -151,7 +153,7 @@ nanobind includes a number of quality-of-live improvements for developers:
   fine-grained control over diverse aspects including :ref:`instance creation
   <lowlevel>`, :ref:`type creation <typeslots>`, and it can store
   :ref:`supplemental data <supplement>` in types. The low-level API provides a
-  useful escape hatch to pursue advanced use cases that were not foreseen in
+  useful escape hatch to pursue advanced projects that were not foreseen in
   the design of this library.
 
 .. _minor_additions:

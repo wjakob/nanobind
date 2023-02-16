@@ -3,6 +3,56 @@ C++ API Reference (Extras)
 
 .. cpp:namespace:: nanobind
 
+Trampolines
+-----------
+
+The following macros to implement trampolines that forward virtual function
+calls to Python require an additional include directive:
+
+.. code-block:: cpp
+
+   #include <nanobind/trampoline.h>
+
+See the section on :ref:`trampolines <trampolines>` for further detail.
+
+.. c:macro:: NB_TRAMPOLINE(base, size)
+
+   Install a trampoline in an alias class to enable dispatching C++ virtual
+   function calls to a Python implementation. Refer to the documentation on
+   :ref:`trampolines <trampolines>` to see how this macro can be used.
+
+.. c:macro:: NB_OVERRIDE(ret_type, base_type, func, ...)
+
+   Dispatch the call to a Python method named ``"func"`` if it is overloaded on
+   the Python side. The method should return a result of type ``ret_type``.
+   Otherwise, call the C++ function ``base_type::func(...)``. Refer to the
+   documentation on :ref:`trampolines <trampolines>` to see how this macro can
+   be used.
+
+.. c:macro:: NB_OVERRIDE_PURE(ret_type, base_type, func, ...)
+
+   Dispatch the call to a Python method named ``"func"`` if it is overloaded on
+   the Python side. The method should return a result of type ``ret_type``.
+   Otherwise, raise an exception. This macro should be used when the C++
+   function is pure virtual. Refer to the documentation on :ref:`trampolines
+   <trampolines>` to see how this macro can be used.
+
+.. c:macro:: NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)
+
+   Dispatch the call to a Python method with custom identifier ``name`` if it is
+   overloaded on the Python side. The method should return a result of type
+   ``ret_type``. Otherwise, call the C++ function ``base_type::func(...)``. Refer
+   to the documentation on :ref:`trampolines <trampolines>` to see how this
+   macro can be used.
+
+.. c:macro:: NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)
+
+   Dispatch the call to a Python method with the custom identifier ``name`` if it
+   is overloaded on the Python side. The method should return a result of type
+   ``ret_type``. Otherwise, raise an exception. This macro should be used when
+   the C++ function is pure virtual. Refer to the documentation on
+   :ref:`trampolines <trampolines>` to see how this macro can be used.
+
 .. _vector_bindings:
 
 STL vector bindings

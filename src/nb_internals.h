@@ -170,6 +170,9 @@ using py_map =
 using keep_alive_set =
     py_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
+using nb_instance_map = py_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>;
+using nb_type_map = py_map<std::type_index, type_data *>;
+
 struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
@@ -188,11 +191,10 @@ struct nb_internals {
     PyTypeObject *nb_tensor;
 
     /// Instance pointer -> Python object mapping
-    py_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>
-        inst_c2p;
+    nb_instance_map inst_c2p;
 
     /// C++ type -> Python type mapping
-    py_map<std::type_index, type_data *> type_c2p;
+    nb_type_map type_c2p;
 
     /// Dictionary of sets storing keep_alive references
     py_map<void *, keep_alive_set, ptr_hash> keep_alive;

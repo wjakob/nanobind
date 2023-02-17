@@ -72,4 +72,26 @@ NB_MODULE(test_holders_ext, m) {
 
     m.def("stats", []{ return std::make_pair(created, deleted); });
     m.def("reset", []{ created = deleted = 0; });
+
+    struct Base { ~Base() = default; };
+    struct PolymorphicBase { virtual ~PolymorphicBase() = default; };
+    struct Subclass : Base { };
+    struct PolymorphicSubclass : PolymorphicBase { };
+    struct AnotherSubclass : Base { };
+    struct AnotherPolymorphicSubclass : PolymorphicBase { };
+
+    nb::class_<Base> (m, "Base");
+    nb::class_<Subclass> (m, "Subclass");
+    nb::class_<PolymorphicBase> (m, "PolymorphicBase");
+    nb::class_<PolymorphicSubclass> (m, "PolymorphicSubclass");
+
+    m.def("u_polymorphic_factory", []() { return std::unique_ptr<PolymorphicBase>(new PolymorphicSubclass()); });
+    m.def("u_polymorphic_factory_2", []() { return std::unique_ptr<PolymorphicBase>(new AnotherPolymorphicSubclass()); });
+    m.def("u_factory", []() { return std::unique_ptr<Base>(new Subclass()); });
+    m.def("u_factory_2", []() { return std::unique_ptr<Base>(new AnotherSubclass()); });
+
+    m.def("s_polymorphic_factory", []() { return std::shared_ptr<PolymorphicBase>(new PolymorphicSubclass()); });
+    m.def("s_polymorphic_factory_2", []() { return std::shared_ptr<PolymorphicBase>(new AnotherPolymorphicSubclass()); });
+    m.def("s_factory", []() { return std::shared_ptr<Base>(new Subclass()); });
+    m.def("s_factory_2", []() { return std::shared_ptr<Base>(new AnotherSubclass()); });
 }

@@ -100,8 +100,17 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
     static handle from_cpp(const Value &value, rv_policy,
                            cleanup_list *cleanup) noexcept {
         bool is_new = false;
-        handle result = nb_type_put(&typeid(T), value.get(),
-                                    rv_policy::reference, cleanup, &is_new);
+        handle result;
+
+        T *value_p = value.get();
+
+        if constexpr (std::is_polymorphic_v<T>)
+            result =
+                nb_type_put_p(&typeid(T), value_p ? &typeid(*value_p) : nullptr,
+                              value_p, rv_policy::reference, cleanup, &is_new);
+        else
+            result = nb_type_put(&typeid(T), value_p, rv_policy::reference,
+                                 cleanup, &is_new);
 
         if (is_new)
             shared_from_cpp(std::static_pointer_cast<void>(value),

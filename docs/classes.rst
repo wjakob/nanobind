@@ -94,25 +94,60 @@ Instances expose fields and methods of both types as expected:
     >>> d.bark()
     'woof!'
 
-nanobind obeys type signature when returning C++ objects: consider the
-following function that returns a ``Dog`` object as a ``Pet`` base pointer.
+.. _automatic_downcasting:
+
+Automatic downcasting
+---------------------
+
+nanobind obeys type signature when returning regular non-polymorphic C++ objects:
+building on the :ref:`previous example <inheritance>`, consider the following
+function that returns a ``Dog`` object as a ``Pet`` base pointer.
 
 .. code-block:: cpp
 
-    m.def("pet_store", []() { return (Pet *) new Dog{"Molly"}; });
+   m.def("pet_store", []() { return (Pet *) new Dog{"Molly"}; });
 
-Only fields and methods of the base type remain accessible.
+Consequently, only fields and methods of the base type remain accessible:
 
 .. code-block:: pycon
 
-    >>> p = my_ext.pet_store()
-    >>> type(p)
-    <class 'my_ext.Pet'>
-    >>> p.bark()
-    AttributeError: 'Pet' object has no attribute 'bark'
+   >>> p = my_ext.pet_store()
+   >>> type(p)
+   <class 'my_ext.Pet'>
+   >>> p.bark()
+   AttributeError: 'Pet' object has no attribute 'bark'
 
-This is the case even when the returned instance is *polymorphic* (a deviation
-from pybind11).
+In C++, a type is only considered `polymorphic
+<https://en.wikipedia.org/wiki/Dynamic_dispatch>`_ if it (or one of its base
+classes) has at least one *virtual function*. Let's add a virtual default
+destructor to make ``Pet`` and its subtypes polymorphic.
+
+.. code-block:: cpp
+
+   struct Pet {
+       virtual ~Pet() = default;
+       std::string name;
+   };
+
+With this change, nanobind is able to inspect the returned C++ instance's
+`virtual table <https://en.wikipedia.org/wiki/Virtual_method_table>`_ and infer
+that it can be represented by a more specialized Python object of type
+``my_ext.Dog``.
+
+.. code-block:: pycon
+
+   >>> p = my_ext.pet_store()
+   >>> type(p)
+   <class 'my_ext.Dog'>
+   >>> p.bark()
+   'woof!'
+
+.. note::
+
+   Automatic downcasting of polymorphic instances is only supported when the
+   subtype has been registered using :cpp:class:`nb::class_\<..\> <class_>`.
+   Otherwise, the return type listed in the function signature takes
+   precedence.
 
 Overloaded methods
 ------------------
@@ -312,8 +347,6 @@ Now everything works as expected:
     >>> p = my_ext.Pet()
     >>> p.name = "Charly"  # OK, overwrite value in C++
     >>> p.age = 2  # OK, dynamically add a new attribute
-    >>> p.__dict__  # just like a native Python class
-    {'age': 2}
 
 Note that there is a small runtime cost for a class with dynamic attributes.
 Not only because of the addition of a ``__dict__``, but also because of more

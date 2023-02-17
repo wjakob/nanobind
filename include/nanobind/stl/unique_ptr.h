@@ -96,8 +96,15 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         if constexpr (IsNanobindDeleter)
             cpp_delete = value.get_deleter().owned_by_cpp();
 
-        handle result =
-            nb_type_put_unique(&typeid(T), value.get(), cleanup, cpp_delete);
+        T *value_p = value.get();
+
+        handle result;
+        if constexpr (std::is_polymorphic_v<T>)
+            result = nb_type_put_unique_p(&typeid(T),
+                                          value_p ? &typeid(*value_p) : nullptr,
+                                          value_p, cleanup, cpp_delete);
+        else
+            result = nb_type_put_unique(&typeid(T), value_p, cleanup, cpp_delete);
 
         if (result.is_valid()) {
             if (cpp_delete)

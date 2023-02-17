@@ -5,7 +5,7 @@
 Changelog
 #########
 
-*nanobind* uses a `semantic versioning <http://semver.org>`_ policy. Since the
+nanobind uses a `semantic versioning <http://semver.org>`_ policy. Since the
 current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
@@ -45,23 +45,25 @@ Version 0.2.0 (TBA)
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`_. (PR `#120
   <https://github.com/wjakob/nanobind/pull/120>`_).
 * Implemented `nb::bind_vector\<T\>() <bind_vector>` analogous to similar
-  functionality in *pybind11*. (commit `f2df8a
+  functionality in pybind11. (commit `f2df8a
   <https://github.com/wjakob/nanobind/commit/f2df8a90fbfb06ee03a79b0dd85fa0e266efeaa9>`_).
 * Implemented :cpp:func:`nb::bind_map\<T\>() <bind_map>` analogous to
-  similar functionality in *pybind11*. (PR `#114
+  similar functionality in pybind11. (PR `#114
   <https://github.com/wjakob/nanobind/pull/114>`_).
+* nanobind now :ref:`automatically downcasts <automatic_downcasting>`
+  polymorphic objects in return values analogous to pybind11.
 * Updated tuple/list iterator to satisfy the ``std::forward_iterator`` concept.
   (PR `#117 <https://github.com/wjakob/nanobind/pull/117>`_).
 * Fixed issues with non-writeable tensors in NumPy. (commit `25cc3c
   <https://github.com/wjakob/nanobind/commit/25cc3ccbd1174e7cfc4eef1d1e7206cc38e854ca>`_).
 * Removed use of some C++20 features from the codebase. This now makes it
-  possible to use *nanobind* on  Visual Studio 2017 and GCC 7.3.1 (used on RHEL 7).
+  possible to use nanobind on  Visual Studio 2017 and GCC 7.3.1 (used on RHEL 7).
   (PR `#115 <https://github.com/wjakob/nanobind/pull/115>`_).
 * Added the :cpp:class:`nb::typed\<...\> <typed>` wrapper to override the type signature of an
   argument in a bound function in the generated docstring. (commit `b3404c4
   <https://github.com/wjakob/nanobind/commit/b3404c4f347981bce7f4c7a9bac762656bed8385>`_).
 * Added an :cpp:func:`nb::implicit_convertible\<A, B\>() <implicitly_convertible>` function analogous to the one in
-  *pybind11*. (commit `aba4af
+  pybind11. (commit `aba4af
   <https://github.com/wjakob/nanobind/commit/aba4af06992f14e21e5b7b379e7986e939316da4>`_).
 * Updated :cpp:func:`nb::make*_iterator\<..\>() <make_iterator>` so that it returns references of elements, not
   copies. (commit `8916f5
@@ -75,7 +77,7 @@ Version 0.2.0 (TBA)
 Version 0.1.0 (January 3, 2022)
 -------------------------------
 
-* Allow *nanobind* methods on non-_nanobind) classes. (PR `#104
+* Allow nanobind methods on non-nanobind) classes. (PR `#104
   <https://github.com/wjakob/nanobind/pull/104>`_).
 * Fix dangling `tp_members` pointer in type initialization. (PR `#99
   <https://github.com/wjakob/nanobind/pull/99>`_).
@@ -140,7 +142,7 @@ Version 0.0.8 (Oct 27, 2022)
   <https://github.com/wjakob/nanobind/commit/be34b165c6a0bed08e477755644f96759b9ed69a>`_).
 * Caster for ``std::set<..>`` and ``std::unordered_set`` (PR `#87
   <https://github.com/wjakob/nanobind/pull/87>`_).
-* Ported ``nb::make[_key_,_value]_iterator()`` from *pybind11*. (commit `34d0be1
+* Ported ``nb::make[_key_,_value]_iterator()`` from pybind11. (commit `34d0be1
   <https://github.com/wjakob/nanobind/commit/34d0be1bbeb54b8265456fd3a4a50e98f93fe6d4>`_).
 * Caster for untyped ``void *`` pointers. (commit `6455fff
   <https://github.com/wjakob/nanobind/commit/6455fff7be5be2867063ea8138cf10e1d9f3065f>`_).

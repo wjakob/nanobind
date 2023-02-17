@@ -208,6 +208,8 @@ NB_MODULE(test_classes_ext, m) {
         std::string s;
     };
 
+    struct Foo { };
+
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
         .def(nb::init<>())
         .def("name", &Animal::name)
@@ -234,8 +236,9 @@ NB_MODULE(test_classes_ext, m) {
     });
 
     // test11_large_pointers
-    m.def("i2p", [](uintptr_t x) { return (Cat *) x; }, nb::rv_policy::reference);
-    m.def("p2i", [](Cat *x) { return (uintptr_t) x; });
+    nb::class_<Foo>(m, "Foo");
+    m.def("i2p", [](uintptr_t x) { return (Foo *) x; }, nb::rv_policy::reference);
+    m.def("p2i", [](Foo *x) { return (uintptr_t) x; });
 
     // test12_implicitly_convertible
     struct A { int a; };
@@ -439,4 +442,21 @@ NB_MODULE(test_classes_ext, m) {
     m.def("is_int_1", [](nb::handle h) { return nb::isinstance<int>(h); });
     m.def("is_int_2", [](nb::handle h) { return nb::isinstance<nb::int_>(h); });
     m.def("is_struct", [](nb::handle h) { return nb::isinstance<Struct>(h); });
+
+    struct Base { ~Base() = default; };
+    struct PolymorphicBase { virtual ~PolymorphicBase() = default; };
+    struct Subclass : Base { };
+    struct PolymorphicSubclass : PolymorphicBase { };
+    struct AnotherSubclass : Base { };
+    struct AnotherPolymorphicSubclass : PolymorphicBase { };
+
+    nb::class_<Base> (m, "Base");
+    nb::class_<Subclass> (m, "Subclass");
+    nb::class_<PolymorphicBase> (m, "PolymorphicBase");
+    nb::class_<PolymorphicSubclass> (m, "PolymorphicSubclass");
+
+    m.def("polymorphic_factory", []() { return (PolymorphicBase *) new PolymorphicSubclass(); });
+    m.def("polymorphic_factory_2", []() { return (PolymorphicBase *) new AnotherPolymorphicSubclass(); });
+    m.def("factory", []() { return (Base *) new Subclass(); });
+    m.def("factory_2", []() { return (Base *) new AnotherSubclass(); });
 }

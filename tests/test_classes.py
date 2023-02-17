@@ -235,13 +235,13 @@ def test11_trampoline_failures():
 def test12_large_pointers():
     for i in range(1, 10):
         c = t.i2p(i)
-        assert isinstance(c, t.Cat)
+        assert isinstance(c, t.Foo)
         assert t.p2i(c) == i
 
     large = 0xffffffffffffffff
     for i in range(large - 10, large):
         c = t.i2p(i)
-        assert isinstance(c, t.Cat)
+        assert isinstance(c, t.Foo)
         assert t.p2i(c) == i
 
 
@@ -552,6 +552,7 @@ def test31_cycle():
     a = t.Wrapper()
     a.value = a
     del a
+    collect()
 
 
 def test32_type_checks():
@@ -561,3 +562,10 @@ def test32_type_checks():
     assert t.is_int_1(v1) and not t.is_int_1(v2)
     assert t.is_int_2(v1) and not t.is_int_2(v2)
     assert not t.is_struct(v1) and t.is_struct(v2)
+
+
+def test33_polymorphic_downcast():
+    assert isinstance(t.factory(), t.Base)
+    assert isinstance(t.factory_2(), t.Base)
+    assert isinstance(t.polymorphic_factory(), t.PolymorphicSubclass)
+    assert isinstance(t.polymorphic_factory_2(), t.PolymorphicBase)

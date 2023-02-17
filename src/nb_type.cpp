@@ -906,37 +906,13 @@ void keep_alive(PyObject *nurse, void *payload,
     }
 }
 
-PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
-                      rv_policy rvp, cleanup_list *cleanup,
-                      bool *is_new) noexcept {
-    // Convert nullptr -> None
-    if (!value) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-
-    // Check if the instance is already registered with nanobind
-    nb_internals &internals = internals_get();
-    auto it = internals.inst_c2p.find(
-        std::pair<void *, std::type_index>(value, *cpp_type));
-    if (it != internals.inst_c2p.end() && rvp != rv_policy::copy) {
-        PyObject *result = (PyObject *) it->second;
-        Py_INCREF(result);
-        return result;
-    } else if (rvp == rv_policy::none) {
-        return nullptr;
-    }
-
-    // Look up the corresponding type
-    auto it2 = internals.type_c2p.find(std::type_index(*cpp_type));
-    if (it2 == internals.type_c2p.end())
-        return nullptr;
-
+static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
+                                    cleanup_list *cleanup,
+                                    bool *is_new) noexcept {
     // The reference_internals RVP needs a self pointer, give up if unavailable
     if (rvp == rv_policy::reference_internal && (!cleanup || !cleanup->self()))
         return nullptr;
 
-    type_data *t = it2->second;
     const bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
     if (intrusive)
         rvp = rv_policy::take_ownership;
@@ -1007,15 +983,91 @@ PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
     return (PyObject *) inst;
 }
 
-PyObject *nb_type_put_unique(const std::type_info *cpp_type, void *value,
-                             cleanup_list *cleanup, bool cpp_delete) noexcept {
-    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+PyObject *nb_type_put(const std::type_info *cpp_type,
+                      void *value, rv_policy rvp,
+                      cleanup_list *cleanup,
+                      bool *is_new) noexcept {
+    using Key = std::pair<void *, std::type_index>;
 
-    bool is_new = false;
-    PyObject *o = nb_type_put(cpp_type, value, policy, cleanup, &is_new);
-    if (!o)
+    // Convert nullptr -> None
+    if (!value) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    // Check if the instance is already registered with nanobind
+    nb_internals &internals = internals_get();
+    nb_instance_map &map = internals.inst_c2p;
+    nb_type_map &type_map = internals.type_c2p;
+    nb_instance_map::iterator it = map.find(Key(value, *cpp_type));
+
+    if (it != map.end() && rvp != rv_policy::copy) {
+        PyObject *result = (PyObject *) it->second;
+        Py_INCREF(result);
+        return result;
+    } else if (rvp == rv_policy::none) {
+        return nullptr;
+    }
+
+    // Look up the corresponding type
+    nb_type_map::iterator it2 = type_map.find(std::type_index(*cpp_type));
+    if (NB_UNLIKELY(it2 == type_map.end()))
         return nullptr;
 
+    return nb_type_put_common(value, it2->second, rvp, cleanup, is_new);
+}
+
+PyObject *nb_type_put_p(const std::type_info *cpp_type,
+                        const std::type_info *cpp_type_p,
+                        void *value, rv_policy rvp,
+                        cleanup_list *cleanup,
+                        bool *is_new) noexcept {
+    using Key = std::pair<void *, std::type_index>;
+
+    // Convert nullptr -> None
+    if (!value) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    // Check if the instance is already registered with nanobind
+    nb_internals &internals = internals_get();
+    nb_instance_map &map = internals.inst_c2p;
+    nb_type_map &type_map = internals.type_c2p;
+    nb_instance_map::iterator it = map.end();
+
+    if (NB_UNLIKELY(cpp_type_p && cpp_type_p != cpp_type))
+        it = map.find(Key(value, *cpp_type_p));
+
+    if (NB_LIKELY(it == map.end()))
+        it = map.find(Key(value, *cpp_type));
+
+    if (it != map.end() && rvp != rv_policy::copy) {
+        PyObject *result = (PyObject *) it->second;
+        Py_INCREF(result);
+        return result;
+    } else if (rvp == rv_policy::none) {
+        return nullptr;
+    }
+
+    // Look up the corresponding type
+    nb_type_map::iterator it2 = type_map.end();
+
+    if (NB_UNLIKELY(cpp_type_p && cpp_type_p != cpp_type))
+        it2 = type_map.find(std::type_index(*cpp_type_p));
+
+    if (NB_LIKELY(it2 == type_map.end()))
+        it2 = type_map.find(std::type_index(*cpp_type));
+
+    if (NB_UNLIKELY(it2 == type_map.end()))
+        return nullptr;
+
+    return nb_type_put_common(value, it2->second, rvp, cleanup, is_new);
+}
+
+static void nb_type_put_unique_finalize(PyObject *o,
+                                        const std::type_info *cpp_type,
+                                        bool cpp_delete, bool is_new) {
     if (!cpp_delete && is_new)
         fail("nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
              "ownership status has become corrupted.",
@@ -1039,6 +1091,35 @@ PyObject *nb_type_put_unique(const std::type_info *cpp_type, void *value,
                  "status has become corrupted.", type_name(cpp_type));
         inst->ready = true;
     }
+}
+
+PyObject *nb_type_put_unique(const std::type_info *cpp_type,
+                             void *value,
+                             cleanup_list *cleanup, bool cpp_delete) noexcept {
+    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+
+    bool is_new = false;
+    PyObject *o = nb_type_put(cpp_type, value, policy, cleanup, &is_new);
+
+    if (o)
+        nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new);
+
+    return o;
+}
+
+PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
+                               const std::type_info *cpp_type_p,
+                               void *value,
+                               cleanup_list *cleanup, bool cpp_delete) noexcept {
+    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+
+    bool is_new = false;
+    PyObject *o =
+        nb_type_put_p(cpp_type, cpp_type_p, value, policy, cleanup, &is_new);
+
+    if (o)
+        nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new);
+
     return o;
 }
 

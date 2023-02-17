@@ -293,8 +293,15 @@ template <typename Type_> struct type_caster_base {
         else
             value_p = (Type *) &value;
 
-        return nb_type_put(&typeid(Type), value_p, infer_policy<T>(policy),
-                           cleanup, nullptr);
+        policy = infer_policy<T>(policy);
+
+        if constexpr (std::is_polymorphic_v<Type>)
+            return nb_type_put_p(&typeid(Type),
+                                 value_p ? &typeid(*value_p) : nullptr, value_p,
+                                 policy, cleanup, nullptr);
+        else
+            return nb_type_put(&typeid(Type), value_p, policy, cleanup,
+                               nullptr);
     }
 
     operator Type*() { return value; }

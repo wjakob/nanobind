@@ -106,10 +106,16 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("sparse_r", [mat]() -> SparseMatrixR {
         return Eigen::SparseView<Eigen::MatrixXf>(mat);
     });
-    m.def("sparse_c",
-          [mat]() -> SparseMatrixC { return Eigen::SparseView<Eigen::MatrixXf>(mat); });
+    m.def("sparse_c", [mat]() -> SparseMatrixC {
+        return Eigen::SparseView<Eigen::MatrixXf>(mat);
+    });
     m.def("sparse_copy_r", [](const SparseMatrixR &m) -> SparseMatrixR { return m; });
     m.def("sparse_copy_c", [](const SparseMatrixC &m) -> SparseMatrixC { return m; });
+    m.def("sparse_r_uncompressed", []() -> SparseMatrixR {
+        SparseMatrixR m(2,2);
+        m.coeffRef(0,0) = 1.0f;
+        return m;
+    });
 
     struct Buffer {
         uint32_t x[30] { };

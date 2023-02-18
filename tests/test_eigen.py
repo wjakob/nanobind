@@ -1,5 +1,7 @@
 import pytest
 import gc
+import re
+import sys
 
 try:
     import numpy as np
@@ -177,23 +179,67 @@ def test07_mutate_arg():
 @needs_numpy_and_eigen
 def test_sparse():
     pytest.importorskip("scipy")
-    ref = np.array(
-        [
-            [0.0, 3, 0, 0, 0, 11],
-            [22, 0, 0, 0, 17, 11],
-            [7, 5, 0, 1, 0, 11],
-            [0, 0, 0, 0, 0, 11],
-            [0, 0, 14, 0, 8, 11],
-        ]
-    )
-    def assert_equal_ref(mat):
-        nonlocal ref
-        np.testing.assert_array_equal(mat, ref)
+    import scipy.sparse
+
+    # no isinstance here because we want strict type equivalence
+    assert type(t.sparse_r()) is scipy.sparse.csr_matrix
+    assert type(t.sparse_c()) is scipy.sparse.csc_matrix
+    assert type(t.sparse_copy_r(t.sparse_r())) is scipy.sparse.csr_matrix
+    assert type(t.sparse_copy_c(t.sparse_c())) is scipy.sparse.csc_matrix
+    assert type(t.sparse_copy_r(t.sparse_c())) is scipy.sparse.csr_matrix
+    assert type(t.sparse_copy_c(t.sparse_r())) is scipy.sparse.csc_matrix
+
     def assert_sparse_equal_ref(sparse_mat):
-        assert_equal_ref(sparse_mat.toarray())
+        ref = np.array(
+            [
+                [0.0, 3, 0, 0, 0, 11],
+                [22, 0, 0, 0, 17, 11],
+                [7, 5, 0, 1, 0, 11],
+                [0, 0, 0, 0, 0, 11],
+                [0, 0, 14, 0, 8, 11],
+            ]
+        )
+        np.testing.assert_array_equal(sparse_mat.toarray(), ref)
+
     assert_sparse_equal_ref(t.sparse_r())
     assert_sparse_equal_ref(t.sparse_c())
     assert_sparse_equal_ref(t.sparse_copy_r(t.sparse_r()))
     assert_sparse_equal_ref(t.sparse_copy_c(t.sparse_c()))
     assert_sparse_equal_ref(t.sparse_copy_r(t.sparse_c()))
     assert_sparse_equal_ref(t.sparse_copy_c(t.sparse_r()))
+
+
+@needs_numpy_and_eigen
+def test_sparse_failures():
+    pytest.importorskip("scipy")
+    import scipy
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "nanobind: unable to return an Eigen sparse matrix that is not in a compressed format. Please call `.makeCompressed()` before returning the value on the C++ end."
+        ),
+    ):
+        t.sparse_r_uncompressed()
+
+    csr_matrix = scipy.sparse.csr_matrix
+    scipy.sparse.csr_matrix = None
+    with pytest.raises(TypeError, match=re.escape("'NoneType' object is not callable")):
+        t.sparse_r()
+
+    del scipy.sparse.csr_matrix
+    with pytest.raises(
+        AttributeError,
+        match=re.escape("module 'scipy.sparse' has no attribute 'csr_matrix'"),
+    ):
+        t.sparse_r()
+
+    sys_path = sys.path
+    sys.path = []
+    del sys.modules["scipy"]
+    with pytest.raises(ModuleNotFoundError, match=re.escape("No module named 'scipy'")):
+        t.sparse_r()
+
+    # undo sabotage of the module
+    sys.path = sys_path
+    scipy.sparse.csr_matrix = csr_matrix

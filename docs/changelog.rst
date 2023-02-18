@@ -42,7 +42,9 @@ Version 0.2.0 (TBA)
         :cpp:func:`.def_prop_rw_static() <class_::def_prop_rw_static>`
 
 * Dropped the first two arguments of the :c:macro:`NB_OVERRIDE_*()
-  <NB_OVERRIDE>` macros that are not needed in nanobind.
+  <NB_OVERRIDE>` macros that turned out to be unnecessary in nanobind. (commit
+  `22bc21
+  <https://github.com/wjakob/nanobind/commit/22bc21b97cd2bbe060d7fb42d374bde72d973ada>`_).
 * Added casters for dense matrix/array types from the `Eigen library
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`_. (PR `#120
   <https://github.com/wjakob/nanobind/pull/120>`_).
@@ -53,7 +55,8 @@ Version 0.2.0 (TBA)
   similar functionality in pybind11. (PR `#114
   <https://github.com/wjakob/nanobind/pull/114>`_).
 * nanobind now :ref:`automatically downcasts <automatic_downcasting>`
-  polymorphic objects in return values analogous to pybind11.
+  polymorphic objects in return values analogous to pybind11. (commit `cab96a
+  <https://github.com/wjakob/nanobind/commit/cab96a9160e0e1a626bc3e4f9fcddcad31e0f727>`_).
 * Updated tuple/list iterator to satisfy the ``std::forward_iterator`` concept.
   (PR `#117 <https://github.com/wjakob/nanobind/pull/117>`_).
 * Fixed issues with non-writeable tensors in NumPy. (commit `25cc3c

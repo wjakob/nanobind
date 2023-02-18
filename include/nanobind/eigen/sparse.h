@@ -13,6 +13,7 @@
 #include <nanobind/eigen/dense.h>
 #include <Eigen/SparseCore>
 
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -92,14 +93,13 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_v<T>>> {
         return from_cpp((const T &) v, policy, cleanup);
     }
 
-    static handle from_cpp(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const T &v, rv_policy policy, cleanup_list *) noexcept {
         if (!v.isCompressed()) {
             PyErr_SetString(PyExc_ValueError,
                             "nanobind: unable to return an Eigen sparse matrix that is not in a compressed format. "
                             "Please call `.makeCompressed()` before returning the value on the C++ end.");
             return handle();
         }
-        T & src = const_cast<T &>(v);
 
         object matrix_type;
         try {
@@ -109,16 +109,26 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_v<T>>> {
             return handle();
         }
 
+        const Index rows = v.rows();
+        const Index cols = v.cols();
         const size_t data_shape[] = { (size_t)v.nonZeros() };
-        const size_t outer_indices_shape[] = { (size_t)((row_major ? v.rows() : v.cols()) + 1) };
-        ScalarNDArray data(src.valuePtr(), 1, data_shape);
-        StorageIndexNDArray outer_indices(src.outerIndexPtr(), 1, outer_indices_shape);
-        StorageIndexNDArray inner_indices(src.innerIndexPtr(), 1, data_shape);
+        const size_t outer_indices_shape[] = { (size_t)((row_major ? rows : cols) + 1) };
+
+        T *src = std::addressof(const_cast<T &>(v));
+        object owner;
+        if (policy == rv_policy::move) {
+            src = new T(std::move(v));
+            owner = capsule(src, [](void *p) noexcept { delete (T *) p; });
+        }
+
+        ScalarNDArray data(src->valuePtr(), 1, data_shape, owner);
+        StorageIndexNDArray outer_indices(src->outerIndexPtr(), 1, outer_indices_shape, owner);
+        StorageIndexNDArray inner_indices(src->innerIndexPtr(), 1, data_shape, owner);
 
         try {
             return matrix_type(make_tuple(
                                    std::move(data), std::move(inner_indices), std::move(outer_indices)),
-                               make_tuple(v.rows(), v.cols()))
+                               make_tuple(rows, cols))
                 .release();
         } catch (python_error &e) {
             e.restore();

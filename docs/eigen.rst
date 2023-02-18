@@ -100,3 +100,16 @@ apply:
   .. code-block:: cpp
 
      void f4(nb::DRef<Eigen::MatrixXf> x) { x *= 2; }
+
+
+Sparse matrices
+---------------
+
+There is also support for Eigen's sparse matrices which are mapped to
+``scipy.sparse.csr_matrix``/``scipy.sparse.csc_matrix``. To use it the extra header
+:file:`nanobind/eigen/sparse.h` has to be included.
+
+.. note::
+
+    There is no support for Eigen sparse vectors because there exists no
+    equivalent type in ``scipy.sparse``.

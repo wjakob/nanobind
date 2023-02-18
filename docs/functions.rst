@@ -46,8 +46,8 @@ be very helpful, e.g.:
 
 .. _noconvert:
 
-Implicit conversions and how to suppress them
----------------------------------------------
+Implicit conversions, and how to suppress them
+----------------------------------------------
 
 Consider the following function taking a floating point value as input:
 
@@ -169,31 +169,30 @@ compile-time errors.
 Overload resolution order
 -------------------------
 
-nanobind uses a two-pass scheme to determine the right implementation when a
-bound function or method with multiple overloads is called from Python.
+nanobind relies on a two-pass scheme to determine the right implementation when
+a bound function or method with multiple overloads is called from Python.
 
-The first pass attempts to call each overload without allowing implicit
-argument conversion (as if every argument had a matching
+The first pass attempts to call each overload while disabling implicit argument
+conversion---it's as if every argument had a matching
 :cpp:func:`nb::arg().noconvert() <arg::noconvert>` annotation as described
-:ref:`above <noconvert>`).
+:ref:`above <noconvert>`. The process terminates successfully when nanobind
+finds an overload that is compatible with the provided arguments.
 
-If the first pass fails, a second pass retries all overloads with argument
-conversion enabled. If the second pass also fails, the function dispatcher
-raises a ``TypeError``.
+If the first pass fails, a second pass retries all overloads while enabling
+implicit argument conversion. If the second pass also fails, the function
+dispatcher raises a ``TypeError``.
 
-Within each pass, overloads are tried in the order in which they were
-registered with nanobind. What this means in practice is that nanobind will
-prefer any overload that does not require implicit argument conversion to one
-that does, but otherwise prefers earlier-defined overloads to later-defined
-ones.
+Within each pass, nanobind tries overloads in the order in which they were
+registered. Consequently, it prefers an overload that does not require implicit
+conversion to one that does, but otherwise prefers earlier-defined overloads to
+later-defined ones. Within the second pass, the precise number of implicit
+conversions needed does not influence the order.
 
-.. note::
-
-    nanobind does *not* further prioritize based on the number/pattern of
-    overloaded arguments.  That is, nanobind does not prioritize a function
-    requiring one conversion over one requiring three, but only prioritizes
-    overloads requiring no conversion at all to overloads that require
-    conversion of at least one argument.
+The special exception :cpp:class:`nb::next_overload <next_overload>` can also
+influence overload resolution. Raising this exception from an overloaded
+function causes it to be skipped, and overload resolution resumes. This can be
+helpful in complex situations where the value of a parameter must be inspected
+to see if a particular overload is eligible.
 
 
 Accepting \*args and \*\*kwargs

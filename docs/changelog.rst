@@ -41,6 +41,8 @@ Version 0.2.0 (TBA)
       - :cpp:func:`.def_prop_ro_static() <class_::def_prop_ro_static>`,
         :cpp:func:`.def_prop_rw_static() <class_::def_prop_rw_static>`
 
+* Dropped the first two arguments of the :c:macro:`NB_OVERRIDE_*()
+  <NB_OVERRIDE>` macros that are not needed in nanobind.
 * Added casters for dense matrix/array types from the `Eigen library
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`_. (PR `#120
   <https://github.com/wjakob/nanobind/pull/120>`_).

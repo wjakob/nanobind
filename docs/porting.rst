@@ -136,7 +136,7 @@ limitations that can be avoided by changing their signatures to
 Usage of ``std::enable_shared_from_this<T>`` is **prohibited** and will raise a
 compile-time assertion (:ref:`details <enable_shared_from_this>`) . This is
 consistent with the philosophy of this library: *the codebase has to adapt to
-the binding tool and not the other way around*. 
+the binding tool and not the other way around*.
 
 Custom constructors
 -------------------
@@ -198,7 +198,14 @@ function calls to Python, now require an extra :c:macro:`NB_TRAMPOLINE(parent,
 size) <NB_TRAMPOLINE()>` declaration, where ``parent`` refers to the parent class
 and ``size`` is at least as big as the number of :c:macro:`NB_OVERRIDE_*() <NB_OVERRIDE>`
 calls. nanobind caches information to enable efficient function dispatch, for
-which it must know the number of trampoline "slots". An example:
+which it must know the number of trampoline "slots".
+
+The macro ``PYBIND11_OVERRIDE_*(..)`` required the base type and return value
+as the first two arguments. This information is no longer needed in nanobind,
+and the arguments should be removed in :c:macro:`NB_OVERRIDE_*()
+<NB_OVERRIDE>`:
+
+An example:
 
 .. code-block:: cpp
 
@@ -206,7 +213,7 @@ which it must know the number of trampoline "slots". An example:
        NB_TRAMPOLINE(Animal, 1);
 
        std::string name() const override {
-           NB_OVERRIDE(std::string, Animal, name);
+           NB_OVERRIDE(name);
        }
    };
 
@@ -215,8 +222,8 @@ Python ``RuntimeError`` exception with a descriptive label, e.g.:
 
 .. code-block:: text
 
-    nanobind::detail::get_trampoline('PyAnimal::what()'): the trampoline ran out of
-    slots (you will need to increase the value provided to the NB_TRAMPOLINE() macro)
+   nanobind::detail::get_trampoline('PyAnimal::what()'): the trampoline ran out of
+   slots (you will need to increase the value provided to the NB_TRAMPOLINE() macro)
 
 Iterator bindings
 -----------------

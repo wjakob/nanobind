@@ -39,29 +39,32 @@ template <size_t Size> struct trampoline {
 };
 
 #define NB_TRAMPOLINE(base, size)                                              \
-    nanobind::detail::trampoline<size> nb_trampoline{ this, &typeid(base) };
+    using NBBase = base;                                                       \
+    using NBBase::NBBase;                                                      \
+    nanobind::detail::trampoline<size> nb_trampoline{ this, &typeid(NBBase) }
 
-#define NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)                 \
+#define NB_OVERRIDE_NAME(name, func, ...)                                      \
     nanobind::handle nb_key = nb_trampoline.lookup(name, false);               \
+    using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
     if (nb_key.is_valid()) {                                                   \
         nanobind::gil_scoped_acquire nb_guard;                                 \
-        return nanobind::cast<ret_type>(                                       \
+        return nanobind::cast<nb_ret_type>(                                    \
             nb_trampoline.base().attr(nb_key)(__VA_ARGS__));                   \
-    } else {                                                                   \
-        return base_type::func(__VA_ARGS__);                                   \
-    }
+    } else                                                                     \
+        return NBBase::func(__VA_ARGS__)                                       \
 
-#define NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)            \
+#define NB_OVERRIDE_PURE_NAME(name, func, ...)                                 \
     nanobind::handle nb_key = nb_trampoline.lookup(name, true);                \
     nanobind::gil_scoped_acquire nb_guard;                                     \
-    return nanobind::cast<ret_type>(                                           \
-        nb_trampoline.base().attr(nb_key)(__VA_ARGS__));
+    using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
+    return nanobind::cast<nb_ret_type>(                                        \
+        nb_trampoline.base().attr(nb_key)(__VA_ARGS__))
 
-#define NB_OVERRIDE(ret_type, base_type, func, ...)                            \
-    NB_OVERRIDE_NAME(ret_type, base_type, #func, func, __VA_ARGS__)
+#define NB_OVERRIDE(func, ...)                                                 \
+    NB_OVERRIDE_NAME(#func, func, __VA_ARGS__)
 
-#define NB_OVERRIDE_PURE(ret_type, base_type, func, ...)                       \
-    NB_OVERRIDE_PURE_NAME(ret_type, base_type, #func, func, __VA_ARGS__)
+#define NB_OVERRIDE_PURE(func, ...)                                            \
+    NB_OVERRIDE_PURE_NAME(#func, func, __VA_ARGS__)
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

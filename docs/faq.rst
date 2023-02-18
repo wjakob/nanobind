@@ -73,7 +73,7 @@ Why are reference arguments not updated?
 Functions like the following example can be exposed in Python, but they won't
 propagate updates to mutable reference arguments.
 
-.. code-block:: stl
+.. code-block:: cpp
 
    void increment(int &i) {
        i++;

@@ -1075,13 +1075,20 @@ the reference section on :ref:`class binding <class_binding>`.
 
 .. cpp:class:: next_overload
 
-   This special exception can be used to inform nanobind that a function
-   overload detected incompatible inputs. nanobind will then try other
-   overloads before reporting an error.
+   Raising this special exception from a bound function informs nanobind that
+   the function overload detected incompatible inputs. nanobind will then try
+   other overloads before reporting a ``TypeError``.
 
    This feature is useful when a multiple overloads of a function accept
    overlapping or identical input types (e.g. :cpp:class:`object`) and must run
    code at runtime to select the right overload.
+
+   You should probably write a thorough docstring explicing the expected inputs
+   in this case, since the behavior won't be obvious from the auto-generated
+   function signature list in the docstring. It can be frustrating when a
+   function call fails with an error message stating that the provided
+   arguments aren't compatible with any overload, when the associated error
+   message suggests otherwise.
 
    .. cpp:function:: next_overload()
 
@@ -1296,7 +1303,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
    - Index ``1`` refers to the first argument. In methods and constructors, index ``1``
      refers to the implicit ``this`` pointer, while regular arguments begin at index ``2``.
 
-    When the nurse or patient equal ``None``, the annotation does nothing. 
+    When the nurse or patient equal ``None``, the annotation does nothing.
 
     nanobind will raise an exception when the nurse object is neither a
     nanobind-registered type nor weak-referenceable.

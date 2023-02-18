@@ -182,15 +182,15 @@ NB_MODULE(test_classes_ext, m) {
         }
 
         std::string name() const override {
-            NB_OVERRIDE(std::string, Animal, name);
+            NB_OVERRIDE(name);
         }
 
         std::string what() const override {
-            NB_OVERRIDE_PURE(std::string, Animal, what);
+            NB_OVERRIDE_PURE(what);
         }
 
         void void_ret() override {
-            NB_OVERRIDE(void, Animal, void_ret);
+            NB_OVERRIDE(void_ret);
         }
     };
 

@@ -20,7 +20,7 @@ public:
         test_destructed++;
     }
 
-    virtual int value() const { return 123; }
+    virtual int value(int i) const { return 123 + i; }
 
     static Test *create_raw() { return new Test(); }
     static ref<Test> create_ref() { return new Test(); }
@@ -28,8 +28,8 @@ public:
 
 class PyTest : Test {
     NB_TRAMPOLINE(Test, 1);
-    virtual int value() const {
-        NB_OVERRIDE(int, Test, value);
+    virtual int value(int i) const {
+        NB_OVERRIDE(value, i);
     }
 };
 
@@ -64,7 +64,7 @@ NB_MODULE(test_intrusive_ext, m) {
         return { test_constructed, test_destructed };
     });
 
-    m.def("get_value_1", [](Test *o) { ref<Test> x(o); return x->value(); });
-    m.def("get_value_2", [](ref<Test> x) { return x->value(); });
-    m.def("get_value_3", [](const ref<Test> &x) { return x->value(); });
+    m.def("get_value_1", [](Test *o) { ref<Test> x(o); return x->value(1); });
+    m.def("get_value_2", [](ref<Test> x) { return x->value(2); });
+    m.def("get_value_3", [](const ref<Test> &x) { return x->value(3); });
 }

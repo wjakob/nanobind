@@ -21,37 +21,51 @@ See the section on :ref:`trampolines <trampolines>` for further detail.
    function calls to a Python implementation. Refer to the documentation on
    :ref:`trampolines <trampolines>` to see how this macro can be used.
 
-.. c:macro:: NB_OVERRIDE(ret_type, base_type, func, ...)
+.. c:macro:: NB_OVERRIDE(func, ...)
 
    Dispatch the call to a Python method named ``"func"`` if it is overloaded on
-   the Python side. The method should return a result of type ``ret_type``.
-   Otherwise, call the C++ function ``base_type::func(...)``. Refer to the
-   documentation on :ref:`trampolines <trampolines>` to see how this macro can
-   be used.
+   the Python side, and forward the function arguments specified in the
+   variable length argument ``...``. Otherwise, call the C++ implementation
+   `func` in the base class.
 
-.. c:macro:: NB_OVERRIDE_PURE(ret_type, base_type, func, ...)
+   Refer to the documentation on :ref:`trampolines <trampolines>` to see how
+   this macro can be used.
+
+.. c:macro:: NB_OVERRIDE_PURE(func, ...)
 
    Dispatch the call to a Python method named ``"func"`` if it is overloaded on
-   the Python side. The method should return a result of type ``ret_type``.
-   Otherwise, raise an exception. This macro should be used when the C++
-   function is pure virtual. Refer to the documentation on :ref:`trampolines
+   the Python side, and forward the function arguments specified in the
+   variable length argument ``...``. Otherwise, raise an exception. This macro
+   should be used when the C++ function is pure virtual.
+
+   Refer to the documentation on :ref:`trampolines <trampolines>` to see how
+   this macro can be used.
+
+.. c:macro:: NB_OVERRIDE_NAME(name, func, ...)
+
+   Dispatch the call to a Python method named ``name`` if it is overloaded on
+   the Python side, and forward the function arguments specified in the
+   variable length argument ``...``. Otherwise, call the C++ function `func` in
+   the base class.
+
+   This function differs from :c:macro:`NB_OVERRIDE() <NB_OVERRIDE>` in that
+   C++ and Python functions can be named differently (e.g., ``operator+`` and
+   ``__add__``). Refer to the documentation on :ref:`trampolines <trampolines>`
+   to see how this macro can be used.
+
+.. c:macro:: NB_OVERRIDE_PURE_NAME(name, func, ...)
+
+   Dispatch the call to a Python method named ``name`` if it is overloaded on
+   the Python side, and forward the function arguments specified in the
+   variable length argument ``...``. Otherwise, raise an exception. This macro
+   should be used when the C++ function is pure virtual.
+
+   This function differs from :c:macro:`NB_OVERRIDE_PURE() <NB_OVERRIDE_PURE>`
+   in that C++ and Python functions can be named differently (e.g.,
+   ``operator+`` and ``__add__``). Although the C++ base implementation cannot
+   be called, its name is still important since nanobind uses it to infer the
+   return value type. Refer to the documentation on :ref:`trampolines
    <trampolines>` to see how this macro can be used.
-
-.. c:macro:: NB_OVERRIDE_NAME(ret_type, base_type, name, func, ...)
-
-   Dispatch the call to a Python method with custom identifier ``name`` if it is
-   overloaded on the Python side. The method should return a result of type
-   ``ret_type``. Otherwise, call the C++ function ``base_type::func(...)``. Refer
-   to the documentation on :ref:`trampolines <trampolines>` to see how this
-   macro can be used.
-
-.. c:macro:: NB_OVERRIDE_PURE_NAME(ret_type, base_type, name, func, ...)
-
-   Dispatch the call to a Python method with the custom identifier ``name`` if it
-   is overloaded on the Python side. The method should return a result of type
-   ``ret_type``. Otherwise, raise an exception. This macro should be used when
-   the C++ function is pure virtual. Refer to the documentation on
-   :ref:`trampolines <trampolines>` to see how this macro can be used.
 
 .. _vector_bindings:
 

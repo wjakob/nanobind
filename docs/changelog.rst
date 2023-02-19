@@ -79,7 +79,7 @@ Version 0.2.0 (TBA)
 * Various minor fixes and improvements.
 * Internals ABI version bump.
 
-Version 0.1.0 (January 3, 2022)
+Version 0.1.0 (January 3, 2023)
 -------------------------------
 
 * Allow nanobind methods on non-nanobind) classes. (PR `#104

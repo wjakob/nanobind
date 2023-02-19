@@ -271,6 +271,8 @@ template <typename T> NB_INLINE rv_policy infer_policy(rv_policy policy) {
     return policy;
 }
 
+template <typename T, typename SFINAE = int> struct type_hook : std::false_type { };
+
 template <typename Type_> struct type_caster_base {
     using Type = Type_;
     static constexpr auto Name = const_name<Type>();
@@ -287,21 +289,27 @@ template <typename Type_> struct type_caster_base {
     template <typename T>
     NB_INLINE static handle from_cpp(T &&value, rv_policy policy,
                                      cleanup_list *cleanup) noexcept {
-        Type *value_p;
+        Type *ptr;
         if constexpr (is_pointer_v<T>)
-            value_p = (Type *) value;
+            ptr = (Type *) value;
         else
-            value_p = (Type *) &value;
+            ptr = (Type *) &value;
 
         policy = infer_policy<T>(policy);
+        const std::type_info *type = &typeid(Type);
 
-        if constexpr (std::is_polymorphic_v<Type>)
-            return nb_type_put_p(&typeid(Type),
-                                 value_p ? &typeid(*value_p) : nullptr, value_p,
-                                 policy, cleanup, nullptr);
-        else
-            return nb_type_put(&typeid(Type), value_p, policy, cleanup,
-                               nullptr);
+        constexpr bool has_type_hook =
+            !std::is_base_of_v<std::false_type, type_hook<Type>>;
+        if constexpr (has_type_hook)
+            type = type_hook<Type>::get(ptr);
+
+        if constexpr (!std::is_polymorphic_v<Type>) {
+            return nb_type_put(type, ptr, policy, cleanup);
+        } else {
+            const std::type_info *type_p =
+                (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
+            return nb_type_put_p(type, type_p, ptr, policy, cleanup);
+        }
     }
 
     operator Type*() { return value; }

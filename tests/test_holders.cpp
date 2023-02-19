@@ -27,6 +27,25 @@ struct SharedWrapper { std::shared_ptr<Example> value; };
 struct UniqueWrapper { std::unique_ptr<Example> value; };
 struct UniqueWrapper2 { std::unique_ptr<Example, nb::deleter<Example>> value; };
 
+enum class PetKind { Cat, Dog };
+struct Pet { const PetKind kind; };
+struct Dog : Pet { Dog() : Pet{PetKind::Dog} { } };
+struct Cat : Pet { Cat() : Pet{PetKind::Cat} { } };
+
+namespace nanobind::detail {
+    template <> struct type_hook<Pet> {
+        static const std::type_info *get(Pet *p) {
+            if (p) {
+                switch (p->kind) {
+                    case PetKind::Dog: return &typeid(Dog);
+                    case PetKind::Cat: return &typeid(Cat);
+                }
+            }
+            return &typeid(Pet);
+        }
+    };
+} // namespace nanobind::detail
+
 NB_MODULE(test_holders_ext, m) {
     nb::class_<Example>(m, "Example")
         .def(nb::init<int>())
@@ -94,4 +113,39 @@ NB_MODULE(test_holders_ext, m) {
     m.def("s_polymorphic_factory_2", []() { return std::shared_ptr<PolymorphicBase>(new AnotherPolymorphicSubclass()); });
     m.def("s_factory", []() { return std::shared_ptr<Base>(new Subclass()); });
     m.def("s_factory_2", []() { return std::shared_ptr<Base>(new AnotherSubclass()); });
+
+    nb::class_<Pet>(m, "Pet");
+    nb::class_<Dog>(m, "Dog");
+    nb::class_<Cat>(m, "Cat");
+
+    nb::enum_<PetKind>(m, "PetKind")
+        .value("Cat", PetKind::Cat)
+        .value("Dog", PetKind::Dog);
+
+    m.def("make_pet", [](PetKind kind) -> Pet* {
+        switch (kind) {
+            case PetKind::Dog:
+                return new Dog();
+            case PetKind::Cat:
+                return new Cat();
+        }
+    });
+
+    m.def("make_pet_u", [](PetKind kind) -> std::unique_ptr<Pet> {
+        switch (kind) {
+            case PetKind::Dog:
+                return std::make_unique<Dog>();
+            case PetKind::Cat:
+                return std::make_unique<Cat>();
+        }
+    });
+
+    m.def("make_pet_s", [](PetKind kind) -> std::shared_ptr<Pet> {
+        switch (kind) {
+            case PetKind::Dog:
+                return std::make_shared<Dog>();
+            case PetKind::Cat:
+                return std::make_shared<Cat>();
+        }
+    });
 }

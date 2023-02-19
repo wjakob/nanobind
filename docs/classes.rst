@@ -551,7 +551,8 @@ number of virtual method slots that can be overridden within Python.
 The macro :c:macro:`NB_OVERRIDE(bark) <NB_OVERRIDE>` intercepts the virtual
 function call, checks if a Python override exists, and forwards the call in
 that case. If no override was found, it falls back to the base class
-implementation.
+implementation. You will need to replicate this pattern for every method that
+should support overriding in Python.
 
 The macro accepts an variable argument list to pass additional parameters. For
 example, suppose that the virtual function ``bark()`` had an additional ``int
@@ -562,7 +563,6 @@ volume`` parameter---in that case, the syntax would need to be adapted as follow
        std::string bark(int volume) const override {
            NB_OVERRIDE(bark, volume);
        }
-
 
 The macro :c:macro:`NB_OVERRIDE_PURE() <NB_OVERRIDE_PURE>` should be used for
 pure virtual functions, and :c:macro:`NB_OVERRIDE() <NB_OVERRIDE>` should be
@@ -599,6 +599,33 @@ With the trampoline in place, our example works as expected:
    Mr. Fluffles: yip!
    Mr. Fluffles: yip!
    Mr. Fluffles: yip!
+
+The following special case needs to be mentioned: you *may not* implement a
+Python trampoline for a method that returns a reference or pointer to a
+type requiring :ref:`type casting <type_casters>`. For example, attempting to
+expose a hypothetical virtual method ``const std::string &get_name() const``
+as follows
+
+.. code-block:: cpp
+
+       const std::string &get_name() const override {
+           NB_OVERRIDE(get_name);
+       }
+
+will fail with a static assertion failure:
+
+.. code-block:: text
+
+   include/nanobind/nb_cast.h:352:13: error: static_assert failed due to requirement '...'
+   "nanobind::cast(): cannot return a reference to a temporary."
+
+This is not a fluke. The Python would return a ``str`` object that nanobind can
+easily type-cast into a temporary ``std::string`` instance. However, when the
+virtual function call returns on the C++ side, that temporary will already have
+expired. There isn't a good solution to this problem, and nanobind therefore
+simply refuses to do it. You will need to change your approach by either using
+:ref:`bindings <bindings>` instead of :ref:`type casters <type_casters>` or
+changing your virtual method interfaces to return by value.
 
 .. _operator_overloading:
 
@@ -789,3 +816,90 @@ but once again each instantiation must be explicitly specified:
     nb::class<MyClass<int>>(m, "MyClassT")
         .def("fn", &MyClass<int>::fn<std::string>);
 
+.. _tag_based_polymorphism:
+
+Tag-based polymorphism
+----------------------
+
+The section on :ref:`automatic downcasting <automatic_downcasting>` explained
+how nanobind can infer the type of polymorphic C++ objects at runtime. It can
+be desirable to extend this automatic downcasting behavior to non-polymorphic
+classes, for example to support *tag-based polymorphism*. In this case,
+instances expose a method or field to identify their type.
+
+For example, consider the following class hierarchy where ``Pet::kind``
+serves this purpose:
+
+.. code-block:: cpp
+
+   #include <nanobind/nanobind.h>
+
+   namespace nb = nanobind;
+
+   enum class PetKind { Cat, Dog };
+
+   struct Pet { const PetKind kind; };
+   struct Dog : Pet { Dog() : Pet{PetKind::Dog} { } };
+   struct Cat : Pet { Cat() : Pet{PetKind::Cat} { } };
+
+   namespace nb = nanobind;
+
+   NB_MODULE(my_ext, m) {
+       nb::class_<Pet>(m, "Pet");
+       nb::class_<Dog>(m, "Dog");
+       nb::class_<Cat>(m, "Cat");
+
+       nb::enum_<PetKind>(m, "PetKind")
+           .value("Cat", PetKind::Cat)
+           .value("Dog", PetKind::Dog);
+
+       m.def("make_pet", [](PetKind kind) -> Pet* {
+           switch (kind) {
+               case PetKind::Dog: return new Dog();
+               case PetKind::Cat: return new Cat();
+           }
+       });
+   }
+
+This code initially doesn't work as expected (the ``make_pet`` function binding
+always creates instances of the ``Pet`` base class).
+
+.. code-block:: pycon
+
+   >>> my_ext.make_pet(my_ext.PetKind.Cat)
+   <my_ext.Pet object at 0x10305ee10>
+
+   >>> my_ext.make_pet(my_ext.PetKind.Dog)
+   <my_ext.Pet object at 0x10328e530>
+
+To fix this, partially specialize the ``type_hook`` class to provide the
+``type_hook<T>::get()`` method:
+
+.. code-block:: cpp
+
+   namespace nanobind::detail {
+       template <> struct type_hook<Pet> {
+           static const std::type_info *get(Pet *p) {
+               if (p) {
+                   switch (p->kind) {
+                       case PetKind::Dog: return &typeid(Dog);
+                       case PetKind::Cat: return &typeid(Cat);
+                   }
+               }
+               return &typeid(Pet);
+           }
+       };
+   } // namespace nanobind::detail
+
+The method will be invoked whenever nanobind needs to convert a C++ pointer of
+type ``T*`` to a Python object. It should inspect the instance and return a
+pointer to a suitable RTTI record. With this override, downcasting works as
+expected:
+
+.. code-block:: pycon
+
+    >>> my_ext.make_pet(my_ext.PetKind.Cat)
+    <my_ext.Cat object at 0x104da6e10>
+
+    >>> my_ext.make_pet(my_ext.PetKind.Dog)
+    <my_ext.Dog object at 0x104da6ef0>

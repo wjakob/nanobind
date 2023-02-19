@@ -57,6 +57,9 @@ Version 0.2.0 (TBA)
 * nanobind now :ref:`automatically downcasts <automatic_downcasting>`
   polymorphic objects in return values analogous to pybind11. (commit `cab96a
   <https://github.com/wjakob/nanobind/commit/cab96a9160e0e1a626bc3e4f9fcddcad31e0f727>`_).
+* nanobind now supports :ref:`tag-based polymorphism <tag_based_polymorphism>`.
+  (commit `19178f
+  <https://github.com/wjakob/nanobind/commit/19178f778fbf77833dba3c46720a07b9abd1a497>`_).
 * Updated tuple/list iterator to satisfy the ``std::forward_iterator`` concept.
   (PR `#117 <https://github.com/wjakob/nanobind/pull/117>`_).
 * Fixed issues with non-writeable tensors in NumPy. (commit `25cc3c

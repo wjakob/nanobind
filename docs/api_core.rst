@@ -1279,8 +1279,13 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
 .. cpp:struct:: is_operator
 
-   Indicate that the bound operator represents a magic operator like
-   ``__add__``, ``__radd__``, etc.
+   Indicate that the bound operator represents a special double underscore
+   method (``__add__``, ``__radd__``, etc.) that implements an arithmetic
+   operation.
+
+   When a bound functions with this annotation is called with incompatible
+   arguments, it will return ``NotImplemented`` rather than raising a
+   ``TypeError``.
 
 .. cpp:struct:: is_implicit
 

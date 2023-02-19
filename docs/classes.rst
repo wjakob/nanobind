@@ -599,3 +599,193 @@ With the trampoline in place, our example works as expected:
    Mr. Fluffles: yip!
    Mr. Fluffles: yip!
    Mr. Fluffles: yip!
+
+.. _operator_overloading:
+
+Operator overloading
+--------------------
+
+Suppose that we're given the following ``Vector2`` class with a vector addition
+and scalar multiplication operation, all implemented using overloaded operators
+in C++.
+
+.. code-block:: cpp
+
+   class Vector2 {
+   public:
+       Vector2(float x, float y) : x(x), y(y) { }
+
+       Vector2 operator+(const Vector2 &v) const { return Vector2(x + v.x, y + v.y); }
+       Vector2 operator*(float value) const { return Vector2(x * value, y * value); }
+       Vector2 operator-() const { return Vector2(-x, -y); }
+       Vector2& operator+=(const Vector2 &v) { x += v.x; y += v.y; return *this; }
+       Vector2& operator*=(float v) { x *= v; y *= v; return *this; }
+
+       friend Vector2 operator*(float f, const Vector2 &v) {
+           return Vector2(f * v.x, f * v.y);
+       }
+
+       std::string to_string() const {
+           return "[" + std::to_string(x) + ", " + std::to_string(y) + "]";
+       }
+   private:
+       float x, y;
+   };
+
+The following snippet shows how the above operators can be conveniently exposed
+to Python.
+
+.. code-block:: cpp
+
+    #include <nanobind/operators.h>
+
+    NB_MODULE(my_ext, m) {
+        nb::class_<Vector2>(m, "Vector2")
+            .def(nb::init<float, float>())
+            .def(nb::self + nb::self)
+            .def(nb::self += nb::self)
+            .def(nb::self *= float())
+            .def(float() * nb::self)
+            .def(nb::self * float())
+            .def(-nb::self)
+            .def("__repr__", &Vector2::to_string);
+    }
+
+Note that a line involving :cpp:class::`nb::self <self>` like
+
+.. code-block:: cpp
+
+   .def(nb::self * float())
+
+is really just short hand notation for
+
+.. code-block:: cpp
+
+   .def("__mul__", [](const Vector2 &a, float b) {
+       return a * b;
+   }, nb::is_operator())
+
+This can be useful for exposing additional operators that don't exist on the
+C++ side, or to perform other types of customization. The
+:cpp:class:`nb::is_operator() <is_operator>` flag marker is needed to inform
+nanobind that this is an operator, which returns ``NotImplemented`` when
+invoked with incompatible arguments rather than throwing a type error.
+
+Binding protected member functions
+----------------------------------
+
+It's normally not possible to expose ``protected`` member functions to Python:
+
+.. code-block:: cpp
+
+    class A {
+    protected:
+        int foo() const { return 42; }
+    };
+
+    nb::class_<A>(m, "A")
+        .def("foo", &A::foo); // error: 'foo' is a protected member of 'A'
+
+On one hand, this is good because non-``public`` members aren't meant to be
+accessed from the outside. But we may want to make use of ``protected``
+functions in derived Python classes.
+
+The following pattern makes this possible:
+
+.. code-block:: cpp
+
+    class A {
+    protected:
+        int foo() const { return 42; }
+    };
+
+    class Publicist : public A { // helper type for exposing protected functions
+    public:
+        using A::foo; // inherited with different access modifier
+    };
+
+    nb::class_<A>(m, "A") // bind the primary class
+        .def("foo", &Publicist::foo); // expose protected methods via the publicist
+
+This works because ``&Publicist::foo`` is exactly the same function as
+``&A::foo`` (same signature and address), just with a different access
+modifier. The only purpose of the ``Publicist`` helper class is to make
+the function name ``public``.
+
+If the intent is to expose ``protected`` ``virtual`` functions which can be
+overridden in Python, the publicist pattern can be combined with the previously
+described trampoline:
+
+.. code-block:: cpp
+
+    class A {
+    public:
+        virtual ~A() = default;
+
+    protected:
+        virtual int foo() const { return 42; }
+    };
+
+    class Trampoline : public A {
+    public:
+        NB_TRAMPOLINE(A, 1);
+        int foo() const override { NB_OVERRIDE(foo); }
+    };
+
+    class Publicist : public A {
+    public:
+        using A::foo;
+    };
+
+    nb::class_<A, Trampoline>(m, "A") // <-- `Trampoline` here
+        .def("foo", &Publicist::foo); // <-- `Publicist` here, not `Trampoline`!
+
+Binding classes with template parameters
+----------------------------------------
+
+nanobind can also wrap classes that have template parameters. Consider these classes:
+
+.. code-block:: cpp
+
+    struct Cat {};
+    struct Dog {};
+
+    template <typename PetType> struct PetHouse {
+        PetHouse(PetType& pet);
+        PetType& get();
+    };
+
+C++ templates may only be instantiated at compile time, so nanobind can only
+wrap instantiated templated classes. You cannot wrap a non-instantiated template:
+
+.. code-block:: cpp
+
+    // BROKEN (this will not compile)
+    nb::class_<PetHouse>(m, "PetHouse");
+        .def("get", &PetHouse::get);
+
+You must explicitly specify each template/type combination that you want to
+wrap separately.
+
+.. code-block:: cpp
+
+    // ok
+    nb::class_<PetHouse<Cat>>(m, "CatHouse")
+        .def("get", &PetHouse<Cat>::get);
+
+    // ok
+    nb::class_<PetHouse<Dog>>(m, "DogHouse")
+        .def("get", &PetHouse<Dog>::get);
+
+If your class methods have template parameters you can wrap those as well,
+but once again each instantiation must be explicitly specified:
+
+.. code-block:: cpp
+
+    typename <typename T> struct MyClass {
+        template <typename V> T fn(V v);
+    };
+
+    nb::class<MyClass<int>>(m, "MyClassT")
+        .def("fn", &MyClass<int>::fn<std::string>);
+

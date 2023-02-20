@@ -58,8 +58,8 @@ Version 0.2.0 (TBA)
   polymorphic objects in return values analogous to pybind11. (commit `cab96a
   <https://github.com/wjakob/nanobind/commit/cab96a9160e0e1a626bc3e4f9fcddcad31e0f727>`_).
 * nanobind now supports :ref:`tag-based polymorphism <tag_based_polymorphism>`.
-  (commit `19178f
-  <https://github.com/wjakob/nanobind/commit/19178f778fbf77833dba3c46720a07b9abd1a497>`_).
+  (commit `6ade94
+  <https://github.com/wjakob/nanobind/commit/6ade94b8e5a2388d66fc9df6f81603c65108cbcc>`_).
 * Updated tuple/list iterator to satisfy the ``std::forward_iterator`` concept.
   (PR `#117 <https://github.com/wjakob/nanobind/pull/117>`_).
 * Fixed issues with non-writeable tensors in NumPy. (commit `25cc3c
@@ -79,6 +79,9 @@ Version 0.2.0 (TBA)
 * Changed the CMake build system so that the library component
   (``libnanobind``) is now compiled statically by default. (commit `8418a4
   <https://github.com/wjakob/nanobind/commit/8418a4aa93d19d7b9714b8d9473539b46cbed508>`_).
+* Switched shared library linking on macOS back to a two-level namespace.
+  (commit `fe4965
+  <https://github.com/wjakob/nanobind/commit/fe4965369435bf7c0925bddf610553d0bb516e27>`_).
 * Various minor fixes and improvements.
 * Internals ABI version bump.
 

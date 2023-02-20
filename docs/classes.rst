@@ -678,7 +678,7 @@ to Python.
             .def("__repr__", &Vector2::to_string);
     }
 
-Note that a line involving :cpp:class::`nb::self <self>` like
+Note that a line involving :cpp:class:`nb::self <self>` like
 
 .. code-block:: cpp
 

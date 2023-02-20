@@ -107,13 +107,13 @@ NB_BINARY_OPERATOR(lshift,    rlshift,      operator<<,   l << r)
 NB_BINARY_OPERATOR(rshift,    rrshift,      operator>>,   l >> r)
 NB_BINARY_OPERATOR(and,       rand,         operator&,    l & r)
 NB_BINARY_OPERATOR(xor,       rxor,         operator^,    l ^ r)
-NB_BINARY_OPERATOR(eq,        eq,           operator==,   l == r)
-NB_BINARY_OPERATOR(ne,        ne,           operator!=,   l != r)
 NB_BINARY_OPERATOR(or,        ror,          operator|,    l | r)
 NB_BINARY_OPERATOR(gt,        lt,           operator>,    l > r)
 NB_BINARY_OPERATOR(ge,        le,           operator>=,   l >= r)
 NB_BINARY_OPERATOR(lt,        gt,           operator<,    l < r)
 NB_BINARY_OPERATOR(le,        ge,           operator<=,   l <= r)
+NB_BINARY_OPERATOR(eq,        eq,           operator==,   l == r)
+NB_BINARY_OPERATOR(ne,        ne,           operator!=,   l != r)
 NB_INPLACE_OPERATOR(iadd,     operator+=,   l += r)
 NB_INPLACE_OPERATOR(isub,     operator-=,   l -= r)
 NB_INPLACE_OPERATOR(imul,     operator*=,   l *= r)
@@ -126,12 +126,10 @@ NB_INPLACE_OPERATOR(ixor,     operator^=,   l ^= r)
 NB_INPLACE_OPERATOR(ior,      operator|=,   l |= r)
 NB_UNARY_OPERATOR(neg,        operator-,    -l)
 NB_UNARY_OPERATOR(pos,        operator+,    +l)
-NB_UNARY_OPERATOR(abs,        abs,          std::abs(l))
-NB_UNARY_OPERATOR(hash,       hash,         std::hash<L>()(l))
 NB_UNARY_OPERATOR(invert,     operator~,    (~l))
 NB_UNARY_OPERATOR(bool,       operator!,    !!l)
-NB_UNARY_OPERATOR(int,        int_,         (int) l)
-NB_UNARY_OPERATOR(float,      float_,       (double) l)
+NB_UNARY_OPERATOR(abs,        abs,          std::abs(l))
+NB_UNARY_OPERATOR(hash,       hash,         std::hash<L>()(l))
 
 #undef NB_BINARY_OPERATOR
 #undef NB_INPLACE_OPERATOR
@@ -142,5 +140,6 @@ NAMESPACE_END(detail)
 // Add named operators so that they are accessible via `nb::`.
 using detail::self;
 using detail::hash;
+using detail::abs;
 
 NAMESPACE_END(NB_NAMESPACE)

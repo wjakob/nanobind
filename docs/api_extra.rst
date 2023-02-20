@@ -3,6 +3,102 @@ C++ API Reference (Extras)
 
 .. cpp:namespace:: nanobind
 
+Operator overloading
+--------------------
+
+The following optional include directive imports the special value :cpp:var:`self`.
+
+.. code-block:: cpp
+
+   #include <nanobind/operators.h>
+
+The underlying type exposes various C++ operators that enable a shorthand
+notation to bind operators to python. See the :ref:`operator overloading
+<operator_overloading>` example in the main documentation for details.
+
+
+.. cpp:class:: detail::self_t
+
+   This is an internal class that should be accessed through the singleton
+   :cpp:var:`self` value.
+
+   It supports the overloaded operators listed below. Depending on whether or
+   not :cpp:var:`self` is the left or right argument of a binary operation, the
+   binding will map to different Python methods as shown below.
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 50 50
+
+      * - C++ operator
+        - Python method (left or right)
+      * - ``operator-``
+        - ``__sub__``, ``__rsub__``
+      * - ``operator+``
+        - ``__add__``, ``__radd__``
+      * - ``operator*``
+        - ``__mul__``, ``__rmul__``
+      * - ``operator/``
+        - ``__truediv__``, ``__rtruediv__``
+      * - ``operator%``
+        - ``__mod__``, ``__rmod__``
+      * - ``operator<<``
+        - ``__lshift__``, ``__rlshift__``
+      * - ``operator>>``
+        - ``__rshift__``, ``__rrshift__``
+      * - ``operator&``
+        - ``__and__``, ``__rand__``
+      * - ``operator^``
+        - ``__xor__``, ``__rxor__``
+      * - ``operator|``
+        - ``__or__``, ``__ror__``
+      * - ``operator>``
+        - ``__gt__``, ``__lt__``
+      * - ``operator>=``
+        - ``__ge__``, ``__le__``
+      * - ``operator<``
+        - ``__lt__``, ``__gt__``
+      * - ``operator<=``
+        - ``__le__``, ``__ge__``
+      * - ``operator==``
+        - ``__eq__``
+      * - ``operator!=``
+        - ``__ne__``
+      * - ``operator+=``
+        - ``__iadd__``
+      * - ``operator-=``
+        - ``__isub__``
+      * - ``operator*=``
+        - ``__mul__``
+      * - ``operator/=``
+        - ``__itruediv__``
+      * - ``operator%=``
+        - ``__imod__``
+      * - ``operator<<=``
+        - ``__ilrshift__``
+      * - ``operator>>=``
+        - ``__ilrshift__``
+      * - ``operator&=``
+        - ``__iand__``
+      * - ``operator^=``
+        - ``__ixor__``
+      * - ``operator|=``
+        - ``__ior__``
+      * - ``operator-`` (unary)
+        - ``__neg__``
+      * - ``operator+`` (unary)
+        - ``__pos__``
+      * - ``operator~``  (unary)
+        - ``__invert__``
+      * - ``operator!``  (unary)
+        - ``__bool__`` (with extra negation)
+      * - ``nb::abs(..)``
+        - ``__abs__``
+      * - ``nb::hash(..)``
+        - ``__hash__``
+
+.. cpp:var:: detail::self_t self
+
 Trampolines
 -----------
 
@@ -417,14 +513,78 @@ in a :ref:`separate section <tensors>`.
 Data types
 ^^^^^^^^^^
 
-template <typename T> constexpr dlpack::dtype dtype() {
+Nanobind uses the `DLPack <https://github.com/dmlc/dlpack>`_ ABI to represent
+metadata about tensors (even when they are exchanged using the buffer
+protocol). Relevant data structures are located in the ``nanobind::dlpack``
+sub-namespace.
+
+.. cpp:enum-class:: dlpack::dtype_code : uint8_t
+
+   This enumeration characterizes the elementary format of tensor values
+   regardless of their bit depth.
+
+   .. cpp:enumerator:: Int = 0
+
+      Signed integer format
+
+   .. cpp:enumerator:: UInt = 1
+
+      Unsigned integer format
+
+   .. cpp:enumerator:: Float = 2
+
+      IEEE-754 floating point format
+
+   .. cpp:enumerator:: Bfloat = 4
+
+      "Brain" floating point format
+
+   .. cpp:enumerator:: Complex = 5
+
+      Complex numbers parameterized by real and imaginary component
+
+.. cpp:struct:: dlpack::dtype
+
+   Represents the data type of values in a tensor. Use the
+   :cpp:func:`dtype\<T\>() <::nanobind::dtype>` function to return a populated
+   instance of this data structure given a scalar C++ arithmetic type.
+
+   .. cpp:member:: uint8_t code = 0;
+
+      This field must contain the value of one of the
+      :cpp:enum:`dlpack::dtype_code` enumerants.
+
+   .. cpp:member:: uint8_t bits = 0;
+
+      Number of bits per entry (e.g., 32 for a C++ single precision ``float``)
+
+   .. cpp:member:: uint16_t lanes = 0;
+
+      Number of SIMD lanes (typically ``1``)
+
+.. cpp:function:: template <typename T> dlpack::dtype dtype()
+
+   Returns a populated instance of the :cpp:class:`dlpack::dtype` structure
+   given a scalar C++ arithmetic type.
 
 Tensor annotations
 ^^^^^^^^^^^^^^^^^^
 
 The :cpp:class:`tensor\<..\> <tensor>` class can be parameterized using the
-helper types below to constrain what valid tensor arguments may be passed to
-a function.
+following optional template parameters to constrain what valid tensor arguments
+may be passed to a function.
+
+Shape
++++++
+
+.. cpp:class:: template<size_t... Is> shape
+
+   Require the tensor to have ``sizeof...(Is)`` dimensions. Each entry of `Is`
+   specifies a fixed size constraint for that specific dimension. An entry
+   equal to :cpp:var:`any` indicates that any size should be accepted for this
+   dimension.
+
+.. cpp:var:: constexpr size_t any = (size_t) -1
 
 Contiguity
 ++++++++++
@@ -439,7 +599,7 @@ Contiguity
 
 .. cpp:class:: any_contig
 
-   Accept either :cpp:class:`c_contig` or :cpp:class:`f_contig`.
+   Don't place any demands on tensor contiguity (the default).
 
 Device type
 +++++++++++

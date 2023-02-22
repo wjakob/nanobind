@@ -243,6 +243,12 @@ return ``std::unique_ptr<..>``, add the extra include directive
 
    #include <nanobind/stl/unique_ptr.h>
 
+.. note::
+
+   While this this header file technically contains a :ref:`type caster
+   <type_casters>`, it is *not* affected by their usual limitations (mandatory
+   copy/conversion, inability to mutate function arguments).
+
 **Example**: The following example binds two functions that create and consume
 instances of a C++ type ``Data`` via unique pointers.
 
@@ -280,39 +286,79 @@ Python object. nanobind will refuse further use of it:
 
    Invoked with types: my_ext.Data
 
-If possible, replace all use of ``std::unique_ptr<T>`` by ``std::unique_ptr<T,
-nb::deleter<T>>`` in your code. Without the latter type declaration, which
-references a custom nanobind-provided deleter :cpp:class:`nb::deleter\<T\>
-<deleter>`,  nanobind cannot transfer ownership of objects constructed using
-:cpp:class:`nb::init\<...\> <init>` to C++ and will refuse to do so with an
-error message. Further detail on this special case can be found in the
-*advanced* :ref:`section <unique_ptr_adv>` on object ownership.
+We strongly recommend that you replace all use of ``std::unique_ptr<T>`` by
+``std::unique_ptr<T, nb::deleter<T>>`` in your code. Without the latter type
+declaration, which references a custom nanobind-provided deleter
+:cpp:class:`nb::deleter\<T\> <deleter>`,  nanobind cannot transfer ownership of
+objects constructed using :cpp:class:`nb::init\<...\> <init>` to C++ and will
+refuse to do so with an error message. Further detail on this special case can
+be found in the *advanced* :ref:`section <unique_ptr_adv>` on object ownership.
 
 .. _shared_ownership:
 
 Shared ownership
 ----------------
 
-In a *shared ownership* model, the lifetime of an object is determined dynamically
-based on *references* from both Python and C++.
+In a *shared ownership* model, an object can have multiple owners that each
+register their claim by holding a *reference*. The system keeps track of the
+total number of references and destroys the object once the count reaches zero.
+Passing such an object in a function call shares ownership between the caller
+and callee. nanobind makes this behavior seamless so that everything works
+regardless of whether caller/callee are written in C++ or Python.
 
 .. _shared_ptr:
 
 Shared pointers
 ^^^^^^^^^^^^^^^
 
+STL shared pointers (``std::shared_ptr<T>``) allocate a separate control block to
+keep track of the reference count, which makes them very general but also slightly
+less efficient than other alternatives.
 
-To be written.
+nanobind's support for shared pointers requires an extra include directive:
 
-Further detail can be found in the *advanced* :ref:`section
-<shared_ptr_adv>` on object ownership.
+.. code-block:: cpp
+
+   #include <nanobind/stl/shared_ptr.h>
+
+.. note::
+
+   While this this header file technically contains a :ref:`type caster
+   <type_casters>`, it is *not* affected by their usual limitations (mandatory
+   copy/conversion, inability to mutate function arguments).
+
+You don't need to specify a return value policy annotation when a function
+returns a shared pointer.
+
+Shared pointer support has one major limitation in nanobind: the
+``std::enable_shared_from_this<T>`` base class that normally enables safe
+conversion of raw pointers to the associated shared pointer *may not be used*.
+Further detail can be found in the *advanced* :ref:`section <shared_ptr_adv>`
+on object ownership. If you need this feature, switch to intrusive reference
+counting explained below.
 
 .. _intrusive_intro:
 
 Intrusive reference counting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Intrusive reference counting is the most general and most efficient way of
-handling shared ownership, but it requires that the base class of an object
-hierarchy is adapted according to the needs of nanobind. See the :ref:`separate
-section on intrusive reference counting <intrusive>` for details.
+Intrusive reference counting is the most flexible and efficient way of handling
+shared ownership. The main downside is that you must adapt the base class of
+your object hierarchy to the needs of nanobind.
+
+The core idea is to define base class (e.g. ``Object``) that is common to all bound
+types requiring shared ownership. That class contains a builtin
+atomic counter to keep track of the number of outstanding references. 
+
+.. code-block:: cpp
+
+   class Object {
+   ...
+   private:
+       mutable std::atomic<size_t> m_ref_count { 0 };
+   };
+
+With a few extra modifications, nanobind can unify this reference count so that
+it accounts for references in both languages. Please see the :ref:`detailed
+section on intrusive reference counting <intrusive>` for a concrete example on
+how to set this up.

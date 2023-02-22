@@ -118,7 +118,7 @@ in the introductory section on object ownership and provides detail on how
 shared pointer conversion is *implemented* by nanobind.
 
 When the user calls a C++ function taking an argument of type
-``std::unique_ptr<T, Deleter>`` from Python, ownership of that object must be
+``std::shared<T>`` from Python, ownership of that object must be
 shared between C++ to Python. nanobind does this by increasing the reference
 count of the ``PyObject`` and then creating a ``std::shared_ptr<T>`` with a new
 control block containing a custom deleter that will in turn reduce the Python
@@ -175,14 +175,14 @@ Deleter>`` from Python, ownership of that object must be transferred from C++ to
   possible when the instance was originally created by a *new expression*
   within C++ and nanobind has taken over ownership (i.e., it was created by
   a function returning a raw pointer ``T *value`` with
-  ``rv_policy::take_ownership``, or a function returning a
+  :cpp:enumerator:`rv_policy::take_ownership`, or a function returning a
   ``std::unique_ptr<T>``). This limitation exists because the ``Deleter``
   will execute the statement ``delete value`` when the unique pointer
   expires, causing undefined behavior when the object was allocated within
   Python (the problem here is that nanobind uses the Python memory allocator
-  and furthermore co-locates Python and C++ object storage. A *delete expression*
-  cannot be used in such a case).
-  nanobind detects this and refuses such unsafe conversions with a warning.
+  and furthermore co-locates Python and C++ object storage. A *delete
+  expression* cannot be used in such a case). nanobind detects this, refuses
+  unsafe conversions with a ``TypeError`` and emits a separate warning.
 
 - To enable ownership transfer under all conditions, nanobind
   provides a custom ``Deleter`` named :cpp:class:`nb::deleter\<T\>
@@ -199,7 +199,7 @@ operations involving it will fail with a ``TypeError``. Reverse ownership
 transfer at a later point will make it usable again.
 
 Binding functions that return a ``std::unique_ptr<T, Deleter>`` always
-works: nanobind will then (re-)acquire ownership of the object.
+works: nanobind will then acquire or reacquire ownership of the object.
 
 Deleters other than ``std::default_delete<T>`` or ``nb::deleter<T>`` are
 *not supported*.

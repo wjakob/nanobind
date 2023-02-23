@@ -1,11 +1,11 @@
 # nanobind — Seamless operability between C++17 and Python
 
-[![Documentation](https://readthedocs.org/projects/nanobind/badge/?version=latest)](https://nanobind.readthedocs.io/en/latest/)
-[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/wjakob/nanobind/ci.yml?label=checks)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
-[![](https://img.shields.io/pypi/v/nanobind.svg?color=green)](https://pypi.org/pypi/nanobind/)
-![](https://img.shields.io/pypi/l/nanobind.svg)
-[![](https://img.shields.io/badge/Example-Link-green)](https://github.com/wjakob/nanobind_example)
-[![](https://img.shields.io/badge/Changelog-Link-green)](https://nanobind.readthedocs.io/en/latest/changelog.html)
+[![Documentation](https://img.shields.io/readthedocs/nanobind/latest)](https://nanobind.readthedocs.io/en/latest/)
+[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/wjakob/nanobind/ci.yml?label=tests)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
+[![](https://img.shields.io/pypi/v/nanobind.svg?color=brightgreen)](https://pypi.org/pypi/nanobind/)
+![](https://img.shields.io/pypi/l/nanobind.svg?color=brightgreen)
+[![](https://img.shields.io/badge/Example-Link-brightgreen)](https://github.com/wjakob/nanobind_example)
+[![](https://img.shields.io/badge/Changelog-Link-brightgreen)](https://nanobind.readthedocs.io/en/latest/changelog.html)
 
 _nanobind_ is a small binding library that exposes C++ types in Python and vice
 versa. It is reminiscent of
@@ -22,5 +22,6 @@ lower** runtime overheads compared to pybind11.
 
 ## Documentation
 
-nanobind's [readthedocs page](https://nanobind.readthedocs.io/en/latest/)
-provides tutorials and detailed reference documentation.
+Please see the following links for tutorial and reference documentation in
+[HTML](https://nanobind.readthedocs.io/en/latest/) and
+[PDF](https://nanobind.readthedocs.io/_/downloads/en/latest/pdf/) formats.

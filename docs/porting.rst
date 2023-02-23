@@ -294,9 +294,10 @@ Removed features include:
   nanobind.
 - ○ **Holders**: nanobind instances co-locate instance data with a Python
   object instead of accessing it via a holder type. This is a major difference
-  compared to pybind11 and may need tweaks to bind code that uses unique and shared
-  pointers. The :ref:`intermediate <ownership>` and :ref:`advanced
-  <ownership_adv>` sections on object ownership provide further detail.
+  compared to pybind11 and will require changes to binding code that used
+  custom holders (e.g. unique or shared pointers). The :ref:`intermediate
+  <ownership>` and :ref:`advanced <ownership_adv>` sections on object ownership
+  provide further detail.
 - ○ **Multi-intepreter, Embedding**: The ability to embed Python in an
   executable or run several independent Python interpreters in the same process
   is unsupported. Nanobind caters to bindings only. Multi-interpreter support

@@ -251,22 +251,22 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
 
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
-    const char *error = nullptr;
     PyObject *res = nullptr;
+    bool gil_error = false, cast_error = false;
 
     size_t nargs_total =
         NB_VECTORCALL_NARGS(nargsf) + (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0);
 
 #if !defined(Py_LIMITED_API)
     if (!PyGILState_Check()) {
-        error = "nanobind::detail::obj_vectorcall(): PyGILState_Check() failure." ;
+        gil_error = true;
         goto end;
     }
 #endif
 
     for (size_t i = 0; i < nargs_total; ++i) {
         if (!args[i]) {
-            error = "nanobind::detail::obj_vectorcall(): argument conversion failure." ;
+            cast_error = true;
             goto end;
         }
     }
@@ -292,10 +292,14 @@ end:
     Py_XDECREF(kwnames);
     Py_DECREF(base);
 
-    if (error)
-        raise("%s", error);
-    else if (!res)
-        raise_python_error();
+    if (!res) {
+        if (cast_error)
+            raise_cast_error();
+        else if (gil_error)
+            raise("nanobind::detail::obj_vectorcall(): PyGILState_Check() failure.");
+        else
+            raise_python_error();
+    }
 
     return res;
 }

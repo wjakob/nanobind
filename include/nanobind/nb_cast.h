@@ -27,8 +27,6 @@
     template <> class type_caster<__VA_ARGS__>                                 \
         : public type_caster_base<__VA_ARGS__> { }; }
 
-#define NB_TYPE(...) __VA_ARGS__
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

@@ -147,7 +147,7 @@ nanobind includes a number of quality-of-live improvements for developers:
   nanobind avoids the issue altogether by not pre-rendering docstrings: they
   are created on the fly when queried. nanobind also has improved
   out-of-the-box compatibility with documentation generation tools like `Sphinx
-  <https://www.sphinx-doc.org/en/master/>`_.
+  <https://www.sphinx-doc.org/en/master/>`__.
 
 - **Low-level API**: nanobind exposes an optional low-level API to provide
   fine-grained control over diverse aspects including :ref:`instance creation
@@ -194,7 +194,7 @@ The following lists minor-but-useful additions relative to pybind11.
 
 - **Raw docstrings**: In cases where absolute control over docstrings is
   required (for example, so that complex cases can be parsed by a tool like
-  `Sphinx <https://www.sphinx-doc.org>`_), the :cpp:class:`nb::raw_doc`
+  `Sphinx <https://www.sphinx-doc.org>`__), the :cpp:class:`nb::raw_doc`
   attribute can be specified to functions. In this case, nanobind will *skip*
   generation of a combined docstring that enumerates overloads along with type
   information.

@@ -1,3 +1,5 @@
+:orphan:
+
 .. cpp:namespace:: nanobind
 
 .. _pypy_issues:

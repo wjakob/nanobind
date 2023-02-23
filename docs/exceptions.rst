@@ -5,15 +5,16 @@
 Exceptions
 ==========
 
+.. _exception_conversion:
+
 Automatic conversion of C++ exceptions
 --------------------------------------
 
-When Python calls a C++ function, it is conceivable that the function might
-raise an exception instead of returning a result. In such a case, nanobind will
-capture the C++ exception and then raise an equivalent exception within Python.
-nanobind includes translations for ``std::exception``, common subclasses, and
-several special classes that translate to specific Python exceptions. The
-mapping is shown below:
+When Python calls a C++ function, that function might raise an exception
+instead of returning a result. In such a case, nanobind will capture the C++
+exception and then raise an equivalent exception within Python. This automatic
+conversion supports ``std::exception``, common subclasses, and several classes
+that convert to specific Python exceptions as shown below:
 
 .. list-table::
   :widths: 40 60
@@ -70,6 +71,8 @@ by the call operator :cpp:func:`nb::handle::operator()
 <detail::api::operator()>` and :cpp:func:`nb::cast() <cast>` when argument(s)
 cannot be converted to Python objects.
 
+.. _custom_exceptions:
+
 Handling custom exceptions
 --------------------------
 
@@ -84,21 +87,18 @@ the provided scope.
        nb::exception<CppExp>(m, "PyExp");
    }
 
-Here, it creates ``my_ext.PyExp``. Furthermore, any C++ exception of type
-``CppExp`` crossing the language barrier will subsequently convert into
+Here, it creates ``my_ext.PyExp``. Subsequently, any C++ exception of type
+``CppExp`` crossing the language barrier will automatically convert to
 ``my_ext.PyExp``.
 
 A Python exception base class can optionally be specified. For example, the
 snippet below causes ``PyExp`` to inherit from ``RuntimeError`` (the default is
-``Exception``).
+``Exception``). The built-in Python exception classes are listed `here
+<https://docs.python.org/3/c-api/exceptions.html#standard-exceptions>`__.
 
 .. code-block:: cpp
 
     nb::exception<CppExp>(module, "PyExp", PyExc_RuntimeError);
-
-The class objects of the built-in Python exceptions are listed in the Python
-documentation on `Standard Exceptions
-<https://docs.python.org/3/c-api/exceptions.html#standard-exceptions>`_.
 
 In more complex cases, :cpp:func:`nb::register_exception_translator()
 <register_exception_translator>` can be called to register a custom exception
@@ -111,14 +111,14 @@ When a C++ exception is captured by nanobind, all registered exception
 translators are tried in reverse order of registration (i.e. the last
 registered translator has the first chance of handling the exception). 
 
-Inside the translator, ``std::rethrow_exception`` should be used within
-a try block to re-throw the exception.  One or more catch clauses to catch
-the appropriate exceptions should then be used with each clause using
-``PyErr_SetString`` to set a Python exception or ``ex(string)`` to set
-the python exception to a custom exception type (see below).
-
-The following example demonstrates this to convert
-``MyCustomException`` into a Python ``IndexError``.
+Inside the translator, call ``std::rethrow_exception()`` within a
+``try``-``catch`` block to re-throw the exception and capture supported
+exception types. The ``catch`` block should call ``PyErr_SetString`` or
+``PyErr_Format`` (`1
+<https://docs.python.org/3/c-api/exceptions.html#c.PyErr_SetString>`__, `2
+<https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Format>`__) to
+set a suitable Python error status. The following example demonstrates this
+pattern to convert ``MyCustomException`` into a Python ``IndexError``.
 
 .. code-block:: cpp
 
@@ -131,34 +131,29 @@ The following example demonstrates this to convert
             }
         });
 
-Multiple exceptions can be handled by a single translator. Unhandled exceptions
-propagate to the caller and are be handled by the preceding translator. If no
-registered exception translator handles the exception, it will be converted
-according to the previously discussed default rules.
+Multiple exceptions can be handled by a single translator. nanobind captures
+unhandled exceptions and forwards them to the preceding translator. If none of
+the exception translators succeeds, it will convert according to the previously
+discussed default rules.
 
 .. note::
 
-    Call either ``PyErr_SetString`` or a custom exception's call
-    operator (``exc(string)``) for every exception caught in a custom exception
-    translator.  Failure to do so will cause Python to crash with ``SystemError:
+    When the exception translator returns normally, it must have set a Python
+    error status. Otherwise, Python will crash with the message ``SystemError:
     error return without exception set``.
 
-    Exceptions that you do not plan to handle should simply not be caught, or
-    may be explicitly (re-)thrown to delegate it to the other exception
-    translators.
+    Unsupported exception types should not be caught, or may be explicitly
+    (re-)thrown to delegate them to the other exception translators.
 
 .. _handling_python_exceptions_cpp:
 
-Handling exceptions from Python in C++
+Capturing Python exceptions within C++
 --------------------------------------
 
-When C++ calls Python functions, such as in a callback function or when
-manipulating Python objects, and Python raises an ``Exception``, nanobind
-converts the Python exception into a C++ exception of type
-:class:`nb::python_error <python_error>` whose payload contains a C++ string
-textual summary and the actual Python exception. :cpp:class:`nb::python_error
-<python_error>` is used to propagate Python exception back to Python (or
-possibly, handle them in C++).
+When nanobind-based C++ code calls a Python function that raises an exception,
+it will automatically convert into a :class:`nb::python_error <python_error>`
+raised on the C++ side. This exception type can be caught and handled in C++ or
+propagate back into Python, where it will undergo reverse conversion.
 
 .. list-table::
   :widths: 40 60
@@ -169,41 +164,47 @@ possibly, handle them in C++).
   * - Any Python ``Exception``
     - :cpp:class:`nb::python_error <python_error>`
 
-For example:
+The class exposes various members to obtain further information about the
+exception. The :cpp:func:`.type() <python_error::type>` and :cpp:func:`.value()
+<python_error::value>` methods provide information about the exception type and
+value, while :cpp:func:`.what() <python_error::what>` generates a
+human-readable representation including a backtrace.
+
+A use of the :cpp:func:`.matches() <python_error::matches>` method to
+distinguish different exception types is shown below:
 
 .. code-block:: cpp
 
     try {
-        // open("missing.txt", "r")
-        auto file = nb::module_::import("io").attr("open")("missing.txt", "r");
-        auto text = file.attr("read")();
+        nb::object file = nb::module_::import_("io").attr("open")("file.txt", "r");
+        nb::object text = file.attr("read")();
         file.attr("close")();
-    } catch (nb::python_error &e) {
+    } catch (const nb::python_error &e) {
         if (e.matches(PyExc_FileNotFoundError)) {
-            nb::print("missing.txt not found");
+            nb::print("file.txt not found");
         } else if (e.matches(PyExc_PermissionError)) {
-            nb::print("missing.txt found but not accessible");
+            nb::print("file.txt found but not accessible");
         } else {
             throw;
         }
     }
 
-Note that C++ to Python exception translation does not apply here, since that is
-a method for translating C++ exceptions to Python, not vice versa. The error raised
-from Python is *always* :cpp:class:`nb::python_error <python_error>`.
+Note that the previously discussed :ref:`automatic conversion
+<exception_conversion>` of C++ exception does not apply here. Errors raised
+from Python *always* convert to :cpp:class:`nb::python_error <python_error>`.
 
 Handling errors from the Python C API
 -------------------------------------
 
-Where possible, use :ref:`nanobind wrappers <wrappers>` instead of calling
-the Python C API directly. When calling the Python C API directly, in
-addition to manually managing reference counts, one must follow the nanobind
-error protocol, which is outlined here.
+Whenever possible, use :ref:`nanobind wrappers <wrappers>` instead of calling
+the Python C API directly. Otherwise, you must carefully manage reference
+counts and adhere to the nanobind error protocol outlined below.
 
-After calling the Python C API, if Python returns an error,
-``throw nb::python_error();``, which allows nanobind to deal with the
-exception and pass it back to the Python interpreter. This includes calls to
-the error setting functions such as ``PyErr_SetString``.
+When a Python C API call fails with an error status, you must immediately
+``throw nb::python_error();`` to capture the error and handle it using
+appropriate C++ mechanisms. This includes calls to error setting functions such
+as ``PyErr_SetString`` (:ref:`custom exception translators <custom_exceptions>`
+are excluded from this rule).
 
 .. code-block:: cpp
 
@@ -213,8 +214,7 @@ the error setting functions such as ``PyErr_SetString``.
     // But it would be easier to simply...
     throw nb::type_error("nanobind wrapper type error");
 
-Alternately, to ignore the error, call `PyErr_Clear
-<https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Clear>`_.
-
-Any Python error must be thrown or cleared, or Python/nanobind will be left in
-an invalid state.
+Alternately, to ignore the error, call `PyErr_Clear()
+<https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Clear>`__. Any
+Python error must be thrown or cleared, or nanobind will be left in an
+invalid state.

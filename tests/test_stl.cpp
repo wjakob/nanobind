@@ -12,7 +12,7 @@
 #include <nanobind/stl/unordered_set.h>
 #include <nanobind/stl/set.h>
 
-NB_MAKE_OPAQUE(NB_TYPE(std::vector<float, std::allocator<float>>))
+NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
 namespace nb = nanobind;
 

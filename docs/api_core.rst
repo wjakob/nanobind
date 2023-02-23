@@ -145,9 +145,10 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
       :cpp:class:`object` and may need to be converted back into a Python
       object using :cpp:func:`cast()`.
 
-      Type conversion is performed using the return value policy `policy` When
-      some of the arguments cannot be converted to Python objects, the function
-      raises a ``std::runtime_error``. When the Python function call fails, it
+      Type conversion is performed using the return value policy `policy` 
+
+      When type conversion of arguments or return value fails, the function
+      raises a :cpp:class:`cast_error`. When the Python function call fails, it
       instead raises a :cpp:class:`python_error`.
 
    .. cpp:function:: args_proxy operator*() const

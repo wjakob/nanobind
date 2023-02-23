@@ -45,7 +45,7 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 # Try to detect the XCode version
-if (NOT NB_XCODE_VERSION AND CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+if (APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   execute_process(
     COMMAND xcodebuild -version
     OUTPUT_VARIABLE NB_XCODE_VERSION_STR

@@ -285,7 +285,7 @@ A number of pybind11 features are unavailable in nanobind. The list below
 uses the following symbols:
 
 - ○: This removal is a design choice. Use pybind11 if you need this feature.
-- ◑: Unclear, to be discussed.
+- ●: Unclear, to be discussed.
 
 Removed features include:
 
@@ -310,18 +310,17 @@ Removed features include:
 - ○ **Compilation**: workarounds for buggy or non-standard-compliant
   compilers were removed and will not be reintroduced.
 - ○ The ``options`` class for customizing docstring generation was removed.
-- ◑ NumPy integration was replaced by a more general
+- ● NumPy integration was replaced by a more general
   :cpp:class:`nb::tensor\<..\> <nanobind::tensor>` integration that supports
   CPU/GPU tensors produced by various frameworks (NumPy, PyTorch,
   TensorFlow, JAX, ..).
-- ◑ Buffer protocol functionality (``.def_buffer()``) was removed in favor of
+- ● Buffer protocol functionality (``.def_buffer()``) was removed in favor of
   the :cpp:class:`nb::tensor\<..\> <nanobind::tensor>` interface.
-- ◑ Nested exceptions are not supported.
-- ◑ Features to facilitate pickling and unpickling were removed.
-- ◑ Support for evaluating Python
-  code strings was removed.
+- ● Nested exceptions are not supported.
+- ● Features to facilitate pickling and unpickling were removed.
+- ● Support for evaluating Python code strings was removed.
 
-Bullet points marked with ◑ may be reintroduced eventually, but this will
+Bullet points marked with ● may be reintroduced eventually, but this will
 need to be done in a careful opt-in manner that does not affect code
 complexity, binary size, and compilation/runtime performance of basic bindings
 that don't depend on these features.

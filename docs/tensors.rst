@@ -116,7 +116,7 @@ The following tensor constraints are available
 
 - The :cpp:class:`nb::shape <shape>` annotation simultaneously constrains
   the tensor rank and the size along specific dimensions. A
-  :cpp:class:`nb::any <any>` entry leaves the corresponding dimension
+  :cpp:var:`nb::any <any>` entry leaves the corresponding dimension
   unconstrained.
 
 - Device tags like :cpp:class:`nb::device::cpu <device::cpu>` or

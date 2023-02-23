@@ -14,7 +14,8 @@ import re
 # ones.
 extensions = [
     "sphinx_copybutton",
-    "sphinxcontrib.moderncmakedomain",
+    "sphinxcontrib.rsvgconverter",
+    "sphinxcontrib.moderncmakedomain"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -201,28 +202,16 @@ htmlhelp_basename = "nanobind_doc"
 latex_engine = "pdflatex"
 
 latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
-    # 'papersize': 'letterpaper',
-    #
-    # The font size ('10pt', '11pt' or '12pt').
-    # 'pointsize': '10pt',
-    #
-    # Additional stuff for the LaTeX preamble.
-    # remove blank pages (between the title page and the TOC, etc.)
+    'papersize': 'a4paper',
+    'pointsize': '10pt',
     "classoptions": ",openany,oneside",
     "preamble": r"""
-\usepackage{fontawesome}
-\usepackage{textgreek}
-\DeclareUnicodeCharacter{00A0}{}
-\DeclareUnicodeCharacter{2194}{\faArrowsH}
-\DeclareUnicodeCharacter{1F382}{\faBirthdayCake}
-\DeclareUnicodeCharacter{1F355}{\faAdjust}
-\DeclareUnicodeCharacter{0301}{'}
-\DeclareUnicodeCharacter{03C0}{\textpi}
-
+\usepackage{MnSymbol}
+\DeclareUnicodeCharacter{25CB}{\ensuremath{\circ}}
+\DeclareUnicodeCharacter{25CF}{\ensuremath{\bullet}}
+\DeclareUnicodeCharacter{21B5}{\ensuremath{\rhookswarrow}}
+\DeclareUnicodeCharacter{2194}{\ensuremath{\leftrightarrow}}
 """,
-    # Latex figure (float) alignment
-    # 'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples

@@ -61,6 +61,8 @@ The following macros, types, and functions were renamed:
     - :cpp:func:`.def_prop_rw_static(..) <class_::def_prop_rw_static>`
   * - ``.def_property_readonly_static(..)``
     - :cpp:func:`.def_prop_ro_static(..) <class_::def_prop_ro_static>`
+  * - ``register_exception<T>``
+    - :cpp:class:`exception\<T\> <exception>`
 
 
 None/null arguments

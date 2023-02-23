@@ -69,6 +69,7 @@ Table of contents
    ownership
    functions
    classes
+   exceptions
    tensors
    packaging
 

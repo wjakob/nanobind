@@ -24,6 +24,10 @@ public:
     python_error(python_error &&) noexcept;
     ~python_error() override;
 
+    bool matches(handle exc) const noexcept {
+        return PyErr_GivenExceptionMatches(m_type, exc.ptr()) != 0;
+    }
+
     /// Move the error back into the Python domain
     void restore() noexcept;
 

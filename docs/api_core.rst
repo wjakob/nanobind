@@ -1046,7 +1046,15 @@ the reference section on :ref:`class binding <class_binding>`.
 
       Return a stringified version of the exception. nanobind internally
       normalizes the exception and generates a traceback that is included
-      as part of this string.
+      as part of this string. This can be a relatively costly operation
+      and should only be used if all of this detail is actually needed.
+
+   .. cpp:function:: bool matches(handle exc) noexcept
+
+      Checks whether the exception has the same type as `exc`.
+
+      The argument to this function is usually one of the `Standard Exceptions
+      <https://docs.python.org/3/c-api/exceptions.html#standard-exceptions>`_.
 
    .. cpp:function:: void restore() noexcept
 

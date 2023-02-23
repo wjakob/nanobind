@@ -1,6 +1,6 @@
-.. _exchange:
-
 .. cpp:namespace:: nanobind
+
+.. _exchange:
 
 Exchanging information
 ======================

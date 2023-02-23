@@ -1,8 +1,8 @@
 # nanobind — Seamless operability between C++17 and Python
 
 [![Documentation](https://readthedocs.org/projects/nanobind/badge/?version=latest)](https://nanobind.readthedocs.io/en/latest/)
-[![Continuous Integration](https://github.com/wjakob/nanobind/actions/workflows/ci.yml/badge.svg)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
-[![](https://img.shields.io/pypi/v/nanobind.svg)](https://pypi.org/pypi/nanobind/)
+[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/wjakob/nanobind/ci.yml?label=checks)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
+[![](https://img.shields.io/pypi/v/nanobind.svg?color=green)](https://pypi.org/pypi/nanobind/)
 ![](https://img.shields.io/pypi/l/nanobind.svg)
 [![](https://img.shields.io/badge/Example-Link-green)](https://github.com/wjakob/nanobind_example)
 [![](https://img.shields.io/badge/Changelog-Link-green)](https://nanobind.readthedocs.io/en/latest/changelog.html)

@@ -22,8 +22,8 @@ immediately converts them into Python objects. Consider the following example:
 
 .. code-block:: cpp
 
-    nb::class_<MyClass>(m, "MyClass")
-        .def("f", &MyClass::f, "value"_a = SomeType(123));
+   nb::class_<MyClass>(m, "MyClass")
+       .def("f", &MyClass::f, "value"_a = SomeType(123));
 
 nanobind must be set up to deal with values of the type ``SomeType`` (via a
 prior instantiation of ``nb::class_<SomeType>``), or an exception will be
@@ -56,12 +56,12 @@ Consider the following function taking a floating point value as input:
    m.def("double", [](float x) { return 2.f * x; });
 
 We can call this function using a Python ``float``, but an ``int`` works just
-as well: 
+as well:
 
 .. code-block:: pycon
 
-    >>> my_ext.double(2)
-    4.0
+   >>> my_ext.double(2)
+   4.0
 
 nanobind performed a so-called *implicit conversion* for convenience. The same
 mechanism generalizes to custom types defining a
@@ -69,9 +69,9 @@ mechanism generalizes to custom types defining a
 
 .. code-block:: cpp
 
-    nb::class_<A>(m, "A")
-        // Following this line, nanobind will automatically convert 'B' -> 'A' if needed
-        .def(nb::init_implicit<B>());
+   nb::class_<A>(m, "A")
+       // Following this line, nanobind will automatically convert 'B' -> 'A' if needed
+       .def(nb::init_implicit<B>());
 
 This behavior is not always desirable---sometimes, it is better to give up or
 try another function overload. To achieve this behavior, use the
@@ -86,12 +86,12 @@ The same experiment now fails with a ``TypeError``:
 
 .. code-block:: pycon
 
-    >>> my_ext.double(2)
-    TypeError: double(): incompatible function arguments. The following ↵
-    argument types are supported:
-        1. double(x: float) -> float
+   >>> my_ext.double(2)
+   TypeError: double(): incompatible function arguments. The following ↵
+   argument types are supported:
+       1. double(x: float) -> float
 
-    Invoked with types: int
+   Invoked with types: int
 
 You may, of course, combine this with the ``_a`` shorthand notation (see the
 section on :ref:`keyword arguments <keyword_and_default_args>`) or use specify
@@ -163,7 +163,6 @@ supported for :ref:`bound <bindings>` types. :ref:`Type casters <type_casters>`
 and :ref:`wrappers <wrappers>` cannot be used in such cases and will produce
 compile-time errors.
 
-
 .. _overload_resolution:
 
 Overload resolution order
@@ -194,6 +193,7 @@ function causes it to be skipped, and overload resolution resumes. This can be
 helpful in complex situations where the value of a parameter must be inspected
 to see if a particular overload is eligible.
 
+.. _args_kwargs_1:
 
 Accepting \*args and \*\*kwargs
 -------------------------------
@@ -230,6 +230,8 @@ arguments. Note, however, that :cpp:class:`nb::args <args>` and
 function, and in that order if both are specified. This is a restriction
 compared to pybind11, which allowed more general arrangements. nanobind also
 lacks the ``kw_only`` and ``pos_only`` annotations available in pybind11.
+
+.. _args_kwargs_2:
 
 Expanding \*args and \*\*kwargs
 -------------------------------
@@ -269,6 +271,7 @@ Here is an example use of the above extension in Python:
    (1, 'positional')
    {'keyword': 'value'}
 
+.. _function_templates:
 
 Function templates
 ------------------
@@ -277,7 +280,7 @@ Consider the following function signature with a *template parameter*:
 
 .. code-block:: cpp
 
-    template <typename T> void process(T t);
+   template <typename T> void process(T t);
 
 A template must be instantiated with concrete types to be usable, which is a
 compile-time operation. The generic version version therefore cannot be used
@@ -285,23 +288,25 @@ in bindings:
 
 .. code-block:: cpp
 
-    m.def("process", &process); // <-- this will not compile
+   m.def("process", &process); // <-- this will not compile
 
 You must bind each instantiation separately, either as a single function
 with overloads, or as separately named functions.
 
 .. code-block:: cpp
 
-    // Option 1:
-    m.def("process", &process<int>);
-    m.def("process", &process<std::string>);
+   // Option 1:
+   m.def("process", &process<int>);
+   m.def("process", &process<std::string>);
 
-    // Option 2:
-    m.def("process_int", &process<int>);
-    m.def("process_string", &process<std::string>);
+   // Option 2:
+   m.def("process_int", &process<int>);
+   m.def("process_string", &process<std::string>);
 
-Lifetime annotation
--------------------
+.. _lifetime_annotations:
+
+Lifetime annotations
+--------------------
 
 The :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>` annotation
 indicates that the argument with index ``Patient`` should be kept alive at least
@@ -326,6 +331,7 @@ the ``log``. Without it, Python may delete the ``Entry`` instance at a later
 point, which would be problematic if ``Log`` did not make a copy but references
 the instance through its pointer address.
 
+.. _call_guards:
 
 Call guards
 -----------
@@ -336,16 +342,16 @@ definition:
 
 .. code-block:: cpp
 
-    m.def("foo", foo, nb::call_guard<T>());
+   m.def("foo", foo, nb::call_guard<T>());
 
 is equivalent to the following pseudocode:
 
 .. code-block:: cpp
 
-    m.def("foo", [](args...) {
-        T scope_guard;
-        return foo(args...); // forwarded arguments
-    });
+   m.def("foo", [](args...) {
+       T scope_guard;
+       return foo(args...); // forwarded arguments
+   });
 
 The only requirement is that ``T`` is default-constructible, but otherwise
 any scope guard will work. This feature is often combined with
@@ -356,3 +362,89 @@ to permit parallel execution.
 Multiple guards should be specified as :cpp:class:`nb::call_guard\<T1, T2,
 T3...\> <call_guard>`. Construction occurs left to right, while destruction
 occurs in reverse.
+
+.. _higher_order_adv:
+
+Higher-order functions
+----------------------
+
+The C++11 standard introduced lambda functions and the generic polymorphic
+function wrapper ``std::function<>``, which enable powerful new ways of working
+with functions. Lambda functions come in two flavors: stateless lambda function
+resemble classic function pointers that link to an anonymous piece of code,
+while stateful lambda functions additionally depend on captured variables that
+are stored in an anonymous *lambda closure object*.
+
+Here is a simple example of a C++ function that takes an arbitrary function
+(stateful or stateless) with signature ``int -> int`` as an argument and runs
+it with the value 10.
+
+.. code-block:: cpp
+
+   int func_arg(const std::function<int(int)> &f) {
+       return f(10);
+   }
+
+The example below is more involved: it takes a function of signature ``int -> int``
+and returns another function of the same kind. The return value is a stateful
+lambda function, which stores the value ``f`` in the capture object and adds 1 to
+its return value upon execution.
+
+.. code-block:: cpp
+
+   std::function<int(int)> func_ret(const std::function<int(int)> &f) {
+       return [f](int i) {
+           return f(i) + 1;
+       };
+   }
+
+This example demonstrates using python named parameters in C++ callbacks which
+requires use of the :cpp:func:`nb::cpp_function <cpp_function>` conversion
+function. Usage is similar to defining methods of classes:
+
+.. code-block:: cpp
+
+   nb::object func_cpp() {
+       return nb::cpp_function([](int i) { return i+1; },
+          nb::arg("number"));
+   }
+
+After including the extra header file :file:`nanobind/stl/function.h`, it is almost
+trivial to generate binding code for all of these functions.
+
+.. code-block:: cpp
+
+   #include <nanobind/stl/function.h>
+
+   NB_MODULE(my_ext, m) {
+       m.def("func_arg", &func_arg);
+       m.def("func_ret", &func_ret);
+       m.def("func_cpp", &func_cpp);
+   }
+
+The following interactive session shows how to call them from Python.
+
+.. code-block:: pycon
+
+   Python 3.11.1 (main, Dec 23 2022, 09:28:24) [Clang 14.0.0 (clang-1400.0.29.202)] on darwin
+   Type "help", "copyright", "credits" or "license" for more information.
+   >>> import my_ext
+   >>> def square(i):
+   ...     return i*i
+   ...
+   >>> my_ext.func_arg(square)
+   100
+   >>> square_plus_1 = my_ext.func_ret(square)
+   >>> square_plus_1(4)
+   17
+   >>> plus_1 = my_ext.func_cpp()
+   >>> plus_1.__doc__
+   '<anonymous>(number: int) -> int'
+   >>> plus_1(number=43)
+   44
+
+.. note::
+
+   This functionality is very useful when generating bindings for callbacks in
+   C++ libraries (e.g. GUI libraries, asynchronous networking libraries,
+   etc.).

@@ -7,7 +7,10 @@ Porting guide
 
 The API of nanobind is *extremely* similar to that of `pybind11
 <https://pybind11.readthedocs.io/en/stable/>`_, which makes porting existing
-projects easy. A number of noteworthy changes are documented below.
+projects easy. Parts of the nanobind documentation are almost verbatim copies
+pybind11's documentation.
+
+A number of noteworthy changes are documented below.
 
 Namespace
 ---------
@@ -320,6 +323,8 @@ Removed features include:
 - ● Nested exceptions are not supported.
 - ● Features to facilitate pickling and unpickling were removed.
 - ● Support for evaluating Python code strings was removed.
+- ● Type casters for time/date conversion (``pybind11/chrono.h``) haven't been
+  ported yet.
 
 Bullet points marked with ● may be reintroduced eventually, but this will
 need to be done in a careful opt-in manner that does not affect code

@@ -20,15 +20,24 @@ objects and vice versa. The illustration below shows a translation between
 C++ (blue) and Python (green) worlds, where a ``std::vector<int>`` instance
 converts from/to a Python ``list`` containing ``int`` objects.
 
-.. image:: images/caster-light.svg
-  :width: 400
-  :align: center
-  :class: only-light
+.. only:: not latex
 
-.. image:: images/caster-dark.svg
-  :width: 400
-  :align: center
-  :class: only-dark
+   .. image:: images/caster-light.svg
+     :width: 400
+     :align: center
+     :class: only-light
+
+   .. image:: images/caster-dark.svg
+     :width: 400
+     :align: center
+     :class: only-dark
+
+.. only:: latex
+
+   .. image:: images/caster-light.svg
+     :width: 400
+     :align: center
+     :class: only-light
 
 **Example**: The following function doubles the entries of an STL vector and
 returns the result.
@@ -202,15 +211,24 @@ main feature of nanobind. In the list-of-integer example, they cause Python
 to interpret ``std::vector<int>`` as a new Python type called
 ``my_ext.IntVector``.
 
-.. image:: images/binding-light.svg
-  :width: 400
-  :align: center
-  :class: only-light
+.. only:: not latex
 
-.. image:: images/binding-dark.svg
-  :width: 400
-  :align: center
-  :class: only-dark
+   .. image:: images/binding-light.svg
+     :width: 400
+     :align: center
+     :class: only-light
+
+   .. image:: images/binding-dark.svg
+     :width: 400
+     :align: center
+     :class: only-dark
+
+.. only:: latex
+
+   .. image:: images/binding-light.svg
+     :width: 400
+     :align: center
+     :class: only-light
 
 **Example**: to switch the previous example to bindings, we first replace
 the type caster header (`nanobind/stl/vector.h
@@ -298,15 +316,24 @@ some cases. nanobind provides *wrapper* classes to use Python types within
 C++. You can think of this as a kind of *reverse binding*. For example, a
 Python list can be accessed through the :cpp:class:`nb::list <list>` type:
 
-.. image:: images/wrapper-light.svg
-  :width: 400
-  :align: center
-  :class: only-light
+.. only:: not latex
 
-.. image:: images/wrapper-dark.svg
-  :width: 400
-  :align: center
-  :class: only-dark
+   .. image:: images/wrapper-light.svg
+     :width: 400
+     :align: center
+     :class: only-light
+
+   .. image:: images/wrapper-dark.svg
+     :width: 400
+     :align: center
+     :class: only-dark
+
+.. only:: latex
+
+   .. image:: images/wrapper-light.svg
+     :width: 400
+     :align: center
+     :class: only-light
 
 This is what the example looks like when expressed using
 :cpp:class:`nb::list <list>` and :cpp:class:`nb::int_ <int_>`.
@@ -349,12 +376,12 @@ The following wrappers are available and require no additional include
 directives:
 :cpp:class:`bytes`, :cpp:class:`callable`, :cpp:class:`capsule`,
 :cpp:class:`dict`, :cpp:class:`ellipsis`, :cpp:class:`handle`,
-:cpp:class:`handle_t\<T\> <handle_t>`, 
+:cpp:class:`handle_t\<T\> <handle_t>`,
 :cpp:class:`int_`, :cpp:class:`iterable`,
 :cpp:class:`iterator`, :cpp:class:`list`, :cpp:class:`mapping`,
 :cpp:class:`module_`, :cpp:class:`object`, :cpp:class:`sequence`,
 :cpp:class:`slice`, :cpp:class:`str`, :cpp:class:`tuple`,
-:cpp:class:`type_object`, :cpp:class:`type_object_t\<T\> <handle_t>`, 
+:cpp:class:`type_object`, :cpp:class:`type_object_t\<T\> <handle_t>`,
 :cpp:class:`args`, and :cpp:class:`kwargs`.
 
 Discussion

@@ -13,8 +13,14 @@ More concretely, :ref:`benchmarks <benchmarks>` show **~2-3× faster** compile
 time, **~3× smaller** binaries, and up to **~8× lower** runtime overheads
 compared to pybind11.
 
-Dependencies
-------------
+.. only:: not latex
+
+   Dependencies
+   ------------
+
+.. only:: latex
+
+   .. rubric:: Dependencies
 
 nanobinds depends on
 
@@ -25,8 +31,14 @@ nanobinds depends on
   supported. Others (MinGW, Intel, NVIDIA, ..) may work as well but will not
   receive support.
 
-How to cite this project?
--------------------------
+.. only:: not latex
+
+   How to cite this project?
+   -------------------------
+
+.. only:: latex
+
+   .. rubric:: How to cite this project?
 
 Please use the following BibTeX template to cite nanobind in scientific
 discourse:
@@ -40,9 +52,10 @@ discourse:
        title = {nanobind---Seamless operability between C++17 and Python}
     }
 
+.. only:: not latex
 
-Table of contents
------------------
+   Table of contents
+   -----------------
 
 .. toctree::
    :maxdepth: 1

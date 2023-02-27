@@ -26,6 +26,16 @@ name and tested CMake version range. The third line line searches for Python >=
     cmake_minimum_required(VERSION 3.18...3.22)
     find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 
+Add the following lines below. They configure CMake to perform an optimized
+*release* build by default unless another build type is specified. Without this
+addition, binding code may run slowly and produce large binaries.
+
+.. code-block:: cmake
+
+   if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+   endif()
 
 Finding nanobind
 ----------------

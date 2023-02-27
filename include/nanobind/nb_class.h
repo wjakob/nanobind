@@ -460,6 +460,59 @@ public:
         return *this;
     }
 
+    /// Compatibility functions (with deprecation warning)
+    template <typename C, typename D, typename... Extra>
+    [[deprecated("replaced by 'def_ro()'")]]
+    class_ &def_readonly(const char *name, D C::*p, const Extra &...extra) {
+        return def_ro(name, p, extra...);
+    }
+
+    template <typename C, typename D, typename... Extra>
+    [[deprecated("replaced by 'def_rw()'")]]
+    class_ &def_readwrite(const char *name, D C::*p, const Extra &...extra) {
+        return def_rw(name, p, extra...);
+    }
+
+    template <typename D, typename... Extra>
+    [[deprecated("replaced by 'def_rw_static()'")]]
+    class_ &def_readwrite_static(const char *name, D *p, const Extra &...extra) {
+        return def_rw_static(name, p, extra...);
+    }
+
+    template <typename D, typename... Extra>
+    [[deprecated("replaced by 'def_ro_static()'")]]
+    class_ &def_readonly_static(const char *name, D *p, const Extra &...extra) {
+        return def_ro_static(name, p, extra...);
+    }
+
+    template <typename Getter, typename Setter, typename... Extra>
+    [[deprecated("replaced by 'def_prop_rw()'")]]
+    class_ & def_property(const char *name, Getter &&getter,
+                          Setter &&setter, const Extra &...extra) {
+        return def_prop_rw(name, getter, setter, extra...);
+    }
+
+    template <typename Getter, typename... Extra>
+    [[deprecated("replaced by 'def_prop_ro()'")]]
+    class_ & def_property_readonly(const char *name, Getter &&getter,
+                                   const Extra &...extra) {
+        return def_prop_ro(name, getter, extra...);
+    }
+
+    template <typename Getter, typename Setter, typename... Extra>
+    [[deprecated("replaced by 'def_prop_rw_static()'")]]
+    class_ & def_property_static(const char *name, Getter &&getter,
+                                 Setter &&setter, const Extra &...extra) {
+        return def_prop_rw_static(name, getter, setter, extra...);
+    }
+
+
+    template <typename Getter, typename... Extra>
+    [[deprecated("replaced by 'def_prop_ro_static()'")]]
+    class_ & def_property_readonly_static(const char *name, Getter &&getter,
+                                          const Extra &...extra) {
+        return def_prop_ro_static(name, getter, extra...);
+    }
 };
 
 template <typename T> class enum_ : public class_<T> {

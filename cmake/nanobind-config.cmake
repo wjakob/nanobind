@@ -62,7 +62,7 @@ endif()
 
 function (nanobind_link_options name)
   if (APPLE)
-    target_link_options(${name} PRIVATE -undefined dynamic_lookup)
+    target_link_options(${name} PRIVATE -undefined dynamic_lookup -dead_strip)
     if (NB_XCODE_VERSION AND NB_XCODE_VERSION VERSION_LESS 14.3)
       target_link_options(${name} PRIVATE -Wl,-no_fixup_chains)
     endif()

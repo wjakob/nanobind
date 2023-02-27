@@ -1,6 +1,8 @@
 from setuptools import setup
 import re
 import os
+import shutil
+
 
 VERSION_REGEX = re.compile(
     r"^\s*#\s*define\s+NB_VERSION_([A-Z]+)\s+(.*)$", re.MULTILINE)
@@ -20,35 +22,41 @@ syntax. In contrast to these existing tools, _nanobind_ is more _efficient_:
 bindings compile in a shorter amount of time, produce smaller binaries, and
 have better runtime performance.'''
 
-dirname = os.path.abspath(os.path.dirname(__file__))
+from tempfile import TemporaryDirectory
 
-for name in ['include', 'ext', 'cmake', 'src']:
-    try:
-        os.symlink(os.path.join(dirname, name),
-                   os.path.join(dirname, 'src', 'nanobind', name))
-    except FileExistsError:
-        pass
+with TemporaryDirectory() as temp_dir:
+    base_dir = os.path.abspath(os.path.dirname(__file__))
 
-setup(
-    name="nanobind",
-    version=nanobind_version,
-    author="Wenzel Jakob",
-    author_email="wenzel.jakob@epfl.ch",
-    description='Seamless operability between C++17 and Python',
-    url="https://github.com/wjakob/nanobind",
-    license="BSD",
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    packages=['nanobind'],
-    zip_safe=False,
-    package_dir={'nanobind': 'src/nanobind'},
-    package_data={'nanobind': [
-        'include/nanobind/*.h',
-        'include/nanobind/stl/*.h',
-        'include/nanobind/stl/detail/*.h',
-        'ext/robin_map/include/tsl/*.h',
-        'cmake/nanobind-config.cmake',
-        'src/*.h',
-        'src/*.cpp'
-    ]}
-)
+
+    for name in ['include', 'ext', 'cmake', 'src']:
+        shutil.copytree(os.path.join(base_dir, name),
+                        os.path.join(temp_dir, name),
+                        dirs_exist_ok=True)
+
+    shutil.move(os.path.join(temp_dir, 'src', '__init__.py'),
+                os.path.join(temp_dir, '__init__.py'))
+
+    setup(
+        name="nanobind",
+        version=nanobind_version,
+        author="Wenzel Jakob",
+        author_email="wenzel.jakob@epfl.ch",
+        description='Seamless operability between C++17 and Python',
+        url="https://github.com/wjakob/nanobind",
+        license="BSD",
+        long_description=long_description,
+        long_description_content_type='text/markdown',
+        packages=['nanobind'],
+        zip_safe=False,
+        package_dir={'nanobind': temp_dir},
+        package_data={'nanobind': [
+            'include/nanobind/*.h',
+            'include/nanobind/stl/*.h',
+            'include/nanobind/stl/detail/*.h',
+            'include/nanobind/eigen/*.h',
+            'ext/robin_map/include/tsl/*.h',
+            'cmake/nanobind-config.cmake',
+            'src/*.h',
+            'src/*.cpp'
+        ]}
+    )

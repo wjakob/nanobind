@@ -273,3 +273,33 @@ used to implement a data destructor as follows:
 
        return nb::ndarray<nb::pytorch, float>(data, 2, shape, owner);
    });
+
+In other situations, it may be helpful to have the capsule manage the lifetime
+of a custom data structure that contains one or multiple containers. The same
+capsule can be referenced from multiple ndarrays and will call the deleter
+when all of them have expired:
+
+.. code-block:: cpp
+
+   m.def("return_multiple", []() {
+       struct Temp {
+           std::vector<float> vec_1;
+           std::vector<float> vec_2;
+       };
+
+       Temp *temp = new Temp();
+       temp->vec_1 = std::move(...);
+       temp->vec_2 = std::move(...);
+
+       nb::capsule deleter(temp, [](void *p) noexcept {
+           delete (Temp *) p;
+       });
+
+       size_t shape_1[1] = { temp->vec_1.size() };
+       size_t shape_2[1] = { temp->vec_2.size() };
+
+       return std::make_pair(
+           nb::ndarray<nb::pytorch, float>(temp->vec_1.data(), 1, shape_1, deleter),
+           nb::ndarray<nb::pytorch, float>(temp->vec_2.data(), 1, shape_2, deleter)
+       );
+   });

@@ -10,13 +10,13 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 // Forward declarations for types in dlpack.h (1)
-namespace dlpack { struct tensor; struct dtype; }
+namespace dlpack { struct dltensor; struct dtype; }
 
 NAMESPACE_BEGIN(detail)
 
 // Forward declarations for types in dlpack.h (2)
-struct tensor_handle;
-struct tensor_req;
+struct ndarray_handle;
+struct ndarray_req;
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -371,27 +371,27 @@ NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
 
 // ========================================================================
 
-// Try to import a reference-counted tensor object via DLPack
-NB_CORE tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
-                                     bool convert) noexcept;
+// Try to import a reference-counted ndarray object via DLPack
+NB_CORE ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
+                                       bool convert) noexcept;
 
-// Describe a local tensor object using a DLPack capsule
-NB_CORE tensor_handle *tensor_create(void *value, size_t ndim,
-                                     const size_t *shape, PyObject *owner,
-                                     const int64_t *strides,
-                                     dlpack::dtype *dtype, int32_t device,
-                                     int32_t device_id);
+// Describe a local ndarray object using a DLPack capsule
+NB_CORE ndarray_handle *ndarray_create(void *value, size_t ndim,
+                                       const size_t *shape, PyObject *owner,
+                                       const int64_t *strides,
+                                       dlpack::dtype *dtype, int32_t device,
+                                       int32_t device_id);
 
-/// Increase the reference count of the given tensor object; returns a pointer
-/// to the underlying DLtensor
-NB_CORE dlpack::tensor *tensor_inc_ref(tensor_handle *) noexcept;
+/// Increase the reference count of the given ndarray object; returns a pointer
+/// to the underlying DLTensor
+NB_CORE dlpack::dltensor *ndarray_inc_ref(ndarray_handle *) noexcept;
 
-/// Decrease the reference count of the given tensor object
-NB_CORE void tensor_dec_ref(tensor_handle *) noexcept;
+/// Decrease the reference count of the given ndarray object
+NB_CORE void ndarray_dec_ref(ndarray_handle *) noexcept;
 
-/// Wrap a tensor_handle* into a PyCapsule
-NB_CORE PyObject *tensor_wrap(tensor_handle *, int framework,
-                              rv_policy policy) noexcept;
+/// Wrap a ndarray_handle* into a PyCapsule
+NB_CORE PyObject *ndarray_wrap(ndarray_handle *, int framework,
+                               rv_policy policy) noexcept;
 
 // ========================================================================
 

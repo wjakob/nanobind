@@ -86,37 +86,52 @@ function (nanobind_build_library TARGET_NAME)
 
   add_library(${TARGET_NAME} ${TARGET_TYPE}
     EXCLUDE_FROM_ALL
+    ${NB_DIR}/include/nanobind/make_iterator.h
     ${NB_DIR}/include/nanobind/nanobind.h
-    ${NB_DIR}/include/nanobind/nb_attr.h
-    ${NB_DIR}/include/nanobind/nb_cast.h
-    ${NB_DIR}/include/nanobind/nb_descr.h
-    ${NB_DIR}/include/nanobind/nb_error.h
-    ${NB_DIR}/include/nanobind/nb_lib.h
-    ${NB_DIR}/include/nanobind/nb_python.h
-    ${NB_DIR}/include/nanobind/nb_tuple.h
     ${NB_DIR}/include/nanobind/nb_accessor.h
+    ${NB_DIR}/include/nanobind/nb_attr.h
     ${NB_DIR}/include/nanobind/nb_call.h
+    ${NB_DIR}/include/nanobind/nb_cast.h
     ${NB_DIR}/include/nanobind/nb_class.h
     ${NB_DIR}/include/nanobind/nb_defs.h
+    ${NB_DIR}/include/nanobind/nb_descr.h
     ${NB_DIR}/include/nanobind/nb_enums.h
+    ${NB_DIR}/include/nanobind/nb_error.h
     ${NB_DIR}/include/nanobind/nb_func.h
+    ${NB_DIR}/include/nanobind/nb_lib.h
     ${NB_DIR}/include/nanobind/nb_misc.h
+    ${NB_DIR}/include/nanobind/nb_python.h
     ${NB_DIR}/include/nanobind/nb_traits.h
+    ${NB_DIR}/include/nanobind/nb_tuple.h
     ${NB_DIR}/include/nanobind/nb_types.h
+    ${NB_DIR}/include/nanobind/ndarray.h
     ${NB_DIR}/include/nanobind/trampoline.h
-    ${NB_DIR}/include/nanobind/tensor.h
     ${NB_DIR}/include/nanobind/operators.h
+    ${NB_DIR}/include/nanobind/stl/array.h
+    ${NB_DIR}/include/nanobind/stl/bind_map.h
+    ${NB_DIR}/include/nanobind/stl/bind_vector.h
+    ${NB_DIR}/include/nanobind/stl/detail
+    ${NB_DIR}/include/nanobind/stl/detail/nb_array.h
+    ${NB_DIR}/include/nanobind/stl/detail/nb_dict.h
+    ${NB_DIR}/include/nanobind/stl/detail/nb_list.h
+    ${NB_DIR}/include/nanobind/stl/detail/nb_set.h
+    ${NB_DIR}/include/nanobind/stl/detail/traits.h
+    ${NB_DIR}/include/nanobind/stl/function.h
+    ${NB_DIR}/include/nanobind/stl/list.h
+    ${NB_DIR}/include/nanobind/stl/map.h
+    ${NB_DIR}/include/nanobind/stl/optional.h
+    ${NB_DIR}/include/nanobind/stl/pair.h
+    ${NB_DIR}/include/nanobind/stl/set.h
     ${NB_DIR}/include/nanobind/stl/shared_ptr.h
-    ${NB_DIR}/include/nanobind/stl/unique_ptr.h
     ${NB_DIR}/include/nanobind/stl/string.h
     ${NB_DIR}/include/nanobind/stl/string_view.h
     ${NB_DIR}/include/nanobind/stl/tuple.h
-    ${NB_DIR}/include/nanobind/stl/pair.h
-    ${NB_DIR}/include/nanobind/stl/function.h
-    ${NB_DIR}/include/nanobind/stl/vector.h
-    ${NB_DIR}/include/nanobind/stl/list.h
-    ${NB_DIR}/include/nanobind/stl/optional.h
+    ${NB_DIR}/include/nanobind/stl/unique_ptr.h
+    ${NB_DIR}/include/nanobind/stl/unordered_map.h
+    ${NB_DIR}/include/nanobind/stl/unordered_set.h
     ${NB_DIR}/include/nanobind/stl/variant.h
+    ${NB_DIR}/include/nanobind/stl/vector.h
+    ${NB_DIR}/include/nanobind/eigen/dense.h
 
     ${NB_DIR}/src/buffer.h
     ${NB_DIR}/src/nb_internals.h
@@ -126,7 +141,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/src/nb_enum.cpp
     ${NB_DIR}/src/common.cpp
     ${NB_DIR}/src/error.cpp
-    ${NB_DIR}/src/tensor.cpp
+    ${NB_DIR}/src/ndarray.cpp
     ${NB_DIR}/src/trampoline.cpp
     ${NB_DIR}/src/implicit.cpp
   )

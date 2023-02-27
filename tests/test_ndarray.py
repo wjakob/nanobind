@@ -1,4 +1,4 @@
-import test_tensor_ext as t
+import test_ndarray_ext as t
 import pytest
 import warnings
 import importlib
@@ -59,13 +59,13 @@ def test01_metadata():
 
 
 def test02_docstr():
-    assert t.get_shape.__doc__ == "get_shape(array: tensor[]) -> list"
-    assert t.pass_uint32.__doc__ == "pass_uint32(array: tensor[dtype=uint32]) -> None"
-    assert t.pass_float32.__doc__ == "pass_float32(array: tensor[dtype=float32]) -> None"
-    assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(array: tensor[dtype=float32, shape=(3, *, 4)]) -> None"
-    assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: tensor[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
-    assert t.check_device.__doc__ == ("check_device(arg: tensor[device='cpu'], /) -> str\n"
-                                      "check_device(arg: tensor[device='cuda'], /) -> str")
+    assert t.get_shape.__doc__ == "get_shape(array: ndarray[]) -> list"
+    assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
+    assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
+    assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(array: ndarray[dtype=float32, shape=(3, *, 4)]) -> None"
+    assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: ndarray[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
+    assert t.check_device.__doc__ == ("check_device(arg: ndarray[device='cpu'], /) -> str\n"
+                                      "check_device(arg: ndarray[device='cuda'], /) -> str")
 
 
 @needs_numpy

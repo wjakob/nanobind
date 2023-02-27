@@ -16,7 +16,7 @@ nanobind_add_module(test_stl_ext test_stl.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_bind_map_ext test_stl_bind_map.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_bind_vector_ext test_stl_bind_vector.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_enum_ext test_enum.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_tensor_ext test_tensor.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_ndarray_ext test_ndarray.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${NB_EXTRA_ARGS})
 nanobind_add_module(test_exception_ext test_exception.cpp object.cpp object.h ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
@@ -57,7 +57,7 @@ set(TEST_FILES
   test_stl.py
   test_stl_bind_map.py
   test_stl_bind_vector.py
-  test_tensor.py
+  test_ndarray.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

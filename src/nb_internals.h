@@ -73,10 +73,10 @@ struct nb_func {
     bool complex_call;
 };
 
-/// Python object representing a `nb_tensor` (which wraps a DLPack tensor)
-struct nb_tensor {
+/// Python object representing a `nb_ndarray` (which wraps a DLPack ndarray)
+struct nb_ndarray {
     PyObject_HEAD
-    tensor_handle *th;
+    ndarray_handle *th;
 };
 
 /// Python object representing an `nb_method` bound to an instance (analogous to non-public PyMethod_Type)
@@ -187,8 +187,8 @@ struct nb_internals {
     PyTypeObject *nb_static_property;
     bool nb_static_property_enabled;
 
-    /// Tensor wrpaper
-    PyTypeObject *nb_tensor;
+    /// N-dimensional array wrapper
+    PyTypeObject *nb_ndarray;
 
     /// Instance pointer -> Python object mapping
     nb_instance_map inst_c2p;

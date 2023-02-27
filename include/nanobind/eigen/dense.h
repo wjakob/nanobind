@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <nanobind/tensor.h>
+#include <nanobind/ndarray.h>
 #include <Eigen/Core>
 
 static_assert(EIGEN_VERSION_AT_LEAST(3, 2, 7),
@@ -26,7 +26,7 @@ template <typename T> using EigenDMap = Eigen::Map<T, 0, EigenDStride>;
 NAMESPACE_BEGIN(detail)
 
 template <typename T>
-using tensor_for_eigen_t = tensor<
+using array_for_eigen_t = ndarray<
     typename T::Scalar,
     numpy,
     std::conditional_t<
@@ -60,25 +60,25 @@ template <typename T> constexpr bool is_eigen_xpr_v =
 
 template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
     using Scalar = typename T::Scalar;
-    using Tensor = tensor_for_eigen_t<T>;
-    using TensorCaster = make_caster<Tensor>;
+    using NDArray = array_for_eigen_t<T>;
+    using NDArrayCaster = make_caster<NDArray>;
 
-    NB_TYPE_CASTER(T, TensorCaster::Name);
+    NB_TYPE_CASTER(T, NDArrayCaster::Name);
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        TensorCaster caster;
+        NDArrayCaster caster;
         if (!caster.from_python(src, flags, cleanup))
             return false;
-        const Tensor &tensor = caster.value;
+        const NDArray &array = caster.value;
 
         if constexpr (T::NumDimensions == 1) {
-            value.resize(tensor.shape(0));
-            memcpy(value.data(), tensor.data(),
-                   tensor.shape(0) * sizeof(Scalar));
+            value.resize(array.shape(0));
+            memcpy(value.data(), array.data(),
+                   array.shape(0) * sizeof(Scalar));
         } else {
-            value.resize(tensor.shape(0), tensor.shape(1));
-            memcpy(value.data(), tensor.data(),
-                   tensor.shape(0) * tensor.shape(1) * sizeof(Scalar));
+            value.resize(array.shape(0), array.shape(1));
+            memcpy(value.data(), array.data(),
+                   array.shape(0) * array.shape(1) * sizeof(Scalar));
         }
 
         return true;
@@ -135,12 +135,12 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
             ptr = temp->data();
         }
 
-        rv_policy tensor_rv_policy =
+        rv_policy array_rv_policy =
             policy == rv_policy::move ? rv_policy::reference : policy;
 
-        object o = steal(TensorCaster::from_cpp(
-            Tensor(ptr, T::NumDimensions, shape, owner, strides),
-            tensor_rv_policy, cleanup));
+        object o = steal(NDArrayCaster::from_cpp(
+            NDArray(ptr, T::NumDimensions, shape, owner, strides),
+            array_rv_policy, cleanup));
 
         return o.release();
     }
@@ -167,12 +167,12 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_xpr_v<T>>> {
 template <typename T, int Options, typename StrideType>
 struct type_caster<Eigen::Map<T, Options, StrideType>> {
     using Map = Eigen::Map<T, Options, StrideType>;
-    using Tensor = tensor_for_eigen_t<Map>;
-    using TensorCaster = type_caster<Tensor>;
-    static constexpr auto Name = TensorCaster::Name;
+    using NDArray = array_for_eigen_t<Map>;
+    using NDArrayCaster = type_caster<NDArray>;
+    static constexpr auto Name = NDArrayCaster::Name;
     template <typename T_> using Cast = Map;
 
-    TensorCaster caster;
+    NDArrayCaster caster;
 
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {
@@ -193,8 +193,8 @@ struct type_caster<Eigen::Map<T, Options, StrideType>> {
             strides[1] = v.colStride();
         }
 
-        return TensorCaster::from_cpp(
-            Tensor((void *) v.data(), T::NumDimensions, shape, handle(), strides),
+        return NDArrayCaster::from_cpp(
+            NDArray((void *) v.data(), T::NumDimensions, shape, handle(), strides),
             rv_policy::reference, cleanup);
     }
 
@@ -217,7 +217,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>> {
     }
 
     operator Map() {
-        Tensor &t = caster.value;
+        NDArray &t = caster.value;
         return Map(t.data(), t.shape(0), t.shape(1), strides());
     }
 };

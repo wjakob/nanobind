@@ -15,6 +15,13 @@ compared to pybind11.
 
 .. only:: not latex
 
+   Documentation formats
+   ---------------------
+
+   You are reading the HTML version of the documentation. An alternative `PDF
+   version <https://nanobind.readthedocs.io/_/downloads/en/latest/pdf/>`__ is
+   also available.
+
    Dependencies
    ------------
 
@@ -83,7 +90,7 @@ discourse:
    functions
    classes
    exceptions
-   tensors
+   ndarray 
    packaging
 
 .. toctree::

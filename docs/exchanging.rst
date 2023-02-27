@@ -128,8 +128,8 @@ The following table lists the currently available type casters:
     - ``#include <nanobind/stl/variant.h>``
   * - ``std::vector<..>``
     - ``#include <nanobind/stl/vector.h>``
-  * - ``nb::tensor<..>``
-    - ``#include <nanobind/tensor.h>``
+  * - ``nb::ndarray<..>``
+    - ``#include <nanobind/ndarray.h>``
   * - ``Eigen::Matrix<..>``, ``Eigen::Array<..>``, ``Eigen::Ref<..>``, ``Eigen::Map<..>``
     - ``#include <nanobind/eigen/dense.h>``
 
@@ -141,7 +141,7 @@ Conversely, the overhead should not be a problem when the data is fully
 "consumed" following conversion.
 
 Note that some type casters (e.g., those for ``std::unique_ptr<..>``,
-``std::shared_ptr<..>``, :cpp:class:`nb::tensor <tensor>`, and for ``Eigen::*``
+``std::shared_ptr<..>``, :cpp:class:`nb::ndarray <ndarray>`, and for ``Eigen::*``
 can perform a type conversion without copying the underlying data.)
 
 .. _type_caster_mutable:

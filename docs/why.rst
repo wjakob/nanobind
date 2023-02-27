@@ -105,29 +105,20 @@ Major additions
 
 nanobind includes a number of quality-of-live improvements for developers:
 
-- **Tensors**: nanobind can exchange
-  tensors with modern array
-  programming frameworks. It uses
-  either `DLPack
-  <https://github.com/dmlc/dlpack>`_
-  or the `buffer protocol
-  <https://docs.python.org/3/c-api/buffer.html>`_
-  to achieve *zero-copy* CPU/GPU
-  tensor exchange with frameworks
-  like `NumPy <https://numpy.org>`_,
-  `PyTorch <https://pytorch.org>`_,
-  `TensorFlow
-  <https://www.tensorflow.org>`_,
-  `JAX
-  <https://jax.readthedocs.io>`_,
-  etc. See the :ref:`section on
-  tensors <tensors>` for details.
+- **N-dimensional arrays**: nanobind can exchange data with modern array programming
+  frameworks. It uses either `DLPack <https://github.com/dmlc/dlpack>`_ or the
+  `buffer protocol <https://docs.python.org/3/c-api/buffer.html>`_ to achieve
+  *zero-copy* CPU/GPU array exchange with frameworks like `NumPy
+  <https://numpy.org>`_, `PyTorch <https://pytorch.org>`_, `TensorFlow
+  <https://www.tensorflow.org>`_, `JAX <https://jax.readthedocs.io>`_, etc. See
+  the :ref:`section on n-dimensional arrays <ndarrays>` for details.
 
 - **Stable ABI**: nanobind can target Python's `stable ABI interface
   <https://docs.python.org/3/c-api/stable.html>`_ starting with Python 3.12.
-  This means that extension modules will be compatible with 
-  future version of Python without having to compile separate binaries per interpreter. That vision is still relatively far out, however: it will require Python
-  3.12+ to be widely deployed.
+  This means that extension modules will be compatible with future version of
+  Python without having to compile separate binaries per interpreter. That
+  vision is still relatively far out, however: it will require Python 3.12+ to
+  be widely deployed.
 
 - **Leak warnings**: When the Python interpreter shuts down, nanobind reports
   instance, type, and function leaks related to bindings, which is useful for

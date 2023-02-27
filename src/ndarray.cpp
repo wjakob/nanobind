@@ -1,4 +1,4 @@
-#include <nanobind/tensor.h>
+#include <nanobind/ndarray.h>
 #include <atomic>
 #include "nb_internals.h"
 
@@ -7,14 +7,14 @@ NAMESPACE_BEGIN(detail)
 
 // ========================================================================
 
-struct managed_tensor {
-    dlpack::tensor dl_tensor;
+struct managed_dltensor {
+    dlpack::dltensor dltensor;
     void *manager_ctx;
-    void (*deleter)(managed_tensor *);
+    void (*deleter)(managed_dltensor *);
 };
 
-struct tensor_handle {
-    managed_tensor *tensor;
+struct ndarray_handle {
+    managed_dltensor *ndarray;
     std::atomic<size_t> refcount;
     PyObject *owner;
     bool free_shape;
@@ -22,8 +22,8 @@ struct tensor_handle {
     bool call_deleter;
 };
 
-void nb_tensor_dealloc(PyObject *self) {
-    tensor_dec_ref(((nb_tensor *) self)->th);
+void nb_ndarray_dealloc(PyObject *self) {
+    ndarray_dec_ref(((nb_ndarray *) self)->th);
 
     freefunc tp_free;
 #if defined(Py_LIMITED_API)
@@ -35,13 +35,13 @@ void nb_tensor_dealloc(PyObject *self) {
     tp_free(self);
 }
 
-int nb_tensor_getbuffer(PyObject *exporter, Py_buffer *view, int) {
-    nb_tensor *self = (nb_tensor *) exporter;
+int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int) {
+    nb_ndarray *self = (nb_ndarray *) exporter;
 
-    dlpack::tensor &t = self->th->tensor->dl_tensor;
+    dlpack::dltensor &t = self->th->ndarray->dltensor;
 
     if (t.device.device_type != device::cpu::value) {
-        PyErr_SetString(PyExc_BufferError, "Only CPU-allocated tensors can be "
+        PyErr_SetString(PyExc_BufferError, "Only CPU-allocated ndarrays can be "
                                            "accessed via the buffer protocol!");
         return -1;
     }
@@ -110,14 +110,14 @@ int nb_tensor_getbuffer(PyObject *exporter, Py_buffer *view, int) {
     return 0;
 }
 
-void nb_tensor_releasebuffer(PyObject *, Py_buffer *view) {
+void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
     PyMem_Free(view->shape);
     PyMem_Free(view->strides);
 }
 
 static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
     scoped_pymalloc<Py_buffer> view;
-    scoped_pymalloc<managed_tensor> mt;
+    scoped_pymalloc<managed_dltensor> mt;
 
     if (PyObject_GetBuffer(o, view.get(), PyBUF_RECORDS)) {
         PyErr_Clear();
@@ -180,12 +180,12 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
         return nullptr;
     }
 
-    mt->deleter = [](managed_tensor *mt2) {
+    mt->deleter = [](managed_dltensor *mt2) {
         gil_scoped_acquire guard;
         Py_buffer *buf = (Py_buffer *) mt2->manager_ctx;
         PyBuffer_Release(buf);
-        PyMem_Free(mt2->dl_tensor.shape);
-        PyMem_Free(mt2->dl_tensor.strides);
+        PyMem_Free(mt2->dltensor.shape);
+        PyMem_Free(mt2->dltensor.strides);
         PyMem_Free(mt2);
     };
 
@@ -199,11 +199,11 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
               value_rounded = value_int;
 #endif
 
-    mt->dl_tensor.data = (void *) value_rounded;
-    mt->dl_tensor.device = { device::cpu::value, 0 };
-    mt->dl_tensor.ndim = view->ndim;
-    mt->dl_tensor.dtype = dt;
-    mt->dl_tensor.byte_offset = value_int - value_rounded;
+    mt->dltensor.data = (void *) value_rounded;
+    mt->dltensor.device = { device::cpu::value, 0 };
+    mt->dltensor.ndim = view->ndim;
+    mt->dltensor.dtype = dt;
+    mt->dltensor.byte_offset = value_int - value_rounded;
 
     scoped_pymalloc<int64_t> strides(view->ndim);
     scoped_pymalloc<int64_t> shape(view->ndim);
@@ -213,13 +213,13 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
     }
 
     mt->manager_ctx = view.release();
-    mt->dl_tensor.shape = shape.release();
-    mt->dl_tensor.strides = strides.release();
+    mt->dltensor.shape = shape.release();
+    mt->dltensor.strides = strides.release();
 
     return PyCapsule_New(mt.release(), "dltensor", [](PyObject *o) {
         error_scope scope; // temporarily save any existing errors
-        managed_tensor *mt =
-            (managed_tensor *) PyCapsule_GetPointer(o, "dltensor");
+        managed_dltensor *mt =
+            (managed_dltensor *) PyCapsule_GetPointer(o, "dltensor");
         if (mt) {
             if (mt->deleter)
                 mt->deleter(mt);
@@ -229,7 +229,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
     });
 }
 
-tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
+ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
                              bool convert) noexcept {
     object capsule;
 
@@ -260,7 +260,7 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
             }
         }
 
-        // Try creating a tensor via the buffer protocol
+        // Try creating a ndarray via the buffer protocol
         if (!capsule.is_valid())
             capsule = steal(dlpack_from_buffer_protocol(o));
 
@@ -277,8 +277,8 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
         return nullptr;
     }
 
-    // Check if the tensor satisfies the requirements
-    dlpack::tensor &t = ((managed_tensor *) ptr)->dl_tensor;
+    // Check if the ndarray satisfies the requirements
+    dlpack::dltensor &t = ((managed_dltensor *) ptr)->dltensor;
 
     bool pass_dtype = true, pass_device = true,
          pass_shape = true, pass_order = true;
@@ -386,15 +386,15 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
         if (!converted.is_valid())
             return nullptr;
         else
-            return tensor_import(converted.ptr(), req, false);
+            return ndarray_import(converted.ptr(), req, false);
     }
 
     if (!pass_dtype || !pass_device || !pass_shape || !pass_order)
         return nullptr;
 
     // Create a reference-counted wrapper
-    scoped_pymalloc<tensor_handle> result;
-    result->tensor = (managed_tensor *) ptr;
+    scoped_pymalloc<ndarray_handle> result;
+    result->ndarray = (managed_dltensor *) ptr;
     result->refcount = 0;
     result->owner = nullptr;
     result->free_shape = false;
@@ -411,36 +411,36 @@ tensor_handle *tensor_import(PyObject *o, const tensor_req *req,
     // Mark the dltensor capsule as "consumed"
     if (PyCapsule_SetName(capsule.ptr(), "used_dltensor") ||
         PyCapsule_SetDestructor(capsule.ptr(), nullptr))
-        fail("nanobind::detail::tensor_import(): could not mark dltensor "
+        fail("nanobind::detail::ndarray_import(): could not mark dltensor "
              "capsule as consumed!");
 
     return result.release();
 }
 
-dlpack::tensor *tensor_inc_ref(tensor_handle *th) noexcept {
+dlpack::dltensor *ndarray_inc_ref(ndarray_handle *th) noexcept {
     if (!th)
         return nullptr;
     ++th->refcount;
-    return &th->tensor->dl_tensor;
+    return &th->ndarray->dltensor;
 }
 
-void tensor_dec_ref(tensor_handle *th) noexcept {
+void ndarray_dec_ref(ndarray_handle *th) noexcept {
     if (!th)
         return;
     size_t rc_value = th->refcount--;
 
     if (rc_value == 0) {
-        fail("tensor_dec_ref(): reference count became negative!");
+        fail("ndarray_dec_ref(): reference count became negative!");
     } else if (rc_value == 1) {
         Py_XDECREF(th->owner);
-        managed_tensor *mt = th->tensor;
+        managed_dltensor *mt = th->ndarray;
         if (th->free_shape) {
-            PyMem_Free(mt->dl_tensor.shape);
-            mt->dl_tensor.shape = nullptr;
+            PyMem_Free(mt->dltensor.shape);
+            mt->dltensor.shape = nullptr;
         }
         if (th->free_strides) {
-            PyMem_Free(mt->dl_tensor.strides);
-            mt->dl_tensor.strides = nullptr;
+            PyMem_Free(mt->dltensor.strides);
+            mt->dltensor.strides = nullptr;
         }
         if (th->call_deleter) {
             if (mt->deleter)
@@ -452,7 +452,7 @@ void tensor_dec_ref(tensor_handle *th) noexcept {
     }
 }
 
-tensor_handle *tensor_create(void *value, size_t ndim, const size_t *shape_in,
+ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
                             PyObject *owner, const int64_t *strides_in,
                             dlpack::dtype *dtype, int32_t device_type,
                             int32_t device_id) {
@@ -467,14 +467,14 @@ tensor_handle *tensor_create(void *value, size_t ndim, const size_t *shape_in,
 #endif
 
 
-    scoped_pymalloc<managed_tensor> tensor;
-    scoped_pymalloc<tensor_handle> result;
+    scoped_pymalloc<managed_dltensor> ndarray;
+    scoped_pymalloc<ndarray_handle> result;
     scoped_pymalloc<int64_t> shape(ndim), strides(ndim);
 
-    auto deleter = [](managed_tensor *mt) {
+    auto deleter = [](managed_dltensor *mt) {
         gil_scoped_acquire guard;
-        tensor_handle *th = (tensor_handle *) mt->manager_ctx;
-        tensor_dec_ref(th);
+        ndarray_handle *th = (ndarray_handle *) mt->manager_ctx;
+        ndarray_dec_ref(th);
     };
 
     for (size_t i = 0; i < ndim; ++i)
@@ -495,17 +495,17 @@ tensor_handle *tensor_create(void *value, size_t ndim, const size_t *shape_in,
         }
     }
 
-    tensor->dl_tensor.data = (void *) value_rounded;
-    tensor->dl_tensor.device.device_type = device_type;
-    tensor->dl_tensor.device.device_id = device_id;
-    tensor->dl_tensor.ndim = (int32_t) ndim;
-    tensor->dl_tensor.dtype = *dtype;
-    tensor->dl_tensor.byte_offset = value_int - value_rounded;
-    tensor->dl_tensor.shape = shape.release();
-    tensor->dl_tensor.strides = strides.release();
-    tensor->manager_ctx = result.get();
-    tensor->deleter = deleter;
-    result->tensor = (managed_tensor *) tensor.release();
+    ndarray->dltensor.data = (void *) value_rounded;
+    ndarray->dltensor.device.device_type = device_type;
+    ndarray->dltensor.device.device_id = device_id;
+    ndarray->dltensor.ndim = (int32_t) ndim;
+    ndarray->dltensor.dtype = *dtype;
+    ndarray->dltensor.byte_offset = value_int - value_rounded;
+    ndarray->dltensor.shape = shape.release();
+    ndarray->dltensor.strides = strides.release();
+    ndarray->manager_ctx = result.get();
+    ndarray->deleter = deleter;
+    result->ndarray = (managed_dltensor *) ndarray.release();
     result->refcount = 0;
     result->owner = owner;
     result->free_shape = true;
@@ -515,30 +515,30 @@ tensor_handle *tensor_create(void *value, size_t ndim, const size_t *shape_in,
     return result.release();
 }
 
-static void tensor_capsule_destructor(PyObject *o) {
+static void ndarray_capsule_destructor(PyObject *o) {
     error_scope scope; // temporarily save any existing errors
-    managed_tensor *mt =
-        (managed_tensor *) PyCapsule_GetPointer(o, "dltensor");
+    managed_dltensor *mt =
+        (managed_dltensor *) PyCapsule_GetPointer(o, "dltensor");
 
     if (mt)
-        tensor_dec_ref((tensor_handle *) mt->manager_ctx);
+        ndarray_dec_ref((ndarray_handle *) mt->manager_ctx);
     else
         PyErr_Clear();
 }
 
-PyObject *tensor_wrap(tensor_handle *th, int framework, rv_policy policy) noexcept {
+PyObject *ndarray_wrap(ndarray_handle *th, int framework, rv_policy policy) noexcept {
     if (!th)
         return none().release().ptr();
 
     bool copy = policy == rv_policy::copy || policy == rv_policy::move;
 
-    if ((tensor_framework) framework == tensor_framework::numpy) {
+    if ((ndarray_framework) framework == ndarray_framework::numpy) {
         try {
-            object o = steal(PyType_GenericAlloc(internals_get().nb_tensor, 0));
+            object o = steal(PyType_GenericAlloc(internals_get().nb_ndarray, 0));
             if (!o.is_valid())
                 return nullptr;
-            ((nb_tensor *) o.ptr())->th = th;
-            tensor_inc_ref(th);
+            ((nb_ndarray *) o.ptr())->th = th;
+            ndarray_inc_ref(th);
 
             return module_::import_("numpy")
                 .attr("array")(o, arg("copy") = copy)
@@ -546,55 +546,55 @@ PyObject *tensor_wrap(tensor_handle *th, int framework, rv_policy policy) noexce
                 .ptr();
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_RuntimeError,
-                         "nanobind::detail::tensor_wrap(): could not "
-                         "convert tensor to NumPy array: %s", e.what());
+                         "nanobind::detail::ndarray_wrap(): could not "
+                         "convert ndarray to NumPy array: %s", e.what());
             return nullptr;
         }
     }
 
     object package;
     try {
-        switch ((tensor_framework) framework) {
-            case tensor_framework::none:
+        switch ((ndarray_framework) framework) {
+            case ndarray_framework::none:
                 break;
 
-            case tensor_framework::pytorch:
+            case ndarray_framework::pytorch:
                 package = module_::import_("torch.utils.dlpack");
                 break;
 
 
-            case tensor_framework::tensorflow:
+            case ndarray_framework::tensorflow:
                 package = module_::import_("tensorflow.experimental.dlpack");
                 break;
 
-            case tensor_framework::jax:
+            case ndarray_framework::jax:
                 package = module_::import_("jax.dlpack");
                 break;
 
 
             default:
-                fail("nanobind::detail::tensor_wrap(): unknown framework "
+                fail("nanobind::detail::ndarray_wrap(): unknown framework "
                      "specified!");
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_RuntimeError,
-                     "nanobind::detail::tensor_wrap(): could not import tensor "
+                     "nanobind::detail::ndarray_wrap(): could not import ndarray "
                      "framework: %s", e.what());
         return nullptr;
     }
 
-    object o = steal(PyCapsule_New(th->tensor, "dltensor",
-                                   tensor_capsule_destructor));
+    object o = steal(PyCapsule_New(th->ndarray, "dltensor",
+                                   ndarray_capsule_destructor));
 
-       tensor_inc_ref(th);
+       ndarray_inc_ref(th);
 
     if (package.is_valid()) {
         try {
             o = package.attr("from_dlpack")(o);
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_RuntimeError,
-                         "nanobind::detail::tensor_wrap(): could not "
-                         "import tensor: %s", e.what());
+                         "nanobind::detail::ndarray_wrap(): could not "
+                         "import ndarray: %s", e.what());
             return nullptr;
         }
     }
@@ -604,7 +604,7 @@ PyObject *tensor_wrap(tensor_handle *th, int framework, rv_policy policy) noexce
             o = o.attr("copy")();
         } catch (std::exception &e) {
             PyErr_Format(PyExc_RuntimeError,
-                         "nanobind::detail::tensor_wrap(): copy failed: %s",
+                         "nanobind::detail::ndarray_wrap(): copy failed: %s",
                          e.what());
             return nullptr;
         }

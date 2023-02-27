@@ -401,51 +401,51 @@ include directive:
    iterate over values.
 
 
-Tensor type
------------
+N-dimensional array type
+------------------------
 
-The following type can be used to exchange tensors with frameworks like
-NumPy, PyTorch, Tensorflow, JAX, and others. It requires an additional
+The following type can be used to exchange n-dimension arrays with frameworks
+like NumPy, PyTorch, Tensorflow, JAX, and others. It requires an additional
 include directive:
 
 .. code-block:: cpp
 
-   #include <nanobind/tensor.h>
+   #include <nanobind/ndarray.h>
 
 Detailed documentation including example code is provided
-in a :ref:`separate section <tensors>`.
+in a :ref:`separate section <ndarrays>`.
 
-.. cpp:class:: template <typename... Args> tensor
+.. cpp:class:: template <typename... Args> ndarray
 
-   .. cpp:function:: tensor() = default
+   .. cpp:function:: ndarray() = default
 
-      Create an invalid tensor.
+      Create an invalid array.
 
-   .. cpp:function:: tensor(const tensor &)
+   .. cpp:function:: ndarray(const ndarray &)
 
-      Copy constructor. Increases the reference count of the referenced tensor.
+      Copy constructor. Increases the reference count of the referenced array.
 
-   .. cpp:function:: tensor(tensor &&)
+   .. cpp:function:: ndarray(ndarray &&)
 
-      Move constructor. Steals the referenced tensor without changing reference counts.
+      Move constructor. Steals the referenced array without changing reference counts.
 
-   .. cpp:function:: ~tensor()
+   .. cpp:function:: ~ndarray()
 
-      Decreases the reference count of the referenced tensor and potentially destroy it.
+      Decreases the reference count of the referenced array and potentially destroy it.
 
-   .. cpp:function:: tensor& operator=(const tensor &)
+   .. cpp:function:: ndarray& operator=(const ndarray &)
 
-      Copy assignment operator. Increases the reference count of the referenced tensor.
-      Decreases the reference count of the previously referenced tensor and potentially destroy it.
+      Copy assignment operator. Increases the reference count of the referenced array.
+      Decreases the reference count of the previously referenced array and potentially destroy it.
 
-   .. cpp:function:: tensor& operator=(tensor &&)
+   .. cpp:function:: ndarray& operator=(ndarray &&)
 
-      Move assignment operator. Steals the referenced tensor without changing reference counts.
-      Decreases the reference count of the previously referenced tensor and potentially destroy it.
+      Move assignment operator. Steals the referenced array without changing reference counts.
+      Decreases the reference count of the previously referenced array and potentially destroy it.
 
-   .. cpp:function:: tensor(void * value, size_t ndim, const size_t * shape, handle owner = nanobind::handle(), const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+   .. cpp:function:: ndarray(void * value, size_t ndim, const size_t * shape, handle owner = nanobind::handle(), const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
 
-      Create a tensor wrapping an existing memory allocation. The following
+      Create an array wrapping an existing memory allocation. The following
       parameters can be specified:
 
       - `value`: pointer address of the memory region.
@@ -455,7 +455,7 @@ in a :ref:`separate section <tensors>`.
       - `shape`: specifies the size along each axis. The referenced array must
         must have `ndim` entries.
 
-      - `owner`: if provided, the tensor will hold a reference to this object
+      - `owner`: if provided, the array will hold a reference to this object
         until it is destructed.
 
       - `strides` is optional; a value of ``nullptr`` implies C-style strides.
@@ -468,7 +468,7 @@ in a :ref:`separate section <tensors>`.
 
    .. cpp:function:: dlpack::dtype dtype() const
 
-      Return the data type of the tensor.
+      Return the data type underlying the array
 
    .. cpp:function:: size_t ndim() const
 
@@ -484,26 +484,26 @@ in a :ref:`separate section <tensors>`.
 
    .. cpp:function:: bool is_valid() const
 
-      Check whether the tensor is in a valid state.
+      Check whether the array is in a valid state.
 
    .. cpp:function:: int32_t device_type() const
 
-      ID denoting the type of device hosting the tensor. This will match the
+      ID denoting the type of device hosting the array. This will match the
       ``value`` field of a device class, such as :cpp:class:`device::cpu::value
       <device::cpu>` or :cpp:class:`device::cuda::value <device::cuda>`.
 
    .. cpp:function:: int32_t device_id() const
 
       In a multi-device/GPU setup, this function returns the ID of the device
-      storing the tensor.
+      storing the array.
 
    .. cpp:function:: const Scalar * data() const
 
-      Return a mutable pointer to the tensor data.
+      Return a mutable pointer to the array data.
 
    .. cpp:function:: Scalar * data()
 
-      Return a const pointer to the tensor data.
+      Return a const pointer to the array data.
 
    .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
 
@@ -514,14 +514,14 @@ Data types
 ^^^^^^^^^^
 
 Nanobind uses the `DLPack <https://github.com/dmlc/dlpack>`_ ABI to represent
-metadata about tensors (even when they are exchanged using the buffer
-protocol). Relevant data structures are located in the ``nanobind::dlpack``
-sub-namespace.
+metadata describing n-dimensional arrays (even when they are exchanged using
+the buffer protocol). Relevant data structures are located in the
+``nanobind::dlpack`` sub-namespace.
 
 .. cpp:enum-class:: dlpack::dtype_code : uint8_t
 
-   This enumeration characterizes the elementary format of tensor values
-   regardless of their bit depth.
+   This enumeration characterizes the elementary array data type regardless of
+   bit depth.
 
    .. cpp:enumerator:: Int = 0
 
@@ -545,7 +545,7 @@ sub-namespace.
 
 .. cpp:struct:: dlpack::dtype
 
-   Represents the data type of values in a tensor. Use the
+   Represents the data type underlying an n-dimensional array. Use the
    :cpp:func:`dtype\<T\>() <::nanobind::dtype>` function to return a populated
    instance of this data structure given a scalar C++ arithmetic type.
 
@@ -567,19 +567,19 @@ sub-namespace.
    Returns a populated instance of the :cpp:class:`dlpack::dtype` structure
    given a scalar C++ arithmetic type.
 
-Tensor annotations
-^^^^^^^^^^^^^^^^^^
+Array annotations
+^^^^^^^^^^^^^^^^^
 
-The :cpp:class:`tensor\<..\> <tensor>` class can be parameterized using the
-following optional template parameters to constrain what valid tensor arguments
-may be passed to a function.
+The :cpp:class:`ndarray\<..\> <ndarray>` class admits optional template
+parameters. They constrain the type of array arguments that may be passed to a
+function.
 
 Shape
 +++++
 
 .. cpp:class:: template<size_t... Is> shape
 
-   Require the tensor to have ``sizeof...(Is)`` dimensions. Each entry of `Is`
+   Require the array to have ``sizeof...(Is)`` dimensions. Each entry of `Is`
    specifies a fixed size constraint for that specific dimension. An entry
    equal to :cpp:var:`any` indicates that any size should be accepted for this
    dimension.
@@ -591,15 +591,15 @@ Contiguity
 
 .. cpp:class:: c_contig
 
-   Request that the tensor storage uses a C-contiguous representation.
+   Request that the array storage uses a C-contiguous representation.
 
 .. cpp:class:: f_contig
 
-   Request that the tensor storage uses a F (Fortran)-contiguous representation.
+   Request that the array storage uses a F (Fortran)-contiguous representation.
 
 .. cpp:class:: any_contig
 
-   Don't place any demands on tensor contiguity (the default).
+   Don't place any demands on array contiguity (the default).
 
 Device type
 +++++++++++
@@ -607,9 +607,9 @@ Device type
 .. cpp:class:: device
 
    The following helper classes can be used to constrain the device and
-   address space of a tensor. Each class has a ``static constexpr int32_t
+   address space of an array. Each class has a ``static constexpr int32_t
    value`` field that will then match up with
-   :cpp:func:`tensor::device_id()`.
+   :cpp:func:`ndarray::device_id()`.
 
    .. cpp:class:: cpu
 
@@ -650,8 +650,8 @@ Device type
 Framework
 +++++++++
 
-Framework annotations cause ``nb::tensor`` objects to convert into an
-equivalent representation in one of the following frameworks:
+Framework annotations cause :cpp:class:`nb::ndarray <ndarray>` objects to
+convert into an equivalent representation in one of the following frameworks:
 
 .. cpp:class:: numpy
 

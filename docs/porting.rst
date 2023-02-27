@@ -315,11 +315,11 @@ Removed features include:
   compilers were removed and will not be reintroduced.
 - ○ The ``options`` class for customizing docstring generation was removed.
 - ● NumPy integration was replaced by a more general
-  :cpp:class:`nb::tensor\<..\> <nanobind::tensor>` integration that supports
+  :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>` integration that supports
   CPU/GPU tensors produced by various frameworks (NumPy, PyTorch,
   TensorFlow, JAX, ..).
 - ● Buffer protocol functionality (``.def_buffer()``) was removed in favor of
-  the :cpp:class:`nb::tensor\<..\> <nanobind::tensor>` interface.
+  the :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>` interface.
 - ● Nested exceptions are not supported.
 - ● Features to facilitate pickling and unpickling were removed.
 - ● Support for evaluating Python code strings was removed.

@@ -172,7 +172,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_xpr_v<T>>> {
 
 /// Caster for Eigen::Map<T>
 template <typename T, int Options, typename StrideType>
-struct type_caster<Eigen::Map<T, Options, StrideType>> {
+struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T>>> {
     using Map = Eigen::Map<T, Options, StrideType>;
     using NDArray = array_for_eigen_t<Map>;
     using NDArrayCaster = type_caster<NDArray>;
@@ -231,7 +231,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>> {
 
 /// Caster for Eigen::Ref<T>
 template <typename T, int Options, typename StrideType>
-struct type_caster<Eigen::Ref<T, Options, StrideType>> {
+struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T>>> {
     using Ref = Eigen::Ref<T, Options, StrideType>;
     using Map = Eigen::Map<T, Options, StrideType>;
     using MapCaster = make_caster<Map>;

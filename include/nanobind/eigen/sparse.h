@@ -21,8 +21,14 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 NAMESPACE_BEGIN(detail)
 
+/// Detect Eigen::SparseMatrix
+template <typename T> constexpr bool is_eigen_sparse_matrix_v =
+    is_eigen_sparse_v<T> &&
+    !std::is_base_of_v<Eigen::SparseMapBase<T, Eigen::ReadOnlyAccessors>, T>;
+
+
 /// Caster for Eigen::SparseMatrix
-template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_v<T>>> {
+template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     using Scalar = typename T::Scalar;
     using StorageIndex = typename T::StorageIndex;
     using Index = typename T::Index;
@@ -135,6 +141,35 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_v<T>>> {
             return handle();
         }
     }
+};
+
+
+/// Caster for Eigen::Map<Eigen::SparseMatrix>
+template <typename T>
+struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
+    using Map = Eigen::Map<T>;
+    using SparseMatrixCaster = type_caster<T>;
+    static constexpr auto Name = SparseMatrixCaster::Name;
+    template <typename T_> using Cast = Map;
+
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+
+    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *cleanup) noexcept = delete;
+};
+
+
+/// Caster for Eigen::Ref<Eigen::SparseMatrix>
+template <typename T, int Options>
+struct type_caster<Eigen::Ref<T, Options>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
+    using Ref = Eigen::Ref<T, Options>;
+    using Map = Eigen::Map<T, Options>;
+    using MapCaster = make_caster<Map>;
+    static constexpr auto Name = MapCaster::Name;
+    template <typename T_> using Cast = Ref;
+
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+
+    static handle from_cpp(const Ref &v, rv_policy policy, cleanup_list *cleanup) noexcept = delete;
 };
 
 NAMESPACE_END(detail)

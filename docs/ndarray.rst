@@ -1,9 +1,9 @@
 .. cpp:namespace:: nanobind
 
-.. _ndarrays:
+.. _ndarray_class:
 
-N-dimensional arrays
-====================
+The ``nb::ndarray<..>`` class
+=============================
 
 nanobind can exchange n-dimensional arrays (henceforth "**ndarrays**") with
 popular array programming frameworks including `NumPy <https://numpy.org>`_,

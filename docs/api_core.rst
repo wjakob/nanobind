@@ -145,7 +145,7 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
       :cpp:class:`object` and may need to be converted back into a Python
       object using :cpp:func:`cast()`.
 
-      Type conversion is performed using the return value policy `policy` 
+      Type conversion is performed using the return value policy `policy`
 
       When type conversion of arguments or return value fails, the function
       raises a :cpp:class:`cast_error`. When the Python function call fails, it
@@ -1333,6 +1333,14 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
    A return value policy determines the question of *ownership* when a bound
    function returns a previously unknown C++ instance that must now be
    converted into a Python object.
+
+   Return value policies apply to functions that return values handled using
+   :ref:`class bindings <bindings>`, which means that their Python equivalent
+   was registered using :cpp:class:`class_\<...\> <class_>`. They are ignored
+   in most other cases. One exception are STL types handled using :ref:`type
+   casters <type_casters>` (e.g. ``std::vector<T>``), which contain a nested
+   type ``T`` handled using class bindings. In this case, the return value
+   policy also applies recursively.
 
    A return value policy is unnecessary when the type itself clarifies
    ownership (e.g., ``std::unique_ptr<T>``, ``std::shared_ptr<T>``, a type with

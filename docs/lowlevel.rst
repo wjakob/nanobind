@@ -166,8 +166,8 @@ Referencing existing instances
 ------------------------------
 
 The above examples used the function :cpp:func:`nb::inst_alloc() <inst_alloc>`
-to allocate a Python object along space to hold a C++ instance associated with
-the binding ``py_type``.
+to allocate a Python object along with space to hold a C++ instance associated
+with the binding ``py_type``.
 
 .. code-block:: cpp
 
@@ -177,7 +177,7 @@ the binding ``py_type``.
    // address given by nb::inst_ptr<MyClass>(py_inst)
    ... omitted, see the previous examples ...
 
-What if the C++ instance already exists? Nanobind also supports this case via
+What if the C++ instance already exists? nanobind also supports this case via
 the :cpp:func:`nb::inst_wrap() <inst_wrap>` function—in this case, the Python
 object references the existing memory region, which is potentially (slightly)
 less efficient due to the need for an extra indirection.
@@ -187,8 +187,9 @@ less efficient due to the need for an extra indirection.
    MyClass *inst = new MyClass();
    nb::object py_inst = nb::inst_wrap(py_type, inst);
 
-   // Mark as ready, garbage-collecting 'py_inst' will
-   // cause 'inst' to be deleted as well
+   // Mark as ready, garbage-collecting 'py_inst' will cause 'inst' to be
+   // deleted as well. Call nb::inst_set_state (documented above) for more
+   // fine-grained control.
    nb::inst_mark_ready(py_inst);
 
 .. _supplement:

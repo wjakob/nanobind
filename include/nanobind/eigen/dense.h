@@ -19,9 +19,9 @@ static_assert(EIGEN_VERSION_AT_LEAST(3, 2, 7),
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// Types for func. arguments that are compatible with various flavors of arrays
-using EigenDStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>;
-template <typename T> using EigenDRef = Eigen::Ref<T, 0, EigenDStride>;
-template <typename T> using EigenDMap = Eigen::Map<T, 0, EigenDStride>;
+using DStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>;
+template <typename T> using DRef = Eigen::Ref<T, 0, DStride>;
+template <typename T> using DMap = Eigen::Map<T, 0, DStride>;
 
 NAMESPACE_BEGIN(detail)
 

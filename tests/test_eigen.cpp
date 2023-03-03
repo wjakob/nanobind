@@ -84,9 +84,11 @@ NB_MODULE(test_eigen_ext, m) {
              const MatrixXuC &b) -> MatrixXuR { return a + b; });
 
     m.def("addMXu_5",
-          [](const nb::EigenDRef<const MatrixXuC> &a,
-             const nb::EigenDRef<const MatrixXuC> &b) -> MatrixXuC { return a + b; },
+          [](const nb::DRef<const MatrixXuC> &a,
+             const nb::DRef<const MatrixXuC> &b) -> MatrixXuC { return a + b; },
           "a"_a.noconvert(), "b"_a.noconvert());
+
+    m.def("mutate_MXu", [](nb::DRef<MatrixXuC> a) { a *= 2; }, nb::arg().noconvert());
 
     m.def("updateV3i", [](Eigen::Ref<Eigen::Vector3i> a) { a[2] = 123; });
     m.def("updateVXi", [](Eigen::Ref<Eigen::VectorXi> a) { a[2] = 123; });

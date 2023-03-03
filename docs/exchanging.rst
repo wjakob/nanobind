@@ -387,13 +387,17 @@ directives:
 Discussion
 ----------
 
-The choices outlined above are more fine-grained than they may appear.
-For example, it is possible to use type casters, bindings, and
-wrappers to handle multiple arguments of *a single function*.
+The choices outlined above are more fine-grained than they may appear. For
+example, it is possible to use type casters, bindings, and wrappers to handle
+multiple arguments of *a single function*.
+
+They can also be combined *within* a single function argument. For example, you
+can type cast a ``std::vector<T>`` containing bindings or wrappers.
 
 In general, we recommend that you use
 
 1. type casters for STL containers, and
+
 2. bindings for other custom types.
 
 If the former turn out to be a performance bottleneck, it is easy to replace

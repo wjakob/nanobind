@@ -90,7 +90,7 @@ discourse:
    functions
    classes
    exceptions
-   ndarray 
+   ndarray_index
    packaging
 
 .. toctree::

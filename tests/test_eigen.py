@@ -165,3 +165,10 @@ def test06_map():
         for j in range(3):
             assert m[i, j] == i*3+j
 
+
+@needs_numpy_and_eigen
+def test07_mutate_arg():
+    A = np.uint32(np.vander(np.arange(10)))
+    A2 = A.copy()
+    t.mutate_MXu(A)
+    assert np.all(A == 2*A2)

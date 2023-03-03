@@ -400,7 +400,6 @@ include directive:
    key-value pairs. `make_value_iterator` returns the second pair element to
    iterate over values.
 
-
 N-dimensional array type
 ------------------------
 
@@ -660,3 +659,27 @@ convert into an equivalent representation in one of the following frameworks:
 .. cpp:class:: pytorch
 
 .. cpp:class:: jax
+
+Eigen convenience type aliases
+------------------------------
+
+The following helper type aliases require an additional include directive:
+
+.. code-block:: cpp
+
+   #include <nanobind/eigen/dense.h>
+
+.. cpp:type:: DStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>
+
+   This type alias refers to an Eigen stride object that is sufficiently flexible
+   so that can be easily called with NumPy arrays and array slices.
+
+.. cpp:type:: template <typename T> DRef = Eigen::Ref<T, 0, DStride>
+
+   This templated type alias creates an ``Eigen::Ref<..>`` with flexible strides for
+   zero-copy data exchange between Eigen and NumPy.
+
+.. cpp:type:: template <typename T> DMap = Eigen::Map<T, 0, DStride>
+
+   This templated type alias creates an ``Eigen::Map<..>`` with flexible strides for
+   zero-copy data exchange between Eigen and NumPy.

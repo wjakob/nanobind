@@ -44,28 +44,9 @@ endfunction()
 # Helper function to handle undefined CPython API symbols on macOS
 # ---------------------------------------------------------------------------
 
-# Try to detect the XCode version
-if (APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  execute_process(
-    COMMAND xcodebuild -version
-    OUTPUT_VARIABLE NB_XCODE_VERSION_STR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_FILE /dev/null)
-  string(REGEX MATCH "Xcode ([0-9][0-9]?([.][0-9])+)" NB_XCODE_VERSION_MATCH ${NB_XCODE_VERSION_STR})
-  if (NB_XCODE_VERSION_MATCH)
-    set(NB_XCODE_VERSION ${CMAKE_MATCH_1} CACHE INTERNAL "")
-    message(STATUS "nanobind: detected Xcode version ${NB_XCODE_VERSION}.")
-  else()
-    message(WARNING "nanobind: could not detect Xcode version!")
-  endif()
-endif()
-
 function (nanobind_link_options name)
   if (APPLE)
-    target_link_options(${name} PRIVATE -undefined dynamic_lookup -dead_strip)
-    if (NB_XCODE_VERSION AND NB_XCODE_VERSION VERSION_LESS 14.3)
-      target_link_options(${name} PRIVATE -Wl,-no_fixup_chains)
-    endif()
+    target_link_options(${name} PRIVATE -undefined dynamic_lookup -Wl,-no_fixup_chains -dead_strip)
   endif()
 endfunction()
 

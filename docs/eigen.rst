@@ -105,11 +105,16 @@ apply:
 Sparse matrices
 ---------------
 
-There is also support for Eigen's sparse matrices which are mapped to
-``scipy.sparse.csr_matrix``/``scipy.sparse.csc_matrix``. To use it the extra header
-:file:`nanobind/eigen/sparse.h` has to be included.
+Add the following include directive to your binding code to exchange sparse
+Eigen types:
 
-.. note::
+.. code-block:: cpp
 
-    There is no support for Eigen sparse vectors because there exists no
-    equivalent type in ``scipy.sparse``.
+   #include <nanobind/eigen/sparse.h>
+
+The ``Eigen::SparseMatrix<..>`` type maps to either ``scipy.sparse.csr_matrix``
+or ``scipy.sparse.csc_matrix`` depending on whether row- or column-major
+storage is used.
+
+There is no support for Eigen sparse vectors because an equivalent type does
+not exist as part of ``scipy.sparse``.

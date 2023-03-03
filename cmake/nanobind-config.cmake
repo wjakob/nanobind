@@ -113,6 +113,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/stl/variant.h
     ${NB_DIR}/include/nanobind/stl/vector.h
     ${NB_DIR}/include/nanobind/eigen/dense.h
+    ${NB_DIR}/include/nanobind/eigen/sparse.h
 
     ${NB_DIR}/src/buffer.h
     ${NB_DIR}/src/nb_internals.h

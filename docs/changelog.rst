@@ -10,8 +10,8 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.2.0 (TBA)
--------------------------------
+Version 0.2.0 (March 3, 2023)
+-----------------------------
 * Nanobind now features documentation on `readthedocs
   <https://nanobind.readthedocs.io>`__.
 * While writing the documentation, I realized how lengthy and inconsistently some of

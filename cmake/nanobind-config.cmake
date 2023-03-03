@@ -46,7 +46,7 @@ endfunction()
 
 function (nanobind_link_options name)
   if (APPLE)
-    target_link_options(${name} PRIVATE -undefined dynamic_lookup -Wl,-no_fixup_chains -dead_strip)
+    target_link_options(${name} PRIVATE -undefined dynamic_lookup -Wl,-no_fixup_chains -Wl,-dead_strip)
   endif()
 endfunction()
 

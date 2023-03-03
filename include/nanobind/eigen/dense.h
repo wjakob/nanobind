@@ -13,8 +13,8 @@
 #include <nanobind/ndarray.h>
 #include <Eigen/Core>
 
-static_assert(EIGEN_VERSION_AT_LEAST(3, 2, 7),
-              "Eigen matrix support in pybind11 requires Eigen >= 3.2.7");
+static_assert(EIGEN_VERSION_AT_LEAST(3, 3, 1),
+              "Eigen matrix support in nanobind requires Eigen >= 3.3.1");
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
@@ -26,11 +26,14 @@ template <typename T> using DMap = Eigen::Map<T, 0, DStride>;
 NAMESPACE_BEGIN(detail)
 
 template <typename T>
+constexpr int NumDimensions = int(T::MaxSizeAtCompileTime) == 1 ? 0 : bool(T::IsVectorAtCompileTime) ? 1 : 2;
+
+template <typename T>
 using array_for_eigen_t = ndarray<
     typename T::Scalar,
     numpy,
     std::conditional_t<
-        T::NumDimensions == 1,
+        NumDimensions<T> == 1,
         shape<(size_t) T::SizeAtCompileTime>,
         shape<(size_t) T::RowsAtCompileTime,
               (size_t) T::ColsAtCompileTime>>,
@@ -38,7 +41,7 @@ using array_for_eigen_t = ndarray<
         T::InnerStrideAtCompileTime == Eigen::Dynamic,
         any_contig,
         std::conditional_t<
-            T::IsRowMajor || T::NumDimensions == 1,
+            T::IsRowMajor || NumDimensions<T> == 1,
             c_contig,
             f_contig
         >
@@ -53,9 +56,13 @@ is_base_of_template_v<T, Eigen::EigenBase>;
 template <typename T> constexpr bool is_eigen_plain_v =
 is_base_of_template_v<T, Eigen::PlainObjectBase>;
 
+/// Detect Eigen::SparseMatrix
+template <typename T> constexpr bool is_eigen_sparse_v =
+is_base_of_template_v<T, Eigen::SparseMatrixBase>;
+
 /// Detects expression templates
 template <typename T> constexpr bool is_eigen_xpr_v =
-    is_eigen_v<T> && !is_eigen_plain_v<T> &&
+    is_eigen_v<T> && !is_eigen_plain_v<T> && !is_eigen_sparse_v<T> &&
     !std::is_base_of_v<Eigen::MapBase<T, Eigen::ReadOnlyAccessors>, T>;
 
 template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
@@ -71,7 +78,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
             return false;
         const NDArray &array = caster.value;
 
-        if constexpr (T::NumDimensions == 1) {
+        if constexpr (NumDimensions<T> == 1) {
             value.resize(array.shape(0));
             memcpy(value.data(), array.data(),
                    array.shape(0) * sizeof(Scalar));
@@ -93,10 +100,10 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
     }
 
     static handle from_cpp(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
-        size_t shape[T::NumDimensions];
-        int64_t strides[T::NumDimensions];
+        size_t shape[NumDimensions<T>];
+        int64_t strides[NumDimensions<T>];
 
-        if constexpr (T::NumDimensions == 1) {
+        if constexpr (NumDimensions<T> == 1) {
             shape[0] = v.size();
             strides[0] = v.innerStride();
         } else {
@@ -139,7 +146,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
             policy == rv_policy::move ? rv_policy::reference : policy;
 
         object o = steal(NDArrayCaster::from_cpp(
-            NDArray(ptr, T::NumDimensions, shape, owner, strides),
+            NDArray(ptr, NumDimensions<T>, shape, owner, strides),
             array_rv_policy, cleanup));
 
         return o.release();
@@ -165,7 +172,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_xpr_v<T>>> {
 
 /// Caster for Eigen::Map<T>
 template <typename T, int Options, typename StrideType>
-struct type_caster<Eigen::Map<T, Options, StrideType>> {
+struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T>>> {
     using Map = Eigen::Map<T, Options, StrideType>;
     using NDArray = array_for_eigen_t<Map>;
     using NDArrayCaster = type_caster<NDArray>;
@@ -180,10 +187,10 @@ struct type_caster<Eigen::Map<T, Options, StrideType>> {
     }
 
     static handle from_cpp(const Map &v, rv_policy, cleanup_list *cleanup) noexcept {
-        size_t shape[T::NumDimensions];
-        int64_t strides[T::NumDimensions];
+        size_t shape[NumDimensions<T>];
+        int64_t strides[NumDimensions<T>];
 
-        if constexpr (T::NumDimensions == 1) {
+        if constexpr (NumDimensions<T> == 1) {
             shape[0] = v.size();
             strides[0] = v.innerStride();
         } else {
@@ -194,7 +201,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>> {
         }
 
         return NDArrayCaster::from_cpp(
-            NDArray((void *) v.data(), T::NumDimensions, shape, handle(), strides),
+            NDArray((void *) v.data(), NumDimensions<T>, shape, handle(), strides),
             rv_policy::reference, cleanup);
     }
 
@@ -224,7 +231,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>> {
 
 /// Caster for Eigen::Ref<T>
 template <typename T, int Options, typename StrideType>
-struct type_caster<Eigen::Ref<T, Options, StrideType>> {
+struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T>>> {
     using Ref = Eigen::Ref<T, Options, StrideType>;
     using Map = Eigen::Map<T, Options, StrideType>;
     using MapCaster = make_caster<Map>;

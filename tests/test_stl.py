@@ -2,6 +2,7 @@ import test_stl_ext as t
 import pytest
 import sys
 from common import collect, skip_on_pypy
+import pathlib
 
 
 @pytest.fixture
@@ -728,3 +729,13 @@ def test65_class_with_movable_field(clean):
         move_constructed=2,
         destructed=4
     )
+
+def test66_replace_extension():
+    if not hasattr(t, "replace_extension"): return
+
+    filename = pathlib.Path("test.txt")
+    assert t.replace_extension(filename, ".obj") == filename.with_suffix(".obj")
+
+    filename = pathlib.Path("🍊.html")
+    assert t.replace_extension(filename, ".svg") == filename.with_suffix(".svg")
+

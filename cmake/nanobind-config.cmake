@@ -97,6 +97,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/stl/detail/nb_list.h
     ${NB_DIR}/include/nanobind/stl/detail/nb_set.h
     ${NB_DIR}/include/nanobind/stl/detail/traits.h
+    ${NB_DIR}/include/nanobind/stl/filesystem.h
     ${NB_DIR}/include/nanobind/stl/function.h
     ${NB_DIR}/include/nanobind/stl/list.h
     ${NB_DIR}/include/nanobind/stl/map.h

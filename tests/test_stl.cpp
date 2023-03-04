@@ -401,15 +401,10 @@ NB_MODULE(test_stl_ext, m) {
         nb::arg("x"));
 
     // test66
-#if defined(NB_HAS_FILESYSTEM)
     m.def("replace_extension", [](std::filesystem::path p, std::string ext) {
         return p.replace_extension(ext);
     });
-#elif defined(NB_HAS_EXPERIMENTAL_FILESYSTEM)
-    m.def("replace_extension", [](std::experimental::filesystem::path p, std::string ext) {
-        return p.replace_extension(ext);
-    });
-#endif
+    m.def("parent_path", [](const std::filesystem::path &p) { return p.parent_path(); });
 
     struct ClassWithMovableField {
         std::vector<Movable> movable;

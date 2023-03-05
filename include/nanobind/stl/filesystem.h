@@ -20,32 +20,48 @@ template <>
 struct type_caster<std::filesystem::path> {
 private:
     static str unicode_from_fs_native(const std::string &w) {
-        PyObject* result = PyUnicode_DecodeFSDefaultAndSize(w.c_str(),
-                                                Py_ssize_t(w.size()));
+        PyObject *result =
+            PyUnicode_DecodeFSDefaultAndSize(w.c_str(), Py_ssize_t(w.size()));
         return steal<str>(result);
     }
 
     static str unicode_from_fs_native(const std::wstring &w) {
-        PyObject* result = PyUnicode_FromWideChar(w.c_str(), Py_ssize_t(w.size()));
+        PyObject *result =
+            PyUnicode_FromWideChar(w.c_str(), Py_ssize_t(w.size()));
         return steal<str>(result);
     }
 
 public:
     static handle from_cpp(const std::filesystem::path &path, rv_policy,
                            cleanup_list *) noexcept {
-        if (auto py_str = unicode_from_fs_native(path.native())) {
-            return module_::import_("pathlib")
-                .attr("Path")(py_str)
-                .release();
+        auto py_str = unicode_from_fs_native(path.native());
+        if (py_str.is_valid()) {
+            try {
+                return module_::import_("pathlib")
+                    .attr("Path")(py_str)
+                    .release();
+            } catch (python_error &e) {
+                e.restore();
+            }
+            return handle();
         }
-        return {};
+        return handle();
     }
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+        // PyUnicode_FSConverter and PyUnicode_FSDecoder normally take care of
+        // calling PyOS_FSPath themselves, but that's broken on PyPy (PyPy
+        // issue #3168) so we do it ourselves instead.
+        PyObject *buf = PyOS_FSPath(src.ptr());
+        if (!buf) {
+            PyErr_Clear();
+            return false;
+        }
+
         PyObject *native = nullptr;
         if constexpr (std::is_same_v<typename std::filesystem::path::value_type,
                                      char>) {
-            if (PyUnicode_FSConverter(src.ptr(), &native) != 0) {
+            if (PyUnicode_FSConverter(buf, &native) != 0) {
                 if (auto *c_str = PyBytes_AsString(native)) {
                     // AsString returns a pointer to the internal buffer, which
                     // must not be free'd.
@@ -53,7 +69,7 @@ public:
                 }
             }
         } else {
-            if (PyUnicode_FSDecoder(src.ptr(), &native) != 0) {
+            if (PyUnicode_FSDecoder(buf, &native) != 0) {
                 if (auto *c_str = PyUnicode_AsWideCharString(native, nullptr)) {
                     // AsWideCharString returns a new string that must be
                     // free'd.
@@ -62,6 +78,7 @@ public:
                 }
             }
         }
+        Py_DECREF(buf);
         Py_XDECREF(native);
         if (PyErr_Occurred()) {
             PyErr_Clear();

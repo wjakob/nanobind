@@ -134,6 +134,8 @@ The following table lists the currently available type casters:
     - ``#include <nanobind/ndarray.h>``
   * - ``Eigen::Matrix<..>``, ``Eigen::Array<..>``, ``Eigen::Ref<..>``, ``Eigen::Map<..>``
     - ``#include <nanobind/eigen/dense.h>``
+  * - ``Eigen::SparseMatrix<..>``
+    - ``#include <nanobind/eigen/sparse.h>``
 
 
 **Con**: Every transition between the Python and C++ side will generally require a

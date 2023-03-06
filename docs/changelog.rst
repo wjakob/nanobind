@@ -14,7 +14,8 @@ Version 0.3.0 (TBA)
 -------------------
 
 * Added a type caster for ``std::filesystem::path``. (PR `#138
-  <https://github.com/wjakob/nanobind/pull/138>`__).
+  <https://github.com/wjakob/nanobind/pull/138>`__ and commit `0b05cd
+  <https://github.com/wjakob/nanobind/commit/0b05cde8bd8685ab42328660da03cc4ee66e3ba2>`__).
 
 Version 0.2.0 (March 3, 2023)
 -----------------------------

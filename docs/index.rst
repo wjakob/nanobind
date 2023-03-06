@@ -100,7 +100,6 @@ discourse:
    ownership_adv
    lowlevel
    typeslots
-   eigen
 
 .. toctree::
    :caption: API Reference

@@ -21,7 +21,7 @@ struct type_caster<std::filesystem::path> {
 
     static handle from_cpp(const std::filesystem::path &path, rv_policy,
                            cleanup_list *) noexcept {
-        str py_str = to_str(path.native());
+        str py_str = to_py_str(path.native());
         if (py_str.is_valid()) {
             try {
                 return module_::import_("pathlib")
@@ -74,14 +74,14 @@ struct type_caster<std::filesystem::path> {
     NB_TYPE_CASTER(std::filesystem::path, const_name("os.PathLike"));
 
 private:
-    static str to_str(const std::string &w) {
+    static str to_py_str(const std::string &s) {
         return steal<str>(
-            PyUnicode_DecodeFSDefaultAndSize(w.c_str(), (Py_ssize_t) w.size()));
+            PyUnicode_DecodeFSDefaultAndSize(s.c_str(), (Py_ssize_t) s.size()));
     }
 
-    static str to_str(const std::wstring &w) {
+    static str to_py_str(const std::wstring &s) {
         return steal<str>(
-            PyUnicode_FromWideChar(w.c_str(), (Py_ssize_t) w.size()));
+            PyUnicode_FromWideChar(s.c_str(), (Py_ssize_t) s.size()));
     }
 };
 

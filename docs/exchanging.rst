@@ -98,6 +98,8 @@ The following table lists the currently available type casters:
     - Built-in (no include file needed)
   * - ``std::array<..>``
     - ``#include <nanobind/stl/array.h>``
+  * - ``std::filesystem::path``
+    - ``#include <nanobind/stl/filesystem.h>``
   * - ``std::function<..>``
     - ``#include <nanobind/stl/function.h>``
   * - ``std::list<..>``

@@ -728,3 +728,27 @@ def test65_class_with_movable_field(clean):
         move_constructed=2,
         destructed=4
     )
+
+def test66_replace_extension():
+    from pathlib import Path
+
+    filename = Path("test.txt")
+    assert t.replace_extension(filename, ".obj") == filename.with_suffix(".obj")
+
+    filename = Path("🍊.html")
+    assert t.replace_extension(filename, ".svg") == filename.with_suffix(".svg")
+
+    class PseudoStrPath:
+        def __fspath__(self):
+            return "foo/bar"
+
+    class PseudoBytesPath:
+        def __fspath__(self):
+            return b"foo/bar"
+
+    assert t.parent_path(Path("foo/bar")) == Path("foo")
+    assert t.parent_path("foo/bar") == Path("foo")
+    assert t.parent_path(b"foo/bar") == Path("foo")
+    assert t.parent_path(PseudoStrPath()) == Path("foo")
+    assert t.parent_path(PseudoBytesPath()) == Path("foo")
+

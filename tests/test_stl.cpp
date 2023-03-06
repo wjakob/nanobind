@@ -11,6 +11,7 @@
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/unordered_set.h>
 #include <nanobind/stl/set.h>
+#include <nanobind/stl/filesystem.h>
 
 NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
@@ -398,6 +399,12 @@ NB_MODULE(test_stl_ext, m) {
             }
         },
         nb::arg("x"));
+
+    // test66
+    m.def("replace_extension", [](std::filesystem::path p, std::string ext) {
+        return p.replace_extension(ext);
+    });
+    m.def("parent_path", [](const std::filesystem::path &p) { return p.parent_path(); });
 
     struct ClassWithMovableField {
         std::vector<Movable> movable;

@@ -128,6 +128,8 @@ NB_MODULE(test_holders_ext, m) {
                 return new Dog();
             case PetKind::Cat:
                 return new Cat();
+            default:
+                throw std::runtime_error("Internal error");
         }
     });
 
@@ -137,6 +139,8 @@ NB_MODULE(test_holders_ext, m) {
                 return std::make_unique<Dog>();
             case PetKind::Cat:
                 return std::make_unique<Cat>();
+            default:
+                throw std::runtime_error("Internal error");
         }
     });
 
@@ -146,6 +150,8 @@ NB_MODULE(test_holders_ext, m) {
                 return std::make_shared<Dog>();
             case PetKind::Cat:
                 return std::make_shared<Cat>();
+            default:
+                throw std::runtime_error("Internal error");
         }
     });
 }

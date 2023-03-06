@@ -10,13 +10,19 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
+Version 0.3.0 (TBA)
+-------------------
+
+* Added a type caster for ``std::filesystem::path``. (PR `#138
+  <https://github.com/wjakob/nanobind/pull/138>`__).
+
 Version 0.2.0 (March 3, 2023)
 -----------------------------
 * Nanobind now features documentation on `readthedocs
   <https://nanobind.readthedocs.io>`__.
-* While writing the documentation, I realized how lengthy and inconsistently some of
-  the :cpp:func:`class_\<T\>::def* <class_::def>` members are named. nanobind
-  will from now on use the following API:
+* The documentation process revealed a number of inconsistencies in the
+  :cpp:func:`class_\<T\>::def* <class_::def>` naming scheme. nanobind will from
+  now on use the following shortened and more logical interface:
 
   .. list-table::
     :widths: 40 60

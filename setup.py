@@ -56,6 +56,8 @@ with TemporaryDirectory() as temp_dir:
             'include/nanobind/eigen/*.h',
             'ext/robin_map/include/tsl/*.h',
             'cmake/nanobind-config.cmake',
+            'cmake/darwin-ld-cpython.sym',
+            'cmake/darwin-ld-pypy.sym',
             'src/*.h',
             'src/*.cpp'
         ]}

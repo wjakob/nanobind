@@ -452,8 +452,10 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 #if PY_VERSION_HEX >= 0x030C0000
     // Life is good, PyType_FromMetaclass() is available
     PyObject *result = PyType_FromMetaclass(metaclass, mod, &spec, base);
-    if (!result)
-        fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed!", t->name);
+    if (!result) {
+        python_error err;
+        fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed: %s!", t->name, err.what());
+    }
 #else
     /* The fallback code below is cursed. It provides an alternative when
        PyType_FromMetaclass() is not available (i.e., on Python < 3.12). It
@@ -464,6 +466,11 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     (void) mod;
 
     PyObject *temp = PyType_FromSpec(&spec);
+    if (!temp) {
+        python_error err;
+        fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed: %s!", t->name, err.what());
+    }
+
     PyHeapTypeObject *temp_ht = (PyHeapTypeObject *) temp;
     PyTypeObject *temp_tp = &temp_ht->ht_type;
 

@@ -173,7 +173,7 @@ provided. The modified binding code looks as follows:
 
    NB_MODULE(my_ext, m) {
        m.def("add", &add, "a"_a, "b"_a = 1,
-             "This function adds two numbers and increments if only one is provided").
+             "This function adds two numbers and increments if only one is provided.");
    }
 
 Let's go through all of the changed lines. The first sets up a short
@@ -202,7 +202,7 @@ binding declarations, which can be specified in any order.
 .. code-block:: cpp
 
    m.def("add", &add, "a"_a, "b"_a = 1,
-         "This function adds two numbers and increments if only one is provided").
+         "This function adds two numbers and increments if only one is provided.");
 
 The string at the end is a `docstring <https://peps.python.org/pep-0257/>`_
 that will later show up in generated documentation. The argument annotations

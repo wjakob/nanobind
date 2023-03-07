@@ -440,9 +440,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     }
 
     if (has_traverse && (!base || (PyType_GetFlags((PyTypeObject *) base) &
-                                   Py_TPFLAGS_HAVE_GC) == 0)) {
+                                   Py_TPFLAGS_HAVE_GC) == 0))
         spec.flags |= Py_TPFLAGS_HAVE_GC;
-    }
 
     *s++ = { 0, nullptr };
 
@@ -517,8 +516,6 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     tp->tp_dictoffset = temp_tp->tp_dictoffset;
     tp->tp_vectorcall = temp_tp->tp_vectorcall;
     tp->tp_flags = spec.flags | Py_TPFLAGS_HEAPTYPE;
-    if (temp_tp->tp_flags & Py_TPFLAGS_HAVE_GC)
-        tp->tp_flags |= Py_TPFLAGS_HAVE_GC;
 
     PyAsyncMethods    *am = tp->tp_as_async = &ht->as_async;
     PyNumberMethods   *nb = tp->tp_as_number = &ht->as_number;

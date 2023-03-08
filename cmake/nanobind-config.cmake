@@ -46,7 +46,6 @@ endfunction()
 
 function (nanobind_link_options name)
   if (APPLE)
-    message(STATUS ${Python_INTERPRETER_ID})
     if (Python_INTERPRETER_ID STREQUAL "PyPy")
       set(NB_LINKER_RESPONSE_FILE darwin-ld-pypy.sym)
     else()

@@ -10,7 +10,7 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.3.0 (March 8, 2023)
+Version 0.3.1 (March 8, 2023)
 -----------------------------
 
 * Added a type caster for ``std::filesystem::path``. (PR `#138
@@ -27,6 +27,10 @@ Version 0.3.0 (March 8, 2023)
   deployment targets. (commit `2f29ec
   <https://github.com/wjakob/nanobind/commit/2f29ec7d5fbebd5f55fb52da297c8d197279f659>`__).
 
+Version 0.3.0 (March 8, 2023)
+-----------------------------
+
+* Botched release, replaced by 0.3.1 on the same day.
 
 Version 0.2.0 (March 3, 2023)
 -----------------------------

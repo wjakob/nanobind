@@ -4,7 +4,7 @@ import sys
 import test_bind_map_ext as t
 
 
-def test_map_string_double():
+def test_map_string_double(capfd):
     mm = t.MapStringDouble()
     mm["a"] = 1
     mm["b"] = 2.5
@@ -36,9 +36,11 @@ def test_map_string_double():
     assert len(mm2) == 0
     assert repr(mm) == "test_bind_map_ext.MapStringDouble({'a': 1.0, 'b': 2.5})"
 
-    with pytest.warns(RuntimeWarning, match="implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed"):
-        with pytest.raises(TypeError):
-            mm2.update({"a" : "b"})
+    with pytest.raises(TypeError):
+        mm2.update({"a" : "b"})
+    captured = capfd.readouterr()
+    assert captured.err.strip() == "nanobind: implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed!"
+
     mm2.update({"a" : 2.5})
     assert len(mm2) == 1
 

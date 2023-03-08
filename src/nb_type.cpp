@@ -690,7 +690,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                                              const std::type_info *cpp_type_src,
                                              const type_data *dst_type,
                                              nb_internals &internals,
-                                             cleanup_list *cleanup, void **out) {
+                                             cleanup_list *cleanup, void **out) noexcept {
     if (dst_type->implicit && cpp_type_src) {
         const std::type_info **it = dst_type->implicit;
         const std::type_info *v;
@@ -749,11 +749,20 @@ found:
         PyErr_Clear();
 
         if (internals.print_implicit_cast_warnings) {
-            PyObject *name = nb_inst_name(src);
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: implicit conversion from type '%U' "
-                             "to type '%s' failed!", name, dst_type->name);
-            Py_DECREF(name);
+#if !defined(Py_LIMITED_API)
+            const char *name = Py_TYPE(src)->tp_name;
+#else
+            PyObject *name_py = nb_inst_name(src);
+            const char *name = PyUnicode_AsUTF8AndSize(name_py, nullptr);
+#endif
+            // Can't use PyErr_Warn*() if conversion failed due to a stack overflow
+            fprintf(stderr,
+                    "nanobind: implicit conversion from type '%s' to type '%s' "
+                    "failed!\n", name, dst_type->name);
+
+#if defined(Py_LIMITED_API)
+            Py_DECREF(name_py);
+#endif
         }
 
         return false;

@@ -2,7 +2,7 @@ import pytest
 
 import test_bind_vector_ext as t
 
-def test01_vector_int():
+def test01_vector_int(capfd):
     v_int = t.VectorInt([0, 0])
     assert len(v_int) == 2
     assert bool(v_int) is True
@@ -40,9 +40,11 @@ def test01_vector_int():
     assert v_int2 == t.VectorInt([0, 99, 2, 3, 4, 5, 6, 7])
 
     # test error handling, and that the vector is unchanged
-    with pytest.warns(RuntimeWarning, match="implicit conversion from type 'list' to type 'test_bind_vector_ext.VectorInt' failed"):
-        with pytest.raises(TypeError):
-            v_int2.extend([8, "a"])
+    with pytest.raises(TypeError):
+        v_int2.extend([8, "a"])
+
+    captured = capfd.readouterr()
+    assert captured.err.strip() == "nanobind: implicit conversion from type 'list' to type 'test_bind_vector_ext.VectorInt' failed!"
 
     assert v_int2 == t.VectorInt([0, 99, 2, 3, 4, 5, 6, 7])
 

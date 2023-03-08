@@ -10,12 +10,23 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
-Version 0.3.0 (TBA)
--------------------
+Version 0.3.0 (March 8, 2023)
+-----------------------------
 
 * Added a type caster for ``std::filesystem::path``. (PR `#138
   <https://github.com/wjakob/nanobind/pull/138>`__ and commit `0b05cd
   <https://github.com/wjakob/nanobind/commit/0b05cde8bd8685ab42328660da03cc4ee66e3ba2>`__).
+* Fixed technical issues involving implicit conversions (commits `022935
+  <https://github.com/wjakob/nanobind/commit/022935cbb92dfb1d02f90546bf6b34013f90e9e5>`__
+  and `5aefe3
+  <https://github.com/wjakob/nanobind/commit/5aefe36e3e07b5b98a6be7c0f3ce28a236fe2330>`__)
+  and construction of type hierarchies with custom garbage collection hooks
+  (commit `022935
+  <https://github.com/wjakob/nanobind/commit/7b3e893e1c14d95f7b3fc838657e6f9ce520d609>`__).
+* Re-enabled the 'chained fixups' linker optimization for recent macOS
+  deployment targets. (commit `2f29ec
+  <https://github.com/wjakob/nanobind/commit/2f29ec7d5fbebd5f55fb52da297c8d197279f659>`__).
+
 
 Version 0.2.0 (March 3, 2023)
 -----------------------------

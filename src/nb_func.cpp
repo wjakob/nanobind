@@ -133,6 +133,11 @@ void nb_bound_method_dealloc(PyObject *self) {
     PyObject_GC_Del(self);
 }
 
+static arg_data method_args[2] = {
+    { "self", nullptr, nullptr, false, false },
+    { nullptr, nullptr, nullptr, false, false }
+};
+
 /**
  * \brief Wrap a C++ function into a Python function object
  *
@@ -140,15 +145,17 @@ void nb_bound_method_dealloc(PyObject *self) {
  */
 PyObject *nb_func_new(const void *in_) noexcept {
     func_data_prelim<0> *f = (func_data_prelim<0> *) in_;
+    arg_data *args_in = std::launder((arg_data *) f->args);
 
-    const bool has_scope      = f->flags & (uint32_t) func_flags::has_scope,
-               has_name       = f->flags & (uint32_t) func_flags::has_name,
-               has_args       = f->flags & (uint32_t) func_flags::has_args,
-               has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
-               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
-               is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
-               is_method      = f->flags & (uint32_t) func_flags::is_method,
-               return_ref     = f->flags & (uint32_t) func_flags::return_ref;
+    bool has_scope      = f->flags & (uint32_t) func_flags::has_scope,
+         has_name       = f->flags & (uint32_t) func_flags::has_name,
+         has_args       = f->flags & (uint32_t) func_flags::has_args,
+         has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
+         has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
+         is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
+         is_method      = f->flags & (uint32_t) func_flags::is_method,
+         return_ref     = f->flags & (uint32_t) func_flags::return_ref,
+         is_constructor = false;
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -183,6 +190,19 @@ PyObject *nb_func_new(const void *in_) noexcept {
             }
         } else {
             PyErr_Clear();
+        }
+
+        is_constructor = strcmp(f->name, "__init__") == 0;
+
+        // Don't use implicit conversions in copy constructors (causes infinite recursion)
+        if (is_constructor && f->nargs == 2 && f->descr_types[0] &&
+            f->descr_types[0] == f->descr_types[1]) {
+            if (has_args) {
+                f->args[1].convert = false;
+            } else {
+                args_in = method_args + 1;
+                has_args = true;
+            }
         }
     }
 
@@ -228,13 +248,15 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     func_data *fc = nb_func_data(func) + to_copy;
     memcpy(fc, f, sizeof(func_data_prelim<0>));
-    if (has_name) {
-        fc->flags |= strcmp(fc->name, "__init__") == 0
-                         ? (uint32_t) func_flags::is_constructor
-                         : (uint16_t) 0;
-    } else {
+
+
+    if (is_constructor)
+        fc->flags |= (uint32_t) func_flags::is_constructor;
+    if (has_args)
+        fc->flags |= (uint32_t) func_flags::has_args;
+
+    if (!has_name)
         fc->name = "<anonymous>";
-    }
 
     if (is_implicit) {
         if (!(fc->flags & (uint32_t) func_flags::is_constructor))
@@ -267,12 +289,10 @@ PyObject *nb_func_new(const void *in_) noexcept {
     }
 
     if (has_args) {
-        arg_data *args_in = std::launder((arg_data *) f->args);
-        fc->args =
-            (arg_data *) malloc(sizeof(arg_data) * (f->nargs + is_method));
+        fc->args = (arg_data *) malloc(sizeof(arg_data) * f->nargs);
 
         if (is_method) // add implicit 'self' argument annotation
-            fc->args[0] = arg_data{ "self", nullptr, nullptr, false, false };
+            fc->args[0] = method_args[0];
         for (size_t i = is_method; i < fc->nargs; ++i)
             fc->args[i] = args_in[i - is_method];
 

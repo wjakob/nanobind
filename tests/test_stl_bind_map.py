@@ -95,7 +95,7 @@ def test_map_string_double(capfd):
 
     assert t.MapStringDouble.__init__.__doc__ == \
 """__init__(self) -> None
-__init__(self, arg: test_bind_map_ext.MapStringDouble, /) -> None
+__init__(self, arg: test_bind_map_ext.MapStringDouble) -> None
 __init__(self, arg: %s[str, float], /) -> None
 
 Overloaded function.
@@ -104,7 +104,7 @@ Overloaded function.
 
 Default constructor
 
-2. ``__init__(self, arg: test_bind_map_ext.MapStringDouble, /) -> None``
+2. ``__init__(self, arg: test_bind_map_ext.MapStringDouble) -> None``
 
 Copy constructor
 

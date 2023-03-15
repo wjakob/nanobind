@@ -1,5 +1,5 @@
 /*
-    nanobind/stl/filesystem.h: type caster for std::string
+    nanobind/stl/filesystem.h: type caster for std::filesystem
 
     Copyright (c) 2023 Qingnan Zhou and Wenzel Jakob
 

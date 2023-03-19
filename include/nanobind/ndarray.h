@@ -33,7 +33,7 @@ NAMESPACE_END(device)
 NAMESPACE_BEGIN(dlpack)
 
 enum class dtype_code : uint8_t {
-    Int = 0, UInt = 1, Float = 2, Bfloat = 4, Complex = 5
+    Int = 0, UInt = 1, Float = 2, Bfloat = 4, Complex = 5, Bool = 6
 };
 
 struct device {
@@ -90,6 +90,8 @@ template <typename T> constexpr dlpack::dtype dtype() {
         result.code = (uint8_t) dlpack::dtype_code::Float;
     else if constexpr (std::is_signed_v<T>)
         result.code = (uint8_t) dlpack::dtype_code::Int;
+    else if constexpr (std::is_same_v<T, bool>)
+        result.code = (uint8_t) dlpack::dtype_code::Bool;
     else
         result.code = (uint8_t) dlpack::dtype_code::UInt;
 
@@ -132,12 +134,23 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_floating_point_v
     }
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T>>> {
+template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>>> {
     static constexpr size_t size = 0;
 
     static constexpr auto name =
         const_name("dtype=") + const_name<std::is_unsigned_v<T>>("u", "") +
         const_name("int") + const_name<sizeof(T) * 8>();
+
+    static void apply(ndarray_req &tr) {
+        tr.dtype = dtype<T>();
+        tr.req_dtype = true;
+    }
+};
+
+template <typename T> struct ndarray_arg<T, enable_if_t<std::is_same_v<T, bool>>> {
+    static constexpr size_t size = 0;
+
+    static constexpr auto name = const_name("dtype=bool");
 
     static void apply(ndarray_req &tr) {
         tr.dtype = dtype<T>();

@@ -74,6 +74,10 @@ int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int) {
             }
             break;
 
+        case dlpack::dtype_code::Bool:
+            format = "?";
+            break;
+
         default:
             break;
     }
@@ -166,6 +170,8 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
             case 'e':
             case 'f':
             case 'd': dt.code = (uint8_t) dlpack::dtype_code::Float; break;
+
+            case '?': dt.code = (uint8_t) dlpack::dtype_code::Bool; break;
 
             default:
                 fail = true;
@@ -356,14 +362,18 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
 
         const char *prefix = nullptr;
         char dtype[9];
-        switch (req->dtype.code) {
-            case (uint8_t) dlpack::dtype_code::Int: prefix = "int"; break;
-            case (uint8_t) dlpack::dtype_code::UInt: prefix = "uint"; break;
-            case (uint8_t) dlpack::dtype_code::Float: prefix = "float"; break;
-            default:
-                return nullptr;
+        if (req->dtype.code == (uint8_t) dlpack::dtype_code::Bool) {
+            std::strcpy(dtype, "bool");
+        } else {
+            switch (req->dtype.code) {
+                case (uint8_t) dlpack::dtype_code::Int: prefix = "int"; break;
+                case (uint8_t) dlpack::dtype_code::UInt: prefix = "uint"; break;
+                case (uint8_t) dlpack::dtype_code::Float: prefix = "float"; break;
+                default:
+                    return nullptr;
+            }
+            snprintf(dtype, sizeof(dtype), "%s%u", prefix, req->dtype.bits);
         }
-        snprintf(dtype, sizeof(dtype), "%s%u", prefix, req->dtype.bits);
 
         object converted;
         try {

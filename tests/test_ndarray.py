@@ -54,14 +54,19 @@ def test01_metadata():
     assert t.get_shape(a) == [3, 4, 5]
     if hasattr(a, '__dlpack__'):
         assert t.get_shape(a.__dlpack__()) == [3, 4, 5]
-    assert not t.check_float(np.array([1], dtype=np.uint32)) and \
+    assert not t.check_float(np.array([1], dtype=np.bool_)) and \
+           not t.check_float(np.array([1], dtype=np.uint32)) and \
                t.check_float(np.array([1], dtype=np.float32))
+    assert not t.check_bool(np.array([1], dtype=np.uint32)) and \
+           not t.check_bool(np.array([1], dtype=np.float32)) and \
+               t.check_bool(np.array([1], dtype=np.bool_))
 
 
 def test02_docstr():
     assert t.get_shape.__doc__ == "get_shape(array: ndarray[]) -> list"
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
     assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
+    assert t.pass_bool.__doc__ == "pass_bool(array: ndarray[dtype=bool]) -> None"
     assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(array: ndarray[dtype=float32, shape=(3, *, 4)]) -> None"
     assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: ndarray[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
     assert t.check_device.__doc__ == ("check_device(arg: ndarray[device='cpu'], /) -> str\n"
@@ -72,9 +77,11 @@ def test02_docstr():
 def test03_constrain_dtype():
     a_u32 = np.array([1], dtype=np.uint32)
     a_f32 = np.array([1], dtype=np.float32)
+    a_bool = np.array([1], dtype=np.bool_)
 
     t.pass_uint32(a_u32)
     t.pass_float32(a_f32)
+    t.pass_bool(a_bool)
 
     with pytest.raises(TypeError) as excinfo:
         t.pass_uint32(a_f32)
@@ -82,6 +89,10 @@ def test03_constrain_dtype():
 
     with pytest.raises(TypeError) as excinfo:
         t.pass_float32(a_u32)
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+    with pytest.raises(TypeError) as excinfo:
+        t.pass_bool(a_u32)
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
@@ -171,6 +182,10 @@ def test09_implicit_conversion():
     t.implicit(np.zeros((2, 2), dtype=np.uint32))
     t.implicit(np.zeros((2, 2, 10), dtype=np.float32)[:, :, 4])
     t.implicit(np.zeros((2, 2, 10), dtype=np.uint32)[:, :, 4])
+    t.implicit(np.zeros((2, 2, 10), dtype=np.bool_)[:, :, 4])
+
+    with pytest.raises(TypeError) as excinfo:
+        t.noimplicit(np.zeros((2, 2), dtype=np.bool_))
 
     with pytest.raises(TypeError) as excinfo:
         t.noimplicit(np.zeros((2, 2), dtype=np.uint32))
@@ -212,9 +227,13 @@ def test11_implicit_conversion_tensorflow():
         t.implicit(tf.zeros((2, 2), dtype=tf.int32))
         t.implicit(tf.zeros((2, 2, 10), dtype=tf.float32)[:, :, 4])
         t.implicit(tf.zeros((2, 2, 10), dtype=tf.int32)[:, :, 4])
+        t.implicit(tf.zeros((2, 2, 10), dtype=tf.bool)[:, :, 4])
 
         with pytest.raises(TypeError) as excinfo:
             t.noimplicit(tf.zeros((2, 2), dtype=tf.int32))
+
+        with pytest.raises(TypeError) as excinfo:
+            t.noimplicit(tf.zeros((2, 2), dtype=tf.bool))
 
 
 @needs_jax
@@ -229,10 +248,13 @@ def test12_implicit_conversion_jax():
     t.implicit(jnp.zeros((2, 2), dtype=jnp.int32))
     t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.float32)[:, :, 4])
     t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.int32)[:, :, 4])
+    t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.bool_)[:, :, 4])
 
     with pytest.raises(TypeError) as excinfo:
         t.noimplicit(jnp.zeros((2, 2), dtype=jnp.int32))
 
+    with pytest.raises(TypeError) as excinfo:
+        t.noimplicit(tf.zeros((2, 2), dtype=tf.bool))
 
 def test13_destroy_capsule():
     collect()

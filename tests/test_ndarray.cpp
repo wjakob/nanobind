@@ -19,9 +19,13 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("check_float", [](const nb::ndarray<> &t) {
         return t.dtype() == nb::dtype<float>();
     });
+    m.def("check_bool", [](const nb::ndarray<> &t) {
+        return t.dtype() == nb::dtype<bool>();
+    });
 
     m.def("pass_float32", [](const nb::ndarray<float> &) { }, "array"_a.noconvert());
     m.def("pass_uint32", [](const nb::ndarray<uint32_t> &) { }, "array"_a.noconvert());
+    m.def("pass_bool", [](const nb::ndarray<bool> &) { }, "array"_a.noconvert());
     m.def("pass_float32_shaped",
           [](const nb::ndarray<float, nb::shape<3, nb::any, 4>> &) {}, "array"_a.noconvert());
 

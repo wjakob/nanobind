@@ -309,6 +309,7 @@ NB_MODULE(test_classes_ext, m) {
     struct MyClass { struct NestedClass { }; };
     nb::class_<MyClass> mcls(m, "MyClass");
     nb::class_<MyClass::NestedClass> ncls(mcls, "NestedClass");
+    mcls.def(nb::init<>());
     mcls.def("f", []{});
     ncls.def("f", []{});
 

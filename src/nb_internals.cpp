@@ -74,13 +74,10 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-extern PyObject *nb_func_get_doc(PyObject *, void *);
-extern PyObject *nb_func_get_name(PyObject *, void *);
-extern PyObject *nb_func_get_qualname(PyObject *, void *);
-extern PyObject *nb_func_get_module(PyObject *, void *);
-#if PY_VERSION_HEX < 0x03090000
 extern PyObject *nb_func_getattro(PyObject *, PyObject *);
-#endif
+extern PyObject *nb_func_get_doc(PyObject *, void *);
+extern PyObject *nb_bound_method_getattro(PyObject *, PyObject *);
+extern PyObject *nb_func_get_getset(PyObject *, PyObject *);
 extern int nb_func_traverse(PyObject *, visitproc, void *);
 extern int nb_func_clear(PyObject *);
 extern void nb_func_dealloc(PyObject *);
@@ -109,18 +106,13 @@ static PyMemberDef nb_func_members[] = {
 
 static PyGetSetDef nb_func_getset[] = {
     { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
-    { "__name__", nb_func_get_name, nullptr, nullptr, nullptr },
-    { "__qualname__", nb_func_get_qualname, nullptr, nullptr, nullptr },
-    { "__module__", nb_func_get_module, nullptr, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
 static PyType_Slot nb_func_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
-#if PY_VERSION_HEX < 0x03090000
     { Py_tp_getattro, (void *) nb_func_getattro },
-#endif
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
@@ -142,9 +134,7 @@ static PyType_Spec nb_func_spec = {
 static PyType_Slot nb_method_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
-#if PY_VERSION_HEX < 0x03090000
     { Py_tp_getattro, (void *) nb_func_getattro },
-#endif
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
@@ -172,6 +162,7 @@ static PyMemberDef nb_bound_method_members[] = {
 
 static PyType_Slot nb_bound_method_slots[] = {
     { Py_tp_members, (void *) nb_bound_method_members },
+    { Py_tp_getattro, (void *) nb_bound_method_getattro },
     { Py_tp_traverse, (void *) nb_bound_method_traverse },
     { Py_tp_clear, (void *) nb_bound_method_clear },
     { Py_tp_dealloc, (void *) nb_bound_method_dealloc },

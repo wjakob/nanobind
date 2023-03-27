@@ -31,6 +31,7 @@ def test01_signature():
     assert t.Struct.value.__doc__ == "value(self) -> int"
     assert t.Struct.create_move.__doc__ == "create_move() -> test_classes_ext.Struct"
     assert t.Struct.set_value.__doc__ == "set_value(self, value: int) -> None"
+    assert t.Struct().set_value.__doc__ == "set_value(self, value: int) -> None"
     assert t.Struct.__doc__ == 'Some documentation'
     assert t.Struct.static_test.__doc__ == (
         "static_test(arg: int, /) -> int\n"
@@ -376,6 +377,9 @@ def test17_name_qualname_module():
     assert MyClass.f.__name__ == 'f'
     assert MyClass.f.__qualname__ == 'MyClass.f'
     assert MyClass.f.__module__ == 'test_classes'
+    assert MyClass().f.__name__ == 'f'
+    assert MyClass().f.__qualname__ == 'MyClass.f'
+    assert MyClass().f.__module__ == 'test_classes'
     assert MyClass.NestedClass.__name__ == 'NestedClass'
     assert MyClass.NestedClass.__qualname__ == 'MyClass.NestedClass'
     assert MyClass.NestedClass.__module__ == 'test_classes'
@@ -387,12 +391,21 @@ def test17_name_qualname_module():
     assert t.f.__module__ == 'test_classes_ext'
     assert t.f.__name__ == 'f'
     assert t.f.__qualname__ == 'f'
+    assert type(t.f).__module__ == 'nanobind'
+    assert type(t.f).__name__ == 'nb_func'
+    assert type(t.f).__qualname__ == 'nb_func'
     assert t.MyClass.__name__ == 'MyClass'
     assert t.MyClass.__qualname__ == 'MyClass'
     assert t.MyClass.__module__ == 'test_classes_ext'
     assert t.MyClass.f.__name__ == 'f'
     assert t.MyClass.f.__qualname__ == 'MyClass.f'
     assert t.MyClass.f.__module__ == 'test_classes_ext'
+    assert t.MyClass().f.__name__ == 'f'
+    assert t.MyClass().f.__qualname__ == 'MyClass.f'
+    assert t.MyClass().f.__module__ == 'test_classes_ext'
+    assert type(t.MyClass.f).__module__ == 'nanobind'
+    assert type(t.MyClass.f).__name__ == 'nb_method'
+    assert type(t.MyClass.f).__qualname__ == 'nb_method'
     assert t.MyClass.NestedClass.__name__ == 'NestedClass'
     assert t.MyClass.NestedClass.__qualname__ == 'MyClass.NestedClass'
     assert t.MyClass.NestedClass.__module__ == 'test_classes_ext'

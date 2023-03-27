@@ -987,7 +987,7 @@ static void nb_func_render_signature(const func_data *f) noexcept {
         fail("nanobind::detail::nb_func_finalize(%s): arguments inconsistent.", f->name);
 }
 
-PyObject *nb_func_get_name(PyObject *self, void *) {
+static PyObject *nb_func_get_name(PyObject *self) {
     func_data *f = nb_func_data(self);
     if (f->flags & (uint32_t) func_flags::has_name) {
         return PyUnicode_FromString(f->name);
@@ -997,7 +997,7 @@ PyObject *nb_func_get_name(PyObject *self, void *) {
     }
 }
 
-PyObject *nb_func_get_qualname(PyObject *self, void *) {
+static PyObject *nb_func_get_qualname(PyObject *self) {
     func_data *f = nb_func_data(self);
     if ((f->flags & (uint32_t) func_flags::has_scope) &&
         (f->flags & (uint32_t) func_flags::has_name)) {
@@ -1014,7 +1014,7 @@ PyObject *nb_func_get_qualname(PyObject *self, void *) {
     }
 }
 
-PyObject *nb_func_get_module(PyObject *self, void *) {
+static PyObject *nb_func_get_module(PyObject *self) {
     func_data *f = nb_func_data(self);
     if (f->flags & (uint32_t) func_flags::has_scope) {
         return PyObject_GetAttrString(
@@ -1024,20 +1024,6 @@ PyObject *nb_func_get_module(PyObject *self, void *) {
         return Py_None;
     }
 }
-
-#if PY_VERSION_HEX < 0x03090000
-// PyGetSetDef entry for __module__ is ignored in Python 3.8
-PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
-    const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr);
-
-    if (!name)
-        return nullptr;
-    else if (strcmp(name, "__module__") == 0)
-        return nb_func_get_module(self, nullptr);
-    else
-        return PyObject_GenericGetAttr(self, name_);
-}
-#endif
 
 PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
@@ -1082,6 +1068,29 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
         buf.rewind(1);
 
     return PyUnicode_FromString(buf.get());
+}
+
+// PyGetSetDef entry for __module__ is ignored in Python 3.8
+PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
+    const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr);
+
+    if (!name)
+        return nullptr;
+    else if (strcmp(name, "__module__") == 0)
+        return nb_func_get_module(self);
+    else if (strcmp(name, "__name__") == 0)
+        return nb_func_get_name(self);
+    else if (strcmp(name, "__qualname__") == 0)
+        return nb_func_get_qualname(self);
+    else if (strcmp(name, "__doc__") == 0)
+        return nb_func_get_doc(self, nullptr);
+    else
+        return PyObject_GenericGetAttr(self, name_);
+}
+
+PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name) {
+    nb_func *func = ((nb_bound_method *) self)->func;
+    return nb_func_getattro((PyObject *) func, name);
 }
 
 /// Excise a substring from 's'

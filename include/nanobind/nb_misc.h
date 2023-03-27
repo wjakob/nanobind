@@ -13,6 +13,8 @@ struct gil_scoped_acquire {
 public:
     gil_scoped_acquire() noexcept : state(PyGILState_Ensure()) { }
     ~gil_scoped_acquire() { PyGILState_Release(state); }
+    gil_scoped_acquire(const gil_scoped_acquire &) = delete;
+    gil_scoped_acquire& operator=(const gil_scoped_acquire &) = delete;
 
 private:
     const PyGILState_STATE state;
@@ -22,6 +24,8 @@ class gil_scoped_release {
 public:
     gil_scoped_release() noexcept : state(PyEval_SaveThread()) { }
     ~gil_scoped_release() { PyEval_RestoreThread(state); }
+    gil_scoped_release(const gil_scoped_release &) = delete;
+    gil_scoped_release& operator=(const gil_scoped_release &) = delete;
 
 private:
     PyThreadState *state;

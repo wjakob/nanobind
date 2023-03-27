@@ -37,7 +37,6 @@ converts from/to a Python ``list`` containing ``int`` objects.
    .. image:: images/caster-light.svg
      :width: 400
      :align: center
-     :class: only-light
 
 **Example**: The following function doubles the entries of an STL vector and
 returns the result.
@@ -232,7 +231,6 @@ to interpret ``std::vector<int>`` as a new Python type called
    .. image:: images/binding-light.svg
      :width: 400
      :align: center
-     :class: only-light
 
 **Example**: to switch the previous example to bindings, we first replace
 the type caster header (`nanobind/stl/vector.h
@@ -337,7 +335,6 @@ Python list can be accessed through the :cpp:class:`nb::list <list>` type:
    .. image:: images/wrapper-light.svg
      :width: 400
      :align: center
-     :class: only-light
 
 This is what the example looks like when expressed using
 :cpp:class:`nb::list <list>` and :cpp:class:`nb::int_ <int_>`.

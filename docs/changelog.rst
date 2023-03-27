@@ -10,6 +10,11 @@ current version is still in the prototype range (*0.x.y*), there are no (formal)
 guarantees of API or ABI stability. That said, I will do my best to minimize
 inconvenience whenever possible.
 
+Version 1.0.0 (TBA)
+-----------------------------
+
+* TBA
+
 Version 0.3.1 (March 8, 2023)
 -----------------------------
 

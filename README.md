@@ -1,4 +1,4 @@
-# nanobind — Seamless operability between C++17 and Python
+# nanobind: tiny and efficient C++/Python bindings
 
 [![Documentation](https://img.shields.io/readthedocs/nanobind/latest)](https://nanobind.readthedocs.io/en/latest/)
 [![Continuous Integration](https://img.shields.io/github/actions/workflow/status/wjakob/nanobind/ci.yml?label=tests)](https://github.com/wjakob/nanobind/actions/workflows/ci.yml)
@@ -34,7 +34,24 @@ Please see the following links for tutorial and reference documentation in
 [HTML](https://nanobind.readthedocs.io/en/latest/) and
 [PDF](https://nanobind.readthedocs.io/_/downloads/en/latest/pdf/) formats.
 
-The nanobind logo was designed by [AndoTwin
-Studio](https://andotwinstudio.com). High-resolution version are available
-here: [light](https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/27/nanobind_logo.jpg),
-[dark](https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark_1.png).
+## License and attribution
+
+All material in this repository is licensed under a three-clause [BSD
+license](LICENSE).
+
+Please use the following BibTeX template to cite nanobind in scientific
+discourse:
+
+```bibtex
+@misc{nanobind,
+   author = {Wenzel Jakob},
+   year = {2022},
+   note = {https://github.com/wjakob/nanobind},
+   title = {nanobind: tiny and efficient C++/Python bindings}
+}
+```
+
+The nanobind logo was designed by [AndoTwin Studio](https://andotwinstudio.com)
+(high-resolution download:
+[light](https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/27/nanobind_logo.jpg),
+[dark](https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark_1.png)).

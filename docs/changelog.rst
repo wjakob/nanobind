@@ -7,7 +7,7 @@ Changelog
 
 nanobind uses a `semantic versioning <http://semver.org>`__ policy.
 
-Version 1.0.0 (March 29, 2023)
+Version 1.0.0 (March 28, 2023)
 -----------------------------
 
 * Nanobind now has a logo. (commit `b65d31

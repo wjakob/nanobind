@@ -759,6 +759,9 @@ found:
             fprintf(stderr,
                     "nanobind: implicit conversion from type '%s' to type '%s' "
                     "failed!\n", name, dst_type->name);
+#if defined(_WIN32)
+            fflush(stderr);
+#endif
 
 #if defined(Py_LIMITED_API)
             Py_DECREF(name_py);

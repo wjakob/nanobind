@@ -10,7 +10,7 @@ I started the `pybind11 <http://github.com/pybind/pybind11>`_ project back in
 on. Thanks to many amazing contributions by others, pybind11 has since become a
 core dependency of software used across the world including flagship projects
 like `PyTorch <https://pytorch.org>`_ and `Tensorflow
-<https://www.tensorflow.org>`_. Every day, is is downloaded over 400'000 times.
+<https://www.tensorflow.org>`_. Every day, it is downloaded over 400'000 times.
 Hundreds of contributed extensions and generalizations address use cases of
 this diverse audience. However, all of this success also came with costs: the
 complexity of the library grew tremendously, which had a negative impact on

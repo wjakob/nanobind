@@ -143,9 +143,10 @@ wasteful when the other side only needs to access a small part of the data.
 Conversely, the overhead should not be a problem when the data is fully
 "consumed" following conversion.
 
-Note that some type casters (e.g., those for ``std::unique_ptr<..>``,
-``std::shared_ptr<..>``, :cpp:class:`nb::ndarray <ndarray>`, and for ``Eigen::*``
-can perform a type conversion without copying the underlying data.)
+A select few type casters (``std::unique_ptr<..>``, ``std::shared_ptr<..>``,
+:cpp:class:`nb::ndarray <ndarray>`, and ``Eigen::*``) are special in the sense
+that they can perform a type conversion *without* copying the underlying data.
+Besides those few exceptions type casting always implies that a copy is made.
 
 .. _type_caster_mutable:
 
@@ -201,7 +202,7 @@ And the binding code
 
    m.def("foo", [](int i) { int rv = foo(i); return std::make_tuple(rv, i); });
 
-In this case, a type caster (``#include <nanobind/stl/variant.h``) must be
+In this case, a type caster (``#include <nanobind/stl/tuple.h``) must be
 included to handle the ``std::tuple<int, int>`` return value.
 
 .. _bindings:

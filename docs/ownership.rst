@@ -156,7 +156,7 @@ options below. In particular, the following policies are available:
 
   The return value policy declaration could actually have been omitted here
   because :cpp:enumerator:`move <rv_policy::move>` is the default for *functions
-  that return by value** (see :cpp:enumerator:`automatic
+  that return by value* (see :cpp:enumerator:`automatic
   <rv_policy::automatic>`).
 
 - :cpp:enumerator:`rv_policy::reference`:

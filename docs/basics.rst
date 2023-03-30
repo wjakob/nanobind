@@ -366,7 +366,7 @@ other things can be bound using analogous :cpp:class:`nb::class_\<...\>
   :header-rows: 1
 
   * - Type
-    - method
+    - Method
   * - Methods & constructors
     - :cpp:func:`.def() <class_::def>`
   * - Fields

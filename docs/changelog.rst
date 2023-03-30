@@ -12,8 +12,11 @@ Version 1.0.0 (March 28, 2023)
 
 * Nanobind now has a logo. (commit `b65d31
   <https://github.com/wjakob/nanobind/commit/b65d3b134d8b9f8d153b51d87751d09a12e4235b>`__).
-* Fixed a subtle issue involving function/method properties and the IPython command line interface. (commit `d432cd <https://github.com/wjakob/nanobind/commit/d4323cdc4b01da0e7de3f9b79f4a2a0615d1a6a1>`__).
-* Added a boolean type to the :cpp:class:`nb::ndarray\<..\> <ndarray>` interface. (commit `989c79 <https://github.com/wjakob/nanobind/commit/989c796317556ba87e227d87dbf1eac9aba443b8>`__)
+* Fixed a subtle issue involving function/method properties and the IPython
+  command line interface. (PR `#151
+  <https://github.com/wjakob/nanobind/pull/151>`__).
+* Added a boolean type to the :cpp:class:`nb::ndarray\<..\> <ndarray>`
+  interface. (PR `#150 <https://github.com/wjakob/nanobind/pull/150>`__).
 * Minor fixes and improvements.
 
 

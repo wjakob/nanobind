@@ -296,10 +296,20 @@ public:
     size_t ndim() const { return m_dltensor.ndim; }
     size_t shape(size_t i) const { return m_dltensor.shape[i]; }
     int64_t stride(size_t i) const { return m_dltensor.strides[i]; }
+    int64_t* shape_ptr() const { return &m_dltensor.shape[0]; }
+    int64_t* stride_ptr() const { return &m_dltensor.strides[0]; }
     bool is_valid() const { return m_handle != nullptr; }
     int32_t device_type() const { return m_dltensor.device.device_type; }
     int32_t device_id() const { return m_dltensor.device.device_id; }
     detail::ndarray_handle *handle() const { return m_handle; }
+
+    size_t size() const {
+        size_t ret = 1;
+        for (size_t i = 0; i < m_dltensor.ndim; ++i) {
+            ret *= m_dltensor.shape[i];
+        }
+        return ret;
+    }
 
     const Scalar *data() const {
         return (const Scalar *)((const uint8_t *) m_dltensor.data + m_dltensor.byte_offset);

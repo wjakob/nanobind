@@ -52,6 +52,9 @@ def test01_metadata():
 
     a = np.zeros(shape=(3, 4, 5))
     assert t.get_shape(a) == [3, 4, 5]
+    assert t.get_size(a) == 60
+    assert t.check_shape_ptr(a)
+    assert t.check_stride_ptr(a)
     if hasattr(a, '__dlpack__'):
         assert t.get_shape(a.__dlpack__()) == [3, 4, 5]
     assert not t.check_float(np.array([1], dtype=np.bool_)) and \

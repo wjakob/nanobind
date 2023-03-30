@@ -358,3 +358,52 @@ def test18_return_array_scalar():
     del x
     collect()
     assert t.destruct_count() - dc == 1
+
+# See PR #162
+@needs_torch
+def test19_single_and_empty_dimension_pytorch():
+    a = torch.ones((1,100,1025), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+    a = torch.ones((100,1,1025), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+    a = torch.ones((0,100,1025), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+    a = torch.ones((100,0,1025), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+    a = torch.ones((100,1025,0), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+    a = torch.ones((100,0,0), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+    a = torch.ones((0,0,0), dtype=torch.float32)
+    t.noop_3d_c_contig(a)
+
+# See PR #162
+@needs_numpy
+def test20_single_and_empty_dimension_numpy():
+    a = np.ones((1,100,1025), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+    a = np.ones((100,1,1025), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+    a = np.ones((0,100,1025), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+    a = np.ones((100,0,1025), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+    a = np.ones((100,1025,0), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+    a = np.ones((100,0,0), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+    a = np.ones((0,0,0), dtype=np.float32)
+    t.noop_3d_c_contig(a)
+
+# See PR #162
+@needs_torch
+def test21_single_and_empty_dimension_fortran_order_pytorch():
+    # This idiom creates a pytorch 2D tensor in column major (aka, 'F') ordering
+    a = torch.ones((0,100), dtype=torch.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+    a = torch.ones((100,0), dtype=torch.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+    a = torch.ones((1,100), dtype=torch.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+    a = torch.ones((100,1), dtype=torch.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)

@@ -23,7 +23,7 @@ struct type_caster<std::optional<T>> {
     using Ti = detail::intrinsic_t<T>;
     using Caster = make_caster<Ti>;
 
-    static constexpr auto Name = const_name("Optional[") + concat(Caster::Name) + const_name("]");;
+    static constexpr auto Name = const_name("Optional[") + concat(Caster::Name) + const_name("]");
     static constexpr bool IsClass = false;
 
     template <typename T_>

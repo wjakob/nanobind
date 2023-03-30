@@ -192,7 +192,7 @@ NumPy floating point matrix.
 
 .. code-block:: cpp
 
-   const float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+   float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
 
    m.def("ret_numpy", []() {
        size_t shape[2] = { 2, 4 };

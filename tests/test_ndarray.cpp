@@ -1,6 +1,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <algorithm>
+#include <vector>
 
 namespace nb = nanobind;
 
@@ -23,7 +24,7 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("check_shape_ptr", [](const nb::ndarray<> &t) {
         std::vector<size_t> shape(t.ndim());
         std::copy(t.shape_ptr(), t.shape_ptr() + t.ndim(), shape.begin());
-        for (size_t i = 0; i < t.ndim(); ++i)
+        for (int32_t i = 0; i < t.ndim(); ++i)
             if (shape[i] != t.shape(i))
                 return false;
         return true;
@@ -32,7 +33,7 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("check_stride_ptr", [](const nb::ndarray<> &t) {
         std::vector<size_t> stride(t.ndim());
         std::copy(t.stride_ptr(), t.stride_ptr() + t.ndim(), stride.begin());
-        for (size_t i = 0; i < t.ndim(); ++i)
+        for (int32_t i = 0; i < t.ndim(); ++i)
             if (stride[i] != t.stride(i))
                 return false;
         return true;

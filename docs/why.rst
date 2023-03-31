@@ -28,7 +28,7 @@ So what is different?
 ---------------------
 
 nanobind is highly related to pybind11 and inherits most of its conventions
-and syntax. The main difference is is a change in philosophy: pybind11 must
+and syntax. The main difference is a change in philosophy: pybind11 must
 deal with *all of C++* to bind legacy codebases, while nanobind targets
 a smaller C++ subset. *The codebase has to adapt to the binding tool and not
 the other way around*, which allows nanobind to be simpler and faster. Pull

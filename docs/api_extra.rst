@@ -473,6 +473,10 @@ in a :ref:`separate section <ndarrays>`.
 
       Return the number of dimensions.
 
+   .. cpp:function:: size_t size() const
+
+      Return the size of the array (i.e. the product of all dimensions).
+
    .. cpp:function:: size_t shape(size_t i) const
 
       Return the size of dimension `i`.
@@ -480,6 +484,19 @@ in a :ref:`separate section <ndarrays>`.
    .. cpp:function:: int64_t stride(size_t i) const
 
       Return the stride of dimension `i`.
+
+   .. cpp:function:: int64_t* shape_ptr() const
+
+      Return a pointer to the shape array. Note that the return type is
+      ``int64_t*``, which may be unexpected as the scalar version
+      :cpp:func:`shape()` casts its result to a ``size_t``.
+
+      This is a consequence of the DLPack tensor representation that uses
+      signed 64-bit integers for all of these fields.
+
+   .. cpp:function:: int64_t* stride_ptr() const
+
+      Return pointer to the stride array.
 
    .. cpp:function:: bool is_valid() const
 

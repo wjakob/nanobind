@@ -131,12 +131,15 @@
 #    error "nanobind requires a newer PyPy version (>= 7.3.10)"
 #endif
 
-#define NB_MODULE(name, variable)                                              \
+#define NB_MODULE_IMPL(name)                                                   \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name();           \
+    extern "C" NB_EXPORT PyObject *PyInit_##name()
+
+#define NB_MODULE(name, variable)                                              \
     static PyModuleDef NB_CONCAT(nanobind_module_def_, name);                  \
     [[maybe_unused]] static void NB_CONCAT(nanobind_init_,                     \
                                            name)(::nanobind::module_ &);       \
-    extern "C" NB_EXPORT PyObject *PyInit_##name() {                           \
+    NB_MODULE_IMPL(name) {                                                     \
         nanobind::module_ m =                                                  \
             nanobind::steal<nanobind::module_>(nanobind::detail::module_new(   \
                 NB_TOSTRING(name), &NB_CONCAT(nanobind_module_def_, name)));   \

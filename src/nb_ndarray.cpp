@@ -504,7 +504,6 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
             --i;
         }
     }
-
     ndarray->dltensor.data = (void *) value_rounded;
     ndarray->dltensor.device.device_type = device_type;
     ndarray->dltensor.device.device_id = device_id;

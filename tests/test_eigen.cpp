@@ -117,6 +117,16 @@ NB_MODULE(test_eigen_ext, m) {
         return m;
     });
 
+    /// issue #166
+    using Matrix1d = Eigen::Matrix<double,1,1>;
+    try {
+        m.def(
+            "default_arg", [](Matrix1d a, Matrix1d b) { return a + b; },
+            "a"_a = Matrix1d::Zero(), "b"_a = Matrix1d::Zero());
+    } catch (...) {
+        // Ignore (NumPy not installed, etc.)
+    }
+
     struct Buffer {
         uint32_t x[30] { };
 

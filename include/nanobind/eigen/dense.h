@@ -26,7 +26,7 @@ template <typename T> using DMap = Eigen::Map<T, 0, DStride>;
 NAMESPACE_BEGIN(detail)
 
 template <typename T>
-constexpr int NumDimensions = int(T::MaxSizeAtCompileTime) == 1 ? 0 : bool(T::IsVectorAtCompileTime) ? 1 : 2;
+constexpr int NumDimensions = bool(T::IsVectorAtCompileTime) ? 1 : 2;
 
 template <typename T>
 using array_for_eigen_t = ndarray<

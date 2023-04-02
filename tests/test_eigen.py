@@ -243,3 +243,8 @@ def test_sparse_failures():
     # undo sabotage of the module
     sys.path = sys_path
     scipy.sparse.csr_matrix = csr_matrix
+
+@needs_numpy_and_eigen
+def test_eigen_scalar_default():
+    x = t.default_arg()
+    assert x==0

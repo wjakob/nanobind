@@ -195,7 +195,7 @@ NB_INLINE void func_extra_apply(F &f, is_operator, size_t &) {
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, rv_policy pol, size_t &) {
-    f.flags = (f.flags & ~0b11) | (uint16_t) pol;
+    f.flags = (f.flags & ~0b111) | (uint16_t) pol;
 }
 
 template <typename F>

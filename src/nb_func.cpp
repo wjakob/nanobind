@@ -256,7 +256,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         fc->flags |= (uint32_t) func_flags::has_args;
 
     if (!has_name)
-        fc->name = "<anonymous>";
+        fc->name = "";
 
     if (is_implicit) {
         if (!(fc->flags & (uint32_t) func_flags::is_constructor))

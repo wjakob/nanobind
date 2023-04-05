@@ -309,6 +309,10 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
         }
     }
 
+    int64_t size = 1;
+    for (uint32_t i = 0; i < req->ndim; ++i)
+        size *= t.shape[i];
+
     scoped_pymalloc<int64_t> strides(t.ndim);
     if ((req->req_order || !t.strides) && t.ndim > 0) {
         size_t accum = 1;
@@ -330,14 +334,14 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
             pass_order = false;
         }
 
-        if (req->req_order) {
+        if (req->req_order && size != 0) { // Tolerate any strides if empty
             if (!t.strides) {
-                // c-style strides assumed
+                /* The provided tensor does not have a valid strides
+                   field, which implies a C-style ordering. */
                 pass_order = req->req_order == 'C';
             } else {
                 for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
-                    if (!((strides[i] == t.strides[i]) ||
-                          (t.shape[i] == 1 && t.strides[i] == 0))) {
+                    if (t.shape[i] != 1 && strides[i] != t.strides[i]) {
                         pass_order = false;
                         break;
                     }

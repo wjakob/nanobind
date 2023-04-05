@@ -164,4 +164,13 @@ NB_MODULE(test_ndarray_ext, m) {
 
             return nb::ndarray<nb::numpy, float>(f, 0, shape, deleter);
     });
+
+    m.def(
+        "noop_3d_c_contig",
+        [](nb::ndarray<float, nb::shape<nb::any, nb::any, nb::any>, nb::c_contig>) { return; });
+
+    m.def(
+        "noop_2d_f_contig",
+        [](nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::f_contig>) { return; });
+
 }

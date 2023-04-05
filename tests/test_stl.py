@@ -752,3 +752,35 @@ def test66_replace_extension():
     assert t.parent_path(PseudoStrPath()) == Path("foo")
     assert t.parent_path(PseudoBytesPath()) == Path("foo")
 
+def test67_chrono():
+    from datetime import datetime, timedelta
+
+    d1 = datetime(2023, 4, 5, 12, 0, 0, 0)
+    d2 = datetime(2023, 4, 5, 12, 30, 0, 123)
+    # datetime -> time_point and duration -> timedelta conversion
+    assert t.difference_between_datetimes(d1, d2) == d1 - d2
+    assert t.difference_between_datetimes(d2, d1) == d2 - d1
+    # date -> time_point conversion
+    assert t.difference_between_datetimes(d2, d1.date()) == timedelta(
+        hours=12, minutes=30, microseconds=123
+    )
+    # time -> time_point conversion
+    assert t.difference_between_datetimes(d2.time(), d1.time()) == timedelta(
+        minutes=30, microseconds=123
+    )
+    assert t.roundtrip_datetime(d1.time()) == datetime(1970, 1, 1, 12, 0, 0)
+    for td in (
+        timedelta(seconds=5),
+        timedelta(microseconds=123),
+        timedelta(days=1, seconds=10),
+        timedelta(seconds=-5),
+        timedelta(microseconds=-123),
+        timedelta(days=-1, seconds=-10),
+    ):
+        # timedelta -> duration conversion
+        assert t.advance_datetime(d1, td) == d1 + td
+        # float -> duration conversion
+        assert t.advance_datetime(d1, td.total_seconds()) == d1 + td
+    # time_point -> datetime conversion
+    assert t.roundtrip_datetime(d1) == d1
+    assert t.roundtrip_datetime(d2) == d2

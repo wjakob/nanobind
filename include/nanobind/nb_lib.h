@@ -395,6 +395,36 @@ NB_CORE PyObject *ndarray_wrap(ndarray_handle *, int framework,
 
 // ========================================================================
 
+/// Unpack a datetime.timedelta object into integer days, seconds, and
+/// microseconds. Returns true if successful, false if `o` is not a timedelta,
+/// or false and sets the Python error indicator if something else went wrong.
+NB_CORE bool unpack_timedelta(PyObject *o, int *days, int *secs,
+                              int *usecs) noexcept;
+
+/// Unpack a datetime.date, datetime.time, or datetime.datetime object into
+/// integer year, month, day, hour, minute, second, and microsecond fields.
+/// Time objects will be considered to represent that time on Jan 1, 1970.
+/// Date objects will be considered to represent midnight on that date.
+/// Returns true if succesful, false if `o` is not a date, time, or datetime,
+/// or false and sets the Python error indicator if something else went wrong.
+NB_CORE bool unpack_datetime(PyObject *o, int *year, int *month, int *day,
+                             int *hour, int *minute, int *second,
+                             int *usec) noexcept;
+
+/// Create a datetime.timedelta object from integer days, seconds, and
+/// microseconds.  Returns a new reference, or nullptr and sets the
+/// Python error indicator on error.
+NB_CORE PyObject* pack_timedelta(int days, int secs, int usecs) noexcept;
+
+/// Create a timezone-naive datetime.datetime object from its components.
+/// Returns a new reference, or nullptr and sets the Python error indicator
+/// on error.
+NB_CORE PyObject* pack_datetime(int year, int month, int day,
+                                int hour, int minute, int second,
+                                int usec) noexcept;
+
+// ========================================================================
+
 /// Print to stdout using Python
 NB_CORE void print(PyObject *file, PyObject *str, PyObject *end);
 

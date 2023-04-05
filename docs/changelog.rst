@@ -7,6 +7,32 @@ Changelog
 
 nanobind uses a `semantic versioning <http://semver.org>`__ policy.
 
+Version 1.1.0 (April 5, 2023)
+-----------------------------
+
+* Added :cpp:func:`size <ndarray::size>`, :cpp:func:`shape_ptr
+  <ndarray::shape_ptr>`, :cpp:func:`stride_ptr <ndarray::stride_ptr>` members
+  to to the :cpp:class:`nb::ndarray\<..\> <ndarray>` class. (PR `#161
+  <https://github.com/wjakob/nanobind/pull/161>`__).
+* Allow macros in :c:macro:`NB_MODULE(..) <NB_MODULE>` name parameter. (PR
+  `#168 <https://github.com/wjakob/nanobind/pull/168>`__).
+* The :cpp:class:`nb::ndarray\<..\> <ndarray>` interface is more tolerant when
+  converting Python (PyTorch/NumPy/..) arrays with a size-0 dimension that have
+  mismatched strides. (PR `#162
+  <https://github.com/wjakob/nanobind/pull/162>`__).
+* Removed the ``<anonymous>`` label from docstrings of anonymous functions,
+  which caused issues in MyPy. (PR `#172
+  <https://github.com/wjakob/nanobind/pull/172>`__).
+* Fixed an issue in the propagation of return value policies that broke
+  user-provided/custom policies in properties (PR `#170
+  <https://github.com/wjakob/nanobind/pull/170>`__).
+* The Eigen interface now converts 1x1 matrices to 1x1 NumPy arrays instead of
+  scalars. (commit `445781
+  <https://github.com/wjakob/nanobind/commit/445781fc2cf2fa326cc22e8fd483e8e4a7bf6cf5>`__).
+* The ``nanobind`` package now has a simple command line interface. (commit
+  `d5ccc8
+  <https://github.com/wjakob/nanobind/commit/d5ccc8844b29ca6cd5188ffd8d16e034bcee9f73>`__).
+
 Version 1.0.0 (March 28, 2023)
 -----------------------------
 

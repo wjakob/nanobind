@@ -34,7 +34,7 @@ Version 1.1.0 (April 5, 2023)
   <https://github.com/wjakob/nanobind/commit/d5ccc8844b29ca6cd5188ffd8d16e034bcee9f73>`__).
 
 Version 1.0.0 (March 28, 2023)
------------------------------
+------------------------------
 
 * Nanobind now has a logo. (commit `b65d31
   <https://github.com/wjakob/nanobind/commit/b65d3b134d8b9f8d153b51d87751d09a12e4235b>`__).

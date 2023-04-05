@@ -19,7 +19,7 @@ _nanobind_ is a small binding library that exposes C++ types in Python and vice
 versa. It is reminiscent of
 [Boost.Python](https://www.boost.org/doc/libs/1_64_0/libs/python/doc/html) and
 [pybind11](https://github.com/pybind/pybind11) and uses near-identical syntax.
-In contrast to these existing tools, nanobind is _more efficient_: bindings
+In contrast to these existing tools, nanobind is more efficient: bindings
 compile in a shorter amount of time, produce smaller binaries, and have better
 runtime performance.
 

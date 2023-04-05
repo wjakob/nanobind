@@ -2130,11 +2130,12 @@ Miscellaneous
 
 .. cpp:struct:: template <typename T, typename D> typed
 
-    This helper class provides an an API for overriding the type annotation of
-    a function argument in generated docstrings. It is particularly helpful
-    when the type signature is not obvious and must be computed at compile time.
-    Otherwise, the :cpp:class:`raw_doc` attribute provides a simpler
-    alternative for taking full control of docstrings and type annotations.
+    This helper class provides an an API for overriding the type
+    annotation of a function argument or return value in generated
+    docstrings. It is particularly helpful when the type signature is
+    not obvious and must be computed at compile time.  Otherwise, the
+    :cpp:class:`raw_doc` attribute provides a simpler alternative for
+    taking full control of docstrings and type annotations.
 
     Consider the following binding that iterates over a Python list.
 

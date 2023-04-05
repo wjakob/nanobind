@@ -220,7 +220,7 @@ template <typename T, typename X> struct type_caster<typed<T, X>> {
         return true;
     }
 
-    static handle from_cpp(const T &src, rv_policy policy,
+    static handle from_cpp(const T2 &src, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
         return Caster::from_cpp(src.value, policy, cleanup);
     }

@@ -349,7 +349,7 @@ Without reference counting
 
       Default move assignment operator.
 
-   .. cpp:function:: operator bool() const
+   .. cpp:function:: explicit operator bool() const
 
       Check if the handle refers to a valid Python object. Equivalent to
       :cpp:func:`detail::api::is_valid()`

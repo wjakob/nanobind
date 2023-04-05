@@ -179,7 +179,7 @@ public:
         return *this;
     }
 
-    NB_INLINE operator bool() const { return m_ptr != nullptr; }
+    NB_INLINE explicit operator bool() const { return m_ptr != nullptr; }
     NB_INLINE PyObject *ptr() const { return m_ptr; }
     NB_INLINE static bool check_(handle) { return true; }
 

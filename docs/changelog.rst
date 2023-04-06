@@ -7,6 +7,21 @@ Changelog
 
 nanobind uses a `semantic versioning <http://semver.org>`__ policy.
 
+Version 1.1.1 (April 6, 2023)
+-----------------------------
+
+* Added documentation on packaging and distributing nanobind modules. (commit
+  `0715b2
+  <https://github.com/wjakob/nanobind/commit/0715b278ba806cf13cf63e41d62438481e7b73b8>`__).
+* Made the conversion :cpp:func:`handle::operator bool() <handle::operator
+  bool>` explicit. (PR `#173 <https://github.com/wjakob/nanobind/pull/173>`__).
+* Support :cpp:class:`nb::typed\<..\> <typed>` in return values. (PR `#174
+  <https://github.com/wjakob/nanobind/pull/174>`__).
+* Tweaks to definitions in ``nb_types.h`` to improve compatibility with further
+  C++ compilers (that said, there is no change about the official set of
+  supported compilers). (commit `b8bd10
+  <https://github.com/wjakob/nanobind/commit/b8bd1086e9b20da8a81a954f03e7947bee5422fd>`__)
+
 Version 1.1.0 (April 5, 2023)
 -----------------------------
 

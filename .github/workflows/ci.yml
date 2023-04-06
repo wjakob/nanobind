@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: test-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # This is the "main" test suite, which tests a large number of different

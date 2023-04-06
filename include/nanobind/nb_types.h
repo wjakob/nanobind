@@ -61,8 +61,8 @@ class object;
 class handle;
 class iterator;
 
-template <typename T = object> T borrow(handle h);
-template <typename T = object> T steal(handle h);
+template <typename T = object> NB_INLINE T borrow(handle h);
+template <typename T = object> NB_INLINE T steal(handle h);
 
 NAMESPACE_BEGIN(detail)
 

@@ -115,8 +115,8 @@ The message at the top warns users attempting to do this.
 
 .. code-block:: cmake
 
-   project(my_ext)
    cmake_minimum_required(VERSION 3.18...3.22)
+   project(my_ext)
 
    if (NOT SKBUILD)
      message(WARNING "\

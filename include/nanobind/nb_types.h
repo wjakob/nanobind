@@ -27,31 +27,46 @@ public:                                                                        \
     NB_INLINE Type() : Parent() {}
 
 /// Helper macro to create detail::api comparison functions
-#define NB_API_COMP(name, op)                                                  \
-    template <typename T> NB_INLINE bool name(const api<T> &o) const {         \
+#define NB_DECL_COMP(name)                                                     \
+    template <typename T2> NB_INLINE bool name(const api<T2> &o) const;
+
+#define NB_IMPL_COMP(name, op)                                                 \
+    template <typename T1> template <typename T2>                              \
+    NB_INLINE bool api<T1>::name(const api<T2> &o) const {                     \
         return detail::obj_comp(derived().ptr(), o.derived().ptr(), op);       \
     }
 
-/// Helper macro to create detail::api unary operators
-#define NB_API_OP_1(name, op)                                                  \
-    NB_INLINE auto name() const {                                              \
+/// Helper macros to create detail::api unary operators
+#define NB_DECL_OP_1(name)                                                     \
+    NB_INLINE object name() const;
+
+#define NB_IMPL_OP_1(name, op)                                                 \
+    template <typename T> NB_INLINE object api<T>::name() const {              \
         return steal(detail::obj_op_1(derived().ptr(), op));                   \
     }
 
-/// Helper macro to create detail::api binary operators
-#define NB_API_OP_2(name, op)                                                  \
-    template <typename T> NB_INLINE auto name(const api<T> &o) const {         \
+/// Helper macros to create detail::api binary operators
+#define NB_DECL_OP_2(name)                                                     \
+    template <typename T2> NB_INLINE object name(const api<T2> &o) const;
+
+#define NB_IMPL_OP_2(name, op)                                                 \
+    template <typename T1> template <typename T2>                              \
+    NB_INLINE object api<T1>::name(const api<T2> &o) const {                   \
         return steal(                                                          \
             detail::obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
     }
 
-#define NB_API_OP_2_I(name, op)                                                \
-    template <typename T> NB_INLINE auto name(const api<T> &o) {               \
+#define NB_DECL_OP_2_I(name)                                                   \
+    template <typename T2> NB_INLINE object name(const api<T2> &o);
+
+#define NB_IMPL_OP_2_I(name, op)                                               \
+    template <typename T1> template <typename T2>                              \
+    NB_INLINE object api<T1>::name(const api<T2> &o) {                         \
         return steal(                                                          \
             detail::obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
     }
 
-#define NB_API_OP_2_IO(name)                                                   \
+#define NB_IMPL_OP_2_IO(name)                                                  \
     template <typename T> NB_INLINE decltype(auto) name(const api<T> &o) {     \
         return operator=(handle::name(o));                                     \
     }
@@ -112,33 +127,33 @@ public:
               typename... Args>
     object operator()(Args &&...args) const;
 
-    NB_API_COMP(equal,      Py_EQ)
-    NB_API_COMP(not_equal,  Py_NE)
-    NB_API_COMP(operator<,  Py_LT)
-    NB_API_COMP(operator<=, Py_LE)
-    NB_API_COMP(operator>,  Py_GT)
-    NB_API_COMP(operator>=, Py_GE)
-    NB_API_OP_1(operator-,  PyNumber_Negative)
-    NB_API_OP_1(operator~,  PyNumber_Invert)
-    NB_API_OP_2(operator+,  PyNumber_Add)
-    NB_API_OP_2(operator-,  PyNumber_Subtract)
-    NB_API_OP_2(operator*,  PyNumber_Multiply)
-    NB_API_OP_2(operator/,  PyNumber_TrueDivide)
-    NB_API_OP_2(operator|,  PyNumber_Or)
-    NB_API_OP_2(operator&,  PyNumber_And)
-    NB_API_OP_2(operator^,  PyNumber_Xor)
-    NB_API_OP_2(operator<<, PyNumber_Lshift)
-    NB_API_OP_2(operator>>, PyNumber_Rshift)
-    NB_API_OP_2(floor_div,  PyNumber_FloorDivide)
-    NB_API_OP_2_I(operator+=, PyNumber_InPlaceAdd)
-    NB_API_OP_2_I(operator-=, PyNumber_InPlaceSubtract)
-    NB_API_OP_2_I(operator*=, PyNumber_InPlaceMultiply)
-    NB_API_OP_2_I(operator/=, PyNumber_InPlaceTrueDivide)
-    NB_API_OP_2_I(operator|=, PyNumber_InPlaceOr)
-    NB_API_OP_2_I(operator&=, PyNumber_InPlaceAnd)
-    NB_API_OP_2_I(operator^=, PyNumber_InPlaceXor)
-    NB_API_OP_2_I(operator<<=,PyNumber_InPlaceLshift)
-    NB_API_OP_2_I(operator>>=,PyNumber_InPlaceRshift)
+    NB_DECL_COMP(equal)
+    NB_DECL_COMP(not_equal)
+    NB_DECL_COMP(operator<)
+    NB_DECL_COMP(operator<=)
+    NB_DECL_COMP(operator>)
+    NB_DECL_COMP(operator>=)
+    NB_DECL_OP_1(operator-)
+    NB_DECL_OP_1(operator~)
+    NB_DECL_OP_2(operator+)
+    NB_DECL_OP_2(operator-)
+    NB_DECL_OP_2(operator*)
+    NB_DECL_OP_2(operator/)
+    NB_DECL_OP_2(operator|)
+    NB_DECL_OP_2(operator&)
+    NB_DECL_OP_2(operator^)
+    NB_DECL_OP_2(operator<<)
+    NB_DECL_OP_2(operator>>)
+    NB_DECL_OP_2(floor_div)
+    NB_DECL_OP_2_I(operator+=)
+    NB_DECL_OP_2_I(operator-=)
+    NB_DECL_OP_2_I(operator*=)
+    NB_DECL_OP_2_I(operator/=)
+    NB_DECL_OP_2_I(operator|=)
+    NB_DECL_OP_2_I(operator&=)
+    NB_DECL_OP_2_I(operator^=)
+    NB_DECL_OP_2_I(operator<<=)
+    NB_DECL_OP_2_I(operator>>=)
 };
 
 NAMESPACE_END(detail)
@@ -225,15 +240,15 @@ public:
         return *this;
     }
 
-    NB_API_OP_2_IO(operator+=)
-    NB_API_OP_2_IO(operator-=)
-    NB_API_OP_2_IO(operator*=)
-    NB_API_OP_2_IO(operator/=)
-    NB_API_OP_2_IO(operator|=)
-    NB_API_OP_2_IO(operator&=)
-    NB_API_OP_2_IO(operator^=)
-    NB_API_OP_2_IO(operator<<=)
-    NB_API_OP_2_IO(operator>>=)
+    NB_IMPL_OP_2_IO(operator+=)
+    NB_IMPL_OP_2_IO(operator-=)
+    NB_IMPL_OP_2_IO(operator*=)
+    NB_IMPL_OP_2_IO(operator/=)
+    NB_IMPL_OP_2_IO(operator|=)
+    NB_IMPL_OP_2_IO(operator&=)
+    NB_IMPL_OP_2_IO(operator^=)
+    NB_IMPL_OP_2_IO(operator<<=)
+    NB_IMPL_OP_2_IO(operator>>=)
 };
 
 template <typename T> NB_INLINE T borrow(handle h) {
@@ -669,6 +684,43 @@ private:
     PyObject *key = nullptr, *value = nullptr;
 };
 
+NB_IMPL_COMP(equal,      Py_EQ)
+NB_IMPL_COMP(not_equal,  Py_NE)
+NB_IMPL_COMP(operator<,  Py_LT)
+NB_IMPL_COMP(operator<=, Py_LE)
+NB_IMPL_COMP(operator>,  Py_GT)
+NB_IMPL_COMP(operator>=, Py_GE)
+NB_IMPL_OP_1(operator-,  PyNumber_Negative)
+NB_IMPL_OP_1(operator~,  PyNumber_Invert)
+NB_IMPL_OP_2(operator+,  PyNumber_Add)
+NB_IMPL_OP_2(operator-,  PyNumber_Subtract)
+NB_IMPL_OP_2(operator*,  PyNumber_Multiply)
+NB_IMPL_OP_2(operator/,  PyNumber_TrueDivide)
+NB_IMPL_OP_2(operator|,  PyNumber_Or)
+NB_IMPL_OP_2(operator&,  PyNumber_And)
+NB_IMPL_OP_2(operator^,  PyNumber_Xor)
+NB_IMPL_OP_2(operator<<, PyNumber_Lshift)
+NB_IMPL_OP_2(operator>>, PyNumber_Rshift)
+NB_IMPL_OP_2(floor_div,  PyNumber_FloorDivide)
+NB_IMPL_OP_2_I(operator+=, PyNumber_InPlaceAdd)
+NB_IMPL_OP_2_I(operator-=, PyNumber_InPlaceSubtract)
+NB_IMPL_OP_2_I(operator*=, PyNumber_InPlaceMultiply)
+NB_IMPL_OP_2_I(operator/=, PyNumber_InPlaceTrueDivide)
+NB_IMPL_OP_2_I(operator|=, PyNumber_InPlaceOr)
+NB_IMPL_OP_2_I(operator&=, PyNumber_InPlaceAnd)
+NB_IMPL_OP_2_I(operator^=, PyNumber_InPlaceXor)
+NB_IMPL_OP_2_I(operator<<=,PyNumber_InPlaceLshift)
+NB_IMPL_OP_2_I(operator>>=,PyNumber_InPlaceRshift)
+
+#undef NB_DECL_COMP
+#undef NB_IMPL_COMP
+#undef NB_DECL_OP_1
+#undef NB_IMPL_OP_1
+#undef NB_DECL_OP_2
+#undef NB_IMPL_OP_2
+#undef NB_DECL_OP_2_I
+#undef NB_IMPL_OP_2_I
+#undef NB_IMPL_OP_2_IO
 
 NAMESPACE_END(detail)
 
@@ -693,9 +745,3 @@ inline detail::fast_iterator list::end() const {
 #endif
 
 NAMESPACE_END(NB_NAMESPACE)
-
-#undef NB_API_COMP
-#undef NB_API_OP_1
-#undef NB_API_OP_2
-#undef NB_API_OP_2_I
-#undef NB_API_OP_2_IO

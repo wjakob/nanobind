@@ -307,3 +307,16 @@ def test34_module_docstring():
 def test35_return_capture():
     x = t.test_35()
     assert x() == 'Test Foo'
+
+def test36_test_char():
+    assert t.test_cast_char('c') == 'c'
+    with pytest.raises(TypeError):
+        assert t.test_cast_char('abc')
+    with pytest.raises(RuntimeError):
+        assert t.test_cast_char(123)
+
+def test37_test_str():
+    assert t.test_cast_str('c') == 'c'
+    assert t.test_cast_str('abc') == 'abc'
+    with pytest.raises(RuntimeError):
+        assert t.test_cast_str(123)

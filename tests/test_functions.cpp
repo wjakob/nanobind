@@ -212,4 +212,12 @@ NB_MODULE(test_functions_ext, m) {
 
         return nb::cpp_function(callback);
     });
+
+    m.def("test_cast_char", [](nb::handle h) {
+        return nb::cast<char>(h);
+    });
+
+    m.def("test_cast_str", [](nb::handle h) {
+        return nb::cast<const char *>(h);
+    });
 }

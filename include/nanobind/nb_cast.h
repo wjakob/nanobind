@@ -338,8 +338,13 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
     if constexpr (std::is_same_v<T, void>) {
         return;
     } else {
-        using Ti     = detail::intrinsic_t<T>;
-        using Caster = detail::make_caster<Ti>;
+        using Caster = detail::make_caster<T>;
+        using Output = typename Caster::template Cast<T>;
+
+        static_assert(
+            !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::IsClass ||
+            std::is_same_v<const char *, T>,
+            "nanobind::cast(): cannot return a reference to a temporary.");
 
         Caster caster;
         if (!caster.from_python(value.derived().ptr(),
@@ -347,18 +352,7 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
                                         : (uint8_t) 0, nullptr))
             detail::raise_cast_error();
 
-        if constexpr (std::is_same_v<T, const char *>) {
-            return caster.operator const char *();
-        } else {
-            static_assert(
-                !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::IsClass,
-                "nanobind::cast(): cannot return a reference to a temporary.");
-
-            if constexpr (detail::is_pointer_v<T>)
-                return caster.operator Ti*();
-            else
-                return caster.operator Ti&();
-        }
+        return caster.operator Output();
     }
 }
 

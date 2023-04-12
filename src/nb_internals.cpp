@@ -403,7 +403,7 @@ static void internals_make() {
     internals_p->nb_bound_method =
         (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
-    // Metaclass #1 (nb_type)
+    // Metaclass (nb_type)
 #if defined(Py_LIMITED_API)
     int tp_itemsize = cast<int>(handle(&PyType_Type).attr("__itemsize__"));
     int tp_basicsize = cast<int>(handle(&PyType_Type).attr("__basicsize__"));
@@ -447,8 +447,7 @@ static void internals_make() {
 
     if (!internals_p->nb_func || !internals_p->nb_method ||
         !internals_p->nb_bound_method || !internals_p->nb_type ||
-        !internals_p->nb_static_property ||
-        !internals_p->nb_ndarray)
+        !internals_p->nb_static_property || !internals_p->nb_ndarray)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000

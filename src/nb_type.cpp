@@ -662,7 +662,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     if (has_dynamic_attr) {
         to->flags |= (uint32_t) type_flags::has_dynamic_attr;
         #if defined(Py_LIMITED_API)
-            to->dictoffset = (Py_ssize_t) (basicsize - ptr_size);
+            to->dictoffset = (size_t) (basicsize - ptr_size);
         #endif
     }
 

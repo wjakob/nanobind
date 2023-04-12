@@ -224,6 +224,6 @@ Here is what this might look like in an implementation:
   MyTensorMedadata &supplement = nb::type_supplement<MyTensorMedadata>(cls);
   supplement.stored_on_gpu = true;
 
-The supplement does not propagate to subclasses created within Python.
-Such types should therefore be created with :cpp:class:`nb::is_final()
-<is_final>`.
+The :cpp:class:`nb::supplement\<T\>() <supplement>` annotation implicitly
+also passes :cpp:class:`nb::is_final() <is_final>` to ensure that type
+objects with supplemental data cannot be subclassed in Python.

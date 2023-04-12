@@ -143,7 +143,7 @@ template <typename T>
 NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
     static_assert(std::is_trivially_default_constructible_v<T>,
                   "The supplement type must be a POD (plain old data) type");
-    t.flags |= (uint32_t) type_flags::has_supplement;
+    t.flags |= (uint32_t) type_flags::has_supplement | (uint32_t) type_flags::is_final;
     t.supplement = (void *) malloc(sizeof(T));
 }
 

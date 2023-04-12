@@ -445,8 +445,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass = is_enum ? internals.nb_enum
-                                      : internals.nb_type;
+    PyTypeObject *metaclass =  internals.nb_type;
 
 #if PY_VERSION_HEX >= 0x030C0000
     // Life is good, PyType_FromMetaclass() is available
@@ -785,8 +784,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     PyTypeObject *src_type = Py_TYPE(src);
     const std::type_info *cpp_type_src = nullptr;
     const PyTypeObject *metaclass = Py_TYPE((PyObject *) src_type);
-    const bool src_is_nb_type = metaclass == internals.nb_type ||
-                                metaclass == internals.nb_enum;
+    const bool src_is_nb_type = metaclass == internals.nb_type;
 
     type_data *dst_type = nullptr;
 
@@ -867,7 +865,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     nb_internals &internals = internals_get();
     PyTypeObject *metaclass = Py_TYPE((PyObject *) Py_TYPE(nurse));
 
-    if (metaclass == internals.nb_type || metaclass == internals.nb_enum) {
+    if (metaclass == internals.nb_type) {
         // Populate nanobind-internal data structures
         keep_alive_set &keep_alive = internals.keep_alive[nurse];
 
@@ -909,7 +907,7 @@ void keep_alive(PyObject *nurse, void *payload,
 
     nb_internals &internals = internals_get();
 
-    if (metaclass == internals.nb_type || metaclass == internals.nb_enum) {
+    if (metaclass == internals.nb_type) {
         keep_alive_set &keep_alive = internals.keep_alive[nurse];
         auto [it, success] = keep_alive.emplace(payload, callback);
         if (!success)
@@ -1221,8 +1219,7 @@ bool nb_type_check(PyObject *t) noexcept {
     nb_internals &internals = internals_get();
     PyTypeObject *metaclass = Py_TYPE(t);
 
-    return metaclass == internals.nb_type ||
-           metaclass == internals.nb_enum;
+    return metaclass == internals.nb_type;
 }
 
 size_t nb_type_size(PyObject *t) noexcept {

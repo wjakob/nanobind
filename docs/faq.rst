@@ -137,7 +137,7 @@ for ``T`` that says: "ignore ``T`` and don't use a type caster to handle it".
 
 .. warning::
 
-   If your extension consistes of multiple source code files that involve
+   If your extension consists of multiple source code files that involve
    overlapping use of type casters and bindings, you are *treading on thin
    ice*. It is easy to violate the *One Definition Rule* (ODR) [`details
    <https://en.wikipedia.org/wiki/One_Definition_Rule>`_] in such a case, which

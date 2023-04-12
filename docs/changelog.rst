@@ -5,7 +5,21 @@
 Changelog
 #########
 
-nanobind uses a `semantic versioning <http://semver.org>`__ policy.
+nanobind uses a `semantic versioning <http://semver.org>`__ policy for its API.
+It also has a separate ABI version that is *not* subject to semantic
+versioning.
+
+The ABI version is relevant whenever a type binding from one extension module
+should be visible in another (also nanobind-based) extension module. In this
+case, both modules must use the same nanobind ABI version, or they will be
+isolated from each other. Releases that don't explicitly mention an ABI version
+below inherit that of the preceding release.
+
+Version 1.2.0 (TBA)
+-------------------
+
+* Removed the superfluous ``nb_enum`` metaclass.
+* ABI version 8.
 
 Version 1.1.1 (April 6, 2023)
 -----------------------------
@@ -171,7 +185,7 @@ Version 0.2.0 (March 3, 2023)
   (commit `fe4965
   <https://github.com/wjakob/nanobind/commit/fe4965369435bf7c0925bddf610553d0bb516e27>`__).
 * Various minor fixes and improvements.
-* Internals ABI version bump.
+* ABI version 7.
 
 Version 0.1.0 (January 3, 2023)
 -------------------------------
@@ -199,7 +213,7 @@ Version 0.1.0 (January 3, 2023)
   discovered in this codebase. (commit `3b81b1
   <https://github.com/wjakob/nanobind/commit/3b81b18577e243118a659b524d4de9500a320312>`__).
 * Various minor fixes and improvements.
-* Internals ABI version bump.
+* ABI version 6.
 
 Version 0.0.9 (Nov 23, 2022)
 ----------------------------
@@ -261,7 +275,7 @@ Version 0.0.8 (Oct 27, 2022)
   extension modules in conjunction with ``typing.py`` (commit `5e11e80
   <https://github.com/wjakob/nanobind/commit/5e11e8032f777c0a34abd437dc6e84a909907c91>`__).
 * Various minor fixes and improvements.
-* Internals ABI version bump.
+* ABI version 5.
 
 Version 0.0.7 (Oct 14, 2022)
 ----------------------------

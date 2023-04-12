@@ -196,20 +196,6 @@ static PyType_Spec nb_type_spec = {
     /* .slots = */ nb_type_slots
 };
 
-static PyType_Slot nb_enum_slots[] = {
-    { Py_tp_base, nullptr },
-    { 0, nullptr }
-};
-
-static PyType_Spec nb_enum_spec = {
-    /*.name = */"nanobind.nb_enum",
-    /*.basicsize = */0,
-    /*.itemsize = */0,
-    /*.flags = */Py_TPFLAGS_DEFAULT,
-    /*.slots = */nb_enum_slots
-};
-
-
 #if PY_VERSION_HEX >= 0x030C0000
 static PyMemberDef nb_static_property_members[] = {
     { "__doc__", T_OBJECT, 0, 0, nullptr },
@@ -425,15 +411,11 @@ static void internals_make() {
     int tp_itemsize = (int) PyType_Type.tp_itemsize;
     int tp_basicsize = (int) PyType_Type.tp_basicsize;
 #endif
-    nb_type_spec.basicsize = nb_enum_spec.basicsize = tp_basicsize
+    nb_type_spec.basicsize = tp_basicsize
         + (int) sizeof(type_data);
-    nb_type_spec.itemsize = nb_enum_spec.itemsize = tp_itemsize;
+    nb_type_spec.itemsize = tp_itemsize;
     nb_type_slots[0].pfunc = &PyType_Type;
     internals_p->nb_type = (PyTypeObject *) PyType_FromSpec(&nb_type_spec);
-
-    // Metaclass #2 (nb_enum)
-    nb_enum_slots[0].pfunc = internals_p->nb_type;
-    internals_p->nb_enum = (PyTypeObject *) PyType_FromSpec(&nb_enum_spec);
 
     /// Static properties
  #if defined(Py_LIMITED_API)
@@ -465,7 +447,7 @@ static void internals_make() {
 
     if (!internals_p->nb_func || !internals_p->nb_method ||
         !internals_p->nb_bound_method || !internals_p->nb_type ||
-        !internals_p->nb_enum || !internals_p->nb_static_property ||
+        !internals_p->nb_static_property ||
         !internals_p->nb_ndarray)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 

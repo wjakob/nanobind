@@ -178,7 +178,7 @@ struct nb_internals {
     PyObject *nb_module;
 
     /// Registered metaclasses for nanobind classes and enumerations
-    PyTypeObject *nb_type, *nb_enum;
+    PyTypeObject *nb_type;
 
     /// Types of nanobind functions and methods
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;

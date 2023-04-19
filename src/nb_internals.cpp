@@ -77,7 +77,6 @@ NAMESPACE_BEGIN(detail)
 extern PyObject *nb_func_getattro(PyObject *, PyObject *);
 extern PyObject *nb_func_get_doc(PyObject *, void *);
 extern PyObject *nb_bound_method_getattro(PyObject *, PyObject *);
-extern PyObject *nb_func_get_getset(PyObject *, PyObject *);
 extern int nb_func_traverse(PyObject *, visitproc, void *);
 extern int nb_func_clear(PyObject *);
 extern void nb_func_dealloc(PyObject *);

@@ -414,17 +414,4 @@ NB_MODULE(test_stl_ext, m) {
     nb::class_<ClassWithMovableField>(m, "ClassWithMovableField")
         .def(nb::init<>())
         .def_rw("movable", &ClassWithMovableField::movable);
-
-    // test67
-    using time_point = std::chrono::time_point<std::chrono::system_clock,
-                                               std::chrono::microseconds>;
-    m.def("difference_between_datetimes",
-          [](const time_point& lhs, const time_point& rhs) {
-              return lhs - rhs;
-          });
-    m.def("advance_datetime",
-          [](const time_point& lhs, const std::chrono::microseconds& rhs) {
-              return lhs + rhs;
-          });
-    m.def("roundtrip_datetime", [](const time_point& p) { return p; });
 }

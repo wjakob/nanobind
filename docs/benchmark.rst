@@ -20,8 +20,8 @@ The following experiments analyze the performance of a large function-heavy
 <https://github.com/pybind/pybind11/tree/smart_holder>`__ that addresses
 long-standing issues related to holder types in pybind11.
 
-Each experiment is shown twice: light gray `[debug]` columns provide data for
-a debug build, and `[opt]` shows a size-optimized build that is representative
+Each experiment is shown twice: light gray ``[debug]`` columns provide data for
+a debug build, and ``[opt]`` shows a size-optimized build that is representative
 of a deployment scenario. The former is included to show that nanobind
 performance is also good during a typical development workflow.
 

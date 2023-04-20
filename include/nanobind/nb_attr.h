@@ -53,7 +53,6 @@ struct is_implicit {};
 struct is_operator {};
 struct is_arithmetic {};
 struct is_final {};
-struct is_enum { bool is_signed; };
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};

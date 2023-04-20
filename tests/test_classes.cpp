@@ -330,15 +330,16 @@ NB_MODULE(test_classes_ext, m) {
     mcls.def("f", []{});
     ncls.def("f", []{});
 
-    // test18_static_properties
+    // test18_static_properties, test19_static_properties_doc
     nb::class_<StaticProperties>(m, "StaticProperties")
         .def_rw_static("value", &StaticProperties::value, "Static property docstring")
         .def_static("get", []{ return StaticProperties::value; } );
 
     nb::class_<StaticProperties2, StaticProperties>(m, "StaticProperties2");
 
-    // test19_supplement
+    // test20_supplement
     struct ClassWithSupplement { };
+    struct ClassWithExternalSupplement { };
     struct Supplement {
         uint8_t data[0xFF];
     };
@@ -350,19 +351,44 @@ NB_MODULE(test_classes_ext, m) {
     for (uint8_t i = 0; i < 0xFF; ++i)
         supplement.data[i] = i;
 
+    auto supp2 = std::make_unique<Supplement>();
+    for (uint8_t i = 0; i < 0xFF; ++i)
+        supp2->data[i] = i;
+    // NB: set as an attribute of MyClass rather than of the module, so that
+    // we can force it to GC before interpreter exit (in order to validate
+    // what happens during GC). Python saves a copy of the top-level module
+    // dictionary in order to avoid re-invoking the module init function if
+    // the sys.modules entry is deleted, and we can't easily remove an item
+    // from this copy.
+    auto scls2 = nb::class_<ClassWithExternalSupplement>(
+            mcls, "ClassWithExternalSupplement", nb::supplement<Supplement*>())
+        .def(nb::init<>());
+    nb::type_supplement<Supplement*>(scls2) = supp2.get();
+    nb::detail::keep_alive(scls2.ptr(), supp2.release(),
+                           [](void *data) noexcept {
+                               try {
+                                   nb::print("Destroying external supplement");
+                               } catch (...) {}
+                               delete static_cast<Supplement*>(data);
+                           });
+
     m.def("check_supplement", [](nb::handle h) {
+        Supplement *s = nullptr;
         if (nb::isinstance<ClassWithSupplement>(h)) {
-            Supplement &s2 = nb::type_supplement<Supplement>(h.type());
-            for (uint16_t i = 0; i < 0xFF; ++i) {
-                if (s2.data[i] != i)
-                    return false;
-            }
-            return true;
+            s = &nb::type_supplement<Supplement>(h.type());
+        } else if (nb::isinstance<ClassWithExternalSupplement>(h)) {
+            s = nb::type_supplement<Supplement*>(h.type());
+        } else {
+            return false;
         }
-        return false;
+        for (uint16_t i = 0; i < 0xFF; ++i) {
+            if (s->data[i] != i)
+                return false;
+        }
+        return true;
     });
 
-    // test20_type_callback
+    // test21_type_callback
     PyType_Slot slots[] {
         { Py_sq_length, (void *) sq_length_dummy },
         { 0, nullptr }
@@ -372,7 +398,7 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<ClassWithLen>(m, "ClassWithLen", nb::type_slots(slots))
         .def(nb::init<>());
 
-    // test21_low_level
+    // test22_low_level
     m.def("test_lowlevel", []() {
         nb::handle py_type = nb::type<Struct>();
         if (!(nb::type_check(py_type) &&
@@ -421,25 +447,25 @@ NB_MODULE(test_classes_ext, m) {
         return nb::make_tuple(py_inst, py_inst_2, py_inst_3);
     });
 
-    // test22_handle_t
+    // test23_handle_t
     m.def("test_handle_t", [](nb::handle_t<Struct> h) { return borrow(h); });
 
-    // test23_type_object_t
+    // test24_type_object_t
     m.def("test_type_object_t", [](nb::type_object_t<Struct> h) -> nb::object { return std::move(h); });
 
-    // test24_none_arg
+    // test25_none_arg
     m.def("none_0", [](Struct *s) { return s == nullptr; });
     m.def("none_1", [](Struct *s) { return s == nullptr; }, nb::arg());
     m.def("none_2", [](Struct *s) { return s == nullptr; }, nb::arg("arg"));
     m.def("none_3", [](Struct *s) { return s == nullptr; }, nb::arg().none());
     m.def("none_4", [](Struct *s) { return s == nullptr; }, nb::arg("arg").none());
 
-    // test25_is_final
+    // test26_is_final
     struct FinalType { };
     nb::class_<FinalType>(m, "FinalType", nb::is_final())
         .def(nb::init<>());
 
-    // test26_dynamic_attr
+    // test27_dynamic_attr
     struct StructWithAttr : Struct { };
     nb::class_<StructWithAttr, Struct>(m, "StructWithAttr", nb::dynamic_attr())
         .def(nb::init<int>());

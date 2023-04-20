@@ -227,3 +227,20 @@ Here is what this might look like in an implementation:
 The :cpp:class:`nb::supplement\<T\>() <supplement>` annotation implicitly
 also passes :cpp:class:`nb::is_final() <is_final>` to ensure that type
 objects with supplemental data cannot be subclassed in Python.
+
+nanobind does not perform any initialization or destruction of the
+supplemental data, and therefore requires that the specified type
+``T`` be trivially default constructible. Note that the supplemental
+data will be **uninitialized** when the type is created, so you must
+either set all fields or use placement new to value-initialize the object.
+If you need to make your supplement own resources, you can use
+``nb::supplement<T*>()`` instead, and manage the lifetime of the ``T``
+object yourself.
+
+.. warning:: If your supplemental data owns Python object references,
+             you may wind up with reference leaks because the supplemental
+             data is not visible to Python's garbage collector. A recommended
+             alternative is to store the Python object references as
+             attributes of the type object (in its ``__dict__``), and
+             cache only non-owning references (:cpp:class:`nb::handle <handle>`)
+             inside the supplemental data.

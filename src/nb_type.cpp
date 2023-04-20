@@ -261,7 +261,7 @@ void nb_type_dealloc(PyObject *o) {
         free(t->implicit_py);
     }
 
-    if (t->flags & (uint32_t) type_flags::has_supplement)
+    if (t->flags & (uint32_t) type_flags::owns_supplement)
         free(t->supplement);
 
     free((char *) t->name);
@@ -320,13 +320,11 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     *t = *t_b;
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions |
-                  (uint32_t) type_flags::has_supplement);
+                  (uint32_t) type_flags::owns_supplement);
     PyObject *name = nb_type_name((PyTypeObject *) self);
     t->name = NB_STRDUP(PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
     t->type_py = (PyTypeObject *) self;
-    t->base = t_b->type;
-    t->base_py = t_b->type_py;
     t->implicit = nullptr;
     t->implicit_py = nullptr;
     t->supplement = nullptr;
@@ -335,17 +333,13 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 }
 
 /// Called when a C++ type is bound via nb::class_<>
-PyObject *nb_type_new(const type_data *t) noexcept {
-    bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
-         is_unsigned_enum  = t->flags & (uint32_t) type_flags::is_unsigned_enum,
-         is_arithmetic     = t->flags & (uint32_t) type_flags::is_arithmetic,
-         is_enum           = is_signed_enum || is_unsigned_enum,
-         has_scope         = t->flags & (uint32_t) type_flags::has_scope,
-         has_doc           = t->flags & (uint32_t) type_flags::has_doc,
-         has_base          = t->flags & (uint32_t) type_flags::has_base,
-         has_base_py       = t->flags & (uint32_t) type_flags::has_base_py,
-         has_type_slots    = t->flags & (uint32_t) type_flags::has_type_slots,
-         has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
+PyObject *nb_type_new(const type_data_prelim *t) noexcept {
+    bool has_scope         = t->flags & (uint32_t) type_flags::has_scope,
+         has_doc           = t->flags & (uint32_t) type_flags_prelim::has_doc,
+         has_base          = t->flags & (uint32_t) type_flags_prelim::has_base,
+         has_base_py       = t->flags & (uint32_t) type_flags_prelim::has_base_py,
+         has_type_slots    = t->flags & (uint32_t) type_flags_prelim::has_type_slots,
+         owns_supplement    = t->flags & (uint32_t) type_flags::owns_supplement,
          has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
@@ -387,6 +381,9 @@ PyObject *nb_type_new(const type_data *t) noexcept {
             fail("nanobind::detail::nb_type_new(\"%s\"): multiple base types "
                  "specified!", t->name);
         base = (PyObject *) t->base_py;
+        if (Py_TYPE(base) != internals.nb_type)
+            fail("nanobind::detail::nb_type_new(\"%s\"): base type is "
+                 "not a nanobind type!", t->name);
     } else if (has_base) {
         auto it = internals.type_c2p.find(std::type_index(*t->base));
         if (it == internals.type_c2p.end())
@@ -412,15 +409,13 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     }
     char *name_copy = NB_STRDUP(name.c_str());
 
-    constexpr size_t nb_enum_max_slots = 22,
-                     nb_type_max_slots = 10,
+    constexpr size_t nb_type_max_slots = 10,
                      nb_extra_slots = 80,
-                     nb_total_slots = nb_enum_max_slots +
-                                      nb_type_max_slots +
+                     nb_total_slots = nb_type_max_slots +
                                       nb_extra_slots + 1;
 
-    PyMemberDef members[2] { };
     PyType_Slot slots[nb_total_slots], *s = slots;
+    PyMemberDef members[2] { };
     PyType_Spec spec = {
         /* .name = */ name_copy,
         /* .basicsize = */ (int) basicsize,
@@ -448,9 +443,6 @@ PyObject *nb_type_new(const type_data *t) noexcept {
             *s++ = t->type_slots[i++];
         }
     }
-
-    if (is_enum)
-        nb_enum_prepare(&s, is_arithmetic);
 
     bool has_traverse = false;
     for (PyType_Slot *ts = slots; ts != s; ++ts) {
@@ -676,7 +668,8 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 #endif
 
     type_data *to = nb_type_data((PyTypeObject *) result);
-    *to = *t;
+    *to = *t; // note: slices off _prelim parts
+    to->flags &= ~(uint32_t) type_flags_prelim::all_prelim_flags;
 
     if (!has_scope)
         to->flags &= ~(uint32_t) type_flags::has_scope;
@@ -690,13 +683,9 @@ PyObject *nb_type_new(const type_data *t) noexcept {
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;
 
-    if (has_supplement) {
-        if (!to->supplement)
-            fail("nanobind::detail::nb_type_new(\"%s\"): supplemental data "
-                 "allocation failed!", t->name);
-    } else {
-        to->supplement = nullptr;
-    }
+    if (owns_supplement && !to->supplement)
+        fail("nanobind::detail::nb_type_new(\"%s\"): supplemental data "
+             "allocation failed!", t->name);
 
     if (has_dynamic_attr) {
         to->flags |= (uint32_t) type_flags::has_dynamic_attr;
@@ -1338,8 +1327,8 @@ const std::type_info *nb_type_info(PyObject *t) noexcept {
     return nb_type_data((PyTypeObject *) t)->type;
 }
 
-void *nb_type_supplement(PyObject *t) noexcept {
-    return nb_type_data((PyTypeObject *) t)->supplement;
+void **nb_type_supplement(PyObject *t) noexcept {
+    return &(nb_type_data((PyTypeObject *) t)->supplement);
 }
 
 PyObject *nb_inst_alloc(PyTypeObject *t) {

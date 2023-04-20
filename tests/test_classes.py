@@ -446,10 +446,20 @@ def test19_static_properties_doc():
     assert "Static property docstring" in pydoc.render_doc(t.StaticProperties2)
 
 
-def test20_supplement():
+def test20_supplement(capsys):
     c = t.ClassWithSupplement()
     assert t.check_supplement(c)
+    assert t.check_supplement(t.MyClass.ClassWithExternalSupplement())
     assert not t.check_supplement(t.Struct())
+    if sys.implementation.name == "pypy":
+        # pypy doesn't GC module contents:
+        # https://foss.heptapod.net/pypy/pypy/-/issues/3855
+        return
+    # test destruction of external supplement via keep_alive:
+    assert capsys.readouterr().out == ""
+    del t.MyClass.ClassWithExternalSupplement
+    collect()
+    assert capsys.readouterr().out == "Destroying external supplement\n"
 
 
 def test21_type_callback():

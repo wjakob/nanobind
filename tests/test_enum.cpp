@@ -8,6 +8,35 @@ enum ClassicEnum { Item1, Item2 };
 
 struct EnumProperty { Enum get_enum() { return Enum::A; } };
 
+enum class Color : uint8_t {
+    Black = 0,
+    Red = 1,
+    Green = 2,
+    Yellow = 3,
+    Blue = 4,
+    Magenta = 5,
+    Cyan = 6,
+    White = 7
+};
+static PyObject *color_or(PyObject *a, PyObject *b) {
+    PyObject *ia = PyNumber_Long(a);
+    PyObject *ib = PyNumber_Long(b);
+    if (!ia || !ib)
+        return nullptr;
+    PyObject *result = PyNumber_Or(ia, ib);
+    Py_DECREF(ia);
+    Py_DECREF(ib);
+    if (!result)
+        return nullptr;
+    PyObject *wrapped_result = PyObject_CallFunctionObjArgs(
+            (PyObject *) Py_TYPE(a), result, nullptr);
+    Py_DECREF(result);
+    return wrapped_result;
+}
+static PyType_Slot color_slots[] = {
+    { Py_nb_or, (void *) color_or },
+    { 0, nullptr }
+};
 
 NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum")
@@ -26,6 +55,17 @@ NB_MODULE(test_enum_ext, m) {
         .value("Item1", ClassicEnum::Item1)
         .value("Item2", ClassicEnum::Item2)
         .export_values();
+
+    // test with custom type slots
+    nb::enum_<Color>(m, "Color", nb::is_arithmetic(), nb::type_slots(color_slots))
+        .value("Black", Color::Black)
+        .value("Red", Color::Red)
+        .value("Green", Color::Green)
+        .value("Blue", Color::Blue)
+        .value("Cyan", Color::Cyan)
+        .value("Yellow", Color::Yellow)
+        .value("Magenta", Color::Magenta)
+        .value("White", Color::White);
 
     m.def("from_enum", [](Enum value) { return (uint32_t) value; });
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });

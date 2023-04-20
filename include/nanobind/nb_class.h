@@ -10,6 +10,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+/// Flags about a type that persist throughout its lifetime
 enum class type_flags : uint32_t {
     /// Does the type provide a C++ destructor?
     is_destructible          = (1 << 0),
@@ -20,78 +21,79 @@ enum class type_flags : uint32_t {
     /// Does the type provide a C++ move constructor?
     is_move_constructible    = (1 << 2),
 
-    /// Is this a python type that extends a bound C++ type?
-    is_python_type           = (1 << 4),
-
-    /// Is the 'scope' field of the type_data structure set?
-    has_scope                = (1 << 5),
-
-    /// Is the 'doc' field of the type_data structure set?
-    has_doc                  = (1 << 6),
-
-    /// Is the 'base' field of the type_data structure set?
-    has_base                 = (1 << 7),
-
-    /// Is the 'base_py' field of the type_data structure set?
-    has_base_py              = (1 << 8),
-
     /// Is the 'destruct' field of the type_data structure set?
-    has_destruct             = (1 << 9),
+    has_destruct             = (1 << 4),
 
     /// Is the 'copy' field of the type_data structure set?
-    has_copy                 = (1 << 10),
+    has_copy                 = (1 << 5),
 
     /// Is the 'move' field of the type_data structure set?
-    has_move                 = (1 << 11),
+    has_move                 = (1 << 6),
 
     /// Internal: does the type maintain a list of implicit conversions?
-    has_implicit_conversions = (1 << 12),
+    has_implicit_conversions = (1 << 7),
 
-    /// This type is a signed enumeration
-    is_signed_enum           = (1 << 13),
-
-    /// This type is an unsigned enumeration
-    is_unsigned_enum         = (1 << 14),
-
-    /// This type is an arithmetic enumeration
-    is_arithmetic            = (1 << 15),
-
-    /// This type provides extra PyType_Slot fields
-    has_type_slots           = (1 << 16),
+    /// Is this a python type that extends a bound C++ type?
+    is_python_type           = (1 << 8),
 
     /// This type does not permit subclassing from Python
-    is_final                 = (1 << 17),
+    is_final                 = (1 << 9),
 
-    /// This type does not permit subclassing from Python
-    has_supplement           = (1 << 18),
+    /// Is the 'scope' field of the type_data_prelim structure set?
+    has_scope                = (1 << 10),
+
+    /// This type's supplemental information is heap-allocated and
+    /// owned by the type object, and should be freed when the type
+    /// object is destroyed
+    owns_supplement          = (1 << 11),
 
     /// Instances of this type support dynamic attribute assignment
-    has_dynamic_attr         = (1 << 19),
+    has_dynamic_attr         = (1 << 12),
 
     /// The class uses an intrusive reference counting approach
-    intrusive_ptr            = (1 << 20),
+    intrusive_ptr            = (1 << 13),
 
     /// Is this a trampoline class meant to be overloaded in Python?
-    is_trampoline            = (1 << 21)
+    is_trampoline            = (1 << 14)
+
+    // Five more flag bits available (15 through 19) without needing
+    // a larger reorganization
 };
 
+/// Flags about a type that are only relevant when it is being created.
+/// These are currently stored in type_data::flags alongside the type_flags
+/// for more efficient memory layout, but could move elsewhere if we run
+/// out of flags.
+enum class type_flags_prelim : uint32_t {
+    /// Is the 'doc' field of the type_data_prelim structure set?
+    has_doc                  = (1 << 20),
+
+    /// Is the 'base' field of the type_data_prelim structure set?
+    has_base                 = (1 << 21),
+
+    /// Is the 'base_py' field of the type_data_prelim structure set?
+    has_base_py              = (1 << 22),
+
+    /// This type provides extra PyType_Slot fields
+    has_type_slots           = (1 << 23),
+
+    all_prelim_flags         = (0xf << 20)
+};
+
+/// Information about a type that persists throughout its lifetime
 struct type_data {
     uint32_t size;
     uint32_t align : 8;
     uint32_t flags : 24;
     const char *name;
-    const char *doc;
     PyObject *scope;
     const std::type_info *type;
-    const std::type_info *base;
     PyTypeObject *type_py;
-    PyTypeObject *base_py;
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
     const std::type_info **implicit;
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
-    PyType_Slot *type_slots;
     void *supplement;
     void (*set_self_py)(void *, PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
@@ -99,52 +101,86 @@ struct type_data {
 #endif
 };
 
-NB_INLINE void type_extra_apply(type_data &t, const handle &h) {
-    t.flags |= (uint32_t) type_flags::has_base_py;
+// If true, then nb::supplement<T> stores the T directly in
+// type_data::supplement, rather than having type_data::supplement point to it.
+template <class T>
+constexpr bool use_inline_supplement = (std::is_pointer_v<T> &&
+                                        sizeof(T) <= sizeof(void*) &&
+                                        alignof(T) <= alignof(void*));
+
+/// Information about a type that is only relevant when it is being created
+struct type_data_prelim : type_data {
+    const std::type_info *base;
+    PyTypeObject *base_py;
+    const char *doc;
+    const PyType_Slot *type_slots;
+};
+
+NB_INLINE void type_extra_apply(type_data_prelim &t, const handle &h) {
+    t.flags |= (uint32_t) type_flags_prelim::has_base_py;
     t.base_py = (PyTypeObject *) h.ptr();
 }
 
-NB_INLINE void type_extra_apply(type_data &t, const char *doc) {
-    t.flags |= (uint32_t) type_flags::has_doc;
+NB_INLINE void type_extra_apply(type_data_prelim &t, const char *doc) {
+    t.flags |= (uint32_t) type_flags_prelim::has_doc;
     t.doc = doc;
 }
 
-NB_INLINE void type_extra_apply(type_data &t, type_slots c) {
-    t.flags |= (uint32_t) type_flags::has_type_slots;
+NB_INLINE void type_extra_apply(type_data_prelim &t, type_slots c) {
+    t.flags |= (uint32_t) type_flags_prelim::has_type_slots;
     t.type_slots = c.value;
 }
 
 template <typename T>
-NB_INLINE void type_extra_apply(type_data &t, intrusive_ptr<T> ip) {
+NB_INLINE void type_extra_apply(type_data_prelim &t, intrusive_ptr<T> ip) {
     t.flags |= (uint32_t) type_flags::intrusive_ptr;
     t.set_self_py = (void (*)(void *, PyObject *) noexcept) ip.set_self_py;
 }
 
-NB_INLINE void type_extra_apply(type_data &t, is_enum e) {
-    if (e.is_signed)
-        t.flags |= (uint32_t) type_flags::is_signed_enum;
-    else
-        t.flags |= (uint32_t) type_flags::is_unsigned_enum;
-}
-
-NB_INLINE void type_extra_apply(type_data &t, is_final) {
+NB_INLINE void type_extra_apply(type_data_prelim &t, is_final) {
     t.flags |= (uint32_t) type_flags::is_final;
 }
 
-NB_INLINE void type_extra_apply(type_data &t, is_arithmetic) {
-    t.flags |= (uint32_t) type_flags::is_arithmetic;
-}
-
-NB_INLINE void type_extra_apply(type_data &t, dynamic_attr) {
+NB_INLINE void type_extra_apply(type_data_prelim &t, dynamic_attr) {
     t.flags |= (uint32_t) type_flags::has_dynamic_attr;
 }
 
 template <typename T>
-NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
+NB_INLINE void type_extra_apply(type_data_prelim &t, supplement<T>) {
     static_assert(std::is_trivially_default_constructible_v<T>,
-                  "The supplement type must be a POD (plain old data) type");
-    t.flags |= (uint32_t) type_flags::has_supplement | (uint32_t) type_flags::is_final;
-    t.supplement = (void *) malloc(sizeof(T));
+                  "nb::supplement<T> requires that T be a plain old data (POD) "
+                  "type; if you want to use something that's not, then pass "
+                  "nb::supplement<T*> and manage its lifetime yourself");
+    t.flags |= (uint32_t) type_flags::is_final;
+    if constexpr (use_inline_supplement<T>) {
+        t.supplement = nullptr;
+    } else {
+        t.flags |= (uint32_t) type_flags::owns_supplement;
+        t.supplement = (void *) malloc(sizeof(T));
+    }
+}
+
+/// Information needed to create an enum (in addition to type_data)
+struct enum_data_prelim : type_data_prelim {
+    bool is_signed = false;
+    bool is_arithmetic = false;
+    uint32_t next_slot = 0;
+    static constexpr uint32_t max_slots = 40;
+    PyType_Slot slots_storage[max_slots];
+};
+
+NB_INLINE void type_extra_apply(enum_data_prelim &ed, is_arithmetic) {
+    ed.is_arithmetic = true;
+}
+
+// enums can't have base classes or be intrusive, and are always final
+void type_extra_apply(enum_data_prelim &, const handle &) = delete;
+template <typename T>
+void type_extra_apply(enum_data_prelim &, intrusive_ptr<T>) = delete;
+void type_extra_apply(enum_data_prelim &, is_final) = delete;
+
+template <typename T> void wrap_destruct(void *value) noexcept {
+    ((T *) value)->~T();
 }
 
 template <typename T> void wrap_copy(void *dst, const void *src) {
@@ -153,10 +189,6 @@ template <typename T> void wrap_copy(void *dst, const void *src) {
 
 template <typename T> void wrap_move(void *dst, void *src) noexcept {
     new ((T *) dst) T(std::move(*(T *) src));
-}
-
-template <typename T> void wrap_destruct(void *value) noexcept {
-    ((T *) value)->~T();
 }
 
 template <typename, template <typename, typename> typename, typename...>
@@ -268,19 +300,19 @@ public:
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
-        detail::type_data d;
+        detail::type_data_prelim d;
 
         d.flags = (uint32_t) detail::type_flags::has_scope;
         d.align = (uint8_t) alignof(Alias);
         d.size = (uint32_t) sizeof(Alias);
-        d.supplement = 0;
+        d.supplement = nullptr;
         d.name = name;
         d.scope = scope.ptr();
         d.type = &typeid(T);
 
         if constexpr (!std::is_same_v<Base, T>) {
             d.base = &typeid(Base);
-            d.flags |= (uint32_t) detail::type_flags::has_base;
+            d.flags |= (uint32_t) detail::type_flags_prelim::has_base;
         }
 
         if constexpr (!std::is_same_v<Alias, T>)
@@ -468,9 +500,36 @@ public:
     using Base = class_<T>;
 
     template <typename... Extra>
-    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra)
-        : Base(scope, name, extra...,
-               is_enum{ std::is_signed_v<std::underlying_type_t<T>> }) { }
+    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra) {
+        detail::enum_data_prelim d;
+
+        static_assert(std::is_trivially_copyable_v<T>);
+        d.flags = ((uint32_t) detail::type_flags::has_scope |
+                   (uint32_t) detail::type_flags::is_copy_constructible |
+                   (uint32_t) detail::type_flags::is_move_constructible |
+                   (uint32_t) detail::type_flags::is_destructible |
+                   (uint32_t) detail::type_flags::is_final);
+        d.align = (uint8_t) alignof(T);
+        d.size = (uint32_t) sizeof(T);
+        d.supplement = nullptr;
+        d.name = name;
+        d.scope = scope.ptr();
+        d.type = &typeid(T);
+        d.is_signed = std::is_signed_v<std::underlying_type_t<T>>;
+
+        (detail::type_extra_apply(d, extra), ...);
+        detail::nb_enum_prepare(&d);
+
+        if (d.flags & (uint32_t) detail::type_flags_prelim::has_type_slots) {
+            // Add the user-provided slots after the nanobind-provided
+            // ones, so that they can override our functionality
+            nb_enum_extend_slots(&d, d.type_slots);
+        }
+        d.flags |= (uint32_t) detail::type_flags_prelim::has_type_slots;
+        d.slots_storage[d.next_slot] = {0, nullptr};
+        d.type_slots = d.slots_storage;
+        Base::m_ptr = detail::nb_type_new(&d);
+    }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
         detail::nb_enum_put(Base::m_ptr, name, &value, doc);
@@ -502,7 +561,13 @@ inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }
 inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
 inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
 template <typename T>
-inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
+inline T &type_supplement(handle h) {
+    if constexpr (detail::use_inline_supplement<T>) {
+        return *(T *) detail::nb_type_supplement(h.ptr());
+    } else {
+        return **(T **) detail::nb_type_supplement(h.ptr());
+    }
+}
 
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }

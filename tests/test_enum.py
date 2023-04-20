@@ -82,3 +82,12 @@ def test05_enum_property():
     w = t.EnumProperty()
     assert w.read_enum == t.Enum.A
     assert str(w.read_enum) == 'test_enum_ext.Enum.A'
+
+def test06_enum_with_custom_slots():
+    # Custom | operator returns an enum
+    assert t.Color.Red | t.Color.Green | t.Color.Blue is t.Color.White
+    assert t.Color.Black | t.Color.Black is t.Color.Black
+    # Other operators (via is_arithmetic) return ints
+    yellow = t.Color.Red + t.Color.Green
+    assert type(yellow) is int
+    assert yellow == t.Color.Yellow and yellow is not t.Color.Yellow

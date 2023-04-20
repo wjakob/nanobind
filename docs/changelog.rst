@@ -15,8 +15,26 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.2.0 (April 24, 2023)
+Version 1.3.0 (TBD)
 -------------------
+
+* Reduced the size of nanobind type objects by 4 pointers.
+  (PR `#192 <https://github.com/wjakob/nanobind/pull/192>`__).
+* Improved support for storing :ref:`supplemental data <supplement>`
+  that consists of a pointer to storage that is not managed by nanobind.
+  We now avoid an additional indirection in this case: the type object
+  stores the pointer directly instead of allocating the pointer on the
+  heap and then pointing to it.
+  (PR `#192 <https://github.com/wjakob/nanobind/pull/192>`__).
+* Updated the implementation of :cpp:class:`nb::enum_ <enum_>` so it does
+  not take advantage of any private nanobind type details. As a side effect,
+  the construct ``nb::class_<T>(..., nb::is_enum(...))`` is no longer permitted;
+  use ``nb::enum_<T>(...)`` instead.
+  (PR `#192 <https://github.com/wjakob/nanobind/pull/192>`__).
+* ABI version 9.
+
+Version 1.2.0 (April 24, 2023)
+------------------------------
 
 * Improvements to the internal C++ → Python instance map data structure to improve
   performance and address type confusion when returning previously registered instances.

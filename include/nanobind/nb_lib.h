@@ -226,8 +226,8 @@ NB_CORE PyObject *nb_func_new(const void *data) noexcept;
 // ========================================================================
 
 /// Create a Python type object for the given type record
-struct type_data;
-NB_CORE PyObject *nb_type_new(const type_data *c) noexcept;
+struct type_data_prelim;
+NB_CORE PyObject *nb_type_new(const type_data_prelim *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
@@ -258,8 +258,11 @@ NB_CORE PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
 /// Try to reliquish ownership from Python object to a unique_ptr
 NB_CORE void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete);
 
-/// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
-NB_CORE void *nb_type_supplement(PyObject *t) noexcept;
+/// Return a pointer to the type_data::supplement field associated with
+/// the given nanobind type. This stores a piece of user-supplied
+/// data if small, or points to it otherwise; see use_inline_supplement
+/// in nb_class.h to disambiguate once you know the supplemental data type.
+NB_CORE void **nb_type_supplement(PyObject *t) noexcept;
 
 /// Check if the given python object represents a nanobind type
 NB_CORE bool nb_type_check(PyObject *t) noexcept;
@@ -348,6 +351,14 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
                                     const std::type_info *dst) noexcept;
 
 // ========================================================================
+
+struct enum_data_prelim;
+
+/// Extend ed.slots with type slots implementing enum functionality
+NB_CORE void nb_enum_prepare(enum_data_prelim *ed) noexcept;
+
+/// Extend ed.slots with the given user-provided type slots
+NB_CORE void nb_enum_extend_slots(enum_data_prelim *ed, const PyType_Slot *slots) noexcept;
 
 /// Add an entry to an enumeration
 NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,

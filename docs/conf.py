@@ -15,8 +15,13 @@ import re
 extensions = [
     "sphinx_copybutton",
     "sphinxcontrib.rsvgconverter",
-    "sphinxcontrib.moderncmakedomain"
+    "sphinxcontrib.moderncmakedomain",
+    "sphinx.ext.intersphinx",
 ]
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = [".templates"]

@@ -173,10 +173,16 @@ public:
     static handle from_cpp(const type& src, rv_policy, cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
-        // Get out microseconds, and make sure they are positive, to avoid
-        // bug in eastern hemisphere time zones
-        // (cfr. https://github.com/pybind/pybind11/issues/2417)
-        using us_t = ch::duration<int, std::micro>;
+        // Get out microseconds, and make sure they are positive, to
+        // avoid bug in eastern hemisphere time zones
+        // (cfr. https://github.com/pybind/pybind11/issues/2417). Note
+        // that if us_t is 32 bits and we get a time_point that also
+        // has a 32-bit time_since_epoch (perhaps because it's
+        // measuring time in minutes or something), then writing `src
+        // - us` below can lead to overflow based on how common_type
+        // is defined on durations. Defining us_t to store 64-bit
+        // microseconds works around this.
+        using us_t = ch::duration<std::int64_t, std::micro>;
         auto us = ch::duration_cast<us_t>(src.time_since_epoch() %
                                           ch::seconds(1));
         if (us.count() < 0)
@@ -191,8 +197,9 @@ public:
 
         std::tm localtime;
         if (!localtime_thread_safe(&tt, &localtime)) {
-            PyErr_SetString(PyExc_ValueError,
-                            "Unable to represent system_clock in local time");
+            PyErr_Format(PyExc_ValueError,
+                         "Unable to represent system_clock in local time; "
+                         "got time_t %ld", static_cast<std::int64_t>(tt));
             return handle();
         }
         return pack_datetime(localtime.tm_year + 1900,

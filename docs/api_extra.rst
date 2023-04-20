@@ -701,12 +701,14 @@ The following helper type aliases require an additional include directive:
    This templated type alias creates an ``Eigen::Map<..>`` with flexible strides for
    zero-copy data exchange between Eigen and NumPy.
 
+.. _chrono_conversions:
+
 Timestamp and duration conversions
 ----------------------------------
 
 nanobind supports bidirectional conversions of timestamps and
 durations between their standard representations in Python
-(`datetime.datetime`, `datetime.timedelta`) and in C++
+(:py:class:`datetime.datetime`, :py:class:`datetime.timedelta`) and in C++
 (``std::chrono::time_point``, ``std::chrono::duration``).
 A few unidirectional conversions from other Python types to these
 C++ types are also provided and explained below.
@@ -720,25 +722,25 @@ These type casters require an additional include directive:
 .. The rest of this section is adapted from pybind11/docs/advanced/cast/chrono.rst
 
 An overview of clocks in C++11
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The C++11 standard defines three different clocks, and users can
 define their own. Each ``std::chrono::time_point`` is defined relative
 to a particular clock. When using the ``chrono`` type caster, you must be
 aware that only ``std::chrono::system_clock`` is guaranteed to convert
-to a Python `~datetime.datetime` object; other clocks may convert to
-`~datetime.timedelta` if they don't represent calendar time.
+to a Python :py:class:`~datetime.datetime` object; other clocks may convert to
+:py:class:`~datetime.timedelta` if they don't represent calendar time.
 
 The first clock defined by the standard is ``std::chrono::system_clock``.
 This clock measures the current date and time, much like the Python
-:func:`time.time` function. It can change abruptly due to
+:py:func:`time.time` function. It can change abruptly due to
 administrative actions, daylight savings time transitions, or
 synchronization with an external time server. That makes this clock a
 poor choice for timing purposes, but a good choice for wall-clock time.
 
 The second clock defined by the standard is ``std::chrono::steady_clock``.
 This clock ticks at a steady rate and is never adjusted, like
-:func:`time.monotonic` in Python. That makes it excellent for timing
+:py:func:`time.monotonic` in Python. That makes it excellent for timing
 purposes, but the value in this clock does not correspond to the
 current date and time. Often this clock will measure the amount of
 time your system has been powered on. This clock will never be
@@ -751,12 +753,12 @@ clocks in the system. It is normally an alias for either ``system_clock``
 or ``steady_clock``, but can be its own independent clock. Due
 to this uncertainty, conversions of time measured on the
 ``high_resolution_clock`` to Python produce platform-dependent types:
-you'll get a `~datetime.datetime` if ``high_resolution_clock`` is
-an alias for ``system_clock`` on your system, or a `~datetime.timedelta`
+you'll get a :py:class:`~datetime.datetime` if ``high_resolution_clock`` is
+an alias for ``system_clock`` on your system, or a :py:class:`~datetime.timedelta`
 value otherwise.
 
 Provided conversions
---------------------
+^^^^^^^^^^^^^^^^^^^^
 
 The C++ types described in this section may be instantiated with any
 precision. Conversions to a less-precise type will round towards zero.
@@ -766,35 +768,35 @@ converting to Python.
 
 .. rubric:: C++ to Python
 
-- ``std::chrono::system_clock::time_point`` → `datetime.datetime`
+- ``std::chrono::system_clock::time_point`` → :py:class:`datetime.datetime`
     A system clock time will be converted to a Python
-    `~datetime.datetime` instance.  The result describes a time in the
+    :py:class:`~datetime.datetime` instance.  The result describes a time in the
     local timezone, but does not have any timezone information
     attached to it (it is a naive datetime object).
 
-- ``std::chrono::duration`` → `datetime.timedelta`
-    A duration will be converted to a Python `~datetime.timedelta`.
+- ``std::chrono::duration`` → :py:class:`datetime.timedelta`
+    A duration will be converted to a Python :py:class:`~datetime.timedelta`.
     Any precision beyond microseconds is lost by rounding towards zero.
 
-- ``std::chrono::[other_clock]::time_point`` → `datetime.timedelta`
+- ``std::chrono::[other_clock]::time_point`` → :py:class:`datetime.timedelta`
     A time on any clock except the system clock will be converted to a Python
-    `~datetime.timedelta`, which measures the number of seconds between
+    :py:class:`~datetime.timedelta`, which measures the number of seconds between
     the clock's epoch and the time point of interest.
 
 .. rubric:: Python to C++
 
-- `datetime.datetime` or `datetime.date` or `datetime.time` → ``std::chrono::system_clock::time_point``
+- :py:class:`datetime.datetime` or :py:class:`datetime.date` or :py:class:`datetime.time` → ``std::chrono::system_clock::time_point``
     A Python date, time, or datetime object can be converted into a
-    system clock timepoint.  A `~datetime.time` with no date
+    system clock timepoint.  A :py:class:`~datetime.time` with no date
     information is treated as that time on January 1, 1970. A
-    `~datetime.date` with no time information is treated as midnight
+    :py:class:`~datetime.date` with no time information is treated as midnight
     on that date. **Any timezone information is ignored.**
 
-- `datetime.timedelta` → ``std::chrono::duration``
+- :py:class:`datetime.timedelta` → ``std::chrono::duration``
     A Python time delta object can be converted into a duration
     that describes the same number of seconds (modulo precision limitations).
 
-- `datetime.timedelta` → ``std::chrono::[other_clock]::time_point``
+- :py:class:`datetime.timedelta` → ``std::chrono::[other_clock]::time_point``
     A Python time delta object can be converted into a timepoint on a
     clock other than the system clock. The resulting timepoint will be
     that many seconds after the target clock's epoch time.

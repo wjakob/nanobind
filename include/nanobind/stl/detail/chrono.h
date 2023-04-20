@@ -141,7 +141,7 @@ NB_NOINLINE inline bool unpack_timedelta(PyObject *o, int *days,
 NB_NOINLINE inline bool unpack_datetime(PyObject *o,
                                         int *year, int *month, int *day,
                                         int *hour, int *minute, int *second,
-                                        int *usec) noexcept {
+                                        int *usec) {
     datetime_types.ensure_ready();
     if (PyType_IsSubtype(Py_TYPE(o),
                          (PyTypeObject *) datetime_types.datetime.ptr())) {

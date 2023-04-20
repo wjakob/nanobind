@@ -302,24 +302,37 @@ def test_chrono_invalid(test_type, roundtrip):
 
     if test_type is datetime.datetime:
         fake_val = fake_type.fromtimestamp(time.time())
-        attr_name = "second"
+        replace_overridden = lambda s: fake_val.replace(second=s)
     else:
         fake_val = fake_type(days=1, seconds=10, microseconds=123456)
-        attr_name = "seconds"
+        replace_overridden = lambda s: fake_type(
+            days=1, seconds=s, microseconds=123456
+        )
 
     for fake_result, errtype in (
-        ("hi", "ValueError"), (0, None), (2**32, "does not fit in an int")
+        ("hi", "TypeError"),
+        (0, None),
+        (2**64, "Python int too large to convert to C long"),
+        (2**32, "OverflowError"),
     ):
         fake_val.override_value = fake_result
         if not m.access_via_python:
             assert roundtrip(fake_val) == fake_val
         elif errtype is None:
-            assert roundtrip(fake_val) == fake_val.replace(
-                **{attr_name: fake_result}
-            )
+            assert roundtrip(fake_val) == replace_overridden(fake_result)
+        elif test_type is datetime.timedelta and sys.implementation.name == "pypy":
+            # pypy's cpyext module converts timedelta to a C structure
+            # before the nanobind function even gets called, producing
+            # a different exception than the one we're testing below.
+            # datetime still works as it doesn't have its attributes
+            # converted but instead is implemented with Python
+            # attribute accesses.
+            pass
         else:
-            with pytest.warns(
-                pytest.PytestUnraisableExceptionWarning, match=errtype
-            ):
+            from _pytest.unraisableexception import catch_unraisable_exception
+
+            with catch_unraisable_exception() as cm:
                 with pytest.raises(TypeError, match="incompatible function arguments"):
                     roundtrip(fake_val)
+                assert cm.unraisable is not None
+                assert errtype in repr(cm.unraisable.exc_value)

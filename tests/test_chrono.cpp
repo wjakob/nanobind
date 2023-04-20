@@ -88,6 +88,6 @@ NB_MODULE(test_chrono_ext, m) {
 #if defined(Py_LIMITED_API)
     m.attr("using_limited_api") = true;
 #else
-    m.attr("using_limited_api") = true;
+    m.attr("using_limited_api") = false;
 #endif
 }

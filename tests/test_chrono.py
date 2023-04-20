@@ -267,7 +267,7 @@ def test_chrono_misc():
     "test_type,roundtrip",
     [
         (datetime.timedelta, m.test_chrono7),
-        (datetime.datetime, m.test_nano_timepoint_roundtrip)m
+        (datetime.datetime, m.test_nano_timepoint_roundtrip),
     ]
 )
 def test_chrono_invalid(test_type, roundtrip):

@@ -32,21 +32,20 @@ public:
     using period = typename type::period;
     using duration_t = std::chrono::duration<rep, period>;
 
-    // signed 25 bits required by the standard
-    using days = std::chrono::duration<int_least32_t, std::ratio<86400>>;
-
     bool from_python(handle src, uint8_t /*flags*/, cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         if (!src) return false;
+
+        // support for signed 25 bits is required by the standard
+        using days = ch::duration<int_least32_t, std::ratio<86400>>;
 
         // If invoked with datetime.delta object, unpack it
         int dd, ss, uu;
         try {
             if (unpack_timedelta(src.ptr(), &dd, &ss, &uu)) {
                 value = type(ch::duration_cast<duration_t>(
-                                 ch::days(dd) + ch::seconds(ss) +
-                                 ch::microseconds(uu));
+                                 days(dd) + ch::seconds(ss) + ch::microseconds(uu)));
                 return true;
             }
         } catch (python_error& e) {
@@ -64,7 +63,7 @@ public:
 #endif
         if (is_float) {
             value = type(ch::duration_cast<duration_t>(
-                             ch::duration<double>(PyFloat_AsDouble(src.ptr())));
+                             ch::duration<double>(PyFloat_AsDouble(src.ptr()))));
             return true;
         }
         return false;
@@ -155,7 +154,7 @@ public:
             }
         } catch (python_error& e) {
             e.restore();
-            PyErr_WriteUnraisable(e.ptr());
+            PyErr_WriteUnraisable(src.ptr());
             return false;
         }
         cal.tm_sec = ss;

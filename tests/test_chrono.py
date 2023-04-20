@@ -288,7 +288,8 @@ def test_chrono_invalid(test_type, roundtrip):
     # regular attribute access; test that invalid results are handled
     # reasonably. On the full API we use Python's <datetime.h> header
     # so we'll always access the true C-level datetime slot and can't
-    # be fooled by tricks like this.
+    # be fooled by tricks like this. PyPy uses normal attribute access
+    # and works like the limited API in this respect.
 
     class fake_type(test_type):
         @property
@@ -310,7 +311,7 @@ def test_chrono_invalid(test_type, roundtrip):
         ("hi", "ValueError"), (0, None), (2**32, "does not fit in an int")
     ):
         fake_val.override_value = fake_result
-        if not m.using_limited_api:
+        if not m.access_via_python:
             assert roundtrip(fake_val) == fake_val
         elif errtype is None:
             assert roundtrip(fake_val) == fake_val.replace(

@@ -57,7 +57,7 @@ public:
         // If invoked with a float we assume it is seconds and convert
         int is_float;
 #if defined(Py_LIMITED_API)
-        is_float = PyType_IsSubtype(Py_TYPE(src.ptr()), (PyObject *) &PyFloat_Type);
+        is_float = PyType_IsSubtype(Py_TYPE(src.ptr()), &PyFloat_Type);
 #else
         is_float = PyFloat_Check(src.ptr());
 #endif

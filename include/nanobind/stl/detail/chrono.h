@@ -13,8 +13,12 @@
 // Functions for working with objects in the Python 'datetime' module,
 // used by the std::chrono type caster in <nanobind/stl/chrono.h>.
 // This is pretty straightforward except on Limited API builds.
+// Note that while PyPy does provide <datetime.h>, it implements
+// the macro-like calls there (PyDateTime_DATE_GET_HOUR, etc) as full
+// function calls that can fail. We use the limited-API logic on PyPy
+// in order to be able to handle errors better.
 
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
 #include <datetime.h>
 #endif
 
@@ -56,7 +60,7 @@ PyObject* pack_datetime(int year, int month, int day,
 // order to avoid increasing the library size for users who don't care
 // about datetimes.
 
-#if defined(Py_LIMITED_API)
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
 
 struct datetime_types_t {
     // Types defined by the datetime module
@@ -122,7 +126,8 @@ NB_NOINLINE inline bool set_from_int_attr(int *dest, PyObject *o,
 NB_NOINLINE inline bool unpack_timedelta(PyObject *o, int *days,
                                          int *secs, int *usecs) {
     datetime_types.ensure_ready();
-    if (PyType_IsSubtype(Py_TYPE(o), datetime_types.timedelta.ptr())) {
+    if (PyType_IsSubtype(Py_TYPE(o),
+                         (PyTypeObject *) datetime_types.timedelta.ptr())) {
         if (!set_from_int_attr(days, o, "days") ||
             !set_from_int_attr(secs, o, "seconds") ||
             !set_from_int_attr(usecs, o, "microseconds")) {
@@ -138,7 +143,8 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
                                         int *hour, int *minute, int *second,
                                         int *usec) noexcept {
     datetime_types.ensure_ready();
-    if (PyType_IsSubtype(Py_TYPE(o), datetime_types.datetime.ptr())) {
+    if (PyType_IsSubtype(Py_TYPE(o),
+                         (PyTypeObject *) datetime_types.datetime.ptr())) {
         if (!set_from_int_attr(usec, o, "microsecond") ||
             !set_from_int_attr(second, o, "second") ||
             !set_from_int_attr(minute, o, "minute") ||
@@ -150,7 +156,8 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
         }
         return true;
     }
-    if (PyType_IsSubtype(Py_TYPE(o), datetime_types.date.ptr())) {
+    if (PyType_IsSubtype(Py_TYPE(o),
+                         (PyTypeObject *) datetime_types.date.ptr())) {
         *usec = *second = *minute = *hour = 0;
         if (!set_from_int_attr(day, o, "day") ||
             !set_from_int_attr(month, o, "month") ||
@@ -159,7 +166,8 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
         }
         return true;
     }
-    if (PyType_IsSubtype(Py_TYPE(o), datetime_types.time.ptr())) {
+    if (PyType_IsSubtype(Py_TYPE(o),
+                         (PyTypeObject *) datetime_types.time.ptr())) {
         *day = 1;
         *month = 1;
         *year = 1970;
@@ -197,7 +205,7 @@ inline PyObject* pack_datetime(int year, int month, int day,
     }
 }
 
-#else // !defined(Py_LIMITED_API)
+#else // !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
 
 NB_NOINLINE inline bool unpack_timedelta(PyObject *o, int *days,
                                          int *secs, int *usecs) {
@@ -278,4 +286,4 @@ inline PyObject* pack_datetime(int year, int month, int day,
                                       hour, minute, second, usec);
 }
 
-#endif // !defined(Py_LIMITED_API)
+#endif // !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)

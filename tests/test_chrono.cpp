@@ -85,9 +85,9 @@ NB_MODULE(test_chrono_ext, m) {
         .def_rw("timestamp_ms", &different_resolutions::timestamp_ms)
         .def_rw("timestamp_us", &different_resolutions::timestamp_us);
 
-#if defined(Py_LIMITED_API)
-    m.attr("using_limited_api") = true;
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
+    m.attr("access_via_python") = true;
 #else
-    m.attr("using_limited_api") = false;
+    m.attr("access_via_python") = false;
 #endif
 }

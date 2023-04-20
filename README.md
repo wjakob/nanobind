@@ -24,9 +24,11 @@ compile in a shorter amount of time, produce smaller binaries, and have better
 runtime performance.
 
 More concretely,
-[benchmarks](https://nanobind.readthedocs.io/en/latest/benchmark.html) show
-**~2-3× faster** compile time, **~3× smaller** binaries, and up to **~8×
-lower** runtime overheads compared to pybind11.
+[benchmarks](https://nanobind.readthedocs.io/en/latest/benchmark.html) show up
+to **~4× faster** compile time, **~5× smaller** binaries, and **~8× lower**
+runtime overheads compared to pybind11. nanobind also outperforms Cython in
+important metrics (**3-12×** binary size reduction, **1.6-4×** compilation time
+reduction, similar runtime performance).
 
 ## Documentation
 

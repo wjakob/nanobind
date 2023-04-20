@@ -3,28 +3,40 @@
 Benchmarks
 ==========
 
-.. note:: 
+.. note::
 
-   **TL;DR**: nanobind bindings compile **~2-3× faster**, produce **~3×
-   smaller** binaries, and have up to **~8× lower** runtime overheads compared
-   to pybind11.
+   **TL;DR**: nanobind bindings compile up to **~4× faster** and produce **~5×
+   smaller** binaries with **~8× lower** runtime overheads compared to
+   pybind11.
 
-The following experiments analyze the performance of a large
-function-heavy (``func``) and class-heavy (``class``) binding microbenchmark
-compiled using `Boost.Python <https://github.com/boostorg/python>`_,
-`pybind11 <https://github.com/pybind/pybind11>`_, and nanobind in both
-``debug`` and size-optimized (``opt``) modes. A comparison with `cppyy
-<https://cppyy.readthedocs.io/en/latest/>`_, which uses dynamic compilation,
-is also shown later. Details on the experimental setup can be found
-:ref:`below <benchmark_details>`.
+   nanobind also outperforms Cython in important metrics (**3-12×** binary size
+   reduction, **1.6-4×** compilation time reduction, similar runtime performance).
+
+The following experiments analyze the performance of a large function-heavy
+(``func``) and class-heavy (``class``) binding microbenchmark compiled using
+`Boost.Python <https://github.com/boostorg/python>`__, `Cython
+<https://cython.org>`__, `pybind11 <https://github.com/pybind/pybind11>`__. The
+``pybind11 + smart_holder`` results below refer to a `special branch
+<https://github.com/pybind/pybind11/tree/smart_holder>`__ that addresses
+long-standing issues related to holder types in pybind11.
+
+Each experiment is shown twice: light gray `[debug]` columns provide data for
+a debug build, and `[opt]` shows a size-optimized build that is representative
+of a deployment scenario. The former is included to show that nanobind
+performance is also good during a typical development workflow.
+
+A comparison with `cppyy <https://cppyy.readthedocs.io/en/latest/>`_, which
+uses dynamic compilation, is also shown later. Details on the experimental
+setup can be found :ref:`below <benchmark_details>`.
 
 Compilation time
 ----------------
 
 The first plot contrasts the compilation time, where “*number* ×”
 annotations denote the amount of time spent relative to nanobind. As
-shown below, nanobind achieves a consistent ~\ **2-3× improvement**
-compared to pybind11.
+shown below, nanobind achieves a ~\ **2.3-4.0× improvement**
+compared to pybind11 and a **1.6-4.4x improvement** compared to Cython.
+
 
 .. image:: images/times.svg
    :width: 800
@@ -33,9 +45,11 @@ compared to pybind11.
 Binary size
 -----------
 
-nanobind also greatly reduces the binary size of the compiled bindings.
-There is a roughly **3× improvement** compared to pybind11 and a **8-9×
-improvement** compared to Boost.Python (both with size optimizations).
+The extremely large size of generated binaries has been a persistent problem of
+many prior binding libraries. nanobind significantly improves this metric in
+size-optimized builds. There is a ~\ **11× improvement** compared to
+Boost.Python, a **3-5× improvement** compared to pybind11, and a **3-12×
+improvement** compared to Cython.
 
 .. image:: images/sizes.svg
    :width: 800
@@ -45,10 +59,12 @@ Performance
 -----------
 
 The last experiment compares the runtime performance overheads by calling a
-bound function many times in a loop. Here, it is also interesting to compare
-against `cppyy <https://cppyy.readthedocs.io/en/latest/>`__ (gray bar) and a
-pure Python implementation that runs bytecode without binding overheads
-(hatched red bar).
+bound function many times in a loop. Here, it is also interesting to
+additionally compare against `cppyy
+<https://cppyy.readthedocs.io/en/latest/>`__ (green bar) and a pure Python
+implementation that runs bytecode without binding overheads (hatched gray bar).
+The `smart_holder` branch of pybind11 is not explicitly listed since its
+runtime performance matches the base version.
 
 .. image:: images/perf.svg
    :width: 850
@@ -60,17 +76,22 @@ functions benchmarked here don’t perform CPU-intensive work, so this
 this mainly measures the overheads of performing a function call,
 boxing/unboxing arguments and return values, etc.
 
-The difference to pybind11 is **significant**: a ~\ **2× improvement**
+The difference to pybind11 is **significant**: a ~\ **2.4× improvement**
 for simple functions, and an **~8× improvement** when classes are being
 passed around. Complexities in pybind11 related to overload
 resolution, multiple inheritance, and holders are the main reasons for
 this difference. Those features were either simplified or completely
 removed in nanobind.
 
-Finally, there is a **~1.4× improvement** in both experiments compared
-to cppyy (please ignore the two ``[debug]`` columns—I did not feel
-comfortable adjusting the JIT compilation flags; all cppyy bindings
-are therefore optimized.)
+The runtime performance Cython and nanobind are similar (Cython leads in one
+experiment and trails in another one). Cython generates specialized binding
+code for every function and class, which is highly redundant (long compile
+times, large binaries) but can also be beneficial for performance.
+
+Finally, there is a **~1.6-2× improvement** in both experiments compared to
+cppyy (please ignore the two ``[debug]`` columns—I did not feel comfortable
+adjusting the JIT compilation flags; all cppyy bindings are therefore
+optimized.)
 
 Discussion
 ----------
@@ -140,10 +161,14 @@ up in ``struct``\ s with bindings.
        .def(py::init<uint16_t, int64_t, int32_t, uint64_t, uint32_t, float>())
        .def("sum", &Struct50::sum);
 
-Each benchmark is compiled in debug mode (``debug``) and with optimizations
-(``opt``) that minimize size (i.e., ``-Os``) and run on Python 3.9.10.
-Compilation is done by AppleClang using consistent flags for all three binding
-tools.
 
 The code to generate the plots shown above is available `here
 <https://github.com/wjakob/nanobind/blob/master/docs/microbenchmark.ipynb>`_.
+
+Each test was compiled in debug mode (``debug``) and with optimizations
+(``opt``) that minimize size (i.e., ``-Os``). Benchmarking was performed on a
+AMD Ryzen 9 7950X workstation running Ubuntu 22.04.2 LTS. CPU boost was
+disabled, and all core clock frequencies were pinned. Reported timings are the
+median of five runs. Compilation used clang++ 15.0.7 with consistent flags for
+all experiments. The relevant software versions are Python 3.10.6, cppyy
+1.12.13, Cython 0.29.28, and nanobind 1.1.1.

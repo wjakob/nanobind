@@ -83,7 +83,7 @@ resolution, multiple inheritance, and holders are the main reasons for
 this difference. Those features were either simplified or completely
 removed in nanobind.
 
-The runtime performance Cython and nanobind are similar (Cython leads in one
+The runtime performance of Cython and nanobind are similar (Cython leads in one
 experiment and trails in another one). Cython generates specialized binding
 code for every function and class, which is highly redundant (long compile
 times, large binaries) but can also be beneficial for performance.
@@ -99,7 +99,7 @@ Discussion
 Performance improvements compared to pybind11 are the result of optimizations
 discussed in the :ref:`previous section <perf_improvements>`.
 
-`cppyy <https://cppyy.readthedocs.io/en/latest/>`_ also achieves excellent
+`cppyy <https://cppyy.readthedocs.io/en/latest/>`_ also achieves good
 performance in the comparison above. It is based on dynamic parsing of C++ code
 and *just-in-time* (JIT) compilation of bindings via the LLVM compiler
 infrastructure. The authors of cppyy report that their tool produces bindings
@@ -169,6 +169,6 @@ Each test was compiled in debug mode (``debug``) and with optimizations
 (``opt``) that minimize size (i.e., ``-Os``). Benchmarking was performed on a
 AMD Ryzen 9 7950X workstation running Ubuntu 22.04.2 LTS. CPU boost was
 disabled, and all core clock frequencies were pinned. Reported timings are the
-median of five runs. Compilation used clang++ 15.0.7 with consistent flags for
-all experiments. The relevant software versions are Python 3.10.6, cppyy
-1.12.13, Cython 0.29.28, and nanobind 1.1.1.
+median of five runs. Compilation used clang++ 15.0.7 with consistent compilation flags for
+all experiments (see the referenced notebook file for detail). The used package
+versions were Python 3.10.6, cppyy 1.12.13, Cython 0.29.28, and nanobind 1.1.1.

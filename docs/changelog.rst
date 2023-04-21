@@ -19,6 +19,11 @@ Version 1.2.0 (TBA)
 -------------------
 
 * Removed the superfluous ``nb_enum`` metaclass.
+  (commit `9c1985 <https://github.com/wjakob/nanobind/commit/9c19850471be70a22114826f6c0edceee99ff40b>`__).
+* Fixed a corner case that prevented ``nb::cast<char>`` from working.
+  (commit `9ae320 <https://github.com/wjakob/nanobind/commit/9ae32054d9a6ad17af15994dc51138eb88f71f92>`__).
+* Added up-to-date nanobind benchmarks on Linux including comparisons to Cython.
+  (commit `834cf3 <https://github.com/wjakob/nanobind/commit/834cf36ce12ffe6470dcffecd21341377c56cee1>`__).
 * ABI version 8.
 
 Version 1.1.1 (April 6, 2023)

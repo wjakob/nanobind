@@ -629,7 +629,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 result = f->impl((void *) f->capture, args, args_flags,
                                  (rv_policy) (f->flags & 0b111), &cleanup);
 
-                if (!result) {
+                if (NB_UNLIKELY(!result)) {
                     error_handler = nb_func_error_noconvert;
                     goto done;
                 }
@@ -651,7 +651,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
 
-                    if (self_flags & (uint32_t) type_flags::intrusive_ptr)
+                    if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::intrusive_ptr))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
@@ -775,7 +775,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
 
-                    if (self_flags & (uint32_t) type_flags::intrusive_ptr)
+                    if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::intrusive_ptr))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }

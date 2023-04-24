@@ -379,27 +379,27 @@ static PyObject *internals_dict() {
     return dict;
 }
 
-static void internals_make() {
+static NB_NOINLINE nb_internals *internals_make() {
     str nb_name("nanobind");
 
-    internals_p = new nb_internals();
+    nb_internals *p = new nb_internals();
 
     PyObject *dict = internals_dict();
 
     const char *internals_id = NB_INTERNALS_ID;
-    PyObject *capsule = PyCapsule_New(internals_p, internals_id, nullptr);
+    PyObject *capsule = PyCapsule_New(p, internals_id, nullptr);
     PyObject *nb_module = PyModule_NewObject(nb_name.ptr());
     int rv = PyDict_SetItemString(dict, internals_id, capsule);
     if (rv || !capsule || !nb_module)
         fail("nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
 
-    internals_p->nb_module = nb_module;
+    p->nb_module = nb_module;
 
     // Function objects
-    internals_p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
-    internals_p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
-    internals_p->nb_bound_method =
+    p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
+    p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
+    p->nb_bound_method =
         (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
     // Metaclass (nb_type)
@@ -414,7 +414,7 @@ static void internals_make() {
         + (int) sizeof(type_data);
     nb_type_spec.itemsize = tp_itemsize;
     nb_type_slots[0].pfunc = &PyType_Type;
-    internals_p->nb_type = (PyTypeObject *) PyType_FromSpec(&nb_type_spec);
+    p->nb_type = (PyTypeObject *) PyType_FromSpec(&nb_type_spec);
 
     /// Static properties
  #if defined(Py_LIMITED_API)
@@ -437,27 +437,27 @@ static void internals_make() {
     nb_static_property_spec.basicsize = tp_basicsize;
     nb_static_property_spec.itemsize = tp_itemsize;
 
-    internals_p->nb_static_property =
+    p->nb_static_property =
         (PyTypeObject *) PyType_FromSpec(&nb_static_property_spec);
-    internals_p->nb_static_property_enabled = true;
+    p->nb_static_property_enabled = true;
 
     // Tensor type
-    internals_p->nb_ndarray = (PyTypeObject *) PyType_FromSpec(&nb_ndarray_spec);
+    p->nb_ndarray = (PyTypeObject *) PyType_FromSpec(&nb_ndarray_spec);
 
-    if (!internals_p->nb_func || !internals_p->nb_method ||
-        !internals_p->nb_bound_method || !internals_p->nb_type ||
-        !internals_p->nb_static_property || !internals_p->nb_ndarray)
+    if (!p->nb_func || !p->nb_method ||
+        !p->nb_bound_method || !p->nb_type ||
+        !p->nb_static_property || !p->nb_ndarray)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000
-    internals_p->nb_ndarray->tp_as_buffer->bf_getbuffer = nb_ndarray_getbuffer;
-    internals_p->nb_ndarray->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
-    internals_p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
-    internals_p->nb_func->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
-    internals_p->nb_method->tp_flags |= NB_HAVE_VECTORCALL;
-    internals_p->nb_method->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
-    internals_p->nb_bound_method->tp_flags |= NB_HAVE_VECTORCALL;
-    internals_p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
+    p->nb_ndarray->tp_as_buffer->bf_getbuffer = nb_ndarray_getbuffer;
+    p->nb_ndarray->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
+    p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
+    p->nb_func->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
+    p->nb_method->tp_flags |= NB_HAVE_VECTORCALL;
+    p->nb_method->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
+    p->nb_bound_method->tp_flags |= NB_HAVE_VECTORCALL;
+    p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
 #endif
 
     register_exception_translator(default_exception_translator, nullptr);
@@ -507,28 +507,34 @@ static void internals_make() {
                 "reported by tools like 'valgrind'). If you are a user of a "
                 "python extension library, you can ignore this warning.");
 #endif
+    return p;
 }
 
-static void internals_fetch() {
+static nb_internals *internals_fetch() {
     PyObject *dict = internals_dict();
 
     const char *internals_id = NB_INTERNALS_ID;
     PyObject *capsule = PyDict_GetItemString(dict, internals_id);
 
+    nb_internals *ptr;
     if (capsule) {
-        internals_p = (nb_internals *) PyCapsule_GetPointer(capsule, internals_id);
-        if (!internals_p)
+        ptr = (nb_internals *) PyCapsule_GetPointer(capsule, internals_id);
+        if (!ptr)
             fail("nanobind::detail::internals_fetch(): capsule pointer is NULL!");
-        return;
+    } else {
+        ptr = internals_make();
     }
 
-    internals_make();
+    internals_p = ptr;
+
+    return ptr;
 }
 
 nb_internals &internals_get() noexcept {
-    if (!internals_p)
-        internals_fetch();
-    return *internals_p;
+    nb_internals *ptr = internals_p;
+    if (NB_UNLIKELY(!ptr))
+        ptr = internals_fetch();
+    return *ptr;
 }
 
 NAMESPACE_END(detail)

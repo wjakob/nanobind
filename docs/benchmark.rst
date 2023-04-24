@@ -6,7 +6,7 @@ Benchmarks
 .. note::
 
    **TL;DR**: nanobind bindings compile up to **~4× faster** and produce **~5×
-   smaller** binaries with **~8× lower** runtime overheads compared to
+   smaller** binaries with **~10× lower** runtime overheads compared to
    pybind11.
 
    nanobind also outperforms Cython in important metrics (**3-12×** binary size
@@ -34,7 +34,7 @@ Compilation time
 
 The first plot contrasts the compilation time, where “*number* ×”
 annotations denote the amount of time spent relative to nanobind. As
-shown below, nanobind achieves a ~\ **2.3-4.0× improvement**
+shown below, nanobind achieves a ~\ **2.7-4.4× improvement**
 compared to pybind11 and a **1.6-4.4x improvement** compared to Cython.
 
 
@@ -76,8 +76,8 @@ functions benchmarked here don’t perform CPU-intensive work, so this
 this mainly measures the overheads of performing a function call,
 boxing/unboxing arguments and return values, etc.
 
-The difference to pybind11 is **significant**: a ~\ **2.4× improvement**
-for simple functions, and an **~8× improvement** when classes are being
+The difference to pybind11 is **significant**: a ~\ **3× improvement**
+for simple functions, and an **~10× improvement** when classes are being
 passed around. Complexities in pybind11 related to overload
 resolution, multiple inheritance, and holders are the main reasons for
 this difference. Those features were either simplified or completely
@@ -88,7 +88,7 @@ experiment and trails in another one). Cython generates specialized binding
 code for every function and class, which is highly redundant (long compile
 times, large binaries) but can also be beneficial for performance.
 
-Finally, there is a **~1.6-2× improvement** in both experiments compared to
+Finally, there is a **~1.6-2.1× improvement** in both experiments compared to
 cppyy (please ignore the two ``[debug]`` columns—I did not feel comfortable
 adjusting the JIT compilation flags; all cppyy bindings are therefore
 optimized.)

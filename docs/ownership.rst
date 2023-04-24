@@ -42,7 +42,7 @@ Consider the following problematic example to see what can go wrong:
        nb::class_<Data>(m, "Data");
 
        // KABOOM, calling this function will crash the Python interpreter
-       m.def("get_data", &get_data());
+       m.def("get_data", &get_data);
    }
 
 The bound function ``my_ext.get_data()`` returns a Python object of type

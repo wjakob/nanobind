@@ -171,4 +171,4 @@ AMD Ryzen 9 7950X workstation running Ubuntu 22.04.2 LTS. CPU boost was
 disabled, and all core clock frequencies were pinned. Reported timings are the
 median of five runs. Compilation used clang++ 15.0.7 with consistent compilation flags for
 all experiments (see the referenced notebook file for detail). The used package
-versions were Python 3.10.6, cppyy 1.12.13, Cython 0.29.28, and nanobind 1.1.1.
+versions were Python 3.10.6, cppyy 1.12.13, Cython 0.29.28, and nanobind 1.2.0.

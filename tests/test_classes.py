@@ -143,6 +143,12 @@ def test08_inheritance():
     assert t.go(dog) == 'Dog says woof'
     assert t.go(cat) == 'Cat says meow'
 
+    assert t.animal_passthrough(dog) is dog
+    assert t.animal_passthrough(cat) is cat
+    assert t.dog_passthrough(dog) is dog
+
+    with pytest.raises(TypeError):
+        t.dog_passthrough(cat)
 
 def test09_method_vectorcall():
     out = []
@@ -176,6 +182,8 @@ def test10_trampoline(clean):
         for _ in range(10):
             assert t.go(d) == 'Dachshund says yap'
 
+        assert t.animal_passthrough(d) is d
+
     a = 0
     class GenericAnimal(t.Animal):
         def what(self):
@@ -192,6 +200,7 @@ def test10_trampoline(clean):
     assert t.go(ga) == 'GenericAnimal says goo'
     assert t.void_ret(ga) is None
     assert a == 1
+    assert t.animal_passthrough(ga) is ga
 
     del ga
     del d
@@ -201,6 +210,12 @@ def test10_trampoline(clean):
         destructed=11
     )
 
+    class GenericDog(t.Dog):
+        pass
+
+    d = GenericDog("GenericDog")
+    assert t.dog_passthrough(d) is d
+    assert t.animal_passthrough(d) is d
 
 def test11_trampoline_failures():
     class Incomplete(t.Animal):

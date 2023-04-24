@@ -115,12 +115,27 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
     }
 
     // Update hash table that maps from C++ to Python instance
-    auto [it, success] = internals_get().inst_c2p.try_emplace(
-        std::pair<void *, std::type_index>(value, *t->type),
-        self);
+    nb_inst_seq seq_v { self };
+    auto [it, success] =
+        internals_get().inst_c2p.try_emplace(value, seq_v);
 
-    if (!success)
-        fail("nanobind::detail::inst_new(): duplicate object!");
+    if (!success) {
+        nb_inst_seq *seq = &it.value();
+        while (true) {
+            if (NB_UNLIKELY(seq->inst == self))
+                fail("nanobind::detail::inst_new(): duplicate instance!");
+            if (!seq->next)
+                break;
+            seq = seq->next;
+        }
+
+        nb_inst_seq *next = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
+        if (NB_UNLIKELY(!next))
+            fail("nanobind::detail::inst_new(): list element allocation failed!");
+
+        *next = seq_v;
+        seq->next = next;
+    }
 
     return (PyObject *) self;
 }
@@ -182,12 +197,36 @@ static void inst_dealloc(PyObject *self) {
     }
 
     // Update hash table that maps from C++ to Python instance
-    auto it = internals.inst_c2p.find(
-        std::pair<void *, std::type_index>(p, *t->type));
-    if (it == internals.inst_c2p.end())
+    nb_inst_seq *seq = nullptr, *pred = nullptr;
+    nb_inst_map &inst_c2p = internals.inst_c2p;
+    nb_inst_map::iterator it = inst_c2p.find(p);
+
+    if (it != inst_c2p.end()) {
+        seq = &it.value();
+
+        do {
+            if (seq->inst == inst)
+                break;
+            pred = seq;
+            seq = seq->next;
+        } while (seq);
+    }
+
+    if (!seq || seq->inst != inst)
         fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
              "an unknown instance (%p)!", t->name, p);
-    internals.inst_c2p.erase(it);
+
+    if (pred) {
+        pred->next = seq->next;
+        PyMem_Free(seq);
+    } else {
+        if (seq->next) {
+            it.value() = *(seq->next);
+            PyMem_Free(seq->next);
+        } else {
+            inst_c2p.erase(it);
+        }
+    }
 
     if (gc) {
         #if defined(Py_LIMITED_API)
@@ -1001,34 +1040,67 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                       void *value, rv_policy rvp,
                       cleanup_list *cleanup,
                       bool *is_new) noexcept {
-    using Key = std::pair<void *, std::type_index>;
-
     // Convert nullptr -> None
     if (!value) {
         Py_INCREF(Py_None);
         return Py_None;
     }
 
-    // Check if the instance is already registered with nanobind
     nb_internals &internals = internals_get();
-    nb_instance_map &map = internals.inst_c2p;
+    nb_inst_map &map = internals.inst_c2p;
     nb_type_map &type_map = internals.type_c2p;
-    nb_instance_map::iterator it = map.find(Key(value, *cpp_type));
+    type_data *td = nullptr;
 
-    if (it != map.end() && rvp != rv_policy::copy) {
-        PyObject *result = (PyObject *) it->second;
-        Py_INCREF(result);
-        return result;
-    } else if (rvp == rv_policy::none) {
-        return nullptr;
+    auto lookup_type = [cpp_type, &td, &type_map]() -> bool {
+        if (!td) {
+            nb_type_map::iterator it =
+                type_map.find(std::type_index(*cpp_type));
+
+            if (it == type_map.end())
+                return false;
+
+            td = it->second;
+        }
+
+        return true;
+    };
+
+    if (rvp != rv_policy::copy) {
+        // Check if the instance is already registered with nanobind
+        nb_inst_map::iterator it = map.find(value);
+
+        if (it != map.end()) {
+            const nb_inst_seq *seq = &it->second;
+
+            while (seq) {
+                PyObject *inst = (PyObject *) seq->inst;
+                PyTypeObject *tp = Py_TYPE(inst);
+
+                if (nb_type_data(tp)->type == cpp_type) {
+                    Py_INCREF(inst);
+                    return inst;
+                }
+
+                if (!lookup_type())
+                    return nullptr;
+
+                if (PyType_IsSubtype(tp, td->type_py)) {
+                    Py_INCREF(inst);
+                    return inst;
+                }
+
+                seq = seq->next;
+            }
+        } else if (rvp == rv_policy::none) {
+            return nullptr;
+        }
     }
 
-    // Look up the corresponding type
-    nb_type_map::iterator it2 = type_map.find(std::type_index(*cpp_type));
-    if (NB_UNLIKELY(it2 == type_map.end()))
+    // Look up the corresponding Python type if not already done
+    if (!lookup_type())
         return nullptr;
 
-    return nb_type_put_common(value, it2->second, rvp, cleanup, is_new);
+    return nb_type_put_common(value, td, rvp, cleanup, is_new);
 }
 
 PyObject *nb_type_put_p(const std::type_info *cpp_type,
@@ -1036,7 +1108,7 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                         void *value, rv_policy rvp,
                         cleanup_list *cleanup,
                         bool *is_new) noexcept {
-    using Key = std::pair<void *, std::type_index>;
+    using Key = std::pair<void *, PyTypeObject *>;
 
     // Convert nullptr -> None
     if (!value) {
@@ -1046,37 +1118,71 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
     // Check if the instance is already registered with nanobind
     nb_internals &internals = internals_get();
-    nb_instance_map &map = internals.inst_c2p;
+    nb_inst_map &map = internals.inst_c2p;
     nb_type_map &type_map = internals.type_c2p;
-    nb_instance_map::iterator it = map.end();
 
-    if (NB_UNLIKELY(cpp_type_p && cpp_type_p != cpp_type))
-        it = map.find(Key(value, *cpp_type_p));
+    // Look up the corresponding Python type
+    type_data *td = nullptr,
+              *td_p = nullptr;
 
-    if (NB_LIKELY(it == map.end()))
-        it = map.find(Key(value, *cpp_type));
+    auto lookup_type = [cpp_type, cpp_type_p, &td, &td_p, &type_map]() -> bool {
+        if (!td) {
+            nb_type_map::iterator it =
+                type_map.find(std::type_index(*cpp_type));
 
-    if (it != map.end() && rvp != rv_policy::copy) {
-        PyObject *result = (PyObject *) it->second;
-        Py_INCREF(result);
-        return result;
-    } else if (rvp == rv_policy::none) {
-        return nullptr;
+            if (it == type_map.end())
+                return false;
+
+            td = it->second;
+
+            if (cpp_type_p && cpp_type_p != cpp_type) {
+                it = type_map.find(std::type_index(*cpp_type_p));
+
+                if (it != type_map.end())
+                    td_p = it->second;
+            }
+        }
+
+        return true;
+    };
+
+    if (rvp != rv_policy::copy) {
+        // Check if the instance is already registered with nanobind
+        nb_inst_map::iterator it = map.find(value);
+
+        if (it != map.end()) {
+            const nb_inst_seq *seq = &it->second;
+            while (seq) {
+                PyObject *inst = (PyObject *) seq->inst;
+                PyTypeObject *tp = Py_TYPE(inst);
+                const std::type_info *p = nb_type_data(tp)->type;
+
+                if (p == cpp_type || p == cpp_type_p) {
+                    Py_INCREF(inst);
+                    return inst;
+                }
+
+                if (!lookup_type())
+                    return nullptr;
+
+                if (PyType_IsSubtype(tp, td->type_py) ||
+                    (td_p && PyType_IsSubtype(tp, td_p->type_py))) {
+                    Py_INCREF(inst);
+                    return inst;
+                }
+
+                seq = seq->next;
+            }
+        } else if (rvp == rv_policy::none) {
+            return nullptr;
+        }
     }
 
-    // Look up the corresponding type
-    nb_type_map::iterator it2 = type_map.end();
-
-    if (NB_UNLIKELY(cpp_type_p && cpp_type_p != cpp_type))
-        it2 = type_map.find(std::type_index(*cpp_type_p));
-
-    if (NB_LIKELY(it2 == type_map.end()))
-        it2 = type_map.find(std::type_index(*cpp_type));
-
-    if (NB_UNLIKELY(it2 == type_map.end()))
+    // Look up the corresponding Python type if not already done
+    if (!lookup_type())
         return nullptr;
 
-    return nb_type_put_common(value, it2->second, rvp, cleanup, is_new);
+    return nb_type_put_common(value, td_p ? td_p : td, rvp, cleanup, is_new);
 }
 
 static void nb_type_put_unique_finalize(PyObject *o,

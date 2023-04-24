@@ -201,6 +201,20 @@ NB_MODULE(test_classes_ext, m) {
         std::string s;
     };
 
+    struct PyDog : Dog {
+        NB_TRAMPOLINE(Dog, 2);
+
+        PyDog(const std::string &s) : Dog(s) { }
+
+        std::string name() const override {
+            NB_OVERRIDE(name);
+        }
+
+        std::string what() const override {
+            NB_OVERRIDE(what);
+        }
+    };
+
     struct Cat : Animal {
         Cat(const std::string &s) : s(s) { }
         std::string name() const override { return "Cat"; }
@@ -215,7 +229,7 @@ NB_MODULE(test_classes_ext, m) {
         .def("name", &Animal::name)
         .def("what", &Animal::what);
 
-    nb::class_<Dog, Animal>(m, "Dog")
+    nb::class_<Dog, Animal, PyDog>(m, "Dog")
         .def(nb::init<const std::string &>());
 
     nb::class_<Cat>(m, "Cat", animal)
@@ -224,6 +238,9 @@ NB_MODULE(test_classes_ext, m) {
     m.def("go", [](Animal *a) {
         return a->name() + " says " + a->what();
     });
+
+    m.def("animal_passthrough", [](Animal *a) { return a; }, nb::rv_policy::none);
+    m.def("dog_passthrough", [](Dog *d) { return d; }, nb::rv_policy::none);
 
     m.def("void_ret", [](Animal *a) { a->void_ret(); });
 

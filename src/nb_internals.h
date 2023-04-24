@@ -101,13 +101,6 @@ struct ptr_hash {
     }
 };
 
-struct ptr_type_hash {
-    NB_INLINE size_t
-    operator()(const std::pair<const void *, std::type_index> &value) const {
-        return ptr_hash()(value.first) ^ value.second.hash_code();
-    }
-};
-
 struct keep_alive_entry {
     void *data; // unique data pointer
     void (*deleter)(void *) noexcept; // custom deleter, excluded from hashing/equality
@@ -170,7 +163,13 @@ using py_map =
 using keep_alive_set =
     py_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
 
-using nb_instance_map = py_map<std::pair<void *, std::type_index>, nb_inst *, ptr_type_hash>;
+// Linked list of instances with the same pointer address. Usually just 1..
+struct nb_inst_seq {
+    nb_inst *inst;
+    nb_inst_seq *next = nullptr;
+};
+
+using nb_inst_map = py_map<void *, nb_inst_seq, ptr_hash>;
 using nb_type_map = py_map<std::type_index, type_data *>;
 
 struct nb_internals {
@@ -191,7 +190,7 @@ struct nb_internals {
     PyTypeObject *nb_ndarray;
 
     /// Instance pointer -> Python object mapping
-    nb_instance_map inst_c2p;
+    nb_inst_map inst_c2p;
 
     /// C++ type -> Python type mapping
     nb_type_map type_c2p;

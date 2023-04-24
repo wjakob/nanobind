@@ -13,16 +13,14 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-void trampoline_new(void **data, size_t size, void *ptr,
-                    const std::type_info *cpp_type) noexcept {
+void trampoline_new(void **data, size_t size, void *ptr) noexcept {
     // GIL is held when the trampoline constructor runs
-    nb_internals &internals = internals_get();
-    auto it = internals.inst_c2p.find(
-        std::pair<void *, std::type_index>(ptr, *cpp_type));
-    if (it == internals.inst_c2p.end())
-        fail("nanobind::detail::trampoline_new(): instance not found!");
+    nb_inst_map &inst_c2p = internals_get().inst_c2p;
+    nb_inst_map::iterator it = inst_c2p.find(ptr);
+    if (it == inst_c2p.end() || it->second.next)
+        fail("nanobind::detail::trampoline_new(): unique instance not found!");
 
-    data[0] = it->second;
+    data[0] = it->second.inst;
     memset(data + 1, 0, sizeof(void *) * 2 * size);
 }
 

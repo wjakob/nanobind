@@ -18,12 +18,19 @@ below inherit that of the preceding release.
 Version 1.2.0 (TBA)
 -------------------
 
+* Improvements to the internal C++ → Python instance map data structure to improve
+  performance and address type confusion when returning previously registered instances.
+  (commit `716354 <https://github.com/wjakob/nanobind/commit/716354f0ed6123d6a19fcabb077b72a17b4ddf79>`__,
+  discussion `189 <https://github.com/wjakob/nanobind/discussions/189>`__).
+* Added up-to-date nanobind benchmarks on Linux including comparisons to Cython.
+  (commit `834cf3
+  <https://github.com/wjakob/nanobind/commit/834cf36ce12ffe6470dcffecd21341377c56cee1>`__
+  and `39e163
+  <https://github.com/wjakob/nanobind/commit/e9e163ec55de995a68a34fafda2e96ff06532658>`__).
 * Removed the superfluous ``nb_enum`` metaclass.
   (commit `9c1985 <https://github.com/wjakob/nanobind/commit/9c19850471be70a22114826f6c0edceee99ff40b>`__).
 * Fixed a corner case that prevented ``nb::cast<char>`` from working.
   (commit `9ae320 <https://github.com/wjakob/nanobind/commit/9ae32054d9a6ad17af15994dc51138eb88f71f92>`__).
-* Added up-to-date nanobind benchmarks on Linux including comparisons to Cython.
-  (commit `834cf3 <https://github.com/wjakob/nanobind/commit/834cf36ce12ffe6470dcffecd21341377c56cee1>`__).
 * ABI version 8.
 
 Version 1.1.1 (April 6, 2023)

@@ -1108,8 +1108,6 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                         void *value, rv_policy rvp,
                         cleanup_list *cleanup,
                         bool *is_new) noexcept {
-    using Key = std::pair<void *, PyTypeObject *>;
-
     // Convert nullptr -> None
     if (!value) {
         Py_INCREF(Py_None);

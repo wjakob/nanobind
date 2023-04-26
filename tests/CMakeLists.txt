@@ -15,6 +15,7 @@ nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_stl_ext test_stl.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_bind_map_ext test_stl_bind_map.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_bind_vector_ext test_stl_bind_vector.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_chrono_ext test_chrono.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_enum_ext test_enum.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_ndarray_ext test_ndarray.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${NB_EXTRA_ARGS})
@@ -57,6 +58,7 @@ set(TEST_FILES
   test_stl.py
   test_stl_bind_map.py
   test_stl_bind_vector.py
+  test_chrono.py
   test_ndarray.py
 )
 

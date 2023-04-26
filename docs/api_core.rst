@@ -1059,7 +1059,25 @@ the reference section on :ref:`class binding <class_binding>`.
 
    .. cpp:function:: void restore() noexcept
 
-      Restore the error status in Python and clear the `python_error` contents.
+      Restore the error status in Python and clear the `python_error`
+      contents. This may only be called once, and you should not
+      reraise the `python_error` in C++ afterward.
+
+   .. cpp:function:: void discard_as_unraisable(handle context) noexcept
+
+      Pass the error to Python's :py:func:`sys.unraisablehook`, which
+      prints a traceback to :py:data:`sys.stderr` by default but may
+      be overridden.  Like :cpp:func:`restore`, this consumes the
+      error and you should not reraise the exception in C++ afterward.
+
+      The *context* argument should be some object whose ``repr()``
+      helps identify the location of the error. The default
+      :py:func:`sys.unraisablehook` prints a traceback that begins
+      with the text ``Exception ignored in:`` followed by
+      the result of ``repr(context)``.
+
+      Example use case: handling a Python error that occurs in a C++
+      destructor where you cannot raise a C++ exception.
 
    .. cpp:function:: handle type() const
 
@@ -1078,7 +1096,7 @@ the reference section on :ref:`class binding <class_binding>`.
    The function :cpp:func:`cast` raises this exception to indicate that a cast
    was unsuccessful.
 
-   .. cpp:function:: next_overload()
+   .. cpp:function:: cast_error()
 
       Constructor
 

@@ -19,7 +19,7 @@ Version 1.3.0 (TBD)
 -------------------
 
 * Reduced the size of nanobind type objects by 4 pointers.
-  (PR `#192 <https://github.com/wjakob/nanobind/pull/192>`__).
+  (PR `#194 <https://github.com/wjakob/nanobind/pull/194>`__).
 * ABI version 9.
 
 Version 1.2.0 (April 24, 2023)

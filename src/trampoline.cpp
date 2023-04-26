@@ -35,8 +35,12 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
     const PyObject *None = Py_None;
 
     current_method cm = current_method_data;
-    if (cm.self == data[0] && (cm.name == name || strcmp(cm.name, name) == 0))
+    if (cm.self == data[0] && (cm.name == name || strcmp(cm.name, name) == 0)) {
+        if (pure)
+            raise("nanobind::detail::get_trampoline('%s()'): tried to call a "
+                  "pure virtual function!", name);
         return nullptr;
+    }
 
     // First quick sweep without lock
     for (size_t i = 0; i < size; i++) {

@@ -55,8 +55,6 @@ template <size_t Size> struct trampoline {
 #define NB_OVERRIDE_PURE_NAME(name, func, ...)                                 \
     nanobind::handle nb_key = nb_trampoline.lookup(name, true);                \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    if (!nb_key.is_valid())                                                    \
-        throw std::runtime_error("Method " name " not implemented!");          \
     nanobind::gil_scoped_acquire nb_guard;                                     \
     return nanobind::cast<nb_ret_type>(                                        \
         nb_trampoline.base().attr(nb_key)(__VA_ARGS__))

@@ -597,3 +597,28 @@ def test33_polymorphic_downcast():
     assert isinstance(t.factory_2(), t.Base)
     assert isinstance(t.polymorphic_factory(), t.PolymorphicSubclass)
     assert isinstance(t.polymorphic_factory_2(), t.PolymorphicBase)
+
+def test34_trampoline_optimization():
+    class Rufus(t.Dog):
+        def __init__(self):
+            super().__init__("woof")
+
+        def name(self):
+            return "Rufus"
+
+    for i in range(2):
+        d1 = t.Dog("woof")
+        d2 = Rufus()
+
+        if i == 0:
+            assert t.go(d1) == 'Dog says woof'
+            assert t.go(d2) == 'Rufus says woof'
+
+        old = t.Dog.name
+        try:
+            t.Dog.name = lambda self: "Max"
+
+            assert t.go(d1) == 'Dog says woof'
+            assert t.go(d2) == 'Rufus says woof'
+        finally:
+            t.Dog.name = old

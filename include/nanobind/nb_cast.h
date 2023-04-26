@@ -207,6 +207,21 @@ template <> struct type_caster<char> {
     }
 };
 
+template <typename T> struct type_caster<pointer_and_handle<T>> {
+    using Caster = detail::make_caster<T>;
+    using T2 = pointer_and_handle<T>;
+    NB_TYPE_CASTER(T2, Caster::Name)
+
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        Caster c;
+        if (!c.from_python(src, flags, cleanup))
+            return false;
+        value.h = src;
+        value.p = c.operator T*();
+        return true;
+    }
+};
+
 template <typename T, typename X> struct type_caster<typed<T, X>> {
     using Caster = detail::make_caster<T>;
     using T2 = typed<T, X>;

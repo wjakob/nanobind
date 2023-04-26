@@ -211,8 +211,15 @@ private:
 
         cl.def(
             "__init__",
-            [](Type *v, Args... args) {
-                new ((Alias *) v) Alias{ (detail::forward_t<Args>) args... };
+            [](pointer_and_handle<Type> v, Args... args) {
+                if constexpr (!std::is_same_v<Type, Alias> &&
+                              std::is_constructible_v<Type, Args...>) {
+                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                        new ((Type *) v.p) Type{ (detail::forward_t<Args>) args... };
+                        return;
+                    }
+                }
+                new ((Alias *) v.p) Alias{ (detail::forward_t<Args>) args... };
             },
             extra...);
     }
@@ -236,8 +243,15 @@ private:
 
         cl.def(
             "__init__",
-            [](Type *v, Arg arg) {
-                new ((Alias *) v) Alias{ (detail::forward_t<Arg>) arg };
+            [](pointer_and_handle<Type> v, Arg arg) {
+                if constexpr (!std::is_same_v<Type, Alias> &&
+                              std::is_constructible_v<Type, Arg>) {
+                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                        new ((Type *) v.p) Type{ (detail::forward_t<Arg>) arg };
+                        return;
+                    }
+                }
+                new ((Alias *) v.p) Alias{ (detail::forward_t<Arg>) arg };
             }, is_implicit(), extra...);
 
         if constexpr (!Caster::IsClass) {

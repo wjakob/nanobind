@@ -601,6 +601,11 @@ public:
 
 template <typename T, typename X> struct typed { T value; };
 
+template <typename T> struct pointer_and_handle {
+    T *p;
+    handle h;
+};
+
 NAMESPACE_BEGIN(detail)
 template <typename Derived> NB_INLINE api<Derived>::operator handle() const {
     return derived().ptr();

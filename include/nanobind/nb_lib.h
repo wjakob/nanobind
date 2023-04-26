@@ -300,6 +300,9 @@ NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
 /// Move-construct 'dst' from 'src', mark it as ready and to be destructed (must have the same nb_type)
 NB_CORE void nb_inst_move(PyObject *dst, const PyObject *src) noexcept;
 
+/// Check if a particular instance uses a Python-derived type
+NB_CORE bool nb_inst_python_derived(PyObject *o) noexcept;
+
 /**
  * This function can be used to manually set two important flags associated with
  * every nanobind instance (``nb_inst``).

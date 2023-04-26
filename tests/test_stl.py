@@ -751,3 +751,4 @@ def test66_replace_extension():
     assert t.parent_path(b"foo/bar") == Path("foo")
     assert t.parent_path(PseudoStrPath()) == Path("foo")
     assert t.parent_path(PseudoBytesPath()) == Path("foo")
+

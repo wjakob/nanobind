@@ -12,7 +12,6 @@
 #include <nanobind/stl/unordered_set.h>
 #include <nanobind/stl/set.h>
 #include <nanobind/stl/filesystem.h>
-#include <nanobind/stl/chrono.h>
 
 NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 

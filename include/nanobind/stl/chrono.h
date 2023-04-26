@@ -49,8 +49,7 @@ public:
                 return true;
             }
         } catch (python_error& e) {
-            e.restore();
-            PyErr_WriteUnraisable(src.ptr());
+            e.discard_as_unraisable(src.ptr());
             return false;
         }
 
@@ -153,8 +152,7 @@ public:
                 return false;
             }
         } catch (python_error& e) {
-            e.restore();
-            PyErr_WriteUnraisable(src.ptr());
+            e.discard_as_unraisable(src.ptr());
             return false;
         }
         cal.tm_sec = ss;

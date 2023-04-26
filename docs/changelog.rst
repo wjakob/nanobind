@@ -21,6 +21,10 @@ Version 1.3.0 (TBD)
 * Added a type caster between Python datetime/timedelta objects and
   C++ ``std::chrono::duration``/``std::chrono::time_point``, ported
   from pybind11. (PR `#175 <https://github.com/wjakob/nanobind/pull/175>`__).
+* Added :cpp:func:`nb::python_error::discard_as_unraisable()
+  <python_error::discard_as_unraisable>` as a wrapper around
+  ``PyErr_WriteUnraisable()``.
+  (PR `#175 <https://github.com/wjakob/nanobind/pull/175>`__).
 
 Version 1.2.0 (April 24, 2023)
 ------------------------------

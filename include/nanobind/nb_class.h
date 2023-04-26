@@ -20,6 +20,10 @@ enum class type_flags : uint32_t {
     /// Does the type provide a C++ move constructor?
     is_move_constructible    = (1 << 2),
 
+    /// Is an extra uintptr_t reserved in each instance of this type for
+    /// supplemental information?
+    has_instance_supplement  = (1 << 3),
+
     /// Is this a python type that extends a bound C++ type?
     is_python_type           = (1 << 4),
 
@@ -145,6 +149,10 @@ NB_INLINE void type_extra_apply(type_data &t, supplement<T>) {
                   "The supplement type must be a POD (plain old data) type");
     t.flags |= (uint32_t) type_flags::has_supplement | (uint32_t) type_flags::is_final;
     t.supplement = (void *) malloc(sizeof(T));
+}
+
+NB_INLINE void type_extra_apply(type_data &t, instance_supplement) {
+    t.flags |= (uint32_t) type_flags::has_instance_supplement;
 }
 
 template <typename T> void wrap_copy(void *dst, const void *src) {
@@ -517,5 +525,11 @@ inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
 inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
+template <typename T>
+inline T &inst_supplement(handle h) {
+    static_assert(std::is_trivially_copyable_v<T> &&
+                  sizeof(T) <= 8 && alignof(T) <= 8);
+    return *(T *) detail::nb_inst_supplement(h.ptr());
+}
 
 NAMESPACE_END(NB_NAMESPACE)

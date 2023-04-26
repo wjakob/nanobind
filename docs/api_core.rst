@@ -1434,6 +1434,13 @@ parameter of the constructor :cpp:func:`class_::class_` and
 
    Indicate that ``sizeof(T)`` bytes of memory should be set aside to store supplemental data in the type object.
 
+.. cpp:struct:: instance_supplement
+
+   Indicate that ``sizeof(uintptr_t)`` bytes of memory should be set
+   aside to store supplemental data in each *instance* of this
+   type. See the discussion of :ref:`supplemental instance data
+   <instance_supplement>`.
+
 .. cpp:struct:: type_slots
 
    .. cpp:function:: type_slots(PyType_Slot * value)
@@ -2051,6 +2058,16 @@ Low-level instance access
 .. cpp:function:: void inst_move(handle dst, handle src)
 
    Copy-construct the contents of `src` into `dst` and mark `dst` as *ready*.
+
+.. cpp:function:: template <typename T> T &inst_supplement(handle h)
+
+   Return a reference to supplemental data stashed in a nanobind
+   instance.  The supplemental data type ``T`` must be trivially
+   copyable, no larger and no more aligned than a pointer; this will
+   be validated at compile time.  You must have passed
+   :cpp:class:`nb::instance_supplement() <instance_supplement>` when
+   constructing the corresponding class; this is *not* validated.
+   See :cpp:class:`instance_supplement`.
 
 
 Global flags

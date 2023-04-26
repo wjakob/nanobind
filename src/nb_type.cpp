@@ -55,19 +55,27 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
     nb_inst *self;
 
+    // Add space for an instance supplement if requested.
+    // We take advantage of our assumption that sizeof(uintptr_t) == 8
+    // (implied by the assertion about nb_inst size in nb_internals.h)
+    // to do this in a branch-free way.
+    constexpr uint32_t supp_flag = (uint32_t) type_flags::has_instance_supplement;
+    static_assert(sizeof(uintptr_t) == supp_flag);
+    const size_t supp_size = t->flags & supp_flag;
+
     if (!gc) {
-        size_t size = sizeof(nb_inst);
+        size_t size = sizeof(nb_inst) + supp_size;
+
         if (!value) {
             // Internal storage: space for the object and padding for alignment
             size += t->size;
             if (align > sizeof(void *))
                 size += align - sizeof(void *);
         }
-
         self = (nb_inst *) PyObject_Malloc(size);
         if (!self)
             return PyErr_NoMemory();
-        memset(self, 0, sizeof(nb_inst));
+        memset(self, 0, sizeof(nb_inst) + supp_size);
         PyObject_Init((PyObject *) self, tp);
     } else {
         self = (nb_inst *) PyType_GenericAlloc(tp, 0);
@@ -75,7 +83,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
     if (!value) {
         // Compute suitably aligned instance payload pointer
-        uintptr_t payload = (uintptr_t) (self + 1);
+        uintptr_t payload = (uintptr_t) (self + 1) + supp_size;
         payload = (payload + align - 1) / align * align;
 
         // Encode offset to aligned payload
@@ -95,8 +103,8 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         } else {
             if (!gc) {
                 // Offset *not* representable, allocate extra memory for a pointer
-                nb_inst *self_2 =
-                    (nb_inst *) PyObject_Realloc(self, sizeof(nb_inst) + sizeof(void *));
+                nb_inst *self_2 = (nb_inst *) PyObject_Realloc(
+                        self, sizeof(nb_inst) + supp_size + sizeof(void *));
 
                 if (!self_2) {
                     PyObject_Free(self);
@@ -106,8 +114,9 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
                 self = self_2;
             }
 
-            *(void **) (self + 1) = value;
-            self->offset = (int32_t) sizeof(nb_inst);
+            uintptr_t payload = (uintptr_t) (self + 1) + supp_size;
+            *(void **) payload = value;
+            self->offset = (int32_t) ((intptr_t) payload - (intptr_t) self);
             self->direct = false;
         }
 
@@ -378,6 +387,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
 
     constexpr size_t ptr_size = sizeof(void *);
     size_t basicsize = sizeof(nb_inst) + t->size;
+    basicsize += (t->flags & (uint32_t) type_flags::has_instance_supplement);
     if (t->align > ptr_size)
         basicsize += t->align - ptr_size;
 
@@ -405,6 +415,7 @@ PyObject *nb_type_new(const type_data *t) noexcept {
         /* Handle a corner case (base class larger than derived class)
            which can arise when extending trampoline base classes */
         size_t base_basicsize = sizeof(nb_inst) + tb->size;
+        base_basicsize += (tb->flags & (uint32_t) type_flags::has_instance_supplement);
         if (tb->align > ptr_size)
             base_basicsize += tb->align - ptr_size;
         if (base_basicsize > basicsize)
@@ -1358,6 +1369,10 @@ PyObject *nb_inst_wrap(PyTypeObject *t, void *ptr) {
 
 void *nb_inst_ptr(PyObject *o) noexcept {
     return inst_ptr((nb_inst *) o);
+}
+
+uintptr_t *nb_inst_supplement(PyObject *o) noexcept {
+    return (uintptr_t *)((nb_inst *) o + 1);
 }
 
 void nb_inst_zero(PyObject *o) noexcept {

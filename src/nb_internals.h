@@ -56,6 +56,19 @@ struct nb_inst { // usually: 24 bytes
 
     /// Does this instance hold reference to others? (via internals.keep_alive)
     bool clear_keep_alive : 1;
+
+    // Followed by some conditional fields:
+    //   uintptr_t instance_supplement;  // if has_instance_supplement type flag
+    //   union {
+    //       T internal_value;           // if this->internal
+    //       T* indirect_value;          // if !this->internal && !this->direct
+    //   };
+    //   PyObject *instance_dict;        // if has_dynamic_attr type flag
+    //
+    // Non-GCable instances are only as large as needed to accommodate the
+    // fields they need. GCable instances are a fixed size. Note that
+    // has_dynamic_attr turns on GC, so the instance_dict is always at a
+    // fixed offset if supported by the type.
 };
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(void *));

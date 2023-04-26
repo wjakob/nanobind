@@ -227,3 +227,79 @@ Here is what this might look like in an implementation:
 The :cpp:class:`nb::supplement\<T\>() <supplement>` annotation implicitly
 also passes :cpp:class:`nb::is_final() <is_final>` to ensure that type
 objects with supplemental data cannot be subclassed in Python.
+
+.. _instance_supplement:
+
+Supplemental instance data
+--------------------------
+
+It is also possible to store supplemental data inside each *instance* of
+a bound type. For performance reasons, an instance supplement must be
+trivially copyable and must be no larger and no more aligned than a pointer.
+
+To reserve space for an instance supplement, pass the
+:cpp:class:`nb::instance_supplement() <instance_supplement>`
+annotation when binding a class; you can then obtain a reference to
+the supplemental data (interpreted as an object of type ``T``) by
+calling :cpp:func:`nb::inst_supplement\<T\>() <inst_supplement>` on an
+instance of that class.  The instance supplement is zero-initialized
+whenever a new Python instance is constructed, either due to an object
+being created from Python or due to wrapping a pointer returned from
+C++. The instance supplement is always stored within the Python object
+instance, even if the C++ object is not.
+
+For example, this feature can be used to cache the hash value of an
+immutable instance:
+
+.. code-block:: cpp
+
+  struct ExpensiveObject { size_t compute_hash() const; /* ... */ };
+  nb::class_<ExpensiveObject> cls(m, "ExpensiveObject", nb::instance_supplement());
+  cls.def("__hash__", [](nb::handle_t<ExpensiveObject> self) {
+      auto& cached_hash = nb::inst_supplement<size_t>(self);
+      if (cached_hash == 0) {
+          if (!nb::inst_ready(self)) {
+              throw nb::type_error("Instance is not initialized!");
+          }
+          cached_hash = nb::inst_ptr<ExpensiveObject>(self)->compute_hash();
+          if (cached_hash == 0) {
+              cached_hash = 1;
+          }
+      }
+      return static_cast<Py_ssize_t>(cached_hash) - 1;
+  });
+
+Or to cache a string associated with the instance:
+
+.. code-block:: cpp
+
+  struct ExpensiveObject { std::string stringify() const; /* ... */ };
+  nb::class_<ExpensiveObject> cls(m, "ExpensiveObject", nb::instance_supplement());
+  cls.def("__str__", [](nb::handle_t<ExpensiveObject> self) {
+      auto& cached_result = nb::inst_supplement<nb::handle>(self);
+      if (!cached_result.is_valid()) {
+          if (!nb::inst_ready(self)) {
+              throw nb::type_error("Instance is not initialized!");
+          }
+          nb::object result = nb::cast(
+                  nb::inst_ptr<ExpensiveObject>(self)->stringify());
+          cached_result = result;
+          return result;
+      } else {
+          return nb::borrow(cached_result);
+      }
+  }, nb::keep_alive<1, 0>());
+
+In the latter example, note that the instance supplement stores a non-owning
+:cpp:class:`nb::handle <handle>`; this is required because nanobind doesn't
+run any destructor for the instance supplement when the instance is destroyed.
+The :cpp:class:`nb::keep_alive <keep_alive>` function annotation is used to
+ensure that the string stays alive for as long as the ``ExpensiveObject`` does.
+
+.. warning:: If an instance supplement is used to store a Python
+             object reference in this way, it will not be visible to
+             the garbage collector, so if it participates in a
+             reference cycle (by indirectly referring back to the instance
+             itself) you will get a reference leak. If you really need to
+             cache a Python object, stick to simple types
+             such as ``str`` that can't participate in cycles.

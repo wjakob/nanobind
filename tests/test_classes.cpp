@@ -14,7 +14,7 @@ using namespace nb::literals;
 
 static int default_constructed = 0, value_constructed = 0, copy_constructed = 0,
            move_constructed = 0, copy_assigned = 0, move_assigned = 0,
-           destructed = 0;
+           destructed = 0, expensive_hashed = 0, expensive_stringed = 0;
 
 struct Struct;
 std::unique_ptr<Struct> struct_tmp;
@@ -146,6 +146,8 @@ NB_MODULE(test_classes_ext, m) {
         d["copy_assigned"] = copy_assigned;
         d["move_assigned"] = move_assigned;
         d["destructed"] = destructed;
+        d["expensive_hashed"] = expensive_hashed;
+        d["expensive_stringed"] = expensive_stringed;
         return d;
     });
 
@@ -157,6 +159,8 @@ NB_MODULE(test_classes_ext, m) {
         copy_assigned = 0;
         move_assigned = 0;
         destructed = 0;
+        expensive_hashed = 0;
+        expensive_stringed = 0;
     });
 
     // test06_big
@@ -477,4 +481,58 @@ NB_MODULE(test_classes_ext, m) {
     m.def("polymorphic_factory_2", []() { return (PolymorphicBase *) new AnotherPolymorphicSubclass(); });
     m.def("factory", []() { return (Base *) new Subclass(); });
     m.def("factory_2", []() { return (Base *) new AnotherSubclass(); });
+
+    // test34_instance_supplement
+    struct ExpensiveHash {
+        int value;
+        ExpensiveHash(int v) : value(v) {}
+        std::size_t compute_hash() const {
+            ++expensive_hashed;
+            return value * 42;
+        }
+    };
+    nb::class_<ExpensiveHash>(m, "ExpensiveHash", nb::instance_supplement())
+        .def(nb::init<int>())
+        .def_static("make", [](int v) { return new ExpensiveHash(v); },
+                    nb::rv_policy::take_ownership)
+        .def("__hash__", [](nb::handle_t<ExpensiveHash> self) {
+            auto& cached_hash = nb::inst_supplement<size_t>(self);
+            if (cached_hash == 0) {
+                if (!nb::inst_ready(self)) {
+                    throw nb::type_error("Instance is not initialized!");
+                }
+                cached_hash = nb::inst_ptr<ExpensiveHash>(self)->compute_hash();
+                if (cached_hash == 0) {
+                    cached_hash = 1;
+                }
+            }
+            return static_cast<Py_ssize_t>(cached_hash) - 1;
+        });
+
+    struct ExpensiveStr {
+        int value;
+        ExpensiveStr(int v) : value(v) {}
+        std::string stringify() const {
+            ++expensive_stringed;
+            return std::string(value, 'X');
+        }
+    };
+    nb::class_<ExpensiveStr>(m, "ExpensiveStr", nb::instance_supplement())
+        .def(nb::init<int>())
+        .def_static("make", [](int v) { return new ExpensiveStr(v); },
+                    nb::rv_policy::take_ownership)
+        .def("__str__", [](nb::handle_t<ExpensiveStr> self) {
+            auto& cached_result = nb::inst_supplement<nb::handle>(self);
+            if (!cached_result.is_valid()) {
+                if (!nb::inst_ready(self)) {
+                    throw nb::type_error("Instance is not initialized!");
+                }
+                nb::object result = nb::cast(
+                        nb::inst_ptr<ExpensiveStr>(self)->stringify());
+                cached_result = result;
+                return result;
+            } else {
+                return nb::borrow(cached_result);
+            }
+        }, nb::keep_alive<1, 0>());
 }

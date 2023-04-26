@@ -597,3 +597,48 @@ def test33_polymorphic_downcast():
     assert isinstance(t.factory_2(), t.Base)
     assert isinstance(t.polymorphic_factory(), t.PolymorphicSubclass)
     assert isinstance(t.polymorphic_factory_2(), t.PolymorphicBase)
+
+
+def test34_instance_supplement(clean):
+    eh1 = t.ExpensiveHash(10)  # constructed in Python
+    eh2 = t.ExpensiveHash.make(20)  # wrapped pointer from C++
+    assert_stats(expensive_hashed=0)
+    assert hash(eh1) == 419
+    assert hash(eh2) == 839
+    assert_stats(expensive_hashed=2)
+    for _ in range(10):
+        assert hash(eh1) == 419
+        assert hash(eh2) == 839
+    assert_stats(expensive_hashed=2)
+
+    eh_uninit = t.ExpensiveHash.__new__(t.ExpensiveHash, 10)
+    with pytest.raises(TypeError, match="not initialized!"):
+        hash(eh_uninit)
+
+    t.reset()
+    es1 = t.ExpensiveStr(5)
+    es2 = t.ExpensiveStr.make(10)
+    assert_stats(expensive_stringed=0)
+    es1_s = str(es1)
+    es2_s = str(es2)
+    assert es1_s == "XXXXX"
+    assert es2_s == "XXXXXXXXXX"
+    assert_stats(expensive_stringed=2)
+    for _ in range(10):
+        assert str(es1) is es1_s
+        assert str(es2) is es2_s
+    assert_stats(expensive_stringed=2)
+    if hasattr(sys, "getrefcount"):
+        del es1_s, es2_s
+        # One for the return value from this call to str(); one being
+        # held by the keep_alive. Can't write 'assert
+        # sys.getrefcount(...) == N' because then pytest's assertion
+        # rewriting holds another ref.
+        rc = sys.getrefcount(str(es1))
+        assert rc == 2
+        rc = sys.getrefcount(str(es2))
+        assert rc == 2
+
+    es_uninit = t.ExpensiveStr.__new__(t.ExpensiveStr, 10)
+    with pytest.raises(TypeError, match="not initialized!"):
+        str(es_uninit)

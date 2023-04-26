@@ -276,6 +276,10 @@ NB_CORE const std::type_info *nb_type_info(PyObject *t) noexcept;
 /// Get a pointer to the instance data of a nanobind instance (nb_inst)
 NB_CORE void *nb_inst_ptr(PyObject *o) noexcept;
 
+/// Get a pointer to storage for a user-defined 'extra' value
+/// associated with the nb_inst o.
+NB_CORE uintptr_t *nb_inst_supplement(PyObject *o) noexcept;
+
 /// Check if a Python type object wraps an instance of a specific C++ type
 NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept;
 

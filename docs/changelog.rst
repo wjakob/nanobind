@@ -15,8 +15,14 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.2.0 (April 24, 2023)
+Version 1.3.0 (TBD)
 -------------------
+
+* Added support for :ref:`per-instance supplemental data <instance_supplement>`.
+  (PR `#193 <https://github.com/wjakob/nanobind/pull/193>`__).
+
+Version 1.2.0 (April 24, 2023)
+------------------------------
 
 * Improvements to the internal C++ → Python instance map data structure to improve
   performance and address type confusion when returning previously registered instances.

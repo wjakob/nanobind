@@ -28,8 +28,19 @@ public:
         return PyErr_GivenExceptionMatches(m_type, exc.ptr()) != 0;
     }
 
-    /// Move the error back into the Python domain
+    /// Move the error back into the Python domain. This may only be called
+    /// once, and you should not reraise the exception in C++ afterward.
     void restore() noexcept;
+
+    /// Pass the error to Python's `sys.unraisablehook`, which prints
+    /// a traceback to `sys.stderr` by default but may be overridden.
+    /// The *context* should be some object whose repr() helps clarify where
+    /// the error occurred. Like `.restore()`, this consumes the error and
+    /// you should not reraise the exception in C++ afterward.
+    void discard_as_unraisable(handle context) noexcept {
+        restore();
+        PyErr_WriteUnraisable(context.ptr());
+    }
 
     handle type() const { return m_type; }
     handle value() const { return m_value; }

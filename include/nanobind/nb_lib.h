@@ -226,8 +226,8 @@ NB_CORE PyObject *nb_func_new(const void *data) noexcept;
 // ========================================================================
 
 /// Create a Python type object for the given type record
-struct type_data;
-NB_CORE PyObject *nb_type_new(const type_data *c) noexcept;
+struct type_init_data;
+NB_CORE PyObject *nb_type_new(const type_init_data *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,

@@ -31,7 +31,7 @@
 # define  NB_STRDUP        _strdup
 #else
 #  define NB_EXPORT        __attribute__ ((visibility("default")))
-#  define NB_IMPORT        __attribute__ ((visibility("default")))
+#  define NB_IMPORT        NB_EXPORT
 #  define NB_INLINE        inline __attribute__((always_inline))
 #  define NB_NOINLINE      __attribute__((noinline))
 #if defined(__clang__)
@@ -63,11 +63,7 @@
 #    define NB_CORE NB_IMPORT
 #  endif
 #else
-#  if defined(_WIN32)
-#    define NB_CORE
-#  else
-#    define NB_CORE NB_EXPORT
-#  endif
+#  define NB_CORE
 #endif
 
 #if defined(__cpp_lib_char8_t) && __cpp_lib_char8_t >= 201811L

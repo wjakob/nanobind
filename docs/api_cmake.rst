@@ -41,17 +41,12 @@ The high-level interface consists of just one CMake command:
 
    .. list-table::
 
-      * - ``NOMINSIZE``
-        - Don't perform optimizations to minimize binary size.
       * - ``STABLE_ABI``
         - Perform a `stable ABI
           <https://docs.python.org/3/c-api/stable.html>`_ build, making it
           possible to use a compiled extension across Python minor versions.
           Only Python >= 3.12 is supported. The flag is ignored on older
           Python versions.
-      * - ``NOSTRIP``
-        - Don't strip debug symbols from the compiled extension
-          when performing release builds.
       * - ``NB_SHARED``
         - Compile the core nanobind library as a shared library (the default).
       * - ``NB_STATIC``
@@ -62,6 +57,11 @@ The high-level interface consists of just one CMake command:
         - Don't remove stack smashing-related protections.
       * - ``LTO``
         - Perform link time optimization.
+      * - ``NOMINSIZE``
+        - Don't perform optimizations to minimize binary size.
+      * - ``NOSTRIP``
+        - Don't strip unneded symbols and debug information from the compiled
+          extension when performing release builds.
 
    :cmake:command:`nanobind_add_module` performs the following
    steps to produce bindings.
@@ -87,16 +87,15 @@ The high-level interface consists of just one CMake command:
    - It appends the library suffix (e.g., ``.cpython-39-darwin.so``) based
      on information provided by CMake’s ``FindPython`` module.
 
-   - When requested via the optional ``STABLE_ABI`` parameter,
-     the build system will create a `stable ABI
-     <https://docs.python.org/3/c-api/stable.html>`_ extension module with a
-     different suffix (e.g., ``.abi3.so``).
+   - When requested via the optional ``STABLE_ABI`` parameter, the build system
+     will create a `stable ABI <https://docs.python.org/3/c-api/stable.html>`_
+     extension module with a different suffix (e.g., ``.abi3.so``).
 
      Once compiled, a stable ABI extension can be reused across Python minor
      versions. In contrast, ordinary builds are only compatible across patch
      versions. This feature requires Python >= 3.12 and is ignored on older
-     versions. Note that use of the stable ABI come at a small performance
-     cost since nanobind can no longer access the internals of various data
+     versions. Note that use of the stable ABI come at a small performance cost
+     since nanobind can no longer access the internals of various data
      structures directly. If in doubt, benchmark your code to see if the cost
      is acceptable.
 
@@ -133,15 +132,19 @@ The high-level interface consists of just one CMake command:
      ``PROTECT_STACK`` flag. Either way, is not recommended that you use
      nanobind in a setting where it presents an attack surface.
 
-   - In non-debug compilation modes, it strips internal symbol names from
-     the resulting binary, which leads to a substantial size reduction.
-     This behavior can be disabled using the optional ``NOSTRIP``
+   - It sets the default symbol visibility to ``hidden`` so that only functions
+     and types specifically marked for export generate symbols in the resulting
+     binary. This substantially reduces the size of the generated binary.
+
+   - In release builds, it strips unreferenced functions and debug information
+     names from the resulting binary. This can substantially reduce the size of
+     the generated binary and can be disabled using the optional ``NOSTRIP``
      argument.
 
-   - Link-time optimization (LTO) is *not active* by default; benefits
-     compared to pybind11 are relatively low, and this tends to make
-     linking a build bottleneck. That said, the optional ``LTO`` argument
-     can be specified to enable LTO in non-debug modes.
+   - Link-time optimization (LTO) is *not active* by default; benefits compared
+     to pybind11 are relatively low, and this can make linking a build
+     bottleneck. That said, the optional ``LTO`` argument can be specified to
+     enable LTO in release builds.
 
 .. _lowlevel-cmake:
 
@@ -174,6 +177,12 @@ is equivalent to
 
     # .. enable link time optimization
     nanobind_lto(my_ext)
+
+    # .. set the default symbol visibility to 'hidden'
+    nanobind_set_visibility(my_ext)
+
+    # .. strip unneeded symbols and debug info from the binary (only active in release builds)
+    nanobind_strip(my_ext)
 
     # .. disable the stack protector
     nanobind_disable_stack_protector(my_ext)
@@ -219,21 +228,44 @@ The various commands are described below:
 .. cmake:command:: nanobind_opt_size
 
    This function enable size optimizations in ``Release``, ``MinSizeRel``,
-   ``RelWithDebInfo`` modes. It expects a single target as argument, as in
+   ``RelWithDebInfo`` builds. It expects a single target as argument, as in
 
    .. code-block:: cmake
 
       nanobind_opt_size(my_target)
 
-.. cmake:command:: nanobind_lto
+.. cmake:command:: nanobind_set_visibility
 
-   This function enable link-time optimization in ``Release`` and
-   ``MinSizeRel`` modes. It expects a single target as argument, as in
+
+   This function sets the default symbol visibility to ``hidden`` so that only
+   functions and types specifically marked for export generate symbols in the
+   resulting binary. It expects a single target as argument, as in
 
    .. code-block:: cmake
 
-      nanobind_lto(my_target)
+      nanobind_trim(my_target)
 
+   This substantially reduces the size of the generated binary.
+
+.. cmake:command:: nanobind_strip
+
+   This function strips unused and debug symbols in ``Release`` and
+   ``MinSizeRel`` builds on Linux and macOS. It expects a single target as
+   argument, as in
+
+   .. code-block:: cmake
+
+      nanobind_strip(my_target)
+
+.. cmake:command:: nanobind_strip
+
+   This function strips unused and debug symbols in ``Release`` and
+   ``MinSizeRel`` builds on Linux and macOS. It expects a single target as
+   argument, as in
+
+   .. code-block:: cmake
+
+      nanobind_strip(my_target)
 
 .. cmake:command:: nanobind_disable_stack_protector
 

@@ -217,8 +217,16 @@ struct current_method {
 };
 
 extern NB_THREAD_LOCAL current_method current_method_data;
+extern nb_internals *internals_p;
+extern nb_internals *internals_fetch();
 
-extern nb_internals &internals_get() noexcept;
+inline nb_internals &internals_get() noexcept {
+    nb_internals *ptr = internals_p;
+    if (NB_UNLIKELY(!ptr))
+        ptr = internals_fetch();
+    return *ptr;
+}
+
 extern char *type_name(const std::type_info *t);
 
 // Forward declarations

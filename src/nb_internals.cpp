@@ -268,7 +268,7 @@ int nb_static_property_set(PyObject *self, PyObject *obj, PyObject *value) {
 NB_THREAD_LOCAL current_method current_method_data =
     current_method{ nullptr, nullptr };
 
-static nb_internals *internals_p = nullptr;
+nb_internals *internals_p = nullptr;
 
 void default_exception_translator(const std::exception_ptr &p, void *) {
     try {
@@ -510,7 +510,7 @@ static NB_NOINLINE nb_internals *internals_make() {
     return p;
 }
 
-static nb_internals *internals_fetch() {
+nb_internals *internals_fetch() {
     PyObject *dict = internals_dict();
 
     const char *internals_id = NB_INTERNALS_ID;
@@ -528,13 +528,6 @@ static nb_internals *internals_fetch() {
     internals_p = ptr;
 
     return ptr;
-}
-
-nb_internals &internals_get() noexcept {
-    nb_internals *ptr = internals_p;
-    if (NB_UNLIKELY(!ptr))
-        ptr = internals_fetch();
-    return *ptr;
 }
 
 NAMESPACE_END(detail)

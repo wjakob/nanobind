@@ -21,24 +21,10 @@ set(NB_SUFFIX ${NB_SUFFIX} CACHE INTERNAL "")
 
 get_filename_component(NB_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 get_filename_component(NB_DIR "${NB_DIR}" PATH)
-set(NB_DIR ${NB_DIR} CACHE INTERNAL "")
 
-# ---------------------------------------------------------------------------
-# Helper function to strip unnecessary sections from binaries on Linux/macOS
-# ---------------------------------------------------------------------------
-
-function(nanobind_strip name)
-  if (CMAKE_STRIP AND NOT MSVC AND NOT CMAKE_BUILD_TYPE MATCHES Debug|RelWithDebInfo)
-    if(APPLE)
-      set(NB_STRIP_OPT -x)
-    endif()
-
-    add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND ${CMAKE_STRIP} ${NB_STRIP_OPT} $<TARGET_FILE:${name}>)
-  endif()
-endfunction()
+set(NB_DIR      ${NB_DIR} CACHE INTERNAL "")
+set(NB_OPT      $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>> CACHE INTERNAL "")
+set(NB_OPT_SIZE $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>,$<CONFIG:RelWithDebInfo>> CACHE INTERNAL "")
 
 # ---------------------------------------------------------------------------
 # Helper function to handle undefined CPython API symbols on macOS
@@ -51,7 +37,7 @@ function (nanobind_link_options name)
     else()
       set(NB_LINKER_RESPONSE_FILE darwin-ld-cpython.sym)
     endif()
-    target_link_options(${name} PRIVATE "-Wl,-dead_strip" "-Wl,@${NB_DIR}/cmake/${NB_LINKER_RESPONSE_FILE}")
+    target_link_options(${name} PRIVATE "-Wl,@${NB_DIR}/cmake/${NB_LINKER_RESPONSE_FILE}")
   endif()
 endfunction()
 
@@ -138,13 +124,15 @@ function (nanobind_build_library TARGET_NAME)
     nanobind_link_options(${TARGET_NAME})
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
-    nanobind_strip(${TARGET_NAME})
-  endif()
 
-  if ((TARGET_TYPE STREQUAL "SHARED") OR (TARGET_NAME MATCHES "-lto"))
-    set_target_properties(${TARGET_NAME} PROPERTIES
-      INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
-      INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
+    if (TARGET_NAME MATCHES "-lto")
+      nanobind_lto(${TARGET_NAME})
+    endif()
+
+    nanobind_strip(${TARGET_NAME})
+  elseif(NOT WIN32 AND NOT APPLE)
+    target_compile_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}:-ffunction-sections -fdata-sections>)
+    target_link_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}: -Wl,--gc-sections>)
   endif()
 
   set_target_properties(${TARGET_NAME} PROPERTIES
@@ -154,6 +142,7 @@ function (nanobind_build_library TARGET_NAME)
     # Do not complain about vsnprintf
     target_compile_definitions(${TARGET_NAME} PRIVATE -D_CRT_SECURE_NO_WARNINGS)
   else()
+    # Generally needed to handle type punning in Python code
     target_compile_options(${TARGET_NAME} PRIVATE -fno-strict-aliasing)
   endif()
 
@@ -173,6 +162,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include)
 
   target_compile_features(${TARGET_NAME} PUBLIC cxx_std_17)
+  nanobind_set_visibility(${TARGET_NAME})
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -181,15 +171,10 @@ endfunction()
 
 function(nanobind_opt_size name)
   if (MSVC)
-    set(NB_OPT_SIZE /Os)
+    target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:/Os>)
   else()
-    set(NB_OPT_SIZE -Os)
+    target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:-Os>)
   endif()
-
-  target_compile_options(${name} PRIVATE
-      $<$<CONFIG:Release>:${NB_OPT_SIZE}>
-      $<$<CONFIG:MinSizeRel>:${NB_OPT_SIZE}>
-      $<$<CONFIG:RelWithDebInfo>:${NB_OPT_SIZE}>)
 endfunction()
 
 function(nanobind_disable_stack_protector name)
@@ -197,10 +182,7 @@ function(nanobind_disable_stack_protector name)
     # The stack protector affects binding size negatively (+8% on Linux in my
     # benchmarks). Protecting from stack smashing in a Python VM seems in any
     # case futile, so let's get rid of it by default in optimized modes.
-    target_compile_options(${name} PRIVATE
-        $<$<CONFIG:Release>:-fno-stack-protector>
-        $<$<CONFIG:MinSizeRel>:-fno-stack-protector>
-        $<$<CONFIG:RelWithDebInfo>:-fno-stack-protector>)
+    target_compile_options(${name} PRIVATE $<${NB_OPT}:-fno-stack-protector>)
   endif()
 endfunction()
 
@@ -225,8 +207,21 @@ function (nanobind_compile_options)
   endif()
 endfunction()
 
+function (nanobind_strip name)
+  if (APPLE)
+    target_link_options(${name} PRIVATE $<${NB_OPT}:-Wl,-dead_strip -Wl,-x -Wl,-S>)
+  elseif (NOT WIN32)
+    target_link_options(${name} PRIVATE $<${NB_OPT}:-Wl,-s>)
+  endif()
+endfunction()
+
+function (nanobind_set_visibility name)
+  set_target_properties(${name} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+endfunction()
+
 function(nanobind_add_module name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "NOMINSIZE;STABLE_ABI;NOSTRIP;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO" "" "")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG
+    "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;NOTRIM" "" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
@@ -301,5 +296,5 @@ function(nanobind_add_module name)
     nanobind_lto(${name})
   endif()
 
-  set_target_properties(${name} PROPERTIES CXX_VISIBILITY_PRESET hidden)
+  nanobind_set_visibility(${name})
 endfunction()

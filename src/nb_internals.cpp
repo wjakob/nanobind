@@ -85,10 +85,6 @@ extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
 extern int nb_type_setattro(PyObject*, PyObject*, PyObject*);
-extern PyObject *nb_ndarray_get(PyObject *, PyObject *);
-extern int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int);
-extern void nb_ndarray_releasebuffer(PyObject *, Py_buffer *);
-extern void nb_ndarray_dealloc(PyObject *self);
 static PyObject *nb_static_property_get(PyObject *, PyObject *, PyObject *);
 
 #if PY_VERSION_HEX >= 0x03090000
@@ -215,23 +211,6 @@ static PyType_Spec nb_static_property_spec = {
     /* .itemsize = */ 0,
     /* .flags = */ Py_TPFLAGS_DEFAULT,
     /* .slots = */ nb_static_property_slots
-};
-
-static PyType_Slot nb_ndarray_slots[] = {
-    { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
-#if PY_VERSION_HEX >= 0x03090000
-    { Py_bf_getbuffer, (void *) nb_ndarray_getbuffer },
-    { Py_bf_releasebuffer, (void *) nb_ndarray_releasebuffer },
-#endif
-    { 0, nullptr }
-};
-
-static PyType_Spec nb_ndarray_spec = {
-    /* .name = */ "nanobind.nb_ndarray",
-    /* .basicsize = */ (int) sizeof(nb_ndarray),
-    /* .itemsize = */ 0,
-    /* .flags = */ Py_TPFLAGS_DEFAULT,
-    /* .slots = */ nb_ndarray_slots
 };
 
 /// `nb_static_property_property.__get__()`: Always pass the class instead of the instance.
@@ -441,17 +420,12 @@ static NB_NOINLINE nb_internals *internals_make() {
         (PyTypeObject *) PyType_FromSpec(&nb_static_property_spec);
     p->nb_static_property_enabled = true;
 
-    // Tensor type
-    p->nb_ndarray = (PyTypeObject *) PyType_FromSpec(&nb_ndarray_spec);
-
     if (!p->nb_func || !p->nb_method ||
         !p->nb_bound_method || !p->nb_type ||
-        !p->nb_static_property || !p->nb_ndarray)
+        !p->nb_static_property)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000
-    p->nb_ndarray->tp_as_buffer->bf_getbuffer = nb_ndarray_getbuffer;
-    p->nb_ndarray->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
     p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
     p->nb_func->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
     p->nb_method->tp_flags |= NB_HAVE_VECTORCALL;

@@ -186,13 +186,13 @@ struct nb_internals {
     PyTypeObject *nb_static_property;
     bool nb_static_property_enabled;
 
-    /// N-dimensional array wrapper
-    PyTypeObject *nb_ndarray;
+    /// N-dimensional array wrapper (constructed optionally)
+    PyTypeObject *nb_ndarray = nullptr;
 
-    /// Instance pointer -> Python object mapping
+    /// C++ -> Python instance map
     nb_inst_map inst_c2p;
 
-    /// C++ type -> Python type mapping
+    /// C++ -> Python type map
     nb_type_map type_c2p;
 
     /// Dictionary of sets storing keep_alive references

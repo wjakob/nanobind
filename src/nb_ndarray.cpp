@@ -22,7 +22,7 @@ struct ndarray_handle {
     bool call_deleter;
 };
 
-void nb_ndarray_dealloc(PyObject *self) {
+static void nb_ndarray_dealloc(PyObject *self) {
     ndarray_dec_ref(((nb_ndarray *) self)->th);
 
     freefunc tp_free;
@@ -35,7 +35,7 @@ void nb_ndarray_dealloc(PyObject *self) {
     tp_free(self);
 }
 
-int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int) {
+static int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int) {
     nb_ndarray *self = (nb_ndarray *) exporter;
 
     dlpack::dltensor &t = self->th->ndarray->dltensor;
@@ -114,9 +114,45 @@ int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int) {
     return 0;
 }
 
-void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
+static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
     PyMem_Free(view->shape);
     PyMem_Free(view->strides);
+}
+
+static PyTypeObject *nb_ndarray_get() noexcept {
+    nb_internals &internals = internals_get();
+    PyTypeObject *tp = internals.nb_ndarray;
+
+    if (NB_UNLIKELY(!tp)) {
+        PyType_Slot slots[] = {
+            { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
+#if PY_VERSION_HEX >= 0x03090000
+            { Py_bf_getbuffer, (void *) nb_ndarray_getbuffer },
+            { Py_bf_releasebuffer, (void *) nb_ndarray_releasebuffer },
+#endif
+            { 0, nullptr }
+        };
+
+        PyType_Spec spec = {
+            /* .name = */ "nanobind.nb_ndarray",
+            /* .basicsize = */ (int) sizeof(nb_ndarray),
+            /* .itemsize = */ 0,
+            /* .flags = */ Py_TPFLAGS_DEFAULT,
+            /* .slots = */ slots
+        };
+
+        tp = (PyTypeObject *) PyType_FromSpec(&spec);
+        if (!tp)
+            fail("nb_ndarray type creation failed!");
+
+#if PY_VERSION_HEX < 0x03090000
+        tp->tp_as_buffer->bf_getbuffer = nb_ndarray_getbuffer;
+        tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
+#endif
+        internals.nb_ndarray = tp;
+    }
+
+    return tp;
 }
 
 static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
@@ -467,9 +503,9 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
 }
 
 ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
-                            PyObject *owner, const int64_t *strides_in,
-                            dlpack::dtype *dtype, int32_t device_type,
-                            int32_t device_id) {
+                               PyObject *owner, const int64_t *strides_in,
+                               dlpack::dtype *dtype, int32_t device_type,
+                               int32_t device_id) {
     /* DLPack mandates 256-byte alignment of the 'DLTensor::data' field, but
        PyTorch unfortunately ignores the 'byte_offset' value.. :-( */
 #if 0
@@ -539,7 +575,8 @@ static void ndarray_capsule_destructor(PyObject *o) {
         PyErr_Clear();
 }
 
-PyObject *ndarray_wrap(ndarray_handle *th, int framework, rv_policy policy) noexcept {
+PyObject *ndarray_wrap(ndarray_handle *th, int framework,
+                       rv_policy policy) noexcept {
     if (!th)
         return none().release().ptr();
 
@@ -547,7 +584,7 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework, rv_policy policy) noex
 
     if ((ndarray_framework) framework == ndarray_framework::numpy) {
         try {
-            object o = steal(PyType_GenericAlloc(internals_get().nb_ndarray, 0));
+            object o = steal(PyType_GenericAlloc(nb_ndarray_get(), 0));
             if (!o.is_valid())
                 return nullptr;
             ((nb_ndarray *) o.ptr())->th = th;

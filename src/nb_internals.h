@@ -183,8 +183,8 @@ struct nb_internals {
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;
 
     /// Property variant for static attributes
-    PyTypeObject *nb_static_property;
-    bool nb_static_property_enabled;
+    PyTypeObject *nb_static_property = nullptr;
+    bool nb_static_property_enabled = true;
 
     /// N-dimensional array wrapper (constructed optionally)
     PyTypeObject *nb_ndarray = nullptr;
@@ -234,7 +234,7 @@ extern int nb_type_init(PyObject *, PyObject *, PyObject *);
 extern void nb_type_dealloc(PyObject *o);
 extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
 extern void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic);
-extern int nb_static_property_set(PyObject *, PyObject *, PyObject *);
+extern PyTypeObject *nb_static_property_get();
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 NB_INLINE func_data *nb_func_data(void *o) {
@@ -283,4 +283,3 @@ private:
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
-

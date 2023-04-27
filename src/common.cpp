@@ -709,12 +709,10 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
 // ========================================================================
 
-void property_install(PyObject *scope, const char *name, bool is_static,
-                      PyObject *getter, PyObject *setter) noexcept {
+static void property_install_impl(PyTypeObject *tp, PyObject *scope,
+                                  const char *name, PyObject *getter,
+                                  PyObject *setter) {
     const nb_internals &internals = internals_get();
-    handle property = (PyObject *) (is_static ? internals.nb_static_property
-                                              : &PyProperty_Type);
-    (void) is_static;
     PyObject *m = getter ? getter : setter;
     object doc = none();
 
@@ -725,12 +723,23 @@ void property_install(PyObject *scope, const char *name, bool is_static,
             doc = str(f->doc);
     }
 
-    handle(scope).attr(name) = property(
+    handle(scope).attr(name) = handle(tp)(
         getter ? handle(getter) : handle(Py_None),
         setter ? handle(setter) : handle(Py_None),
         handle(Py_None), // deleter
         doc
     );
+}
+
+void property_install(PyObject *scope, const char *name, PyObject *getter,
+                      PyObject *setter) noexcept {
+    property_install_impl(&PyProperty_Type, scope, name, getter, setter);
+}
+
+void property_install_static(PyObject *scope, const char *name,
+                             PyObject *getter, PyObject *setter) noexcept {
+    property_install_impl(nb_static_property_get(), scope, name, getter,
+                          setter);
 }
 
 // ========================================================================

@@ -114,6 +114,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/src/nb_type.cpp
     ${NB_DIR}/src/nb_enum.cpp
     ${NB_DIR}/src/nb_ndarray.cpp
+    ${NB_DIR}/src/nb_static_property.cpp
     ${NB_DIR}/src/common.cpp
     ${NB_DIR}/src/error.cpp
     ${NB_DIR}/src/trampoline.cpp

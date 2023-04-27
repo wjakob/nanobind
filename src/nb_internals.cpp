@@ -85,7 +85,6 @@ extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
 extern int nb_type_setattro(PyObject*, PyObject*, PyObject*);
-static PyObject *nb_static_property_get(PyObject *, PyObject *, PyObject *);
 
 #if PY_VERSION_HEX >= 0x03090000
 #  define NB_HAVE_VECTORCALL_PY39_OR_NEWER NB_HAVE_VECTORCALL
@@ -190,59 +189,6 @@ static PyType_Spec nb_type_spec = {
     /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     /* .slots = */ nb_type_slots
 };
-
-#if PY_VERSION_HEX >= 0x030C0000
-static PyMemberDef nb_static_property_members[] = {
-    { "__doc__", T_OBJECT, 0, 0, nullptr },
-    { nullptr, 0, 0, 0, nullptr }
-};
-#endif
-
-static PyType_Slot nb_static_property_slots[] = {
-    { Py_tp_base, nullptr },
-    { Py_tp_members, nullptr },
-    { Py_tp_descr_get, (void *) nb_static_property_get },
-    { 0, nullptr }
-};
-
-static PyType_Spec nb_static_property_spec = {
-    /* .name = */ "nanobind.nb_static_property",
-    /* .basicsize = */ 0,
-    /* .itemsize = */ 0,
-    /* .flags = */ Py_TPFLAGS_DEFAULT,
-    /* .slots = */ nb_static_property_slots
-};
-
-/// `nb_static_property_property.__get__()`: Always pass the class instead of the instance.
-static PyObject *nb_static_property_get(PyObject *self, PyObject *, PyObject *cls) {
-    if (internals_get().nb_static_property_enabled) {
-        #if defined(Py_LIMITED_API)
-            static descrgetfunc tp_descr_get =
-                (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
-        #else
-            descrgetfunc tp_descr_get = PyProperty_Type.tp_descr_get;
-        #endif
-
-        return tp_descr_get(self, cls, cls);
-    } else {
-        Py_INCREF(self);
-        return self;
-    }
-}
-
-/// `nb_static_property_property.__set__()`: Just like the above `__get__()`.
-int nb_static_property_set(PyObject *self, PyObject *obj, PyObject *value) {
-    PyObject *cls = PyType_Check(obj) ? obj : (PyObject *) Py_TYPE(obj);
-
-    #if defined(Py_LIMITED_API)
-        static descrsetfunc tp_descr_set =
-            (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
-    #else
-        descrsetfunc tp_descr_set = PyProperty_Type.tp_descr_set;
-    #endif
-
-    return tp_descr_set(self, cls, value);
-}
 
 NB_THREAD_LOCAL current_method current_method_data =
     current_method{ nullptr, nullptr };
@@ -395,34 +341,8 @@ static NB_NOINLINE nb_internals *internals_make() {
     nb_type_slots[0].pfunc = &PyType_Type;
     p->nb_type = (PyTypeObject *) PyType_FromSpec(&nb_type_spec);
 
-    /// Static properties
- #if defined(Py_LIMITED_API)
-    tp_basicsize = cast<int>(handle(&PyProperty_Type).attr("__basicsize__"));
-    tp_itemsize = cast<int>(handle(&PyProperty_Type).attr("__itemsize__"));
- #else
-    tp_basicsize = (int) PyProperty_Type.tp_basicsize;
-    tp_itemsize = (int) PyProperty_Type.tp_itemsize;
- #endif
-
-    // See https://github.com/python/cpython/issues/98963
-#if PY_VERSION_HEX >= 0x030C0000
-    nb_static_property_members[0].offset = tp_basicsize;
-    nb_static_property_slots[1].pfunc = nb_static_property_members;
-    tp_basicsize += sizeof(PyObject *);
-#else
-    nb_static_property_slots[1].pfunc = PyProperty_Type.tp_members;
-#endif
-    nb_static_property_slots[0].pfunc = &PyProperty_Type;
-    nb_static_property_spec.basicsize = tp_basicsize;
-    nb_static_property_spec.itemsize = tp_itemsize;
-
-    p->nb_static_property =
-        (PyTypeObject *) PyType_FromSpec(&nb_static_property_spec);
-    p->nb_static_property_enabled = true;
-
     if (!p->nb_func || !p->nb_method ||
-        !p->nb_bound_method || !p->nb_type ||
-        !p->nb_static_property)
+        !p->nb_bound_method || !p->nb_type)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000

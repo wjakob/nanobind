@@ -61,7 +61,6 @@ protected:
     PyObject *m_local[Small];
 };
 
-
 // ========================================================================
 
 /// Raise a std::runtime_error with the given message
@@ -321,8 +320,12 @@ NB_CORE std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept;
 // ========================================================================
 
 // Create and install a Python property object
-NB_CORE void property_install(PyObject *scope, const char *name, bool is_static,
+NB_CORE void property_install(PyObject *scope, const char *name,
                               PyObject *getter, PyObject *setter) noexcept;
+
+NB_CORE void property_install_static(PyObject *scope, const char *name,
+                                     PyObject *getter,
+                                     PyObject *setter) noexcept;
 
 // ========================================================================
 

@@ -1285,8 +1285,9 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     internals.nb_static_property_enabled = true;
 
     if (cur) {
-        if (Py_TYPE(cur) == internals.nb_static_property) {
-            int rv = nb_static_property_set(cur, obj, value);
+        PyTypeObject *tp = internals.nb_static_property;
+        if (Py_TYPE(cur) == tp) {
+            int rv = tp->tp_descr_set(cur, obj, value);
             Py_DECREF(cur);
             return rv;
         }

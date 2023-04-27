@@ -395,8 +395,7 @@ public:
             set_p = cpp_function((detail::forward_t<Setter>) setter,
                                  scope(*this), is_method(), extra...);
 
-        detail::property_install(m_ptr, name_, false, get_p.ptr(),
-                                 set_p.ptr());
+        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr());
         return *this;
     }
 
@@ -414,8 +413,7 @@ public:
             set_p = cpp_function((detail::forward_t<Setter>) setter,
                                  scope(*this), extra...);
 
-        detail::property_install(m_ptr, name_, true, get_p.ptr(),
-                                 set_p.ptr());
+        detail::property_install_static(m_ptr, name_, get_p.ptr(), set_p.ptr());
         return *this;
     }
 

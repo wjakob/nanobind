@@ -42,35 +42,40 @@ def test01_unsigned_enum():
 
 
 def test02_signed_enum():
-  assert repr(t.SEnum.A) == 'test_enum_ext.SEnum.A'
-  assert repr(t.SEnum.B) == 'test_enum_ext.SEnum.B'
-  assert repr(t.SEnum.C) == 'test_enum_ext.SEnum.C'
-  assert int(t.SEnum.A) == 0
-  assert int(t.SEnum.B) == 1
-  assert int(t.SEnum.C) == -1
-  assert t.SEnum(0) is t.SEnum.A
-  assert t.SEnum(1) is t.SEnum.B
-  assert t.SEnum(-1) is t.SEnum.C
-  assert t.from_enum(t.SEnum.A) == 0
-  assert t.from_enum(t.SEnum.B) == 1
-  assert t.from_enum(t.SEnum.C) == -1
-  assert hash(t.SEnum.A) == 0
-  assert hash(t.SEnum.B) == 1
-  assert hash(t.SEnum.C) == -2 # -1 is an invalid hash value.
+    assert repr(t.SEnum.A) == 'test_enum_ext.SEnum.A'
+    assert repr(t.SEnum.B) == 'test_enum_ext.SEnum.B'
+    assert repr(t.SEnum.C) == 'test_enum_ext.SEnum.C'
+    assert int(t.SEnum.A) == 0
+    assert int(t.SEnum.B) == 1
+    assert int(t.SEnum.C) == -1
+    assert t.SEnum(0) is t.SEnum.A
+    assert t.SEnum(1) is t.SEnum.B
+    assert t.SEnum(-1) is t.SEnum.C
+    assert t.from_enum(t.SEnum.A) == 0
+    assert t.from_enum(t.SEnum.B) == 1
+    assert t.from_enum(t.SEnum.C) == -1
+    assert hash(t.SEnum.A) == 0
+    assert hash(t.SEnum.B) == 1
+    assert hash(t.SEnum.C) == -2 # -1 is an invalid hash value.
 
 
 def test03_enum_arithmetic():
     assert t.SEnum.B + 2 == 3
+    assert t.SEnum.B + 2.5 == 3.5
     assert 2 + t.SEnum.B == 3
+    assert 2.5 + t.SEnum.B == 3.5
     assert t.SEnum.B >> t.SEnum.B == 0
     assert t.SEnum.B << t.SEnum.B == 2
     assert -t.SEnum.B == -1 and -t.SEnum.C == 1
     assert t.SEnum.B & t.SEnum.B == 1
     assert t.SEnum.B & ~t.SEnum.B == 0
 
-    with pytest.raises(TypeError) as excinfo:
-        assert t.Enum.B + 2 == 3
-    assert 'unsupported operand type' in str(excinfo.value)
+    with pytest.raises(TypeError, match="unsupported operand type"):
+        t.Enum.B + 2
+    with pytest.raises(TypeError, match="unsupported operand type"):
+        t.SEnum.B - "1"
+    with pytest.raises(TypeError, match="unsupported operand type"):
+        t.SEnum.B >> 1.0
 
 
 def test04_enum_export():
@@ -99,3 +104,46 @@ def test07_enum_entries_dict_is_protected():
     with pytest.raises(AttributeError, match="internal nanobind attribute"):
         delattr(t.Color, "@entries")
     assert getattr(t.Color, "@entries")[3] == ("Yellow", None, t.Color.Yellow)
+
+
+def test08_enum_comparisons():
+    assert int(t.Enum.B) == int(t.SEnum.B) == 1
+    for enum in (t.Enum, t.SEnum):
+        value = getattr(enum, "B")
+        assert value != str(int(value))
+        assert value != int(value) + 0.4
+        assert value != float(int(value))
+        assert value < int(value) + 0.4
+        for i in (0, 0.5, 1, 1.5, 2):
+            assert (value == i) == (int(value) == i)
+            assert (value != i) == (int(value) != i)
+            assert (value < i) == (int(value) < i)
+            assert (value <= i) == (int(value) <= i)
+            assert (value >= i) == (int(value) >= i)
+            assert (value > i) == (int(value) > i)
+
+            assert (i == value) == (i == int(value))
+            assert (i != value) == (i != int(value))
+            assert (i < value) == (i < int(value))
+            assert (i <= value) == (i <= int(value))
+            assert (i >= value) == (i >= int(value))
+            assert (i > value) == (i > int(value))
+
+        for unrelated in (None, "hello", "1"):
+            assert value != unrelated and unrelated != value
+            assert not (value == unrelated) and not (unrelated == value)
+            with pytest.raises(TypeError):
+                value < unrelated
+            with pytest.raises(TypeError):
+                unrelated < value
+
+    # different enum types never compare equal ...
+    assert t.Enum.B != t.SEnum.B and t.SEnum.B != t.Enum.B
+    assert not (t.Enum.B == t.SEnum.B) and not (t.SEnum.B == t.Enum.B)
+    assert t.Enum.B != t.SEnum.C and t.SEnum.C != t.Enum.B
+
+    # ... but can be ordered by their underlying values
+    assert t.Enum.A < t.SEnum.B
+    assert t.SEnum.B > t.Enum.A
+    assert t.Enum.A <= t.SEnum.A and t.Enum.A >= t.SEnum.A
+    assert t.Enum.A != t.SEnum.A

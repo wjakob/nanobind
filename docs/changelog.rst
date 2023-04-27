@@ -73,6 +73,41 @@ Version 1.3.0 (TBD)
   allowing arbitrary Python data associated with the type to be accessed
   without a dictionary lookup while keeping this data visible to the
   garbage collector.  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* Fixed surprising behavior in enumeration comparisons and arithmetic
+  (PR `#207 <https://github.com/wjakob/nanobind/pull/207>`__):
+
+  * Enum equality comparisons (``==`` and ``!=``) now can only be true
+    if both operands have the same enum type, or if one is an enum and
+    the other is an :py:class:`int`. This resolves some confusing
+    results and ensures that enumerators of different types have a
+    distinct identity, which is important if they're being put into
+    the same set or used as keys in the same dictionary. All of the
+    following were previously true but will now evaluate as false:
+
+    * ``FooEnum(1) == BarEnum(1)``
+    * ``FooEnum(1) == 1.2``
+    * ``FooEnum(1) == "1"``
+
+  * Enum ordering comparisons (``<``, ``<=``, ``>=``, ``>``) and
+    arithmetic operations (when using the :cpp:struct:`is_arithmetic`
+    annotation) now require that any non-enum operand be a Python number
+    (an object that defines ``__int__``, ``__float__``, and/or ``__index__``)
+    and will avoid truncating non-integer operands to integers. Note that
+    unlike with equality comparisons, ordering and arithmetic operations
+    *do* still permit two operands that are enums of different types.
+    Some examples of changed behavior:
+
+    * ``FooEnum(1) < 1.2`` is now true (used to be false)
+    * ``FooEnum(2) * 1.5`` is now 3.0 (used to be 2)
+    * ``FooEnum(3) - "2"`` now raises an exception (used to be 1)
+
+  * Enum comparisons and arithmetic operations with unsupported types
+    now return `NotImplemented` rather than raising an exception.
+    This means equality comparisons such as ``some_enum == None`` will
+    return unequal rather than failing; order comparisons such as
+    ``some_enum < None`` will still fail, but now with a more
+    informative error.
+
 * ABI version 8.
 
 Version 1.2.0 (April 24, 2023)

@@ -145,19 +145,59 @@ static PyGetSetDef nb_enum_getset[] = {
 };
 
 PyObject *nb_enum_richcompare(PyObject *a, PyObject *b, int op) {
-    PyObject *ia = PyNumber_Long(a);
-    PyObject *ib = PyNumber_Long(b);
-    if (!ia || !ib)
-        return nullptr;
-    PyObject *result = PyObject_RichCompare(ia, ib, op);
-    Py_DECREF(ia);
-    Py_DECREF(ib);
+    // SomeType.tp_richcompare(a, b, op) is always invoked with 'a'
+    // having type SomeType. Note that this is different than binary
+    // arithmetic operations because comparisons can be reversed;
+    // Python will ask type(a) to check 'a > b' if type(b) doesn't
+    // know how to check 'b < a'.
+
+    if (op == Py_EQ || op == Py_NE) {
+        // For equality/inequality comparisons, only allow enums to be
+        // equal with their same enum type or with their underlying
+        // value as an integer.  This is a little awkward (it breaks
+        // transitivity of equality) but it's better than allowing
+        // 'Shape.CIRCLE == Color.RED' to be true just because both
+        // enumerators have the same underlying value (which would
+        // also prevent putting both enumerators in the same set or as
+        // keys in the same dictionary).
+        if (Py_TYPE(a) != Py_TYPE(b) && !PyLong_Check(b)) {
+            Py_RETURN_NOTIMPLEMENTED;
+        }
+    } else {
+        // For ordering, allow comparison against any number,
+        // including floats. Note that enums count as a number for
+        // purposes of this check (it's anything that defines a __float__,
+        // __int__, or __index__ slot).
+        if (!PyNumber_Check(b)) {
+            Py_RETURN_NOTIMPLEMENTED;
+        }
+    }
+
+    PyObject *ia = PyNumber_Index(a); // must succeed since a is an enum
+    PyObject *ib = nullptr;
+    if (PyIndex_Check(b)) {
+        // If b can be converted losslessly to an integer (which includes
+        // the case where b is also an enum) then do that.
+        ib = PyNumber_Index(b);
+    } else {
+        // Otherwise do the comparison against b as-is, which will probably
+        // wind up calling b's tp_richcompare for the reversed operation.
+        ib = b;
+        Py_INCREF(ib);
+    }
+    PyObject *result = nullptr;
+    if (ia && ib) {
+        result = PyObject_RichCompare(ia, ib, op);
+    }
+    Py_XDECREF(ia);
+    Py_XDECREF(ib);
     return result;
 }
 
+// Unary operands are easy because we know the argument will be this enum type
 #define NB_ENUM_UNOP(name, op)                                                 \
     PyObject *nb_enum_##name(PyObject *a) {                                    \
-        PyObject *ia = PyNumber_Long(a);                                       \
+        PyObject *ia = PyNumber_Index(a);                                      \
         if (!ia)                                                               \
             return nullptr;                                                    \
         PyObject *result = op(ia);                                             \
@@ -165,16 +205,49 @@ PyObject *nb_enum_richcompare(PyObject *a, PyObject *b, int op) {
         return result;                                                         \
     }
 
+// Binary operands are trickier due to the potential for reversed operations.
+// We know either a or b is an enum object, but not which one.
+NB_NOINLINE PyObject *nb_enum_binop(PyObject *a, PyObject *b,
+                                    PyObject* (*op)(PyObject*, PyObject*)) {
+    // Both operands should be numbers. (Enums count as numbers because they
+    // define nb_int and nb_index slots.)
+    if (!PyNumber_Check(a) || !PyNumber_Check(b)) {
+        Py_RETURN_NOTIMPLEMENTED;
+    }
+
+    // Convert operands that support __index__ (lossless integer conversion),
+    // including enums, to that integer. Leave other kinds of numbers (such
+    // as floats and Decimals) alone. Then repeat the operation.
+    // Note that we can assume at least one of the PyNumber_Index calls
+    // succeeds, since one of our arguments is an enum.
+    PyObject *ia = nullptr, *ib = nullptr, *result = nullptr;
+    if (PyIndex_Check(a)) {
+        ia = PyNumber_Index(a);
+    } else {
+        ia = a;
+        Py_INCREF(ia);
+    }
+    if (PyIndex_Check(b)) {
+        ib = PyNumber_Index(b);
+    } else {
+        ib = b;
+        Py_INCREF(ib);
+    }
+    if (ia == a && ib == b) {
+        PyErr_SetString(PyExc_SystemError,
+                        "nanobind enum arithmetic invoked without an enum "
+                        "as either operand");
+    } else if (ia && ib) {
+        result = op(ia, ib);
+    }
+    Py_XDECREF(ia);
+    Py_XDECREF(ib);
+    return result;
+}
+
 #define NB_ENUM_BINOP(name, op)                                                \
     PyObject *nb_enum_##name(PyObject *a, PyObject *b) {                       \
-        PyObject *ia = PyNumber_Long(a),                                       \
-                 *ib = PyNumber_Long(b),                                       \
-                 *result = nullptr;                                            \
-        if (ia && ib)                                                          \
-            result = op(ia, ib);                                               \
-        Py_XDECREF(ia);                                                        \
-        Py_XDECREF(ib);                                                        \
-        return result;                                                         \
+        return nb_enum_binop(a, b, op);                                        \
     }
 
 NB_ENUM_BINOP(add, PyNumber_Add)

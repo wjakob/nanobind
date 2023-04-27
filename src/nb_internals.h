@@ -101,29 +101,6 @@ struct ptr_hash {
     }
 };
 
-struct keep_alive_entry {
-    void *data; // unique data pointer
-    void (*deleter)(void *) noexcept; // custom deleter, excluded from hashing/equality
-
-    keep_alive_entry(void *data, void (*deleter)(void *) noexcept = nullptr)
-        : data(data), deleter(deleter) { }
-};
-
-/// Equality operator for keep_alive_entry (only targets data field)
-struct keep_alive_eq {
-    NB_INLINE bool operator()(const keep_alive_entry &a,
-                              const keep_alive_entry &b) const {
-        return a.data == b.data;
-    }
-};
-
-/// Hash operator for keep_alive_entry (only targets data field)
-struct keep_alive_hash {
-    NB_INLINE size_t operator()(const keep_alive_entry &entry) const {
-        return ptr_hash()(entry.data);
-    }
-};
-
 // Minimal allocator definition, contains only the parts needed by tsl::*
 template <typename T> class py_allocator {
 public:
@@ -160,17 +137,28 @@ template <typename key, typename value, typename hash = std::hash<key>,
 using py_map =
     tsl::robin_map<key, value, hash, eq, py_allocator<std::pair<key, value>>>;
 
-using keep_alive_set =
-    py_set<keep_alive_entry, keep_alive_hash, keep_alive_eq>;
-
 // Linked list of instances with the same pointer address. Usually just 1..
 struct nb_inst_seq {
     nb_inst *inst;
-    nb_inst_seq *next = nullptr;
+    nb_inst_seq *next;
 };
 
-using nb_inst_map = py_map<void *, nb_inst_seq, ptr_hash>;
 using nb_type_map = py_map<std::type_index, type_data *>;
+
+/// A simple pointer-to-pointer map that is reused a few times below (even if
+/// not 100% ideal) to avoid template code generation bloat.
+using nb_ptr_map  = py_map<void *, void*, ptr_hash>;
+
+/// Convenience functions to deal with the pointer encoding in 'internals.inst_c2p'
+
+/// Does this entry store a linked list of instances?
+NB_INLINE bool         nb_is_seq(void *p)   { return ((uintptr_t) p) & 1; }
+
+/// Tag a nb_inst_seq* pointer as such
+NB_INLINE void*        nb_mark_seq(void *p) { return (void *) (((uintptr_t) p) | 1); }
+
+/// Retrieve the nb_inst_seq* pointer from an 'inst_c2p' value
+NB_INLINE nb_inst_seq* nb_get_seq(void *p)  { return (nb_inst_seq *) (((uintptr_t) p) ^ 1); }
 
 struct nb_internals {
     /// Internal nanobind module
@@ -189,17 +177,27 @@ struct nb_internals {
     /// N-dimensional array wrapper (created on demand)
     PyTypeObject *nb_ndarray = nullptr;
 
-    /// C++ -> Python instance map
-    nb_inst_map inst_c2p;
+    /**
+     * C++ -> Python instance map
+     *
+     * This associative data structure maps a C++ instance pointer onto its
+     * associated PyObject* (if bit 0 is zero) or a linked list of type
+     * `nb_inst_seq*` (if bit 0 is set---it must be cleared before interpreting
+     * the pointer in this case).
+     *
+     * The latter case occurs when several distinct Python objects reference
+     * the same memory address (e.g. a struct and its first member).
+     */
+    nb_ptr_map inst_c2p;
 
     /// C++ -> Python type map
     nb_type_map type_c2p;
 
-    /// Dictionary of sets storing keep_alive references
-    py_map<void *, keep_alive_set, ptr_hash> keep_alive;
+    /// Dictionary storing keep_alive references
+    py_map<void *, nb_ptr_map, ptr_hash> keep_alive;
 
-    /// nb_func/meth instance list for leak reporting
-    py_set<void *, ptr_hash> funcs;
+    /// nb_func/meth instance map for leak reporting (used as set, the value is unused)
+    nb_ptr_map funcs;
 
     /// Registered C++ -> Python exception translators
     std::vector<std::pair<exception_translator, void *>> exception_translators;

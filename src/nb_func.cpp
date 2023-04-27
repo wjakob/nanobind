@@ -242,7 +242,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
                                           : nb_func_vectorcall_simple;
 
     // Register the function
-    auto [it, success] = internals.funcs.insert(func);
+    auto [it, success] = internals.funcs.try_emplace(func, nullptr);
     if (!success)
         fail("nanobind::detail::nb_func_new(): internal update failed (2)!");
 

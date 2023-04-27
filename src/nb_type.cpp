@@ -115,12 +115,23 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
     }
 
     // Update hash table that maps from C++ to Python instance
-    nb_inst_seq seq_v { self };
     auto [it, success] =
-        internals_get().inst_c2p.try_emplace(value, seq_v);
+        internals_get().inst_c2p.try_emplace(value, self);
 
-    if (!success) {
-        nb_inst_seq *seq = &it.value();
+    if (NB_UNLIKELY(!success)) {
+        void *entry = it->second;
+
+        // Potentially convert the map value into linked list format
+        if (!nb_is_seq(entry)) {
+            nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
+            if (NB_UNLIKELY(!first))
+                fail("nanobind::detail::inst_new(): list element allocation failed!");
+            first->inst = (nb_inst *) entry;
+            first->next = nullptr;
+            entry = it.value() = nb_mark_seq(first);
+        }
+
+        nb_inst_seq *seq = nb_get_seq(entry);
         while (true) {
             if (NB_UNLIKELY(seq->inst == self))
                 fail("nanobind::detail::inst_new(): duplicate instance!");
@@ -133,7 +144,8 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         if (NB_UNLIKELY(!next))
             fail("nanobind::detail::inst_new(): list element allocation failed!");
 
-        *next = seq_v;
+        next->inst = self;
+        next->next = nullptr;
         seq->next = next;
     }
 
@@ -185,50 +197,62 @@ static void inst_dealloc(PyObject *self) {
             fail("nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
                  "keep_alive information", t->name);
 
-        keep_alive_set ref_set = std::move(it.value());
+        nb_ptr_map ref_set = std::move(it.value());
         internals.keep_alive.erase(it);
 
-        for (keep_alive_entry e: ref_set) {
-            if (!e.deleter)
-                Py_DECREF((PyObject *) e.data);
+        for (auto [data, deleter]: ref_set) {
+            using Deleter = void (*) (void *) noexcept;
+
+            if (!deleter)
+                Py_DECREF((PyObject *) data);
             else
-                e.deleter(e.data);
+                ((Deleter) deleter)(data);
         }
     }
 
     // Update hash table that maps from C++ to Python instance
-    nb_inst_seq *seq = nullptr, *pred = nullptr;
-    nb_inst_map &inst_c2p = internals.inst_c2p;
-    nb_inst_map::iterator it = inst_c2p.find(p);
+    nb_ptr_map &inst_c2p = internals.inst_c2p;
+    nb_ptr_map::iterator it = inst_c2p.find(p);
+    bool found = false;
 
-    if (it != inst_c2p.end()) {
-        seq = &it.value();
-
-        do {
-            if (seq->inst == inst)
-                break;
-            pred = seq;
-            seq = seq->next;
-        } while (seq);
-    }
-
-    if (!seq || seq->inst != inst)
-        fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
-             "an unknown instance (%p)!", t->name, p);
-
-    if (pred) {
-        pred->next = seq->next;
-        PyMem_Free(seq);
-    } else {
-        if (seq->next) {
-            it.value() = *(seq->next);
-            PyMem_Free(seq->next);
-        } else {
+    if (NB_LIKELY(it != inst_c2p.end())) {
+        void *entry = it->second;
+        if (NB_LIKELY(entry == inst)) {
+            found = true;
             inst_c2p.erase(it);
+        } else if (nb_is_seq(entry)) {
+            // Multiple objects are associated with this address. Find the right one!
+            nb_inst_seq *seq = nb_get_seq(entry),
+                        *pred = nullptr;
+
+            do {
+                if (seq->inst == inst) {
+                    found = true;
+
+                    if (pred) {
+                        pred->next = seq->next;
+                    } else {
+                        if (seq->next)
+                            it.value() = nb_mark_seq(seq->next);
+                        else
+                            inst_c2p.erase(it);
+                    }
+
+                    PyMem_Free(seq);
+                    break;
+                }
+
+                pred = seq;
+                seq = seq->next;
+            } while (seq);
         }
     }
 
-    if (gc) {
+    if (NB_UNLIKELY(!found))
+        fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
+             "an unknown instance (%p)!", t->name, p);
+
+    if (NB_UNLIKELY(gc)) {
         #if defined(Py_LIMITED_API)
             static freefunc tp_free =
                 (freefunc) PyType_GetSlot(tp, Py_tp_free);
@@ -400,8 +424,6 @@ static PyTypeObject *nb_type_tp(nb_internals &internals) noexcept {
 
     return tp;
 }
-
-
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
@@ -979,14 +1001,14 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
 
     if (metaclass == internals.nb_type) {
         // Populate nanobind-internal data structures
-        keep_alive_set &keep_alive = internals.keep_alive[nurse];
+        nb_ptr_map &keep_alive = internals.keep_alive[nurse];
 
-        auto [it, success] = keep_alive.emplace(patient);
+        auto [it, success] = keep_alive.try_emplace(patient, nullptr);
         if (success) {
             Py_INCREF(patient);
             ((nb_inst *) nurse)->clear_keep_alive = true;
         } else {
-            if (it->deleter)
+            if (it->second)
                 fail("nanobind::detail::keep_alive(): internal error: entry "
                      "has a deletion callback!");
         }
@@ -1020,8 +1042,8 @@ void keep_alive(PyObject *nurse, void *payload,
     nb_internals &internals = internals_get();
 
     if (metaclass == internals.nb_type) {
-        keep_alive_set &keep_alive = internals.keep_alive[nurse];
-        auto [it, success] = keep_alive.emplace(payload, callback);
+        nb_ptr_map &keep_alive = internals.keep_alive[nurse];
+        auto [it, success] = keep_alive.try_emplace(payload, (void *) callback);
         if (!success)
             raise("keep_alive(): the given 'payload' pointer was already registered!");
         ((nb_inst *) nurse)->clear_keep_alive = true;
@@ -1120,7 +1142,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
     }
 
     nb_internals &internals = internals_get();
-    nb_inst_map &map = internals.inst_c2p;
+    nb_ptr_map &inst_c2p = internals.inst_c2p;
     nb_type_map &type_map = internals.type_c2p;
     type_data *td = nullptr;
 
@@ -1140,29 +1162,39 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
 
     if (rvp != rv_policy::copy) {
         // Check if the instance is already registered with nanobind
-        nb_inst_map::iterator it = map.find(value);
+        nb_ptr_map::iterator it = inst_c2p.find(value);
 
-        if (it != map.end()) {
-            const nb_inst_seq *seq = &it->second;
+        if (it != inst_c2p.end()) {
+            void *entry = it->second;
+            nb_inst_seq seq;
 
-            while (seq) {
-                PyObject *inst = (PyObject *) seq->inst;
-                PyTypeObject *tp = Py_TYPE(inst);
+            if (NB_UNLIKELY(nb_is_seq(entry))) {
+                seq = *nb_get_seq(entry);
+            } else {
+                seq.inst = (nb_inst *) entry;
+                seq.next = nullptr;
+            }
+
+            while (true) {
+                PyTypeObject *tp = Py_TYPE(seq.inst);
 
                 if (nb_type_data(tp)->type == cpp_type) {
-                    Py_INCREF(inst);
-                    return inst;
+                    Py_INCREF(seq.inst);
+                    return (PyObject *) seq.inst;
                 }
 
                 if (!lookup_type())
                     return nullptr;
 
                 if (PyType_IsSubtype(tp, td->type_py)) {
-                    Py_INCREF(inst);
-                    return inst;
+                    Py_INCREF(seq.inst);
+                    return (PyObject *) seq.inst;
                 }
 
-                seq = seq->next;
+                if (seq.next == nullptr)
+                    break;
+
+                seq = *seq.next;
             }
         } else if (rvp == rv_policy::none) {
             return nullptr;
@@ -1189,7 +1221,7 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
     // Check if the instance is already registered with nanobind
     nb_internals &internals = internals_get();
-    nb_inst_map &map = internals.inst_c2p;
+    nb_ptr_map &inst_c2p = internals.inst_c2p;
     nb_type_map &type_map = internals.type_c2p;
 
     // Look up the corresponding Python type
@@ -1219,18 +1251,27 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
     if (rvp != rv_policy::copy) {
         // Check if the instance is already registered with nanobind
-        nb_inst_map::iterator it = map.find(value);
+        nb_ptr_map::iterator it = inst_c2p.find(value);
 
-        if (it != map.end()) {
-            const nb_inst_seq *seq = &it->second;
-            while (seq) {
-                PyObject *inst = (PyObject *) seq->inst;
-                PyTypeObject *tp = Py_TYPE(inst);
+        if (it != inst_c2p.end()) {
+            void *entry = it->second;
+            nb_inst_seq seq;
+
+            if (NB_UNLIKELY(nb_is_seq(entry))) {
+                seq = *nb_get_seq(entry);
+            } else {
+                seq.inst = (nb_inst *) entry;
+                seq.next = nullptr;
+            }
+
+            while (true) {
+                PyTypeObject *tp = Py_TYPE(seq.inst);
+
                 const std::type_info *p = nb_type_data(tp)->type;
 
                 if (p == cpp_type || p == cpp_type_p) {
-                    Py_INCREF(inst);
-                    return inst;
+                    Py_INCREF(seq.inst);
+                    return (PyObject *) seq.inst;
                 }
 
                 if (!lookup_type())
@@ -1238,11 +1279,14 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
                 if (PyType_IsSubtype(tp, td->type_py) ||
                     (td_p && PyType_IsSubtype(tp, td_p->type_py))) {
-                    Py_INCREF(inst);
-                    return inst;
+                    Py_INCREF(seq.inst);
+                    return (PyObject *) seq.inst;
                 }
 
-                seq = seq->next;
+                if (seq.next == nullptr)
+                    break;
+
+                seq = *seq.next;
             }
         } else if (rvp == rv_policy::none) {
             return nullptr;

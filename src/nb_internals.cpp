@@ -245,7 +245,7 @@ static void internals_cleanup() {
             fprintf(stderr, "nanobind: leaked %zu functions!\n",
                     internals_p->funcs.size());
             int ctr = 0;
-            for (void *f : internals_p->funcs) {
+            for (auto [f, p] : internals_p->funcs) {
                 fprintf(stderr, " - leaked function \"%s\"\n",
                         nb_func_data(f)->name);
                 if (ctr++ == 10) {

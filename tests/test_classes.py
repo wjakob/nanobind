@@ -125,6 +125,13 @@ def test06_reference_internal(clean):
         destructed=2
     )
 
+    # ----
+
+    s = t.PairStruct()
+    s1 = s.s1
+    del s1
+    del s
+
 
 def test07_big():
     x = [t.Big() for i in range(1024)]

@@ -1510,9 +1510,11 @@ documented for :ref:`classes <class_binding_annotations>`.
    Indicate that the enumeration may be used with arithmetic
    operations.  This enables the binary operators ``+ - * // & | ^ <<
    >>`` and unary ``- ~ abs()``, with operands of either enumeration
-   or integer type; the result will be a regular integer. It is
-   unspecified whether operations on mixed enum types (such as
-   ``Shape.Circle + Color.Red``) are permissible.
+   or numeric type; the result will be as if the enumeration operands
+   were first converted to integers. (So ``Shape(2) + Shape(1) == 3`` and
+   ``Shape(2) * 1.5 == 3.0``.) It is unspecified whether operations on
+   mixed enum types (such as ``Shape.Circle + Color.Red``) are
+   permissible.
 
 Function binding
 ----------------

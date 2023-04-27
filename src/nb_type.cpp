@@ -141,7 +141,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 }
 
 // Allocate a new instance with co-located storage
-PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
+static PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
     return inst_new_impl(type, nullptr);
 }
 
@@ -244,7 +244,7 @@ static void inst_dealloc(PyObject *self) {
     Py_DECREF(tp);
 }
 
-void nb_type_dealloc(PyObject *o) {
+static void nb_type_dealloc(PyObject *o) {
     type_data *t = nb_type_data((PyTypeObject *) o);
 
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0) {
@@ -277,7 +277,7 @@ void nb_type_dealloc(PyObject *o) {
 }
 
 /// Called when a C++ type is extended from within Python
-int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
+static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     if (NB_TUPLE_GET_SIZE(args) != 3) {
         PyErr_SetString(PyExc_RuntimeError,
                         "nb_type_init(): invalid number of arguments!");
@@ -331,6 +331,77 @@ int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
     return 0;
 }
+
+/// Special case to handle 'Class.property = value' assignments
+static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
+    nb_internals &internals = internals_get();
+
+    internals.nb_static_property_enabled = false;
+    PyObject *cur = PyObject_GetAttr(obj, name);
+    internals.nb_static_property_enabled = true;
+
+    if (cur) {
+        PyTypeObject *tp = internals.nb_static_property;
+        if (Py_TYPE(cur) == tp) {
+            int rv = tp->tp_descr_set(cur, obj, value);
+            Py_DECREF(cur);
+            return rv;
+        }
+        Py_DECREF(cur);
+    } else {
+        PyErr_Clear();
+    }
+
+    #if defined(Py_LIMITED_API)
+        static setattrofunc tp_setattro =
+            (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
+    #else
+        setattrofunc tp_setattro = PyType_Type.tp_setattro;
+    #endif
+
+    return tp_setattro(obj, name, value);
+}
+
+static PyTypeObject *nb_type_tp(nb_internals &internals) noexcept {
+    PyTypeObject *tp = internals.nb_type;
+
+    if (NB_UNLIKELY(!tp)) {
+        PyType_Slot slots[] = {
+            { Py_tp_base, &PyType_Type },
+            { Py_tp_dealloc, (void *) nb_type_dealloc },
+            { Py_tp_setattro, (void *) nb_type_setattro },
+            { Py_tp_init, (void *) nb_type_init },
+            { 0, nullptr }
+        };
+
+#if defined(Py_LIMITED_API)
+        int itemsize = cast<int>(handle(&PyType_Type).attr("__itemsize__"));
+        int basicsize = cast<int>(handle(&PyType_Type).attr("__basicsize__"));
+#else
+        int itemsize = (int) PyType_Type.tp_itemsize;
+        int basicsize = (int) PyType_Type.tp_basicsize;
+#endif
+        basicsize += (int) sizeof(type_data);
+
+        PyType_Spec spec = {
+            /* .name = */ "nanobind.nb_type",
+            /* .basicsize = */ basicsize,
+            /* .itemsize = */ itemsize,
+            /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+            /* .slots = */ slots
+        };
+
+        tp = (PyTypeObject *) PyType_FromSpec(&spec);
+        if (!tp)
+            fail("nb_type type creation failed!");
+
+        internals.nb_type = tp;
+    }
+
+    return tp;
+}
+
+
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
@@ -485,7 +556,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass =  internals.nb_type;
+    PyTypeObject *metaclass = nb_type_tp(internals);
 
 #if PY_VERSION_HEX >= 0x030C0000
     // Life is good, PyType_FromMetaclass() is available
@@ -1274,36 +1345,6 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
     }
 
     inst->ready = false;
-}
-
-/// Special case to handle 'Class.property = value' assignments
-int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
-    nb_internals &internals = internals_get();
-
-    internals.nb_static_property_enabled = false;
-    PyObject *cur = PyObject_GetAttr(obj, name);
-    internals.nb_static_property_enabled = true;
-
-    if (cur) {
-        PyTypeObject *tp = internals.nb_static_property;
-        if (Py_TYPE(cur) == tp) {
-            int rv = tp->tp_descr_set(cur, obj, value);
-            Py_DECREF(cur);
-            return rv;
-        }
-        Py_DECREF(cur);
-    } else {
-        PyErr_Clear();
-    }
-
-    #if defined(Py_LIMITED_API)
-        static setattrofunc tp_setattro =
-            (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
-    #else
-        setattrofunc tp_setattro = PyType_Type.tp_setattro;
-    #endif
-
-    return tp_setattro(obj, name, value);
 }
 
 bool nb_type_isinstance(PyObject *o, const std::type_info *t) noexcept {

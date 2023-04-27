@@ -34,7 +34,7 @@ static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject 
     return tp_descr_set(self, cls, value);
 }
 
-PyTypeObject *nb_static_property_get() {
+PyTypeObject *nb_static_property_tp() noexcept {
     nb_internals &internals = internals_get();
     PyTypeObject *tp = internals.nb_static_property;
 

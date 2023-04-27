@@ -176,17 +176,17 @@ struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
 
-    /// Registered metaclasses for nanobind classes and enumerations
-    PyTypeObject *nb_type;
+    /// Metaclass of nanobind classes (created on demand)
+    PyTypeObject *nb_type = nullptr;
 
     /// Types of nanobind functions and methods
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;
 
-    /// Property variant for static attributes
+    /// Property variant for static attributes (created on demand)
     PyTypeObject *nb_static_property = nullptr;
     bool nb_static_property_enabled = true;
 
-    /// N-dimensional array wrapper (constructed optionally)
+    /// N-dimensional array wrapper (created on demand)
     PyTypeObject *nb_ndarray = nullptr;
 
     /// C++ -> Python instance map
@@ -230,11 +230,9 @@ inline nb_internals &internals_get() noexcept {
 extern char *type_name(const std::type_info *t);
 
 // Forward declarations
-extern int nb_type_init(PyObject *, PyObject *, PyObject *);
-extern void nb_type_dealloc(PyObject *o);
 extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
 extern void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic);
-extern PyTypeObject *nb_static_property_get();
+extern PyTypeObject *nb_static_property_tp() noexcept;
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 NB_INLINE func_data *nb_func_data(void *o) {
@@ -255,7 +253,9 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
 }
 
 extern PyObject *nb_type_name(PyTypeObject *o) noexcept;
-inline PyObject *nb_inst_name(PyObject *o) noexcept { return nb_type_name(Py_TYPE(o)); }
+inline PyObject *nb_inst_name(PyObject *o) noexcept {
+        return nb_type_name(Py_TYPE(o));
+}
 
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);

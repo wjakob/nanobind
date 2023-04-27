@@ -84,7 +84,6 @@ extern int nb_bound_method_traverse(PyObject *, visitproc, void *);
 extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
-extern int nb_type_setattro(PyObject*, PyObject*, PyObject*);
 
 #if PY_VERSION_HEX >= 0x03090000
 #  define NB_HAVE_VECTORCALL_PY39_OR_NEWER NB_HAVE_VECTORCALL
@@ -172,22 +171,6 @@ static PyType_Spec nb_bound_method_spec = {
     /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
                    NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     /* .slots = */ nb_bound_method_slots
-};
-
-static PyType_Slot nb_type_slots[] = {
-    { Py_tp_base, nullptr },
-    { Py_tp_dealloc, (void *) nb_type_dealloc },
-    { Py_tp_setattro, (void *) nb_type_setattro },
-    { Py_tp_init, (void *) nb_type_init },
-    { 0, nullptr }
-};
-
-static PyType_Spec nb_type_spec = {
-    /* .name = */ "nanobind.nb_type",
-    /* .basicsize = */ 0,
-    /* .itemsize = */ 0,
-    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    /* .slots = */ nb_type_slots
 };
 
 NB_THREAD_LOCAL current_method current_method_data =
@@ -313,36 +296,18 @@ static NB_NOINLINE nb_internals *internals_make() {
 
     const char *internals_id = NB_INTERNALS_ID;
     PyObject *capsule = PyCapsule_New(p, internals_id, nullptr);
-    PyObject *nb_module = PyModule_NewObject(nb_name.ptr());
+    p->nb_module = PyModule_NewObject(nb_name.ptr());
     int rv = PyDict_SetItemString(dict, internals_id, capsule);
-    if (rv || !capsule || !nb_module)
+    if (rv || !capsule || !p->nb_module)
         fail("nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
-
-    p->nb_module = nb_module;
 
     // Function objects
     p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
-    p->nb_bound_method =
-        (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
+    p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
-    // Metaclass (nb_type)
-#if defined(Py_LIMITED_API)
-    int tp_itemsize = cast<int>(handle(&PyType_Type).attr("__itemsize__"));
-    int tp_basicsize = cast<int>(handle(&PyType_Type).attr("__basicsize__"));
-#else
-    int tp_itemsize = (int) PyType_Type.tp_itemsize;
-    int tp_basicsize = (int) PyType_Type.tp_basicsize;
-#endif
-    nb_type_spec.basicsize = tp_basicsize
-        + (int) sizeof(type_data);
-    nb_type_spec.itemsize = tp_itemsize;
-    nb_type_slots[0].pfunc = &PyType_Type;
-    p->nb_type = (PyTypeObject *) PyType_FromSpec(&nb_type_spec);
-
-    if (!p->nb_func || !p->nb_method ||
-        !p->nb_bound_method || !p->nb_type)
+    if (!p->nb_func || !p->nb_method || !p->nb_bound_method)
         fail("nanobind::detail::internals_make(): type initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000

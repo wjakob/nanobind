@@ -738,7 +738,7 @@ void property_install(PyObject *scope, const char *name, PyObject *getter,
 
 void property_install_static(PyObject *scope, const char *name,
                              PyObject *getter, PyObject *setter) noexcept {
-    property_install_impl(nb_static_property_get(), scope, name, getter,
+    property_install_impl(nb_static_property_tp(), scope, name, getter,
                           setter);
 }
 

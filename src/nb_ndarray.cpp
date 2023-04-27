@@ -35,7 +35,7 @@ static void nb_ndarray_dealloc(PyObject *self) {
     tp_free(self);
 }
 
-static int nb_ndarray_getbuffer(PyObject *exporter, Py_buffer *view, int) {
+static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
     nb_ndarray *self = (nb_ndarray *) exporter;
 
     dlpack::dltensor &t = self->th->ndarray->dltensor;
@@ -119,7 +119,7 @@ static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
     PyMem_Free(view->strides);
 }
 
-static PyTypeObject *nb_ndarray_get() noexcept {
+static PyTypeObject *nd_ndarray_tp() noexcept {
     nb_internals &internals = internals_get();
     PyTypeObject *tp = internals.nb_ndarray;
 
@@ -127,7 +127,7 @@ static PyTypeObject *nb_ndarray_get() noexcept {
         PyType_Slot slots[] = {
             { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
 #if PY_VERSION_HEX >= 0x03090000
-            { Py_bf_getbuffer, (void *) nb_ndarray_getbuffer },
+            { Py_bf_getbuffer, (void *) nd_ndarray_tpbuffer },
             { Py_bf_releasebuffer, (void *) nb_ndarray_releasebuffer },
 #endif
             { 0, nullptr }
@@ -146,9 +146,10 @@ static PyTypeObject *nb_ndarray_get() noexcept {
             fail("nb_ndarray type creation failed!");
 
 #if PY_VERSION_HEX < 0x03090000
-        tp->tp_as_buffer->bf_getbuffer = nb_ndarray_getbuffer;
+        tp->tp_as_buffer->bf_getbuffer = nd_ndarray_tpbuffer;
         tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
 #endif
+
         internals.nb_ndarray = tp;
     }
 
@@ -584,7 +585,7 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
 
     if ((ndarray_framework) framework == ndarray_framework::numpy) {
         try {
-            object o = steal(PyType_GenericAlloc(nb_ndarray_get(), 0));
+            object o = steal(PyType_GenericAlloc(nd_ndarray_tp(), 0));
             if (!o.is_valid())
                 return nullptr;
             ((nb_ndarray *) o.ptr())->th = th;

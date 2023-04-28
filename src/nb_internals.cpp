@@ -91,6 +91,19 @@ extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
 #  define NB_HAVE_VECTORCALL_PY39_OR_NEWER 0
 #endif
 
+static PyType_Slot nb_meta_slots[] = {
+    { Py_tp_base, nullptr },
+    { 0, nullptr }
+};
+
+static PyType_Spec nb_meta_spec = {
+    /* .name = */ "nanobind.nb_meta",
+    /* .basicsize = */ 0,
+    /* .itemsize = */ 0,
+    /* .flags = */ Py_TPFLAGS_DEFAULT,
+    /* .slots = */ nb_meta_slots
+};
+
 static PyMemberDef nb_func_members[] = {
     { "__vectorcalloffset__", T_PYSSIZET,
       (Py_ssize_t) offsetof(nb_func, vectorcall), READONLY, nullptr },
@@ -138,13 +151,13 @@ static PyType_Slot nb_method_slots[] = {
 };
 
 static PyType_Spec nb_method_spec = {
-    /*.name = */"nanobind.nb_method",
-    /*.basicsize = */(int) sizeof(nb_func),
-    /*.itemsize = */(int) sizeof(func_data),
-    /*.flags = */Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
-        | Py_TPFLAGS_METHOD_DESCRIPTOR
-        | NB_HAVE_VECTORCALL_PY39_OR_NEWER,
-    /*.slots = */nb_method_slots
+    /*.name = */ "nanobind.nb_method",
+    /*.basicsize = */ (int) sizeof(nb_func),
+    /*.itemsize = */ (int) sizeof(func_data),
+    /*.flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+                  Py_TPFLAGS_METHOD_DESCRIPTOR |
+                  NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+    /*.slots = */ nb_method_slots
 };
 
 static PyMemberDef nb_bound_method_members[] = {
@@ -296,19 +309,24 @@ static NB_NOINLINE nb_internals *internals_make() {
 
     const char *internals_id = NB_INTERNALS_ID;
     PyObject *capsule = PyCapsule_New(p, internals_id, nullptr);
-    p->nb_module = PyModule_NewObject(nb_name.ptr());
     int rv = PyDict_SetItemString(dict, internals_id, capsule);
-    if (rv || !capsule || !p->nb_module)
+    if (rv || !capsule)
         fail("nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
 
-    // Function objects
+    nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
+
+    p->nb_module = PyModule_NewObject(nb_name.ptr());
+    p->nb_meta = (PyTypeObject *) PyType_FromSpec(&nb_meta_spec);
+    p->nb_type_dict = PyDict_New();
     p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
-    if (!p->nb_func || !p->nb_method || !p->nb_bound_method)
-        fail("nanobind::detail::internals_make(): type initialization failed!");
+    PyErr_Print();
+    if (!p->nb_module || !p->nb_meta || !p->nb_type_dict || !p->nb_func ||
+        !p->nb_method || !p->nb_bound_method)
+        fail("nanobind::detail::internals_make(): initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000
     p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;

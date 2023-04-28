@@ -49,7 +49,9 @@ PyTypeObject *nb_static_property_tp() noexcept {
 
         PyType_Slot slots[] = {
             { Py_tp_base, &PyProperty_Type },
+#if PY_VERSION_HEX < 0x030C0000
             { Py_tp_members, nullptr },
+#endif
             { Py_tp_descr_get, (void *) nb_static_property_descr_get },
             { Py_tp_descr_set, (void *) nb_static_property_descr_set },
             { 0, nullptr }
@@ -60,11 +62,10 @@ PyTypeObject *nb_static_property_tp() noexcept {
 #else
         // See https://github.com/python/cpython/issues/98963
         PyMemberDef members[] = {
-            { "__doc__", T_OBJECT, 0, 0, nullptr },
+            { "__doc__", T_OBJECT, basicsize, 0, nullptr },
             { nullptr, 0, 0, 0, nullptr }
         };
 
-        members[0].offset = basicsize;
         slots[1].pfunc = members;
         basicsize += sizeof(PyObject *);
 #endif

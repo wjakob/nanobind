@@ -101,7 +101,6 @@ struct type_data {
     void (*move)(void *, void *) noexcept;
     const std::type_info **implicit;
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
-    void *supplement;
     void (*set_self_py)(void *, PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
     size_t dictoffset;
@@ -114,6 +113,7 @@ struct type_init_data : type_data {
     PyTypeObject *base_py;
     const char *doc;
     const PyType_Slot *type_slots;
+    size_t supplement;
 };
 
 NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
@@ -148,9 +148,11 @@ NB_INLINE void type_extra_apply(type_init_data &t, dynamic_attr) {
 template <typename T>
 NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
     static_assert(std::is_trivially_default_constructible_v<T>,
-                  "The supplement type must be a POD (plain old data) type");
+                  "The supplement must be a POD (plain old data) type");
+    static_assert(alignof(T) <= alignof(void *),
+                  "The alignment requirement of the supplement is too high.");
     t.flags |= (uint32_t) type_flags::has_supplement | (uint32_t) type_flags::is_final;
-    t.supplement = (void *) malloc(sizeof(T));
+    t.supplement = sizeof(T);
 }
 
 // Enum-specific annotations:
@@ -306,7 +308,6 @@ public:
         d.flags = (uint32_t) detail::type_flags::has_scope;
         d.align = (uint8_t) alignof(Alias);
         d.size = (uint32_t) sizeof(Alias);
-        d.supplement = nullptr;
         d.name = name;
         d.scope = scope.ptr();
         d.type = &typeid(T);

@@ -164,8 +164,11 @@ struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
 
-    /// Metaclass of nanobind classes (created on demand)
-    PyTypeObject *nb_type = nullptr;
+    /// Meta-metaclass of nanobind instances
+    PyTypeObject *nb_meta;
+
+    /// Dictionary with nanobind metaclass(es) for different payload sizes
+    PyObject *nb_type_dict;
 
     /// Types of nanobind functions and methods
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;

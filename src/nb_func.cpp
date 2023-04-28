@@ -415,8 +415,6 @@ static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
                     "could not be translated!");
 }
 
-static PyTypeObject *nb_type_cache = nullptr;
-
 /// Dispatch loop that is used to invoke functions created by nb_func_new
 static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                             PyObject *const *args_in,
@@ -438,22 +436,23 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     if (is_method) {
         self_arg = nargs_in > 0 ? args_in[0] : nullptr;
 
-        if (!nb_type_cache)
-            nb_type_cache = internals_get().nb_type;
+        if (NB_LIKELY(self_arg)) {
+            PyTypeObject *self_tp = Py_TYPE(self_arg);
 
-        if (self_arg && Py_TYPE((PyObject *) Py_TYPE(self_arg)) == nb_type_cache) {
-            self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
-            if (self_flags & (uint32_t) type_flags::is_trampoline)
-                current_method_data = current_method{ fr->name, self_arg };
+            if (NB_LIKELY(nb_type_check((PyObject *) self_tp))) {
+                self_flags = nb_type_data(self_tp)->flags;
+                if (self_flags & (uint32_t) type_flags::is_trampoline)
+                    current_method_data = current_method{ fr->name, self_arg };
 
-            is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
-            if (is_constructor) {
-                if (((nb_inst *) self_arg)->ready) {
-                    PyErr_SetString(
-                        PyExc_RuntimeError,
-                        "nanobind::detail::nb_func_vectorcall(): the __init__ "
-                        "method should not be called on an initialized object!");
-                    return nullptr;
+                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+                if (is_constructor) {
+                    if (((nb_inst *) self_arg)->ready) {
+                        PyErr_SetString(
+                            PyExc_RuntimeError,
+                            "nanobind::detail::nb_func_vectorcall(): the __init__ "
+                            "method should not be called on an initialized object!");
+                        return nullptr;
+                    }
                 }
             }
         }
@@ -696,22 +695,22 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     if (is_method) {
         self_arg = nargs_in > 0 ? args_in[0] : nullptr;
 
-        if (NB_UNLIKELY(!nb_type_cache))
-            nb_type_cache = internals_get().nb_type;
+        if (NB_LIKELY(self_arg)) {
+            PyTypeObject *self_tp = Py_TYPE(self_arg);
+            if (NB_LIKELY(nb_type_check((PyObject *) self_tp))) {
+                self_flags = nb_type_data(self_tp)->flags;
+                if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::is_trampoline))
+                    current_method_data = current_method{ fr->name, self_arg };
 
-        if (NB_LIKELY(self_arg && Py_TYPE((PyObject *) Py_TYPE(self_arg)) == nb_type_cache)) {
-            self_flags = nb_type_data(Py_TYPE(self_arg))->flags;
-            if (NB_UNLIKELY(self_flags & (uint32_t) type_flags::is_trampoline))
-                current_method_data = current_method{ fr->name, self_arg };
-
-            is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
-            if (is_constructor) {
-                if (NB_UNLIKELY(((nb_inst *) self_arg)->ready)) {
-                    PyErr_SetString(PyExc_RuntimeError,
-                                    "nanobind::detail::nb_func_vectorcall_simple():"
-                                    " the __init__ method should not be called on "
-                                    "an initialized object!");
-                    return nullptr;
+                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+                if (is_constructor) {
+                    if (NB_UNLIKELY(((nb_inst *) self_arg)->ready)) {
+                        PyErr_SetString(PyExc_RuntimeError,
+                                        "nanobind::detail::nb_func_vectorcall_simple():"
+                                        " the __init__ method should not be called on "
+                                        "an initialized object!");
+                        return nullptr;
+                    }
                 }
             }
         }

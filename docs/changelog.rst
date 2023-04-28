@@ -18,16 +18,35 @@ below inherit that of the preceding release.
 Version 1.3.0 (TBD)
 -------------------
 
-
-* Reduced the size of nanobind type objects by 4 pointers.
-  (PR `#194 <https://github.com/wjakob/nanobind/pull/194>`__).
-* Added a type caster between Python datetime/timedelta objects and
+* Added a type caster between Python ``datetime``/``timedelta`` objects and
   C++ ``std::chrono::duration``/``std::chrono::time_point``, ported
   from pybind11. (PR `#175 <https://github.com/wjakob/nanobind/pull/175>`__).
+* Internal nanobind types (``nb_type``, ``nb_static_property``, ``nb_ndarray``)
+  are now constructed on demand. This reduces the size of the ``libnanobind``
+  component in static (``NB_STATIC``) builds when those features are not used.
+  (commits `95e45a
+  <https://github.com/wjakob/nanobind/commit/95e45a4027dcbce935091533f7d41bf59e3e5fe1>`__,
+  `375083
+  <https://github.com/wjakob/nanobind/commit/37508386a1f8c346d17a0353c8152940aacde9c2>`__,
+  and `e033c8
+  <https://github.com/wjakob/nanobind/commit/e033c8fab4a14cbb9c5b0e08b1bdf49af2a9cb22>`__).
+* Reduced the number of exception-related exports to further crunch
+  ``libnanobind``. (commit `f7e81
+  <https://github.com/wjakob/nanobind/commit/f7e81567fe928553bf5830fb3bdef4cef42e1994>`__).
+* Refined a number of compiler and linker flags across platforms to ensure compact
+  binaries especially in static (``NB_STATIC``) builds. (commit `5ead9f
+  <https://github.com/wjakob/nanobind/commit/5ead9ff348a2ef0df8231e6480607a5b0623a16b>`__)
+* Supplemental type data specified via :cpp:class:`nb::supplement\<T\>()
+  <supplement>` is now stored directly within the type object instead of being
+  referenced through an indirection. (commit `d82ca9
+  <https://github.com/wjakob/nanobind/commit/d82ca9c14191e74dd35dd5bf15fc90f5230319fb>`__).
+* Reduced the size of nanobind type objects by 5 pointers. (PR `#194
+  <https://github.com/wjakob/nanobind/pull/194>`__ and commit `d82ca9
+  <https://github.com/wjakob/nanobind/commit/d82ca9c14191e74dd35dd5bf15fc90f5230319fb>`__).
 * Added :cpp:func:`nb::python_error::discard_as_unraisable()
   <python_error::discard_as_unraisable>` as a wrapper around
-  ``PyErr_WriteUnraisable()``.
-  (PR `#175 <https://github.com/wjakob/nanobind/pull/175>`__).
+  ``PyErr_WriteUnraisable()``. (PR `#175
+  <https://github.com/wjakob/nanobind/pull/175>`__).
 * ABI version 9.
 
 Version 1.2.0 (April 24, 2023)

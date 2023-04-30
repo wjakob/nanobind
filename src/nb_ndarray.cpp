@@ -96,8 +96,10 @@ static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
     Py_INCREF(exporter);
 
     Py_ssize_t len = view->itemsize;
-    scoped_pymalloc<Py_ssize_t> strides(t.ndim), shape(t.ndim);
-    for (int32_t i = 0; i < t.ndim; ++i) {
+    scoped_pymalloc<Py_ssize_t> strides((size_t) t.ndim),
+                                  shape((size_t) t.ndim);
+
+    for (size_t i = 0; i < (size_t) t.ndim; ++i) {
         len *= (Py_ssize_t) t.shape[i];
         strides[i] = (Py_ssize_t) t.strides[i] * view->itemsize;
         shape[i] = (Py_ssize_t) t.shape[i];
@@ -248,8 +250,8 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
     mt->dltensor.dtype = dt;
     mt->dltensor.byte_offset = value_int - value_rounded;
 
-    scoped_pymalloc<int64_t> strides(view->ndim);
-    scoped_pymalloc<int64_t> shape(view->ndim);
+    scoped_pymalloc<int64_t> strides((size_t) view->ndim);
+    scoped_pymalloc<int64_t> shape((size_t) view->ndim);
     for (size_t i = 0; i < (size_t) view->ndim; ++i) {
         strides[i] = (int64_t) (view->strides[i] / view->itemsize);
         shape[i] = (int64_t) view->shape[i];
@@ -350,21 +352,21 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
     for (uint32_t i = 0; i < req->ndim; ++i)
         size *= t.shape[i];
 
-    scoped_pymalloc<int64_t> strides(t.ndim);
+    scoped_pymalloc<int64_t> strides((size_t) t.ndim);
     if ((req->req_order || !t.strides) && t.ndim > 0) {
         size_t accum = 1;
 
         if (req->req_order == 'C' || !t.strides) {
-            for (uint32_t i = (uint32_t) (t.ndim - 1);;) {
-                strides[i] = accum;
+            for (size_t i = (size_t) (t.ndim - 1);;) {
+                strides[i] = (int64_t) accum;
                 accum *= t.shape[i];
                 if (i == 0)
                     break;
                 --i;
             }
         } else if (req->req_order == 'F') {
-            for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
-                strides[i] = accum;
+            for (size_t i = 0; i < (size_t) t.ndim; ++i) {
+                strides[i] = (int64_t) accum;
                 accum *= t.shape[i];
             }
         } else {
@@ -377,7 +379,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
                    field, which implies a C-style ordering. */
                 pass_order = req->req_order == 'C';
             } else {
-                for (uint32_t i = 0; i < (uint32_t) t.ndim; ++i) {
+                for (size_t i = 0; i < (size_t) t.ndim; ++i) {
                     if (t.shape[i] != 1 && strides[i] != t.strides[i]) {
                         pass_order = false;
                         break;

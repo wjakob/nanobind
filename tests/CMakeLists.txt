@@ -9,6 +9,13 @@ if (NB_TEST_SHARED_BUILD)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_SHARED)
 endif()
 
+# Enable extra warning flags
+if (MSVC)
+  add_compile_options(/W4)
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
+endif()
+
 nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})

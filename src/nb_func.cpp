@@ -19,6 +19,7 @@
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
+#  pragma warning(disable: 6255) // _alloca indicates failure by raising a stack overflow exception
 #endif
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -158,6 +159,13 @@ static bool set_builtin_exception_status(builtin_exception &e) {
     return true;
 }
 
+void *malloc_check(size_t size) {
+    void *ptr = malloc(size);
+    if (!ptr)
+        fail("nanobind: malloc() failed!");
+    return ptr;
+}
+
 /**
  * \brief Wrap a C++ function into a Python function object
  *
@@ -292,7 +300,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     for (size_t i = 0;; ++i) {
         if (!f->descr[i]) {
-            fc->descr = (char *) malloc(sizeof(char) * (i + 1));
+            fc->descr = (char *) malloc_check(sizeof(char) * (i + 1));
             memcpy((char *) fc->descr, f->descr, (i + 1) * sizeof(char));
             break;
         }
@@ -301,7 +309,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     for (size_t i = 0;; ++i) {
         if (!f->descr_types[i]) {
             fc->descr_types = (const std::type_info **)
-                malloc(sizeof(const std::type_info *) * (i + 1));
+                malloc_check(sizeof(const std::type_info *) * (i + 1));
             memcpy(fc->descr_types, f->descr_types,
                         (i + 1) * sizeof(const std::type_info *));
             break;
@@ -309,7 +317,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     }
 
     if (has_args) {
-        fc->args = (arg_data *) malloc(sizeof(arg_data) * f->nargs);
+        fc->args = (arg_data *) malloc_check(sizeof(arg_data) * f->nargs);
 
         if (is_method) // add implicit 'self' argument annotation
             fc->args[0] = method_args[0];
@@ -601,7 +609,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     break;
 
                 args[i] = arg;
-                args_flags[i] = arg_convert ? (uint8_t) cast_flags::convert : 0;
+                args_flags[i] = arg_convert ? (uint8_t) cast_flags::convert : (uint8_t) 0;
             }
 
             // Skip this overload if positional arguments were unavailable
@@ -837,7 +845,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
     nb_bound_method *mb = (nb_bound_method *) self;
-    size_t nargs = NB_VECTORCALL_NARGS(nargsf);
+    size_t nargs = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
     PyObject *result;
     if (nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET) {

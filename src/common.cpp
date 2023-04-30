@@ -24,10 +24,10 @@ void raise(const char *fmt, ...) {
     va_list args;
 
     va_start(args, fmt);
-    size_t size = vsnprintf(buf, sizeof(buf), fmt, args);
+    int size = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    if (size < sizeof(buf))
+    if (size < (int) sizeof(buf))
         throw std::runtime_error(buf);
 
     scoped_pymalloc<char> temp(size + 1);
@@ -255,8 +255,8 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
     PyObject *res = nullptr;
     bool gil_error = false, cast_error = false;
 
-    size_t nargs_total =
-        NB_VECTORCALL_NARGS(nargsf) + (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0);
+    size_t nargs_total = (size_t) (NB_VECTORCALL_NARGS(nargsf) +
+                         (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
 
 #if !defined(Py_LIMITED_API)
     if (!PyGILState_Check()) {
@@ -941,8 +941,8 @@ void set_implicit_cast_warnings(bool value) noexcept {
 // ========================================================================
 
 void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
-                      Py_ssize_t &stop, Py_ssize_t &step,
-                      size_t &slice_length) {
+                   Py_ssize_t &stop, Py_ssize_t &step,
+                   size_t &slice_length) {
     if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
         detail::raise_python_error();
     Py_ssize_t slice_length_ =

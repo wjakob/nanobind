@@ -390,12 +390,12 @@ class bytes : public object {
 
     const char *c_str() { return PyBytes_AsString(m_ptr); }
 
-    size_t size() const { return PyBytes_Size(m_ptr); }
+    size_t size() const { return (size_t) PyBytes_Size(m_ptr); }
 };
 
 class tuple : public object {
     NB_OBJECT_DEFAULT(tuple, object, "tuple", PyTuple_Check)
-    size_t size() const { return NB_TUPLE_GET_SIZE(m_ptr); }
+    size_t size() const { return (size_t) NB_TUPLE_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
 
@@ -412,7 +412,7 @@ class type_object : public object {
 class list : public object {
     NB_OBJECT(list, object, "list", PyList_Check)
     list() : object(PyList_New(0), detail::steal_t()) { }
-    size_t size() const { return NB_LIST_GET_SIZE(m_ptr); }
+    size_t size() const { return (size_t) NB_LIST_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);
 
@@ -428,7 +428,7 @@ class list : public object {
 class dict : public object {
     NB_OBJECT(dict, object, "dict", PyDict_Check)
     dict() : object(PyDict_New(), detail::steal_t()) { }
-    size_t size() const { return NB_DICT_GET_SIZE(m_ptr); }
+    size_t size() const { return (size_t) NB_DICT_GET_SIZE(m_ptr); }
     detail::dict_iterator begin() const;
     detail::dict_iterator end() const;
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Keys)); }
@@ -515,9 +515,9 @@ NB_INLINE bool isinstance(handle h) noexcept {
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
 NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
 NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }
-NB_INLINE size_t len(const tuple &t) { return NB_TUPLE_GET_SIZE(t.ptr()); }
-NB_INLINE size_t len(const list &l) { return NB_LIST_GET_SIZE(l.ptr()); }
-NB_INLINE size_t len(const dict &d) { return NB_DICT_GET_SIZE(d.ptr()); }
+NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
+NB_INLINE size_t len(const list &l) { return (size_t) NB_LIST_GET_SIZE(l.ptr()); }
+NB_INLINE size_t len(const dict &d) { return (size_t) NB_DICT_GET_SIZE(d.ptr()); }
 
 inline void print(handle value, handle end = handle(), handle file = handle()) {
     detail::print(value.ptr(), end.ptr(), file.ptr());
@@ -553,7 +553,7 @@ public:
     detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const {
         Py_ssize_t start, stop, step;
         size_t slice_length;
-        detail::slice_compute(m_ptr, size, start, stop, step, slice_length);
+        detail::slice_compute(m_ptr, (Py_ssize_t) size, start, stop, step, slice_length);
         return detail::tuple(start, stop, step, slice_length);
     }
 };

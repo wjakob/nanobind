@@ -108,7 +108,7 @@ public:
         const int digits = 10;
         const char *num = "0123456789";
         char buf[digits];
-        int i = digits;
+        size_t i = digits;
 
         do {
             buf[--i] = num[value % 10];
@@ -129,14 +129,14 @@ public:
         return tmp;
     }
 
-    size_t size() const { return m_cur - m_start; }
-    size_t remain() const { return m_end - m_cur; }
+    size_t size() const { return (size_t) (m_cur - m_start); }
+    size_t remain() const { return (size_t) (m_end - m_cur); }
 
 private:
     void expand(size_t minval = 2) {
         size_t old_alloc_size = m_end - m_start,
                new_alloc_size = 2 * old_alloc_size + minval,
-               used_size      = m_cur - m_start,
+               used_size      = (size_t) (m_cur - m_start),
                copy_size      = used_size + 1;
 
         if (old_alloc_size < copy_size)

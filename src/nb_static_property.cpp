@@ -49,11 +49,8 @@ PyTypeObject *nb_static_property_tp() noexcept {
 
         PyType_Slot slots[] = {
             { Py_tp_base, &PyProperty_Type },
-#if PY_VERSION_HEX < 0x030C0000
             { Py_tp_members, nullptr },
-#endif
             { Py_tp_descr_get, (void *) nb_static_property_descr_get },
-            { Py_tp_descr_set, (void *) nb_static_property_descr_set },
             { 0, nullptr }
         };
 
@@ -83,6 +80,7 @@ PyTypeObject *nb_static_property_tp() noexcept {
             fail("nb_static_property type creation failed!");
 
         internals.nb_static_property = tp;
+        internals.nb_static_property_descr_set = nb_static_property_descr_set;
     }
 
     return tp;

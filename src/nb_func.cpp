@@ -138,6 +138,26 @@ static arg_data method_args[2] = {
     { nullptr, nullptr, nullptr, false, false }
 };
 
+static bool set_builtin_exception_status(builtin_exception &e) {
+    PyObject *o;
+
+    switch (e.type()) {
+        case exception_type::stop_iteration: o = PyExc_StopIteration; break;
+        case exception_type::index_error: o = PyExc_IndexError; break;
+        case exception_type::key_error: o = PyExc_KeyError; break;
+        case exception_type::value_error: o = PyExc_ValueError; break;
+        case exception_type::type_error: o = PyExc_TypeError; break;
+        case exception_type::buffer_error: o = PyExc_BufferError; break;
+        case exception_type::import_error: o = PyExc_ImportError; break;
+        case exception_type::attribute_error: o = PyExc_AttributeError; break;
+        case exception_type::next_overload: return false;
+        default: fail("Unknown exception type!");
+    }
+
+    PyErr_SetString(o, e.what());
+    return true;
+}
+
 /**
  * \brief Wrap a C++ function into a Python function object
  *
@@ -400,14 +420,18 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
 static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
     std::exception_ptr e = std::current_exception();
 
-    for (auto pair : internals_get().exception_translators) {
+    nb_translator_seq *cur  = &internals_get().translators;
+
+    while (cur) {
         try {
             // Try exception translator & forward payload
-            pair.first(e, pair.second);
+            cur->translator(e, cur->payload);
             return;
         } catch (...) {
             e = std::current_exception();
         }
+
+        cur = cur->next;
     }
 
     PyErr_SetString(PyExc_SystemError,
@@ -632,8 +656,13 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     error_handler = nb_func_error_noconvert;
                     goto done;
                 }
-            } catch (next_overload &) {
-                result = NB_NEXT_OVERLOAD;
+            } catch (builtin_exception &e) {
+                if (set_builtin_exception_status(e)) {
+                    result = nullptr;
+                    goto done;
+                } else {
+                    result = NB_NEXT_OVERLOAD;
+                }
             } catch (python_error &e) {
                 e.restore();
                 result = nullptr;
@@ -756,8 +785,13 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                     error_handler = nb_func_error_noconvert;
                     goto done;
                 }
-            } catch (next_overload &) {
-                result = NB_NEXT_OVERLOAD;
+            } catch (builtin_exception &e) {
+                if (set_builtin_exception_status(e)) {
+                    result = nullptr;
+                    goto done;
+                } else {
+                    result = NB_NEXT_OVERLOAD;
+                }
             } catch (python_error &e) {
                 e.restore();
                 result = nullptr;

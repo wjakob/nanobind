@@ -153,34 +153,20 @@ void python_error::restore() noexcept {
     m_type = m_value = m_trace = nullptr;
 }
 
-next_overload::next_overload() : std::exception() { }
-next_overload::~next_overload() = default;
-const char *next_overload::what() const noexcept { return "nanobind::next_overload"; }
-
-cast_error::cast_error() : std::exception() { }
-cast_error::~cast_error() = default;
-const char *cast_error::what() const noexcept { return "nanobind::cast_error"; }
-
-#define NB_EXCEPTION(name, type)                                               \
-    name::name() : builtin_exception("") { }                                   \
-    void name::set_error() const { PyErr_SetString(type, what()); }
-
-NB_EXCEPTION(stop_iteration, PyExc_StopIteration)
-NB_EXCEPTION(index_error, PyExc_IndexError)
-NB_EXCEPTION(key_error, PyExc_KeyError)
-NB_EXCEPTION(value_error, PyExc_ValueError)
-NB_EXCEPTION(type_error, PyExc_TypeError)
-NB_EXCEPTION(buffer_error, PyExc_BufferError)
-NB_EXCEPTION(import_error, PyExc_ImportError)
-NB_EXCEPTION(attribute_error, PyExc_AttributeError)
-
-#undef NB_EXCEPTION
+builtin_exception::builtin_exception(exception_type type, const char *what)
+    : std::runtime_error(what ? what : ""), m_type(type) { }
+builtin_exception::~builtin_exception() { }
 
 NAMESPACE_BEGIN(detail)
 
 void register_exception_translator(exception_translator t, void *payload) {
-    auto &et = internals_get().exception_translators;
-    et.insert(et.begin(), { t, payload });
+    nb_internals &internals = internals_get();
+
+    nb_translator_seq *cur  = &internals.translators,
+                      *next = new nb_translator_seq(*cur);
+    cur->next = next;
+    cur->payload = payload;
+    cur->translator = t;
 }
 
 NB_CORE PyObject *exception_new(PyObject *scope, const char *name,

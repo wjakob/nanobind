@@ -206,7 +206,7 @@ public:
                              localtime.tm_hour,
                              localtime.tm_min,
                              localtime.tm_sec,
-                             us.count());
+                             (int) us.count());
     }
     NB_TYPE_CASTER(type, const_name("datetime.datetime"));
 };

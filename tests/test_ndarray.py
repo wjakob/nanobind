@@ -257,7 +257,7 @@ def test12_implicit_conversion_jax():
         t.noimplicit(jnp.zeros((2, 2), dtype=jnp.int32))
 
     with pytest.raises(TypeError) as excinfo:
-        t.noimplicit(tf.zeros((2, 2), dtype=tf.bool))
+        t.noimplicit(jnp.zeros((2, 2), dtype=jnp.uint8))
 
 def test13_destroy_capsule():
     collect()

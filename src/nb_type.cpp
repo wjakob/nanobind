@@ -126,14 +126,14 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
             nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
             if (NB_UNLIKELY(!first))
                 fail("nanobind::detail::inst_new(): list element allocation failed!");
-            first->inst = (nb_inst *) entry;
+            first->inst = (PyObject *) entry;
             first->next = nullptr;
             entry = it.value() = nb_mark_seq(first);
         }
 
         nb_inst_seq *seq = nb_get_seq(entry);
         while (true) {
-            if (NB_UNLIKELY(seq->inst == self))
+            if (NB_UNLIKELY((nb_inst *) seq->inst == self))
                 fail("nanobind::detail::inst_new(): duplicate instance!");
             if (!seq->next)
                 break;
@@ -144,7 +144,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         if (NB_UNLIKELY(!next))
             fail("nanobind::detail::inst_new(): list element allocation failed!");
 
-        next->inst = self;
+        next->inst = (PyObject *) self;
         next->next = nullptr;
         seq->next = next;
     }
@@ -226,7 +226,7 @@ static void inst_dealloc(PyObject *self) {
                         *pred = nullptr;
 
             do {
-                if (seq->inst == inst) {
+                if ((nb_inst *) seq->inst == inst) {
                     found = true;
 
                     if (pred) {
@@ -362,7 +362,7 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     if (cur) {
         PyTypeObject *tp = internals.nb_static_property;
         if (Py_TYPE(cur) == tp) {
-            int rv = tp->tp_descr_set(cur, obj, value);
+            int rv = internals.nb_static_property_descr_set(cur, obj, value);
             Py_DECREF(cur);
             return rv;
         }
@@ -423,6 +423,8 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
         Py_INCREF(mod);
         ht->ht_module = mod;
     }
+#else
+    (void) mod;
 #endif
 
     PyTypeObject *tp = &ht->ht_type;
@@ -1218,7 +1220,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
             if (NB_UNLIKELY(nb_is_seq(entry))) {
                 seq = *nb_get_seq(entry);
             } else {
-                seq.inst = (nb_inst *) entry;
+                seq.inst = (PyObject *) entry;
                 seq.next = nullptr;
             }
 
@@ -1227,7 +1229,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
 
                 if (nb_type_data(tp)->type == cpp_type) {
                     Py_INCREF(seq.inst);
-                    return (PyObject *) seq.inst;
+                    return seq.inst;
                 }
 
                 if (!lookup_type())
@@ -1235,7 +1237,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
 
                 if (PyType_IsSubtype(tp, td->type_py)) {
                     Py_INCREF(seq.inst);
-                    return (PyObject *) seq.inst;
+                    return seq.inst;
                 }
 
                 if (seq.next == nullptr)
@@ -1307,7 +1309,7 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
             if (NB_UNLIKELY(nb_is_seq(entry))) {
                 seq = *nb_get_seq(entry);
             } else {
-                seq.inst = (nb_inst *) entry;
+                seq.inst = (PyObject *) entry;
                 seq.next = nullptr;
             }
 
@@ -1318,7 +1320,7 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
                 if (p == cpp_type || p == cpp_type_p) {
                     Py_INCREF(seq.inst);
-                    return (PyObject *) seq.inst;
+                    return seq.inst;
                 }
 
                 if (!lookup_type())
@@ -1327,7 +1329,7 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                 if (PyType_IsSubtype(tp, td->type_py) ||
                     (td_p && PyType_IsSubtype(tp, td_p->type_py))) {
                     Py_INCREF(seq.inst);
-                    return (PyObject *) seq.inst;
+                    return seq.inst;
                 }
 
                 if (seq.next == nullptr)
@@ -1428,7 +1430,7 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
                 "this issue.", name);
 
             Py_DECREF(name);
-            raise_next_overload();
+            throw next_overload();
         }
 
         inst->cpp_delete = false;

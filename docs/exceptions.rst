@@ -38,24 +38,24 @@ that convert to specific Python exceptions as shown below:
     - ``ValueError``
   * - ``std::overflow_error``
     - ``OverflowError``
-  * - :cpp:class:`nb::stop_iteration <stop_iteration>`
+  * - :cpp:func:`nb::stop_iteration <stop_iteration>`
     - ``StopIteration`` (used to implement custom iterator) 
-  * - :cpp:class:`nb::index_error <index_error>`
+  * - :cpp:func:`nb::index_error <index_error>`
     - ``IndexError`` (used to indicate out of bounds access in ``__getitem__``,
       ``__setitem__``, etc.)
-  * - :cpp:class:`nb::key_error <index_error>`
+  * - :cpp:func:`nb::key_error <index_error>`
     - ``KeyError`` (used to indicate an invalid access in ``__getitem__``,
       ``__setitem__``, etc.)
-  * - :cpp:class:`nb::value_error <value_error>`
+  * - :cpp:func:`nb::value_error <value_error>`
     - ``ValueError`` (used to indicate an invalid value in operations like
       ``container.remove(...)``)
-  * - :cpp:class:`nb::type_error <type_error>`
+  * - :cpp:func:`nb::type_error <type_error>`
     - ``TypeError``
-  * - :cpp:class:`nb::buffer_error <type_error>`
+  * - :cpp:func:`nb::buffer_error <type_error>`
     - ``BufferError``
-  * - :cpp:class:`nb::import_error <import_error>`
+  * - :cpp:func:`nb::import_error <import_error>`
     - ``ImportError``
-  * - :cpp:class:`nb::attribute_error <attribute_error>`
+  * - :cpp:func:`nb::attribute_error <attribute_error>`
     - ``AttributeError``
   * - Any other exception
     - ``SystemError``

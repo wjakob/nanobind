@@ -82,8 +82,9 @@ void raise_python_error() {
              "an error condition!");
 }
 
-void raise_next_overload() {
-    throw next_overload();
+void raise_next_overload_if_null(void *p) {
+    if (NB_UNLIKELY(!p))
+        throw next_overload();
 }
 
 void raise_cast_error() {
@@ -514,7 +515,7 @@ PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
 }
 
 // ========================================================================
-//
+
 PyObject *int_from_obj(PyObject *o) {
     PyObject *result = PyNumber_Long(o);
     if (!result)
@@ -827,32 +828,6 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
 template <typename T, bool Recurse = true>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
-        // Fast path for integers that aren't too large (max. one 15- or 30-bit "digit")
-        #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
-            PyLongObject *lo = (PyLongObject *) o;
-            Py_ssize_t size = Py_SIZE(o);
-
-            if (size == 0 || size == 1) {
-                digit value_d = lo->ob_digit[0];
-                T value = (T) value_d;
-                *out = value;
-                return sizeof(T) >= sizeof(digit) || value_d == (digit) value;
-            }
-
-            if constexpr (std::is_unsigned_v<T>) {
-                if (size < 0)
-                    return false;
-            } else {
-                if (size == -1) {
-                    sdigit value_d = - (sdigit) lo->ob_digit[0];
-                    T value = (T) value_d;
-                    *out = value;
-                    return sizeof(T) >= sizeof(sdigit) || value_d == (sdigit) value;
-                }
-            }
-        #endif
-
-
         // Slow path
         using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
         using Tp = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;

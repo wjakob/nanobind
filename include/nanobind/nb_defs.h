@@ -66,6 +66,12 @@
 #  define NB_CORE
 #endif
 
+#if !defined(NB_SHARED) && defined(__GNUC__)
+#  define NB_EXPORT_SHARED __attribute__ ((visibility("hidden")))
+#else
+#  define NB_EXPORT_SHARED
+#endif
+
 #if defined(__cpp_lib_char8_t) && __cpp_lib_char8_t >= 201811L
 #  define NB_HAS_U8STRING
 #endif

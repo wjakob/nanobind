@@ -1,3 +1,5 @@
+#pragma once
+
 #if defined(__GNUC__)
 // Don't warn about missing fields in PyTypeObject declarations
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -139,7 +141,7 @@ using py_map =
 
 // Linked list of instances with the same pointer address. Usually just 1..
 struct nb_inst_seq {
-    nb_inst *inst;
+    PyObject *inst;
     nb_inst_seq *next;
 };
 
@@ -160,6 +162,12 @@ NB_INLINE void*        nb_mark_seq(void *p) { return (void *) (((uintptr_t) p) |
 /// Retrieve the nb_inst_seq* pointer from an 'inst_c2p' value
 NB_INLINE nb_inst_seq* nb_get_seq(void *p)  { return (nb_inst_seq *) (((uintptr_t) p) ^ 1); }
 
+struct nb_translator_seq {
+    exception_translator translator;
+    void *payload;
+    nb_translator_seq *next = nullptr;
+};
+
 struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
@@ -176,6 +184,7 @@ struct nb_internals {
     /// Property variant for static attributes (created on demand)
     PyTypeObject *nb_static_property = nullptr;
     bool nb_static_property_enabled = true;
+    descrsetfunc nb_static_property_descr_set = nullptr;
 
     /// N-dimensional array wrapper (created on demand)
     PyTypeObject *nb_ndarray = nullptr;
@@ -203,7 +212,7 @@ struct nb_internals {
     nb_ptr_map funcs;
 
     /// Registered C++ -> Python exception translators
-    std::vector<std::pair<exception_translator, void *>> exception_translators;
+    nb_translator_seq translators;
 
     /// Should nanobind print leak warnings on exit?
     bool print_leak_warnings = true;

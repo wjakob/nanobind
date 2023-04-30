@@ -19,10 +19,10 @@ struct error_scope {
 /// Wraps a Python error state as a C++ exception
 class NB_EXPORT python_error : public std::exception {
 public:
-    python_error();
-    python_error(const python_error &);
-    python_error(python_error &&) noexcept;
-    ~python_error() override;
+    NB_EXPORT_SHARED python_error();
+    NB_EXPORT_SHARED python_error(const python_error &);
+    NB_EXPORT_SHARED python_error(python_error &&) noexcept;
+    NB_EXPORT_SHARED ~python_error() override;
 
     bool matches(handle exc) const noexcept {
         return PyErr_GivenExceptionMatches(m_type, exc.ptr()) != 0;
@@ -30,7 +30,7 @@ public:
 
     /// Move the error back into the Python domain. This may only be called
     /// once, and you should not reraise the exception in C++ afterward.
-    void restore() noexcept;
+    NB_EXPORT_SHARED void restore() noexcept;
 
     /// Pass the error to Python's `sys.unraisablehook`, which prints
     /// a traceback to `sys.stderr` by default but may be overridden.
@@ -46,7 +46,7 @@ public:
     handle value() const { return m_value; }
     handle trace() const { return m_trace; }
 
-    const char *what() const noexcept override;
+    NB_EXPORT_SHARED const char *what() const noexcept override;
 
 private:
     mutable PyObject *m_type = nullptr;
@@ -55,36 +55,31 @@ private:
     mutable char *m_what = nullptr;
 };
 
-/// Throw from a bound method to skip to the next overload
-class NB_EXPORT next_overload : public std::exception {
-public:
-    next_overload();
-    ~next_overload() override;
-    const char *what() const noexcept override;
-};
-
 /// Thrown by nanobind::cast when casting fails
-class NB_EXPORT cast_error : public std::exception {
-public:
-    cast_error();
-    ~cast_error() override;
-    const char *what() const noexcept override;
+using cast_error = std::bad_cast;
+
+enum class exception_type {
+    stop_iteration, index_error, key_error, value_error,
+    type_error, buffer_error, import_error, attribute_error,
+    next_overload
 };
 
 // Base interface used to expose common Python exceptions in C++
 class NB_EXPORT builtin_exception : public std::runtime_error {
 public:
-    using std::runtime_error::runtime_error;
-    virtual void set_error() const = 0;
+    NB_EXPORT_SHARED builtin_exception(exception_type type, const char *what);
+    NB_EXPORT_SHARED builtin_exception(builtin_exception &&) = default;
+    NB_EXPORT_SHARED builtin_exception(const builtin_exception &) = default;
+    NB_EXPORT_SHARED ~builtin_exception();
+    NB_EXPORT_SHARED exception_type type() const { return m_type; }
+private:
+    exception_type m_type;
 };
 
-#define NB_EXCEPTION(type)                                          \
-    class NB_EXPORT type : public builtin_exception {               \
-    public:                                                         \
-        using builtin_exception::builtin_exception;                 \
-        type();                                                     \
-        void set_error() const override;                            \
-    };
+#define NB_EXCEPTION(name)                                                     \
+    inline builtin_exception name(const char *what = nullptr) {                \
+        return builtin_exception(exception_type::name, what);                  \
+    }
 
 NB_EXCEPTION(stop_iteration)
 NB_EXCEPTION(index_error)
@@ -94,6 +89,7 @@ NB_EXCEPTION(type_error)
 NB_EXCEPTION(buffer_error)
 NB_EXCEPTION(import_error)
 NB_EXCEPTION(attribute_error)
+NB_EXCEPTION(next_overload)
 
 #undef NB_EXCEPTION
 

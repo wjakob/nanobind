@@ -203,7 +203,8 @@ template <> struct type_caster<char> {
     explicit operator char() {
         if (value && value[0] && value[1] == '\0')
             return value[0];
-        throw next_overload();
+        else
+            throw next_overload();
     }
 };
 
@@ -328,14 +329,12 @@ template <typename Type_> struct type_caster_base {
     operator Type*() { return value; }
 
     operator Type&() {
-        if (!value)
-            raise_next_overload();
+        raise_next_overload_if_null(value);
         return *value;
     }
 
     operator Type&&() && {
-        if (!value)
-            raise_next_overload();
+        raise_next_overload_if_null(value);
         return (Type &&) *value;
     }
 

@@ -1,3 +1,4 @@
+#pragma once
 #include <string.h>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)

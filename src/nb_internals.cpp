@@ -194,10 +194,6 @@ nb_internals *internals_p = nullptr;
 void default_exception_translator(const std::exception_ptr &p, void *) {
     try {
         std::rethrow_exception(p);
-    } catch (python_error &e) {
-        e.restore();
-    } catch (const builtin_exception &e) {
-        e.set_error();
     } catch (const std::bad_alloc &e) {
         PyErr_SetString(PyExc_MemoryError, e.what());
     } catch (const std::domain_error &e) {
@@ -323,7 +319,6 @@ static NB_NOINLINE nb_internals *internals_make() {
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
-    PyErr_Print();
     if (!p->nb_module || !p->nb_meta || !p->nb_type_dict || !p->nb_func ||
         !p->nb_method || !p->nb_bound_method)
         fail("nanobind::detail::internals_make(): initialization failed!");
@@ -337,7 +332,7 @@ static NB_NOINLINE nb_internals *internals_make() {
     p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
 #endif
 
-    register_exception_translator(default_exception_translator, nullptr);
+    p->translators = { default_exception_translator, nullptr, nullptr };
 
 #if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)
     /* The implementation of typing.py on CPython <3.12 tends to introduce

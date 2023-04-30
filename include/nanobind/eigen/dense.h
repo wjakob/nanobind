@@ -211,6 +211,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
         int64_t inner = caster.value.stride(0),
                 outer = caster.value.stride(1);
+        (void) outer;
 
         if constexpr (T::IsRowMajor)
             std::swap(inner, outer);

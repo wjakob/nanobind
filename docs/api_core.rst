@@ -148,7 +148,7 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
       Type conversion is performed using the return value policy `policy`
 
       When type conversion of arguments or return value fails, the function
-      raises a :cpp:class:`cast_error`. When the Python function call fails, it
+      raises a :cpp:type:`cast_error`. When the Python function call fails, it
       instead raises a :cpp:class:`python_error`.
 
    .. cpp:function:: args_proxy operator*() const
@@ -1123,47 +1123,56 @@ the reference section on :ref:`class binding <class_binding>`.
 
 .. cpp:class:: builtin_exception : public std::runtime_error
 
-   Base class of C++ versions of builtin Python exceptions (see below)
+   General-purpose class to propagate builtin Python exceptions from C++. A
+   number of convenience functions (see below) instantiate it.
 
-.. cpp:class:: stop_iteration : public builtin_exception
+.. cpp:function:: builtin_exception stop_iteration(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``StopIteration`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``StopIteration`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: index_error : public builtin_exception
+.. cpp:function:: builtin_exception index_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``IndexError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``IndexError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: key_error : public builtin_exception
+.. cpp:function:: builtin_exception key_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``KeyError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``KeyError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: value_error : public builtin_exception
+.. cpp:function:: builtin_exception value_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``ValueError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``ValueError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: type_error : public builtin_exception
+.. cpp:function:: builtin_exception type_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``TypeError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``TypeError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: buffer_error : public builtin_exception
+.. cpp:function:: builtin_exception buffer_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``BufferError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``BufferError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: import_error : public builtin_exception
+.. cpp:function:: builtin_exception import_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``ImportError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``ImportError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
-.. cpp:class:: attribute_error : public builtin_exception
+.. cpp:function:: builtin_exception attribute_error(const char * what = nullptr)
 
-   When thrown in C++ code called from Python, nanobind will raise a
-   ``AttributeError`` exception in Python.
+   Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
+   instance that nanobind will re-raise as a Python ``AttributeError`` exception
+   boundary. when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: void register_exception_translator(void (* exception_translator)(const std::exception_ptr &, void*), void * payload = nullptr)
 
@@ -1202,7 +1211,7 @@ Casting
    When the `convert` argument is set to ``true`` (the default), the
    implementation may also attempt *implicit conversions* to perform the cast.
 
-   The function raises a :cpp:class:`cast_error` when the conversion fails.
+   The function raises a :cpp:type:`cast_error` when the conversion fails.
 
 .. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy = rv_policy::automatic_reference)
 
@@ -1210,7 +1219,7 @@ Casting
    policy `policy` is used to handle ownership-related questions when a new
    Python object must be created.
 
-   The function raises a :cpp:class:`cast_error` when the conversion fails.
+   The function raises a :cpp:type:`cast_error` when the conversion fails.
 
 .. cpp:function:: template <typename T> object find(const T &value) noexcept
 
@@ -1224,7 +1233,7 @@ Casting
    value policy `policy` is used to handle ownership-related questions when a
    new Python objects must be created.
 
-   The function raises a :cpp:class:`cast_error` when the conversion fails.
+   The function raises a :cpp:type:`cast_error` when the conversion fails.
 
 Common binding annotations
 --------------------------

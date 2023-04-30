@@ -51,19 +51,7 @@ enum class type_flags : uint32_t {
     /// Is this a trampoline class meant to be overloaded in Python?
     is_trampoline            = (1 << 13),
 
-    /// Is the 'scope' field of the type_data structure set?
-    has_scope                = (1 << 14),
-
-    /// This type is a signed enumeration
-    is_signed_enum           = (1 << 15),
-
-    /// This type is an unsigned enumeration
-    is_unsigned_enum         = (1 << 16),
-
-    /// This type is an arithmetic enumeration
-    is_arithmetic            = (1 << 17),
-
-    // Two more flag bits available (18 and 19) without needing
+    // Six more flag bits available (14 through 19) without needing
     // a larger reorganization
 };
 
@@ -81,7 +69,8 @@ enum class type_init_flags : uint32_t {
     /// Is the 'base_py' field of the type_data_prelim structure set?
     has_base_py              = (1 << 22),
 
-    /// This type provides extra PyType_Slot fields
+    /// This type provides extra PyType_Slot fields via the 'type_slots'
+    /// and/or 'type_slots_callback' members of type_init_data
     has_type_slots           = (1 << 23),
 
     all_init_flags         = (0xf << 20)
@@ -93,7 +82,6 @@ struct type_data {
     uint32_t align : 8;
     uint32_t flags : 24;
     const char *name;
-    PyObject *scope;
     const std::type_info *type;
     PyTypeObject *type_py;
     void (*destruct)(void *);
@@ -109,11 +97,13 @@ struct type_data {
 
 /// Information about a type that is only relevant when it is being created
 struct type_init_data : type_data {
+    PyObject *scope;
     const std::type_info *base;
     PyTypeObject *base_py;
     const char *doc;
     const PyType_Slot *type_slots;
     size_t supplement;
+    void (*type_slots_callback)(const type_init_data *d, PyType_Slot *&slots, size_t max_slots);
 };
 
 NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
@@ -127,8 +117,19 @@ NB_INLINE void type_extra_apply(type_init_data &t, const char *doc) {
 }
 
 NB_INLINE void type_extra_apply(type_init_data &t, type_slots c) {
-    t.flags |= (uint32_t) type_init_flags::has_type_slots;
+    if ((t.flags & (uint32_t) type_init_flags::has_type_slots) == 0) {
+        t.flags |= (uint32_t) type_init_flags::has_type_slots;
+        t.type_slots_callback = nullptr;
+    }
     t.type_slots = c.value;
+}
+
+NB_INLINE void type_extra_apply(type_init_data &t, type_slots_callback c) {
+    if ((t.flags & (uint32_t) type_init_flags::has_type_slots) == 0) {
+        t.flags |= (uint32_t) type_init_flags::has_type_slots;
+        t.type_slots = nullptr;
+    }
+    t.type_slots_callback = c.callback;
 }
 
 template <typename T>
@@ -155,18 +156,34 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
     t.supplement = sizeof(T);
 }
 
-// Enum-specific annotations:
+/// Information about an enum, stored as its type_data::supplement
+struct enum_supplement {
+    bool is_signed = false;
+    PyObject* entries = nullptr;
+    PyObject* scope = nullptr;
+};
 
-NB_INLINE void type_extra_apply(type_init_data &t, is_enum e) {
-    if (e.is_signed)
-        t.flags |= (uint32_t) type_flags::is_signed_enum;
-    else
-        t.flags |= (uint32_t) type_flags::is_unsigned_enum;
+/// Information needed to create an enum
+struct enum_init_data : type_init_data {
+    bool is_signed = false;
+    bool is_arithmetic = false;
+};
+
+NB_INLINE void type_extra_apply(enum_init_data &ed, is_arithmetic) {
+    ed.is_arithmetic = true;
 }
 
-NB_INLINE void type_extra_apply(type_init_data &t, is_arithmetic) {
-    t.flags |= (uint32_t) type_flags::is_arithmetic;
-}
+// Enums can't have base classes or supplements or be intrusive, and
+// are always final. They can't use type_slots_callback because that is
+// used by the enum mechanism internally, but can provide additional
+// slots using type_slots.
+void type_extra_apply(enum_init_data &, const handle &) = delete;
+template <typename T>
+void type_extra_apply(enum_init_data &, intrusive_ptr<T>) = delete;
+template <typename T>
+void type_extra_apply(enum_init_data &, supplement<T>) = delete;
+void type_extra_apply(enum_init_data &, is_final) = delete;
+void type_extra_apply(enum_init_data &, type_slots_callback) = delete;
 
 template <typename T> void wrap_copy(void *dst, const void *src) {
     new ((T *) dst) T(*(const T *) src);
@@ -214,6 +231,28 @@ template <typename T>
 constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
 
 NAMESPACE_END(detail)
+
+// Low level access to nanobind type objects
+inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }
+inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }
+inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
+inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
+template <typename T>
+inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
+
+// Low level access to nanobind instance objects
+inline bool inst_check(handle h) { return type_check(h.type()); }
+inline object inst_alloc(handle h) { return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr())); }
+inline object inst_wrap(handle h, void *p) { return steal(detail::nb_inst_wrap((PyTypeObject *) h.ptr(), p)); }
+inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
+inline void inst_set_state(handle h, bool ready, bool destruct) { detail::nb_inst_set_state(h.ptr(), ready, destruct); }
+inline std::pair<bool, bool> inst_state(handle h) { return detail::nb_inst_state(h.ptr()); }
+inline void inst_mark_ready(handle h) { inst_set_state(h, true, true); }
+inline bool inst_ready(handle h) { return inst_state(h).first; }
+inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
+inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
+inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
+template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 
 template <typename... Args> struct init {
     template <typename T, typename... Ts> friend class class_;
@@ -305,7 +344,7 @@ public:
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
         detail::type_init_data d;
 
-        d.flags = (uint32_t) detail::type_flags::has_scope;
+        d.flags = 0;
         d.align = (uint8_t) alignof(Alias);
         d.size = (uint32_t) sizeof(Alias);
         d.name = name;
@@ -500,9 +539,34 @@ public:
     using Base = class_<T>;
 
     template <typename... Extra>
-    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra)
-        : Base(scope, name, extra...,
-               is_enum{ std::is_signed_v<std::underlying_type_t<T>> }) { }
+    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra) {
+        detail::enum_init_data d;
+
+        static_assert(std::is_trivially_copyable_v<T>);
+        d.flags = ((uint32_t) detail::type_flags::has_supplement |
+                   (uint32_t) detail::type_init_flags::has_type_slots |
+                   (uint32_t) detail::type_flags::is_copy_constructible |
+                   (uint32_t) detail::type_flags::is_move_constructible |
+                   (uint32_t) detail::type_flags::is_destructible |
+                   (uint32_t) detail::type_flags::is_final);
+        d.align = (uint8_t) alignof(T);
+        d.size = (uint32_t) sizeof(T);
+        d.name = name;
+        d.type = &typeid(T);
+        d.supplement = sizeof(detail::enum_supplement);
+        d.scope = scope.ptr();
+        d.type_slots = nullptr;
+        d.type_slots_callback = detail::nb_enum_prepare;
+        d.is_signed = std::is_signed_v<std::underlying_type_t<T>>;
+
+        (detail::type_extra_apply(d, extra), ...);
+
+        Base::m_ptr = detail::nb_type_new(&d);
+
+        detail::enum_supplement &supp = type_supplement<detail::enum_supplement>(*this);
+        supp.is_signed = d.is_signed;
+        supp.scope = d.scope;
+    }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
         detail::nb_enum_put(Base::m_ptr, name, &value, doc);
@@ -527,27 +591,5 @@ template <typename Source, typename Target> void implicitly_convertible() {
             &typeid(Target));
     }
 }
-
-// Low level access to nanobind type objects
-inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }
-inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }
-inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
-inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
-template <typename T>
-inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
-
-// Low level access to nanobind instance objects
-inline bool inst_check(handle h) { return type_check(h.type()); }
-inline object inst_alloc(handle h) { return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr())); }
-inline object inst_wrap(handle h, void *p) { return steal(detail::nb_inst_wrap((PyTypeObject *) h.ptr(), p)); }
-inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
-inline void inst_set_state(handle h, bool ready, bool destruct) { detail::nb_inst_set_state(h.ptr(), ready, destruct); }
-inline std::pair<bool, bool> inst_state(handle h) { return detail::nb_inst_state(h.ptr()); }
-inline void inst_mark_ready(handle h) { inst_set_state(h, true, true); }
-inline bool inst_ready(handle h) { return inst_state(h).first; }
-inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
-inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
-inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
-template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 
 NAMESPACE_END(NB_NAMESPACE)

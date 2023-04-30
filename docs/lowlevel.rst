@@ -224,6 +224,12 @@ Here is what this might look like in an implementation:
   MyTensorMedadata &supplement = nb::type_supplement<MyTensorMedadata>(cls);
   supplement.stored_on_gpu = true;
 
-The :cpp:class:`nb::supplement\<T\>() <supplement>` annotation implicitly
-also passes :cpp:class:`nb::is_final() <is_final>` to ensure that type
-objects with supplemental data cannot be subclassed in Python.
+The :cpp:class:`nb::supplement\<T\>() <supplement>` annotation implicitly also
+passes :cpp:class:`nb::is_final() <is_final>` to ensure that type objects with
+supplemental data cannot be subclassed in Python.
+
+nanobind requires that the specified type ``T`` be trivially default
+constructible. It zero-initializes the supplement when the type is first
+created but does not perform any further custom initialization or destruction.
+You can fill the supplement with different contents following the type
+creation, e.g., using the placement new operator.

@@ -252,18 +252,10 @@ static void inst_dealloc(PyObject *self) {
         fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
              "an unknown instance (%p)!", t->name, p);
 
-    if (NB_UNLIKELY(gc)) {
-        #if defined(Py_LIMITED_API)
-            static freefunc tp_free =
-                (freefunc) PyType_GetSlot(tp, Py_tp_free);
-        #else
-            freefunc tp_free = tp->tp_free;
-        #endif
-
-        tp_free(self);
-    } else {
+    if (NB_UNLIKELY(gc))
+        NB_SLOT(internals, PyType_Type, tp_free)(self);
+    else
         PyObject_Free(self);
-    }
 
     Py_DECREF(tp);
 }
@@ -287,14 +279,7 @@ static void nb_type_dealloc(PyObject *o) {
 
     free((char *) t->name);
 
-    #if defined(Py_LIMITED_API)
-        static destructor tp_dealloc =
-            (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
-    #else
-        destructor tp_dealloc = PyType_Type.tp_dealloc;
-    #endif
-
-    tp_dealloc(o);
+    NB_SLOT(internals_get(), PyType_Type, tp_dealloc)(o);
 }
 
 /// Called when a C++ type is extended from within Python
@@ -325,14 +310,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         return -1;
     }
 
-    #if defined(Py_LIMITED_API)
-        static initproc tp_init =
-            (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
-    #else
-        initproc tp_init = PyType_Type.tp_init;
-    #endif
-
-    int rv = tp_init(self, args, kwds);
+    int rv = NB_SLOT(internals_get(), PyType_Type, tp_init)(self, args, kwds);
     if (rv)
         return rv;
 
@@ -371,14 +349,7 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         PyErr_Clear();
     }
 
-    #if defined(Py_LIMITED_API)
-        static setattrofunc tp_setattro =
-            (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
-    #else
-        setattrofunc tp_setattro = PyType_Type.tp_setattro;
-    #endif
-
-    return tp_setattro(obj, name, value);
+    return NB_SLOT(internals, PyType_Type, tp_setattro)(obj, name, value);
 }
 
 static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,

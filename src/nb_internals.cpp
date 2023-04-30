@@ -332,6 +332,20 @@ static NB_NOINLINE nb_internals *internals_make() {
     p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
 #endif
 
+#if defined(Py_LIMITED_API)
+    // Cache important functions from PyType_Type and PyProperty_Type
+    p->PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
+    p->PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
+    p->PyType_Type_tp_dealloc =
+        (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
+    p->PyType_Type_tp_setattro =
+        (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
+    p->PyProperty_Type_tp_descr_get =
+        (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
+    p->PyProperty_Type_tp_descr_set =
+        (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
+#endif
+
     p->translators = { default_exception_translator, nullptr, nullptr };
 
 #if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)

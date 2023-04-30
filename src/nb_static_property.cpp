@@ -5,15 +5,9 @@ NAMESPACE_BEGIN(detail)
 
 /// `nb_static_property.__get__()`: Always pass the class instead of the instance.
 static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObject *cls) {
-    if (internals_get().nb_static_property_enabled) {
-        #if defined(Py_LIMITED_API)
-            static descrgetfunc tp_descr_get =
-                (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
-        #else
-            descrgetfunc tp_descr_get = PyProperty_Type.tp_descr_get;
-        #endif
-
-        return tp_descr_get(self, cls, cls);
+    nb_internals &internals = internals_get();
+    if (internals.nb_static_property_enabled) {
+        return NB_SLOT(internals, PyProperty_Type, tp_descr_get)(self, cls, cls);
     } else {
         Py_INCREF(self);
         return self;
@@ -23,15 +17,7 @@ static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObje
 /// `nb_static_property.__set__()`: Just like the above `__get__()`.
 static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject *value) {
     PyObject *cls = PyType_Check(obj) ? obj : (PyObject *) Py_TYPE(obj);
-
-    #if defined(Py_LIMITED_API)
-        static descrsetfunc tp_descr_set =
-            (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
-    #else
-        descrsetfunc tp_descr_set = PyProperty_Type.tp_descr_set;
-    #endif
-
-    return tp_descr_set(self, cls, value);
+    return NB_SLOT(internals_get(), PyProperty_Type, tp_descr_set)(self, cls, value);
 }
 
 PyTypeObject *nb_static_property_tp() noexcept {

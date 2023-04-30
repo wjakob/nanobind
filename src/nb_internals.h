@@ -219,7 +219,24 @@ struct nb_internals {
 
     /// Should nanobind print warnings after implicit cast failures?
     bool print_implicit_cast_warnings = true;
+
+#if defined(Py_LIMITED_API)
+    // Cache for important functions from PyType_Type and PyProperty_Type
+    freefunc PyType_Type_tp_free;
+    initproc PyType_Type_tp_init;
+    destructor PyType_Type_tp_dealloc;
+    setattrofunc PyType_Type_tp_setattro;
+    descrgetfunc PyProperty_Type_tp_descr_get;
+    descrsetfunc PyProperty_Type_tp_descr_set;
+#endif
 };
+
+/// Convenience macro to potentially access cached functions
+#if defined(Py_LIMITED_API)
+#  define NB_SLOT(internals, type, name) internals.type##_##name
+#else
+#  define NB_SLOT(internals, type, name) type.name
+#endif
 
 struct current_method {
     const char *name;

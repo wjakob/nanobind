@@ -120,6 +120,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/src/trampoline.cpp
     ${NB_DIR}/src/implicit.cpp
   )
+  add_library(nanobind::nanobind ALIAS ${TARGET_NAME})
 
   if (TARGET_TYPE STREQUAL "SHARED")
     nanobind_link_options(${TARGET_NAME})

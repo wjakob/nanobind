@@ -39,19 +39,16 @@ enum class type_flags : uint32_t {
     /// This type does not permit subclassing from Python
     is_final                 = (1 << 9),
 
-    /// Is the 'supplement' field of the type_data structure set?
-    has_supplement           = (1 << 10),
-
     /// Instances of this type support dynamic attribute assignment
-    has_dynamic_attr         = (1 << 11),
+    has_dynamic_attr         = (1 << 10),
 
     /// The class uses an intrusive reference counting approach
-    intrusive_ptr            = (1 << 12),
+    intrusive_ptr            = (1 << 11),
 
     /// Is this a trampoline class meant to be overloaded in Python?
-    is_trampoline            = (1 << 13),
+    is_trampoline            = (1 << 12),
 
-    // Six more flag bits available (14 through 19) without needing
+    // Six more flag bits available (13 through 18) without needing
     // a larger reorganization
 };
 
@@ -60,20 +57,23 @@ enum class type_flags : uint32_t {
 /// for more efficient memory layout, but could move elsewhere if we run
 /// out of flags.
 enum class type_init_flags : uint32_t {
-    /// Is the 'doc' field of the type_data_prelim structure set?
+    /// Is the 'supplement' field of the type_init_data structure set?
+    has_supplement           = (1 << 19),
+
+    /// Is the 'doc' field of the type_init_data structure set?
     has_doc                  = (1 << 20),
 
-    /// Is the 'base' field of the type_data_prelim structure set?
+    /// Is the 'base' field of the type_init_data structure set?
     has_base                 = (1 << 21),
 
-    /// Is the 'base_py' field of the type_data_prelim structure set?
+    /// Is the 'base_py' field of the type_init_data structure set?
     has_base_py              = (1 << 22),
 
     /// This type provides extra PyType_Slot fields via the 'type_slots'
     /// and/or 'type_slots_callback' members of type_init_data
     has_type_slots           = (1 << 23),
 
-    all_init_flags         = (0xf << 20)
+    all_init_flags           = (0x1f << 19)
 };
 
 /// Information about a type that persists throughout its lifetime
@@ -102,8 +102,8 @@ struct type_init_data : type_data {
     PyTypeObject *base_py;
     const char *doc;
     const PyType_Slot *type_slots;
-    size_t supplement;
     void (*type_slots_callback)(const type_init_data *d, PyType_Slot *&slots, size_t max_slots);
+    size_t supplement;
 };
 
 NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
@@ -152,7 +152,7 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
                   "The supplement must be a POD (plain old data) type");
     static_assert(alignof(T) <= alignof(void *),
                   "The alignment requirement of the supplement is too high.");
-    t.flags |= (uint32_t) type_flags::has_supplement | (uint32_t) type_flags::is_final;
+    t.flags |= (uint32_t) type_init_flags::has_supplement | (uint32_t) type_flags::is_final;
     t.supplement = sizeof(T);
 }
 
@@ -543,7 +543,7 @@ public:
         detail::enum_init_data d;
 
         static_assert(std::is_trivially_copyable_v<T>);
-        d.flags = ((uint32_t) detail::type_flags::has_supplement |
+        d.flags = ((uint32_t) detail::type_init_flags::has_supplement |
                    (uint32_t) detail::type_init_flags::has_type_slots |
                    (uint32_t) detail::type_flags::is_copy_constructible |
                    (uint32_t) detail::type_flags::is_move_constructible |

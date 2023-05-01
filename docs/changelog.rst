@@ -63,6 +63,17 @@ Version 1.3.0 (TBD)
   to improve the speed of object and name lookups. Note that this prevents
   use of ``nb::supplement<T>()`` with enums for other purposes.
   (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* Added the :cpp:class:`nb::type_slots_callback` class binding annotation,
+  similar to :cpp:class:`nb::type_slots` but allowing more dynamic choices.
+  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* nanobind type objects now treat attributes specially whose names
+  begin with ``@``. These attributes can be set once, but not
+  rebound or deleted.  This safeguard allows a borrowed reference to
+  the attribute value to be safely stashed in the type supplement,
+  allowing arbitrary Python data associated with the type to be accessed
+  without a dictionary lookup while keeping this data visible to the
+  garbage collector.  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* ABI version 9.
 
 Version 1.2.0 (April 24, 2023)
 ------------------------------

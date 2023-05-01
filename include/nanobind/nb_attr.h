@@ -67,6 +67,13 @@ struct type_slots {
     PyType_Slot *value;
 };
 
+struct type_slots_callback {
+    using cb_t = void (*)(const detail::type_init_data *t,
+                          PyType_Slot *&slots, size_t max_slots) noexcept;
+    type_slots_callback(cb_t callback) : callback(callback) { }
+    cb_t callback;
+};
+
 struct raw_doc {
     const char *value;
     raw_doc(const char *doc) : value(doc) {}
@@ -77,20 +84,6 @@ constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
 NAMESPACE_END(literals)
 
 NAMESPACE_BEGIN(detail)
-
-/// This is an alternative to 'nb::type_slots' that provides a
-/// callback which will be invoked during type creation to populate
-/// the type's list of slots.  It is used by nb::enum_. It can be used
-/// alongside the public nb::type_slots interface; if both are
-/// provided, type_slots_callback runs first (so type_slots can override).
-///
-/// The callback should execute ``*slots++ = {Py_tp_foo, (void *) handle_foo};``
-/// at most *max_slots* times.
-struct type_slots_callback {
-    using cb_t = void (*)(const type_init_data *t, PyType_Slot *&slots, size_t max_slots);
-    type_slots_callback(cb_t callback) : callback(callback) { }
-    cb_t callback;
-};
 
 enum class func_flags : uint32_t {
     /* Low 3 bits reserved for return value policy */

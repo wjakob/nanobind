@@ -1463,6 +1463,24 @@ parameter of the constructor :cpp:func:`class_::class_`.
    zero-initialized ``PyType_Slot`` element. See :ref:`Customizing type creation
    <typeslots>` for more information about this feature.
 
+.. cpp:struct:: type_slots_callback
+
+   .. cpp:function:: type_slots_callback(void (*callback)(detail::type_init_data *, PyType_Slot *&slots, size_t max_slots) noexcept)
+
+   This is an alternative to `type_slots` that provides a callback
+   which will be invoked during type creation to populate the type's
+   list of slots. It is used by `enum_`. It can be used in addition to
+   the `type_slots` annotation; if both are provided,
+   `type_slots_callback` runs first (so `type_slots` can override its choices).
+
+   The callback should execute ``*slots++ = {Py_tp_foo, (void *) handle_foo};``
+   at most *max_slots* times.
+
+   Information about the type under construction is available via the first
+   parameter received by the callback, but be aware that this is an internal
+   type which is not subject to nanobind's usual semantic versioning guarantees.
+   See ``include/nanobind/nb_class.h`` for more details.
+
 .. cpp:struct:: template <typename T> intrusive_ptr
 
    nanobind provides a custom interface for intrusive reference-counted C++

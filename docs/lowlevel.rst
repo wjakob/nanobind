@@ -233,3 +233,13 @@ constructible. It zero-initializes the supplement when the type is first
 created but does not perform any further custom initialization or destruction.
 You can fill the supplement with different contents following the type
 creation, e.g., using the placement new operator.
+
+The contents of the supplemental data are not directly visible to Python's
+cyclic garbage collector, which creates challenges if you want to reference
+Python objects. The recommended workaround is to store the Python objects
+as attributes of the type object (in its ``__dict__``) and store a borrowed
+``PyObject*`` reference in the supplemental data. If you use an attribute
+name that begins with the symbol ``@``, then nanobind will prevent Python
+code from rebinding or deleting the attribute after it has been set, making
+the borrowed reference reasonably safe. See the implementation of ``nb::enum_``
+for an example.

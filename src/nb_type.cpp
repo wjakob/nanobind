@@ -650,7 +650,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          has_base          = t->flags & (uint32_t) type_init_flags::has_base,
          has_base_py       = t->flags & (uint32_t) type_init_flags::has_base_py,
          has_type_slots    = t->flags & (uint32_t) type_init_flags::has_type_slots,
-         has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
+         has_supplement    = t->flags & (uint32_t) type_init_flags::has_supplement,
          has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
 

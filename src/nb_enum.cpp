@@ -13,19 +13,23 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-static PyObject *nb_enum_int(PyObject *o);
+NB_INLINE enum_supplement &nb_enum_supplement(PyTypeObject *type) {
+    return type_supplement<enum_supplement>(type);
+}
+
+static PyObject *nb_enum_int_signed(PyObject *o);
+static PyObject *nb_enum_int_unsigned(PyObject *o);
 
 /// Map to unique representative enum instance, returns a borrowed reference
 static PyObject *nb_enum_lookup(PyObject *self) {
-    PyObject *int_val = nb_enum_int(self),
-             *dict    = PyObject_GetAttrString((PyObject *) Py_TYPE(self), "__entries");
-
+    enum_supplement &supp = nb_enum_supplement(Py_TYPE(self));
+    PyObject *int_val = supp.is_signed ? nb_enum_int_signed(self)
+                                       : nb_enum_int_unsigned(self);
     PyObject *rec = nullptr;
-    if (int_val && dict)
-        rec = (PyObject *) PyDict_GetItem(dict, int_val);
+    if (int_val && supp.entries)
+        rec = (PyObject *) PyDict_GetItem(supp.entries, int_val);
 
     Py_XDECREF(int_val);
-    Py_XDECREF(dict);
 
     if (rec && PyTuple_CheckExact(rec) && NB_TUPLE_GET_SIZE(rec) == 3) {
         return rec;
@@ -69,36 +73,34 @@ static PyObject *nb_enum_get_doc(PyObject *self, void *) {
     return result;
 }
 
-static PyObject *nb_enum_int(PyObject *o) {
+NB_NOINLINE static PyObject *nb_enum_int_signed(PyObject *o) {
     type_data *t = nb_type_data(Py_TYPE(o));
-
     const void *p = inst_ptr((nb_inst *) o);
-    if (t->flags & (uint32_t) type_flags::is_unsigned_enum) {
-        unsigned long long value;
-        switch (t->size) {
-            case 1: value = (unsigned long long) *(const uint8_t *)  p; break;
-            case 2: value = (unsigned long long) *(const uint16_t *) p; break;
-            case 4: value = (unsigned long long) *(const uint32_t *) p; break;
-            case 8: value = (unsigned long long) *(const uint64_t *) p; break;
-            default: PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
-                     return nullptr;
-        }
-        return PyLong_FromUnsignedLongLong(value);
-    } else if (t->flags & (uint32_t) type_flags::is_signed_enum) {
-        long long value;
-        switch (t->size) {
-            case 1: value = (long long) *(const int8_t *)  p; break;
-            case 2: value = (long long) *(const int16_t *) p; break;
-            case 4: value = (long long) *(const int32_t *) p; break;
-            case 8: value = (long long) *(const int64_t *) p; break;
-            default: PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
-                     return nullptr;
-        }
-        return PyLong_FromLongLong(value);
-    } else {
-        PyErr_SetString(PyExc_TypeError, "nb_enum: input is not an enumeration!");
-        return nullptr;
+    long long value;
+    switch (t->size) {
+        case 1: value = (long long) *(const int8_t *)  p; break;
+        case 2: value = (long long) *(const int16_t *) p; break;
+        case 4: value = (long long) *(const int32_t *) p; break;
+        case 8: value = (long long) *(const int64_t *) p; break;
+        default: PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
+                 return nullptr;
     }
+    return PyLong_FromLongLong(value);
+}
+
+NB_NOINLINE static PyObject *nb_enum_int_unsigned(PyObject *o) {
+    type_data *t = nb_type_data(Py_TYPE(o));
+    const void *p = inst_ptr((nb_inst *) o);
+    unsigned long long value;
+    switch (t->size) {
+        case 1: value = (unsigned long long) *(const uint8_t *)  p; break;
+        case 2: value = (unsigned long long) *(const uint16_t *) p; break;
+        case 4: value = (unsigned long long) *(const uint32_t *) p; break;
+        case 8: value = (unsigned long long) *(const uint64_t *) p; break;
+        default: PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
+                 return nullptr;
+    }
+    return PyLong_FromUnsignedLongLong(value);
 }
 
 static PyObject *nb_enum_init(PyObject *, PyObject *, PyObject *) {
@@ -113,14 +115,11 @@ static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 
     arg = NB_TUPLE_GET_ITEM(args, 0);
     if (PyLong_Check(arg)) {
-        PyObject *entries =
-            PyObject_GetAttrString((PyObject *) subtype, "__entries");
-        if (!entries)
+        enum_supplement &supp = nb_enum_supplement(subtype);
+        if (!supp.entries)
             goto error;
 
-        PyObject *item = PyDict_GetItem(entries, arg);
-        Py_DECREF(entries);
-
+        PyObject *item = PyDict_GetItem(supp.entries, arg);
         if (item && PyTuple_CheckExact(item) && NB_TUPLE_GET_SIZE(item) == 3) {
             item = NB_TUPLE_GET_ITEM(item, 2);
             Py_INCREF(item);
@@ -203,21 +202,15 @@ int nb_enum_traverse(PyObject *o, visitproc visit, void *arg) {
 Py_hash_t nb_enum_hash(PyObject *o) {
     Py_hash_t value = 0;
     type_data *t = nb_type_data(Py_TYPE(o));
-    if (t->flags & (uint32_t(type_flags::is_unsigned_enum) |
-                    uint32_t(type_flags::is_signed_enum))) {
-        const void *p = inst_ptr((nb_inst *) o);
-        switch (t->size) {
-            case 1: value = *(const int8_t *)  p; break;
-            case 2: value = *(const int16_t *) p; break;
-            case 4: value = *(const int32_t *) p; break;
-            case 8: value = *(const int64_t *) p; break;
-            default:
-                PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
-                return -1;
-        }
-    } else {
-        PyErr_SetString(PyExc_TypeError, "nb_enum: input is not an enumeration!");
-        return -1;
+    const void *p = inst_ptr((nb_inst *) o);
+    switch (t->size) {
+        case 1: value = *(const int8_t *)  p; break;
+        case 2: value = *(const int16_t *) p; break;
+        case 4: value = *(const int32_t *) p; break;
+        case 8: value = *(const int64_t *) p; break;
+        default:
+            PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
+            return -1;
     }
 
     // Hash functions should return -1 when an error occurred.
@@ -227,26 +220,33 @@ Py_hash_t nb_enum_hash(PyObject *o) {
     return value;
 }
 
-void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
-    PyType_Slot *t = *s;
+void nb_enum_prepare(const type_init_data *td,
+                     PyType_Slot *&t, size_t max_slots) noexcept {
+    /* 22 is the number of slot assignments below. Update it if you add more.
+       These built-in slots are added before any user-defined ones. */
+    if (max_slots < 22) {
+        fail("nanobind::detail::nb_enum_prepare(\"%s\"): ran out of "
+             "type slots!", td->name);
+    }
 
-    /* Careful: update 'nb_enum_max_slots' field in nb_type.cpp
-       when adding further type slots */
+    const enum_init_data *ed = static_cast<const enum_init_data *>(td);
+    auto int_fn = ed->is_signed ? nb_enum_int_signed : nb_enum_int_unsigned;
+
     *t++ = { Py_tp_new, (void *) nb_enum_new };
     *t++ = { Py_tp_init, (void *) nb_enum_init };
     *t++ = { Py_tp_repr, (void *) nb_enum_repr };
     *t++ = { Py_tp_richcompare, (void *) nb_enum_richcompare };
-    *t++ = { Py_nb_int, (void *) nb_enum_int };
-    *t++ = { Py_nb_index, (void *) nb_enum_int };
+    *t++ = { Py_nb_int, (void *) int_fn };
+    *t++ = { Py_nb_index, (void *) int_fn };
     *t++ = { Py_tp_getset, (void *) nb_enum_getset };
     *t++ = { Py_tp_traverse, (void *) nb_enum_traverse };
     *t++ = { Py_tp_clear, (void *) nb_enum_clear };
     *t++ = { Py_tp_hash, (void *) nb_enum_hash };
 
-    if (is_arithmetic) {
+    if (ed->is_arithmetic) {
         *t++ = { Py_nb_add, (void *) nb_enum_add };
         *t++ = { Py_nb_subtract, (void *) nb_enum_sub };
-        *t++ = { Py_nb_multiply, (void *) nb_enum_sub };
+        *t++ = { Py_nb_multiply, (void *) nb_enum_mul };
         *t++ = { Py_nb_floor_divide, (void *) nb_enum_div };
         *t++ = { Py_nb_or, (void *) nb_enum_or };
         *t++ = { Py_nb_xor, (void *) nb_enum_xor };
@@ -257,13 +257,12 @@ void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic) {
         *t++ = { Py_nb_invert, (void *) nb_enum_inv };
         *t++ = { Py_nb_absolute, (void *) nb_enum_abs };
     }
-
-    *s = t;
 }
 
 void nb_enum_put(PyObject *type, const char *name, const void *value,
                  const char *doc) noexcept {
-    PyObject *doc_obj, *rec, *dict, *int_val;
+    PyObject *doc_obj, *rec, *int_val;
+    enum_supplement &supp = nb_enum_supplement((PyTypeObject *) type);
 
     PyObject *name_obj = PyUnicode_InternFromString(name);
     if (doc) {
@@ -291,54 +290,55 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
     if (PyObject_SetAttr(type, name_obj, (PyObject *) inst))
         goto error;
 
-    int_val = nb_enum_int((PyObject *) inst);
+    int_val = supp.is_signed ? nb_enum_int_signed((PyObject *) inst)
+                             : nb_enum_int_unsigned((PyObject *) inst);
     if (!int_val)
         goto error;
 
-    dict = PyObject_GetAttrString(type, "__entries");
-    if (!dict) {
-        PyErr_Clear();
-        dict = PyDict_New();
+    if (!supp.entries) {
+        PyObject *dict = PyDict_New();
         if (!dict)
             goto error;
 
-        if (PyObject_SetAttrString(type, "__entries", dict))
+        // Stash the entries dict in the type object's dict so that GC
+        // can see the enumerators. nb_type_setattro ensures that user
+        // code can't reassign or delete this attribute (its logic
+        // is based on the @ prefix in the name).
+        if (PyObject_SetAttrString(type, "@entries", dict))
             goto error;
+
+        supp.entries = dict;
+        Py_DECREF(dict);
     }
 
-    if (PyDict_SetItem(dict, int_val, rec))
+    if (PyDict_SetItem(supp.entries, int_val, rec))
         goto error;
 
     Py_DECREF(int_val);
-    Py_DECREF(dict);
     Py_DECREF(rec);
 
     return;
 
 error:
-    fail("nanobind::detail::nb_enum_add(): could not create enum entry!");
+    fail("nanobind::detail::nb_enum_put(): could not create enum entry!");
 }
 
 void nb_enum_export(PyObject *tp) {
-    type_data *t = nb_type_data((PyTypeObject *) tp);
-    PyObject *entries = PyObject_GetAttrString(tp, "__entries");
-
-    if (!entries || !(t->flags & (uint32_t) type_flags::has_scope))
+    enum_supplement &supp = nb_enum_supplement((PyTypeObject *) tp);
+    if (!supp.entries || supp.scope == nullptr)
         fail("nanobind::detail::nb_enum_export(): internal error!");
 
     PyObject *key, *value;
     Py_ssize_t pos = 0;
 
-    while (PyDict_Next(entries, &pos, &key, &value)) {
+    while (PyDict_Next(supp.entries, &pos, &key, &value)) {
         if (!PyTuple_CheckExact(value) || NB_TUPLE_GET_SIZE(value) != 3)
             fail("nanobind::detail::nb_enum_export(): internal error! (2)");
 
-        setattr(t->scope,
+        setattr(supp.scope,
                 NB_TUPLE_GET_ITEM(value, 0),
                 NB_TUPLE_GET_ITEM(value, 2));
     }
-
-    Py_DECREF(entries);
 }
 
 NAMESPACE_END(detail)

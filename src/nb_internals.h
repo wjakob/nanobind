@@ -62,11 +62,6 @@ struct nb_inst { // usually: 24 bytes
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(void *));
 
-struct nb_enum_supplement {
-    PyObject *name;
-    const char *doc;
-};
-
 /// Python object representing a bound C++ function
 struct nb_func {
     PyObject_VAR_HEAD
@@ -258,7 +253,6 @@ extern char *type_name(const std::type_info *t);
 
 // Forward declarations
 extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
-extern void nb_enum_prepare(PyType_Slot **s, bool is_arithmetic);
 extern PyTypeObject *nb_static_property_tp() noexcept;
 
 /// Fetch the nanobind function record from a 'nb_func' instance

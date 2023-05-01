@@ -34,8 +34,9 @@ Version 1.3.0 (TBD)
 * Reduced the per-instance overhead of nanobind by 1 pointer and simplified the
   internal hash table types to crunch ``libnanobind``. (commit `de018d
   <https://github.com/wjakob/nanobind/commit/de018db2d17905564703f1ade4aa201a22f8551f>`__).
-* Reduced the size of nanobind type objects by 5 pointers. (PR `#194
-  <https://github.com/wjakob/nanobind/pull/194>`__ and commit `d82ca9
+* Reduced the size of nanobind type objects by 6 pointers. (PR `#194
+  <https://github.com/wjakob/nanobind/pull/194>`__, `#195
+  <https://github.com/wjakob/nanobind/pull/195>`__, and commit `d82ca9
   <https://github.com/wjakob/nanobind/commit/d82ca9c14191e74dd35dd5bf15fc90f5230319fb>`__).
 * Internal nanobind types (``nb_type``, ``nb_static_property``, ``nb_ndarray``)
   are now constructed on demand. This reduces the size of the ``libnanobind``
@@ -53,6 +54,25 @@ Version 1.3.0 (TBD)
   <python_error::discard_as_unraisable>` as a wrapper around
   ``PyErr_WriteUnraisable()``. (PR `#175
   <https://github.com/wjakob/nanobind/pull/175>`__).
+* Updated the implementation of :cpp:class:`nb::enum_ <enum_>` so it does
+  not take advantage of any private nanobind type details. As a side effect,
+  the construct ``nb::class_<T>(..., nb::is_enum(...))`` is no longer permitted;
+  use ``nb::enum_<T>(...)`` instead.
+  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* nanobind enums now take advantage of :ref:`supplemental data <supplement>`
+  to improve the speed of object and name lookups. Note that this prevents
+  use of ``nb::supplement<T>()`` with enums for other purposes.
+  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* Added the :cpp:class:`nb::type_slots_callback` class binding annotation,
+  similar to :cpp:class:`nb::type_slots` but allowing more dynamic choices.
+  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+* nanobind type objects now treat attributes specially whose names
+  begin with ``@``. These attributes can be set once, but not
+  rebound or deleted.  This safeguard allows a borrowed reference to
+  the attribute value to be safely stashed in the type supplement,
+  allowing arbitrary Python data associated with the type to be accessed
+  without a dictionary lookup while keeping this data visible to the
+  garbage collector.  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
 * ABI version 9.
 
 Version 1.2.0 (April 24, 2023)

@@ -355,6 +355,10 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
 
 // ========================================================================
 
+/// Fill in slots for an enum type being built
+NB_CORE void nb_enum_prepare(const type_init_data *t,
+                             PyType_Slot *&slots, size_t max_slots) noexcept;
+
 /// Add an entry to an enumeration
 NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
                          const char *doc) noexcept;

@@ -53,7 +53,6 @@ struct is_implicit {};
 struct is_operator {};
 struct is_arithmetic {};
 struct is_final {};
-struct is_enum { bool is_signed; };
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
@@ -66,6 +65,13 @@ template <typename T> struct intrusive_ptr {
 struct type_slots {
     type_slots (PyType_Slot *value) : value(value) { }
     PyType_Slot *value;
+};
+
+struct type_slots_callback {
+    using cb_t = void (*)(const detail::type_init_data *t,
+                          PyType_Slot *&slots, size_t max_slots) noexcept;
+    type_slots_callback(cb_t callback) : callback(callback) { }
+    cb_t callback;
 };
 
 struct raw_doc {

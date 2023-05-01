@@ -345,6 +345,21 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
             return rv;
         }
         Py_DECREF(cur);
+
+        const char *cname = PyUnicode_AsUTF8AndSize(name, nullptr);
+        if (!cname) {
+            PyErr_Clear(); // probably a non-string attribute name
+        } else if (cname[0] == '@') {
+            /* Prevent type attributes starting with an `@` sign from being
+               rebound or deleted. This is useful to safely stash owning
+               references. The ``nb::enum_<>`` class, e.g., uses this to ensure
+               indirect ownership of a borrowed reference in the supplemental
+               type data. */
+            PyErr_Format(PyExc_AttributeError,
+                         "internal nanobind attribute '%s' cannot be "
+                         "reassigned or deleted.", cname);
+            return -1;
+        }
     } else {
         PyErr_Clear();
     }
@@ -631,16 +646,11 @@ static PyTypeObject *nb_type_tp(nb_internals &internals,
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
-    bool is_signed_enum    = t->flags & (uint32_t) type_flags::is_signed_enum,
-         is_unsigned_enum  = t->flags & (uint32_t) type_flags::is_unsigned_enum,
-         is_arithmetic     = t->flags & (uint32_t) type_flags::is_arithmetic,
-         is_enum           = is_signed_enum || is_unsigned_enum,
-         has_scope         = t->flags & (uint32_t) type_flags::has_scope,
-         has_doc           = t->flags & (uint32_t) type_init_flags::has_doc,
+    bool has_doc           = t->flags & (uint32_t) type_init_flags::has_doc,
          has_base          = t->flags & (uint32_t) type_init_flags::has_base,
          has_base_py       = t->flags & (uint32_t) type_init_flags::has_base_py,
          has_type_slots    = t->flags & (uint32_t) type_init_flags::has_type_slots,
-         has_supplement    = t->flags & (uint32_t) type_flags::has_supplement,
+         has_supplement    = t->flags & (uint32_t) type_init_flags::has_supplement,
          has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
@@ -649,21 +659,17 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     object modname;
     PyObject *mod = nullptr;
 
-    if (has_scope) {
-        has_scope = t->scope != nullptr;
+    if (t->scope != nullptr) {
+        if (PyModule_Check(t->scope)) {
+            mod = t->scope;
+            modname = getattr(t->scope, "__name__", handle());
+        } else {
+            modname = getattr(t->scope, "__module__", handle());
 
-        if (has_scope) {
-            if (PyModule_Check(t->scope)) {
-                mod = t->scope;
-                modname = getattr(t->scope, "__name__", handle());
-            } else {
-                modname = getattr(t->scope, "__module__", handle());
-
-                object scope_qualname = getattr(t->scope, "__qualname__", handle());
-                if (scope_qualname.is_valid())
-                    qualname = steal<str>(
-                        PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
-            }
+            object scope_qualname = getattr(t->scope, "__qualname__", handle());
+            if (scope_qualname.is_valid())
+                qualname = steal<str>(
+                    PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
         }
     }
 
@@ -710,11 +716,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
     char *name_copy = NB_STRDUP(name.c_str());
 
-    constexpr size_t nb_enum_max_slots = 22,
-                     nb_type_max_slots = 10,
+    constexpr size_t nb_type_max_slots = 10,
                      nb_extra_slots = 80,
                      nb_total_slots = nb_type_max_slots +
-                                      nb_enum_max_slots +
                                       nb_extra_slots + 1;
 
     PyMemberDef members[2] { };
@@ -738,17 +742,25 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         *s++ = { Py_tp_doc, (void *) t->doc };
 
     if (has_type_slots) {
-        size_t i = 0;
-        while (t->type_slots[i].slot) {
-            if (i == nb_extra_slots)
-                fail("nanobind::detail::nb_type_new(\"%s\"): ran out of type "
-                     "slots!", t->name);
-            *s++ = t->type_slots[i++];
+        size_t num_avail = nb_extra_slots;
+        if (t->type_slots_callback) {
+            PyType_Slot* first_new = s;
+            t->type_slots_callback(t, s, num_avail);
+            if (first_new + num_avail < s)
+                fail("nanobind::detail::nb_type_new(\"%s\"): type_slots_callback "
+                     "overflowed the slots array!", t->name);
+            num_avail -= (s - first_new);
+        }
+        if (t->type_slots) {
+            size_t i = 0;
+            while (t->type_slots[i].slot) {
+                if (i == num_avail)
+                    fail("nanobind::detail::nb_type_new(\"%s\"): ran out of "
+                         "type slots!", t->name);
+                *s++ = t->type_slots[i++];
+            }
         }
     }
-
-    if (is_enum)
-        nb_enum_prepare(&s, is_arithmetic);
 
     bool has_traverse = false;
     for (PyType_Slot *ts = slots; ts != s; ++ts) {
@@ -791,18 +803,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed: %s!", t->name, err.what());
     }
 
-// #if PY_VERSION_HEX < 0x03090000
-//     if (has_dynamic_attr)
-//         tp->tp_dictoffset = (Py_ssize_t) (basicsize - ptr_size);
-// #endif
-
-
     type_data *to = nb_type_data((PyTypeObject *) result);
     *to = *t; // note: slices off _init parts
     to->flags &= ~(uint32_t) type_init_flags::all_init_flags;
-
-    if (!has_scope)
-        to->flags &= ~(uint32_t) type_flags::has_scope;
 
     if (!intrusive_ptr && tb &&
         (tb->flags & (uint32_t) type_flags::intrusive_ptr)) {
@@ -820,7 +823,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         #endif
     }
 
-    if (has_scope)
+    if (t->scope != nullptr)
         setattr(t->scope, t->name, result);
 
     setattr(result, "__qualname__", qualname.ptr());

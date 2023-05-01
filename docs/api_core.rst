@@ -1248,12 +1248,6 @@ The following annotations can be specified in both function and class bindings.
       :cpp:class:`type_object`) in which the function or class should be
       registered.
 
-.. cpp:struct:: name
-
-   .. cpp:function:: name(const char * value)
-
-      Captures the name of the function or class.
-
 .. _function_binding_annotations:
 
 Function binding annotations
@@ -1262,6 +1256,12 @@ Function binding annotations
 The following annotations can be specified using the variable-length ``Extra``
 parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 :cpp:func:`cpp_function`, etc.
+
+.. cpp:struct:: name
+
+   .. cpp:function:: name(const char * value)
+
+      Captures the name of the function.
 
 .. cpp:struct:: arg
 
@@ -1436,8 +1436,7 @@ Class binding annotations
 -------------------------
 
 The following annotations can be specified using the variable-length ``Extra``
-parameter of the constructor :cpp:func:`class_::class_` and
-:cpp:func:`enum_::enum_`.
+parameter of the constructor :cpp:func:`class_::class_`.
 
 .. cpp:struct:: is_final
 
@@ -1445,21 +1444,13 @@ parameter of the constructor :cpp:func:`class_::class_` and
 
 .. cpp:struct:: dynamic_attr
 
-   Indicate that a type requires a Python dictionary to support the dynamic addition of attributes.
-
-.. cpp:struct:: is_enum
-
-   .. cpp:function:: is_enum(bool is_signed)
-
-      Mark the bound class as an enumeration backed by a signed or unsigned integer type.
-
-.. cpp:struct:: is_arithmetic
-
-   Indicate that the enumeration may be used as part of arithmetic operations.
+   Indicate that instances of a type require a Python dictionary to support the dynamic addition of attributes.
 
 .. cpp:struct:: template <typename T> supplement
 
-   Indicate that ``sizeof(T)`` bytes of memory should be set aside to store supplemental data in the type object.
+   Indicate that ``sizeof(T)`` bytes of memory should be set aside to
+   store supplemental data in the type object. See :ref:`Supplemental
+   type data <supplement>` for more information.
 
 .. cpp:struct:: type_slots
 
@@ -1469,7 +1460,26 @@ parameter of the constructor :cpp:func:`class_::class_` and
    types. In certain advanced use cases, it may be helpful to append additional
    type slots during type construction. This class binding annotation can be
    used to accomplish this. The provided list should be followed by a
-   zero-initialized ``PyType_Slot`` element.
+   zero-initialized ``PyType_Slot`` element. See :ref:`Customizing type creation
+   <typeslots>` for more information about this feature.
+
+.. cpp:struct:: type_slots_callback
+
+   .. cpp:function:: type_slots_callback(void (*callback)(detail::type_init_data *, PyType_Slot *&slots, size_t max_slots) noexcept)
+
+   This is an alternative to `type_slots` that provides a callback
+   which will be invoked during type creation to populate the type's
+   list of slots. It is used by `enum_`. It can be used in addition to
+   the `type_slots` annotation; if both are provided,
+   `type_slots_callback` runs first (so `type_slots` can override its choices).
+
+   The callback should execute ``*slots++ = {Py_tp_foo, (void *) handle_foo};``
+   at most *max_slots* times.
+
+   Information about the type under construction is available via the first
+   parameter received by the callback, but be aware that this is an internal
+   type which is not subject to nanobind's usual semantic versioning guarantees.
+   See ``include/nanobind/nb_class.h`` for more details.
 
 .. cpp:struct:: template <typename T> intrusive_ptr
 
@@ -1482,6 +1492,27 @@ parameter of the constructor :cpp:func:`class_::class_` and
 
       Declares a callback that will be invoked when a C++ instance is first
       cast into a Python object.
+
+
+.. _enum_binding_annotations:
+
+Enum binding annotations
+------------------------
+
+The following annotations can be specified using the variable-length
+``Extra`` parameter of the constructor :cpp:func:`enum_::enum_`.
+Enums also support the :cpp:struct:`dynamic_attr` and
+:cpp:struct:`type_slots` annotations
+documented for :ref:`classes <class_binding_annotations>`.
+
+.. cpp:struct:: is_arithmetic
+
+   Indicate that the enumeration may be used with arithmetic
+   operations.  This enables the binary operators ``+ - * // & | ^ <<
+   >>`` and unary ``- ~ abs()``, with operands of either enumeration
+   or integer type; the result will be a regular integer. It is
+   unspecified whether operations on mixed enum types (such as
+   ``Shape.Circle + Color.Red``) are permissible.
 
 Function binding
 ----------------
@@ -1858,8 +1889,8 @@ Class binding
 
       Bind the enumeration of type `T` to the identifier `name` within the
       scope `scope`. The variable length `extra` parameter can be used to pass
-      a docstring and other :ref:`class binding annotations
-      <class_binding_annotations>` such as :cpp:class:`is_arithmetic`.
+      a docstring and other :ref:`enum binding annotations
+      <enum_binding_annotations>` such as :cpp:class:`is_arithmetic`.
 
    .. cpp:function:: enum_ &value(const char * name, T value, const char * doc = nullptr)
 
@@ -2015,15 +2046,16 @@ Type objects
 
 .. cpp:function:: template <typename T> T &type_supplement(handle h)
 
-   Return a reference to supplemental data stashed in a type object. See
-   :cpp:class:`supplement`.
+   Return a reference to supplemental data stashed in a type object.
+   The type ``T`` must exactly match the type specified in the
+   :cpp:class:`nb::supplement\<T\> <supplement>` annotation used when
+   creating the type; no type check is performed, and accessing an
+   incorrect supplement type may crash the interpreter.
+   See :cpp:class:`supplement`.
 
 Instances
 ^^^^^^^^^
 
-
-Low-level instance access
--------------------------
 .. cpp:function:: bool inst_check(handle h)
 
    Returns ``true`` if `h` represents an instance of a type that was

@@ -82,3 +82,20 @@ def test05_enum_property():
     w = t.EnumProperty()
     assert w.read_enum == t.Enum.A
     assert str(w.read_enum) == 'test_enum_ext.Enum.A'
+
+def test06_enum_with_custom_slots():
+    # Custom | operator returns an enum
+    assert t.Color.Red | t.Color.Green | t.Color.Blue is t.Color.White
+    assert t.Color.Black | t.Color.Black is t.Color.Black
+    # Other operators (via is_arithmetic) return ints
+    yellow = t.Color.Red + t.Color.Green
+    assert type(yellow) is int
+    assert yellow == t.Color.Yellow and yellow is not t.Color.Yellow
+
+
+def test07_enum_entries_dict_is_protected():
+    with pytest.raises(AttributeError, match="internal nanobind attribute"):
+        setattr(t.Color, "@entries", {})
+    with pytest.raises(AttributeError, match="internal nanobind attribute"):
+        delattr(t.Color, "@entries")
+    assert getattr(t.Color, "@entries")[3] == ("Yellow", None, t.Color.Yellow)

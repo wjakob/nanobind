@@ -156,9 +156,11 @@ function (nanobind_build_library TARGET_NAME)
   endif()
 
   target_include_directories(${TARGET_NAME} PRIVATE
-    ${NB_DIR}/ext/robin_map/include)
+    ${NB_DIR}/ext/robin_map/include
+    ${Python_INCLUDE_DIRS}
+    ${NB_DIR}/include)
 
-  target_include_directories(${TARGET_NAME} PUBLIC
+  target_include_directories(${TARGET_NAME} SYSTEM INTERFACE
     ${Python_INCLUDE_DIRS}
     ${NB_DIR}/include)
 

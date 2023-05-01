@@ -167,13 +167,13 @@ PyObject *nb_enum_richcompare(PyObject *a, PyObject *b, int op) {
 
 #define NB_ENUM_BINOP(name, op)                                                \
     PyObject *nb_enum_##name(PyObject *a, PyObject *b) {                       \
-        PyObject *ia = PyNumber_Long(a);                                       \
-        PyObject *ib = PyNumber_Long(b);                                       \
-        if (!ia || !ib)                                                        \
-            return nullptr;                                                    \
-        PyObject *result = op(ia, ib);                                         \
-        Py_DECREF(ia);                                                         \
-        Py_DECREF(ib);                                                         \
+        PyObject *ia = PyNumber_Long(a),                                       \
+                 *ib = PyNumber_Long(b),                                       \
+                 *result = nullptr;                                            \
+        if (ia && ib)                                                          \
+            result = op(ia, ib);                                               \
+        Py_XDECREF(ia);                                                        \
+        Py_XDECREF(ib);                                                        \
         return result;                                                         \
     }
 

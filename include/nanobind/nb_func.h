@@ -22,7 +22,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             [func = (forward_t<Func>) func](Args... args) NB_INLINE_LAMBDA {
                 typename Guard::type g;
                 (void) g;
-                return func(args...);
+                return func((forward_t<Args>) args...);
             },
             (Return(*)(Args...)) nullptr, is, extra...);
     }

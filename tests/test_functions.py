@@ -137,6 +137,7 @@ def test13_call_guard():
     assert t.call_guard_value() == 0
     assert t.test_call_guard() == 1
     assert t.call_guard_value() == 2
+    assert t.test_call_guard_wrapper_rvalue_ref(1) == 1
     assert not t.test_release_gil()
 
 

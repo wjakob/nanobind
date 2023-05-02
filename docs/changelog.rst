@@ -73,7 +73,7 @@ Version 1.3.0 (TBD)
   allowing arbitrary Python data associated with the type to be accessed
   without a dictionary lookup while keeping this data visible to the
   garbage collector.  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
-* ABI version 9.
+* ABI version 8.
 
 Version 1.2.0 (April 24, 2023)
 ------------------------------
@@ -91,7 +91,6 @@ Version 1.2.0 (April 24, 2023)
   (commit `9c1985 <https://github.com/wjakob/nanobind/commit/9c19850471be70a22114826f6c0edceee99ff40b>`__).
 * Fixed a corner case that prevented ``nb::cast<char>`` from working.
   (commit `9ae320 <https://github.com/wjakob/nanobind/commit/9ae32054d9a6ad17af15994dc51138eb88f71f92>`__).
-* ABI version 8.
 
 Version 1.1.1 (April 6, 2023)
 -----------------------------
@@ -372,6 +371,7 @@ Version 0.0.6 (Oct 14, 2022)
 * Custom exception support (commit `41b7da <https://github.com/wjakob/nanobind/commit/41b7da33f1bc5c583bb98df66bdac2a058ec5c15>`__).
 * Register nanobind functions with Python's cyclic garbage collector (PR `#86 <https://github.com/wjakob/nanobind/pull/86>`__).
 * Various minor fixes and improvements.
+* ABI version 3.
 
 Version 0.0.5 (May 13, 2022)
 ----------------------------
@@ -398,6 +398,7 @@ Version 0.0.2 (Mar 10, 2022)
 ----------------------------
 
 * Initial release of the nanobind codebase.
+* ABI version 1.
 
 Version 0.0.1 (Feb 21, 2022)
 ----------------------------

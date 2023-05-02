@@ -11,7 +11,6 @@
 
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
-#include <tsl/robin_set.h>
 #include <typeindex>
 #include <cstring>
 
@@ -124,10 +123,6 @@ template <class T1, class T2>
 bool operator==(const py_allocator<T1> &, const py_allocator<T2> &) noexcept {
     return true;
 }
-
-template <typename key, typename hash = std::hash<key>,
-          typename eq = std::equal_to<key>>
-using py_set = tsl::robin_set<key, hash, eq, py_allocator<key>>;
 
 template <typename key, typename value, typename hash = std::hash<key>,
           typename eq = std::equal_to<key>>

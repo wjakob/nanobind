@@ -80,6 +80,9 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     /// Test call_guard feature
+    m.def("test_call_guard_wrapper_rvalue_ref", [](int&& i) { return i; },
+          nb::call_guard<my_call_guard>());
+
     m.def("test_call_guard", []() {
         return call_guard_value;
     }, nb::call_guard<my_call_guard>());

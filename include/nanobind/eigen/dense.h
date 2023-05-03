@@ -226,7 +226,8 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
     operator Map() {
         NDArray &t = caster.value;
-        return Map(t.data(), t.shape(0), t.shape(1), strides());
+        return Map(t.data(), t.shape(0), t.ndim() == 1 ? 1 : t.shape(1),
+                   strides());
     }
 };
 

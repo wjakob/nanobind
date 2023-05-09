@@ -108,6 +108,10 @@ Version 1.3.0 (TBD)
     ``some_enum < None`` will still fail, but now with a more
     informative error.
 
+* Added an `enum_` annotation, `allow_unenumerated`, which permits
+  unenumerated values to be constructed from Python. By default these
+  are forbidden, but some C++ code relies on them.
+
 * ABI version 8.
 
 Version 1.2.0 (April 24, 2023)

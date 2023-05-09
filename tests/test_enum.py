@@ -147,3 +147,29 @@ def test08_enum_comparisons():
     assert t.SEnum.B > t.Enum.A
     assert t.Enum.A <= t.SEnum.A and t.Enum.A >= t.SEnum.A
     assert t.Enum.A != t.SEnum.A
+
+
+def test09_enum_unenumerated():
+    assert t.StrongInt.Invalid == -1
+    assert t.StrongInt(42) == 42
+    assert t.StrongInt(-32768) == -32768
+    assert t.StrongUInt(1) == 1
+    assert t.StrongUInt(65535) == 65535
+    assert repr(t.StrongInt(42)) == "test_enum_ext.StrongInt(42)"
+    assert repr(t.StrongInt(-1)) == "test_enum_ext.StrongInt.Invalid"
+    assert repr(t.StrongUInt(0)) == "test_enum_ext.StrongUInt(0)"
+
+    with pytest.raises(OverflowError, match="too large"):
+        t.StrongUInt(65536)
+    with pytest.raises(OverflowError, match="too big to convert"):
+        t.StrongUInt(2 ** 64)
+    with pytest.raises(OverflowError, match="negative int to unsigned"):
+        t.StrongUInt(-1)
+    with pytest.raises(OverflowError, match="too negative"):
+        t.StrongInt(-32769)
+    with pytest.raises(OverflowError, match="too positive"):
+        t.StrongInt(32768)
+    with pytest.raises(OverflowError, match="too big to convert"):
+        t.StrongInt(2 ** 63)
+    with pytest.raises(OverflowError, match="too big to convert"):
+        t.StrongInt(-(2 ** 63) - 1)

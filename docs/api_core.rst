@@ -1516,6 +1516,16 @@ documented for :ref:`classes <class_binding_annotations>`.
    mixed enum types (such as ``Shape.Circle + Color.Red``) are
    permissible.
 
+.. cpp:struct:: allow_unenumerated
+
+   Indicate that the enumeration may have unenumerated values constructed
+   from Python; for example, ``SomeEnum(4)`` when only 0 through 3 are
+   defined. Without this annotation, such attempts will raise an
+   exception (although returning the unenumerated value from C++ will
+   still work for performance reasons). This supports binding
+   enumerations that are used on the C++ side as strongly typed
+   integers, with or without a few named values.
+
 Function binding
 ----------------
 

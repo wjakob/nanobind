@@ -4,6 +4,8 @@ namespace nb = nanobind;
 
 enum class Enum  : uint32_t { A, B, C = (uint32_t) -1 };
 enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
+enum class StrongInt : int16_t { Invalid = -1 };
+enum class StrongUInt : uint16_t {};
 enum ClassicEnum { Item1, Item2 };
 
 struct EnumProperty { Enum get_enum() { return Enum::A; } };
@@ -66,6 +68,10 @@ NB_MODULE(test_enum_ext, m) {
         .value("Yellow", Color::Yellow)
         .value("Magenta", Color::Magenta)
         .value("White", Color::White);
+
+    nb::enum_<StrongUInt>(m, "StrongUInt", nb::allow_unenumerated());
+    nb::enum_<StrongInt>(m, "StrongInt", nb::allow_unenumerated())
+        .value("Invalid", StrongInt::Invalid);
 
     m.def("from_enum", [](Enum value) { return (uint32_t) value; });
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });

@@ -41,15 +41,25 @@ static PyObject *nb_enum_lookup(PyObject *self) {
 }
 
 static PyObject *nb_enum_repr(PyObject *self) {
-    PyObject *entry = nb_enum_lookup(self);
-    if (!entry)
-        return nullptr;
-
     PyObject *name = nb_inst_name(self);
-    PyObject *result =
-        PyUnicode_FromFormat("%U.%U", name, NB_TUPLE_GET_ITEM(entry, 0));
+    PyObject *entry = nb_enum_lookup(self);
+    PyObject *result;
+    if (!entry) {
+        PyErr_Clear();
+        enum_supplement &supp = nb_enum_supplement(Py_TYPE(self));
+        PyObject *int_val = supp.is_signed ? nb_enum_int_signed(self)
+                                           : nb_enum_int_unsigned(self);
+        if (!int_val) {
+            Py_DECREF(name);
+            return nullptr;
+        }
+        result = PyUnicode_FromFormat("%U(%S)", name, int_val);
+        Py_DECREF(int_val);
+    } else {
+        result = PyUnicode_FromFormat("%U.%U", name,
+                                      NB_TUPLE_GET_ITEM(entry, 0));
+    }
     Py_DECREF(name);
-
     return result;
 }
 
@@ -107,6 +117,48 @@ static PyObject *nb_enum_init(PyObject *, PyObject *, PyObject *) {
     return 0;
 }
 
+static bool nb_enum_set_value(PyObject *self, PyObject *value) {
+    nb_inst *inst = reinterpret_cast<nb_inst*>(self);
+    if (inst->ready) {
+        PyErr_SetString(PyExc_ValueError, "can't change enum value");
+        return false;
+    }
+    enum_supplement &supp = nb_enum_supplement(Py_TYPE(self));
+    size_t size = nb_type_data(Py_TYPE(self))->size;
+    void *inst_data = inst_ptr(inst);
+    const char *too = nullptr;
+    if (supp.is_signed) {
+        long long lval = PyLong_AsLongLong(value);
+        if (lval == -1LL && PyErr_Occurred()) {
+            return false;
+        }
+        if (size < sizeof(lval)) {
+            long long shifted = lval >> ((8 * size) - 1);
+            if (shifted != 0 && shifted != -1LL)
+                too = shifted > 0 ? "positive" : "negative";
+        }
+        memcpy(inst_data, &lval, size);
+    } else {
+        unsigned long long lval = PyLong_AsUnsignedLongLong(value);
+        if (lval == -1ULL && PyErr_Occurred()) {
+            return false;
+        }
+        if (size < sizeof(lval) && (lval >> (8 * size)) != 0)
+            too = "large";
+        memcpy(inst_data, &lval, size);
+    }
+    if (too) {
+        PyErr_Format(PyExc_OverflowError,
+                     "value %R too %s for %u-byte enumeration",
+                     value, too, size);
+        return false;
+    }
+    inst->ready = true;
+    inst->destruct = false;
+    inst->cpp_delete = false;
+    return true;
+}
+
 static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
     PyObject *arg;
 
@@ -116,14 +168,23 @@ static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
     arg = NB_TUPLE_GET_ITEM(args, 0);
     if (PyLong_Check(arg)) {
         enum_supplement &supp = nb_enum_supplement(subtype);
-        if (!supp.entries)
-            goto error;
-
-        PyObject *item = PyDict_GetItem(supp.entries, arg);
-        if (item && PyTuple_CheckExact(item) && NB_TUPLE_GET_SIZE(item) == 3) {
-            item = NB_TUPLE_GET_ITEM(item, 2);
-            Py_INCREF(item);
-            return item;
+        if (supp.entries) {
+            PyObject *item = PyDict_GetItem(supp.entries, arg);
+            if (item && PyTuple_CheckExact(item) && NB_TUPLE_GET_SIZE(item) == 3) {
+                item = NB_TUPLE_GET_ITEM(item, 2);
+                Py_INCREF(item);
+                return item;
+            }
+        }
+        if (supp.allow_unenumerated) {
+            PyObject *inst = inst_new_impl(subtype, nullptr);
+            if (!inst)
+                goto error;
+            if (!nb_enum_set_value(inst, arg)) {
+                Py_DECREF(inst);
+                return nullptr;
+            }
+            return inst;
         }
     } else if (Py_TYPE(arg) == subtype) {
         Py_INCREF(arg);

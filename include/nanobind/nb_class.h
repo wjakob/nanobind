@@ -159,6 +159,7 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
 /// Information about an enum, stored as its type_data::supplement
 struct enum_supplement {
     bool is_signed = false;
+    bool allow_unenumerated = false;
     PyObject* entries = nullptr;
     PyObject* scope = nullptr;
 };
@@ -167,10 +168,14 @@ struct enum_supplement {
 struct enum_init_data : type_init_data {
     bool is_signed = false;
     bool is_arithmetic = false;
+    bool allow_unenumerated = false;
 };
 
 NB_INLINE void type_extra_apply(enum_init_data &ed, is_arithmetic) {
     ed.is_arithmetic = true;
+}
+NB_INLINE void type_extra_apply(enum_init_data &ed, allow_unenumerated) {
+    ed.allow_unenumerated = true;
 }
 
 // Enums can't have base classes or supplements or be intrusive, and
@@ -565,6 +570,7 @@ public:
 
         detail::enum_supplement &supp = type_supplement<detail::enum_supplement>(*this);
         supp.is_signed = d.is_signed;
+        supp.allow_unenumerated = d.allow_unenumerated;
         supp.scope = d.scope;
     }
 

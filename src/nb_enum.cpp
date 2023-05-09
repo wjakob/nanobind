@@ -138,12 +138,23 @@ static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
             PyObject *inst = inst_new_impl(subtype, nullptr);
             if (!inst)
                 goto error;
+            PyObject *args[2] = {inst, arg};
+#if PY_VERSION_HEX < 0x03090000
+            PyObject *result = nullptr;
+            PyObject *method = PyObject_GetAttrString(inst, "__setstate__");
+            if (method) {
+                result = _PyObject_Vectorcall(
+                    method, args + 1, 1 + PY_VECTORCALL_ARGUMENTS_OFFSET,
+                    nullptr);
+                Py_DECREF(method);
+            }
+#else
             PyObject *setstate_name = PyUnicode_FromString("__setstate__");
             check(setstate_name, "Could not construct string '__setstate__'!");
-            PyObject *args[2] = {inst, arg};
             PyObject *result = PyObject_VectorcallMethod(
                     setstate_name, args, 2 + PY_VECTORCALL_ARGUMENTS_OFFSET,
                     nullptr);
+#endif
             if (result) {
                 Py_DECREF(result);
                 return inst;

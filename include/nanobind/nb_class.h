@@ -566,14 +566,17 @@ public:
 
         (detail::type_extra_apply(d, extra), ...);
 
+        // Save this so the compiler can tell it's not changed by nb_type_new:
+        const bool allow_unenumerated = d.allow_unenumerated;
+
         Base::m_ptr = detail::nb_type_new(&d);
 
         detail::enum_supplement &supp = type_supplement<detail::enum_supplement>(*this);
         supp.is_signed = d.is_signed;
-        supp.allow_unenumerated = d.allow_unenumerated;
+        supp.allow_unenumerated = allow_unenumerated;
         supp.scope = d.scope;
 
-        if (supp.allow_unenumerated) {
+        if (allow_unenumerated) {
             this->def("__setstate__",
                       [](T *self, std::underlying_type_t<T> value) {
                           *self = static_cast<T>(value);

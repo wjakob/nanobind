@@ -20,8 +20,8 @@ NAMESPACE_END(detail)
 
 python_error::python_error() {
     PyErr_Fetch(&m_type, &m_value, &m_trace);
-    if (!m_type)
-        detail::fail("nanobind::python_error::python_error(): error indicator unset!");
+    check(m_type,
+          "nanobind::python_error::python_error(): error indicator unset!");
 }
 
 python_error::~python_error() {
@@ -72,9 +72,8 @@ const char *python_error::what() const noexcept {
         return m_what;
 
     PyErr_NormalizeException(&m_type, &m_value, &m_trace);
-
-    if (!m_type)
-        detail::fail("nanobind::python_error::what(): PyNormalize_Exception() failed!");
+    check(m_type,
+          "nanobind::python_error::what(): PyNormalize_Exception() failed!");
 
     if (m_trace) {
         if (PyException_SetTraceback(m_value, m_trace) < 0)
@@ -146,8 +145,8 @@ const char *python_error::what() const noexcept {
 }
 
 void python_error::restore() noexcept {
-    if (!m_type)
-        detail::fail("nanobind::python_error::restore(): error was already restored!");
+    check(m_type,
+          "nanobind::python_error::restore(): error was already restored!");
 
     PyErr_Restore(m_type, m_value, m_trace);
     m_type = m_value = m_trace = nullptr;
@@ -178,21 +177,21 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
         modname = getattr(scope, "__module__", handle());
 
     if (!modname.is_valid())
-        raise("nanobind::detail::exception_new(): could not determine module name!");
+        raise("nanobind::detail::exception_new(): could not determine module "
+              "name!");
 
-    str combined = steal<str>(
-        PyUnicode_FromFormat("%U.%s", modname.ptr(), name));
+    str combined =
+        steal<str>(PyUnicode_FromFormat("%U.%s", modname.ptr(), name));
 
-    PyObject *result = PyErr_NewException(combined.c_str(), base, nullptr);
-    if (!result)
-        raise("nanobind::detail::exception_new(): creation failed!");
+    object result = steal(PyErr_NewException(combined.c_str(), base, nullptr));
+    check(result, "nanobind::detail::exception_new(): creation failed!");
 
     if (hasattr(scope, name))
-        raise("nanobind::detail::exception_new(): an object of the same name already "
-              "exists!");
+        raise("nanobind::detail::exception_new(): an object of the same name "
+              "already exists!");
 
     setattr(scope, name, result);
-    return result;
+    return result.release().ptr();
 }
 
 NAMESPACE_END(detail)

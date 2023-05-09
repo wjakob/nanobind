@@ -144,8 +144,7 @@ static PyTypeObject *nd_ndarray_tp() noexcept {
         };
 
         tp = (PyTypeObject *) PyType_FromSpec(&spec);
-        if (!tp)
-            fail("nb_ndarray type creation failed!");
+        check(tp, "nb_ndarray type creation failed!");
 
 #if PY_VERSION_HEX < 0x03090000
         tp->tp_as_buffer->bf_getbuffer = nd_ndarray_tpbuffer;
@@ -464,8 +463,8 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
     // Mark the dltensor capsule as "consumed"
     if (PyCapsule_SetName(capsule.ptr(), "used_dltensor") ||
         PyCapsule_SetDestructor(capsule.ptr(), nullptr))
-        fail("nanobind::detail::ndarray_import(): could not mark dltensor "
-             "capsule as consumed!");
+        check(false, "nanobind::detail::ndarray_import(): could not mark "
+                     "dltensor capsule as consumed!");
 
     return result.release();
 }
@@ -483,7 +482,7 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
     size_t rc_value = th->refcount--;
 
     if (rc_value == 0) {
-        fail("ndarray_dec_ref(): reference count became negative!");
+        check(false, "ndarray_dec_ref(): reference count became negative!");
     } else if (rc_value == 1) {
         Py_XDECREF(th->owner);
         managed_dltensor *mt = th->ndarray;
@@ -626,8 +625,8 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
 
 
             default:
-                fail("nanobind::detail::ndarray_wrap(): unknown framework "
-                     "specified!");
+                check(false, "nanobind::detail::ndarray_wrap(): unknown "
+                             "framework specified!");
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_RuntimeError,

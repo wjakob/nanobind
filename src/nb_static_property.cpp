@@ -62,8 +62,7 @@ PyTypeObject *nb_static_property_tp() noexcept {
         };
 
         tp = (PyTypeObject *) PyType_FromSpec(&spec);
-        if (!tp)
-            fail("nb_static_property type creation failed!");
+        check(tp, "nb_static_property type creation failed!");
 
         internals.nb_static_property = tp;
         internals.nb_static_property_descr_set = nb_static_property_descr_set;

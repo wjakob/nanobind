@@ -290,8 +290,7 @@ static PyObject *internals_dict() {
 #else
     PyObject *dict = PyInterpreterState_GetDict(PyInterpreterState_Get());
 #endif
-    if (!dict)
-        fail("nanobind::detail::internals_dict(): failed!");
+    check(dict, "nanobind::detail::internals_dict(): failed!");
 
     return dict;
 }
@@ -306,8 +305,8 @@ static NB_NOINLINE nb_internals *internals_make() {
     const char *internals_id = NB_INTERNALS_ID;
     PyObject *capsule = PyCapsule_New(p, internals_id, nullptr);
     int rv = PyDict_SetItemString(dict, internals_id, capsule);
-    if (rv || !capsule)
-        fail("nanobind::detail::internals_make(): allocation failed!");
+    check(!rv && capsule,
+          "nanobind::detail::internals_make(): allocation failed!");
     Py_DECREF(capsule);
 
     nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
@@ -319,9 +318,9 @@ static NB_NOINLINE nb_internals *internals_make() {
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
 
-    if (!p->nb_module || !p->nb_meta || !p->nb_type_dict || !p->nb_func ||
-        !p->nb_method || !p->nb_bound_method)
-        fail("nanobind::detail::internals_make(): initialization failed!");
+    check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
+              p->nb_method && p->nb_bound_method,
+          "nanobind::detail::internals_make(): initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000
     p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
@@ -405,8 +404,8 @@ nb_internals *internals_fetch() {
     nb_internals *ptr;
     if (capsule) {
         ptr = (nb_internals *) PyCapsule_GetPointer(capsule, internals_id);
-        if (!ptr)
-            fail("nanobind::detail::internals_fetch(): capsule pointer is NULL!");
+        check(ptr,
+              "nanobind::detail::internals_fetch(): capsule pointer is NULL!");
     } else {
         ptr = internals_make();
     }
@@ -415,6 +414,14 @@ nb_internals *internals_fetch() {
 
     return ptr;
 }
+
+#if defined(NB_COMPACT_ASSERTIONS)
+NB_NOINLINE void fail_unspecified() noexcept {
+    fail("nanobind: encountered an unrecoverable error condition. Recompile "
+         "using the 'Debug' or 'RelWithDebInfo' modes to obtain further "
+         "information about this problem.");
+}
+#endif
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

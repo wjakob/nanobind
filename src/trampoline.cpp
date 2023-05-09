@@ -17,8 +17,8 @@ void trampoline_new(void **data, size_t size, void *ptr) noexcept {
     // GIL is held when the trampoline constructor runs
     nb_ptr_map &inst_c2p = internals_get().inst_c2p;
     nb_ptr_map::iterator it = inst_c2p.find(ptr);
-    if (it == inst_c2p.end() || (((uintptr_t) it->second) & 1))
-        fail("nanobind::detail::trampoline_new(): unique instance not found!");
+    check(it != inst_c2p.end() && (((uintptr_t) it->second) & 1) == 0,
+          "nanobind::detail::trampoline_new(): unique instance not found!");
 
     data[0] = it->second;
     memset(data + 1, 0, sizeof(void *) * 2 * size);

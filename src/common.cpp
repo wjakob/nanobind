@@ -65,21 +65,19 @@ PyObject *capsule_new(const void *ptr, const char *name,
 
     PyObject *c = PyCapsule_New((void *) ptr, name, capsule_cleanup);
 
-    if (!c)
-        fail("nanobind::detail::capsule_new(): allocation failed!");
+    check(c, "nanobind::detail::capsule_new(): allocation failed!");
 
-    if (PyCapsule_SetContext(c, (void *) cleanup) != 0)
-        fail("nanobind::detail::capsule_new(): could not set context!");
+    int rv = PyCapsule_SetContext(c, (void *) cleanup);
+    check(rv == 0, "nanobind::detail::capsule_new(): could not set context!");
 
     return c;
 }
 
 void raise_python_error() {
-    if (PyErr_Occurred())
-        throw python_error();
-    else
-        fail("nanobind::detail::raise_python_error() called without "
-             "an error condition!");
+    check(PyErr_Occurred(),
+          "nanobind::detail::raise_python_error() called without "
+          "an error condition!");
+    throw python_error();
 }
 
 void raise_next_overload_if_null(void *p) {
@@ -106,8 +104,7 @@ void cleanup_list::release() noexcept {
 void cleanup_list::expand() noexcept {
     uint32_t new_capacity = m_capacity * 2;
     PyObject **new_data = (PyObject **) malloc(new_capacity * sizeof(PyObject *));
-    if (!new_data)
-        fail("nanobind::detail::cleanup_list::expand(): out of memory!");
+    check(new_data, "nanobind::detail::cleanup_list::expand(): out of memory!");
     memcpy(new_data, m_data, m_size * sizeof(PyObject *));
     if (m_capacity != Small)
         free(m_data);
@@ -122,8 +119,7 @@ PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
     def->m_name = name;
     def->m_size = -1;
     PyObject *m = PyModule_Create(def);
-    if (!m)
-        fail("nanobind::detail::module_new(): allocation failed!");
+    check(m, "nanobind::detail::module_new(): allocation failed!");
     return m;
 }
 
@@ -177,7 +173,7 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
     return res;
 
 fail:
-    fail("nanobind::detail::module_new_submodule(): failed.");
+    check(false, "nanobind::detail::module_new_submodule(): failed.");
 }
 
 // ========================================================================

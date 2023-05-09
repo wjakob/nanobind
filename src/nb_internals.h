@@ -23,6 +23,13 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+#if defined(NB_COMPACT_ASSERTIONS)
+[[noreturn]] extern void fail_unspecified() noexcept;
+#  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail_unspecified()
+#else
+#  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail(__VA_ARGS__)
+#endif
+
 /// Nanobind function metadata (overloads, etc.)
 struct func_data : func_data_prelim<0> {
     arg_data *args;

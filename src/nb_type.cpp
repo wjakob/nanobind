@@ -124,8 +124,8 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         // Potentially convert the map value into linked list format
         if (!nb_is_seq(entry)) {
             nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-            if (NB_UNLIKELY(!first))
-                fail("nanobind::detail::inst_new(): list element allocation failed!");
+            check(first, "nanobind::detail::inst_new(): list element "
+                         "allocation failed!");
             first->inst = (PyObject *) entry;
             first->next = nullptr;
             entry = it.value() = nb_mark_seq(first);
@@ -133,16 +133,16 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
         nb_inst_seq *seq = nb_get_seq(entry);
         while (true) {
-            if (NB_UNLIKELY((nb_inst *) seq->inst == self))
-                fail("nanobind::detail::inst_new(): duplicate instance!");
+            check((nb_inst *) seq->inst != self,
+                  "nanobind::detail::inst_new(): duplicate instance!");
             if (!seq->next)
                 break;
             seq = seq->next;
         }
 
         nb_inst_seq *next = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-        if (NB_UNLIKELY(!next))
-            fail("nanobind::detail::inst_new(): list element allocation failed!");
+        check(next,
+              "nanobind::detail::inst_new(): list element allocation failed!");
 
         next->inst = (PyObject *) self;
         next->next = nullptr;
@@ -174,13 +174,11 @@ static void inst_dealloc(PyObject *self) {
     void *p = inst_ptr(inst);
 
     if (inst->destruct) {
-        if (t->flags & (uint32_t) type_flags::is_destructible) {
-            if (t->flags & (uint32_t) type_flags::has_destruct)
-                t->destruct(p);
-        } else {
-            fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
-                 "the destructor of a non-destructible type!", t->name);
-        }
+        check(t->flags & (uint32_t) type_flags::is_destructible,
+              "nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
+              "the destructor of a non-destructible type!", t->name);
+        if (t->flags & (uint32_t) type_flags::has_destruct)
+            t->destruct(p);
     }
 
     if (inst->cpp_delete) {
@@ -193,9 +191,9 @@ static void inst_dealloc(PyObject *self) {
     nb_internals &internals = internals_get();
     if (inst->clear_keep_alive) {
         auto it = internals.keep_alive.find(self);
-        if (it == internals.keep_alive.end())
-            fail("nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
-                 "keep_alive information", t->name);
+        check(it != internals.keep_alive.end(),
+              "nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
+              "keep_alive information", t->name);
 
         nb_weakref_seq *s = (nb_weakref_seq *) it->second;
         internals.keep_alive.erase(it);
@@ -250,9 +248,9 @@ static void inst_dealloc(PyObject *self) {
         }
     }
 
-    if (NB_UNLIKELY(!found))
-        fail("nanobind::detail::inst_dealloc(\"%s\"): attempted to delete "
-             "an unknown instance (%p)!", t->name, p);
+    check(found,
+          "nanobind::detail::inst_dealloc(\"%s\"): attempted to delete an "
+          "unknown instance (%p)!", t->name, p);
 
     if (NB_UNLIKELY(gc))
         NB_SLOT(internals, PyType_Type, tp_free)(self);
@@ -266,12 +264,12 @@ static void nb_type_dealloc(PyObject *o) {
     type_data *t = nb_type_data((PyTypeObject *) o);
 
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0) {
-        nb_internals &internals = internals_get();
-        auto it = internals.type_c2p.find(std::type_index(*t->type));
-        if (it == internals.type_c2p.end())
-            fail("nanobind::detail::nb_type_dealloc(\"%s\"): could not "
-                 "find type!", t->name);
-        internals.type_c2p.erase(it);
+        nb_type_map &type_c2p = internals_get().type_c2p;
+        nb_type_map::iterator it = type_c2p.find(std::type_index(*t->type));
+        check(it != type_c2p.end(),
+              "nanobind::detail::nb_type_dealloc(\"%s\"): could not "
+              "find type!", t->name);
+        type_c2p.erase(it);
     }
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
@@ -643,9 +641,10 @@ static PyTypeObject *nb_type_tp(nb_internals &internals,
 
         handle(tp).attr("__module__") = "nanobind";
 
-        if (!tp ||
-            PyDict_SetItem(internals.nb_type_dict, key.ptr(), (PyObject *) tp))
-            fail("nb_type type creation failed!");
+        int rv = 1;
+        if (tp)
+            rv = PyDict_SetItem(internals.nb_type_dict, key.ptr(), (PyObject *) tp);
+        check(rv == 0, "nb_type type creation failed!");
 
         Py_DECREF(tp);
     }
@@ -693,18 +692,19 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     PyObject *base = nullptr;
     if (has_base_py) {
-        if (has_base)
-            fail("nanobind::detail::nb_type_new(\"%s\"): multiple base types "
-                 "specified!", t->name);
+        check(!has_base,
+              "nanobind::detail::nb_type_new(\"%s\"): multiple base types "
+              "specified!", t->name);
         base = (PyObject *) t->base_py;
-        if (!nb_type_check(base))
-            fail("nanobind::detail::nb_type_new(\"%s\"): base type is "
-                 "not a nanobind type!", t->name);
+        check(nb_type_check(base),
+              "nanobind::detail::nb_type_new(\"%s\"): base type is not a "
+              "nanobind type!", t->name);
     } else if (has_base) {
-        auto it = internals.type_c2p.find(std::type_index(*t->base));
-        if (it == internals.type_c2p.end())
-            fail("nanobind::detail::nb_type_new(\"%s\"): base type \"%s\" not "
-                 "known to nanobind!", t->name, type_name(t->base));
+        nb_type_map::iterator it =
+            internals.type_c2p.find(std::type_index(*t->base));
+        check(it != internals.type_c2p.end(),
+                  "nanobind::detail::nb_type_new(\"%s\"): base type \"%s\" not "
+                  "known to nanobind!", t->name, type_name(t->base));
         base = (PyObject *) it->second->type_py;
     }
 
@@ -755,17 +755,17 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         if (t->type_slots_callback) {
             PyType_Slot* first_new = s;
             t->type_slots_callback(t, s, num_avail);
-            if (first_new + num_avail < s)
-                fail("nanobind::detail::nb_type_new(\"%s\"): type_slots_callback "
-                     "overflowed the slots array!", t->name);
+            check(first_new + num_avail >= s,
+                  "nanobind::detail::nb_type_new(\"%s\"): type_slots_callback "
+                  "overflowed the slots array!", t->name);
             num_avail -= (s - first_new);
         }
         if (t->type_slots) {
             size_t i = 0;
             while (t->type_slots[i].slot) {
-                if (i == num_avail)
-                    fail("nanobind::detail::nb_type_new(\"%s\"): ran out of "
-                         "type slots!", t->name);
+                check(i != num_avail,
+                      "nanobind::detail::nb_type_new(\"%s\"): ran out of "
+                      "type slots!", t->name);
                 *s++ = t->type_slots[i++];
             }
         }
@@ -809,7 +809,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
     if (!result) {
         python_error err;
-        fail("nanobind::detail::nb_type_new(\"%s\"): type construction failed: %s!", t->name, err.what());
+        check(false,
+              "nanobind::detail::nb_type_new(\"%s\"): type construction "
+              "failed: %s!", t->name, err.what());
     }
 
     type_data *to = nb_type_data((PyTypeObject *) result);
@@ -1008,8 +1010,8 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
 static PyObject *keep_alive_callback(PyObject *self, PyObject *const *args,
                                      Py_ssize_t nargs) {
-    if (nargs != 1 || !PyWeakref_CheckRefExact(args[0]))
-        fail("nanobind::detail::keep_alive_callback(): invalid input!");
+    check(nargs == 1 && PyWeakref_CheckRefExact(args[0]),
+          "nanobind::detail::keep_alive_callback(): invalid input!");
     Py_DECREF(args[0]); // self
     Py_DECREF(self); // patient
     Py_INCREF(Py_None);
@@ -1017,12 +1019,9 @@ static PyObject *keep_alive_callback(PyObject *self, PyObject *const *args,
 }
 
 static PyMethodDef keep_alive_callback_def = {
-    "keep_alive_callback",
-    (PyCFunction) (void *) keep_alive_callback,
-    METH_FASTCALL,
-    "Implementation detail of nanobind::detail::keep_alive"
+    "keep_alive_callback", (PyCFunction) (void *) keep_alive_callback,
+    METH_FASTCALL, nullptr
 };
-
 
 void keep_alive(PyObject *nurse, PyObject *patient) {
     if (!patient || !nurse || nurse == Py_None || patient == Py_None)
@@ -1043,8 +1042,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
 
         nb_weakref_seq *s =
             (nb_weakref_seq *) PyObject_Malloc(sizeof(nb_weakref_seq));
-        if (!s)
-            fail("nanobind::detail::keep_alive(): out of memory!");
+        check(s, "nanobind::detail::keep_alive(): out of memory!");
 
         s->payload = patient;
         s->callback = nullptr;
@@ -1064,8 +1062,8 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
                   "reference! Likely, the 'nurse' argument you specified is not "
                   "a weak-referenceable type!");
         }
-        if (!callback)
-            fail("nanobind::detail::keep_alive(): callback creation failed!");
+        check(callback,
+              "nanobind::detail::keep_alive(): callback creation failed!");
 
         // Increase patient reference count, leak weak reference
         Py_INCREF(patient);
@@ -1075,15 +1073,13 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
 
 void keep_alive(PyObject *nurse, void *payload,
                 void (*callback)(void *) noexcept) noexcept {
-    if (!nurse)
-        fail("nanobind::detail::keep_alive(): 'nurse' is undefined!");
+    check(nurse, "nanobind::detail::keep_alive(): 'nurse' is undefined!");
 
     if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
         nb_weakref_seq
             **pp = (nb_weakref_seq **) &internals_get().keep_alive[nurse],
             *s   = (nb_weakref_seq *) PyObject_Malloc(sizeof(nb_weakref_seq));
-        if (!s)
-            fail("nanobind::detail::keep_alive(): out of memory!");
+        check(s, "nanobind::detail::keep_alive(): out of memory!");
 
         s->payload = payload;
         s->callback = callback;
@@ -1134,31 +1130,29 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
                 memset(value, 0, t->size);
             }
         } else {
-            if (t->flags & (uint32_t) type_flags::is_copy_constructible) {
-                rvp = rv_policy::copy;
-            } else {
-                fail("nanobind::detail::nb_type_put(\"%s\"): attempted to move "
-                     "an instance that is neither copy- nor move-constructible!",
-                     t->name);
-            }
+            check(t->flags & (uint32_t) type_flags::is_copy_constructible,
+                  "nanobind::detail::nb_type_put(\"%s\"): attempted to move "
+                  "an instance that is neither copy- nor move-constructible!",
+                  t->name);
+
+            rvp = rv_policy::copy;
         }
     }
 
     if (rvp == rv_policy::copy) {
-        if (t->flags & (uint32_t) type_flags::is_copy_constructible) {
-            if (t->flags & (uint32_t) type_flags::has_copy) {
-                try {
-                    t->copy(new_value, value);
-                } catch (...) {
-                    Py_DECREF(inst);
-                    return nullptr;
-                }
-            } else {
-                memcpy(new_value, value, t->size);
+        check(t->flags & (uint32_t) type_flags::is_copy_constructible,
+              "nanobind::detail::nb_type_put(\"%s\"): attempted to copy "
+              "an instance that is not copy-constructible!", t->name);
+
+        if (t->flags & (uint32_t) type_flags::has_copy) {
+            try {
+                t->copy(new_value, value);
+            } catch (...) {
+                Py_DECREF(inst);
+                return nullptr;
             }
         } else {
-            fail("nanobind::detail::nb_type_put(\"%s\"): attempted to copy "
-                 "an instance that is not copy-constructible!", t->name);
+            memcpy(new_value, value, t->size);
         }
     }
 
@@ -1347,27 +1341,28 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 static void nb_type_put_unique_finalize(PyObject *o,
                                         const std::type_info *cpp_type,
                                         bool cpp_delete, bool is_new) {
-    if (!cpp_delete && is_new)
-        fail("nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
-             "ownership status has become corrupted.",
-             type_name(cpp_type), cpp_delete);
+    (void) cpp_type;
+    check(cpp_delete || !is_new,
+          "nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
+          "ownership status has become corrupted.",
+          type_name(cpp_type), cpp_delete);
 
     nb_inst *inst = (nb_inst *) o;
 
     if (cpp_delete) {
-        if (inst->ready != is_new || inst->destruct != is_new ||
-            inst->cpp_delete != is_new)
-            fail("nanobind::detail::nb_type_put_unique(type='%s', "
-                 "cpp_delete=%i): unexpected status flags! (ready=%i, "
-                 "destruct=%i, cpp_delete=%i)",
-                 type_name(cpp_type), cpp_delete, inst->ready,
-                 inst->destruct, inst->cpp_delete);
+        check(inst->ready == is_new && inst->destruct == is_new &&
+                  inst->cpp_delete == is_new,
+              "nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
+              "unexpected status flags! (ready=%i, destruct=%i, cpp_delete=%i)",
+              type_name(cpp_type), cpp_delete, inst->ready, inst->destruct,
+              inst->cpp_delete);
 
         inst->ready = inst->destruct = inst->cpp_delete = true;
     } else {
-        if (inst->ready)
-            fail("nanobind::detail::nb_type_put_unique('%s'): ownership "
-                 "status has become corrupted.", type_name(cpp_type));
+        check(!inst->ready,
+                  "nanobind::detail::nb_type_put_unique('%s'): ownership "
+                  "status has become corrupted.", type_name(cpp_type));
+
         inst->ready = true;
     }
 }
@@ -1406,10 +1401,10 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
     nb_inst *inst = (nb_inst *) o;
 
     // This function is called to indicate ownership *changes*
-    if (!inst->ready)
-        fail("nanobind::detail::nb_relinquish_ownership('%s'): ownership "
-             "status has become corrupted.",
-             PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
+    check(inst->ready,
+          "nanobind::detail::nb_relinquish_ownership('%s'): ownership "
+          "status has become corrupted.",
+          PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
 
     if (cpp_delete) {
         if (!inst->cpp_delete || !inst->destruct || inst->internal) {
@@ -1521,13 +1516,12 @@ void nb_inst_destruct(PyObject *o) noexcept {
     type_data *t = nb_type_data(Py_TYPE(o));
 
     if (nbi->destruct) {
-        if (t->flags & (uint32_t) type_flags::is_destructible) {
-            if (t->flags & (uint32_t) type_flags::has_destruct)
-                t->destruct(inst_ptr(nbi));
-        } else {
-            fail("nanobind::detail::nb_inst_destruct(\"%s\"): attempted to call "
-                 "the destructor of a non-destructible type!", t->name);
-        }
+        check(t->flags & (uint32_t) type_flags::is_destructible,
+              "nanobind::detail::nb_inst_destruct(\"%s\"): attempted to call "
+              "the destructor of a non-destructible type!",
+              t->name);
+        if (t->flags & (uint32_t) type_flags::has_destruct)
+            t->destruct(inst_ptr(nbi));
         nbi->destruct = false;
     }
 
@@ -1538,9 +1532,9 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
     PyTypeObject *tp = Py_TYPE((PyObject *) src);
     type_data *t = nb_type_data(tp);
 
-    if (tp != Py_TYPE(dst) ||
-        (t->flags & (uint32_t) type_flags::is_copy_constructible) == 0)
-        fail("nanobind::detail::nb_inst_copy(): invalid arguments!");
+    check(tp == Py_TYPE(dst) &&
+              (t->flags & (uint32_t) type_flags::is_copy_constructible),
+          "nanobind::detail::nb_inst_copy(): invalid arguments!");
 
     nb_inst *nbi = (nb_inst *) dst;
     const void *src_data = inst_ptr((nb_inst *) src);
@@ -1558,9 +1552,9 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
     PyTypeObject *tp = Py_TYPE((PyObject *) src);
     type_data *t = nb_type_data(tp);
 
-    if (tp != Py_TYPE(dst) ||
-        (t->flags & (uint32_t) type_flags::is_move_constructible) == 0)
-        fail("nanobind::detail::nb_inst_move(): invalid arguments!");
+    check(tp == Py_TYPE(dst) &&
+              (t->flags & (uint32_t) type_flags::is_move_constructible),
+          "nanobind::detail::nb_inst_move(): invalid arguments!");
 
     nb_inst *nbi = (nb_inst *) dst;
     void *src_data = inst_ptr((nb_inst *) src);

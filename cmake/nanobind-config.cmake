@@ -130,7 +130,7 @@ function (nanobind_build_library TARGET_NAME)
     nanobind_strip(${TARGET_NAME})
   elseif(NOT WIN32 AND NOT APPLE)
     target_compile_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}:-ffunction-sections -fdata-sections>)
-    target_link_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}: -Wl,--gc-sections>)
+    target_link_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}:-Wl,--gc-sections>)
   endif()
 
   set_target_properties(${TARGET_NAME} PROPERTIES
@@ -151,6 +151,11 @@ function (nanobind_build_library TARGET_NAME)
       target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
     endif()
   endif()
+
+  # Nanobind performs many assertion checks -- detailed error messages aren't
+  # included in Release/MinSizeRel modes
+  target_compile_definitions(${TARGET_NAME} PRIVATE
+    $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
 
   target_include_directories(${TARGET_NAME} PRIVATE
     ${NB_DIR}/ext/robin_map/include)

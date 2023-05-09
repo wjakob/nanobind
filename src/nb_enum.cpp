@@ -297,10 +297,9 @@ void nb_enum_prepare(const type_init_data *td,
                      PyType_Slot *&t, size_t max_slots) noexcept {
     /* 22 is the number of slot assignments below. Update it if you add more.
        These built-in slots are added before any user-defined ones. */
-    if (max_slots < 22) {
-        fail("nanobind::detail::nb_enum_prepare(\"%s\"): ran out of "
-             "type slots!", td->name);
-    }
+    check(max_slots >= 22,
+          "nanobind::detail::nb_enum_prepare(\"%s\"): ran out of "
+          "type slots!", td->name);
 
     const enum_init_data *ed = static_cast<const enum_init_data *>(td);
     auto int_fn = ed->is_signed ? nb_enum_int_signed : nb_enum_int_unsigned;
@@ -393,20 +392,21 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
     return;
 
 error:
-    fail("nanobind::detail::nb_enum_put(): could not create enum entry!");
+    check(false,
+          "nanobind::detail::nb_enum_put(): could not create enum entry!");
 }
 
 void nb_enum_export(PyObject *tp) {
     enum_supplement &supp = nb_enum_supplement((PyTypeObject *) tp);
-    if (!supp.entries || supp.scope == nullptr)
-        fail("nanobind::detail::nb_enum_export(): internal error!");
+    check(supp.entries && supp.scope != nullptr,
+          "nanobind::detail::nb_enum_export(): internal error!");
 
     PyObject *key, *value;
     Py_ssize_t pos = 0;
 
     while (PyDict_Next(supp.entries, &pos, &key, &value)) {
-        if (!PyTuple_CheckExact(value) || NB_TUPLE_GET_SIZE(value) != 3)
-            fail("nanobind::detail::nb_enum_export(): internal error! (2)");
+        check(PyTuple_CheckExact(value) && NB_TUPLE_GET_SIZE(value) == 3,
+              "nanobind::detail::nb_enum_export(): internal error! (2)");
 
         setattr(supp.scope,
                 NB_TUPLE_GET_ITEM(value, 0),

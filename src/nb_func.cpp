@@ -83,12 +83,10 @@ void nb_func_dealloc(PyObject *self) {
         // Delete from registered function list
         auto &funcs = internals_get().funcs;
         auto it = funcs.find(self);
-        if (it == funcs.end()) {
-            const char *name = (f->flags & (uint32_t) func_flags::has_name)
-                                   ? f->name : "<anonymous>";
-            fail("nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
-                 name);
-        }
+        check(it != funcs.end(),
+              "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
+              ((f->flags & (uint32_t) func_flags::has_name) ? f->name
+                                                            : "<anonymous>"));
         funcs.erase(it);
 
         for (size_t i = 0; i < size; ++i) {
@@ -152,7 +150,9 @@ static bool set_builtin_exception_status(builtin_exception &e) {
         case exception_type::import_error: o = PyExc_ImportError; break;
         case exception_type::attribute_error: o = PyExc_AttributeError; break;
         case exception_type::next_overload: return false;
-        default: fail("Unknown exception type!");
+        default:
+            check(false, "nanobind::detail::set_builtin_exception_status(): "
+                         "invalid exception type!");
     }
 
     PyErr_SetString(o, e.what());
@@ -192,8 +192,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     // Check for previous overloads
     if (has_scope && has_name) {
         name = PyUnicode_FromString(f->name);
-        if (!name)
-            fail("nb::detail::nb_func_new(\"%s\"): invalid name.", f->name);
+        check(name, "nb::detail::nb_func_new(\"%s\"): invalid name.", f->name);
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
@@ -201,10 +200,11 @@ PyObject *nb_func_new(const void *in_) noexcept {
                 Py_TYPE(func_prev) == internals.nb_method) {
                 func_data *fp = nb_func_data(func_prev);
 
-                if ((fp->flags & (uint32_t) func_flags::is_method) !=
-                    (f ->flags & (uint32_t) func_flags::is_method))
-                    fail("nb::detail::nb_func_new(\"%s\"): mismatched static/"
-                         "instance method flags in function overloads!", f->name);
+                check((fp->flags & (uint32_t) func_flags::is_method) ==
+                          (f->flags & (uint32_t) func_flags::is_method),
+                      "nb::detail::nb_func_new(\"%s\"): mismatched static/"
+                      "instance method flags in function overloads!",
+                      f->name);
 
                 /* Never append a method to an overload chain of a parent class;
                    instead, hide the parent's overloads in this case */
@@ -213,8 +213,9 @@ PyObject *nb_func_new(const void *in_) noexcept {
             } else if (f->name[0] == '_') {
                 Py_CLEAR(func_prev);
             } else {
-                fail("nb::detail::nb_func_new(\"%s\"): cannot overload "
-                     "existing non-function object of the same name!", f->name);
+                check(false,
+                      "nb::detail::nb_func_new(\"%s\"): cannot overload "
+                      "existing non-function object of the same name!", f->name);
             }
         } else {
             PyErr_Clear();
@@ -238,9 +239,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
     Py_ssize_t to_copy = func_prev ? Py_SIZE(func_prev) : 0;
     nb_func *func = (nb_func *) PyType_GenericAlloc(
         is_method ? internals.nb_method : internals.nb_func, to_copy + 1);
-    if (!func)
-        fail("nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
-             has_name ? f->name : "<anonymous>");
+    check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
+          has_name ? f->name : "<anonymous>");
 
     func->max_nargs_pos = f->nargs;
     func->complex_call = has_args || has_var_args || has_var_kwargs;
@@ -259,8 +259,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
         ((PyVarObject *) func_prev)->ob_size = 0;
 
         auto it = internals.funcs.find(func_prev);
-        if (it == internals.funcs.end())
-            fail("nanobind::detail::nb_func_new(): internal update failed (1)!");
+        check(it != internals.funcs.end(),
+              "nanobind::detail::nb_func_new(): internal update failed (1)!");
         internals.funcs.erase(it);
     }
 
@@ -271,8 +271,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     // Register the function
     auto [it, success] = internals.funcs.try_emplace(func, nullptr);
-    if (!success)
-        fail("nanobind::detail::nb_func_new(): internal update failed (2)!");
+    check(success,
+          "nanobind::detail::nb_func_new(): internal update failed (2)!");
 
     func_data *fc = nb_func_data(func) + to_copy;
     memcpy(fc, f, sizeof(func_data_prelim<0>));
@@ -287,12 +287,14 @@ PyObject *nb_func_new(const void *in_) noexcept {
         fc->name = "";
 
     if (is_implicit) {
-        if (!(fc->flags & (uint32_t) func_flags::is_constructor))
-            fail("nb::detail::nb_func_new(\"%s\"): nanobind::is_implicit() "
-                 "should only be specified for constructors.", f->name);
-        if (f->nargs != 2)
-            fail("nb::detail::nb_func_new(\"%s\"): implicit constructors "
-                 "should only have one argument.", f->name);
+        check(fc->flags & (uint32_t) func_flags::is_constructor,
+              "nb::detail::nb_func_new(\"%s\"): nanobind::is_implicit() "
+              "should only be specified for constructors.",
+              f->name);
+        check(f->nargs == 2,
+              "nb::detail::nb_func_new(\"%s\"): implicit constructors "
+              "should only have one argument.",
+              f->name);
 
         if (f->descr_types[1])
             implicitly_convertible(f->descr_types[1], f->descr_types[0]);
@@ -337,8 +339,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     if (has_scope && name) {
         int rv = PyObject_SetAttr(f->scope, name, (PyObject *) func);
-        if (rv)
-            fail("nb::detail::nb_func_new(\"%s\"): setattr. failed.", f->name);
+        check(rv == 0, "nb::detail::nb_func_new(\"%s\"): setattr. failed.",
+              f->name);
     }
 
     Py_XDECREF(name);
@@ -902,7 +904,7 @@ static void nb_func_render_signature(const func_data *f) noexcept {
     const std::type_info **descr_type = f->descr_types;
     nb_internals &internals = internals_get();
 
-    size_t arg_index = 0;
+    uint32_t arg_index = 0;
     buf.put_dstr(f->name);
 
     for (const char *pc = f->descr; *pc != '\0'; ++pc) {
@@ -910,51 +912,47 @@ static void nb_func_render_signature(const func_data *f) noexcept {
 
         switch (c) {
             case '{':
-                // Argument name
-                if (has_var_kwargs && arg_index + 1 == (size_t) f->nargs) {
-                    buf.put("**");
-                    if (has_args && f->args[arg_index].name)
-                        buf.put_dstr(f->args[arg_index].name);
-                    else
-                        buf.put("kwargs");
-                    pc += 4; // strlen("dict")
-                    break;
-                }
+                {
+                    const char *arg_name = has_args ? f->args[arg_index].name : nullptr;
 
-                if (has_var_args && arg_index + 1 + has_var_kwargs == (size_t) f->nargs) {
-                    buf.put("*");
-                    if (has_args && f->args[arg_index].name)
-                        buf.put_dstr(f->args[arg_index].name);
-                    else
-                        buf.put("args");
-                    pc += 5; // strlen("tuple")
-                    break;
-                }
-
-                if (has_args && f->args[arg_index].name) {
-                    buf.put_dstr(f->args[arg_index].name);
-                } else if (is_method && arg_index == 0) {
-                    buf.put("self");
-
-                    // Skip over type
-                    while (*pc != '}') {
-                        if (*pc == '%')
-                            descr_type++;
-                        pc++;
+                    // Argument name
+                    if (has_var_kwargs && arg_index + 1 == f->nargs) {
+                        buf.put("**");
+                        buf.put_dstr(arg_name ? arg_name : "kwargs");
+                        pc += 4; // strlen("dict")
+                        break;
                     }
-                    arg_index++;
-                    continue;
-                } else {
-                    buf.put("arg");
-                    if (arg_index > size_t(is_method) ||
-                        f->nargs > 1 + (uint32_t) is_method)
-                        buf.put_uint32((uint32_t) (arg_index - is_method));
-                }
 
-                if (!(is_method && arg_index == 0))
+                    if (has_var_args && arg_index + 1 + has_var_kwargs == f->nargs) {
+                        buf.put("*");
+                        buf.put_dstr(arg_name ? arg_name : "args");
+                        pc += 5; // strlen("tuple")
+                        break;
+                    }
+
+                    if (is_method && arg_index == 0) {
+                        buf.put("self");
+
+                        // Skip over type
+                        while (*pc != '}') {
+                            if (*pc == '%')
+                                descr_type++;
+                            pc++;
+                        }
+                        arg_index++;
+                        continue;
+                    } else if (arg_name) {
+                        buf.put_dstr(arg_name);
+                    } else {
+                        buf.put("arg");
+                        if (f->nargs > 1 + (uint32_t) is_method)
+                            buf.put_uint32(arg_index - is_method);
+                    }
+
                     buf.put(": ");
-                if (has_args && f->args[arg_index].none)
-                    buf.put("Optional[");
+                    if (has_args && f->args[arg_index].none)
+                        buf.put("Optional[");
+                }
                 break;
 
             case '}':
@@ -997,8 +995,8 @@ static void nb_func_render_signature(const func_data *f) noexcept {
                 break;
 
             case '%':
-                if (!*descr_type)
-                    fail("nb::detail::nb_func_finalize(): missing type!");
+                check(*descr_type,
+                      "nb::detail::nb_func_finalize(): missing type!");
 
                 if (!(is_method && arg_index == 0)) {
                     auto it = internals.type_c2p.find(std::type_index(**descr_type));
@@ -1024,8 +1022,9 @@ static void nb_func_render_signature(const func_data *f) noexcept {
         }
     }
 
-    if (arg_index != f->nargs || *descr_type != nullptr)
-        fail("nanobind::detail::nb_func_finalize(%s): arguments inconsistent.", f->name);
+    check(arg_index == f->nargs && !*descr_type,
+          "nanobind::detail::nb_func_finalize(%s): arguments inconsistent.",
+          f->name);
 }
 
 static PyObject *nb_func_get_name(PyObject *self) {
@@ -1146,7 +1145,7 @@ static void strexc(char *s, const char *sub) {
 }
 
 /// Return a readable string representation of a C++ type
-char *type_name(const std::type_info *t) {
+NB_NOINLINE char *type_name(const std::type_info *t) {
     const char *name_in = t->name();
 
 #if defined(__GNUG__)

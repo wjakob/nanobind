@@ -129,10 +129,17 @@ template <typename key, typename value, typename hash = std::hash<key>,
 using py_map =
     tsl::robin_map<key, value, hash, eq, py_allocator<std::pair<key, value>>>;
 
-// Linked list of instances with the same pointer address. Usually just 1..
+// Linked list of instances with the same pointer address. Usually just 1.
 struct nb_inst_seq {
     PyObject *inst;
     nb_inst_seq *next;
+};
+
+// Weak reference list. Usually, there is just one entry
+struct nb_weakref_seq {
+    void (*callback)(void *) noexcept;
+    void *payload;
+    nb_weakref_seq *next;
 };
 
 using nb_type_map = py_map<std::type_index, type_data *>;
@@ -183,9 +190,9 @@ struct nb_internals {
      * C++ -> Python instance map
      *
      * This associative data structure maps a C++ instance pointer onto its
-     * associated PyObject* (if bit 0 is zero) or a linked list of type
-     * `nb_inst_seq*` (if bit 0 is set---it must be cleared before interpreting
-     * the pointer in this case).
+     * associated PyObject* (if bit 0 of the map value is zero) or a linked
+     * list of type `nb_inst_seq*` (if bit 0 is set---it must be cleared before
+     * interpreting the pointer in this case).
      *
      * The latter case occurs when several distinct Python objects reference
      * the same memory address (e.g. a struct and its first member).
@@ -196,7 +203,7 @@ struct nb_internals {
     nb_type_map type_c2p;
 
     /// Dictionary storing keep_alive references
-    py_map<void *, nb_ptr_map, ptr_hash> keep_alive;
+    nb_ptr_map keep_alive;
 
     /// nb_func/meth instance map for leak reporting (used as set, the value is unused)
     nb_ptr_map funcs;
@@ -211,7 +218,7 @@ struct nb_internals {
     bool print_implicit_cast_warnings = true;
 
 #if defined(Py_LIMITED_API)
-    // Cache for important functions from PyType_Type and PyProperty_Type
+    // Cache important functions from PyType_Type and PyProperty_Type
     freefunc PyType_Type_tp_free;
     initproc PyType_Type_tp_init;
     destructor PyType_Type_tp_dealloc;

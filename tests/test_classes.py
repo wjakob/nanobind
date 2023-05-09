@@ -308,6 +308,7 @@ def test15_keep_alive_nbtype(clean):
     s = t.Struct()
     a = t.Dog('Rufus')
     assert t.keep_alive_arg(s, a) is a
+    assert t.keep_alive_arg(s, a) is a
     del s
     assert_stats(
         default_constructed=1
@@ -321,6 +322,7 @@ def test15_keep_alive_nbtype(clean):
     t.reset()
     s = t.Struct()
     a = t.Dog('Rufus')
+    assert t.keep_alive_ret(a, s) is s
     assert t.keep_alive_ret(a, s) is s
     del a
     assert_stats(

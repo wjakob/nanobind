@@ -197,17 +197,19 @@ static void inst_dealloc(PyObject *self) {
             fail("nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
                  "keep_alive information", t->name);
 
-        nb_ptr_map ref_set = std::move(it.value());
+        nb_weakref_seq *s = (nb_weakref_seq *) it->second;
         internals.keep_alive.erase(it);
+        do {
+            nb_weakref_seq *c = s;
+            s = c->next;
 
-        for (auto [data, deleter]: ref_set) {
-            using Deleter = void (*) (void *) noexcept;
-
-            if (!deleter)
-                Py_DECREF((PyObject *) data);
+            if (c->callback)
+                c->callback(c->payload);
             else
-                ((Deleter) deleter)(data);
-        }
+                Py_DECREF((PyObject *) c->payload);
+
+            PyObject_Free(c);
+        } while (s);
     }
 
     // Update hash table that maps from C++ to Python instance
@@ -474,7 +476,6 @@ static const uint8_t type_slots[] {
 
 static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
                                         PyType_Spec *spec) {
-
 #if PY_VERSION_HEX >= 0x030C0000
     // Life is good, PyType_FromMetaclass() is available
     return PyType_FromMetaclass(meta, mod, spec, nullptr);
@@ -1027,22 +1028,31 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     if (!patient || !nurse || nurse == Py_None || patient == Py_None)
         return;
 
-    nb_internals &internals = internals_get();
-    PyTypeObject *metaclass = Py_TYPE((PyObject *) Py_TYPE(nurse));
+    if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
+        nb_weakref_seq **pp =
+            (nb_weakref_seq **) &internals_get().keep_alive[nurse];
 
-    if (Py_TYPE((PyObject *) metaclass) == internals.nb_meta) {
-        // Populate nanobind-internal data structures
-        nb_ptr_map &keep_alive = internals.keep_alive[nurse];
+        do {
+            nb_weakref_seq *p = *pp;
+            if (!p)
+                break;
+            else if (p->payload == patient && !p->callback)
+                return;
+            pp = &p->next;
+        } while (true);
 
-        auto [it, success] = keep_alive.try_emplace(patient, nullptr);
-        if (success) {
-            Py_INCREF(patient);
-            ((nb_inst *) nurse)->clear_keep_alive = true;
-        } else {
-            if (it->second)
-                fail("nanobind::detail::keep_alive(): internal error: entry "
-                     "has a deletion callback!");
-        }
+        nb_weakref_seq *s =
+            (nb_weakref_seq *) PyObject_Malloc(sizeof(nb_weakref_seq));
+        if (!s)
+            fail("nanobind::detail::keep_alive(): out of memory!");
+
+        s->payload = patient;
+        s->callback = nullptr;
+        s->next = nullptr;
+        *pp = s;
+
+        Py_INCREF(patient);
+        ((nb_inst *) nurse)->clear_keep_alive = true;
     } else {
         PyObject *callback =
             PyCFunction_New(&keep_alive_callback_def, patient);
@@ -1066,17 +1076,20 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
 void keep_alive(PyObject *nurse, void *payload,
                 void (*callback)(void *) noexcept) noexcept {
     if (!nurse)
-        fail("nanobind::detail::keep_alive(): nurse==nullptr!");
+        fail("nanobind::detail::keep_alive(): 'nurse' is undefined!");
 
-    PyTypeObject *metaclass = Py_TYPE((PyObject *) Py_TYPE(nurse));
+    if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
+        nb_weakref_seq
+            **pp = (nb_weakref_seq **) &internals_get().keep_alive[nurse],
+            *s   = (nb_weakref_seq *) PyObject_Malloc(sizeof(nb_weakref_seq));
+        if (!s)
+            fail("nanobind::detail::keep_alive(): out of memory!");
 
-    nb_internals &internals = internals_get();
+        s->payload = payload;
+        s->callback = callback;
+        s->next = *pp;
+        *pp = s;
 
-    if (Py_TYPE((PyObject *) metaclass) == internals.nb_meta) {
-        nb_ptr_map &keep_alive = internals.keep_alive[nurse];
-        auto [it, success] = keep_alive.try_emplace(payload, (void *) callback);
-        if (!success)
-            raise("keep_alive(): the given 'payload' pointer was already registered!");
         ((nb_inst *) nurse)->clear_keep_alive = true;
     } else {
         PyObject *patient = capsule_new(payload, nullptr, callback);

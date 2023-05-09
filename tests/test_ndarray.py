@@ -50,9 +50,11 @@ def test01_metadata():
         assert t.get_shape(b) == []
     assert 'incompatible function arguments' in str(excinfo.value)
 
-    a = np.zeros(shape=(3, 4, 5))
+    a = np.zeros(shape=(3, 4, 5), dtype=np.float64)
     assert t.get_shape(a) == [3, 4, 5]
     assert t.get_size(a) == 60
+    assert t.get_nbytes(a) == 60*8
+    assert t.get_itemsize(a) == 8
     assert t.check_shape_ptr(a)
     assert t.check_stride_ptr(a)
     if hasattr(a, '__dlpack__'):

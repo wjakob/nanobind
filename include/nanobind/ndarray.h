@@ -310,6 +310,9 @@ public:
         return ret;
     }
 
+    size_t itemsize() const { return ((size_t) dtype().bits + 7) / 8; }
+    size_t nbytes() const { return ((size_t) dtype().bits * size() + 7) / 8; }
+
     const Scalar *data() const {
         return (const Scalar *)((const uint8_t *) m_dltensor.data + m_dltensor.byte_offset);
     }

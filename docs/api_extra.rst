@@ -477,6 +477,17 @@ in a :ref:`separate section <ndarrays>`.
 
       Return the size of the array (i.e. the product of all dimensions).
 
+   .. cpp:function:: size_t itemsize() const
+
+      Return the size of a single array element in bytes. The returned value
+      is rounded to the next full byte in case of bit-level representations
+      (query :cpp:member:`dtype::bits` for bit-level granularity).
+
+   .. cpp:function:: size_t nbytes() const
+
+      Return the size of the entire array bytes. The returned value is rounded
+      to the next full byte in case of bit-level representations.
+
    .. cpp:function:: size_t shape(size_t i) const
 
       Return the size of dimension `i`.

@@ -21,6 +21,14 @@ NB_MODULE(test_ndarray_ext, m) {
         return t.size();
     }, "array"_a.noconvert());
 
+    m.def("get_itemsize", [](const nb::ndarray<> &t) {
+        return t.itemsize();
+    }, "array"_a.noconvert());
+
+    m.def("get_nbytes", [](const nb::ndarray<> &t) {
+        return t.nbytes();
+    }, "array"_a.noconvert());
+
     m.def("check_shape_ptr", [](const nb::ndarray<> &t) {
         std::vector<int64_t> shape(t.ndim());
         std::copy(t.shape_ptr(), t.shape_ptr() + t.ndim(), shape.begin());

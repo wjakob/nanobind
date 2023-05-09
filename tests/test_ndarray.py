@@ -326,6 +326,9 @@ def test15_passthrough():
     collect()
     assert t.destruct_count() - dc == 1
 
+    a = np.array([1,2,3])
+    b = t.passthrough(a)
+    assert a is b
 
 @needs_numpy
 def test16_return_numpy():

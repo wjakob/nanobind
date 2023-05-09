@@ -16,7 +16,7 @@ struct managed_dltensor {
 struct ndarray_handle {
     managed_dltensor *ndarray;
     std::atomic<size_t> refcount;
-    PyObject *owner;
+    PyObject *owner, *self;
     bool free_shape;
     bool free_strides;
     bool call_deleter;
@@ -274,11 +274,12 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
 }
 
 ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
-                             bool convert) noexcept {
+                               bool convert) noexcept {
     object capsule;
+    bool is_pycapsule = PyCapsule_CheckExact(o);
 
     // If this is not a capsule, try calling o.__dlpack__()
-    if (!PyCapsule_CheckExact(o)) {
+    if (!is_pycapsule) {
         capsule = steal(PyObject_CallMethod(o, "__dlpack__", nullptr));
 
         if (!capsule.is_valid()) {
@@ -451,6 +452,12 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
     result->owner = nullptr;
     result->free_shape = false;
     result->call_deleter = true;
+    if (is_pycapsule) {
+        result->self = nullptr;
+    } else {
+        result->self = o;
+        Py_INCREF(o);
+    }
 
     // Ensure that the strides member is always initialized
     if (t.strides) {
@@ -485,6 +492,7 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
         check(false, "ndarray_dec_ref(): reference count became negative!");
     } else if (rc_value == 1) {
         Py_XDECREF(th->owner);
+        Py_XDECREF(th->self);
         managed_dltensor *mt = th->ndarray;
         if (th->free_shape) {
             PyMem_Free(mt->dltensor.shape);
@@ -517,7 +525,6 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
     uintptr_t value_int = (uintptr_t) value,
               value_rounded = value_int;
 #endif
-
 
     scoped_pymalloc<managed_dltensor> ndarray;
     scoped_pymalloc<ndarray_handle> result;
@@ -559,6 +566,7 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
     result->ndarray = (managed_dltensor *) ndarray.release();
     result->refcount = 0;
     result->owner = owner;
+    result->self = nullptr;
     result->free_shape = true;
     result->free_strides = true;
     result->call_deleter = false;
@@ -581,6 +589,11 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
                        rv_policy policy) noexcept {
     if (!th)
         return none().release().ptr();
+
+    if (th->self) {
+        Py_INCREF(th->self);
+        return th->self;
+    }
 
     bool copy = policy == rv_policy::copy || policy == rv_policy::move;
 

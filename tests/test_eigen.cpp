@@ -141,4 +141,13 @@ NB_MODULE(test_eigen_ext, m) {
         .def(nb::init<>())
         .def("map", &Buffer::map, nb::rv_policy::reference_internal)
         .def("dmap", &Buffer::dmap, nb::rv_policy::reference_internal);
+
+
+    struct ClassWithEigenMember {
+        Eigen::MatrixXd member = Eigen::Matrix2d::Ones();
+    };
+
+    nb::class_<ClassWithEigenMember>(m, "ClassWithEigenMember")
+        .def(nb::init<>())
+        .def_rw("member", &ClassWithEigenMember::member);
 }

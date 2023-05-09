@@ -177,7 +177,7 @@ def test07_mutate_arg():
 
 
 @needs_numpy_and_eigen
-def test_sparse():
+def test08_sparse():
     pytest.importorskip("scipy")
     import scipy.sparse
 
@@ -210,7 +210,7 @@ def test_sparse():
 
 
 @needs_numpy_and_eigen
-def test_sparse_failures():
+def test09_sparse_failures():
     pytest.importorskip("scipy")
     import scipy
 
@@ -245,6 +245,30 @@ def test_sparse_failures():
     scipy.sparse.csr_matrix = csr_matrix
 
 @needs_numpy_and_eigen
-def test_eigen_scalar_default():
+def test10_eigen_scalar_default():
     x = t.default_arg()
     assert x==0
+
+@needs_numpy_and_eigen
+def test11_prop():
+    for j in range(3):
+        c = t.ClassWithEigenMember()
+        ref = np.ones((2, 2))
+        if j == 0:
+            c.member = ref
+
+        for i in range(2):
+            member = c.member
+            if j == 2 and i == 0:
+                member[0, 0] = 10
+                ref[0, 0] = 10
+            assert np.all(member == ref)
+            del member
+            gc.collect()
+            gc.collect()
+
+        member = c.member
+        del c
+        gc.collect()
+        gc.collect()
+        assert np.all(member == ref)

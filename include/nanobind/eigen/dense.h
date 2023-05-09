@@ -140,6 +140,8 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T>>> {
             T *temp = new T(std::move(v));
             owner = capsule(temp, [](void *p) noexcept { delete (T *) p; });
             ptr = temp->data();
+        } else if (policy == rv_policy::reference_internal) {
+            owner = borrow(cleanup->self());
         }
 
         rv_policy array_rv_policy =

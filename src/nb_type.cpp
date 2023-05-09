@@ -660,7 +660,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          has_type_slots    = t->flags & (uint32_t) type_init_flags::has_type_slots,
          has_supplement    = t->flags & (uint32_t) type_init_flags::has_supplement,
          has_dynamic_attr  = t->flags & (uint32_t) type_flags::has_dynamic_attr,
-         intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr;
+         intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr,
+         has_shared_from_this = t->flags & (uint32_t) type_flags::has_shared_from_this;
 
     nb_internals &internals = internals_get();
     str name(t->name), qualname = name;
@@ -822,6 +823,12 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         (tb->flags & (uint32_t) type_flags::intrusive_ptr)) {
         to->flags |= (uint32_t) type_flags::intrusive_ptr;
         to->set_self_py = tb->set_self_py;
+    }
+
+    if (!has_shared_from_this && tb &&
+        (tb->flags & (uint32_t) type_flags::has_shared_from_this)) {
+        to->flags |= (uint32_t) type_flags::has_shared_from_this;
+        to->keep_shared_from_this_alive = tb->keep_shared_from_this_alive;
     }
 
     to->name = name_copy;
@@ -1112,9 +1119,6 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     if (!inst)
         return nullptr;
 
-    if (is_new)
-        *is_new = true;
-
     void *new_value = inst_ptr(inst);
     if (rvp == rv_policy::move) {
         if (t->flags & (uint32_t) type_flags::is_move_constructible) {
@@ -1155,6 +1159,18 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
             memcpy(new_value, value, t->size);
         }
     }
+
+    // If we can find an existing C++ shared_ptr for this object, and
+    // the instance we're creating just holds a pointer, then take out
+    // another C++ shared_ptr that shares ownership with the existing
+    // one, and tie its lifetime to the Python object. This is the
+    // same thing done by the <nanobind/stl/shared_ptr.h> caster when
+    // returning shared_ptr<T> to Python explicitly.
+    if ((t->flags & (uint32_t) type_flags::has_shared_from_this) &&
+        !store_in_obj && t->keep_shared_from_this_alive((PyObject *) inst))
+        rvp = rv_policy::reference;
+    else if (is_new)
+        *is_new = true;
 
     inst->destruct = rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
     inst->cpp_delete = rvp == rv_policy::take_ownership;

@@ -330,12 +330,30 @@ nanobind's support for shared pointers requires an extra include directive:
 You don't need to specify a return value policy annotation when a function
 returns a shared pointer.
 
-Shared pointer support has one major limitation in nanobind: the
-``std::enable_shared_from_this<T>`` base class that normally enables safe
-conversion of raw pointers to the associated shared pointer *may not be used*.
-Further detail can be found in the *advanced* :ref:`section <shared_ptr_adv>`
-on object ownership. If you need this feature, switch to intrusive reference
-counting explained below.
+nanobind's implementation of ``std::shared_ptr`` support typically
+allocates a new ``shared_ptr`` control block each time a Python object
+must be converted to ``std::shared_ptr<T>``. The new ``shared_ptr``
+"owns" a reference to the Python object, and its deleter drops that
+reference.  This has the advantage that the Python portion of the
+object will be kept alive by its C++-side references (which is
+important when implementing C++ virtual methods in Python), but it can
+be inefficient when passing the same object back and forth between
+Python and C++ many times, and it means that the ``use_count()``
+method of ``std::shared_ptr`` will return a value that does not
+capture all uses. Some of these problems can be mitigated by modifying
+``T`` so that it inherits from ``std::enable_shared_from_this<T>``.
+See the :ref:`advanced section <shared_ptr_adv>` on object ownership
+for more details on the implementation.
+
+nanobind has limited support for objects that inherit from
+``std::enable_shared_from_this<T>`` to allow safe conversion of raw
+pointers to shared pointers. The safest way to deal with these objects
+is to always use ``std::make_shared<T>(...)`` when constructing them in C++,
+and always pass them across the Python/C++ boundary wrapped in an explicit
+``std::shared_ptr<T>``. If you do this, then there shouldn't be any
+surprises. If you will be passing raw ``T*`` pointers around, then
+read the :ref:`advanced section on object ownership <enable_shared_from_this>`
+for additional caveats.
 
 .. _intrusive_intro:
 

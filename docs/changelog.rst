@@ -34,7 +34,7 @@ Version 1.3.0 (TBD)
 * Reduced the per-instance overhead of nanobind by 1 pointer and simplified the
   internal hash table types to crunch ``libnanobind``. (commit `de018d
   <https://github.com/wjakob/nanobind/commit/de018db2d17905564703f1ade4aa201a22f8551f>`__).
-* Reduced the size of nanobind type objects by 6 pointers. (PR `#194
+* Reduced the size of nanobind type objects by 5 pointers. (PR `#194
   <https://github.com/wjakob/nanobind/pull/194>`__, `#195
   <https://github.com/wjakob/nanobind/pull/195>`__, and commit `d82ca9
   <https://github.com/wjakob/nanobind/commit/d82ca9c14191e74dd35dd5bf15fc90f5230319fb>`__).
@@ -107,6 +107,11 @@ Version 1.3.0 (TBD)
     return unequal rather than failing; order comparisons such as
     ``some_enum < None`` will still fail, but now with a more
     informative error.
+
+* nanobind now has limited support for binding types that inherit from
+  ``std::enable_shared_from_this<T>``. See the :ref:`advanced section
+  on object ownership <enable_shared_from_this>` for more details.
+  (PR `#212 <https://github.com/wjakob/nanobind/pull/212>`__).
 
 * ABI version 8.
 

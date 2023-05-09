@@ -1,3 +1,4 @@
+import sys
 import test_holders_ext as t
 import pytest
 from common import collect
@@ -176,3 +177,170 @@ def test09_tag_based_unique():
 def test09_tag_based_shared():
     assert isinstance(t.make_pet_s(t.PetKind.Dog), t.Dog)
     assert isinstance(t.make_pet_s(t.PetKind.Cat), t.Cat)
+
+
+def check_shared_from_this_py_owned(ty, factory, value):
+    e = ty(value)
+
+    # Creating from Python does not enable shared_from_this
+    assert e.value == value
+    assert not e.has_shared_from_this()
+    assert t.owns_cpp(e)
+
+    # Passing to C++ as a shared_ptr does
+    w = t.SharedWrapperST(e)
+    assert e.has_shared_from_this()
+    assert w.ptr is e
+
+    # Execute shared_from_this on the C++ side
+    w2 = t.SharedWrapperST.from_existing(e)
+    assert e.use_count() == 2
+    assert w.value == w2.value == e.value == value
+    assert t.same_owner(w, w2)
+
+    # Returning a raw pointer from C++ locates the existing instance
+    assert w2.get_own() is w2.get_ref() is e
+    assert t.owns_cpp(e)
+
+    if hasattr(sys, "getrefcount"):
+        # One reference is held by the C++ shared_ptr, one by our
+        # locals dict, and one by the arg to getrefcount
+        rc = sys.getrefcount(e)
+        assert rc == 3
+
+    # Dropping the Python object does not actually destroy it, because
+    # the shared_ptr holds a reference. There is still a PyObject* at
+    # the same address.
+    prev_id = id(e)
+    del e
+    collect()
+    assert t.stats() == (1, 0)
+    assert id(w.get_ref()) == prev_id
+    assert t.owns_cpp(w.get_ref())
+    assert type(w.get_ref()) is ty
+
+    # Dropping the wrappers' shared_ptrs drops the PyObject reference and
+    # the object is finally GC'ed
+    del w, w2
+    collect()
+    assert t.stats() == (1, 1)
+
+
+def test10_shared_from_this_create_in_python(clean):
+    check_shared_from_this_py_owned(t.ExampleST, t.ExampleST, 42)
+
+    # Subclass in C++
+    t.reset()
+    check_shared_from_this_py_owned(t.DerivedST, t.DerivedST, 30)
+
+    # Subclass in Python
+    class SubST(t.ExampleST):
+        pass
+
+    t.reset()
+    check_shared_from_this_py_owned(SubST, SubST, 20)
+
+
+def test11_shared_from_this_create_raw_in_cpp(clean):
+    # Creating a raw pointer from C++ does not enable shared_from_this;
+    # although the object is held by pointer rather than value, the logical
+    # ownership transfers to Python and the behavior is equivalent to test10.
+    # Once we get a shared_ptr it owns a reference to the Python object.
+    check_shared_from_this_py_owned(t.ExampleST, t.ExampleST.make, 10)
+
+    # Subclass in C++
+    t.reset()
+    check_shared_from_this_py_owned(t.DerivedST, t.DerivedST.make, 5)
+
+
+def test12_shared_from_this_create_shared_in_cpp(clean):
+    # Creating a shared_ptr from C++ enables shared_from_this. Now the
+    # shared_ptr does not keep the Python object alive; it's directly
+    # owning the ExampleST object on the C++ side.
+    e = t.ExampleST.make_shared(10)
+    assert e.value == 10
+    assert e.has_shared_from_this()
+    assert e.shared_from_this() is e  # same instance
+    assert e.use_count() == 1
+    assert not t.owns_cpp(e)
+    if hasattr(sys, "getrefcount"):
+        # One reference is held by our locals dict and one by the
+        # arg to getrefcount
+        rc = sys.getrefcount(e)
+        assert rc == 2
+
+    w = t.SharedWrapperST.from_existing(e)
+    assert w.ptr is e
+    # One shared_ptr whose lifetime is tied to e. And one inside the wrapper
+    assert e.use_count() == 2
+
+    # Drop the Python object; C++ object still remains owned by the wrapper
+    del e
+    collect()
+    assert t.stats() == (1, 0)
+    assert w.use_count() == 1
+
+    # Get a new Python object reference; it will share ownership of the
+    # same underlying C++ object
+    e2 = w.get_own()
+    assert not t.owns_cpp(e2)
+    assert w.ptr is e2
+    assert w.use_count() == 2
+
+    del e2
+    collect()
+    assert t.stats() == (1, 0)
+    assert w.use_count() == 1
+
+    # Get a new C++-side reference
+    w2 = t.SharedWrapperST.from_wrapper(w)
+    assert w2.use_count() == 2
+    assert t.same_owner(w, w2)
+
+    # Get another one by roundtripping through Python.
+    # The nanobind conversion to shared_ptr<ExampleST> should use the
+    # existing shared_from_this shared_ptr
+    w3 = t.SharedWrapperST(w.ptr)
+    assert w3.use_count() == 3
+    assert t.same_owner(w2, w3)
+
+    # Destroy everything
+    assert t.stats() == (1, 0)
+    del w, w2, w3
+    collect()
+    assert t.stats() == (1, 1)
+
+
+def test13_shared_from_this_create_derived_in_cpp(clean):
+    # This tests that keep_shared_from_this_alive is inherited by
+    # derived classes properly
+
+    # Pass shared_ptr<T> to Python
+    e = t.DerivedST.make_shared(20)
+    assert type(e) is t.DerivedST
+    assert e.value == 20
+    assert e.has_shared_from_this()
+    assert not t.owns_cpp(e)
+    assert e.use_count() == 1
+
+    # Pass it back to C++
+    w = t.SharedWrapperST(e)
+    assert e.use_count() == w.use_count() == 2
+
+    del e
+    collect()
+    assert t.stats() == (1, 0)
+    assert w.use_count() == 1
+
+    # Pass it back to Python as a raw pointer
+    e = w.get_own()
+    # ExampleST is not polymorphic, so the derived-class identity is
+    # lost once the Python instance is destroyed
+    assert type(e) is t.ExampleST
+    assert not t.owns_cpp(e)
+    assert w.use_count() == 2
+    assert w.get_own() is e
+
+    del e, w
+    collect()
+    assert t.stats() == (1, 1)

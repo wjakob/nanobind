@@ -132,16 +132,22 @@ both of the following include directives to your code:
 .. code-block:: cpp
 
    #include <nanobind/stl/unique_ptr.h>
-   #include <nanobind/stl/unique_shared_ptr.h>
+   #include <nanobind/stl/shared_ptr.h>
 
 Binding functions that take ``std::unique_ptr<T>`` arguments involves some
 limitations that can be avoided by changing their signatures to
 ``std::unique_ptr<T, nb::deleter<T>>`` (:ref:`details <unique_ptr>`).
 
-Usage of ``std::enable_shared_from_this<T>`` is **prohibited** and will raise a
-compile-time assertion (:ref:`details <enable_shared_from_this>`) . This is
-consistent with the philosophy of this library: *the codebase has to adapt to
-the binding tool and not the other way around*.
+Use of ``std::enable_shared_from_this<T>`` is permitted, but since
+nanobind does not use holder types, an object
+constructed in Python will typically not have any associated
+``std::shared_ptr<T>`` until it is passed to a C++ function that
+accepts ``std::shared_ptr<T>``. That means a C++ function that accepts
+a raw ``T*`` and calls ``shared_from_this()`` on it might stop working
+when ported from pybind11 to nanobind. You can solve this problem
+by always passing such objects across the Python/C++ boundary as
+``std::shared_ptr<T>`` rather than as ``T*``. See the :ref:`advanced section
+on object ownership <enable_shared_from_this>` for more details.
 
 Custom constructors
 -------------------

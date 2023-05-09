@@ -48,7 +48,11 @@ enum class type_flags : uint32_t {
     /// Is this a trampoline class meant to be overloaded in Python?
     is_trampoline            = (1 << 12),
 
-    // Six more flag bits available (13 through 18) without needing
+    /// Is this a class that inherits from enable_shared_from_this?
+    /// If so, type_data::keep_shared_from_this_alive is also set.
+    has_shared_from_this     = (1 << 13),
+
+    // Five more flag bits available (14 through 18) without needing
     // a larger reorganization
 };
 
@@ -90,6 +94,7 @@ struct type_data {
     const std::type_info **implicit;
     bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
     void (*set_self_py)(void *, PyObject *) noexcept;
+    bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
     size_t dictoffset;
 #endif
@@ -384,6 +389,20 @@ public:
                 d.flags |= (uint32_t) detail::type_flags::has_destruct;
                 d.destruct = detail::wrap_destruct<T>;
             }
+        }
+
+        if constexpr (detail::has_shared_from_this_v<T>) {
+            d.flags |= (uint32_t) detail::type_flags::has_shared_from_this;
+            d.keep_shared_from_this_alive = [](PyObject *self) noexcept {
+                if (auto sp = inst_ptr<T>(self)->weak_from_this().lock()) {
+                    detail::keep_alive(self, new auto(std::move(sp)),
+                                       [](void *p) noexcept {
+                                           delete (decltype(sp) *) p;
+                                       });
+                    return true;
+                }
+                return false;
+            };
         }
 
         (detail::type_extra_apply(d, extra), ...);

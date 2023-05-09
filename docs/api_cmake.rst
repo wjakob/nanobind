@@ -211,19 +211,15 @@ The various commands are described below:
       * - ``-static``
         - Perform a static library build (shared is the default).
       * - ``-abi3``
-        - Perform a stable ABI build.
-      * - ``-lto``
-        - Use link time optimization when compiling for release mode. This
-          is done by default for shared builds, and the flag only controls
-          the behavior of static builds.
+        - Perform a stable ABI build targeting Python v3.12+.
 
    .. code-block:: cmake
 
       # Normal shared library build
       nanobind_build_library(nanobind)
 
-      # Static ABI3 build with LTO
-      nanobind_build_library(nanobind-static-abi3-lto)
+      # Static ABI3 build
+      nanobind_build_library(nanobind-static-abi3)
 
 .. cmake:command:: nanobind_opt_size
 

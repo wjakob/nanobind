@@ -125,10 +125,7 @@ function (nanobind_build_library TARGET_NAME)
     nanobind_link_options(${TARGET_NAME})
     target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
-
-    if (TARGET_NAME MATCHES "-lto")
-      nanobind_lto(${TARGET_NAME})
-    endif()
+    nanobind_lto(${TARGET_NAME})
 
     nanobind_strip(${TARGET_NAME})
   elseif(NOT WIN32 AND NOT APPLE)
@@ -263,11 +260,6 @@ function(nanobind_add_module name)
 
   if (ARG_STABLE_ABI)
     set(libname "${libname}-abi3")
-  endif()
-
-  # Shared builds always use LTO for release builds of the library component
-  if (ARG_LTO AND NOT ARG_NB_STATIC)
-    set(libname "${libname}-lto")
   endif()
 
   nanobind_build_library(${libname})

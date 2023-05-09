@@ -221,7 +221,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
             PyErr_Clear();
         }
 
-        is_constructor = strcmp(f->name, "__init__") == 0;
+        is_constructor = (strcmp(f->name, "__init__") == 0 ||
+                          strcmp(f->name, "__setstate__") == 0);
 
         // Don't use implicit conversions in copy constructors (causes infinite recursion)
         if (is_constructor && f->nargs == 2 && f->descr_types[0] &&

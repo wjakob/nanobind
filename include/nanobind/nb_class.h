@@ -572,6 +572,13 @@ public:
         supp.is_signed = d.is_signed;
         supp.allow_unenumerated = d.allow_unenumerated;
         supp.scope = d.scope;
+
+        if (supp.allow_unenumerated) {
+            this->def("__setstate__",
+                      [](T *self, std::underlying_type_t<T> value) {
+                          *self = static_cast<T>(value);
+                      });
+        }
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {

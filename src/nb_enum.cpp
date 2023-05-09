@@ -117,48 +117,6 @@ static PyObject *nb_enum_init(PyObject *, PyObject *, PyObject *) {
     return 0;
 }
 
-static bool nb_enum_set_value(PyObject *self, PyObject *value) {
-    nb_inst *inst = reinterpret_cast<nb_inst*>(self);
-    if (inst->ready) {
-        PyErr_SetString(PyExc_ValueError, "can't change enum value");
-        return false;
-    }
-    enum_supplement &supp = nb_enum_supplement(Py_TYPE(self));
-    size_t size = nb_type_data(Py_TYPE(self))->size;
-    void *inst_data = inst_ptr(inst);
-    const char *too = nullptr;
-    if (supp.is_signed) {
-        long long lval = PyLong_AsLongLong(value);
-        if (lval == -1LL && PyErr_Occurred()) {
-            return false;
-        }
-        if (size < sizeof(lval)) {
-            long long shifted = lval >> ((8 * size) - 1);
-            if (shifted != 0 && shifted != -1LL)
-                too = shifted > 0 ? "positive" : "negative";
-        }
-        memcpy(inst_data, &lval, size);
-    } else {
-        unsigned long long lval = PyLong_AsUnsignedLongLong(value);
-        if (lval == -1ULL && PyErr_Occurred()) {
-            return false;
-        }
-        if (size < sizeof(lval) && (lval >> (8 * size)) != 0)
-            too = "large";
-        memcpy(inst_data, &lval, size);
-    }
-    if (too) {
-        PyErr_Format(PyExc_OverflowError,
-                     "value %R too %s for %u-byte enumeration",
-                     value, too, size);
-        return false;
-    }
-    inst->ready = true;
-    inst->destruct = false;
-    inst->cpp_delete = false;
-    return true;
-}
-
 static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
     PyObject *arg;
 
@@ -180,11 +138,17 @@ static PyObject *nb_enum_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
             PyObject *inst = inst_new_impl(subtype, nullptr);
             if (!inst)
                 goto error;
-            if (!nb_enum_set_value(inst, arg)) {
-                Py_DECREF(inst);
-                return nullptr;
+            PyObject *setstate_name = PyUnicode_FromString("__setstate__");
+            check(setstate_name, "Could not construct string '__setstate__'!");
+            PyObject *args[2] = {inst, arg};
+            PyObject *result = PyObject_VectorcallMethod(
+                    setstate_name, args, 2 + PY_VECTORCALL_ARGUMENTS_OFFSET,
+                    nullptr);
+            if (result) {
+                Py_DECREF(result);
+                return inst;
             }
-            return inst;
+            Py_DECREF(inst);
         }
     } else if (Py_TYPE(arg) == subtype) {
         Py_INCREF(arg);

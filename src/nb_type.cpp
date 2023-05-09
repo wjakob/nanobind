@@ -367,6 +367,111 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     return NB_SLOT(internals, PyType_Type, tp_setattro)(obj, name, value);
 }
 
+#if PY_VERSION_HEX < 0x030C0000
+#  if PY_VERSION_HEX < 0x03090000
+#    define Py_bf_getbuffer 1
+#    define Py_bf_releasebuffer 2
+#  endif
+
+template <size_t I1, size_t I2, size_t Offset> uint8_t constexpr Ei() {
+    // Compile-time check to ensure that indices and alignment match our expectation
+    static_assert(I1 == I2 && (Offset % sizeof(void *)) == 0,
+                  "type_slots: internal error");
+    return (uint8_t) (Offset / sizeof(void *));
+}
+
+#define E(i1, p1, p2, name)                                                    \
+    Ei<i1, Py_##p2##_##name, offsetof(PyHeapTypeObject, p1.p2##_##name)>()
+
+// Precomputed mapping from type slot ID to an entry in the data structure
+static const uint8_t type_slots[] {
+    E(1, as_buffer, bf, getbuffer),
+    E(2, as_buffer, bf, releasebuffer),
+    E(3, as_mapping, mp, ass_subscript),
+    E(4, as_mapping, mp, length),
+    E(5, as_mapping, mp, subscript),
+    E(6, as_number, nb, absolute),
+    E(7, as_number, nb, add),
+    E(8, as_number, nb, and),
+    E(9, as_number, nb, bool),
+    E(10, as_number, nb, divmod),
+    E(11, as_number, nb, float),
+    E(12, as_number, nb, floor_divide),
+    E(13, as_number, nb, index),
+    E(14, as_number, nb, inplace_add),
+    E(15, as_number, nb, inplace_and),
+    E(16, as_number, nb, inplace_floor_divide),
+    E(17, as_number, nb, inplace_lshift),
+    E(18, as_number, nb, inplace_multiply),
+    E(19, as_number, nb, inplace_or),
+    E(20, as_number, nb, inplace_power),
+    E(21, as_number, nb, inplace_remainder),
+    E(22, as_number, nb, inplace_rshift),
+    E(23, as_number, nb, inplace_subtract),
+    E(24, as_number, nb, inplace_true_divide),
+    E(25, as_number, nb, inplace_xor),
+    E(26, as_number, nb, int),
+    E(27, as_number, nb, invert),
+    E(28, as_number, nb, lshift),
+    E(29, as_number, nb, multiply),
+    E(30, as_number, nb, negative),
+    E(31, as_number, nb, or),
+    E(32, as_number, nb, positive),
+    E(33, as_number, nb, power),
+    E(34, as_number, nb, remainder),
+    E(35, as_number, nb, rshift),
+    E(36, as_number, nb, subtract),
+    E(37, as_number, nb, true_divide),
+    E(38, as_number, nb, xor),
+    E(39, as_sequence, sq, ass_item),
+    E(40, as_sequence, sq, concat),
+    E(41, as_sequence, sq, contains),
+    E(42, as_sequence, sq, inplace_concat),
+    E(43, as_sequence, sq, inplace_repeat),
+    E(44, as_sequence, sq, item),
+    E(45, as_sequence, sq, length),
+    E(46, as_sequence, sq, repeat),
+    E(47, ht_type, tp, alloc),
+    E(48, ht_type, tp, base),
+    E(49, ht_type, tp, bases),
+    E(50, ht_type, tp, call),
+    E(51, ht_type, tp, clear),
+    E(52, ht_type, tp, dealloc),
+    E(53, ht_type, tp, del),
+    E(54, ht_type, tp, descr_get),
+    E(55, ht_type, tp, descr_set),
+    E(56, ht_type, tp, doc),
+    E(57, ht_type, tp, getattr),
+    E(58, ht_type, tp, getattro),
+    E(59, ht_type, tp, hash),
+    E(60, ht_type, tp, init),
+    E(61, ht_type, tp, is_gc),
+    E(62, ht_type, tp, iter),
+    E(63, ht_type, tp, iternext),
+    E(64, ht_type, tp, methods),
+    E(65, ht_type, tp, new),
+    E(66, ht_type, tp, repr),
+    E(67, ht_type, tp, richcompare),
+    E(68, ht_type, tp, setattr),
+    E(69, ht_type, tp, setattro),
+    E(70, ht_type, tp, str),
+    E(71, ht_type, tp, traverse),
+    E(72, ht_type, tp, members),
+    E(73, ht_type, tp, getset),
+    E(74, ht_type, tp, free),
+    E(75, as_number, nb, matrix_multiply),
+    E(76, as_number, nb, inplace_matrix_multiply),
+    E(77, as_async, am, await),
+    E(78, as_async, am, aiter),
+    E(79, as_async, am, anext),
+    E(80, ht_type, tp, finalize),
+#if PY_VERSION_HEX >= 0x030A0000
+    E(81, as_async, am, send),
+#endif
+};
+
+#endif
+
 static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
                                         PyType_Spec *spec) {
 
@@ -414,152 +519,55 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 #endif
 
     PyTypeObject *tp = &ht->ht_type;
-    PyMemberDef *members = nullptr;
-
     tp->tp_name = name_cstr;
     tp->tp_basicsize = spec->basicsize;
     tp->tp_itemsize = spec->itemsize;
     tp->tp_flags = spec->flags | Py_TPFLAGS_HEAPTYPE;
+    tp->tp_as_async = &ht->as_async;
+    tp->tp_as_number = &ht->as_number;
+    tp->tp_as_sequence = &ht->as_sequence;
+    tp->tp_as_mapping = &ht->as_mapping;
+    tp->tp_as_buffer = &ht->as_buffer;
 
-    PyAsyncMethods    *am = tp->tp_as_async = &ht->as_async;
-    PyNumberMethods   *nb = tp->tp_as_number = &ht->as_number;
-    PySequenceMethods *sq = tp->tp_as_sequence = &ht->as_sequence;
-    PyMappingMethods  *mp = tp->tp_as_mapping = &ht->as_mapping;
-    PyBufferProcs     *bf = tp->tp_as_buffer = &ht->as_buffer;
+    PyType_Slot *ts = spec->slots;
+    bool fail = false;
+    while (true) {
+        int slot = ts->slot;
 
-    #define CASE(tp, name) \
-        case Py_##tp##_##name: \
-            tp->tp##_##name = (decltype(tp->tp##_##name)) ts->pfunc; \
+        if (slot == 0) {
             break;
+        } else if (slot < (int) sizeof(type_slots)) {
+            *(((void **) ht) + type_slots[slot - 1]) = ts->pfunc;
+        } else {
+            PyErr_Format(PyExc_RuntimeError,
+                         "nb_type_from_metaclass(): unhandled slot %i", slot);
+            fail = true;
+            break;
+        }
+        ts++;
+    }
 
-    for (PyType_Slot *ts = spec->slots; ts->slot != 0; ++ts) {
-        switch (ts->slot) {
-            CASE(tp, dealloc)
-            CASE(tp, getattr)
-            CASE(tp, setattr)
-            CASE(tp, repr)
-            CASE(tp, hash)
-            CASE(tp, call)
-            CASE(tp, str)
-            CASE(tp, getattro)
-            CASE(tp, setattro)
-            CASE(tp, traverse)
-            CASE(tp, clear)
-            CASE(tp, richcompare)
-            CASE(tp, iter)
-            CASE(tp, iternext)
-            CASE(tp, methods)
-            CASE(tp, getset)
-            CASE(tp, descr_get)
-            CASE(tp, descr_set)
-            CASE(tp, init)
-            CASE(tp, alloc)
-            CASE(tp, new)
-            CASE(tp, free)
-            CASE(tp, is_gc)
-            CASE(tp, del)
-            CASE(tp, finalize)
+    // Bring type object into a safe state (before error handling)
+    const PyMemberDef *members = tp->tp_members;
+    const char *doc = tp->tp_doc;
+    tp->tp_members = nullptr;
+    tp->tp_doc = nullptr;
+    Py_XINCREF(tp->tp_base);
 
-            #if PY_VERSION_HEX < 0x03090000
-            #  define Py_bf_getbuffer 1
-            #  define Py_bf_releasebuffer 2
-            #endif
-
-            CASE(bf, getbuffer)
-            CASE(bf, releasebuffer)
-
-            CASE(mp, ass_subscript)
-            CASE(mp, length)
-            CASE(mp, subscript)
-
-            CASE(nb, absolute)
-            CASE(nb, add)
-            CASE(nb, and)
-            CASE(nb, bool)
-            CASE(nb, divmod)
-            CASE(nb, float)
-            CASE(nb, floor_divide)
-            CASE(nb, index)
-            CASE(nb, inplace_add)
-            CASE(nb, inplace_and)
-            CASE(nb, inplace_floor_divide)
-            CASE(nb, inplace_lshift)
-            CASE(nb, inplace_multiply)
-            CASE(nb, inplace_or)
-            CASE(nb, inplace_power)
-            CASE(nb, inplace_remainder)
-            CASE(nb, inplace_rshift)
-            CASE(nb, inplace_subtract)
-            CASE(nb, inplace_true_divide)
-            CASE(nb, inplace_xor)
-            CASE(nb, int)
-            CASE(nb, invert)
-            CASE(nb, lshift)
-            CASE(nb, multiply)
-            CASE(nb, negative)
-            CASE(nb, or)
-            CASE(nb, positive)
-            CASE(nb, power)
-            CASE(nb, remainder)
-            CASE(nb, rshift)
-            CASE(nb, subtract)
-            CASE(nb, true_divide)
-            CASE(nb, xor)
-            CASE(nb, matrix_multiply)
-            CASE(nb, inplace_matrix_multiply)
-
-            CASE(sq, ass_item)
-            CASE(sq, concat)
-            CASE(sq, contains)
-            CASE(sq, inplace_concat)
-            CASE(sq, inplace_repeat)
-            CASE(sq, item)
-            CASE(sq, length)
-            CASE(sq, repeat)
-
-            CASE(am, await)
-            CASE(am, aiter)
-            CASE(am, anext)
-#if PY_VERSION_HEX >= 0x030A0000
-            CASE(am, send)
-#endif
-            case Py_tp_doc:
-                if (ts->pfunc) {
-                    const char *source = (const char *) ts->pfunc;
-                    size_t size = strlen(source) + 1;
-                    char *target = (char *) PyObject_Malloc(size);
-                    if (!target) {
-                        Py_DECREF((PyObject *) tp);
-                        return PyErr_NoMemory();
-                    }
-                    memcpy(target, source, size);
-                    tp->tp_doc = target;
-                }
-                break;
-
-            case Py_tp_base:
-                if (ts->pfunc) {
-                    tp->tp_base = (PyTypeObject *) ts->pfunc;
-                    Py_INCREF(tp->tp_base);
-                }
-                break;
-
-            case Py_tp_members:
-                members = (PyMemberDef *) ts->pfunc;
-                break;
-
-            default:
-                Py_DECREF(tp);
-                return PyErr_Format(
-                    PyExc_RuntimeError,
-                    "nb_type_from_metaclass(): unhandled slot %i", ts->slot);
+    if (doc && !fail) {
+        size_t size = strlen(doc) + 1;
+        char *target = (char *) PyObject_Malloc(size);
+        if (!target) {
+            PyErr_NoMemory();
+            fail = true;
+        } else {
+            memcpy(target, doc, size);
+            tp->tp_doc = target;
         }
     }
 
-    if (members) {
+    if (members && !fail) {
         while (members->name) {
-            bool unhandled = false;
-
             if (members->type == T_PYSSIZET && members->flags == READONLY) {
                 if (strcmp(members->name, "__dictoffset__") == 0)
                     tp->tp_dictoffset = members->offset;
@@ -568,23 +576,23 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
                 else if (strcmp(members->name, "__vectorcalloffset__") == 0)
                     tp->tp_vectorcall_offset = members->offset;
                 else
-                    unhandled = true;
+                    fail = true;
             } else {
-                unhandled = true;
+                fail = true;
             }
 
-            if (unhandled) {
-                Py_DECREF(tp);
-                return PyErr_Format(
+            if (fail) {
+                PyErr_Format(
                     PyExc_RuntimeError,
                     "nb_type_from_metaclass(): unhandled tp_members entry!");
+                break;
             }
 
             members++;
         }
     }
 
-    if (PyType_Ready(tp)) {
+    if (fail || PyType_Ready(tp) != 0) {
         Py_DECREF(tp);
         return nullptr;
     }

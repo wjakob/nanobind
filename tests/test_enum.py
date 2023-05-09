@@ -1,3 +1,4 @@
+import sys
 import test_enum_ext as t
 import pytest
 
@@ -159,17 +160,23 @@ def test09_enum_unenumerated():
     assert repr(t.StrongInt(-1)) == "test_enum_ext.StrongInt.Invalid"
     assert repr(t.StrongUInt(0)) == "test_enum_ext.StrongUInt(0)"
 
+    outside_longlong_range = (
+        "integer too large"
+        if sys.implementation.name == "pypy"
+        else "too big to convert"
+    )
+
     with pytest.raises(OverflowError, match="too large"):
         t.StrongUInt(65536)
-    with pytest.raises(OverflowError, match="too big to convert"):
+    with pytest.raises(OverflowError, match=outside_longlong_range):
         t.StrongUInt(2 ** 64)
-    with pytest.raises(OverflowError, match="negative int to unsigned"):
+    with pytest.raises(OverflowError, match="negative int.* to unsigned"):
         t.StrongUInt(-1)
     with pytest.raises(OverflowError, match="too negative"):
         t.StrongInt(-32769)
     with pytest.raises(OverflowError, match="too positive"):
         t.StrongInt(32768)
-    with pytest.raises(OverflowError, match="too big to convert"):
+    with pytest.raises(OverflowError, match=outside_longlong_range):
         t.StrongInt(2 ** 63)
-    with pytest.raises(OverflowError, match="too big to convert"):
+    with pytest.raises(OverflowError, match=outside_longlong_range):
         t.StrongInt(-(2 ** 63) - 1)

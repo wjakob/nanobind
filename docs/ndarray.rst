@@ -6,15 +6,15 @@ The ``nb::ndarray<..>`` class
 =============================
 
 nanobind can exchange n-dimensional arrays (henceforth "**ndarrays**") with
-popular array programming frameworks including `NumPy <https://numpy.org>`_,
-`PyTorch <https://pytorch.org>`_, `TensorFlow <https://www.tensorflow.org>`_,
-and `JAX <https://jax.readthedocs.io>`_. It supports *zero-copy* exchange using
-two protocols:
+popular array programming frameworks including `NumPy
+<https://numpy.org>`__, `PyTorch <https://pytorch.org>`__, `TensorFlow
+<https://www.tensorflow.org>`__, and `JAX <https://jax.readthedocs.io>`__.
+It supports *zero-copy* exchange using two protocols:
 
 -  The classic `buffer
-   protocol <https://docs.python.org/3/c-api/buffer.html>`_.
+   protocol <https://docs.python.org/3/c-api/buffer.html>`__.
 
--  `DLPack <https://github.com/dmlc/dlpack>`_, a
+-  `DLPack <https://github.com/dmlc/dlpack>`__, a
    GPU-compatible generalization of the buffer protocol.
 
 nanobind knows how to talk to each framework and takes care
@@ -138,7 +138,7 @@ builtin reference counting: it can be moved or copied within C++ code.
 Copies will point to the same underlying buffer and increase the reference
 count until they go out of scope. It is legal call
 :cpp:class:`nb::ndarray\<...\> <ndarray>` members from multithreaded code even
-when the `GIL <https://wiki.python.org/moin/GlobalInterpreterLock>`_ is not
+when the `GIL <https://wiki.python.org/moin/GlobalInterpreterLock>`__ is not
 held.
 
 Constraints in type signatures
@@ -159,7 +159,7 @@ input. This produces the following error message:
 
 Note that these type annotations are intended for humans–they will not
 currently work with automatic type checking tools like `MyPy
-<https://mypy.readthedocs.io/en/stable/>`_ (which at least for the time being
+<https://mypy.readthedocs.io/en/stable/>`__ (which at least for the time being
 don’t provide a portable or sufficiently flexible annotation of n-dimensional
 arrays).
 
@@ -224,8 +224,8 @@ values:
    ``jaxlib.xla_extension.DeviceArray``.
 -  No framework annotation. In this case, nanobind will return a raw
    Python ``dltensor``
-   `capsule <https://docs.python.org/3/c-api/capsule.html>`_
-   representing the `DLPack <https://github.com/dmlc/dlpack>`_
+   `capsule <https://docs.python.org/3/c-api/capsule.html>`__
+   representing the `DLPack <https://github.com/dmlc/dlpack>`__
    metadata.
 
 Note that shape and order annotations like :cpp:class:`nb::shape <shape>` and
@@ -303,3 +303,24 @@ when all of them have expired:
            nb::ndarray<nb::pytorch, float>(temp->vec_2.data(), 1, shape_2, deleter)
        );
    });
+
+Limitations
+-----------
+
+.. _dtype_restrictions:
+
+Libraries like `NumPy <https://numpy.org>`__ support arrays with flexible
+internal representations (*dtypes*), including
+
+- Floating point and integer arrays with various bit depths
+
+- Null-terminated strings
+
+- Arbitrary Python objects
+
+- Heterogeneous data structures composed of multiple fields
+
+nanobind's :cpp:class:`nb::ndarray\<...\> <ndarray>` is based on the `DLPack
+<https://github.com/dmlc/dlpack>`__ array exchange protocol, which causes it to
+be more restrictive. Presently supported dtypes include signed/unsigned
+integers, floating point values, and boolean values.

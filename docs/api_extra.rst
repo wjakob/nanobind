@@ -542,8 +542,11 @@ Data types
 
 Nanobind uses the `DLPack <https://github.com/dmlc/dlpack>`_ ABI to represent
 metadata describing n-dimensional arrays (even when they are exchanged using
-the buffer protocol). Relevant data structures are located in the
-``nanobind::dlpack`` sub-namespace.
+the buffer protocol). Consequently, the set of possible dtypes is :ref:`more
+restricted <dtype_restrictions>` than that of other nd-array libraries (e.g.,
+NumPy). Relevant data structures are located in the ``nanobind::dlpack``
+sub-namespace.
+
 
 .. cpp:enum-class:: dlpack::dtype_code : uint8_t
 

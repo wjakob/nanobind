@@ -616,14 +616,13 @@ static PyTypeObject *nb_type_tp(nb_internals &internals,
             { 0, nullptr }
         };
 
-#if defined(Py_LIMITED_API)
-        int itemsize = cast<int>(handle(&PyType_Type).attr("__itemsize__"));
-        int basicsize = cast<int>(handle(&PyType_Type).attr("__basicsize__"));
+#if PY_VERSION_HEX >= 0x030C0000
+        int basicsize = -(int) (sizeof(type_data) + supplement),
+            itemsize = 0;
 #else
-        int itemsize = (int) PyType_Type.tp_itemsize;
-        int basicsize = (int) PyType_Type.tp_basicsize;
+        int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement)),
+            itemsize = (int) PyType_Type.tp_itemsize;
 #endif
-        basicsize += (int) (sizeof(type_data) + supplement);
 
         char name[17 + 20 + 1];
         snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
@@ -1587,11 +1586,8 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
 }
 
 #if defined(Py_LIMITED_API)
-static size_t type_basicsize = 0;
 type_data *nb_type_data_static(PyTypeObject *o) noexcept {
-    if (type_basicsize == 0)
-        type_basicsize = cast<size_t>(handle(&PyType_Type).attr("__basicsize__"));
-    return (type_data *) (((char *) o) + type_basicsize);
+    return (type_data *) PyObject_GetTypeData((PyObject *) o, Py_TYPE((PyObject *) o));
 }
 #endif
 

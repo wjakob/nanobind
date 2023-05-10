@@ -126,15 +126,9 @@ public:
     void deallocate(T *p, size_type /*n*/) noexcept { PyMem_Free(p); }
 };
 
-template <class T1, class T2>
-bool operator==(const py_allocator<T1> &, const py_allocator<T2> &) noexcept {
-    return true;
-}
-
 template <typename key, typename value, typename hash = std::hash<key>,
           typename eq = std::equal_to<key>>
-using py_map =
-    tsl::robin_map<key, value, hash, eq, py_allocator<std::pair<key, value>>>;
+using py_map = tsl::robin_map<key, value, hash, eq>;
 
 // Linked list of instances with the same pointer address. Usually just 1.
 struct nb_inst_seq {

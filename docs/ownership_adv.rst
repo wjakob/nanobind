@@ -228,8 +228,9 @@ must produce type-specific code to implement the above behaviors.
 
 There is no way to enable ``shared_from_this`` immediately upon
 regular Python-side object construction (i.e., ``SomeType(*args)``
-rather than ``SomeType.some_fn(*args)``). If you need to support that,
-then use :ref:`intrusive reference counting <intrusive>` instead.
+rather than ``SomeType.some_fn(*args)``). If this limitation creates
+a problem for your application, you might get better results by using
+:ref:`intrusive reference counting <intrusive>` instead.
 
 .. warning:: C++ code that receives a raw pointer ``T *obj`` *must not*
    assume that it has exclusive ownership of ``obj``, or even that

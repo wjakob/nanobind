@@ -301,6 +301,7 @@ def test12_shared_from_this_create_shared_in_cpp(clean):
     # The nanobind conversion to shared_ptr<ExampleST> should use the
     # existing shared_from_this shared_ptr
     w3 = t.SharedWrapperST(w.ptr)
+    collect()  # on pypy the w.ptr temporary can stay alive
     assert w3.use_count() == 3
     assert t.same_owner(w2, w3)
 

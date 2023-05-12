@@ -168,15 +168,17 @@ behaviors:
   identical to what would happen if the C++ code did ``return
   obj->shared_from_this();`` (returning an explicit
   ``std::shared_ptr<ST>`` to Python) rather than ``return obj;``.
-  The return value policy has no effect in this case; you will get
+  The return value policy has limited effect in this case; you will get
   shared ownership on the Python side regardless of whether you used
-  ``rv_policy::take_ownership`` or ``rv_policy::reference``.
+  `rv_policy::take_ownership` or `rv_policy::reference`.
+  (`rv_policy::copy` and `rv_policy::move` will still create a new
+  object that has no ongoing relationship to the returned pointer.)
 
   * Note that this behavior occurs only if such a ``std::shared_ptr<ST>``
     already exists! If not, then nanobind behaves as it would without
     ``enable_shared_from_this``: a raw pointer will transfer exclusive
     ownership to Python by default, or will create a non-owning reference
-    if you use ``rv_policy::reference``.
+    if you use `rv_policy::reference`.
 
 * If a Python object is passed to C++ as ``std::shared_ptr<ST> obj``,
   and there already exists an associated ``std::shared_ptr<ST>`` which
@@ -234,9 +236,10 @@ a problem for your application, you might get better results by using
 
 .. warning:: C++ code that receives a raw pointer ``T *obj`` *must not*
    assume that it has exclusive ownership of ``obj``, or even that
-   ``obj`` is allocated on the heap; ``obj`` might be a subobject of a
-   nanobind instance allocated from Python. This applies even if
-   ``T`` supports ``shared_from_this()`` and there is no associated
+   ``obj`` is allocated on the C++ heap (via ``operator new``);
+   ``obj`` might instead be a subobject of a nanobind instance
+   allocated from Python. This applies even if ``T`` supports
+   ``shared_from_this()`` and there is no associated
    ``std::shared_ptr``. Lack of a ``shared_ptr`` does *not* imply
    exclusive ownership; it just means there's no way to share ownership
    with whoever the current owner is.

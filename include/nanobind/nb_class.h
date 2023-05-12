@@ -394,6 +394,10 @@ public:
         if constexpr (detail::has_shared_from_this_v<T>) {
             d.flags |= (uint32_t) detail::type_flags::has_shared_from_this;
             d.keep_shared_from_this_alive = [](PyObject *self) noexcept {
+                // weak_from_this().lock() is equivalent to shared_from_this(),
+                // except that it returns an empty shared_ptr instead of
+                // throwing an exception if there is no active shared_ptr
+                // for this object. (Added in C++17.)
                 if (auto sp = inst_ptr<T>(self)->weak_from_this().lock()) {
                     detail::keep_alive(self, new auto(std::move(sp)),
                                        [](void *p) noexcept {

@@ -15,33 +15,40 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+// shared_ptr deleter that reduces the reference count of a Python object
+struct py_deleter {
+    void operator()(void *) noexcept {
+        // Don't run the deleter if the interpreter has been shut down
+        if (!Py_IsInitialized())
+            return;
+        gil_scoped_acquire guard;
+        Py_DECREF(o);
+    }
+
+    PyObject *o;
+};
+
 /**
- * Create a generic std::shared_ptr to evade population of a potential
- * std::enable_shared_from_this weak pointer. The specified deleter reduces the
- * reference count of the Python object.
+ * Create a std::shared_ptr for `ptr` that owns a reference to the Python
+ * object `h`; if `ptr` is non-null, then the refcount of `h` is incremented
+ * before creating the shared_ptr and decremented by its deleter.
+ *
+ * Usually this is instantiated with T = void, to reduce template bloat.
+ * But if the pointee type uses enable_shared_from_this, we instantiate
+ * with T = that type, in order to allow its internal weak_ptr to share
+ * ownership with the shared_ptr we're creating.
  *
  * The next two functions are simultaneously marked as 'inline' (to avoid
  * linker errors) and 'NB_NOINLINE' (to avoid them being inlined into every
  * single shared_ptr type_caster, which would enlarge the binding size)
  */
-inline NB_NOINLINE std::shared_ptr<void>
-shared_from_python(void *ptr, handle h) noexcept {
-    struct py_deleter {
-        void operator()(void *) noexcept {
-            // Don't run the deleter if the interpreter has been shut down
-            if (!Py_IsInitialized())
-                return;
-            gil_scoped_acquire guard;
-            Py_DECREF(o);
-        }
-
-        PyObject *o;
-    };
-
+template <typename T>
+inline NB_NOINLINE std::shared_ptr<T>
+shared_from_python(T *ptr, handle h) noexcept {
     if (ptr)
-        return std::shared_ptr<void>(ptr, py_deleter{ h.inc_ref().ptr() });
+        return std::shared_ptr<T>(ptr, py_deleter{ h.inc_ref().ptr() });
     else
-        return std::shared_ptr<void>((PyObject *) nullptr);
+        return std::shared_ptr<T>(nullptr);
 }
 
 inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
@@ -50,14 +57,6 @@ inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
                [](void *p) noexcept { delete (std::shared_ptr<void> *) p; });
 }
 
-template <class T, class = void>
-struct uses_shared_from_this : std::false_type { };
-
-template <class T>
-struct uses_shared_from_this<
-    T, std::void_t<decltype(std::declval<T>().shared_from_this())>>
-    : std::true_type { };
-
 template <typename T> struct type_caster<std::shared_ptr<T>> {
     using Value = std::shared_ptr<T>;
     using Caster = make_caster<T>;
@@ -65,11 +64,6 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                   "Binding 'shared_ptr<T>' requires that 'T' can also be bound "
                   "by nanobind. It appears that you specified a type which "
                   "would undergo conversion/copying, which is not allowed.");
-    static_assert(!uses_shared_from_this<T>::value,
-                  "nanobind does not permit use of std::shared_from_this, "
-                  "which can cause undefined behavior. (Refer to "
-                  "https://nanobind.readthedocs.io/en/latest/ownership.html "
-                  "for details.)");
 
     static constexpr auto Name = Caster::Name;
     static constexpr bool IsClass = true;
@@ -84,9 +78,23 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         if (!caster.from_python(src, flags, cleanup))
             return false;
 
-        value = std::static_pointer_cast<T>(
-            shared_from_python(caster.operator T *(), src));
-
+        T *ptr = caster.operator T *();
+        if constexpr (has_shared_from_this_v<T>) {
+            if (ptr) {
+                if (auto sp = ptr->weak_from_this().lock()) {
+                    // There is already a C++ shared_ptr for this object. Use it.
+                    value = std::static_pointer_cast<T>(std::move(sp));
+                    return true;
+                }
+            }
+            // Otherwise create a new one. Use shared_from_python<T>(...)
+            // so that future calls to ptr->shared_from_this() can share
+            // ownership with it.
+            value = shared_from_python(ptr, src);
+        } else {
+            value = std::static_pointer_cast<T>(
+                shared_from_python(static_cast<void *>(ptr), src));
+        }
         return true;
     }
 

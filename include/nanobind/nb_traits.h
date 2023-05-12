@@ -132,6 +132,16 @@ struct detector<std::void_t<Op<Arg>>, Op, Arg>
    avoid redundancy when combined with nb::arg(...).none(). */
 template <typename T> struct remove_opt_mono { using type = T; };
 
+// Detect std::enable_shared_from_this without including <memory>
+template <typename T>
+auto has_shared_from_this_impl(T *ptr) ->
+    decltype(ptr->weak_from_this().lock().get(), std::true_type{});
+std::false_type has_shared_from_this_impl(...);
+
+template <typename T>
+constexpr bool has_shared_from_this_v =
+    decltype(has_shared_from_this_impl((T *) nullptr))::value;
+
 NAMESPACE_END(detail)
 
 template <typename... Args>

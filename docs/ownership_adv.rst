@@ -118,7 +118,7 @@ in the introductory section on object ownership and provides detail on how
 shared pointer conversion is *implemented* by nanobind.
 
 When the user calls a C++ function taking an argument of type
-``std::shared<T>`` from Python, ownership of that object must be
+``std::shared_ptr<T>`` from Python, ownership of that object must be
 shared between C++ to Python. nanobind does this by increasing the reference
 count of the ``PyObject`` and then creating a ``std::shared_ptr<T>`` with a new
 control block containing a custom deleter that will in turn reduce the Python
@@ -139,19 +139,110 @@ true global reference count.
 
 .. _enable_shared_from_this:
 
-Limitations
-^^^^^^^^^^^
+enable_shared_from_this
+^^^^^^^^^^^^^^^^^^^^^^^
 
-nanobind refuses conversion of classes that derive from
-``std::enable_shared_from_this<T>``. This is a fundamental limitation:
-nanobind instances do not create a base shared pointer that declares
-ownership of an object. Other parts of a C++ codebase might then incorrectly
-assume ownership and eventually try to ``delete`` a nanobind instance
-allocated using ``pymalloc`` (which is undefined behavior). A compile-time
-assertion catches this and warns about the problem.
+The C++ standard library class ``std::enable_shared_from_this<T>``
+allows an object that inherits from it to locate an existing
+``std::shared_ptr<T>`` that manages that object. nanobind supports
+types that inherit from ``enable_shared_from_this``, with some caveats
+described in this section.
 
-Replacing shared pointers with :ref:`intrusive reference counting
-<intrusive>` fixes this limitations.
+Background (not nanobind-specific): Suppose a type ``ST`` inherits
+from ``std::enable_shared_from_this<ST>``. When a raw pointer ``ST
+*obj`` or ``std::unique_ptr<ST> obj`` is wrapped in a shared pointer
+using a constructor of the form ``std::shared_ptr<ST>(obj, ...)``, a
+reference to the new ``shared_ptr``\'s control block is saved (as
+``std::weak_ptr<ST>``) inside the object. This allows new
+``shared_ptr``\s that share ownership with the existing one to be
+obtained for the same object using ``obj->shared_from_this()`` or
+``obj->weak_from_this()``.
+
+nanobind's support for ``std::enable_shared_from_this`` consists of three
+behaviors:
+
+* If a raw pointer ``ST *obj`` is returned from C++ to Python, and
+  there already exists an associated ``std::shared_ptr<ST>`` which
+  ``obj->shared_from_this()`` can locate, then nanobind will produce a
+  Python instance that shares ownership with it. The behavior is
+  identical to what would happen if the C++ code did ``return
+  obj->shared_from_this();`` (returning an explicit
+  ``std::shared_ptr<ST>`` to Python) rather than ``return obj;``.
+  The return value policy has limited effect in this case; you will get
+  shared ownership on the Python side regardless of whether you used
+  `rv_policy::take_ownership` or `rv_policy::reference`.
+  (`rv_policy::copy` and `rv_policy::move` will still create a new
+  object that has no ongoing relationship to the returned pointer.)
+
+  * Note that this behavior occurs only if such a ``std::shared_ptr<ST>``
+    already exists! If not, then nanobind behaves as it would without
+    ``enable_shared_from_this``: a raw pointer will transfer exclusive
+    ownership to Python by default, or will create a non-owning reference
+    if you use `rv_policy::reference`.
+
+* If a Python object is passed to C++ as ``std::shared_ptr<ST> obj``,
+  and there already exists an associated ``std::shared_ptr<ST>`` which
+  ``obj->shared_from_this()`` can locate, then nanobind will produce a
+  ``std::shared_ptr<ST>`` that shares ownership with it: an additional
+  reference to the same control block, rather than a new control block
+  (as would occur without ``enable_shared_from_this``). This improves
+  performance and makes the result of ``shared_ptr::use_count()`` more
+  accurate.
+
+* If a Python object is passed to C++ as ``std::shared_ptr<ST> obj``, and
+  there is no associated ``std::shared_ptr<ST>`` that
+  ``obj->shared_from_this()`` can locate, then nanobind will produce
+  a ``std::shared_ptr<ST>`` as usual (with a new control block whose deleter
+  drops a Python object reference), *and* will do so in a way that enables
+  future calls to ``obj->shared_from_this()`` to find it as long
+  as any ``shared_ptr`` that shares this control block is still alive on
+  the C++ side.
+
+  (Once all of the ``std::shared_ptr<ST>``\s that share this control block
+  have been destroyed, the underlying PyObject reference being
+  managed by the ``shared_ptr`` deleter will be dropped,
+  and ``shared_from_this()`` will stop working. It can be reenabled by
+  passing the Python object back to C++ as ``std::shared_ptr<ST>`` once more,
+  which will create another control block.)
+
+Bindings for a class that supports ``enable_shared_from_this`` will be
+slightly larger than bindings for a class that doesn't, as nanobind
+must produce type-specific code to implement the above behaviors.
+
+.. warning:: The ``shared_from_this()`` method will only work when there
+   is actually a ``std::shared_ptr`` managing the object. A nanobind
+   instance constructed from Python will not have an associated
+   ``std::shared_ptr`` yet, so ``shared_from_this()`` will throw an
+   exception if you pass such an instance to C++ using a reference or
+   raw pointer. ``shared_from_this()`` will only work when there exists
+   a corresponding live ``std::shared_ptr`` on the C++ side.
+
+   The only situation where nanobind will create the first
+   ``std::shared_ptr`` for an object (thus enabling
+   ``shared_from_this()``), even with ``enable_shared_from_this``, is
+   when a Python instance is passed to C++ as the explicit type
+   ``std::shared_ptr<T>``. If you don't do this, or if no such
+   ``std::shared_ptr`` is still alive, then ``shared_from_this()`` will
+   throw an exception. It also works to create the ``std::shared_ptr``
+   on the C++ side, such as by using a factory function which always
+   uses ``std::make_shared<T>(...)`` to construct the object, and
+   returns the resulting ``std::shared_ptr<T>`` to Python.
+
+There is no way to enable ``shared_from_this`` immediately upon
+regular Python-side object construction (i.e., ``SomeType(*args)``
+rather than ``SomeType.some_fn(*args)``). If this limitation creates
+a problem for your application, you might get better results by using
+:ref:`intrusive reference counting <intrusive>` instead.
+
+.. warning:: C++ code that receives a raw pointer ``T *obj`` *must not*
+   assume that it has exclusive ownership of ``obj``, or even that
+   ``obj`` is allocated on the C++ heap (via ``operator new``);
+   ``obj`` might instead be a subobject of a nanobind instance
+   allocated from Python. This applies even if ``T`` supports
+   ``shared_from_this()`` and there is no associated
+   ``std::shared_ptr``. Lack of a ``shared_ptr`` does *not* imply
+   exclusive ownership; it just means there's no way to share ownership
+   with whoever the current owner is.
 
 .. _unique_ptr_adv:
 

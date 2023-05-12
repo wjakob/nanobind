@@ -132,6 +132,14 @@ struct detector<std::void_t<Op<Arg>>, Op, Arg>
    avoid redundancy when combined with nb::arg(...).none(). */
 template <typename T> struct remove_opt_mono { using type = T; };
 
+template <typename Base, typename Derived>
+struct is_accessible_static_base_of {
+    template <typename B = Base, typename D = Derived>
+    static decltype(static_cast<D*>(std::declval<B*>()), std::true_type()) check(B*);
+    static std::false_type check(...);
+    static constexpr bool value = decltype(check((Base*)nullptr))::value;
+};
+
 NAMESPACE_END(detail)
 
 template <typename... Args>

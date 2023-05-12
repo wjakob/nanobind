@@ -340,6 +340,16 @@ public:
         sizeof...(Ts) == !std::is_same_v<Base, T> + !std::is_same_v<Alias, T>,
         "nanobind::class_<> was invoked with extra arguments that could not be handled");
 
+    // Fail on virtual bases -- they need a this-ptr adjustment, but they're
+    // not amenable to the runtime test in the class_ constructor (because
+    // a C-style cast will do reinterpret_cast if static_cast is invalid).
+    // Primary but inaccessible (ambiguous or private) bases will also
+    // fail is_accessible_static_base_of; the !is_convertible option is to
+    // avoid mis-detecting them as virtual bases.
+    static_assert(!std::is_convertible_v<T*, Base*> ||
+                  detail::is_accessible_static_base_of<Base, T>::value,
+                  "nanobind does not support virtual base classes");
+
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
         detail::type_init_data d;
@@ -354,6 +364,13 @@ public:
         if constexpr (!std::is_same_v<Base, T>) {
             d.base = &typeid(Base);
             d.flags |= (uint32_t) detail::type_init_flags::has_base;
+
+            if (uintptr_t offset = (uintptr_t) (Base*) (T*) 0x1000 - 0x1000) {
+                detail::raise("nanobind::class_<>: base class %s is at offset "
+                              "%td within %s! nanobind does not support "
+                              "multiple inheritance", typeid(Base).name(),
+                              offset, typeid(T).name());
+            }
         }
 
         if constexpr (!std::is_same_v<Alias, T>)

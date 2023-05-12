@@ -631,3 +631,10 @@ def test34_trampoline_optimization():
             assert t.go(d2) == 'Rufus says woof'
         finally:
             t.Dog.name = old
+
+
+def test35_non_primary():
+    with pytest.raises(RuntimeError, match="not support multiple inheritance"):
+        t.bind_newly_polymorphic_subclass()
+    with pytest.raises(RuntimeError, match="not support multiple inheritance"):
+        t.bind_subclass_with_non_primary_base()

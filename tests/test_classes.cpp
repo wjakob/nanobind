@@ -477,4 +477,23 @@ NB_MODULE(test_classes_ext, m) {
     m.def("polymorphic_factory_2", []() { return (PolymorphicBase *) new AnotherPolymorphicSubclass(); });
     m.def("factory", []() { return (Base *) new Subclass(); });
     m.def("factory_2", []() { return (Base *) new AnotherSubclass(); });
+
+    // Test detection of unsupported base/derived relationships
+    // (nanobind requires base subobjects to be at offset zero in the
+    // derived class)
+    struct DerivedBecomesPolymorphic : Struct {
+        virtual ~DerivedBecomesPolymorphic() {}
+    };
+    struct DerivedNonPrimary : Big, Struct {};
+    struct DerivedVirt : virtual Struct {};
+    m.def("bind_newly_polymorphic_subclass", []() {
+        nb::class_<DerivedBecomesPolymorphic, Struct>(
+            nb::handle(), "DerivedBecomesPolymorphic");
+    });
+    m.def("bind_subclass_with_non_primary_base", []() {
+        nb::class_<DerivedNonPrimary, Struct>(nb::handle(), "DerivedNonPrimary");
+    });
+    static_assert(!nb::detail::is_accessible_static_base_of<Struct, DerivedVirt>::value);
+    // this fails at compile time:
+    //nb::class_<DerivedVirt, Struct>(nb::handle(), "DerivedVirt");
 }

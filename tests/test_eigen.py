@@ -308,7 +308,7 @@ def test11_prop():
 
 @needs_numpy_and_eigen
 def test12_cast():
-    vec = np.ones(1000, dtype=int)
+    vec = np.ones(1000, dtype=np.int32)
     assert_array_equal(t.castToMapVectorXi(vec), vec)
     assert_array_equal(t.castToRefVectorXi(vec), vec)
     for vec in vec[::2], np.float32(vec):

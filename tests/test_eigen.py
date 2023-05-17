@@ -308,12 +308,13 @@ def test11_prop():
 
 @needs_numpy_and_eigen
 def test12_cast():
-    vec = np.ones(1000, dtype=np.int32)
-    assert_array_equal(t.castToMapVectorXi(vec), vec)
-    assert_array_equal(t.castToRefVectorXi(vec), vec)
+    vec = np.arange(1000, dtype=np.int32)
+    assert_array_equal(t.castToMapVXi(vec), vec)
+    assert_array_equal(t.castToRefVXi(vec), vec)
+    assert_array_equal(t.castToRefConstVXi(vec), vec)
     for vec in vec[::2], np.float32(vec):
         with pytest.raises(RuntimeError, match="bad cast"):
-            t.castToMapVectorXi(vec)
+            t.castToMapVXi(vec)
         with pytest.raises(RuntimeError, match="bad cast"):
-            t.castToRefVectorXi(vec)
-
+            t.castToRefVXi(vec)
+        assert_array_equal(t.castToRefConstVXi(vec), vec)

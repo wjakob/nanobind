@@ -31,13 +31,13 @@ constexpr int NumDimensions = bool(T::IsVectorAtCompileTime) ? 1 : 2;
 template<typename T>
 struct StrideExtr
 {
-  using Type = Eigen::Stride<0, 0>;
+    using Type = Eigen::Stride<0, 0>;
 };
 
 template <typename T, int Options, typename StrideType>
 struct StrideExtr<Eigen::Map<T, Options, StrideType>>
 {
-  using Type = StrideType;
+    using Type = StrideType;
 };
 
 template<typename T>
@@ -204,35 +204,33 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
     NDArrayCaster caster;
 
-    bool from_python(handle src, uint8_t flags,
-                     cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         if (!cleanup)
             flags &= ~(uint8_t)cast_flags::convert;
-        return from_python2(src, flags, cleanup);
+        return from_python_(src, flags, cleanup);
     }
 
-    bool from_python2(handle src, uint8_t flags,
-      cleanup_list* cleanup) noexcept {
-      if (!caster.from_python(src, flags, cleanup))
-        return false;
-      if constexpr (!requiresContigMemory<Map>)
-      {
-        if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic)
-          if (std::max<Eigen::Index>(1, StrideType::InnerStrideAtCompileTime) != (NumDimensions<T> == 1 || !T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
+    bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
+        if (!caster.from_python(src, flags, cleanup))
             return false;
-        if constexpr (NumDimensions<T> == 2 && StrideType::OuterStrideAtCompileTime != Eigen::Dynamic)
-        {
-          auto outerStrideExpected =
-              StrideType::OuterStrideAtCompileTime != 0
-              ? StrideType::OuterStrideAtCompileTime
-              : T::IsRowMajor
-                  ? caster.value.shape(0)
-                  : caster.value.shape(1);
-          if (outerStrideExpected != (T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
-              return false;
+        if constexpr (!requiresContigMemory<Map>)  {
+            if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic)
+                if (std::max<int64_t>(1, StrideType::InnerStrideAtCompileTime) != (NumDimensions<T> == 1 || !T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
+                    return false;
+            if constexpr (NumDimensions<T> == 2 && StrideType::OuterStrideAtCompileTime != Eigen::Dynamic) {
+                int64_t outerStrideExpected;
+                if constexpr (StrideType::OuterStrideAtCompileTime != 0)
+                    outerStrideExpected = StrideType::OuterStrideAtCompileTime;
+                else
+                    if constexpr (T::IsRowMajor)
+                        outerStrideExpected = caster.value.shape(1);
+                    else
+                        outerStrideExpected = caster.value.shape(0);
+                if (outerStrideExpected != (T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
+                    return false;
+            }
         }
-      }
-      return true;
+        return true;
     }
 
     static handle from_cpp(const Map &v, rv_policy, cleanup_list *cleanup) noexcept {
@@ -255,29 +253,27 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
     }
 
     StrideType strides() const {
-      constexpr int IS = StrideType::InnerStrideAtCompileTime,
-                    OS = StrideType::OuterStrideAtCompileTime;
+        constexpr int IS = StrideType::InnerStrideAtCompileTime,
+                      OS = StrideType::OuterStrideAtCompileTime;
 
         int64_t inner = caster.value.stride(0),
                 outer;
         if constexpr (NumDimensions<T> == 1)
-          outer = caster.value.shape(0);
+            outer = caster.value.shape(0);
         else
-          outer = caster.value.stride(1);
+            outer = caster.value.stride(1);
 
         if constexpr (T::IsRowMajor)
             std::swap(inner, outer);
 
-        if constexpr (IS == 0)
-        {
-          assert(inner == 1);
-          inner = 0;
+        if constexpr (IS == 0) {
+            assert(inner == 1);
+            inner = 0;
         }
 
-        if constexpr (OS == 0)
-        {
-          assert(NumDimensions<T> == 1 || outer == (T::IsRowMajor ? caster.value.shape(1) : caster.value.shape(0)));
-          outer = 0;
+        if constexpr (OS == 0) {
+            assert(NumDimensions<T> == 1 || outer == (T::IsRowMajor ? int64_t(caster.value.shape(1)) : int64_t(caster.value.shape(0))));
+            outer = 0;
         }
 
         if constexpr (std::is_same_v<StrideType, Eigen::InnerStride<IS>>)
@@ -290,32 +286,43 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
     operator Map() {
         NDArray &t = caster.value;
-        return Map(t.data(), t.shape(0), t.ndim() == 1 ? 1 : t.shape(1),
-                   strides());
+        return Map(t.data(), t.shape(0), t.ndim() == 1 ? 1 : t.shape(1), strides());
     }
 };
+
 
 /// Caster for Eigen::Ref<T>
 template <typename T, int Options, typename StrideType>
 struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T> && is_ndarray_scalar_v<typename T::Scalar>>> {
     using Ref = Eigen::Ref<T, Options, StrideType>;
     using Map = Eigen::Map<T, Options, StrideType>;
+    using DMap = Eigen::Map<T, Options, DStride>;
     using MapCaster = make_caster<Map>;
+    using DMapCaster = make_caster<DMap>;
     static constexpr bool IsClass = false;
     static constexpr auto Name = MapCaster::Name;
     template <typename T_> using Cast = Ref;
 
     MapCaster caster;
+    DMapCaster dcaster;
 
-    bool from_python(handle src, uint8_t flags,
-                     cleanup_list *cleanup) noexcept {
-        if constexpr (!std::is_const_v<T>)
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        if constexpr (std::is_const_v<T>)
             if (!cleanup)
-                flags &= ~(uint8_t)cast_flags::convert;
-        return caster.from_python2(src, flags, cleanup);
+                return caster.from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup) ||
+                       dcaster.from_python_(src, flags, cleanup);
+        return caster.from_python(src, flags, cleanup);
     }
 
-    operator Ref() { return Ref(caster.operator Map()); }
+    operator Ref() {
+        if constexpr (std::is_const_v<T>)
+            if (dcaster.caster.value.is_valid()) {
+                // Return a Ref that owns the data it maps.
+                assert(!Eigen::internal::traits<Ref>::template match<DMap>::type::value);
+                return Ref(dcaster.operator DMap());
+            }
+        return Ref(caster.operator Map());
+    }
 };
 
 NAMESPACE_END(detail)

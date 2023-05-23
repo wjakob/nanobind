@@ -163,6 +163,10 @@ static PyType_Spec nb_method_spec = {
 static PyMemberDef nb_bound_method_members[] = {
     { "__vectorcalloffset__", T_PYSSIZET,
       (Py_ssize_t) offsetof(nb_bound_method, vectorcall), READONLY, nullptr },
+    { "__func__", T_OBJECT_EX,
+      (Py_ssize_t) offsetof(nb_bound_method, func), READONLY, nullptr },
+    { "__self__", T_OBJECT_EX,
+      (Py_ssize_t) offsetof(nb_bound_method, self), READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 

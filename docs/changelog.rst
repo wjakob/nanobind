@@ -113,6 +113,11 @@ Version 1.3.0 (TBD)
   on object ownership <enable_shared_from_this>` for more details.
   (PR `#212 <https://github.com/wjakob/nanobind/pull/212>`__).
 
+* Added introspection attributes ``__self__`` and ``__func__`` to nanobind
+  bound methods, to make them more like regular Python bound methods.
+  Fixed a bug where ``some_obj.method.__call__()`` would behave differently
+  than ``some_obj.method()``.
+
 * ABI version 8.
 
 Version 1.2.0 (April 24, 2023)

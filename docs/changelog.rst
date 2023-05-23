@@ -117,6 +117,7 @@ Version 1.3.0 (TBD)
   bound methods, to make them more like regular Python bound methods.
   Fixed a bug where ``some_obj.method.__call__()`` would behave differently
   than ``some_obj.method()``.
+  (PR `#216 <https://github.com/wjakob/nanobind/pull/216>`__).
 
 * ABI version 8.
 

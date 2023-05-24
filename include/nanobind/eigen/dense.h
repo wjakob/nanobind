@@ -231,27 +231,18 @@ struct type_caster<T, enable_if_t<is_eigen_xpr_v<T> &&
     }
 };
 
-/** \brief Type caster for ``Eigen::Map<T>``
 
-  The ``Eigen::Map<..>`` type exists to efficiently access memory provided by a
-  caller. Given that, the nanobind type caster refuses to turn incompatible
-  inputs into a ``Eigen::Map<T>`` when this would require an implicit
-  conversion.
-*/
-
-template <typename T, int Options, typename StrideType>
-struct type_caster<Eigen::Map<T, Options, StrideType>,
-                   enable_if_t<is_eigen_plain_v<T> &&
-                               is_ndarray_scalar_v<typename T::Scalar>>> {
-    using Map = Eigen::Map<T, Options, StrideType>;
+template <typename T, int IS, int OS>
+struct map_base_caster_impl
+{
     using NDArray =
-        array_for_eigen_t<Map, std::conditional_t<std::is_const_v<Map>,
-                                                  const typename Map::Scalar,
-                                                  typename Map::Scalar>>;
+        array_for_eigen_t<T, std::conditional_t<std::is_const_v<T>,
+                                                  const typename T::Scalar,
+                                                  typename T::Scalar>>;
     using NDArrayCaster = type_caster<NDArray>;
     static constexpr bool IsClass = false;
     static constexpr auto Name = NDArrayCaster::Name;
-    template <typename T_> using Cast = Map;
+    template <typename T_> using Cast = T;
 
     NDArrayCaster caster;
 
@@ -265,13 +256,13 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
             return false;
 
         // Check for memory layout compatibility of non-contiguous 'Map' types
-        if constexpr (!is_contiguous_v<Map>)  {
+        if constexpr (!is_contiguous_v<T>)  {
             // Dynamic inner strides support any input, check the fixed case
-            if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic) {
+            if constexpr (IS != Eigen::Dynamic) {
                 // A compile-time stride of 0 implies "contiguous" ..
-                int64_t is_expected = StrideType::InnerStrideAtCompileTime == 0
+                int64_t is_expected = IS == 0
                                       ? 1 /*  .. and equals 1 for the inner stride */
-                                      : StrideType::InnerStrideAtCompileTime,
+                                      : IS,
                         is_actual = caster.value.stride(
                             (ndim_v<T> != 1 && T::IsRowMajor) ? 1 : 0);
 
@@ -280,10 +271,10 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
             }
 
             // Analogous check for the outer strides
-            if constexpr (ndim_v<T> == 2 && StrideType::OuterStrideAtCompileTime != Eigen::Dynamic) {
-                int64_t os_expected = StrideType::OuterStrideAtCompileTime == 0
+            if constexpr (ndim_v<T> == 2 && OS != Eigen::Dynamic) {
+                int64_t os_expected = OS == 0
                                         ? caster.value.shape(T::IsRowMajor ? 1 : 0)
-                                        : StrideType::OuterStrideAtCompileTime,
+                                        : OS,
                         os_actual   = caster.value.stride(T::IsRowMajor ? 0 : 1);
 
                 if (os_expected != os_actual)
@@ -293,7 +284,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const T &v, rv_policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -311,17 +302,38 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
             rv_policy::reference, cleanup);
     }
+};
+
+/** \brief Type caster for ``Eigen::Map<T>``
+
+  The ``Eigen::Map<..>`` type exists to efficiently access memory provided by a
+  caller. Given that, the nanobind type caster refuses to turn incompatible
+  inputs into a ``Eigen::Map<T>`` when this would require an implicit
+  conversion.
+*/
+template <typename T, int Options, typename StrideType>
+struct type_caster<Eigen::Map<T, Options, StrideType>,
+                   enable_if_t<is_eigen_plain_v<T> &&
+                               is_ndarray_scalar_v<typename T::Scalar>>>
+    : public map_base_caster_impl<Eigen::Map<T, Options, StrideType>,
+                                  StrideType::InnerStrideAtCompileTime,
+                                  StrideType::OuterStrideAtCompileTime>
+{
+    using Base = map_base_caster_impl<Eigen::Map<T, Options, StrideType>,
+                                      StrideType::InnerStrideAtCompileTime,
+                                      StrideType::OuterStrideAtCompileTime>;
+    static constexpr int IS = StrideType::InnerStrideAtCompileTime;
+    static constexpr int OS = StrideType::OuterStrideAtCompileTime;
+    using NDArray = typename Base::NDArray;
+    using Map = Eigen::Map<T, Options, StrideType>;
 
     StrideType strides() const {
-        constexpr int IS = StrideType::InnerStrideAtCompileTime,
-                      OS = StrideType::OuterStrideAtCompileTime;
-
-        int64_t inner = caster.value.stride(0),
+        int64_t inner = this->caster.value.stride(0),
                 outer;
         if constexpr (ndim_v<T> == 1)
-            outer = caster.value.shape(0);
+            outer = this->caster.value.shape(0);
         else
-            outer = caster.value.stride(1);
+            outer = this->caster.value.stride(1);
 
         if constexpr (ndim_v<T> == 2 && T::IsRowMajor)
             std::swap(inner, outer);
@@ -342,12 +354,28 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     }
 
     operator Map() {
-        NDArray &t = caster.value;
+        NDArray& t = this->caster.value;
         if constexpr (ndim_v<T> == 1)
             return Map(t.data(), t.shape(0), strides());
         else
             return Map(t.data(), t.shape(0), t.shape(1), strides());
     }
+};
+
+
+/** \brief Type caster for ``Eigen::Block<T>``
+
+  The ``Eigen::Block<..>`` gives access to a rectangular part of a matrix or array.
+  When the block is a view of a type with internal storage, share the data buffer.
+*/
+template <typename T, int BlockRows, int BlockCols, bool InnerPanel>
+struct type_caster<Eigen::Block<T, BlockRows, BlockCols, InnerPanel>,
+                   enable_if_t<is_eigen_plain_v<T> &&
+                               is_ndarray_scalar_v<typename T::Scalar>>>
+    : public map_base_caster_impl<Eigen::Block<T, BlockRows, BlockCols, InnerPanel>,
+                                  Eigen::internal::traits<Eigen::Block<T, BlockRows, BlockCols, InnerPanel>>::InnerStrideAtCompileTime,
+                                  Eigen::internal::traits<Eigen::Block<T, BlockRows, BlockCols, InnerPanel>>::OuterStrideAtCompileTime>
+{
 };
 
 /** \brief Caster for Eigen::Ref<T>

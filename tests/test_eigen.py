@@ -308,7 +308,7 @@ def test10_eigen_scalar_default():
 def test11_prop():
     for j in range(3):
         c = t.ClassWithEigenMember()
-        ref = np.ones((2, 2))
+        ref = np.ones((3, 3))
         if j == 0:
             c.member = ref
 
@@ -349,3 +349,35 @@ def test12_cast():
     for v in vec, vec2, vecf:
         with pytest.raises(RuntimeError, match='bad[_ ]cast'):
             t.castToRef03CnstVXi(v)
+
+@needs_numpy_and_eigen
+def test13_view():
+    c = t.ClassWithEigenMember()
+    view = c.get_view()
+    ref = np.ones((2, 2))
+    assert view.size == 4
+    assert view.shape == (2, 2)
+    assert np.all(view == ref)
+
+    view[0, 0] = 10.
+    # a view is an expression, evaluated when returned
+    assert c.member[0, 0] == 1.
+
+@needs_numpy_and_eigen
+def test14_block():
+    c = t.ClassWithEigenMember()
+    block = c.get_block()
+    ref = np.ones((2, 2))
+    assert block.size == 4
+    assert block.shape == (2, 2)
+    assert np.all(block == ref)
+
+    block[0, 0] = 10.
+    assert c.member[0, 0] == 10.
+
+@needs_numpy_and_eigen
+def test15_index():
+    c = t.ClassWithEigenMember()
+    index = c.get_index()
+    assert isinstance(index, float)
+    assert index == 1.

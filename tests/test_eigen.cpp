@@ -192,12 +192,16 @@ NB_MODULE(test_eigen_ext, m) {
 
 
     struct ClassWithEigenMember {
-        Eigen::MatrixXd member = Eigen::Matrix2d::Ones();
+        Eigen::MatrixXd member = Eigen::Matrix3d::Ones();
     };
 
     nb::class_<ClassWithEigenMember>(m, "ClassWithEigenMember")
         .def(nb::init<>())
-        .def_rw("member", &ClassWithEigenMember::member);
+        .def_rw("member", &ClassWithEigenMember::member)
+        .def("get_view", [](ClassWithEigenMember& c){ return c.member(Eigen::seq(0, 2, 2), Eigen::seq(0, 1)); })
+        .def("get_block", [](ClassWithEigenMember& c){ return c.member(Eigen::seq(0, 1), Eigen::seq(0, 1)); })
+        .def("get_xpr_block", [](ClassWithEigenMember& c){ return (c.member * 1.)(Eigen::seq(0, 1), Eigen::seq(0, 1)); })
+        .def("get_index", [](ClassWithEigenMember& c){ return c.member(0, 0); });
 
     m.def("castToMapVXi", [](nb::object obj) -> Eigen::Map<Eigen::VectorXi> {
         return nb::cast<Eigen::Map<Eigen::VectorXi>>(obj);
@@ -214,5 +218,4 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("castToRef03CnstVXi", [](nb::object obj) -> Eigen::VectorXi {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi, Eigen::Unaligned, Eigen::InnerStride<3>>>(obj);
     });
-
 }

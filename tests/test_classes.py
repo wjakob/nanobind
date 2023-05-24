@@ -607,6 +607,7 @@ def test33_polymorphic_downcast():
     assert isinstance(t.polymorphic_factory(), t.PolymorphicSubclass)
     assert isinstance(t.polymorphic_factory_2(), t.PolymorphicBase)
 
+
 def test34_trampoline_optimization():
     class Rufus(t.Dog):
         def __init__(self):
@@ -631,3 +632,19 @@ def test34_trampoline_optimization():
             assert t.go(d2) == 'Rufus says woof'
         finally:
             t.Dog.name = old
+
+
+def test35_method_introspection():
+    obj = t.Struct(5)
+    m = obj.value
+    assert m() == m.__call__() == 5
+    assert hash(m) == m.__hash__()
+    assert repr(m) == m.__repr__()
+    assert "bound_method" in repr(m)
+    assert m.__self__ is obj
+    assert m.__func__ is t.Struct.value
+    # attributes not defined by nb_bound_method are forwarded to nb_method:
+    assert m.__name__ == "value"
+    assert m.__qualname__ == "Struct.value"
+    assert m.__module__ == t.__name__
+    assert m.__doc__ == t.Struct.value.__doc__ == "value(self) -> int"

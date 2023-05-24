@@ -1128,9 +1128,22 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
         return PyObject_GenericGetAttr(self, name_);
 }
 
-PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name) {
+PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name_) {
+    bool passthrough = false;
+    if (const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr)) {
+        // These attributes do exist on nb_bound_method (because they
+        // exist on every type) but we want to take their special handling
+        // from nb_func_getattro instead.
+        passthrough = (strcmp(name, "__doc__") == 0 ||
+                       strcmp(name, "__module__") == 0);
+    }
+    if (!passthrough) {
+        if (PyObject* res = PyObject_GenericGetAttr(self, name_))
+            return res;
+        PyErr_Clear();
+    }
     nb_func *func = ((nb_bound_method *) self)->func;
-    return nb_func_getattro((PyObject *) func, name);
+    return nb_func_getattro((PyObject *) func, name_);
 }
 
 /// Excise a substring from 's'

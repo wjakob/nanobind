@@ -821,7 +821,7 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     return false;
 }
 
-#if PY_VERSION_HEX < 0x030c0000
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && PY_VERSION_HEX < 0x030c0000
 // Direct access for compact integers. These functions are
 // available as part of Python starting with version 3.12b1+
 

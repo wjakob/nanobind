@@ -119,6 +119,12 @@ Version 1.3.0 (TBD)
   than ``some_obj.method()``.
   (PR `#216 <https://github.com/wjakob/nanobind/pull/216>`__).
 
+* Use the new `PEP-697 <https://peps.python.org/pep-0697/>`__ interface to
+  access data in type objects when compiling stable ABI3 wheels. This improves
+  forward compatibility (the Python team may at some point significantly
+  refactor the layout and internals of type objects). (PR `#211
+  <https://github.com/wjakob/nanobind/pull/211>`__):
+
 * ABI version 8.
 
 Version 1.2.0 (April 24, 2023)

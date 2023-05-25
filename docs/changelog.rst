@@ -24,6 +24,9 @@ Version 1.3.0 (TBD)
 * Refined compiler and linker flags across platforms to ensure compact binaries
   especially in ``NB_STATIC`` builds. (commit `5ead9f
   <https://github.com/wjakob/nanobind/commit/5ead9ff348a2ef0df8231e6480607a5b0623a16b>`__)
+*  The :cpp:class:`nb::ndarray\<..\> <ndarray>` class can now use the buffer
+  protocol to receive and return arrays representing read-only memory. (PR
+  `#217 <https://github.com/wjakob/nanobind/pull/217>`__)t.
 * Reduced the number of exception-related exports to further crunch
   ``libnanobind``. (commit `763962
   <https://github.com/wjakob/nanobind/commit/763962b8ce76414148089ef6a68cff97d7cc66ce>`__).

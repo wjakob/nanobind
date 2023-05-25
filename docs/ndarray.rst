@@ -115,6 +115,10 @@ The following constraints are available
 - A scalar type (``float``, ``uint8_t``, etc.) constrains the representation
   of the ndarray.
 
+- This scalar type can be further annotated with ``const``, which is necessary
+  if you plan to call nanobind functions with arrays that do not permit write
+  access.
+
 - The :cpp:class:`nb::shape <shape>` annotation simultaneously constrains the
   number of array dimensions and the size per dimension. A :cpp:var:`nb::any
   <any>` entry leaves the corresponding dimension unconstrained.
@@ -176,8 +180,9 @@ conversion. This, e.g., makes possible to call a function expecting a
 ``float32`` array with ``float64`` data. Implicit conversions create
 temporary ndarrays containing a copy of the data, which can be
 undesirable. To suppress then, add a
-:cpp:func:`nb::arg("ndarray").noconvert() <arg::noconvert>`
-:cpp:func:`"ndarray"_a.noconvert() <arg::noconvert>` or
+:cpp:func:`nb::arg("my_array_arg").noconvert() <arg::noconvert>`
+or
+:cpp:func:`"my_array_arg"_a.noconvert() <arg::noconvert>` or
 function binding annotation.
 
 Binding functions that return arrays
@@ -188,23 +193,26 @@ to CPU/GPU memory, and what framework (NumPy/..) should be used to encapsulate
 the data.
 
 The following simple binding declaration shows how to return a ``2x4``
-NumPy floating point matrix.
+NumPy floating point matrix that does not permit write access.
 
 .. code-block:: cpp
 
-   float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+   // at top level
+   const float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-   m.def("ret_numpy", []() {
-       size_t shape[2] = { 2, 4 };
-       return nb::ndarray<nb::numpy, float, nb::shape<2, nb::any>>(
-           data, /* ndim = */ 2, shape);
-   });
+   NB_MODULE(my_ext, m) {
+       m.def("ret_numpy", []() {
+           size_t shape[2] = { 2, 4 };
+           return nb::ndarray<nb::numpy, const float, nb::shape<2, nb::any>>(
+               data, /* ndim = */ 2, shape);
+       });
+    }
 
 The auto-generated docstring of this function is:
 
 .. code-block:: python
 
-   ret_pytorch() -> np.ndarray[float32, shape=(2, *)]
+   ret_pytorch() -> np.ndarray[float32, writable=False, shape=(2, *)]
 
 Calling it in Python yields
 
@@ -230,7 +238,7 @@ values:
 
 Note that shape and order annotations like :cpp:class:`nb::shape <shape>` and
 :cpp:class:`nb::c_contig <c_contig>` enter into the docstring, but nanobind
-won’t spend time on additional checks. It trusts that your method returns what
+won't spend time on additional checks. It trusts that your method returns what
 it declares. Furthermore, non-CPU ndarrays must be explicitly indicate the
 device type and device ID using special parameters of the :cpp:func:`ndarray()
 <ndarray::ndarray()>` constructor shown below. Device types indicated via
@@ -324,3 +332,7 @@ nanobind's :cpp:class:`nb::ndarray\<...\> <ndarray>` is based on the `DLPack
 <https://github.com/dmlc/dlpack>`__ array exchange protocol, which causes it to
 be more restrictive. Presently supported dtypes include signed/unsigned
 integers, floating point values, and boolean values.
+
+Nanobind can receive and return read-only arrays via the buffer protocol used
+to exchange data with NumPy. The DLPack interface currently ignores this
+annotation.

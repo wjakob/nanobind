@@ -112,6 +112,7 @@ struct ndarray_req {
     size_t *shape = nullptr;
     bool req_shape = false;
     bool req_dtype = false;
+    bool req_ro = false;
     char req_order = '\0';
     uint8_t req_device = 0;
 };
@@ -126,11 +127,14 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_floating_point_v
     static constexpr size_t size = 0;
 
     static constexpr auto name =
-        const_name("dtype=float") + const_name<sizeof(T) * 8>();
+        const_name("dtype=float") +
+        const_name<sizeof(T) * 8>() +
+        const_name<std::is_const_v<T>>(", writable=False", "");
 
     static void apply(ndarray_req &tr) {
         tr.dtype = dtype<T>();
         tr.req_dtype = true;
+        tr.req_ro = std::is_const_v<T>;
     }
 };
 
@@ -138,23 +142,29 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> &&
     static constexpr size_t size = 0;
 
     static constexpr auto name =
-        const_name("dtype=") + const_name<std::is_unsigned_v<T>>("u", "") +
-        const_name("int") + const_name<sizeof(T) * 8>();
+        const_name("dtype=") +
+        const_name<std::is_unsigned_v<T>>("u", "") +
+        const_name("int") + const_name<sizeof(T) * 8>() +
+        const_name<std::is_const_v<T>>(", writable=False", "");
 
     static void apply(ndarray_req &tr) {
         tr.dtype = dtype<T>();
         tr.req_dtype = true;
+        tr.req_ro = std::is_const_v<T>;
     }
 };
 
 template <typename T> struct ndarray_arg<T, enable_if_t<std::is_same_v<T, bool>>> {
     static constexpr size_t size = 0;
 
-    static constexpr auto name = const_name("dtype=bool");
+    static constexpr auto name =
+        const_name("dtype=bool") +
+        const_name<std::is_const_v<T>>(", writable=False", "");
 
     static void apply(ndarray_req &tr) {
         tr.dtype = dtype<T>();
         tr.req_dtype = true;
+        tr.req_ro = std::is_const_v<T>;
     }
 };
 
@@ -248,7 +258,7 @@ public:
             m_dltensor = *detail::ndarray_inc_ref(handle);
     }
 
-    ndarray(void *value,
+    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> value,
             size_t ndim,
             const size_t *shape,
             handle owner = nanobind::handle(),
@@ -256,9 +266,9 @@ public:
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int32_t device_type = device::cpu::value,
             int32_t device_id = 0) {
-        m_handle =
-            detail::ndarray_create(value, ndim, shape, owner.ptr(), strides,
-                                  &dtype, device_type, device_id);
+        m_handle = detail::ndarray_create(
+            (void *) value, ndim, shape, owner.ptr(), strides, &dtype,
+            std::is_const_v<Scalar>, device_type, device_id);
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
@@ -296,8 +306,8 @@ public:
     size_t ndim() const { return (size_t) m_dltensor.ndim; }
     size_t shape(size_t i) const { return (size_t) m_dltensor.shape[i]; }
     int64_t stride(size_t i) const { return m_dltensor.strides[i]; }
-    int64_t* shape_ptr() const { return m_dltensor.shape; }
-    int64_t* stride_ptr() const { return m_dltensor.strides; }
+    const int64_t* shape_ptr() const { return m_dltensor.shape; }
+    const int64_t* stride_ptr() const { return m_dltensor.strides; }
     bool is_valid() const { return m_handle != nullptr; }
     int32_t device_type() const { return m_dltensor.device.device_type; }
     int32_t device_id() const { return m_dltensor.device.device_id; }
@@ -317,10 +327,27 @@ public:
         return (const Scalar *)((const uint8_t *) m_dltensor.data + m_dltensor.byte_offset);
     }
 
-    Scalar *data() { return (Scalar *)((uint8_t *) m_dltensor.data + m_dltensor.byte_offset); }
+    template <typename T = Scalar, std::enable_if_t<!std::is_const_v<T>, int> = 1>
+    Scalar *data() {
+        return (Scalar *) ((uint8_t *) m_dltensor.data +
+                           m_dltensor.byte_offset);
+    }
 
+    template <typename T = Scalar,
+              std::enable_if_t<!std::is_const_v<T>, int> = 1, typename... Ts>
+    NB_INLINE auto &operator()(Ts... indices) {
+        return *(Scalar *) ((uint8_t *) m_dltensor.data +
+                            byte_offset(indices...));
+    }
+
+    template <typename... Ts> NB_INLINE const auto & operator()(Ts... indices) const {
+        return *(const Scalar *) ((const uint8_t *) m_dltensor.data +
+                                  byte_offset(indices...));
+    }
+
+private:
     template <typename... Ts>
-    NB_INLINE auto& operator()(Ts... indices) {
+    NB_INLINE int64_t byte_offset(Ts... indices) const {
         static_assert(
             !std::is_same_v<Scalar, void>,
             "To use nb::ndarray::operator(), you must add a scalar type "
@@ -331,15 +358,13 @@ public:
             "annotation to the ndarray template parameters.");
         static_assert(sizeof...(Ts) == Info::shape_type::size,
                       "nb::ndarray::operator(): invalid number of arguments");
-
-        int64_t counter = 0, index = 0;
+        size_t counter = 0;
+        int64_t index = 0;
         ((index += int64_t(indices) * m_dltensor.strides[counter++]), ...);
-        return (Scalar &) *(
-            (uint8_t *) m_dltensor.data + m_dltensor.byte_offset +
-            index * sizeof(typename Info::scalar_type));
+
+        return (int64_t) m_dltensor.byte_offset + index * sizeof(typename Info::scalar_type);
     }
 
-private:
     detail::ndarray_handle *m_handle = nullptr;
     dlpack::dltensor m_dltensor;
 };

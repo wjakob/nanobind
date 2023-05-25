@@ -389,8 +389,8 @@ NB_CORE ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
 NB_CORE ndarray_handle *ndarray_create(void *value, size_t ndim,
                                        const size_t *shape, PyObject *owner,
                                        const int64_t *strides,
-                                       dlpack::dtype *dtype, int32_t device,
-                                       int32_t device_id);
+                                       dlpack::dtype *dtype, bool ro,
+                                       int32_t device, int32_t device_id);
 
 /// Increase the reference count of the given ndarray object; returns a pointer
 /// to the underlying DLTensor

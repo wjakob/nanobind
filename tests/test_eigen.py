@@ -26,6 +26,7 @@ def test01_vector_fixed():
     assert_array_equal(t.addV3i(a, b), c)
     assert_array_equal(t.addR3i(a, b), c)
     assert_array_equal(t.addRefV3i(a, b), c)
+    assert_array_equal(t.addRefR3i(a, b), c)
     assert_array_equal(t.addA3i(a, b), c)
     assert_array_equal(t.addA3i_retExpr(a, b), c)
 
@@ -33,6 +34,7 @@ def test01_vector_fixed():
     assert_array_equal(t.addV3i(af, b), c)
     assert_array_equal(t.addR3i(af, b), c)
     assert_array_equal(t.addRefV3i(af, b), c)
+    assert_array_equal(t.addRefR3i(af, b), c)
     assert_array_equal(t.addA3i(af, b), c)
 
     # But not the second one
@@ -42,6 +44,8 @@ def test01_vector_fixed():
         t.addR3i(a, bf)
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.addRefV3i(a, bf)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addRefR3i(a, bf)
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.addA3i(a, bf)
 
@@ -313,8 +317,8 @@ def test12_cast():
     assert_array_equal(t.castToRefVXi(vec), vec)
     assert_array_equal(t.castToRefConstVXi(vec), vec)
     for vec in vec[::2], np.float32(vec):
-        with pytest.raises(RuntimeError, match="bad cast"):
+        with pytest.raises(RuntimeError, match="bad[_ ]cast"):
             t.castToMapVXi(vec)
-        with pytest.raises(RuntimeError, match="bad cast"):
+        with pytest.raises(RuntimeError, match="bad[_ ]cast"):
             t.castToRefVXi(vec)
         assert_array_equal(t.castToRefConstVXi(vec), vec)

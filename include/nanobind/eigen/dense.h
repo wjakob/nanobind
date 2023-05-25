@@ -26,58 +26,58 @@ template <typename T> using DMap = Eigen::Map<T, 0, DStride>;
 NAMESPACE_BEGIN(detail)
 
 template <typename T>
-constexpr int NumDimensions = bool(T::IsVectorAtCompileTime) ? 1 : 2;
+constexpr int num_dimensions = bool(T::IsVectorAtCompileTime) ? 1 : 2;
 
-template<typename T>
-struct StrideExtr
-{
+template<typename T> struct StrideExtr {
     using Type = Eigen::Stride<0, 0>;
 };
 
-template <typename T, int Options, typename StrideType>
-struct StrideExtr<Eigen::Map<T, Options, StrideType>>
-{
+template <typename T, int Options, typename StrideType> struct StrideExtr<Eigen::Map<T, Options, StrideType>> {
     using Type = StrideType;
 };
 
-template<typename T>
-using Stride = typename StrideExtr<T>::Type;
+template<typename T> using Stride = typename StrideExtr<T>::Type;
 
-template<typename T>
-constexpr bool requiresContigMemory =
+/// Is true for Eigen types that are known at compile-time to hold contiguous memory only, which includes all specializations of Matrix and Array,
+/// and specializations of Map and Ref with according stride types and shapes. A (compile-time) stride of 0 means "contiguous" to Eigen.
+template<typename T> constexpr bool requires_contig_memory =
     (Stride<T>::InnerStrideAtCompileTime == 0 || Stride<T>::InnerStrideAtCompileTime == 1) &&
-    (NumDimensions<T> == 1 ||
+    (num_dimensions<T> == 1 ||
      Stride<T>::OuterStrideAtCompileTime == 0 ||
      Stride<T>::OuterStrideAtCompileTime != Eigen::Dynamic && Stride<T>::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime);
 
-template <typename T>
-using array_for_eigen_t = ndarray<
+/// Alias ndarray for a given Eigen type, to be used by type_caster<EigenType>::from_python, which calls type_caster<array_for_eigen_t<EigenType>>::from_python.
+/// If the Eigen type is known at compile-time to handle contiguous memory only, then this alias makes type_caster<array_for_eigen_t<EigenType>>::from_python
+/// either fail or provide an ndarray with contiguous memory, triggering a conversion if necessary and supported by flags.
+/// Otherwise, this alias makes type_caster<array_for_eigen_t<EigenType>>::from_python either fail or provide an ndarray with arbitrary strides,
+/// which need to be checked for compatibility then. There is no way to ask type_caster<ndarray> for specific strides other than c_contig and f_contig.
+/// Hence, if an Eigen type requires non-contiguous strides (at compile-time) and type_caster<array_for_eigen_t<EigenType>> provides an ndarray with unsuitable strides (at run-time),
+/// then type_caster<EigenType>::from_python just fails. Note, however, that this is rather unusual, since the default stride type of Map requires contiguous memory,
+/// and the one of Ref requires a contiguous inner stride, while it can handle any outer stride.
+template <typename T> using array_for_eigen_t = ndarray<
     typename T::Scalar,
     numpy,
     std::conditional_t<
-        NumDimensions<T> == 1,
+        num_dimensions<T> == 1,
         shape<(size_t) T::SizeAtCompileTime>,
         shape<(size_t) T::RowsAtCompileTime,
               (size_t) T::ColsAtCompileTime>>,
     std::conditional_t<
-        requiresContigMemory<T>,
+        requires_contig_memory<T>,
         std::conditional_t<
-            NumDimensions<T> == 1 || T::IsRowMajor,
+            num_dimensions<T> == 1 || T::IsRowMajor,
             c_contig,
             f_contig>,
         any_contig>>;
 
 /// Any kind of Eigen class
-template <typename T> constexpr bool is_eigen_v =
-is_base_of_template_v<T, Eigen::EigenBase>;
+template <typename T> constexpr bool is_eigen_v = is_base_of_template_v<T, Eigen::EigenBase>;
 
 /// Detects Eigen::Array, Eigen::Matrix, etc.
-template <typename T> constexpr bool is_eigen_plain_v =
-is_base_of_template_v<T, Eigen::PlainObjectBase>;
+template <typename T> constexpr bool is_eigen_plain_v = is_base_of_template_v<T, Eigen::PlainObjectBase>;
 
 /// Detect Eigen::SparseMatrix
-template <typename T> constexpr bool is_eigen_sparse_v =
-is_base_of_template_v<T, Eigen::SparseMatrixBase>;
+template <typename T> constexpr bool is_eigen_sparse_v = is_base_of_template_v<T, Eigen::SparseMatrixBase>;
 
 /// Detects expression templates
 template <typename T> constexpr bool is_eigen_xpr_v =
@@ -96,17 +96,12 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T> && i
         if (!caster.from_python(src, flags, cleanup))
             return false;
         const NDArray &array = caster.value;
-
-        if constexpr (NumDimensions<T> == 1) {
+        if constexpr (num_dimensions<T> == 1)
             value.resize(array.shape(0));
-            memcpy(value.data(), array.data(),
-                   array.shape(0) * sizeof(Scalar));
-        } else {
+        else
             value.resize(array.shape(0), array.shape(1));
-            memcpy(value.data(), array.data(),
-                   array.shape(0) * array.shape(1) * sizeof(Scalar));
-        }
-
+        // array_for_eigen_t<T> ensures that array holds contiguous memory.
+        memcpy(value.data(), array.data(), array.size() * sizeof(Scalar));
         return true;
     }
 
@@ -119,10 +114,10 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T> && i
     }
 
     static handle from_cpp(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
-        size_t shape[NumDimensions<T>];
-        int64_t strides[NumDimensions<T>];
+        size_t shape[num_dimensions<T>];
+        int64_t strides[num_dimensions<T>];
 
-        if constexpr (NumDimensions<T> == 1) {
+        if constexpr (num_dimensions<T> == 1) {
             shape[0] = v.size();
             strides[0] = v.innerStride();
         } else {
@@ -167,7 +162,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_plain_v<T> && i
             policy == rv_policy::move ? rv_policy::reference : policy;
 
         object o = steal(NDArrayCaster::from_cpp(
-            NDArray(ptr, NumDimensions<T>, shape, owner, strides),
+            NDArray(ptr, num_dimensions<T>, shape, owner, strides),
             array_rv_policy, cleanup));
 
         return o.release();
@@ -206,6 +201,8 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         if (!cleanup)
+            // src is not a bound function argument, but e.g. an argument of cast.
+            // Hence, prevent the returned Map from mapping into a temporary created due to conversion.
             flags &= ~(uint8_t)cast_flags::convert;
         return from_python_(src, flags, cleanup);
     }
@@ -213,20 +210,28 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
     bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
         if (!caster.from_python(src, flags, cleanup))
             return false;
-        if constexpr (!requiresContigMemory<Map>)  {
-            if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic)
-                if (std::max<int64_t>(1, StrideType::InnerStrideAtCompileTime) != (NumDimensions<T> == 1 || !T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
+        // Check if StrideType can cope with the strides of caster.value. Avoid this check if their types guarantee that, anyway.
+        // Instead of failing due to unsuitable strides, if a cleanup_list is passed and flags supports conversions,
+        // then this could make a copy of caster.value.data() with the required memory layout, create a Map that points into this memory,
+        // and stash a capsule that owns the memory into the cleanup_list.
+        // This is not done for simplicity, and because creating a Map that maps into a copy does not make too much sense, anyway.
+
+        // If requires_contig_memory<Map> is true, then StrideType is known at compile-time to only cope with contiguous memory.
+        // Since caster.from_python has succeeded, caster.value now surely provides contiguous memory, and so its strides surely fit.
+        if constexpr (!requires_contig_memory<Map>)  {
+            // A stride that is dynamic at compile-time copes with any stride at run-time. 
+            if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic) {
+                // A stride of 0 at compile-time means "contiguous" to Eigen, which is always 1 for the inner stride.
+                int64_t expected_inner_stride = StrideType::InnerStrideAtCompileTime == 0 ? 1 : StrideType::InnerStrideAtCompileTime;
+                if (expected_inner_stride != (num_dimensions<T> == 1 || !T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
                     return false;
-            if constexpr (NumDimensions<T> == 2 && StrideType::OuterStrideAtCompileTime != Eigen::Dynamic) {
-                int64_t outerStrideExpected;
-                if constexpr (StrideType::OuterStrideAtCompileTime != 0)
-                    outerStrideExpected = StrideType::OuterStrideAtCompileTime;
-                else
-                    if constexpr (T::IsRowMajor)
-                        outerStrideExpected = caster.value.shape(1);
-                    else
-                        outerStrideExpected = caster.value.shape(0);
-                if (outerStrideExpected != (T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
+            }
+            if constexpr (num_dimensions<T> == 2 && StrideType::OuterStrideAtCompileTime != Eigen::Dynamic) {
+                int64_t expected_outer_stride =
+                    StrideType::OuterStrideAtCompileTime == 0
+                    ? T::IsRowMajor ? caster.value.shape(1) : caster.value.shape(0)
+                    : StrideType::OuterStrideAtCompileTime;
+                if (expected_outer_stride != (T::IsRowMajor ? caster.value.stride(0) : caster.value.stride(1)))
                     return false;
             }
         }
@@ -234,10 +239,10 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
     }
 
     static handle from_cpp(const Map &v, rv_policy, cleanup_list *cleanup) noexcept {
-        size_t shape[NumDimensions<T>];
-        int64_t strides[NumDimensions<T>];
+        size_t shape[num_dimensions<T>];
+        int64_t strides[num_dimensions<T>];
 
-        if constexpr (NumDimensions<T> == 1) {
+        if constexpr (num_dimensions<T> == 1) {
             shape[0] = v.size();
             strides[0] = v.innerStride();
         } else {
@@ -248,37 +253,40 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
         }
 
         return NDArrayCaster::from_cpp(
-            NDArray((void *) v.data(), NumDimensions<T>, shape, handle(), strides),
+            NDArray((void *) v.data(), num_dimensions<T>, shape, handle(), strides),
             rv_policy::reference, cleanup);
     }
 
     StrideType strides() const {
-        constexpr int IS = StrideType::InnerStrideAtCompileTime,
-                      OS = StrideType::OuterStrideAtCompileTime;
+        constexpr int is = StrideType::InnerStrideAtCompileTime,
+                      os = StrideType::OuterStrideAtCompileTime;
 
         int64_t inner = caster.value.stride(0),
                 outer;
-        if constexpr (NumDimensions<T> == 1)
+        if constexpr (num_dimensions<T> == 1)
             outer = caster.value.shape(0);
         else
             outer = caster.value.stride(1);
 
-        if constexpr (T::IsRowMajor)
+        if constexpr (num_dimensions<T> == 2 && T::IsRowMajor)
             std::swap(inner, outer);
 
-        if constexpr (IS == 0) {
-            assert(inner == 1);
+        // Compile-time strides of 0 must be passed as such to constructors of StrideType, to avoid assertions in Eigen.
+        if constexpr (is == 0) {
+            // Ensured by stride checks in from_python_:
+            // assert(inner == 1);
             inner = 0;
         }
 
-        if constexpr (OS == 0) {
-            assert(NumDimensions<T> == 1 || outer == (T::IsRowMajor ? int64_t(caster.value.shape(1)) : int64_t(caster.value.shape(0))));
+        if constexpr (os == 0) {
+            // Ensured by stride checks in from_python_:
+            // assert(num_dimensions<T> == 1 || outer == (T::IsRowMajor ? int64_t(caster.value.shape(1)) : int64_t(caster.value.shape(0))));
             outer = 0;
         }
 
-        if constexpr (std::is_same_v<StrideType, Eigen::InnerStride<IS>>)
+        if constexpr (std::is_same_v<StrideType, Eigen::InnerStride<is>>)
             return StrideType(inner);
-        else if constexpr (std::is_same_v<StrideType, Eigen::OuterStride<OS>>)
+        else if constexpr (std::is_same_v<StrideType, Eigen::OuterStride<os>>)
             return StrideType(outer);
         else
             return StrideType(outer, inner);
@@ -286,12 +294,20 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
     operator Map() {
         NDArray &t = caster.value;
-        return Map(t.data(), t.shape(0), t.ndim() == 1 ? 1 : t.shape(1), strides());
+        if constexpr (num_dimensions<T> == 1)
+            return Map(t.data(), t.shape(0), strides());
+        return Map(t.data(), t.shape(0), t.shape(1), strides());
     }
 };
 
 
 /// Caster for Eigen::Ref<T>
+/// Both Ref<T> and Ref<T const> map data. But unlike Ref<T>, Ref<T const> may own the data it maps.
+/// This is the case e.g. if Ref<T const> is constructed from an Eigen type that has non-matching strides.
+/// Hence, type_caster<Ref<T const, ...>>::from_python supports conversions even if the passed handle is not a bound function argument.
+/// To avoid unnecessary copies, it first calls the type_caster for matching strides with conversions disabled,
+/// and only if that fails, it calls the one for arbitrary strides.
+/// Since the latter is called only if the first one failed, the Ref is guaranteed to be constructed such that it owns its data in this case.
 template <typename T, int Options, typename StrideType>
 struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T> && is_ndarray_scalar_v<typename T::Scalar>>> {
     using Ref = Eigen::Ref<T, Options, StrideType>;
@@ -317,8 +333,8 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plai
     operator Ref() {
         if constexpr (std::is_const_v<T>)
             if (dcaster.caster.value.is_valid()) {
-                // Return a Ref that owns the data it maps.
-                assert(!Eigen::internal::traits<Ref>::template match<DMap>::type::value);
+                // Return a Ref<T const, ...> that owns the data it maps.
+                // assert(!Eigen::internal::traits<Ref>::template match<DMap>::type::value);
                 return Ref(dcaster.operator DMap());
             }
         return Ref(caster.operator Map());

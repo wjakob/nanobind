@@ -200,24 +200,24 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
     NDArrayCaster caster;
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        if (!cleanup)
-            // src is not a bound function argument, but e.g. an argument of cast.
-            // Hence, prevent the returned Map from mapping into a temporary created due to conversion.
-            flags &= ~(uint8_t)cast_flags::convert;
-        return from_python_(src, flags, cleanup);
+        // Conversions result in an Eigen::Map pointing into a temporary ndarray.
+        // If src is not a bound function argument, but e.g. an argument of cast, then this temporary would be destroyed upon returning from cast.
+        // Hence, conversions cannot be supported in this case.
+        // If src is a bound function argument, then cleanup would keep alive this temporary until returning from the bound function.
+        // Hence, conversions could be supported in this case, resulting in a bound function altering the Map without an effect on the Python side.
+        // This behaviour would be surprising, however, as bound functions expecting a Map most probably expect that Map to point into the caller's data.
+        // Hence, do not support conversions in any case.
+        return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
     }
 
     bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
         if (!caster.from_python(src, flags, cleanup))
             return false;
+
         // Check if StrideType can cope with the strides of caster.value. Avoid this check if their types guarantee that, anyway.
-        // Instead of failing due to unsuitable strides, if a cleanup_list is passed and flags supports conversions,
-        // then this could make a copy of caster.value.data() with the required memory layout, create a Map that points into this memory,
-        // and stash a capsule that owns the memory into the cleanup_list.
-        // This is not done for simplicity, and because creating a Map that maps into a copy does not make too much sense, anyway.
 
         // If requires_contig_memory<Map> is true, then StrideType is known at compile-time to only cope with contiguous memory.
-        // Since caster.from_python has succeeded, caster.value now surely provides contiguous memory, and so its strides surely fit.
+        // Then since caster.from_python has succeeded, caster.value now surely provides contiguous memory, and so its strides surely fit.
         if constexpr (!requires_contig_memory<Map>)  {
             // A stride that is dynamic at compile-time copes with any stride at run-time. 
             if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic) {
@@ -302,12 +302,6 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
 
 
 /// Caster for Eigen::Ref<T>
-/// Both Ref<T> and Ref<T const> map data. But unlike Ref<T>, Ref<T const> may own the data it maps.
-/// This is the case e.g. if Ref<T const> is constructed from an Eigen type that has non-matching strides.
-/// Hence, type_caster<Ref<T const, ...>>::from_python supports conversions even if the passed handle is not a bound function argument.
-/// To avoid unnecessary copies, it first calls the type_caster for matching strides with conversions disabled,
-/// and only if that fails, it calls the one for arbitrary strides.
-/// Since the latter is called only if the first one failed, the Ref is guaranteed to be constructed such that it owns its data in this case.
 template <typename T, int Options, typename StrideType>
 struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plain_v<T> && is_ndarray_scalar_v<typename T::Scalar>>> {
     using Ref = Eigen::Ref<T, Options, StrideType>;
@@ -322,11 +316,19 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plai
     MapCaster caster;
     DMapCaster dcaster;
 
+    /// Both Ref<T> and Ref<T const> map data. type_caster<Ref<T>>::from_python behaves like type_caster<Map<T>>::from_python.
+    /// Unlike Ref<T>, Ref<T const> may own the data it maps. It does so if constructed from e.g. an Eigen type that has non-matching strides.
+    /// Hence, type_caster<Ref<T const>>::from_python may support conversions.
+    /// It first calls the type_caster for matching strides, which does not support conversions,
+    /// and only if that fails, it calls the one for arbitrary strides, supporting conversions to T::Scalar if flags say so.
+    /// If the first type_caster succeeds, then the returned Ref maps the original data.
+    /// Otherwise, because the first type_caster failed, the Ref is constructed such that it owns the data it maps.
+    /// type_caster<Ref<T const>> always supports stride conversions, independent of flags, and so flags control the conversion of T::Scalar only.
+    /// Reason: if the intention was to not allow stride conversions either, then the bound function would most probably expect a Map instead of a Ref.
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         if constexpr (std::is_const_v<T>)
-            if (!cleanup)
-                return caster.from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup) ||
-                       dcaster.from_python_(src, flags, cleanup);
+            return caster.from_python(src, flags, cleanup) ||
+                   dcaster.from_python_(src, flags, cleanup);
         return caster.from_python(src, flags, cleanup);
     }
 

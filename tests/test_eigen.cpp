@@ -6,45 +6,35 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 NB_MODULE(test_eigen_ext, m) {
-    m.def(
-        "addV3i",
-        [](const Eigen::Vector3i &a,
-           const Eigen::Vector3i &b) -> Eigen::Vector3i { return a + b; },
-        "a"_a, "b"_a.noconvert());
+    m.def("addV3i",
+          [](const Eigen::Vector3i &a,
+             const Eigen::Vector3i &b) -> Eigen::Vector3i { return a + b; },
+          "a"_a, "b"_a.noconvert());
 
-    m.def(
-        "addR3i",
-        [](const Eigen::RowVector3i &a,
-           const Eigen::RowVector3i &b) -> Eigen::RowVector3i { return a + b; },
-        "a"_a, "b"_a.noconvert());
+    m.def("addR3i",
+          [](const Eigen::RowVector3i &a,
+             const Eigen::RowVector3i &b) -> Eigen::RowVector3i { return a + b; },
+          "a"_a, "b"_a.noconvert());
 
-    m.def(
-        "addRefV3i",
-        [](const Eigen::Ref<const Eigen::Vector3i> &a,
-           const Eigen::Ref<const Eigen::Vector3i> &b) -> Eigen::Vector3i {
-            return a + b;
-        },
-        "a"_a, "b"_a.noconvert());
+    m.def("addRefCnstV3i",
+          [](const Eigen::Ref<const Eigen::Vector3i> &a,
+             const Eigen::Ref<const Eigen::Vector3i> &b) -> Eigen::Vector3i { return a + b; },
+          "a"_a, "b"_a.noconvert());
 
-    m.def(
-        "addRefR3i",
-        [](const Eigen::Ref<const Eigen::RowVector3i>& a,
-           const Eigen::Ref<const Eigen::RowVector3i>& b) -> Eigen::RowVector3i {
-            return a + b;
-        },
-        "a"_a, "b"_a.noconvert());
+    m.def("addRefCnstR3i",
+          [](const Eigen::Ref<const Eigen::RowVector3i>& a,
+             const Eigen::Ref<const Eigen::RowVector3i>& b) -> Eigen::RowVector3i { return a + b; },
+          "a"_a, "b"_a.noconvert());
 
-    m.def(
-        "addA3i",
-        [](const Eigen::Array3i &a,
-           const Eigen::Array3i &b) -> Eigen::Array3i { return a + b; },
-        "a"_a, "b"_a.noconvert());
+    m.def("addA3i",
+          [](const Eigen::Array3i &a,
+             const Eigen::Array3i &b) -> Eigen::Array3i { return a + b; },
+          "a"_a, "b"_a.noconvert());
 
-    m.def(
-        "addA3i_retExpr",
-        [](const Eigen::Array3i &a,
-           const Eigen::Array3i &b) { return a + b; },
-        "a"_a, "b"_a.noconvert());
+    m.def("addA3i_retExpr",
+          [](const Eigen::Array3i &a,
+             const Eigen::Array3i &b) { return a + b; },
+          "a"_a, "b"_a.noconvert());
 
     m.def("addVXi",
           [](const Eigen::VectorXi &a,
@@ -92,35 +82,57 @@ NB_MODULE(test_eigen_ext, m) {
           [](const MatrixXuR &a,
              const MatrixXuC &b) -> MatrixXuR { return a + b; });
 
-    m.def("addMapMXuCC_nc",
-      [](const Eigen::Map<const MatrixXuC>& a,
-         const Eigen::Map<const MatrixXuC>& b) -> MatrixXuC { return a + b; },
-      "a"_a.noconvert(), "b"_a.noconvert());
+    m.def("addMapMXuCC",
+          [](const Eigen::Map<MatrixXuC>& a,
+             const Eigen::Map<MatrixXuC>& b) -> MatrixXuC { return a + b; });
 
-    m.def("addMapMXuRR_nc",
-      [](const Eigen::Map<const MatrixXuR>& a,
-         const Eigen::Map<const MatrixXuR>& b) -> MatrixXuC { return a + b; },
-      "a"_a.noconvert(), "b"_a.noconvert());
+    m.def("addMapCnstMXuCC",
+          [](const Eigen::Map<const MatrixXuC>& a,
+             const Eigen::Map<const MatrixXuC>& b) -> MatrixXuC { return a + b; });
 
-    m.def("addRefMXuCC_nc",
-      [](const Eigen::Ref<const MatrixXuC>& a,
-         const Eigen::Ref<const MatrixXuC>& b) -> MatrixXuC { return a + b; },
-      "a"_a.noconvert(), "b"_a.noconvert());
+    m.def("addMapMXuRR",
+          [](const Eigen::Map<MatrixXuR>& a,
+             const Eigen::Map<MatrixXuR>& b) -> MatrixXuC { return a + b; });
 
-    m.def("addRefMXuRR_nc",
-      [](const Eigen::Ref<const MatrixXuR>& a,
-         const Eigen::Ref<const MatrixXuR>& b) -> MatrixXuC { return a + b; },
-      "a"_a.noconvert(), "b"_a.noconvert());
+    m.def("addMapCnstMXuRR",
+          [](const Eigen::Map<const MatrixXuR>& a,
+             const Eigen::Map<const MatrixXuR>& b) -> MatrixXuC { return a + b; });
+
+    m.def("addRefMXuCC",
+          [](const Eigen::Ref<MatrixXuC>& a,
+             const Eigen::Ref<MatrixXuC>& b) -> MatrixXuC { return a + b; });
+
+    m.def("addRefCnstMXuCC",
+          [](const Eigen::Ref<const MatrixXuC>& a,
+             const Eigen::Ref<const MatrixXuC>& b) -> MatrixXuC { return a + b; });
+
+    m.def("addRefCnstMXuCC_nc",
+          [](const Eigen::Ref<const MatrixXuC>& a,
+             const Eigen::Ref<const MatrixXuC>& b) -> MatrixXuC { return a + b; },
+          "a"_a.noconvert(), "b"_a.noconvert());
+
+    m.def("addRefMXuRR",
+          [](const Eigen::Ref<MatrixXuR>& a,
+             const Eigen::Ref<MatrixXuR>& b) -> MatrixXuC { return a + b; });
+
+    m.def("addRefCnstMXuRR",
+          [](const Eigen::Ref<const MatrixXuR>& a,
+             const Eigen::Ref<const MatrixXuR>& b) -> MatrixXuC { return a + b; });
+
+    m.def("addRefCnstMXuRR_nc",
+          [](const Eigen::Ref<const MatrixXuR>& a,
+             const Eigen::Ref<const MatrixXuR>& b) -> MatrixXuC { return a + b; },
+          "a"_a.noconvert(), "b"_a.noconvert());
 
     m.def("addDRefMXuCC_nc",
-          [](const nb::DRef<const MatrixXuC> &a,
-             const nb::DRef<const MatrixXuC> &b) -> MatrixXuC { return a + b; },
+          [](const nb::DRef<MatrixXuC> &a,
+             const nb::DRef<MatrixXuC> &b) -> MatrixXuC { return a + b; },
           "a"_a.noconvert(), "b"_a.noconvert());
 
     m.def("addDRefMXuRR_nc",
-      [](const nb::DRef<const MatrixXuR>& a,
-         const nb::DRef<const MatrixXuR>& b) -> MatrixXuC { return a + b; },
-      "a"_a.noconvert(), "b"_a.noconvert());
+          [](const nb::DRef<MatrixXuR>& a,
+             const nb::DRef<MatrixXuR>& b) -> MatrixXuC { return a + b; },
+          "a"_a.noconvert(), "b"_a.noconvert());
 
     m.def("mutate_DRefMXuC", [](nb::DRef<MatrixXuC> a) { a *= 2; }, nb::arg().noconvert());
 
@@ -193,7 +205,7 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("castToRefVXi", [](nb::object obj) -> Eigen::VectorXi {
         return nb::cast<Eigen::Ref<Eigen::VectorXi>>(obj);
     });
-    m.def("castToRefConstVXi", [](nb::object obj) -> Eigen::VectorXi {
+    m.def("castToRefCnstVXi", [](nb::object obj) -> Eigen::VectorXi {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi>>(obj);
     });
 

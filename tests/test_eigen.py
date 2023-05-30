@@ -25,16 +25,16 @@ def test01_vector_fixed():
 
     assert_array_equal(t.addV3i(a, b), c)
     assert_array_equal(t.addR3i(a, b), c)
-    assert_array_equal(t.addRefV3i(a, b), c)
-    assert_array_equal(t.addRefR3i(a, b), c)
+    assert_array_equal(t.addRefCnstV3i(a, b), c)
+    assert_array_equal(t.addRefCnstR3i(a, b), c)
     assert_array_equal(t.addA3i(a, b), c)
     assert_array_equal(t.addA3i_retExpr(a, b), c)
 
     # Implicit conversion supported for first argument
     assert_array_equal(t.addV3i(af, b), c)
     assert_array_equal(t.addR3i(af, b), c)
-    assert_array_equal(t.addRefV3i(af, b), c)
-    assert_array_equal(t.addRefR3i(af, b), c)
+    assert_array_equal(t.addRefCnstV3i(af, b), c)
+    assert_array_equal(t.addRefCnstR3i(af, b), c)
     assert_array_equal(t.addA3i(af, b), c)
 
     # But not the second one
@@ -43,9 +43,9 @@ def test01_vector_fixed():
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.addR3i(a, bf)
     with pytest.raises(TypeError, match='incompatible function arguments'):
-        t.addRefV3i(a, bf)
+        t.addRefCnstV3i(a, bf)
     with pytest.raises(TypeError, match='incompatible function arguments'):
-        t.addRefR3i(a, bf)
+        t.addRefCnstR3i(a, bf)
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.addA3i(a, bf)
 
@@ -55,7 +55,7 @@ def test01_vector_fixed():
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.addR3i(x, b)
     with pytest.raises(TypeError, match='incompatible function arguments'):
-        t.addRefV3i(x, b)
+        t.addRefCnstV3i(x, b)
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.addA3i(x, b)
 
@@ -99,16 +99,16 @@ def test03_update_map():
     assert_array_equal(c, b)
 
     c = np.float32(a)
-    t.updateRefV3i(c)
-    assert_array_equal(c, a)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.updateRefV3i(c)
 
     c = np.float32(a)
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.updateRefV3i_nc(c)
 
     c = np.float32(a)
-    t.updateRefVXi(c)
-    assert_array_equal(c, a)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.updateRefVXi(c)
 
     c = np.float32(a)
     with pytest.raises(TypeError, match='incompatible function arguments'):
@@ -158,25 +158,43 @@ def test05_matrix_large_nonsymm(rowStart, colStart, rowStep, colStep, transpose)
     assert_array_equal(t.addDRefMXuCC_nc(A, A), A2)
     assert_array_equal(t.addDRefMXuRR_nc(A, A), A2)
     if A.flags['C_CONTIGUOUS']:
-        assert_array_equal(t.addMapMXuRR_nc(A, A), A2)
+        assert_array_equal(t.addMapMXuRR(A, A), A2)
+        assert_array_equal(t.addMapCnstMXuRR(A, A), A2)
     else:
         with pytest.raises(TypeError, match="incompatible function arguments"):
-            t.addMapMXuRR_nc(A, A)
+            t.addMapMXuRR(A, A)
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addMapCnstMXuRR(A, A)
+
+    assert_array_equal(t.addRefCnstMXuRR(A, A), A2)
+    assert_array_equal(t.addRefCnstMXuRR(A.view(np.int32), A), A2)
+    assert_array_equal(t.addRefCnstMXuRR_nc(A, A), A2)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.addRefCnstMXuRR_nc(A.view(np.int32), A)
     if A.strides[1] == A.itemsize:
-        assert_array_equal(t.addRefMXuRR_nc(A, A), A2)
+        assert_array_equal(t.addRefMXuRR(A, A), A2)
     else:
         with pytest.raises(TypeError, match="incompatible function arguments"):
-            t.addRefMXuRR_nc(A, A)
+            t.addRefMXuRR(A, A)
     if A.flags['F_CONTIGUOUS']:
-        assert_array_equal(t.addMapMXuCC_nc(A, A), A2)
+        assert_array_equal(t.addMapMXuCC(A, A), A2)
+        assert_array_equal(t.addMapCnstMXuCC(A, A), A2)
     else:
         with pytest.raises(TypeError, match="incompatible function arguments"):
-            t.addMapMXuCC_nc(A, A)
+            t.addMapMXuCC(A, A)
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addMapCnstMXuCC(A, A)
+    
+    assert_array_equal(t.addRefCnstMXuCC(A, A), A2)
+    assert_array_equal(t.addRefCnstMXuCC(A.view(np.int32), A), A2)
+    assert_array_equal(t.addRefCnstMXuCC_nc(A, A), A2)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.addRefCnstMXuCC_nc(A.view(np.int32), A)
     if A.strides[0] == A.itemsize:
-        assert_array_equal(t.addRefMXuCC_nc(A, A), A2)
+        assert_array_equal(t.addRefMXuCC(A, A), A2)
     else:
         with pytest.raises(TypeError, match="incompatible function arguments"):
-            t.addRefMXuCC_nc(A, A)
+            t.addRefMXuCC(A, A)
     A = np.ascontiguousarray(A)
     assert A.flags['C_CONTIGUOUS']
     assert_array_equal(t.addMXuRR_nc(A, A), A2)
@@ -315,10 +333,10 @@ def test12_cast():
     vec = np.arange(1000, dtype=np.int32)
     assert_array_equal(t.castToMapVXi(vec), vec)
     assert_array_equal(t.castToRefVXi(vec), vec)
-    assert_array_equal(t.castToRefConstVXi(vec), vec)
+    assert_array_equal(t.castToRefCnstVXi(vec), vec)
     for vec in vec[::2], np.float32(vec):
         with pytest.raises(RuntimeError, match="bad[_ ]cast"):
             t.castToMapVXi(vec)
         with pytest.raises(RuntimeError, match="bad[_ ]cast"):
             t.castToRefVXi(vec)
-        assert_array_equal(t.castToRefConstVXi(vec), vec)
+        assert_array_equal(t.castToRefCnstVXi(vec), vec)

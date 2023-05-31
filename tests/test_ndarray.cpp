@@ -8,6 +8,7 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 int destruct_count = 0;
+static const float f_const[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 
 NB_MODULE(test_ndarray_ext, m) {
     m.def("get_shape", [](const nb::ndarray<> &t) {
@@ -148,6 +149,11 @@ NB_MODULE(test_ndarray_ext, m) {
                                                              deleter);
     });
 
+    m.def("ret_numpy_const", []() {
+        size_t shape[2] = { 2, 4 };
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_const, 2, shape);
+    });
+
     m.def("ret_pytorch", []() {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };
@@ -173,12 +179,15 @@ NB_MODULE(test_ndarray_ext, m) {
             return nb::ndarray<nb::numpy, float>(f, 0, shape, deleter);
     });
 
-    m.def(
-        "noop_3d_c_contig",
-        [](nb::ndarray<float, nb::shape<nb::any, nb::any, nb::any>, nb::c_contig>) { return; });
+    m.def("noop_3d_c_contig",
+          [](nb::ndarray<float, nb::shape<nb::any, nb::any, nb::any>,
+                         nb::c_contig>) { return; });
 
-    m.def(
-        "noop_2d_f_contig",
-        [](nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::f_contig>) { return; });
+    m.def("noop_2d_f_contig",
+          [](nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::f_contig>) {
+              return;
+          });
 
+    m.def("accept_rw", [](nb::ndarray<float, nb::shape<2>> a) { return a(0); });
+    m.def("accept_ro", [](nb::ndarray<const float, nb::shape<2>> a) { return a(0); });
 }

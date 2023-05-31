@@ -15,25 +15,42 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.3.0 (TBD)
--------------------
+Version 1.3.0 (May 31, 2023)
+----------------------------
 
+This is a big release. The sections below cover added features, efficiency
+improvements, and miscellaneous fixes and improvements.
+
+New features
+^^^^^^^^^^^^
+* nanobind now supports binding types that inherit from
+  ``std::enable_shared_from_this<T>``. See the :ref:`advanced section
+  on object ownership <enable_shared_from_this>` for more details.
+  (PR `#212 <https://github.com/wjakob/nanobind/pull/212>`__).
 * Added a type caster between Python ``datetime``/``timedelta`` objects and
   C++ ``std::chrono::duration``/``std::chrono::time_point``, ported
   from pybind11. (PR `#175 <https://github.com/wjakob/nanobind/pull/175>`__).
-* Refined compiler and linker flags across platforms to ensure compact binaries
-  especially in ``NB_STATIC`` builds. (commit `5ead9f
-  <https://github.com/wjakob/nanobind/commit/5ead9ff348a2ef0df8231e6480607a5b0623a16b>`__)
-* Reduced the number of exception-related exports to further crunch
-  ``libnanobind``. (commit `763962
-  <https://github.com/wjakob/nanobind/commit/763962b8ce76414148089ef6a68cff97d7cc66ce>`__).
+* The :cpp:class:`nb::ndarray\<..\> <ndarray>` class can now use the buffer
+  protocol to receive and return arrays representing read-only memory. (PR
+  `#217 <https://github.com/wjakob/nanobind/pull/217>`__).
+* Added :cpp:func:`nb::python_error::discard_as_unraisable()
+  <python_error::discard_as_unraisable>` as a wrapper around
+  ``PyErr_WriteUnraisable()``. (PR `#175
+  <https://github.com/wjakob/nanobind/pull/175>`__).
+
+Efficiency improvements:
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Reduced the per-instance overhead of nanobind by 1 pointer and simplified the
+  internal hash table types to crunch ``libnanobind``. (commit `de018d
+  <https://github.com/wjakob/nanobind/commit/de018db2d17905564703f1ade4aa201a22f8551f>`__).
 * Supplemental type data specified via :cpp:class:`nb::supplement\<T\>()
   <supplement>` is now stored directly within the type object instead of being
   referenced through an indirection. (commit `d82ca9
   <https://github.com/wjakob/nanobind/commit/d82ca9c14191e74dd35dd5bf15fc90f5230319fb>`__).
-* Reduced the per-instance overhead of nanobind by 1 pointer and simplified the
-  internal hash table types to crunch ``libnanobind``. (commit `de018d
-  <https://github.com/wjakob/nanobind/commit/de018db2d17905564703f1ade4aa201a22f8551f>`__).
+* Reduced the number of exception-related exports to further crunch
+  ``libnanobind``. (commit `763962
+  <https://github.com/wjakob/nanobind/commit/763962b8ce76414148089ef6a68cff97d7cc66ce>`__).
 * Reduced the size of nanobind type objects by 5 pointers. (PR `#194
   <https://github.com/wjakob/nanobind/pull/194>`__, `#195
   <https://github.com/wjakob/nanobind/pull/195>`__, and commit `d82ca9
@@ -50,18 +67,31 @@ Version 1.3.0 (TBD)
 * Added a small function cache to improve code generation in limited API
   builds. (commit `f0f4aa
   <https://github.com/wjakob/nanobind/commit/f0f42a564995ba3bd573282674d1a6d636a048c8>`__).
-* Added :cpp:func:`nb::python_error::discard_as_unraisable()
-  <python_error::discard_as_unraisable>` as a wrapper around
-  ``PyErr_WriteUnraisable()``. (PR `#175
-  <https://github.com/wjakob/nanobind/pull/175>`__).
+* Refined compiler and linker flags across platforms to ensure compact binaries
+  especially in ``NB_STATIC`` builds. (commit `5ead9f
+  <https://github.com/wjakob/nanobind/commit/5ead9ff348a2ef0df8231e6480607a5b0623a16b>`__)
+* nanobind enums now take advantage of :ref:`supplemental data <supplement>`
+  to improve the speed of object and name lookups. Note that this prevents
+  use of ``nb::supplement<T>()`` with enums for other purposes.
+  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
+
+Miscellaneous fixes and improvements
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Use the new `PEP-697 <https://peps.python.org/pep-0697/>`__ interface to
+  access data in type objects when compiling stable ABI3 wheels. This improves
+  forward compatibility (the Python team may at some point significantly
+  refactor the layout and internals of type objects). (PR `#211
+  <https://github.com/wjakob/nanobind/pull/211>`__):
+* Added introspection attributes ``__self__`` and ``__func__`` to nanobind
+  bound methods, to make them more like regular Python bound methods.
+  Fixed a bug where ``some_obj.method.__call__()`` would behave differently
+  than ``some_obj.method()``.
+  (PR `#216 <https://github.com/wjakob/nanobind/pull/216>`__).
 * Updated the implementation of :cpp:class:`nb::enum_ <enum_>` so it does
   not take advantage of any private nanobind type details. As a side effect,
   the construct ``nb::class_<T>(..., nb::is_enum(...))`` is no longer permitted;
   use ``nb::enum_<T>(...)`` instead.
-  (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
-* nanobind enums now take advantage of :ref:`supplemental data <supplement>`
-  to improve the speed of object and name lookups. Note that this prevents
-  use of ``nb::supplement<T>()`` with enums for other purposes.
   (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
 * Added the :cpp:class:`nb::type_slots_callback` class binding annotation,
   similar to :cpp:class:`nb::type_slots` but allowing more dynamic choices.
@@ -107,17 +137,6 @@ Version 1.3.0 (TBD)
     return unequal rather than failing; order comparisons such as
     ``some_enum < None`` will still fail, but now with a more
     informative error.
-
-* nanobind now has limited support for binding types that inherit from
-  ``std::enable_shared_from_this<T>``. See the :ref:`advanced section
-  on object ownership <enable_shared_from_this>` for more details.
-  (PR `#212 <https://github.com/wjakob/nanobind/pull/212>`__).
-
-* Added introspection attributes ``__self__`` and ``__func__`` to nanobind
-  bound methods, to make them more like regular Python bound methods.
-  Fixed a bug where ``some_obj.method.__call__()`` would behave differently
-  than ``some_obj.method()``.
-  (PR `#216 <https://github.com/wjakob/nanobind/pull/216>`__).
 
 * ABI version 8.
 

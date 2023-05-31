@@ -821,9 +821,40 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     return false;
 }
 
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && PY_VERSION_HEX < 0x030c0000
+// Direct access for compact integers. These functions are
+// available as part of Python starting with version 3.12b1+
+
+NB_INLINE bool PyUnstable_Long_IsCompact(const PyLongObject *o) {
+    return abs(Py_SIZE(o)) <= 1;
+}
+
+NB_INLINE Py_ssize_t PyUnstable_Long_CompactValue(const PyLongObject *o) {
+    return Py_SIZE(o) * (Py_ssize_t) o->ob_digit[0];
+}
+#endif
+
 template <typename T, bool Recurse = true>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
+        PyLongObject *l = (PyLongObject *) o;
+
+        // Fast path for compact integers
+        if (NB_LIKELY(PyUnstable_Long_IsCompact(l))) {
+            Py_ssize_t value = PyUnstable_Long_CompactValue(l);
+            T value_t = (T) value;
+
+            if (NB_UNLIKELY((std::is_unsigned_v<T> && value < 0) ||
+                            (sizeof(T) != sizeof(Py_ssize_t) &&
+                             value != (Py_ssize_t) value_t)))
+                return false;
+
+            *out = value_t;
+            return true;
+        }
+#endif
+
         // Slow path
         using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
         using Tp = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
@@ -852,14 +883,13 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     }
 
     if constexpr (Recurse) {
-        if ((flags & (uint8_t)cast_flags::convert) && !PyFloat_Check(o)) {
+        if ((flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
             PyObject* temp = PyNumber_Long(o);
             if (temp) {
                 bool result = load_int<T, false>(temp, 0, out);
                 Py_DECREF(temp);
                 return result;
-            }
-            else {
+            } else {
                 PyErr_Clear();
             }
         }

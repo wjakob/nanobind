@@ -223,4 +223,6 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_cast_str", [](nb::handle h) {
         return nb::cast<const char *>(h);
     });
+
+    m.def("test_0", +[](int a, uint64_t b, int64_t c, uint32_t d, int32_t e, uint16_t f) { return a+b+c+d+e+f; });
 }

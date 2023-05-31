@@ -208,7 +208,7 @@ work without changes. The ``tp_clear`` slot requires small touch-ups:
 
    int wrapper_tp_clear(PyObject *self) {
        Wrapper *w = nb::inst_ptr<Wrapper>(self);
-       w->value = std::function<void(void)>();
+       w->value = nullptr;
        return 0;
    }
 

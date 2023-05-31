@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.15...3.22)
-project(nanobind)
+cmake_minimum_required(VERSION 3.15...3.26)
+project(nanobind LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
 # Only build tests by default if this is the top-level CMake project

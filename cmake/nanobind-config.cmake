@@ -195,7 +195,11 @@ endfunction()
 
 function(nanobind_extension_abi3 name)
   get_filename_component(ext "${NB_SUFFIX}" LAST_EXT)
-  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ".abi3${ext}")
+  if(WIN32)
+    set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX ".abi3${ext}")
+  else()
+    set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX "${ext}")
+  endif()
 endfunction()
 
 function (nanobind_lto name)

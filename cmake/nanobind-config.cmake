@@ -4,18 +4,25 @@ if (NOT TARGET Python::Module)
   message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
 endif()
 
-# Determine the right suffix for ordinary and stable ABI extensions
-if (Python_SOSABI)
-  set(NB_SUFFIX_EXT "${CMAKE_SHARED_MODULE_SUFFIX}")
+# Determine the right suffix for ordinary and stable ABI extensions.
+# Python_SOSABI is guaranteed to be available in CMake 3.26+, and it may
+# also be available as part of backported FindPython in scikit-build-core
+if (DEFINED Python_SOSABI)
   if (WIN32)
     set(NB_SUFFIX_EXT ".pyd")
+  else()
+    set(NB_SUFFIX_EXT "${CMAKE_SHARED_MODULE_SUFFIX}")
   endif()
 
-  # These are guaranteed to both be available in CMake 3.26+
   set(NB_SUFFIX   ".${Python_SOABI}${NB_SUFFIX_EXT}")
-  set(NB_SUFFIX_S ".${Python_SOSABI}${NB_SUFFIX_EXT}")
+
+  if (Python_SOSABI STREQUAL "")
+    set(NB_SUFFIX_S "${NB_SUFFIX_EXT}")
+  else()
+    set(NB_SUFFIX_S ".${Python_SOSABI}${NB_SUFFIX_EXT}")
+  endif()
 else()
-  # Determine the Python extension suffix and stash in the CMake cache
+  # Query Python directly to get the right suffix
   execute_process(
     COMMAND "${Python_EXECUTABLE}" "-c"
       "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
@@ -36,6 +43,7 @@ else()
   endif()
 endif()
 
+# Stash these for later use
 set(NB_SUFFIX   ${NB_SUFFIX}   CACHE INTERNAL "")
 set(NB_SUFFIX_S ${NB_SUFFIX_S} CACHE INTERNAL "")
 

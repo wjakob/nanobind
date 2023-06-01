@@ -249,9 +249,15 @@ function (nanobind_set_visibility name)
   set_target_properties(${name} PROPERTIES CXX_VISIBILITY_PRESET hidden)
 endfunction()
 
+function (nanobind_musl_static_libcpp name)
+  if ("$ENV{AUDITWHEEL_PLAT}" MATCHES "musllinux")
+    target_link_options(${name} PRIVATE -static-libstdc++ -static-libgcc)
+  endif()
+endfunction()
+
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;NOTRIM" "" "")
+    "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;NOTRIM;MUSL_DYNAMIC_LIBCPP" "" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
@@ -306,6 +312,10 @@ function(nanobind_add_module name)
 
   if (ARG_LTO)
     nanobind_lto(${name})
+  endif()
+
+  if (ARG_NB_STATIC AND NOT ARG_MUSL_DYNAMIC_LIBCPP)
+    nanobind_musl_static_libcpp(${name})
   endif()
 
   nanobind_set_visibility(${name})

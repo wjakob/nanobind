@@ -62,6 +62,14 @@ The high-level interface consists of just one CMake command:
       * - ``NOSTRIP``
         - Don't strip unneded symbols and debug information from the compiled
           extension when performing release builds.
+      * - ``MUSL_DYNAMIC_LIBCPP``
+        - When `cibuildwheel
+          <https://cibuildwheel.readthedocs.io/en/stable/>`__ is used to
+          produce `musllinux <https://peps.python.org/pep-0656/>`__ wheels,
+          don't statically link against ``libstdc++`` and ``libgcc`` (which is
+          an optimization that nanobind does by default in this specific case).
+          If this explanation sounds confusing, then you can ignore it. See the
+          detailed description below for more information on this step.
 
    :cmake:command:`nanobind_add_module` performs the following
    steps to produce bindings.
@@ -146,6 +154,20 @@ The high-level interface consists of just one CMake command:
      bottleneck. That said, the optional ``LTO`` argument can be specified to
      enable LTO in release builds.
 
+   - nanobind's CMake build system is often combined with `cibuildwheel
+     <https://cibuildwheel.readthedocs.io/en/stable/>`__ to automate the
+     generation of wheels for many different platforms. One such platform
+     called `musllinux <https://peps.python.org/pep-0656/>`__ exists to create
+     tiny self-contained binaries that are cheap to install in a container
+     environment (Docker, etc.). An issue of the combination with nanobind is
+     that ``musllinux`` doesn't include the ``libstdc++`` and ``libgcc``
+     libraries which nanobind depends on. ``cibuildwheel`` then has to ship
+     those along in each wheel, which actually increases their size rather
+     dramatically (by a factor of >5x for small projects). To avoid this,
+     nanobind prefers to link against these libraries *statically* when it
+     detects a ``cibuildwheel`` build targeting ``musllinux``. Pass the
+     ``MUSL_DYNAMIC_LIBCPP`` parameter to avoid this behavior.
+
 .. _lowlevel-cmake:
 
 Low-level interface
@@ -195,6 +217,9 @@ is equivalent to
 
     # .. set important linker flags
     nanobind_link_options(my_ext)
+
+    # Statically link against libstdc++/libgcc when targeting musllinux
+    nanobind_musl_static_libcpp(${name})
 
 The various commands are described below:
 
@@ -312,3 +337,10 @@ The various commands are described below:
    .. code-block:: cmake
 
       nanobind_link_options(my_target)
+
+.. cmake:command:: nanobind_musl_static_libcpp
+
+   This function passes the linker flags ``-static-libstdc++`` and
+   ``-static-libgcc`` to ``gcc`` when the environment variable
+   ``AUDITWHEEL_PLAT`` contains the string ``musllinux``, which indicates a
+   cibuildwheel build targeting that platform.

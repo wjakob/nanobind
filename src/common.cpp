@@ -272,11 +272,11 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
     if (method_call) {
         PyObject *self = PyObject_GetAttr(args[0], /* name = */ base);
         if (self) {
-            res = _PyObject_Vectorcall(self, args + 1, nargsf - 1, kwnames);
+            res = _PyObject_Vectorcall(self, (PyObject **) args + 1, nargsf - 1, kwnames);
             Py_DECREF(self);
         }
     } else {
-        res = _PyObject_Vectorcall(base, args, nargsf, kwnames);
+        res = _PyObject_Vectorcall(base, (PyObject **) args, nargsf, kwnames);
     }
 #else
     res = (method_call ? PyObject_VectorcallMethod

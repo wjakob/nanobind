@@ -15,6 +15,12 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.3.1 (May 31, 2023)
+----------------------------
+
+* CMake build system improvements for stable ABI wheel generation. 
+  (PR `#222 <https://github.com/wjakob/nanobind/pull/222>`__).
+
 Version 1.3.0 (May 31, 2023)
 ----------------------------
 

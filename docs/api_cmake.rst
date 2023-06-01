@@ -33,7 +33,7 @@ The high-level interface consists of just one CMake command:
 
       nanobind_build_library(
         my_ext                   # Target name
-        NB_STATIC STABLE_API LTO # Optional flags (see below)
+        NB_STATIC STABLE_ABI LTO # Optional flags (see below)
         my_ext.h                 # Source code files below
         my_ext.cpp)
 
@@ -45,14 +45,16 @@ The high-level interface consists of just one CMake command:
         - Perform a `stable ABI
           <https://docs.python.org/3/c-api/stable.html>`_ build, making it
           possible to use a compiled extension across Python minor versions.
-          Only Python >= 3.12 is supported. The flag is ignored on older
-          Python versions.
-      * - ``NB_SHARED``
-        - Compile the core nanobind library as a shared library (the default).
+          The flag is ignored on Python versions older than < 3.12.
       * - ``NB_STATIC``
         - Compile the core nanobind library as a static library. This
-          simplifies redistribution but unnecessarily increases the binary
-          storage footprint when a project contains many Python extensions.
+          simplifies redistribution but can increase the combined binary
+          storage footprint when a project contains many Python extensions
+          (this is the default).
+      * - ``NB_SHARED``
+        - The opposite of ``NB_STATIC``: compile the core nanobind library
+          as a shared library for use in projects that consist of multiple
+          extensions.
       * - ``PROTECT_STACK``
         - Don't remove stack smashing-related protections.
       * - ``LTO``
@@ -62,6 +64,14 @@ The high-level interface consists of just one CMake command:
       * - ``NOSTRIP``
         - Don't strip unneded symbols and debug information from the compiled
           extension when performing release builds.
+      * - ``MUSL_DYNAMIC_LIBCPP``
+        - When `cibuildwheel
+          <https://cibuildwheel.readthedocs.io/en/stable/>`__ is used to
+          produce `musllinux <https://peps.python.org/pep-0656/>`__ wheels,
+          don't statically link against ``libstdc++`` and ``libgcc`` (which is
+          an optimization that nanobind does by default in this specific case).
+          If this explanation sounds confusing, then you can ignore it. See the
+          detailed description below for more information on this step.
 
    :cmake:command:`nanobind_add_module` performs the following
    steps to produce bindings.
@@ -146,6 +156,20 @@ The high-level interface consists of just one CMake command:
      bottleneck. That said, the optional ``LTO`` argument can be specified to
      enable LTO in release builds.
 
+   - nanobind's CMake build system is often combined with `cibuildwheel
+     <https://cibuildwheel.readthedocs.io/en/stable/>`__ to automate the
+     generation of wheels for many different platforms. One such platform
+     called `musllinux <https://peps.python.org/pep-0656/>`__ exists to create
+     tiny self-contained binaries that are cheap to install in a container
+     environment (Docker, etc.). An issue of the combination with nanobind is
+     that ``musllinux`` doesn't include the ``libstdc++`` and ``libgcc``
+     libraries which nanobind depends on. ``cibuildwheel`` then has to ship
+     those along in each wheel, which actually increases their size rather
+     dramatically (by a factor of >5x for small projects). To avoid this,
+     nanobind prefers to link against these libraries *statically* when it
+     detects a ``cibuildwheel`` build targeting ``musllinux``. Pass the
+     ``MUSL_DYNAMIC_LIBCPP`` parameter to avoid this behavior.
+
 .. _lowlevel-cmake:
 
 Low-level interface
@@ -196,6 +220,9 @@ is equivalent to
     # .. set important linker flags
     nanobind_link_options(my_ext)
 
+    # Statically link against libstdc++/libgcc when targeting musllinux
+    nanobind_musl_static_libcpp(my_ext)
+
 The various commands are described below:
 
 .. cmake:command:: nanobind_build_library
@@ -209,7 +236,7 @@ The various commands are described below:
       :widths: 10 50
 
       * - ``-static``
-        - Perform a static library build (shared is the default).
+        - Perform a static library build (without this suffix, a shared build is used)
       * - ``-abi3``
         - Perform a stable ABI build targeting Python v3.12+.
 
@@ -242,16 +269,6 @@ The various commands are described below:
       nanobind_trim(my_target)
 
    This substantially reduces the size of the generated binary.
-
-.. cmake:command:: nanobind_strip
-
-   This function strips unused and debug symbols in ``Release`` and
-   ``MinSizeRel`` builds on Linux and macOS. It expects a single target as
-   argument, as in
-
-   .. code-block:: cmake
-
-      nanobind_strip(my_target)
 
 .. cmake:command:: nanobind_strip
 
@@ -312,3 +329,17 @@ The various commands are described below:
    .. code-block:: cmake
 
       nanobind_link_options(my_target)
+
+.. cmake:command:: nanobind_musl_static_libcpp
+
+   This function passes the linker flags ``-static-libstdc++`` and
+   ``-static-libgcc`` to ``gcc`` when the environment variable
+   ``AUDITWHEEL_PLAT`` contains the string ``musllinux``, which indicates a
+   cibuildwheel build targeting that platform.
+
+   The function expects a single target as argument, as in
+
+   .. code-block:: cmake
+
+      nanobind_musl_static_libcpp(my_target)
+

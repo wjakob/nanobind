@@ -18,153 +18,42 @@ Note that all of the recommended practices have already been implemented in the
 which is a minimal C++ project with nanobind-based bindings. You may therefore
 prefer to clone this repository and modify its contents.
 
-Step 1: Specify build dependencies
-----------------------------------
+Step 1: Overview
+----------------
 
-In the root directory of your project, create a file named ``pyproject.toml``
-listing build-time dependencies. Runtime dependencies don't need to be added
-here. The following core dependencies are required by nanobind:
-
-.. code-block:: toml
-
-   [build-system]
-   requires = [
-       "setuptools>=42",
-       "wheel",
-       "scikit-build>=0.16.7",
-       "cmake>=3.18",
-       "nanobind>=1.1.0",
-       "ninja; platform_system!='Windows'"
-   ]
-
-   build-backend = "setuptools.build_meta"
-
-Step 2: Create a ``setup.py`` file
-----------------------------------
-
-Most wheels are built using the `setuptools
-<https://packaging.python.org/en/latest/guides/distributing-packages-using-setuptools/>`__
-package. We also use it here in combination with `scikit-build
-<https://scikit-build.readthedocs.io/en/latest>`__, which can be thought of as
-a glue layer connecting setuptools with CMake.
-
-To do so, create the file ``setup.py`` at the root of your project directory.
-This file provides metadata about the project and also constitutes the entry
-point of the build system.
-
-.. code-block:: python
-
-   import sys
-
-   try:
-       from skbuild import setup
-       import nanobind
-   except ImportError:
-       print("The preferred way to invoke 'setup.py' is via pip, as in 'pip "
-             "install .'. If you wish to run the setup script directly, you must "
-             "first install the build dependencies listed in pyproject.toml!",
-             file=sys.stderr)
-       raise
-
-   setup(
-       name="my_ext",          # <- The package name (e.g. for PyPI) goes here
-       version="0.0.1",        # <- The current version number.
-       author="Your name",
-       author_email="your.email@address.org",
-       description="A brief description of what the package does",
-       long_description="A long format description in Markdown format",
-       long_description_content_type='text/markdown',
-       url="https://github.com/username/repository_name",
-       python_requires=">=3.8",
-       license="BSD",
-       packages=['my_ext'],     # <- The package will install one module named 'my_ext'
-       package_dir={'': 'src'}, # <- Root directory containing the Python package
-       cmake_install_dir="src/my_ext", # <- CMake will place the compiled extension here
-       include_package_data=True
-   )
-
-The warning message at the top will be explained shortly. This particular
-``setup.py`` file assumes the following project directory structure:
+The example project has a simple directory structure:
 
 .. code-block:: text
 
+   ├── README.md
    ├── CMakeLists.txt
    ├── pyproject.toml
-   ├── setup.py
    └── src/
        ├── my_ext.cpp
        └── my_ext/
            └── __init__.py
 
-In other words, the source code is located in a ``src`` directory containing
-the Python package as a subdirectory. Naturally, the code can also be
-arranged differently, but this will require corresponding modifications in
-``setup.py``.
+The file ``CMakeLists.txt`` contains the C++-specifics part of the build
+system, while ``pyproject.toml`` explains how to turn the example into a wheel.
+The file ``README.md`` should ideally explain how to use the project in more
+detail. Its contents are arbitrary, but the file must exist for the following
+build system to work.
 
-In practice, it can be convenient to add further code that extracts relevant
-fields like version number, short/long description, etc. from code or the
-project's README file to avoid duplication.
+All source code is located in a ``src`` directory containing the Python package
+as a subdirectory.
 
-Step 3: Create a CMake build system
------------------------------------
+Compilation will turn ``my_ext.cpp`` into a shared library in the package
+directory, which has an underscored platform-dependent name (e.g.,
+``_my_ext_impl.cpython-311-darwin.so``) to indicate that it is an
+implementation detail. The ``src/my_ext/__init__.py`` imports the extension and
+exposes relevant functionality. In this small example project, it only contains
+a single line:
 
-Next, we will set up a suitable ``CMakeLists.txt`` file in the root directory.
-Since this build system is designed to be invoked through ``setup.py`` and
-``scikit-build``, it does not make sense to perform a standalone CMake build.
-The message at the top warns users attempting to do this.
+.. code-block:: python
 
-.. code-block:: cmake
+   from ._my_ext_impl import hello
 
-   cmake_minimum_required(VERSION 3.18...3.22)
-   project(my_ext)
-
-   if (NOT SKBUILD)
-     message(WARNING "\
-     This CMake file is meant to be executed using 'scikit-build'. Running
-     it directly will almost certainly not produce the desired result. If
-     you are a user trying to install this package, please use the command
-     below, which will install all necessary build dependencies, compile
-     the package in an isolated environment, and then install it.
-     =====================================================================
-      $ pip install .
-     =====================================================================
-     If you are a software developer, and this is your own package, then
-     it is usually much more efficient to install the build dependencies
-     in your environment once and use the following command that avoids
-     a costly creation of a new virtual environment at every compilation:
-     =====================================================================
-      $ python setup.py install
-     =====================================================================")
-   endif()
-
-   # Perform a release build by default
-   if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-   endif()
-
-   # Create CMake targets for Python components needed by nanobind
-   find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
-
-   # Determine the nanobind CMake include path and register it
-   execute_process(
-     COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
-     OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
-   list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
-
-   # Import nanobind through CMake's find_package mechanism
-   find_package(nanobind CONFIG REQUIRED)
-
-   # We are now ready to compile the actual extension module
-   nanobind_add_module(
-     _my_ext_impl
-     src/my_ext.cpp
-   )
-
-   # Install directive for scikit-build
-   install(TARGETS _my_ext_impl LIBRARY DESTINATION .)
-
-A simple definition of ``src/my_ext.cpp`` could contain the following:
+The file ``src/my_ext.cpp`` contains minimal bindings for an example function:
 
 .. code-block:: cpp
 
@@ -174,23 +63,154 @@ A simple definition of ``src/my_ext.cpp`` could contain the following:
        m.def("hello", []() { return "Hello world!"; });
    }
 
-Compilation and installation will turn this binding code into a shared library
-located in the ``src/my_ext`` directory with an undescored platform-dependent
-name (e.g., ``_my_ext_impl.cpython-311-darwin.so``) indicating that the
-extension is an implementation detail. The ``__init__.py`` file in the same
-directory has the purpose of importing the extension and exposing relevant
-functionality, e.g.:
+The next two steps will set up the infrastructure needed for wheel generation.
 
-.. code-block:: python
+Step 2: Specify build dependencies and metadata
+-----------------------------------------------
 
-   from ._my_ext_impl import hello
+In the root directory of the project, create a file named ``pyproject.toml``
+listing *build-time dependencies*. Note that runtime dependencies *do not* need
+to be added here. The following core dependencies are required by nanobind:
+
+.. code-block:: toml
+
+   [build-system]
+   requires = ["scikit-build-core >=0.4.3", "nanobind >=1.3.1"]
+   build-backend = "scikit_build_core.build"
+
+You may need to increase the minimum nanobind version in the above snippet if
+you are using features from versions newer than 1.3.1.
+
+Just below the list of build-time requirements, specify project metadata including:
+
+- The project's name (which must be a valid package name)
+- The version number
+- A brief (1-line) description of the project
+- The name of a more detailed README file
+- The list of authors with email addresses.
+- The software license
+- The project web page
+- Runtime dependencies, if applicable
+
+An example is shown below:
+
+.. code-block:: toml
+
+   [project]
+   name = "my_ext"
+   version = "0.0.1"
+   description = "A brief description of what this project does"
+   readme = "README.md"
+   requires-python = ">=3.8"
+   authors = [
+       { name = "Your Name", email = "your.email@address.com" },
+   ]
+   classifiers = [
+       "License :: BSD",
+   ]
+   # Optional: runtime dependency specification
+   # dependencies = [ "cryptography >=41.0" ]
+
+   [project.urls]
+   Homepage = "https://github.com/your/project"
+
+We will use `scikit-build-core
+<https://github.com/scikit-build/scikit-build-core>`__ to build wheels, and
+this tool also has its own configuration block in ``pyproject.toml``. The
+following defaults are recommended:
+
+.. code-block:: toml
+
+   [tool.scikit-build]
+   # Protect the configuration against future changes in scikit-build-core
+   minimum-version = "0.4"
+
+   # Setuptools-style build caching in a local directory
+   build-dir = "build/{wheel_tag}"
+
+   # Build stable ABI wheels for CPython 3.12+
+   wheel.py-api = "cp312"
+
+Step 3: Set up a CMake build system
+-----------------------------------
+
+Next, we will set up a suitable ``CMakeLists.txt`` file in the root directory.
+Since this build system is designed to be invoked through
+``scikit-build-core``, it does not make sense to perform a standalone CMake
+build. The message at the top warns users attempting to do this.
+
+.. code-block:: cmake
+
+   # Set the minimum CMake version and policies for highest tested version
+   cmake_minimum_required(VERSION 3.15...3.26)
+
+   # Set up the project and ensure there is a working C++ compiler
+   project(my_ext LANGUAGES CXX)
+
+   # Warn if the user invokes CMake directly
+   if (NOT SKBUILD)
+     message(WARNING "\
+     This CMake file is meant to be executed using 'scikit-build-core'.
+     Running it directly will almost certainly not produce the desired
+     result. If you are a user trying to install this package, use the
+     command below, which will install all necessary build dependencies,
+     compile the package in an isolated environment, and then install it.
+     =====================================================================
+      $ pip install .
+     =====================================================================
+     If you are a software developer, and this is your own package, then
+     it is usually much more efficient to install the build dependencies
+     in your environment once and use the following command that avoids
+     a costly creation of a new virtual environment at every compilation:
+     =====================================================================
+      $ pip install nanobind scikit-build-core[pyproject]
+      $ pip install --no-build-isolation -ve .
+     =====================================================================
+     You may optionally add -Ceditable.rebuild=true to auto-rebuild when
+     the package is imported. Otherwise, you need to rerun the above
+     after editing C++ files.")
+   endif()
+
+Next, import Python and nanobind including the ``Development.SABIModule``
+component that can be used to create `stable ABI
+<https://docs.python.org/3/c-api/stable.html>`__ builds.
+
+.. code-block:: cmake
+
+   # Try to import all Python components potentially needed by nanobind
+   find_package(Python 3.8
+     REQUIRED COMPONENTS Interpreter Development.Module
+     OPTIONAL_COMPONENTS Development.SABIModule)
+
+   # Import nanobind through CMake's find_package mechanism
+   find_package(nanobind CONFIG REQUIRED)
+
+The last two steps build and install the actual extension
+
+.. code-block:: cmake
+
+    # We are now ready to compile the actual extension module
+    nanobind_add_module(
+      # Name of the extension
+      _my_ext_impl
+
+      # Target the stable ABI for Python 3.12+, which reduces
+      # the number of binary wheels that must be built. This
+      # does nothing on older Python versions
+      STABLE_ABI
+
+      # Source code goes here
+      src/my_ext.cpp
+    )
+
+    # Install directive for scikit-build-core
+    install(TARGETS _my_ext_impl LIBRARY DESTINATION my_ext)
+
 
 Step 4: Install the package locally
 -----------------------------------
 
-It used to be common to run ``setup.py`` files directly (as in ``python
-setup.py install``), but this is fragile when the environment doesn't have the
-exact right versions of all build dependencies. The recommended method is via
+To install the package, run
 
 .. code-block:: bash
 
@@ -214,22 +234,51 @@ instead of installing the package.
 
    $ pip wheel .
 
-Step 5: Build wheels in the cloud
+Step 5: Incremental rebuilds
+----------------------------
+
+The ``pip install`` and ``pip wheel`` commands are extremely conservative to
+ensure reproducible builds. They create a pristine virtual environment and
+install build-time dependencies before compiling the extension *from scratch*.
+
+It can be frustrating to wait for this lengthy sequence of steps after every
+small change to a source file during the active development phase of a project.
+To avoid this, first install the project's build dependencies, e.g.:
+
+.. code-block:: bash
+
+   $ pip install nanobind scikit-build-core[pyproject]
+
+Next, install the project without build isolation to enable incremental builds:
+
+.. code-block:: bash
+
+   $ pip install --no-build-isolation -ve .
+
+This command will need to be run after every change to reinstall the updated package.
+For an even more interactive experience, use
+
+.. code-block:: bash
+
+   $ pip install --no-build-isolation -Ceditable.rebuild=true -ve .
+
+This will automatically rebuild any code (if needed) whenever the ``my_ext``
+package is imported into a Python session.
+
+Step 6: Build wheels in the cloud
 ---------------------------------
 
-On my machine, the previous step produced a file named
-``my_ext-0.0.1-cp311-cp311-macosx_13_0_arm64.whl`` that is specific to
-Python 3.11 running on an arm64 macOS machine. Other Python versions
-and operating systems will each require their own wheels, which leads
-to a challenging build matrix.
+On my machine, the ``pip wheel`` command produces a file named
+``my_ext-0.0.1-cp311-cp311-macosx_13_0_arm64.whl`` that is specific to Python
+3.11 running on an arm64 macOS machine. Other Python versions and operating
+systems each require their own wheels, which leads to a dauntingly large build
+matrix (though nanobind's stable ABI support will help to significantly reduce
+the size of this matrix once Python 3.12 is more widespread). 
 
-In the future (once Python 3.12 is more widespread), nanobind's Stable ABI
-support will help to reduce the size of this build matrix. More information
-about this will be added here at a later point.
-
-In the meantime, we can use GitHub actions along with the powerful
-`cibuildwheel <https://cibuildwheel.readthedocs.io/en/stable/>`__ package to
-fully automate the process of wheel generation.
+Rather than building these wheels manually on different machines, it is far
+more efficient to use GitHub actions along with the powerful `cibuildwheel
+<https://cibuildwheel.readthedocs.io/en/stable/>`__ package to fully automate
+the process.
 
 To do so, create a file named ``.github/workflows/wheels.yml`` containing
 the contents of the `following file
@@ -238,6 +287,26 @@ You may want to remove the ``on: push:`` lines, otherwise, the action will run
 after every commit, which is perhaps a bit excessive. In this case, you can
 still trigger the action manually on the *Actions* tab of the GitHub project
 page.
+
+Furthermore, append the following ``cibuildwheel``-specific configuration to
+``pyproject.toml``:
+
+.. code-block:: toml
+
+    [tool.cibuildwheel]
+    # 32-bit builds are not supported by nanobind
+    archs = ["auto64"]
+
+    # Necessary to see build output from the actual compilation
+    build-verbosity = 1
+
+    # Optional: run pytest to ensure that the package was correctly built
+    # test-command = "pytest {project}/tests"
+    # test-requires = "pytest"
+
+    # Needed for full C++17 support on macOS
+    [tool.cibuildwheel.macos.environment]
+    MACOSX_DEPLOYMENT_TARGET = "10.14"
 
 Following each run, the action provides a downloadable *build artifact*, which
 is a ZIP file containing all the individual wheel files for each platform.

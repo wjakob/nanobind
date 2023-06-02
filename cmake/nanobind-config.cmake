@@ -275,7 +275,7 @@ function(nanobind_add_module name)
   if ((Python_VERSION VERSION_LESS 3.12) OR
       (NOT Python_INTERPRETER_ID STREQUAL "Python") OR
       (NOT TARGET Python::SABIModule))
-    set(ARG_STABLE_ABI OFF)
+    set(ARG_STABLE_ABI FALSE)
   endif()
 
   set(libname "nanobind")

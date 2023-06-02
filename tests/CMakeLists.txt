@@ -16,6 +16,11 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "
   add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
 endif()
 
+if (UNIX AND (CMAKE_SIZEOF_VOID_P EQUAL 4) AND (CMAKE_SYSTEM_PROCESSOR STREQUAL i686))
+  # Don't use the legacy 387 math coprocessor in 32 bit builds, this causes tests to fail
+  add_compile_options(-mfpmath=sse -msse2)
+endif()
+
 nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})

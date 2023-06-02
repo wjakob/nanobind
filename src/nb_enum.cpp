@@ -280,7 +280,7 @@ Py_hash_t nb_enum_hash(PyObject *o) {
         case 1: value = *(const int8_t *)  p; break;
         case 2: value = *(const int16_t *) p; break;
         case 4: value = *(const int32_t *) p; break;
-        case 8: value = *(const int64_t *) p; break;
+        case 8: value = (Py_hash_t) * (const int64_t*)p; break;
         default:
             PyErr_SetString(PyExc_TypeError, "nb_enum: invalid type size!");
             return -1;

@@ -7,6 +7,8 @@
 // Silence warnings that MSVC reports in robin_*.h
 #  pragma warning(disable: 4127) // conditional expression is constant
 #  pragma warning(disable: 4324) // structure was padded due to alignment specifier
+#  pragma warning(disable: 4293) // shift count negative or too big  <-- erroneously raised in a constexpr-disabled block
+#  pragma warning(disable: 4310) // cast truncates constant value <-- erroneously raised in a constexpr-disabled block
 #endif
 
 #include <nanobind/nanobind.h>
@@ -66,7 +68,7 @@ struct nb_inst { // usually: 24 bytes
     bool clear_keep_alive : 1;
 };
 
-static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(void *));
+static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
 
 /// Python object representing a bound C++ function
 struct nb_func {
@@ -94,12 +96,20 @@ struct nb_bound_method {
 struct ptr_hash {
     size_t operator()(const void *p) const {
         uintptr_t v = (uintptr_t) p;
-        // fmix64 from MurmurHash by Austin Appleby (public domain)
-        v ^= v >> 33;
-        v *= (uintptr_t) 0xff51afd7ed558ccdull;
-        v ^= v >> 33;
-        v *= (uintptr_t) 0xc4ceb9fe1a85ec53ull;
-        v ^= v >> 33;
+        // fmix32/64 from MurmurHash by Austin Appleby (public domain)
+        if constexpr (sizeof(void *) == 4) {
+            v ^= v >> 16;
+            v *= 0x85ebca6b;
+            v ^= v >> 13;
+            v *= 0xc2b2ae35;
+            v ^= v >> 16;
+        } else {
+            v ^= v >> 33;
+            v *= (uintptr_t) 0xff51afd7ed558ccdull;
+            v ^= v >> 33;
+            v *= (uintptr_t) 0xc4ceb9fe1a85ec53ull;
+            v ^= v >> 33;
+        }
         return (size_t) v;
     }
 };

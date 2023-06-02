@@ -15,6 +15,16 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.4.0 (TBA)
+-------------------
+
+* Added support for 32 bit processors (only i686 tested so far).
+  (PR `#224 <https://github.com/wjakob/nanobind/pull/224>`__).
+* Added support for PyPy 3.8. (commit `cd8135
+  <https://github.com/wjakob/nanobind/commit/cd8135baa1da1213252272b5c9ecbf909e947597>`__).
+* Reduced binary bloat of musllinux wheels. (commit `f52513
+  <https://github.com/wjakob/nanobind/commit/f525139a80d173feaea5518e842aceeb6ceec5cf>`__).
+
 Version 1.3.1 (May 31, 2023)
 ----------------------------
 

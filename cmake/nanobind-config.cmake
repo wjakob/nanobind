@@ -17,7 +17,7 @@ endif()
 # PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
 # report an incorrect value. Only use it if it looks correct (X-X-X form).
 if(DEFINED Python_SOABI AND "${Python_SOABI}" MATCHES ".+-.+-.+")
-    set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX_EXT}")
+  set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX_EXT}")
 endif()
 
 # Python_SOSABI is guaranteed to be available in CMake 3.26+, and it may

@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.15...3.22)
-project(nanobind)
+cmake_minimum_required(VERSION 3.15...3.26)
+project(nanobind LANGUAGES CXX)
 
 # ---------------------------------------------------------------------------
 # Only build tests by default if this is the top-level CMake project
@@ -55,15 +55,11 @@ endif()
 # ---------------------------------------------------------------------------
 
 if (NOT TARGET Python::Module OR NOT TARGET Python::Interpreter)
-    set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
+  set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
 
-    if (WIN32 AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.26 AND Python_INTERPRETER_ID STREQUAL "Python")
-      # Windows stable ABI builds for CPython require Development.SABIModule provided by CMake>=3.26
-      find_package(Python 3.8 COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)
-    else()
-      # The following suffices in all other cases
-      find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
-    endif()
+  find_package(Python 3.8
+    REQUIRED COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule)
 endif()
 
 # ---------------------------------------------------------------------------

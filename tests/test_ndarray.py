@@ -261,6 +261,7 @@ def test12_implicit_conversion_jax():
     with pytest.raises(TypeError) as excinfo:
         t.noimplicit(jnp.zeros((2, 2), dtype=jnp.uint8))
 
+
 def test13_destroy_capsule():
     collect()
     dc = t.destruct_count()
@@ -330,6 +331,7 @@ def test15_passthrough():
     b = t.passthrough(a)
     assert a is b
 
+
 @needs_numpy
 def test16_return_numpy():
     collect()
@@ -357,6 +359,7 @@ def test17_return_pytorch():
     collect()
     assert t.destruct_count() - dc == 1
 
+
 @needs_numpy
 def test18_return_array_scalar():
     collect()
@@ -366,6 +369,7 @@ def test18_return_array_scalar():
     del x
     collect()
     assert t.destruct_count() - dc == 1
+
 
 # See PR #162
 @needs_torch
@@ -403,6 +407,7 @@ def test20_single_and_empty_dimension_numpy():
     a = np.ones((0,0,0), dtype=np.float32)
     t.noop_3d_c_contig(a)
 
+
 # See PR #162
 @needs_torch
 def test21_single_and_empty_dimension_fortran_order_pytorch():
@@ -415,3 +420,26 @@ def test21_single_and_empty_dimension_fortran_order_pytorch():
     t.noop_2d_f_contig(a)
     a = torch.ones((100,1), dtype=torch.float32).t().contiguous().t()
     t.noop_2d_f_contig(a)
+
+
+@needs_numpy
+def test22_ro_array():
+    a = np.array([1, 2], dtype=np.float32)
+    assert t.accept_ro(a) == 1
+    assert t.accept_rw(a) == 1
+    a.setflags(write=False)
+    assert t.accept_ro(a) == 1
+    with pytest.raises(TypeError) as excinfo:
+        t.accept_rw(a)
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+
+@needs_numpy
+def test22_return_ro():
+    x = t.ret_numpy_const()
+    assert t.ret_numpy_const.__doc__  == 'ret_numpy_const() -> numpy.ndarray[dtype=float32, writable=False, shape=(2, 4)]'
+    assert x.shape == (2, 4)
+    assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+    with pytest.raises(ValueError) as excinfo:
+        x[0,0] =1
+    assert 'read-only' in str(excinfo.value)

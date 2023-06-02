@@ -496,16 +496,16 @@ in a :ref:`separate section <ndarrays>`.
 
       Return the stride of dimension `i`.
 
-   .. cpp:function:: int64_t* shape_ptr() const
+   .. cpp:function:: const int64_t* shape_ptr() const
 
       Return a pointer to the shape array. Note that the return type is
-      ``int64_t*``, which may be unexpected as the scalar version
+      ``const int64_t*``, which may be unexpected as the scalar version
       :cpp:func:`shape()` casts its result to a ``size_t``.
 
       This is a consequence of the DLPack tensor representation that uses
       signed 64-bit integers for all of these fields.
 
-   .. cpp:function:: int64_t* stride_ptr() const
+   .. cpp:function:: const int64_t* stride_ptr() const
 
       Return pointer to the stride array.
 
@@ -526,11 +526,12 @@ in a :ref:`separate section <ndarrays>`.
 
    .. cpp:function:: const Scalar * data() const
 
-      Return a mutable pointer to the array data.
+      Return a const pointer to the array data.
 
    .. cpp:function:: Scalar * data()
 
-      Return a const pointer to the array data.
+      Return a mutable pointer to the array data. Only enabled when `Scalar` is
+      not itself ``const``.
 
    .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
 
@@ -603,6 +604,24 @@ Array annotations
 The :cpp:class:`ndarray\<..\> <ndarray>` class admits optional template
 parameters. They constrain the type of array arguments that may be passed to a
 function.
+
+The following are supported:
+
+Data type
++++++++++
+
+The data type of the underlying scalar element. The following are supported.
+
+- ``[u]int8_t`` up to ``[u]int64_t`` and other variations (``unsigned long long``, etc.)
+- ``float``, ``double``
+- ``bool``
+
+Annotate the data type with ``const`` to indicate a read-only array. Note that
+only the buffer protocol/NumPy interface considers ``const``-ness at the
+moment; data exchange with other array libraries will ignore this annotation.
+
+nanobind does not support non-standard types as documented in the section on
+:ref:`dtype limitations <dtype_restrictions>`.
 
 Shape
 +++++

@@ -20,6 +20,7 @@ struct ndarray_handle {
     bool free_shape;
     bool free_strides;
     bool call_deleter;
+    bool ro;
 };
 
 static void nb_ndarray_dealloc(PyObject *self) {
@@ -107,7 +108,7 @@ static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
 
     view->ndim = t.ndim;
     view->len = len;
-    view->readonly = false;
+    view->readonly = self->th->ro;
     view->suboffsets = nullptr;
     view->internal = nullptr;
     view->strides = strides.release();
@@ -157,11 +158,12 @@ static PyTypeObject *nd_ndarray_tp() noexcept {
     return tp;
 }
 
-static PyObject *dlpack_from_buffer_protocol(PyObject *o) {
+static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     scoped_pymalloc<Py_buffer> view;
     scoped_pymalloc<managed_dltensor> mt;
 
-    if (PyObject_GetBuffer(o, view.get(), PyBUF_RECORDS)) {
+    if (PyObject_GetBuffer(o, view.get(),
+                           ro ? PyBUF_RECORDS_RO : PyBUF_RECORDS)) {
         PyErr_Clear();
         return nullptr;
     }
@@ -307,7 +309,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
 
         // Try creating a ndarray via the buffer protocol
         if (!capsule.is_valid())
-            capsule = steal(dlpack_from_buffer_protocol(o));
+            capsule = steal(dlpack_from_buffer_protocol(o, req->req_ro));
 
         if (!capsule.is_valid())
             return nullptr;
@@ -452,6 +454,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
     result->owner = nullptr;
     result->free_shape = false;
     result->call_deleter = true;
+    result->ro = req->req_ro;
     if (is_pycapsule) {
         result->self = nullptr;
     } else {
@@ -514,8 +517,8 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
 
 ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
                                PyObject *owner, const int64_t *strides_in,
-                               dlpack::dtype *dtype, int32_t device_type,
-                               int32_t device_id) {
+                               dlpack::dtype *dtype, bool ro,
+                               int32_t device_type, int32_t device_id) {
     /* DLPack mandates 256-byte alignment of the 'DLTensor::data' field, but
        PyTorch unfortunately ignores the 'byte_offset' value.. :-( */
 #if 0
@@ -570,6 +573,7 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
     result->free_shape = true;
     result->free_strides = true;
     result->call_deleter = false;
+    result->ro = ro;
     Py_XINCREF(owner);
     return result.release();
 }

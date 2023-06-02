@@ -43,6 +43,7 @@
 -U _PyPyCFunction_Check
 -U _PyPyCFunction_GetFunction
 -U _PyPyCFunction_Type
+-U _PyPyCFunction_NewEx
 -U _PyPyCMethod_New
 -U _PyPyCallIter_New
 -U _PyPyCallable_Check
@@ -898,6 +899,7 @@
 -U __PyPyObject_GetDictPtr
 -U __PyPyObject_New
 -U __PyPyObject_NewVar
+-U __PyPyObject_Vectorcall
 -U __PyPyPyGC_AddMemoryPressure
 -U __PyPyPy_Free
 -U __PyPyPy_Malloc

@@ -308,9 +308,25 @@ Furthermore, append the following ``cibuildwheel``-specific configuration to
 Following each run, the action provides a downloadable *build artifact*, which
 is a ZIP file containing all the individual wheel files for each platform.
 
+By default, ``cibuildwheel`` will launch a very large build matrix, and it is
+possible that your extension is not compatible with every single configuration.
+For example, suppose that the project depends on Python 3.9+ and a 64 bit
+processor. In this case, add further entries to the ``[tool.cibuildwheel]``
+block to remove incompatible configurations from the matrix:
+
+.. code-block:: toml
+
+    skip = ["cp38-*", "pp38-*"] # Skip CPython and PyPy 3.8
+    archs = ["auto64"]          # Only target 64 bit architectures
+
+The `cibuildwheel documentation
+<https://cibuildwheel.readthedocs.io/en/stable/options/>`__ explains the
+possible options.
+
 If you set up a GitHub actions `secret
 <https://docs.github.com/en/actions/security-guides/encrypted-secrets>`__ named
 ``pypi_password`` containing a PyPI authentication token, the action will
 automatically upload the generated wheels to the `Python Package Index (PyPI)
 <https://pypi.org>`__ when the action is triggered by a `software release event
 <https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository>`__.
+

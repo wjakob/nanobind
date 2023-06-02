@@ -10,7 +10,7 @@ for distributing extensions created using nanobind.
 
 This section walks through the recommended sequence of steps to build wheels
 and optionally automate this process to simultaneously target many platforms
-(Linux, Windows, macOS) and processors (x86_64, arm64) using the `GitHub
+(Linux, Windows, macOS) and processors (i386, x86_64, arm64) using the `GitHub
 Actions <https://github.com/features/actions>`__ CI service.
 
 Note that all of the recommended practices have already been implemented in the
@@ -294,9 +294,6 @@ Furthermore, append the following ``cibuildwheel``-specific configuration to
 .. code-block:: toml
 
     [tool.cibuildwheel]
-    # 32-bit builds are not supported by nanobind
-    archs = ["auto64"]
-
     # Necessary to see build output from the actual compilation
     build-verbosity = 1
 

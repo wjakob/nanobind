@@ -256,12 +256,13 @@ def test11_trampoline_failures():
 
 
 def test12_large_pointers():
+    import struct
     for i in range(1, 10):
         c = t.i2p(i)
         assert isinstance(c, t.Foo)
         assert t.p2i(c) == i
 
-    large = 0xffffffffffffffff
+    large = (1 << (struct.calcsize("P")*8))-1
     for i in range(large - 10, large):
         c = t.i2p(i)
         assert isinstance(c, t.Foo)

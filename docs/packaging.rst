@@ -75,11 +75,11 @@ to be added here. The following core dependencies are required by nanobind:
 .. code-block:: toml
 
    [build-system]
-   requires = ["scikit-build-core >=0.4.3", "nanobind >=1.3.1"]
+   requires = ["scikit-build-core >=0.4.3", "nanobind >=1.3.2"]
    build-backend = "scikit_build_core.build"
 
 You may need to increase the minimum nanobind version in the above snippet if
-you are using features from versions newer than 1.3.1.
+you are using features from versions newer than 1.3.2.
 
 Just below the list of build-time requirements, specify project metadata including:
 

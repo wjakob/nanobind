@@ -243,6 +243,9 @@ include directive:
    not comparable or copy-assignable, some of these functions will not be
    generated.
 
+   The binding operation is a no-op if the vector type has already been
+   registered with nanobind.
+
 .. _map_bindings:
 
 STL map bindings
@@ -307,6 +310,9 @@ nanobind API and require an additional include directive:
         - Returns an iterable view of the map's values
       * - ``items(self, arg: Map) -> Map.ItemView``
         - Returns an iterable view of the map's items
+
+   The binding operation is a no-op if the map type has already been
+   registered with nanobind.
 
 Unique pointer deleter
 ----------------------

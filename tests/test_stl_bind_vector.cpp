@@ -8,6 +8,9 @@ NB_MODULE(test_bind_vector_ext, m) {
     nb::bind_vector<std::vector<unsigned int>>(m, "VectorInt");
     nb::bind_vector<std::vector<bool>>(m, "VectorBool");
 
+    // Ensure that a repeated binding call is ignored
+    nb::bind_vector<std::vector<bool>>(m, "VectorBool");
+
     struct El {
         explicit El(int v) : a(v) {}
         int a;

@@ -1,4 +1,5 @@
 import pytest
+import platform
 
 import test_bind_vector_ext as t
 
@@ -43,8 +44,14 @@ def test01_vector_int(capfd):
     with pytest.raises(TypeError):
         v_int2.extend([8, "a"])
 
-    captured = capfd.readouterr()
-    assert captured.err.strip() == "nanobind: implicit conversion from type 'list' to type 'test_bind_vector_ext.VectorInt' failed!"
+    captured = capfd.readouterr().err.strip()
+    ref = "nanobind: implicit conversion from type 'list' to type 'test_bind_vector_ext.VectorInt' failed!"
+
+    # Work around Pytest-related flakiness (https://github.com/pytest-dev/pytest/issues/10843)
+    if platform.system() == 'Windows':
+        assert captured == ref or captured == ''
+    else:
+        assert captured == ref
 
     assert v_int2 == t.VectorInt([0, 99, 2, 3, 4, 5, 6, 7])
 

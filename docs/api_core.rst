@@ -1535,12 +1535,23 @@ Class binding
 
 .. cpp:class:: template <typename T, typename... Ts> class_ : public object
 
-   Binding helper class to expose a custom C++ type `T` (declared using either the ``class`` or ``struct`` keyword)
-   in Python.
+   Binding helper class to expose a custom C++ type `T` (declared using either
+   the ``class`` or ``struct`` keyword) in Python.
 
    The variable length parameter `Ts` is optional and  can be used to specify
    the base class of `T` and/or an alias needed to realize :ref:`trampoline
    classes <trampolines>`.
+
+   When the type ``T`` was previously already registered (either within the
+   same extension or another extension), the the ``class_<..>`` declaration is
+   redundant. nanobind will print a warning message in this case:
+
+   .. code-block:: text
+
+      RuntimeWarning: nanobind: type 'MyType' was already registered!
+
+   The ``class_<..>`` instance will subsequently wrap the original type object
+   instead of creating a new one.
 
    .. cpp:function:: template <typename... Extra> class_(handle scope, const char * name, const Extra &... extra)
 

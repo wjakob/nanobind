@@ -701,7 +701,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     PyObject *result = nullptr,
              *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
 
-    /// Small array holding temporaries (implicit conversion/*args/**kwargs)
+    // Small array holding temporaries (implicit conversion/*args/**kwargs)
     cleanup_list cleanup(self_arg);
 
     // Handler routine that will be invoked in case of an error condition

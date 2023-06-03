@@ -669,6 +669,16 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     object modname;
     PyObject *mod = nullptr;
 
+    // Update hash table that maps from std::type_info to Python type
+    auto [it, success] =
+        internals.type_c2p.try_emplace(std::type_index(*t->type), nullptr);
+    if (!success) {
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: type '%s' was already registered!\n", t->name);
+        PyObject *tp = (PyObject *) it->second->type_py;
+        Py_INCREF(tp);
+        return tp;
+    }
+
     if (t->scope != nullptr) {
         if (PyModule_Check(t->scope)) {
             mod = t->scope;
@@ -850,12 +860,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (modname.is_valid())
         setattr(result, "__module__", modname.ptr());
 
-    // Update hash table that maps from std::type_info to Python type
-    auto [it, success] =
-        internals.type_c2p.try_emplace(std::type_index(*t->type), to);
-    if (!success)
-        fail("nanobind::detail::nb_type_new(\"%s\"): type was already "
-             "registered!", t->name);
+    internals.type_c2p[std::type_index(*t->type)] = to;
 
     return result;
 }

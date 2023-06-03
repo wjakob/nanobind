@@ -320,17 +320,16 @@ Removed features include:
 - ○ **Compilation**: workarounds for buggy or non-standard-compliant
   compilers were removed and will not be reintroduced.
 - ○ The ``options`` class for customizing docstring generation was removed.
-- ● NumPy integration was replaced by a more general
-  :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>` integration that supports
-  CPU/GPU tensors produced by various frameworks (NumPy, PyTorch,
-  TensorFlow, JAX, ..).
-- ● Buffer protocol functionality (``.def_buffer()``) was removed in favor of
-  the :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>` interface.
+- ○ The NumPy array class (``py::array``) was removed in exchange for a more
+  powerful alternative (:cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>`)
+  that additionally supports CPU/GPU tensors produced by various frameworks
+  (NumPy, PyTorch, TensorFlow, JAX, etc.). Its API is not compatible with
+  pybind11, however.
+- ● Buffer protocol binding (``.def_buffer()``) was removed in favor of
+  :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>`.
 - ● Nested exceptions are not supported.
 - ● Features to facilitate pickling and unpickling were removed.
 - ● Support for evaluating Python code strings was removed.
-- ● Type casters for time/date conversion (``pybind11/chrono.h``) haven't been
-  ported yet.
 
 Bullet points marked with ● may be reintroduced eventually, but this will
 need to be done in a careful opt-in manner that does not affect code

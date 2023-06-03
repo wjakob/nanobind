@@ -17,7 +17,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 8
+#  define NB_INTERNALS_VERSION 9
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!
@@ -189,9 +189,6 @@ static PyType_Spec nb_bound_method_spec = {
                    NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     /* .slots = */ nb_bound_method_slots
 };
-
-NB_THREAD_LOCAL current_method current_method_data =
-    current_method{ nullptr, nullptr };
 
 nb_internals *internals_p = nullptr;
 

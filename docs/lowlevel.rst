@@ -218,7 +218,7 @@ Here is what this might look like in an implementation:
   };
 
   // Register a new type MyTensor, and reserve space for sizeof(MyTensorMedadata)
-  nb::class_<MyTensor> cls(m, "MyTensor", nb::supplement<MyTensorMedadata>(), nb::is_final())
+  nb::class_<MyTensor> cls(m, "MyTensor", nb::supplement<MyTensorMedadata>())
 
   /// Mutable reference to 'MyTensorMedadata' portion in Python type object
   MyTensorMedadata &supplement = nb::type_supplement<MyTensorMedadata>(cls);

@@ -66,6 +66,9 @@ struct nb_inst { // usually: 24 bytes
 
     /// Does this instance hold reference to others? (via internals.keep_alive)
     bool clear_keep_alive : 1;
+
+    /// Does this instance use intrusive reference counting?
+    bool intrusive : 1;
 };
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
@@ -246,12 +249,6 @@ struct nb_internals {
 #  define NB_SLOT(internals, type, name) type.name
 #endif
 
-struct current_method {
-    const char *name;
-    PyObject *self;
-};
-
-extern NB_THREAD_LOCAL current_method current_method_data;
 extern nb_internals *internals_p;
 extern nb_internals *internals_fetch();
 

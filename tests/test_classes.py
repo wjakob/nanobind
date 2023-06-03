@@ -58,9 +58,9 @@ def test03_instantiate(clean):
 
 def test04_double_init():
     s = t.Struct()
-    with pytest.raises(RuntimeError) as excinfo:
-        s.__init__()
-    assert 'the __init__ method should not be called on an initialized object!' in str(excinfo.value)
+    with pytest.warns(RuntimeWarning, match='nanobind: attempted to initialize an already-initialized instance of type'):
+        with pytest.raises(TypeError):
+            s.__init__(3)
 
 
 def test05_rv_policy(clean):

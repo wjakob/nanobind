@@ -15,27 +15,37 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+struct ticket;
+
 NB_CORE void trampoline_new(void **data, size_t size, void *ptr) noexcept;
 NB_CORE void trampoline_release(void **data, size_t size) noexcept;
-
-NB_CORE PyObject *trampoline_lookup(void **data, size_t size, const char *name,
-                                    bool pure);
+NB_CORE void trampoline_enter(void **data, size_t size, const char *name,
+                              bool pure, ticket *ticket);
+NB_CORE void trampoline_leave(ticket *ticket) noexcept;
 
 template <size_t Size> struct trampoline {
     mutable void *data[2 * Size + 1];
 
-    NB_INLINE trampoline(void *ptr) {
-        trampoline_new(data, Size, ptr);
-    }
-
+    NB_INLINE trampoline(void *ptr) { trampoline_new(data, Size, ptr); }
     NB_INLINE ~trampoline() { trampoline_release(data, Size); }
-
-    NB_INLINE handle lookup(const char *name, bool pure) const {
-        return trampoline_lookup(data, Size, name, pure);
-    }
 
     NB_INLINE handle base() const { return (PyObject *) data[0]; }
 };
+
+struct ticket {
+    handle self;
+    handle key;
+    ticket *prev{};
+    PyGILState_STATE state{};
+
+    template <size_t Size>
+    NB_INLINE ticket(const trampoline<Size> &t, const char *name, bool pure) {
+        trampoline_enter(t.data, Size, name, pure, this);
+    }
+
+    NB_INLINE ~ticket() noexcept { trampoline_leave(this); }
+};
+
 
 #define NB_TRAMPOLINE(base, size)                                              \
     using NBBase = base;                                                       \
@@ -43,21 +53,19 @@ template <size_t Size> struct trampoline {
     nanobind::detail::trampoline<size> nb_trampoline{ this }
 
 #define NB_OVERRIDE_NAME(name, func, ...)                                      \
-    nanobind::handle nb_key = nb_trampoline.lookup(name, false);               \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    if (nb_key.is_valid()) {                                                   \
-        nanobind::gil_scoped_acquire nb_guard;                                 \
+    nanobind::detail::ticket nb_ticket(nb_trampoline, name, false);            \
+    if (nb_ticket.key.is_valid()) {                                                       \
         return nanobind::cast<nb_ret_type>(                                    \
-            nb_trampoline.base().attr(nb_key)(__VA_ARGS__));                   \
+            nb_trampoline.base().attr(nb_ticket.key)(__VA_ARGS__));            \
     } else                                                                     \
         return NBBase::func(__VA_ARGS__)
 
 #define NB_OVERRIDE_PURE_NAME(name, func, ...)                                 \
-    nanobind::handle nb_key = nb_trampoline.lookup(name, true);                \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    nanobind::gil_scoped_acquire nb_guard;                                     \
+    nanobind::detail::ticket nb_ticket(nb_trampoline, name, true);             \
     return nanobind::cast<nb_ret_type>(                                        \
-        nb_trampoline.base().attr(nb_key)(__VA_ARGS__))
+        nb_trampoline.base().attr(nb_ticket.key)(__VA_ARGS__))
 
 #define NB_OVERRIDE(func, ...)                                                 \
     NB_OVERRIDE_NAME(#func, func, __VA_ARGS__)

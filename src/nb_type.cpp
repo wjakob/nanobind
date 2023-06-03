@@ -114,6 +114,8 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         self->internal = false;
     }
 
+    self->intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+
     // Update hash table that maps from C++ to Python instance
     auto [it, success] =
         internals_get().inst_c2p.try_emplace(value, self);
@@ -982,12 +984,14 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         if (valid) {
             nb_inst *inst = (nb_inst *) src;
 
-            if (!inst->ready &&
-                (flags & (uint8_t) cast_flags::construct) == 0) {
-                PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                                 "nanobind: attempted to access an "
-                                 "uninitialized instance of type '%s'!\n",
-                                 t->name);
+            if (((flags & (uint8_t) cast_flags::construct) != 0) == inst->ready) {
+                PyErr_WarnFormat(
+                    PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
+                    inst->ready
+                        ? "attempted to initialize an already-initialized "
+                          "instance"
+                        : "attempted to access an uninitialized instance",
+                    t->name);
                 return false;
             }
 

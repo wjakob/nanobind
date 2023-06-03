@@ -20,6 +20,15 @@ Version 1.4.0 (TBA)
 
 * Improved the efficiency of the function dispatch loop. (PR `#227
   <https://github.com/wjakob/nanobind/pull/227>`__).
+* Added a ``NB_DOMAIN`` parameter to :cmake:command:`nanobind_add_module` which
+  can isolate extensions from each other to avoid binding clashes. See the
+  associated :ref:`FAQ entry <type-visibility>` for details. (commit `977119
+  <https://github.com/wjakob/nanobind/commit/977119c4797db7decf8064cf118afde768ff8fab>`__).
+* Reduced the severity of nanobind encountering a duplicate type binding
+  (commits `f3b0e6
+  <https://github.com/wjakob/nanobind/commit/f3b0e6cbd69a4adcdc31dbe0b844370b1b60dbcf>`__,
+  and `2c9124
+  <https://github.com/wjakob/nanobind/commit/2c9124bbbe736881fa8f9f33ea7817c98b43bf8b>`__).
 * ABI version 9.
 
 Version 1.3.2 (June 2, 2023)

@@ -314,17 +314,17 @@ the extensions:
 - use debug/release mode consistently (debug and release builds are isolated from each other).
 
 In addition, nanobind provides a feature to intentionally scope extensions to a
-named subdomain to avoid conflicts with other extensions. To do so, specify the
+named domain to avoid conflicts with other extensions. To do so, specify the
 ``NB_DOMAIN`` parameter in CMake:
 
 .. code-block:: cmake
 
    nanobind_add_module(my_ext
-                       NB_DOMAIN "my_project"
+                       NB_DOMAIN my_project
                        my_ext.cpp)
 
 In this case, inter-extension type visibility is furthermore restricted to
-extensions in the "my_project" domain.
+extensions in the ``"my_project"`` domain.
 
 How to cite this project?
 -------------------------

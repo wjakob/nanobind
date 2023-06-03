@@ -1,5 +1,6 @@
 import pytest
 import sys
+import platform
 
 import test_bind_map_ext as t
 
@@ -38,8 +39,14 @@ def test_map_string_double(capfd):
 
     with pytest.raises(TypeError):
         mm2.update({"a" : "b"})
-    captured = capfd.readouterr()
-    assert captured.err.strip() == "nanobind: implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed!"
+    captured = capfd.readouterr().err.strip()
+    ref = "nanobind: implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed!"
+
+    # Work around Pytest-related flakiness (https://github.com/pytest-dev/pytest/issues/10843)
+    if platform.system() == 'Windows':
+        assert captured == ref or captured == ''
+    else:
+        assert captured == ref
 
     mm2.update({"a" : 2.5})
     assert len(mm2) == 1

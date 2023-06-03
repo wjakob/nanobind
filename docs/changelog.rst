@@ -15,10 +15,17 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.4.0 (TBA)
+-------------------
+
+* Improved the efficiency of the function dispatch loop. (PR `#227
+  <https://github.com/wjakob/nanobind/pull/227>`__).
+* ABI version 9.
+
 Version 1.3.2 (June 2, 2023)
 ----------------------------
 
-* Fixed compilation on 32 bit processorss (only i686 tested so far).
+* Fixed compilation on 32 bit processors (only ``i686`` tested so far).
   (PR `#224 <https://github.com/wjakob/nanobind/pull/224>`__).
 * Fixed compilation on PyPy 3.8. (commit `cd8135
   <https://github.com/wjakob/nanobind/commit/cd8135baa1da1213252272b5c9ecbf909e947597>`__).

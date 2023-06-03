@@ -62,14 +62,23 @@
 #  define NB_BUILD_ABI ""
 #endif
 
+// Can have limited and non-limited-API extensions in the same process, and they might be incompatible
 #if defined(Py_LIMITED_API)
-#  define NB_LIMITED_API "_limited"
+#  define NB_STABLE_ABI "_stable"
 #else
-#  define NB_LIMITED_API ""
+#  define NB_STABLE_ABI ""
 #endif
 
-#define NB_INTERNALS_ID "__nb_internals_v" \
-    NB_TOSTRING(NB_INTERNALS_VERSION) NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI NB_BUILD_TYPE NB_LIMITED_API "__"
+#if defined(NB_DOMAIN)
+#  define NB_DOMAIN_KEY "_" NB_TOSTRING(NB_DOMAIN)
+#else
+#  define NB_DOMAIN_KEY
+#endif
+
+#define NB_INTERNALS_ID                                                        \
+    "__nb_internals_v" NB_TOSTRING(NB_INTERNALS_VERSION)                       \
+        NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI NB_BUILD_TYPE NB_STABLE_ABI    \
+            NB_DOMAIN_KEY "__"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)

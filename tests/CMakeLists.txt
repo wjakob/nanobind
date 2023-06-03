@@ -51,8 +51,8 @@ target_compile_definitions(inter_module PRIVATE -DSHARED_BUILD)
 target_compile_features(inter_module PRIVATE cxx_std_17)
 target_include_directories(inter_module PRIVATE ${NB_DIR}/include)
 
-nanobind_add_module(test_inter_module_1_ext NOTRIM test_inter_module_1.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_inter_module_2_ext NOTRIM test_inter_module_2.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_1_ext NB_DOMAIN mydomain test_inter_module_1.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module_2.cpp ${NB_EXTRA_ARGS})
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 

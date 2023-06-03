@@ -257,7 +257,8 @@ endfunction()
 
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;NOTRIM;MUSL_DYNAMIC_LIBCPP" "" "")
+    "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP"
+    "NB_DOMAIN" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
@@ -287,7 +288,15 @@ function(nanobind_add_module name)
     set(libname "${libname}-abi3")
   endif()
 
+  if (ARG_NB_DOMAIN)
+    set(libname ${libname}-${ARG_NB_DOMAIN})
+  endif()
+
   nanobind_build_library(${libname})
+
+  if (ARG_NB_DOMAIN)
+    target_compile_definitions(${libname} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
+  endif()
 
   if (ARG_STABLE_ABI)
     target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)

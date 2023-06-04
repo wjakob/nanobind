@@ -5,41 +5,57 @@ if (NOT TARGET Python::Module)
 endif()
 
 # Determine the right suffix for ordinary and stable ABI extensions.
+
+# We always need to know the extension
+if(WIN32)
+  set(NB_SUFFIX_EXT ".pyd")
+else()
+  set(NB_SUFFIX_EXT "${CMAKE_SHARED_MODULE_SUFFIX}")
+endif()
+
+# This was added in CMake 3.17+, also available earlier in scikit-build-core.
+# PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
+# report an incorrect value. Only use it if it looks correct (X-X-X form).
+if(DEFINED Python_SOABI AND "${Python_SOABI}" MATCHES ".+-.+-.+")
+  set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX_EXT}")
+endif()
+
 # Python_SOSABI is guaranteed to be available in CMake 3.26+, and it may
-# also be available as part of backported FindPython in scikit-build-core
-if (DEFINED Python_SOSABI)
-  if (WIN32)
-    set(NB_SUFFIX_EXT ".pyd")
-  else()
-    set(NB_SUFFIX_EXT "${CMAKE_SHARED_MODULE_SUFFIX}")
-  endif()
-
-  set(NB_SUFFIX   ".${Python_SOABI}${NB_SUFFIX_EXT}")
-
-  if (Python_SOSABI STREQUAL "")
+# also be available as part of backported FindPython in scikit-build-core.
+if(DEFINED Python_SOSABI)
+  if(Python_SOSABI STREQUAL "")
     set(NB_SUFFIX_S "${NB_SUFFIX_EXT}")
   else()
     set(NB_SUFFIX_S ".${Python_SOSABI}${NB_SUFFIX_EXT}")
   endif()
-else()
-  # Query Python directly to get the right suffix
+endif()
+
+# If either suffix is missing, call Python to compute it
+if(NOT DEFINED NB_SUFFIX OR NOT DEFINED NB_SUFFIX_S)
+  # Query Python directly to get the right suffix.
   execute_process(
     COMMAND "${Python_EXECUTABLE}" "-c"
       "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
     RESULT_VARIABLE NB_SUFFIX_RET
-    OUTPUT_VARIABLE NB_SUFFIX
+    OUTPUT_VARIABLE EXT_SUFFIX
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  if (NB_SUFFIX_RET AND NOT NB_SUFFIX_RET EQUAL 0)
+  if(NB_SUFFIX_RET AND NOT NB_SUFFIX_RET EQUAL 0)
     message(FATAL_ERROR "nanobind: Python sysconfig query to "
       "find 'EXT_SUFFIX' property failed!")
   endif()
 
-  get_filename_component(NB_SUFFIX_EXT "${NB_SUFFIX}" LAST_EXT)
-  if (WIN32)
-    set(NB_SUFFIX_S "${NB_SUFFIX_EXT}")
-  else()
-    set(NB_SUFFIX_S ".abi3${NB_SUFFIX_EXT}")
+  if(NOT DEFINED NB_SUFFIX)
+    set(NB_SUFFIX "${EXT_SUFFIX}")
+  endif()
+
+  if(NOT DEFINED NB_SUFFIX_S)
+    get_filename_component(NB_SUFFIX_EXT "${EXT_SUFFIX}" LAST_EXT)
+    if(WIN32)
+      set(NB_SUFFIX_S "${NB_SUFFIX_EXT}")
+    else()
+      set(NB_SUFFIX_S ".abi3${NB_SUFFIX_EXT}")
+    endif()
   endif()
 endif()
 

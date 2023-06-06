@@ -48,8 +48,9 @@ template<typename T> constexpr bool requires_contig_memory =
 
 /// Is true for StrideTypes that can describe the contiguous memory layout of the plain Eigen type T.
 template<typename StrideType, typename T> constexpr bool can_map_contig_memory =
-    (StrideType::InnerStrideAtCompileTime == 0 || StrideType::InnerStrideAtCompileTime == 1) &&
+    (StrideType::InnerStrideAtCompileTime == 0 || StrideType::InnerStrideAtCompileTime == 1 || StrideType::InnerStrideAtCompileTime == Eigen::Dynamic) &&
     (num_dimensions<T> == 1 ||
+     StrideType::OuterStrideAtCompileTime == 0 ||
      StrideType::OuterStrideAtCompileTime == Eigen::Dynamic ||
      StrideType::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime);
 
@@ -303,7 +304,8 @@ struct type_caster<Eigen::Map<T, Options, StrideType>, enable_if_t<is_eigen_plai
         NDArray &t = caster.value;
         if constexpr (num_dimensions<T> == 1)
             return Map(t.data(), t.shape(0), strides());
-        return Map(t.data(), t.shape(0), t.shape(1), strides());
+        else
+            return Map(t.data(), t.shape(0), t.shape(1), strides());
     }
 };
 
@@ -368,7 +370,8 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plai
             return caster.from_python(src, flags, cleanup) ||
                    can_map_contig_mem &&
                    dcaster.from_python_(src, (!DmapMatches::value || cleanup) ? flags : flags & ~(uint8_t)cast_flags::convert, cleanup);
-        return caster.from_python(src, flags, cleanup);
+        else
+            return caster.from_python(src, flags, cleanup);
     }
 
     operator Ref() {

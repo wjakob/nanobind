@@ -30,51 +30,65 @@ void trampoline_release(void **data, size_t size) noexcept {
         Py_XDECREF((PyObject *) data[i*2 + 2]);
 }
 
-PyObject *trampoline_lookup(void **data, size_t size, const char *name,
-                            bool pure) {
+static void trampoline_enter_internal(void **data, size_t size,
+                                      const char *name, bool pure, ticket *t) {
     const PyObject *None = Py_None;
+    PyGILState_STATE state{ };
+    const char *error = nullptr;
+    PyObject *key = nullptr, *value = nullptr;
+    PyTypeObject *value_tp = nullptr;
+    nb_internals *internals = nullptr;
+    size_t offset = 0;
 
-    current_method cm = current_method_data;
-    if (cm.self == data[0] && (cm.name == name || strcmp(cm.name, name) == 0)) {
-        if (pure)
-            raise("nanobind::detail::get_trampoline('%s()'): tried to call a "
-                  "pure virtual function!", name);
-        return nullptr;
-    }
-
-    // First quick sweep without lock
-    for (size_t i = 0; i < size; i++) {
-        void *d_name  = data[2*i + 1],
-             *d_value = data[2*i + 2];
-        if (name == d_name && d_value)
-            return d_value != None ? (PyObject *) d_value : nullptr;
-    }
-
-    PyGILState_STATE state = PyGILState_Ensure();
-
-    // Nothing found -- retry, now with lock held
+    // First, perform a quick sweep without lock
     for (size_t i = 0; i < size; i++) {
         void *d_name  = data[2*i + 1],
              *d_value = data[2*i + 2];
         if (name == d_name && d_value) {
-            PyGILState_Release(state);
-            return d_value != None ? (PyObject *) d_value : nullptr;
+            if (d_value != None) {
+                t->state = PyGILState_Ensure();
+                t->key = (PyObject *) d_value;
+                return;
+            } else {
+                if (pure) {
+                    error = "tried to call a pure virtual function";
+                    state = PyGILState_Ensure();
+                    goto fail;
+                } else {
+                    return;
+                }
+            }
+        }
+    }
+
+    // Nothing found -- retry, now with lock held
+    state = PyGILState_Ensure();
+    for (size_t i = 0; i < size; i++) {
+        void *d_name  = data[2*i + 1],
+             *d_value = data[2*i + 2];
+        if (name == d_name && d_value) {
+            if (d_value != None) {
+                t->state = state;
+                t->key = (PyObject *) d_value;
+                return;
+            } else {
+                if (pure) {
+                    error = "tried to call a pure virtual function";
+                    goto fail;
+                } else {
+                    PyGILState_Release(state);
+                    return;
+                }
+            }
         }
     }
 
     // Sill no luck -- perform a lookup and populate the trampoline
-    const char *error = nullptr;
-    PyTypeObject *value_tp = nullptr;
-
-    size_t offset = 0;
     for (; offset < size; offset++) {
         if (data[2 * offset + 1] == nullptr &&
             data[2 * offset + 2] == nullptr)
             break;
     }
-
-    nb_internals &internals = internals_get();
-    PyObject *key = nullptr, *value = nullptr;
 
     if (offset == size) {
         error = "the trampoline ran out of slots (you will need to increase "
@@ -97,30 +111,69 @@ PyObject *trampoline_lookup(void **data, size_t size, const char *name,
     value_tp = Py_TYPE(value);
     Py_CLEAR(value);
 
-    if (value_tp == internals.nb_func || value_tp == internals.nb_method ||
-        value_tp == internals.nb_bound_method) {
+    internals = &internals_get();
+    if (value_tp == internals->nb_func || value_tp == internals->nb_method ||
+        value_tp == internals->nb_bound_method) {
+        Py_DECREF(key);
+
         if (pure) {
             error = "tried to call a pure virtual function";
             goto fail;
         }
 
-        Py_DECREF(key);
-        key = Py_None;
         Py_INCREF(Py_None);
+        key = Py_None;
     }
 
     data[2 * offset + 1] = (void *) name;
     data[2 * offset + 2] = key;
 
-    PyGILState_Release(state);
-    return key != None ? (PyObject *) key : nullptr;
+    if (key != None) {
+        t->state = state;
+        t->key = key;
+        return;
+    } else {
+        PyGILState_Release(state);
+        return;
+    }
 
 fail:
-    type_data *t = nb_type_data(Py_TYPE((PyObject *) data[0]));
+    type_data *td = nb_type_data(Py_TYPE((PyObject *) data[0]));
     PyGILState_Release(state);
 
     raise("nanobind::detail::get_trampoline('%s::%s()'): %s!",
-          t->name, name, error);
+          td->name, name, error);
+}
+
+NB_THREAD_LOCAL ticket *current_ticket = nullptr;
+
+void trampoline_enter(void **data, size_t size, const char *name, bool pure, ticket *t) {
+    trampoline_enter_internal(data, size, name, pure, t);
+
+    if (t->key) {
+        t->self = (PyObject *) data[0];
+        t->prev = current_ticket;
+
+        if (t->prev && t->prev->self.is(t->self) && t->prev->key.is(t->key)) {
+            t->self = handle();
+            t->key = handle();
+            t->prev = nullptr;
+            PyGILState_Release(t->state);
+            if (pure)
+                raise("nanobind::detail::get_trampoline('%s()'): tried to call "
+                      "a pure virtual function!", name);
+            return;
+        }
+
+        current_ticket = t;
+    }
+}
+
+void trampoline_leave(ticket *t) noexcept {
+    if (!t->key)
+        return;
+    current_ticket = t->prev;
+    PyGILState_Release(t->state);
 }
 
 NAMESPACE_END(detail)

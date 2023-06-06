@@ -45,14 +45,11 @@ enum class type_flags : uint32_t {
     /// The class uses an intrusive reference counting approach
     intrusive_ptr            = (1 << 11),
 
-    /// Is this a trampoline class meant to be overloaded in Python?
-    is_trampoline            = (1 << 12),
-
     /// Is this a class that inherits from enable_shared_from_this?
     /// If so, type_data::keep_shared_from_this_alive is also set.
-    has_shared_from_this     = (1 << 13),
+    has_shared_from_this     = (1 << 12),
 
-    // Five more flag bits available (14 through 18) without needing
+    // Six more flag bits available (13 through 18) without needing
     // a larger reorganization
 };
 
@@ -360,9 +357,6 @@ public:
             d.base = &typeid(Base);
             d.flags |= (uint32_t) detail::type_init_flags::has_base;
         }
-
-        if constexpr (!std::is_same_v<Alias, T>)
-            d.flags |= (uint32_t) detail::type_flags::is_trampoline;
 
         if constexpr (detail::is_copy_constructible_v<T>) {
             d.flags |= (uint32_t) detail::type_flags::is_copy_constructible;

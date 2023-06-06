@@ -17,7 +17,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 8
+#  define NB_INTERNALS_VERSION 9
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!
@@ -62,14 +62,23 @@
 #  define NB_BUILD_ABI ""
 #endif
 
+// Can have limited and non-limited-API extensions in the same process, and they might be incompatible
 #if defined(Py_LIMITED_API)
-#  define NB_LIMITED_API "_limited"
+#  define NB_STABLE_ABI "_stable"
 #else
-#  define NB_LIMITED_API ""
+#  define NB_STABLE_ABI ""
 #endif
 
-#define NB_INTERNALS_ID "__nb_internals_v" \
-    NB_TOSTRING(NB_INTERNALS_VERSION) NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI NB_BUILD_TYPE NB_LIMITED_API "__"
+#if defined(NB_DOMAIN)
+#  define NB_DOMAIN_KEY "_" NB_TOSTRING(NB_DOMAIN)
+#else
+#  define NB_DOMAIN_KEY
+#endif
+
+#define NB_INTERNALS_ID                                                        \
+    "__nb_internals_v" NB_TOSTRING(NB_INTERNALS_VERSION)                       \
+        NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI NB_BUILD_TYPE NB_STABLE_ABI    \
+            NB_DOMAIN_KEY "__"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -189,9 +198,6 @@ static PyType_Spec nb_bound_method_spec = {
                    NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     /* .slots = */ nb_bound_method_slots
 };
-
-NB_THREAD_LOCAL current_method current_method_data =
-    current_method{ nullptr, nullptr };
 
 nb_internals *internals_p = nullptr;
 

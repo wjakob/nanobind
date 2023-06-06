@@ -400,11 +400,14 @@ NB_MODULE(test_stl_ext, m) {
         },
         nb::arg("x"));
 
+    // std::filesystem incomplete on GCC 8
+#if !(defined(__GNUC__) && !defined(__clang__) && __GNUC__ <= 8)
     // test66
     m.def("replace_extension", [](std::filesystem::path p, std::string ext) {
         return p.replace_extension(ext);
     });
     m.def("parent_path", [](const std::filesystem::path &p) { return p.parent_path(); });
+#endif
 
     struct ClassWithMovableField {
         std::vector<Movable> movable;

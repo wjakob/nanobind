@@ -10,7 +10,7 @@ for distributing extensions created using nanobind.
 
 This section walks through the recommended sequence of steps to build wheels
 and optionally automate this process to simultaneously target many platforms
-(Linux, Windows, macOS) and processors (x86_64, arm64) using the `GitHub
+(Linux, Windows, macOS) and processors (i386, x86_64, arm64) using the `GitHub
 Actions <https://github.com/features/actions>`__ CI service.
 
 Note that all of the recommended practices have already been implemented in the
@@ -75,11 +75,11 @@ to be added here. The following core dependencies are required by nanobind:
 .. code-block:: toml
 
    [build-system]
-   requires = ["scikit-build-core >=0.4.3", "nanobind >=1.3.1"]
+   requires = ["scikit-build-core >=0.4.3", "nanobind >=1.3.2"]
    build-backend = "scikit_build_core.build"
 
 You may need to increase the minimum nanobind version in the above snippet if
-you are using features from versions newer than 1.3.1.
+you are using features from versions newer than 1.3.2.
 
 Just below the list of build-time requirements, specify project metadata including:
 
@@ -294,9 +294,6 @@ Furthermore, append the following ``cibuildwheel``-specific configuration to
 .. code-block:: toml
 
     [tool.cibuildwheel]
-    # 32-bit builds are not supported by nanobind
-    archs = ["auto64"]
-
     # Necessary to see build output from the actual compilation
     build-verbosity = 1
 
@@ -311,9 +308,25 @@ Furthermore, append the following ``cibuildwheel``-specific configuration to
 Following each run, the action provides a downloadable *build artifact*, which
 is a ZIP file containing all the individual wheel files for each platform.
 
+By default, ``cibuildwheel`` will launch a very large build matrix, and it is
+possible that your extension is not compatible with every single configuration.
+For example, suppose that the project depends on Python 3.9+ and a 64 bit
+processor. In this case, add further entries to the ``[tool.cibuildwheel]``
+block to remove incompatible configurations from the matrix:
+
+.. code-block:: toml
+
+    skip = ["cp38-*", "pp38-*"] # Skip CPython and PyPy 3.8
+    archs = ["auto64"]          # Only target 64 bit architectures
+
+The `cibuildwheel documentation
+<https://cibuildwheel.readthedocs.io/en/stable/options/>`__ explains the
+possible options.
+
 If you set up a GitHub actions `secret
 <https://docs.github.com/en/actions/security-guides/encrypted-secrets>`__ named
 ``pypi_password`` containing a PyPI authentication token, the action will
 automatically upload the generated wheels to the `Python Package Index (PyPI)
 <https://pypi.org>`__ when the action is triggered by a `software release event
 <https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository>`__.
+

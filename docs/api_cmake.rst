@@ -64,6 +64,9 @@ The high-level interface consists of just one CMake command:
       * - ``NOSTRIP``
         - Don't strip unneded symbols and debug information from the compiled
           extension when performing release builds.
+      * - ``NB_DOMAIN <name>``
+        - Restrict the inter-extension type visibility to a named subdomain.
+          See the associated :ref:`FAQ entry <type-visibility>` for details.
       * - ``MUSL_DYNAMIC_LIBCPP``
         - When `cibuildwheel
           <https://cibuildwheel.readthedocs.io/en/stable/>`__ is used to
@@ -169,6 +172,11 @@ The high-level interface consists of just one CMake command:
      nanobind prefers to link against these libraries *statically* when it
      detects a ``cibuildwheel`` build targeting ``musllinux``. Pass the
      ``MUSL_DYNAMIC_LIBCPP`` parameter to avoid this behavior.
+
+   - If desired (via the optional ``NB_DOMAIN`` parameter), nanobind will
+     restrict the visibility of symbols to a named subdomain to avoid conflicts
+     between bindings. See the associated :ref:`FAQ entry <type-visibility>`
+     for details.
 
 .. _lowlevel-cmake:
 

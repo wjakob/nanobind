@@ -15,6 +15,32 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.4.0 (TBA)
+-------------------
+
+* Improved the efficiency of the function dispatch loop. (PR `#227
+  <https://github.com/wjakob/nanobind/pull/227>`__).
+* Added a ``NB_DOMAIN`` parameter to :cmake:command:`nanobind_add_module` which
+  can isolate extensions from each other to avoid binding clashes. See the
+  associated :ref:`FAQ entry <type-visibility>` for details. (commit `977119
+  <https://github.com/wjakob/nanobind/commit/977119c4797db7decf8064cf118afde768ff8fab>`__).
+* Reduced the severity of nanobind encountering a duplicate type binding
+  (commits `f3b0e6
+  <https://github.com/wjakob/nanobind/commit/f3b0e6cbd69a4adcdc31dbe0b844370b1b60dbcf>`__,
+  and `2c9124
+  <https://github.com/wjakob/nanobind/commit/2c9124bbbe736881fa8f9f33ea7817c98b43bf8b>`__).
+* ABI version 9.
+
+Version 1.3.2 (June 2, 2023)
+----------------------------
+
+* Fixed compilation on 32 bit processors (only ``i686`` tested so far).
+  (PR `#224 <https://github.com/wjakob/nanobind/pull/224>`__).
+* Fixed compilation on PyPy 3.8. (commit `cd8135
+  <https://github.com/wjakob/nanobind/commit/cd8135baa1da1213252272b5c9ecbf909e947597>`__).
+* Reduced binary bloat of musllinux wheels. (commit `f52513
+  <https://github.com/wjakob/nanobind/commit/f525139a80d173feaea5518e842aceeb6ceec5cf>`__).
+
 Version 1.3.1 (May 31, 2023)
 ----------------------------
 

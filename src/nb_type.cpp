@@ -114,6 +114,8 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         self->internal = false;
     }
 
+    self->intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+
     // Update hash table that maps from C++ to Python instance
     auto [it, success] =
         internals_get().inst_c2p.try_emplace(value, self);
@@ -667,6 +669,16 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     object modname;
     PyObject *mod = nullptr;
 
+    // Update hash table that maps from std::type_info to Python type
+    auto [it, success] =
+        internals.type_c2p.try_emplace(std::type_index(*t->type), nullptr);
+    if (!success) {
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: type '%s' was already registered!\n", t->name);
+        PyObject *tp = (PyObject *) it->second->type_py;
+        Py_INCREF(tp);
+        return tp;
+    }
+
     if (t->scope != nullptr) {
         if (PyModule_Check(t->scope)) {
             mod = t->scope;
@@ -848,12 +860,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (modname.is_valid())
         setattr(result, "__module__", modname.ptr());
 
-    // Update hash table that maps from std::type_info to Python type
-    auto [it, success] =
-        internals.type_c2p.try_emplace(std::type_index(*t->type), to);
-    if (!success)
-        fail("nanobind::detail::nb_type_new(\"%s\"): type was already "
-             "registered!", t->name);
+    internals.type_c2p[std::type_index(*t->type)] = to;
 
     return result;
 }
@@ -982,12 +989,14 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         if (valid) {
             nb_inst *inst = (nb_inst *) src;
 
-            if (!inst->ready &&
-                (flags & (uint8_t) cast_flags::construct) == 0) {
-                PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                                 "nanobind: attempted to access an "
-                                 "uninitialized instance of type '%s'!\n",
-                                 t->name);
+            if (((flags & (uint8_t) cast_flags::construct) != 0) == inst->ready) {
+                PyErr_WarnFormat(
+                    PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
+                    inst->ready
+                        ? "attempted to initialize an already-initialized "
+                          "instance"
+                        : "attempted to access an uninitialized instance",
+                    t->name);
                 return false;
             }
 

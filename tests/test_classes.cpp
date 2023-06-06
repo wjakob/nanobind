@@ -8,6 +8,7 @@
 #include <cstring>
 #include <vector>
 #include <nanobind/stl/detail/traits.h>
+#include "inter_module.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -477,4 +478,6 @@ NB_MODULE(test_classes_ext, m) {
     m.def("polymorphic_factory_2", []() { return (PolymorphicBase *) new AnotherPolymorphicSubclass(); });
     m.def("factory", []() { return (Base *) new Subclass(); });
     m.def("factory_2", []() { return (Base *) new AnotherSubclass(); });
+
+    m.def("check_shared", [](Shared *) { });
 }

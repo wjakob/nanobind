@@ -356,11 +356,11 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
 
     scoped_pymalloc<int64_t> strides((size_t) t.ndim);
     if ((req->req_order || !t.strides) && t.ndim > 0) {
-        size_t accum = 1;
+        int64_t accum = 1;
 
         if (req->req_order == 'C' || !t.strides) {
             for (size_t i = (size_t) (t.ndim - 1);;) {
-                strides[i] = (int64_t) accum;
+                strides[i] = accum;
                 accum *= t.shape[i];
                 if (i == 0)
                     break;
@@ -368,7 +368,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
             }
         } else if (req->req_order == 'F') {
             for (size_t i = 0; i < (size_t) t.ndim; ++i) {
-                strides[i] = (int64_t) accum;
+                strides[i] = accum;
                 accum *= t.shape[i];
             }
         } else {

@@ -48,6 +48,12 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
     using ValueRef = typename detail::iterator_access<typename Vector::iterator>::result_type;
     using Value = std::decay_t<ValueRef>;
 
+    handle cl_cur = type<Vector>();
+    if (cl_cur.is_valid()) {
+        // Binding already exists, don't re-create
+        return borrow<class_<Vector>>(cl_cur);
+    }
+
     auto cl = class_<Vector>(scope, name, std::forward<Args>(args)...)
         .def(init<>(), "Default constructor")
 

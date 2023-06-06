@@ -286,6 +286,46 @@ by consumers of ``libfoo``.
 
    target_compile_definitions(libfoo PRIVATE MYLIB_BUILD)
 
+.. _type-visibility:
+
+How can I avoid conflicts with other projects using nanobind?
+-------------------------------------------------------------
+
+Suppose that a type binding in your project conflicts with another extension, for
+example because both expose a common type (e.g., ``std::latch``). nanobind will
+warn whenever it detects such a conflict:
+
+.. code-block:: text
+
+  RuntimeWarning: nanobind: type 'latch' was already registered!
+
+In the worst case, this could actually break both packages (especially if the
+bindings of the two packages expose an inconsistent/incompatible API).
+
+The higher-level issue here is that nanobind will by default try to make type
+bindings visible across extensions because this is helpful to partition large
+binding projects into smaller parts. Such information exchange requires that
+the extensions:
+
+- use the same nanobind *ABI version* (see the :ref:`Changelog <changelog>` for details).
+- use the same compiler (extensions built with GCC and Clang are isolated from each other).
+- use ABI-compatible versions of the C++ library.
+- use the stable ABI interface consistently (stable and unstable builds are isolated from each other).
+- use debug/release mode consistently (debug and release builds are isolated from each other).
+
+In addition, nanobind provides a feature to intentionally scope extensions to a
+named domain to avoid conflicts with other extensions. To do so, specify the
+``NB_DOMAIN`` parameter in CMake:
+
+.. code-block:: cmake
+
+   nanobind_add_module(my_ext
+                       NB_DOMAIN my_project
+                       my_ext.cpp)
+
+In this case, inter-extension type visibility is furthermore restricted to
+extensions in the ``"my_project"`` domain.
+
 How to cite this project?
 -------------------------
 

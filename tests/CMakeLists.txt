@@ -16,6 +16,11 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "
   add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
 endif()
 
+if (UNIX AND (CMAKE_SIZEOF_VOID_P EQUAL 4) AND (CMAKE_SYSTEM_PROCESSOR STREQUAL i686))
+  # Don't use the legacy 387 math coprocessor in 32 bit builds, this causes tests to fail
+  add_compile_options(-mfpmath=sse -msse2)
+endif()
+
 nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})
@@ -46,8 +51,8 @@ target_compile_definitions(inter_module PRIVATE -DSHARED_BUILD)
 target_compile_features(inter_module PRIVATE cxx_std_17)
 target_include_directories(inter_module PRIVATE ${NB_DIR}/include)
 
-nanobind_add_module(test_inter_module_1_ext NOTRIM test_inter_module_1.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_inter_module_2_ext NOTRIM test_inter_module_2.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_1_ext NB_DOMAIN mydomain test_inter_module_1.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module_2.cpp ${NB_EXTRA_ARGS})
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 

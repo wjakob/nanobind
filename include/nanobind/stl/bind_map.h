@@ -42,6 +42,12 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Key = typename Map::key_type;
     using Value = typename Map::mapped_type;
 
+    handle cl_cur = type<Map>();
+    if (cl_cur.is_valid()) {
+        // Binding already exists, don't re-create
+        return borrow<class_<Map>>(cl_cur);
+    }
+
     auto cl = class_<Map>(scope, name, std::forward<Args>(args)...)
         .def(init<>(),
              "Default constructor")

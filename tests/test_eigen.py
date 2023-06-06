@@ -331,12 +331,21 @@ def test11_prop():
 @needs_numpy_and_eigen
 def test12_cast():
     vec = np.arange(1000, dtype=np.int32)
+    vec2 = vec[::2]
+    vecf = np.float32(vec)
     assert_array_equal(t.castToMapVXi(vec), vec)
     assert_array_equal(t.castToRefVXi(vec), vec)
     assert_array_equal(t.castToRefCnstVXi(vec), vec)
-    for vec in vec[::2], np.float32(vec):
+    assert_array_equal(t.castToDRefCnstVXi(vec), vec)
+    for v in vec2, vecf:
         with pytest.raises(RuntimeError, match="bad[_ ]cast"):
-            t.castToMapVXi(vec)
+            t.castToMapVXi(v)
         with pytest.raises(RuntimeError, match="bad[_ ]cast"):
-            t.castToRefVXi(vec)
-        assert_array_equal(t.castToRefCnstVXi(vec), vec)
+            t.castToRefVXi(v)
+        assert_array_equal(t.castToRefCnstVXi(v), v)
+    assert_array_equal(t.castToDRefCnstVXi(vec2), vec2)
+    with pytest.raises(RuntimeError, match="bad[_ ]cast"):
+        t.castToDRefCnstVXi(vecf)   
+    for v in vec, vec2, vecf:
+        with pytest.raises(RuntimeError, match='bad[_ ]cast'):
+            t.castToRef03CnstVXi(v)

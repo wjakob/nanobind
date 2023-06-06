@@ -46,6 +46,13 @@ template<typename T> constexpr bool requires_contig_memory =
      Stride<T>::OuterStrideAtCompileTime == 0 ||
      Stride<T>::OuterStrideAtCompileTime != Eigen::Dynamic && Stride<T>::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime);
 
+/// Is true for StrideTypes that can describe the contiguous memory layout of the plain Eigen type T.
+template<typename StrideType, typename T> constexpr bool can_map_contig_memory =
+    (StrideType::InnerStrideAtCompileTime == 0 || StrideType::InnerStrideAtCompileTime == 1) &&
+    (num_dimensions<T> == 1 ||
+     StrideType::OuterStrideAtCompileTime == Eigen::Dynamic ||
+     StrideType::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime);
+
 /// Alias ndarray for a given Eigen type, to be used by type_caster<EigenType>::from_python, which calls type_caster<array_for_eigen_t<EigenType>>::from_python.
 /// If the Eigen type is known at compile-time to handle contiguous memory only, then this alias makes type_caster<array_for_eigen_t<EigenType>>::from_python
 /// either fail or provide an ndarray with contiguous memory, triggering a conversion if necessary and supported by flags.
@@ -309,38 +316,68 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>, enable_if_t<is_eigen_plai
     using DMap = Eigen::Map<T, Options, DStride>;
     using MapCaster = make_caster<Map>;
     using DMapCaster = make_caster<DMap>;
+    using DmapMatches = typename Eigen::internal::traits<Ref>::template match<DMap>::type;
+    static constexpr bool can_map_contig_mem = can_map_contig_memory<StrideType, T>;
     static constexpr bool IsClass = false;
-    static constexpr auto Name = MapCaster::Name;
+    static constexpr auto Name = const_name<std::is_const_v<T>>(DMapCaster::Name, MapCaster::Name);
     template <typename T_> using Cast = Ref;
 
     MapCaster caster;
     DMapCaster dcaster;
 
-    /// Both Ref<T> and Ref<T const> map data. type_caster<Ref<T>>::from_python behaves like type_caster<Map<T>>::from_python.
-    /// Unlike Ref<T>, Ref<T const> may own the data it maps. It does so if constructed from e.g. an Eigen type that has non-matching strides.
-    /// Hence, type_caster<Ref<T const>>::from_python may support conversions.
-    /// It first calls the type_caster for matching strides, which does not support conversions,
-    /// and only if that fails, it calls the one for arbitrary strides, supporting conversions to T::Scalar if flags say so.
-    /// If the first type_caster succeeds, then the returned Ref maps the original data.
-    /// Otherwise, because the first type_caster failed, the Ref is constructed such that it owns the data it maps.
-    /// type_caster<Ref<T const>> always supports stride conversions, independent of flags, and so flags control the conversion of T::Scalar only.
-    /// Reason: if the intention was to not allow stride conversions either, then the bound function would most probably expect a Map instead of a Ref.
+
+    /// In short:
+    /// - type_caster<Ref<T>> supports no conversions, independent of flags.
+    /// - type_caster<Ref<T const>>
+    ///   + supports stride conversions, independent of flags, except for uncommon strides.
+    ///   + It additionally supports conversions to T::Scalar if flags say so, 
+    ///     and if either a cleanup_list is passed, or if Ref is guaranteed to map its own data.
+    /// 
+    /// type_caster<Ref<T const>> supports stride conversions independent of flags, because if the intention was to not allow them,
+    /// then the bound function would most probably expect a Map instead of a Ref.
+    /// 
+    /// Both Ref<T> and Ref<T const> map data.
+    /// Like for Map, type_caster<Ref<T>>::from_python does not support conversions, and for the same reasons.
+    /// But unlike Ref<T>, instead of mapping external data, Ref<T const> may alternatively map data that it owns itself.
+    /// Ref<T const> then maps its member variable m_object, having copy-constructed it from the passed Eigen type.
+    /// The primary use case of Ref<T const> is as function argument that either maps the caller's data, or a suitably converted copy thereof.
+    /// Hence, unlike with Map and Ref<T>, a Ref<T const> that maps a (converted) copy is intended,
+    /// and thus, type_caster<Ref<T const>>::from_python may support conversions.
+    /// It first calls the type_caster for matching strides, not supporting conversions.
+    /// If that fails, it calls the one for arbitrary strides. Since conversions to T::Scalar create a temporary ndarray, 
+    /// conversions are supported only if flags say so, and if either a cleanup_list is passed (that keeps the temporary alive),
+    /// or if Ref<T const> is guaranteed to map its own data (having copied the temporary), which is ensured only if DmapMatches::value is false.
+    /// 
+    /// Unfortunately, if src's scalar type needs to be converted, then the latter means that e.g.
+    ///   cast<Eigen::Ref<const Eigen::VectorXi>>(src) succeeds, while
+    ///   cast<      DRef<const Eigen::VectorXi>>(src) fails -
+    /// even though DRef would be expected to support a superset of the types supported by Ref.
+    /// 
+    /// Ref<T const>::m_object holds contiguous memory, which Ref silently fails to map if this is impossible given StrideType
+    /// and the passed object's shape. If mapping fails, then Ref is left with mapping nullptr.
+    /// While this could be considered below, it is not done for efficiency reasons:
+    /// due to Ref's missing move constructor, its unusual copy constructor, and since C++ does not guarantee named return value optimizations,
+    /// the Ref would need to be created only for checking it, and created a second time for returning it,
+    /// which seems too costly for a Ref that owns its data.
+    /// Instead of checking thoroughly after construction, conversion fails if it is known at compile-time that mapping may fail,
+    /// even though it may actually succeed in some of these cases at run-time (e.g. StrideType::OuterStrideAtCompileTime==4,
+    /// and a row-major Matrix with a dynamic number of columns and 4 columns at run-time).
+    /// Once Ref<T const> defines a move constructor https://gitlab.com/libeigen/eigen/-/issues/2668, this restriction may be lifted.
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         if constexpr (std::is_const_v<T>)
             return caster.from_python(src, flags, cleanup) ||
-                   dcaster.from_python_(src, flags, cleanup);
+                   can_map_contig_mem &&
+                   dcaster.from_python_(src, (!DmapMatches::value || cleanup) ? flags : flags & ~(uint8_t)cast_flags::convert, cleanup);
         return caster.from_python(src, flags, cleanup);
     }
 
     operator Ref() {
         if constexpr (std::is_const_v<T>)
-            if (dcaster.caster.value.is_valid()) {
-                // Return a Ref<T const, ...> that owns the data it maps.
-                // assert(!Eigen::internal::traits<Ref>::template match<DMap>::type::value);
+            if (dcaster.caster.value.is_valid())
                 return Ref(dcaster.operator DMap());
-            }
         return Ref(caster.operator Map());
     }
+
 };
 
 NAMESPACE_END(detail)

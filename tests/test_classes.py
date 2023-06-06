@@ -649,3 +649,20 @@ def test35_method_introspection():
     assert m.__qualname__ == "Struct.value"
     assert m.__module__ == t.__name__
     assert m.__doc__ == t.Struct.value.__doc__ == "value(self) -> int"
+
+
+def test38_pickle(clean):
+    import pickle
+
+    s = t.Struct(123)
+    s2 = pickle.dumps(s, protocol=pickle.HIGHEST_PROTOCOL)
+    s3 = pickle.loads(s2)
+    assert s.value() == s3.value()
+    del s, s3
+
+    assert_stats(
+        value_constructed=1,
+        pickled=1,
+        unpickled=1,
+        destructed=2
+    )

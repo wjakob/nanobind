@@ -4,6 +4,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/tuple.h>
 #include <memory>
 #include <cstring>
 #include <vector>
@@ -15,7 +16,7 @@ using namespace nb::literals;
 
 static int default_constructed = 0, value_constructed = 0, copy_constructed = 0,
            move_constructed = 0, copy_assigned = 0, move_assigned = 0,
-           destructed = 0;
+           destructed = 0, pickled = 0, unpickled = 0;
 
 struct Struct;
 std::unique_ptr<Struct> struct_tmp;
@@ -32,7 +33,9 @@ struct Struct {
     ~Struct() { destructed++; }
 
     int value() const { return i; }
+    int getstate() const { ++pickled; return i; }
     void set_value(int value) { i = value; }
+    void setstate(int value) { unpickled++; i = value; }
 
     static int static_test(int) { return 1; }
     static int static_test(float) { return 2; }
@@ -120,6 +123,8 @@ NB_MODULE(test_classes_ext, m) {
         .def("set_value", &Struct::set_value, "value"_a)
         .def("self", &Struct::self, nb::rv_policy::none)
         .def("none", [](Struct &) -> const Struct * { return nullptr; })
+        .def("__getstate__", &Struct::getstate)
+        .def("__setstate__", &Struct::setstate)
         .def_static("static_test", nb::overload_cast<int>(&Struct::static_test))
         .def_static("static_test", nb::overload_cast<float>(&Struct::static_test))
         .def_static("create_move", &Struct::create_move)
@@ -128,7 +133,6 @@ NB_MODULE(test_classes_ext, m) {
         .def_static("create_copy", &Struct::create_copy,
                     nb::rv_policy::copy)
         .def_static("create_take", &Struct::create_take);
-
 
     if (!nb::type<Struct>().is(cls))
         nb::detail::raise("type lookup failed!");
@@ -147,6 +151,8 @@ NB_MODULE(test_classes_ext, m) {
         d["copy_assigned"] = copy_assigned;
         d["move_assigned"] = move_assigned;
         d["destructed"] = destructed;
+        d["pickled"] = pickled;
+        d["unpickled"] = unpickled;
         return d;
     });
 
@@ -158,6 +164,8 @@ NB_MODULE(test_classes_ext, m) {
         copy_assigned = 0;
         move_assigned = 0;
         destructed = 0;
+        pickled = 0;
+        unpickled = 0;
     });
 
     // test06_big

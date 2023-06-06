@@ -222,7 +222,9 @@ PyObject *nb_func_new(const void *in_) noexcept {
         }
 
         // Is this method a constructor that takes a class binding as first parameter?
-        is_constructor = is_method && strcmp(f->name, "__init__") == 0 &&
+        is_constructor = is_method &&
+                         (strcmp(f->name, "__init__") == 0 ||
+                          strcmp(f->name, "__setstate__") == 0) &&
                          strncmp(f->descr, "({%}", 4) == 0;
 
         // Don't use implicit conversions in copy constructors (causes infinite recursion)

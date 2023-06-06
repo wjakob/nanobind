@@ -903,3 +903,37 @@ expected:
 
     >>> my_ext.make_pet(my_ext.PetKind.Dog)
     <my_ext.Dog object at 0x104da6ef0>
+
+Pickling
+--------
+
+To pickle and unpickle objects bound using nanobind, expose the
+``__getstate__`` and ``__setstate__`` methods. They should return and retrieve
+the internal instance state using representations that themselves support
+pickling. The example below, e.g., does this using a tuple.
+
+The ``__setstate__`` method should construct the object in-place analogous to
+custom ``__init__``-style constructors.
+
+.. code-block:: cpp
+
+   #include <nanobind/stl/tuple.h>
+
+   struct Pet {
+        std::string name;
+        int age;
+        Pet(const std::string &name, int age) : name(name), age(age) { }
+   };
+
+   NB_MODULE(my_ext, m) {
+       nb::class_<Pet>(m, "Pet")
+          // ...
+          .def("__getstate__", [](const Pet &pet) { return std::make_tuple(pet.name, pet.age); })
+          .def("__setstate__", [](Pet &pet, const std::tuple<std::string, int> &state) {
+                new (&pet) Pet(
+                    std::get<0>(state),
+                    std::get<1>(state)
+                );
+          });
+    }
+

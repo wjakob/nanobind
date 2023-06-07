@@ -20,6 +20,10 @@ Version 1.4.0 (TBA)
 
 * Improved the efficiency of the function dispatch loop. (PR `#227
   <https://github.com/wjakob/nanobind/pull/227>`__).
+* Significant improvements to the Eigen type casters (generalized stride
+  handling to avoid unnecessary copies, support for conversion via
+  ``nb::cast()``, many refinements to the  ``Eigen::Ref<T>`` interface). (PR
+  `#215 <https://github.com/wjakob/nanobind/pull/215>`__).
 * Added a ``NB_DOMAIN`` parameter to :cmake:command:`nanobind_add_module` which
   can isolate extensions from each other to avoid binding clashes. See the
   associated :ref:`FAQ entry <type-visibility>` for details. (commit `977119
@@ -29,6 +33,8 @@ Version 1.4.0 (TBA)
   <https://github.com/wjakob/nanobind/commit/f3b0e6cbd69a4adcdc31dbe0b844370b1b60dbcf>`__,
   and `2c9124
   <https://github.com/wjakob/nanobind/commit/2c9124bbbe736881fa8f9f33ea7817c98b43bf8b>`__).
+* Support for pickling/unpickling nanobind objects. (commit `59843e
+  <https://github.com/wjakob/nanobind/commit/59843e09bc6e8f2b0338829a44cf71e25f76cba3>`__).
 * ABI version 9.
 
 Version 1.3.2 (June 2, 2023)

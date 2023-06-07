@@ -398,7 +398,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
 
     static constexpr bool IsClass = false;
     static constexpr auto Name =
-        const_name<MaybeConvert>(MapCaster::Name, DMapCaster::Name);
+        const_name<MaybeConvert>(DMapCaster::Name, MapCaster::Name);
 
     template <typename T_> using Cast = Ref;
 

@@ -78,9 +78,16 @@ struct tensorflow { };
 struct pytorch { };
 struct jax { };
 
+NAMESPACE_BEGIN(detail)
+
+template<typename T> constexpr bool is_ndarray_scalar_v =
+std::is_floating_point_v<T> || std::is_integral_v<T>;
+
+NAMESPACE_END(detail)
+
 template <typename T> constexpr dlpack::dtype dtype() {
     static_assert(
-        std::is_floating_point_v<T> || std::is_integral_v<T>,
+        detail::is_ndarray_scalar_v<T>,
         "nanobind::dtype<T>: T must be a floating point or integer variable!"
     );
 

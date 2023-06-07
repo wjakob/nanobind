@@ -1,15 +1,18 @@
 import pytest
 import gc
+import itertools
 import re
 import sys
 
 try:
     import numpy as np
+    from numpy.testing import assert_array_equal
     import test_eigen_ext as t
     def needs_numpy_and_eigen(x):
         return x
 except:
     needs_numpy_and_eigen = pytest.mark.skip(reason="NumPy and Eigen are required")
+
 
 @needs_numpy_and_eigen
 def test01_vector_fixed():
@@ -20,63 +23,59 @@ def test01_vector_fixed():
     af = np.float32(a)
     bf = np.float32(b)
 
-    assert np.all(t.addV3i_1(a, b) == c)
-    assert np.all(t.addV3i_2(a, b) == c)
-    assert np.all(t.addV3i_3(a, b) == c)
-    assert np.all(t.addV3i_4(a, b) == c)
-    assert np.all(t.addV3i_5(a, b) == c)
+    assert_array_equal(t.addV3i(a, b), c)
+    assert_array_equal(t.addR3i(a, b), c)
+    assert_array_equal(t.addRefCnstV3i(a, b), c)
+    assert_array_equal(t.addRefCnstR3i(a, b), c)
+    assert_array_equal(t.addA3i(a, b), c)
+    assert_array_equal(t.addA3i_retExpr(a, b), c)
 
     # Implicit conversion supported for first argument
-    assert np.all(t.addV3i_1(af, b) == c)
-    assert np.all(t.addV3i_2(af, b) == c)
-    assert np.all(t.addV3i_3(af, b) == c)
-    assert np.all(t.addV3i_4(af, b) == c)
+    assert_array_equal(t.addV3i(af, b), c)
+    assert_array_equal(t.addR3i(af, b), c)
+    assert_array_equal(t.addRefCnstV3i(af, b), c)
+    assert_array_equal(t.addRefCnstR3i(af, b), c)
+    assert_array_equal(t.addA3i(af, b), c)
 
     # But not the second one
-    with pytest.raises(TypeError) as e:
-        t.addV3i_1(a, bf)
-    assert 'incompatible function arguments' in str(e)
-    with pytest.raises(TypeError) as e:
-        t.addV3i_2(a, bf)
-    assert 'incompatible function arguments' in str(e)
-    with pytest.raises(TypeError) as e:
-        t.addV3i_3(a, bf)
-    assert 'incompatible function arguments' in str(e)
-    with pytest.raises(TypeError) as e:
-        t.addV3i_4(a, bf)
-    assert 'incompatible function arguments' in str(e)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addV3i(a, bf)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addR3i(a, bf)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addRefCnstV3i(a, bf)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addRefCnstR3i(a, bf)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addA3i(a, bf)
 
     # Catch size errors
-    with pytest.raises(TypeError) as e:
-        t.addV3i_1(x, b)
-    assert 'incompatible function arguments' in str(e)
-    with pytest.raises(TypeError) as e:
-        t.addV3i_2(x, b)
-    assert 'incompatible function arguments' in str(e)
-    with pytest.raises(TypeError) as e:
-        t.addV3i_3(x, b)
-    assert 'incompatible function arguments' in str(e)
-    with pytest.raises(TypeError) as e:
-        t.addV3i_4(x, b)
-    assert 'incompatible function arguments' in str(e)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addV3i(x, b)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addR3i(x, b)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addRefCnstV3i(x, b)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.addA3i(x, b)
 
 
 @needs_numpy_and_eigen
 def test02_vector_dynamic():
-    a  = np.array([1, 2, 3],    dtype=np.int32)
-    b  = np.array([0, 1, 2],    dtype=np.int32)
-    c  = np.array([1, 3, 5],    dtype=np.int32)
+    a  = np.array([1, 2, 3], dtype=np.int32)
+    b  = np.array([0, 1, 2], dtype=np.int32)
+    c  = np.array([1, 3, 5], dtype=np.int32)
     x  = np.arange(10000, dtype=np.int32)
     af = np.float32(a)
 
     # Check call with dynamically sized arrays
-    assert np.all(t.addVXi(a, b) == c)
+    assert_array_equal(t.addVXi(a, b), c)
 
     # Implicit conversion
-    assert np.all(t.addVXi(af, b) == c)
+    assert_array_equal(t.addVXi(af, b), c)
 
     # Try with a big array. This will move the result to avoid a copy
-    r = np.all(t.addVXi(x, x) == 2*x)
+    assert_array_equal(t.addVXi(x, x), 2*x)
 
 
 @needs_numpy_and_eigen
@@ -84,68 +83,124 @@ def test03_update_map():
     a = np.array([1, 2, 3], dtype=np.int32)
     b = np.array([1, 2, 123], dtype=np.int32)
     c = a.copy()
-    t.updateV3i(c)
-    assert np.all(c == b)
+    t.updateRefV3i(c)
+    assert_array_equal(c, b)
 
     c = a.copy()
-    t.updateVXi(c)
-    assert np.all(c == b)
+    t.updateRefV3i_nc(c)
+    assert_array_equal(c, b)
+
+    c = a.copy()
+    t.updateRefVXi(c)
+    assert_array_equal(c, b)
+
+    c = a.copy()
+    t.updateRefVXi_nc(c)
+    assert_array_equal(c, b)
+
+    c = np.float32(a)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.updateRefV3i(c)
+
+    c = np.float32(a)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.updateRefV3i_nc(c)
+
+    c = np.float32(a)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.updateRefVXi(c)
+
+    c = np.float32(a)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.updateRefVXi_nc(c)
+
 
 
 @needs_numpy_and_eigen
 def test04_matrix():
     A = np.vander((1, 2, 3, 4,))
     At = A.T
-    A2 = 2*A
-    At2 = 2*At
     assert A.flags['C_CONTIGUOUS']
     assert At.flags['F_CONTIGUOUS']
-    assert np.all(t.addM4u_1(A, A) == A2)
-    assert np.all(t.addM4u_1(At, At) == At2)
-    assert np.all(t.addM4u_2(A, A) == A2)
-    assert np.all(t.addM4u_2(At, At) == At2)
-    assert np.all(t.addM4u_3(A, A) == A2)
-    assert np.all(t.addM4u_3(At, At) == At2)
-    assert np.all(t.addM4u_4(A, A) == A2)
-    assert np.all(t.addM4u_4(At, At) == At2)
-    assert np.all(t.addMXu_1(A, A) == A2)
-    assert np.all(t.addMXu_1(At, At) == At2)
-    assert np.all(t.addMXu_2(A, A) == A2)
-    assert np.all(t.addMXu_2(At, At) == At2)
-    assert np.all(t.addMXu_3(A, A) == A2)
-    assert np.all(t.addMXu_3(At, At) == At2)
-    assert np.all(t.addMXu_4(A, A) == A2)
-    assert np.all(t.addMXu_4(At, At) == At2)
+    base = np.zeros((A.shape[0] * 2, A.shape[1] * 2), A.dtype)
+    base[::2, ::2] = A
+    Av = base[-2::-2, -2::-2]
+    assert Av.base is base
+    Avt = Av.T
+    assert Avt.base is base
+    matrices = A, At, Av, Avt
+    for addM in (t.addM4uCC, t.addM4uRR, t.addM4uCR, t.addM4uRC,
+                 t.addMXuCC, t.addMXuRR, t.addMXuCR, t.addMXuRC):
+        for left, right in itertools.product(matrices, matrices):
+            assert_array_equal(addM(left, right), left + right)
 
 
 @needs_numpy_and_eigen
-@pytest.mark.parametrize("start", (0, 10))
-def test05_matrix_large_nonsymm(start):
+@pytest.mark.parametrize("rowStart", (0, 1))
+@pytest.mark.parametrize("colStart", (0, 2))
+@pytest.mark.parametrize("rowStep", (1, 2, -2))
+@pytest.mark.parametrize("colStep", (1, 3, -3))
+@pytest.mark.parametrize("transpose", (False, True))
+def test05_matrix_large_nonsymm(rowStart, colStart, rowStep, colStep, transpose):
     A = np.uint32(np.vander(np.arange(80)))
-    A = A[:, start:]
-    A2 = A+A
-    out = t.addMXu_1(A, A)
-    assert np.all(t.addMXu_1(A, A) == A2)
-    assert np.all(t.addMXu_2(A, A) == A2)
-    assert np.all(t.addMXu_3(A, A) == A2)
-    assert np.all(t.addMXu_4(A, A) == A2)
-    assert np.all(t.addMXu_5(A, A) == A2)
+    if rowStep < 0:
+        rowStart = -rowStart - 1
+    if colStep < 0:
+        colStart = -colStart - 1
+    A = A[rowStart::rowStep, colStart::colStep]
+    if transpose:
+        A = A.T
+    A2 = A + A
+    assert_array_equal(t.addMXuCC(A, A), A2)
+    assert_array_equal(t.addMXuRR(A, A), A2)
+    assert_array_equal(t.addMXuCR(A, A), A2)
+    assert_array_equal(t.addMXuRC(A, A), A2)
+    assert_array_equal(t.addDRefMXuCC_nc(A, A), A2)
+    assert_array_equal(t.addDRefMXuRR_nc(A, A), A2)
+    if A.flags['C_CONTIGUOUS']:
+        assert_array_equal(t.addMapMXuRR(A, A), A2)
+        assert_array_equal(t.addMapCnstMXuRR(A, A), A2)
+    else:
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addMapMXuRR(A, A)
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addMapCnstMXuRR(A, A)
 
+    assert_array_equal(t.addRefCnstMXuRR(A, A), A2)
+    assert_array_equal(t.addRefCnstMXuRR(A.view(np.int32), A), A2)
+    assert_array_equal(t.addRefCnstMXuRR_nc(A, A), A2)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.addRefCnstMXuRR_nc(A.view(np.int32), A)
+    if A.strides[1] == A.itemsize:
+        assert_array_equal(t.addRefMXuRR(A, A), A2)
+    else:
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addRefMXuRR(A, A)
+    if A.flags['F_CONTIGUOUS']:
+        assert_array_equal(t.addMapMXuCC(A, A), A2)
+        assert_array_equal(t.addMapCnstMXuCC(A, A), A2)
+    else:
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addMapMXuCC(A, A)
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addMapCnstMXuCC(A, A)
+    
+    assert_array_equal(t.addRefCnstMXuCC(A, A), A2)
+    assert_array_equal(t.addRefCnstMXuCC(A.view(np.int32), A), A2)
+    assert_array_equal(t.addRefCnstMXuCC_nc(A, A), A2)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.addRefCnstMXuCC_nc(A.view(np.int32), A)
+    if A.strides[0] == A.itemsize:
+        assert_array_equal(t.addRefMXuCC(A, A), A2)
+    else:
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.addRefMXuCC(A, A)
     A = np.ascontiguousarray(A)
     assert A.flags['C_CONTIGUOUS']
-    assert np.all(t.addMXu_2_nc(A, A) == A2)
-
+    assert_array_equal(t.addMXuRR_nc(A, A), A2)
     A = np.asfortranarray(A)
     assert A.flags['F_CONTIGUOUS']
-    assert np.all(t.addMXu_1_nc(A, A) == A2)
-
-    A = A.T
-    A2 = A2.T
-    assert np.all(t.addMXu_1(A, A) == A2)
-    assert np.all(t.addMXu_2(A, A) == A2)
-    assert np.all(t.addMXu_3(A, A) == A2)
-    assert np.all(t.addMXu_4(A, A) == A2)
-    assert np.all(t.addMXu_5(A, A) == A2)
+    assert_array_equal(t.addMXuCC_nc(A, A), A2)
 
 
 @needs_numpy_and_eigen
@@ -172,8 +227,8 @@ def test06_map():
 def test07_mutate_arg():
     A = np.uint32(np.vander(np.arange(10)))
     A2 = A.copy()
-    t.mutate_MXu(A)
-    assert np.all(A == 2*A2)
+    t.mutate_DRefMXuC(A)
+    assert_array_equal(A, 2*A2)
 
 
 @needs_numpy_and_eigen
@@ -199,7 +254,7 @@ def test08_sparse():
                 [0, 0, 14, 0, 8, 11],
             ]
         )
-        np.testing.assert_array_equal(sparse_mat.toarray(), ref)
+        assert_array_equal(sparse_mat.toarray(), ref)
 
     assert_sparse_equal_ref(t.sparse_r())
     assert_sparse_equal_ref(t.sparse_c())
@@ -262,7 +317,7 @@ def test11_prop():
             if j == 2 and i == 0:
                 member[0, 0] = 10
                 ref[0, 0] = 10
-            assert np.all(member == ref)
+            assert_array_equal(member, ref)
             del member
             gc.collect()
             gc.collect()
@@ -271,4 +326,26 @@ def test11_prop():
         del c
         gc.collect()
         gc.collect()
-        assert np.all(member == ref)
+        assert_array_equal(member, ref)
+
+@needs_numpy_and_eigen
+def test12_cast():
+    vec = np.arange(1000, dtype=np.int32)
+    vec2 = vec[::2]
+    vecf = np.float32(vec)
+    assert_array_equal(t.castToMapVXi(vec), vec)
+    assert_array_equal(t.castToRefVXi(vec), vec)
+    assert_array_equal(t.castToRefCnstVXi(vec), vec)
+    assert_array_equal(t.castToDRefCnstVXi(vec), vec)
+    for v in vec2, vecf:
+        with pytest.raises(RuntimeError, match="bad[_ ]cast"):
+            t.castToMapVXi(v)
+        with pytest.raises(RuntimeError, match="bad[_ ]cast"):
+            t.castToRefVXi(v)
+        assert_array_equal(t.castToRefCnstVXi(v), v)
+    assert_array_equal(t.castToDRefCnstVXi(vec2), vec2)
+    with pytest.raises(RuntimeError, match="bad[_ ]cast"):
+        t.castToDRefCnstVXi(vecf)   
+    for v in vec, vec2, vecf:
+        with pytest.raises(RuntimeError, match='bad[_ ]cast'):
+            t.castToRef03CnstVXi(v)

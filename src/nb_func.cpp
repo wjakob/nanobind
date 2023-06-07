@@ -81,7 +81,7 @@ void nb_func_dealloc(PyObject *self) {
         func_data *f = nb_func_data(self);
 
         // Delete from registered function list
-        auto &funcs = internals_get().funcs;
+        auto &funcs = internals->funcs;
         auto it = funcs.find(self);
         check(it != funcs.end(),
               "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
@@ -187,7 +187,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
-    nb_internals &internals = internals_get();
 
     // Check for previous overloads
     if (has_scope && has_name) {
@@ -196,8 +195,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
-            if (Py_TYPE(func_prev) == internals.nb_func ||
-                Py_TYPE(func_prev) == internals.nb_method) {
+            if (Py_TYPE(func_prev) == internals->nb_func ||
+                Py_TYPE(func_prev) == internals->nb_method) {
                 func_data *fp = nb_func_data(func_prev);
 
                 check((fp->flags & (uint32_t) func_flags::is_method) ==
@@ -242,7 +241,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     // Create a new function and destroy the old one
     Py_ssize_t to_copy = func_prev ? Py_SIZE(func_prev) : 0;
     nb_func *func = (nb_func *) PyType_GenericAlloc(
-        is_method ? internals.nb_method : internals.nb_func, to_copy + 1);
+        is_method ? internals->nb_method : internals->nb_func, to_copy + 1);
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           has_name ? f->name : "<anonymous>");
 
@@ -262,10 +261,10 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
-        auto it = internals.funcs.find(func_prev);
-        check(it != internals.funcs.end(),
+        auto it = internals->funcs.find(func_prev);
+        check(it != internals->funcs.end(),
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
-        internals.funcs.erase(it);
+        internals->funcs.erase(it);
     }
 
     func->complex_call |= func->max_nargs_pos >= NB_MAXARGS_SIMPLE;
@@ -274,7 +273,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
                                           : nb_func_vectorcall_simple;
 
     // Register the function
-    auto [it, success] = internals.funcs.try_emplace(func, nullptr);
+    auto [it, success] = internals->funcs.try_emplace(func, nullptr);
     check(success,
           "nanobind::detail::nb_func_new(): internal update failed (2)!");
 
@@ -434,9 +433,8 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
 static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
     std::exception_ptr e = std::current_exception();
 
-    nb_translator_seq *cur  = &internals_get().translators;
-
-    while (cur) {
+    for (nb_translator_seq *cur = &internals->translators; cur;
+         cur = cur->next) {
         try {
             // Try exception translator & forward payload
             cur->translator(e, cur->payload);
@@ -444,8 +442,6 @@ static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
         } catch (...) {
             e = std::current_exception();
         }
-
-        cur = cur->next;
     }
 
     PyErr_SetString(PyExc_SystemError,
@@ -822,7 +818,7 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
            in a way that breaks this optimization :-/ */
 
         nb_bound_method *mb =
-            PyObject_GC_New(nb_bound_method, internals_get().nb_bound_method);
+            PyObject_GC_New(nb_bound_method, internals->nb_bound_method);
         mb->func = (nb_func *) self;
         mb->self = inst;
         mb->vectorcall = nb_bound_method_vectorcall;
@@ -846,7 +842,6 @@ static void nb_func_render_signature(const func_data *f) noexcept {
                has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 
     const std::type_info **descr_type = f->descr_types;
-    nb_internals &internals = internals_get();
 
     uint32_t arg_index = 0;
     buf.put_dstr(f->name);
@@ -943,9 +938,9 @@ static void nb_func_render_signature(const func_data *f) noexcept {
                       "nb::detail::nb_func_render_signature(): missing type!");
 
                 if (!(is_method && arg_index == 0)) {
-                    auto it = internals.type_c2p.find(std::type_index(**descr_type));
+                    auto it = internals->type_c2p.find(std::type_index(**descr_type));
 
-                    if (it != internals.type_c2p.end()) {
+                    if (it != internals->type_c2p.end()) {
                         handle th((PyObject *) it->second->type_py);
                         buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                         buf.put('.');

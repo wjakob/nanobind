@@ -304,14 +304,14 @@ function(nanobind_add_module name)
     set(libname "${libname}-abi3")
   endif()
 
-  if (ARG_NB_DOMAIN)
+  if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
     set(libname ${libname}-${ARG_NB_DOMAIN})
   endif()
 
   nanobind_build_library(${libname})
 
   if (ARG_NB_DOMAIN)
-    target_compile_definitions(${libname} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
+    target_compile_definitions(${name} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
   endif()
 
   if (ARG_STABLE_ABI)

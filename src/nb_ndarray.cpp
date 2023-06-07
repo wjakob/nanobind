@@ -123,8 +123,7 @@ static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
 }
 
 static PyTypeObject *nd_ndarray_tp() noexcept {
-    nb_internals &internals = internals_get();
-    PyTypeObject *tp = internals.nb_ndarray;
+    PyTypeObject *tp = internals->nb_ndarray;
 
     if (NB_UNLIKELY(!tp)) {
         PyType_Slot slots[] = {
@@ -152,7 +151,7 @@ static PyTypeObject *nd_ndarray_tp() noexcept {
         tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
 #endif
 
-        internals.nb_ndarray = tp;
+        internals->nb_ndarray = tp;
     }
 
     return tp;

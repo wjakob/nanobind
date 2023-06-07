@@ -117,8 +117,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
     self->intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
     // Update hash table that maps from C++ to Python instance
-    auto [it, success] =
-        internals_get().inst_c2p.try_emplace(value, self);
+    auto [it, success] = internals->inst_c2p.try_emplace(value, self);
 
     if (NB_UNLIKELY(!success)) {
         void *entry = it->second;
@@ -190,15 +189,15 @@ static void inst_dealloc(PyObject *self) {
             operator delete(p, std::align_val_t(t->align));
     }
 
-    nb_internals &internals = internals_get();
     if (inst->clear_keep_alive) {
-        auto it = internals.keep_alive.find(self);
-        check(it != internals.keep_alive.end(),
+        nb_ptr_map &keep_alive = internals->keep_alive;
+        nb_ptr_map::iterator it = keep_alive.find(self);
+        check(it != keep_alive.end(),
               "nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
               "keep_alive information", t->name);
 
         nb_weakref_seq *s = (nb_weakref_seq *) it->second;
-        internals.keep_alive.erase(it);
+        keep_alive.erase(it);
         do {
             nb_weakref_seq *c = s;
             s = c->next;
@@ -213,7 +212,7 @@ static void inst_dealloc(PyObject *self) {
     }
 
     // Update hash table that maps from C++ to Python instance
-    nb_ptr_map &inst_c2p = internals.inst_c2p;
+    nb_ptr_map &inst_c2p = internals->inst_c2p;
     nb_ptr_map::iterator it = inst_c2p.find(p);
     bool found = false;
 
@@ -255,7 +254,7 @@ static void inst_dealloc(PyObject *self) {
           "unknown instance (%p)!", t->name, p);
 
     if (NB_UNLIKELY(gc))
-        NB_SLOT(internals, PyType_Type, tp_free)(self);
+        NB_SLOT(PyType_Type, tp_free)(self);
     else
         PyObject_Free(self);
 
@@ -266,7 +265,7 @@ static void nb_type_dealloc(PyObject *o) {
     type_data *t = nb_type_data((PyTypeObject *) o);
 
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0) {
-        nb_type_map &type_c2p = internals_get().type_c2p;
+        nb_type_map &type_c2p = internals->type_c2p;
         nb_type_map::iterator it = type_c2p.find(std::type_index(*t->type));
         check(it != type_c2p.end(),
               "nanobind::detail::nb_type_dealloc(\"%s\"): could not "
@@ -281,7 +280,7 @@ static void nb_type_dealloc(PyObject *o) {
 
     free((char *) t->name);
 
-    NB_SLOT(internals_get(), PyType_Type, tp_dealloc)(o);
+    NB_SLOT(PyType_Type, tp_dealloc)(o);
 }
 
 /// Called when a C++ type is extended from within Python
@@ -312,7 +311,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         return -1;
     }
 
-    int rv = NB_SLOT(internals_get(), PyType_Type, tp_init)(self, args, kwds);
+    int rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
     if (rv)
         return rv;
 
@@ -333,16 +332,15 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
 /// Special case to handle 'Class.property = value' assignments
 static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
-    nb_internals &internals = internals_get();
-
-    internals.nb_static_property_enabled = false;
+    nb_internals *int_p = internals;
+    int_p->nb_static_property_enabled = false;
     PyObject *cur = PyObject_GetAttr(obj, name);
-    internals.nb_static_property_enabled = true;
+    int_p->nb_static_property_enabled = true;
 
     if (cur) {
-        PyTypeObject *tp = internals.nb_static_property;
+        PyTypeObject *tp = int_p->nb_static_property;
         if (Py_TYPE(cur) == tp) {
-            int rv = internals.nb_static_property_descr_set(cur, obj, value);
+            int rv = int_p->nb_static_property_descr_set(cur, obj, value);
             Py_DECREF(cur);
             return rv;
         }
@@ -366,7 +364,7 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         PyErr_Clear();
     }
 
-    return NB_SLOT(internals, PyType_Type, tp_setattro)(obj, name, value);
+    return NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 }
 
 #if PY_VERSION_HEX < 0x030C0000
@@ -602,12 +600,11 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 #endif
 }
 
-static PyTypeObject *nb_type_tp(nb_internals &internals,
-                                size_t supplement) noexcept {
+static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
     object key = steal(PyLong_FromSize_t(supplement));
 
     PyTypeObject *tp =
-        (PyTypeObject *) PyDict_GetItem(internals.nb_type_dict, key.ptr());
+        (PyTypeObject *) PyDict_GetItem(internals->nb_type_dict, key.ptr());
 
     if (NB_UNLIKELY(!tp)) {
         PyType_Slot slots[] = {
@@ -638,13 +635,13 @@ static PyTypeObject *nb_type_tp(nb_internals &internals,
         };
 
         tp = (PyTypeObject *) nb_type_from_metaclass(
-            internals.nb_meta, internals.nb_module, &spec);
+            internals->nb_meta, internals->nb_module, &spec);
 
         handle(tp).attr("__module__") = "nanobind";
 
         int rv = 1;
         if (tp)
-            rv = PyDict_SetItem(internals.nb_type_dict, key.ptr(), (PyObject *) tp);
+            rv = PyDict_SetItem(internals->nb_type_dict, key.ptr(), (PyObject *) tp);
         check(rv == 0, "nb_type type creation failed!");
 
         Py_DECREF(tp);
@@ -664,14 +661,13 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          intrusive_ptr     = t->flags & (uint32_t) type_flags::intrusive_ptr,
          has_shared_from_this = t->flags & (uint32_t) type_flags::has_shared_from_this;
 
-    nb_internals &internals = internals_get();
     str name(t->name), qualname = name;
     object modname;
     PyObject *mod = nullptr;
 
     // Update hash table that maps from std::type_info to Python type
     auto [it, success] =
-        internals.type_c2p.try_emplace(std::type_index(*t->type), nullptr);
+        internals->type_c2p.try_emplace(std::type_index(*t->type), nullptr);
     if (!success) {
         PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: type '%s' was already registered!\n", t->name);
         PyObject *tp = (PyObject *) it->second->type_py;
@@ -713,8 +709,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
               "nanobind type!", t->name);
     } else if (has_base) {
         nb_type_map::iterator it =
-            internals.type_c2p.find(std::type_index(*t->base));
-        check(it != internals.type_c2p.end(),
+            internals->type_c2p.find(std::type_index(*t->base));
+        check(it != internals->type_c2p.end(),
                   "nanobind::detail::nb_type_new(\"%s\"): base type \"%s\" not "
                   "known to nanobind!", t->name, type_name(t->base));
         base = (PyObject *) it->second->type_py;
@@ -815,8 +811,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass =
-        nb_type_tp(internals, has_supplement ? t->supplement : 0);
+    PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0);
 
     PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
     if (!result) {
@@ -860,7 +855,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (modname.is_valid())
         setattr(result, "__module__", modname.ptr());
 
-    internals.type_c2p[std::type_index(*t->type)] = to;
+    internals->type_c2p[std::type_index(*t->type)] = to;
 
     return result;
 }
@@ -869,7 +864,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                                              const std::type_info *cpp_type_src,
                                              const type_data *dst_type,
-                                             nb_internals &internals,
+                                             nb_type_map &type_c2p,
                                              cleanup_list *cleanup, void **out) noexcept {
     if (dst_type->implicit && cpp_type_src) {
         const std::type_info **it = dst_type->implicit;
@@ -882,8 +877,8 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
 
         it = dst_type->implicit;
         while ((v = *it++)) {
-            auto it2 = internals.type_c2p.find(std::type_index(*v));
-            if (it2 != internals.type_c2p.end() &&
+            nb_type_map::iterator it2 = type_c2p.find(std::type_index(*v));
+            if (it2 != type_c2p.end() &&
                 PyType_IsSubtype(Py_TYPE(src), it2->second->type_py))
                 goto found;
         }
@@ -928,7 +923,7 @@ found:
     } else {
         PyErr_Clear();
 
-        if (internals.print_implicit_cast_warnings) {
+        if (internals->print_implicit_cast_warnings) {
 #if !defined(Py_LIMITED_API)
             const char *name = Py_TYPE(src)->tp_name;
 #else
@@ -961,12 +956,12 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         return true;
     }
 
-    nb_internals &internals = internals_get();
     PyTypeObject *src_type = Py_TYPE(src);
     const std::type_info *cpp_type_src = nullptr;
     const bool src_is_nb_type = nb_type_check((PyObject *) src_type);
 
     type_data *dst_type = nullptr;
+    nb_type_map &type_c2p = internals->type_c2p;
 
     // If 'src' is a nanobind-bound type
     if (src_is_nb_type) {
@@ -978,8 +973,8 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
         // If not, look up the Python type and check the inheritance chain
         if (!valid) {
-            auto it = internals.type_c2p.find(std::type_index(*cpp_type));
-            if (it != internals.type_c2p.end()) {
+            auto it = type_c2p.find(std::type_index(*cpp_type));
+            if (it != type_c2p.end()) {
                 dst_type = it->second;
                 valid = PyType_IsSubtype(src_type, dst_type->type_py);
             }
@@ -1009,14 +1004,14 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     // Try an implicit conversion as last resort (if possible & requested)
     if ((flags & (uint16_t) cast_flags::convert) && cleanup) {
         if (!src_is_nb_type) {
-            auto it = internals.type_c2p.find(std::type_index(*cpp_type));
-            if (it != internals.type_c2p.end())
+            auto it = type_c2p.find(std::type_index(*cpp_type));
+            if (it != type_c2p.end())
                 dst_type = it->second;
         }
 
         if (dst_type &&
             (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions))
-            return nb_type_get_implicit(src, cpp_type_src, dst_type, internals,
+            return nb_type_get_implicit(src, cpp_type_src, dst_type, type_c2p,
                                         cleanup, out);
     }
 
@@ -1044,7 +1039,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
 
     if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
         nb_weakref_seq **pp =
-            (nb_weakref_seq **) &internals_get().keep_alive[nurse];
+            (nb_weakref_seq **) &internals->keep_alive[nurse];
 
         do {
             nb_weakref_seq *p = *pp;
@@ -1092,7 +1087,7 @@ void keep_alive(PyObject *nurse, void *payload,
 
     if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
         nb_weakref_seq
-            **pp = (nb_weakref_seq **) &internals_get().keep_alive[nurse],
+            **pp = (nb_weakref_seq **) &internals->keep_alive[nurse],
             *s   = (nb_weakref_seq *) PyObject_Malloc(sizeof(nb_weakref_seq));
         check(s, "nanobind::detail::keep_alive(): out of memory!");
 
@@ -1203,9 +1198,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
         return Py_None;
     }
 
-    nb_internals &internals = internals_get();
-    nb_ptr_map &inst_c2p = internals.inst_c2p;
-    nb_type_map &type_map = internals.type_c2p;
+    nb_ptr_map &inst_c2p = internals->inst_c2p;
+    nb_type_map &type_map = internals->type_c2p;
     type_data *td = nullptr;
 
     auto lookup_type = [cpp_type, &td, &type_map]() -> bool {
@@ -1282,9 +1276,8 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
     }
 
     // Check if the instance is already registered with nanobind
-    nb_internals &internals = internals_get();
-    nb_ptr_map &inst_c2p = internals.inst_c2p;
-    nb_type_map &type_map = internals.type_c2p;
+    nb_ptr_map &inst_c2p = internals->inst_c2p;
+    nb_type_map &type_map = internals->type_c2p;
 
     // Look up the corresponding Python type
     type_data *td = nullptr,
@@ -1455,27 +1448,22 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
 }
 
 bool nb_type_isinstance(PyObject *o, const std::type_info *t) noexcept {
-    nb_internals &internals = internals_get();
-    auto it = internals.type_c2p.find(std::type_index(*t));
-    if (it == internals.type_c2p.end())
+    nb_type_map &type_c2p = internals->type_c2p;
+    auto it = type_c2p.find(std::type_index(*t));
+    if (it == type_c2p.end())
         return false;
     return PyType_IsSubtype(Py_TYPE(o), it->second->type_py);
 }
 
 PyObject *nb_type_lookup(const std::type_info *t) noexcept {
-    nb_internals &internals = internals_get();
-    auto it = internals.type_c2p.find(std::type_index(*t));
-    if (it != internals.type_c2p.end())
+    nb_type_map &type_c2p = internals->type_c2p;
+    auto it = type_c2p.find(std::type_index(*t));
+    if (it != type_c2p.end())
         return (PyObject *) it->second->type_py;
     return nullptr;
 }
 
-static PyTypeObject *nb_meta_cache = nullptr;
-
 bool nb_type_check(PyObject *t) noexcept {
-    if (NB_UNLIKELY(!nb_meta_cache))
-        nb_meta_cache = internals_get().nb_meta;
-
     PyTypeObject *meta  = Py_TYPE(t),
                  *meta2 = Py_TYPE((PyObject *) meta);
 

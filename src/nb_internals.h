@@ -244,20 +244,13 @@ struct nb_internals {
 
 /// Convenience macro to potentially access cached functions
 #if defined(Py_LIMITED_API)
-#  define NB_SLOT(internals, type, name) internals.type##_##name
+#  define NB_SLOT(type, name) internals->type##_##name
 #else
-#  define NB_SLOT(internals, type, name) type.name
+#  define NB_SLOT(type, name) type.name
 #endif
 
-extern nb_internals *internals_p;
-extern nb_internals *internals_fetch();
-
-inline nb_internals &internals_get() noexcept {
-    nb_internals *ptr = internals_p;
-    if (NB_UNLIKELY(!ptr))
-        ptr = internals_fetch();
-    return *ptr;
-}
+extern nb_internals *internals;
+extern PyTypeObject *nb_meta_cache;
 
 extern char *type_name(const std::type_info *t);
 

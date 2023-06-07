@@ -159,9 +159,7 @@ builtin_exception::~builtin_exception() { }
 NAMESPACE_BEGIN(detail)
 
 void register_exception_translator(exception_translator t, void *payload) {
-    nb_internals &internals = internals_get();
-
-    nb_translator_seq *cur  = &internals.translators,
+    nb_translator_seq *cur  = &internals->translators,
                       *next = new nb_translator_seq(*cur);
     cur->next = next;
     cur->payload = payload;

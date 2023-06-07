@@ -15,7 +15,7 @@ NAMESPACE_BEGIN(detail)
 
 void implicitly_convertible(const std::type_info *src,
                             const std::type_info *dst) noexcept {
-    nb_type_map &type_c2p = internals_get().type_c2p;
+    nb_type_map &type_c2p = internals->type_c2p;
 
     nb_type_map::iterator it = type_c2p.find(std::type_index(*dst));
     check(it != type_c2p.end(),
@@ -46,7 +46,7 @@ void implicitly_convertible(const std::type_info *src,
 void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
                                               cleanup_list *),
                             const std::type_info *dst) noexcept {
-    nb_type_map &type_c2p = internals_get().type_c2p;
+    nb_type_map &type_c2p = internals->type_c2p;
 
     nb_type_map::iterator it = type_c2p.find(std::type_index(*dst));
     check(it != type_c2p.end(),

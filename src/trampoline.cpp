@@ -15,7 +15,7 @@ NAMESPACE_BEGIN(detail)
 
 void trampoline_new(void **data, size_t size, void *ptr) noexcept {
     // GIL is held when the trampoline constructor runs
-    nb_ptr_map &inst_c2p = internals_get().inst_c2p;
+    nb_ptr_map &inst_c2p = internals->inst_c2p;
     nb_ptr_map::iterator it = inst_c2p.find(ptr);
     check(it != inst_c2p.end() && (((uintptr_t) it->second) & 1) == 0,
           "nanobind::detail::trampoline_new(): unique instance not found!");
@@ -37,7 +37,6 @@ static void trampoline_enter_internal(void **data, size_t size,
     const char *error = nullptr;
     PyObject *key = nullptr, *value = nullptr;
     PyTypeObject *value_tp = nullptr;
-    nb_internals *internals = nullptr;
     size_t offset = 0;
 
     // First, perform a quick sweep without lock
@@ -111,7 +110,6 @@ static void trampoline_enter_internal(void **data, size_t size,
     value_tp = Py_TYPE(value);
     Py_CLEAR(value);
 
-    internals = &internals_get();
     if (value_tp == internals->nb_func || value_tp == internals->nb_method ||
         value_tp == internals->nb_bound_method) {
         Py_DECREF(key);

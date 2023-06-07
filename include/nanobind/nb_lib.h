@@ -90,6 +90,10 @@ NB_CORE void raise_cast_error();
 
 // ========================================================================
 
+NB_CORE void init(const char *domain);
+
+// ========================================================================
+
 /// Convert a Python object into a Python unicode string
 NB_CORE PyObject *str_from_obj(PyObject *o);
 

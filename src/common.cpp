@@ -709,12 +709,11 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 static void property_install_impl(PyTypeObject *tp, PyObject *scope,
                                   const char *name, PyObject *getter,
                                   PyObject *setter) {
-    const nb_internals &internals = internals_get();
     PyObject *m = getter ? getter : setter;
     object doc = none();
 
-    if (m && (Py_TYPE(m) == internals.nb_func ||
-              Py_TYPE(m) == internals.nb_method)) {
+    if (m && (Py_TYPE(m) == internals->nb_func ||
+              Py_TYPE(m) == internals->nb_method)) {
         func_data *f = nb_func_data(m);
         if (f->flags & (uint32_t) func_flags::has_doc)
             doc = str(f->doc);
@@ -957,11 +956,11 @@ void decref_checked(PyObject *o) noexcept {
 // ========================================================================
 
 void set_leak_warnings(bool value) noexcept {
-    internals_get().print_leak_warnings = value;
+    internals->print_leak_warnings = value;
 }
 
 void set_implicit_cast_warnings(bool value) noexcept {
-    internals_get().print_implicit_cast_warnings = value;
+    internals->print_implicit_cast_warnings = value;
 }
 
 // ========================================================================

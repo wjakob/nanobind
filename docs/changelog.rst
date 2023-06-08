@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.4.0 (TBA)
--------------------
+Version 1.4.0 (June 8, 2023)
+----------------------------
 
 * Improved the efficiency of the function dispatch loop. (PR `#227
   <https://github.com/wjakob/nanobind/pull/227>`__).

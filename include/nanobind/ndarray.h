@@ -97,7 +97,7 @@ template <typename T> constexpr dlpack::dtype dtype() {
         result.code = (uint8_t) dlpack::dtype_code::Float;
     else if constexpr (std::is_signed_v<T>)
         result.code = (uint8_t) dlpack::dtype_code::Int;
-    else if constexpr (std::is_same_v<T, bool>)
+    else if constexpr (std::is_same_v<std::remove_cv_t<T>, bool>)
         result.code = (uint8_t) dlpack::dtype_code::Bool;
     else
         result.code = (uint8_t) dlpack::dtype_code::UInt;
@@ -145,7 +145,7 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_floating_point_v
     }
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>>> {
+template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>>> {
     static constexpr size_t size = 0;
 
     static constexpr auto name =
@@ -161,7 +161,7 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> &&
     }
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<std::is_same_v<T, bool>>> {
+template <typename T> struct ndarray_arg<T, enable_if_t<std::is_same_v<std::remove_cv_t<T>, bool>>> {
     static constexpr size_t size = 0;
 
     static constexpr auto name =

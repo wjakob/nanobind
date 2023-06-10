@@ -708,12 +708,12 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
               "nanobind::detail::nb_type_new(\"%s\"): base type is not a "
               "nanobind type!", t->name);
     } else if (has_base) {
-        nb_type_map::iterator it =
+        nb_type_map::iterator it2 =
             internals->type_c2p.find(std::type_index(*t->base));
-        check(it != internals->type_c2p.end(),
+        check(it2 != internals->type_c2p.end(),
                   "nanobind::detail::nb_type_new(\"%s\"): base type \"%s\" not "
                   "known to nanobind!", t->name, type_name(t->base));
-        base = (PyObject *) it->second->type_py;
+        base = (PyObject *) it2->second->type_py;
     }
 
     type_data *tb = nullptr;

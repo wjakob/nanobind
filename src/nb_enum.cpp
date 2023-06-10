@@ -344,7 +344,7 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
         Py_INCREF(Py_None);
     }
 
-    nb_inst *inst = (nb_inst *) inst_new_impl((PyTypeObject *) type, nullptr);
+    nb_inst *inst = (nb_inst *) inst_new_int((PyTypeObject *) type);
 
     if (!doc_obj || !name_obj || !inst)
         goto error;

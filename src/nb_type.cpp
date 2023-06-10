@@ -47,74 +47,96 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
     return -1;
 }
 
-/// Allocate memory for a nb_type instance with internal or external storage
-PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
+/// Allocate memory for a nb_type instance with internal storage
+PyObject *inst_new_int(PyTypeObject *tp) {
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
-    const type_data *t = nb_type_data(tp);
-    size_t align = (size_t) t->align;
 
     nb_inst *self;
+    if (NB_LIKELY(!gc))
+        self = PyObject_New(nb_inst, tp);
+    else
+        self = (nb_inst *) PyType_GenericAlloc(tp, 0);
 
-    if (!gc) {
-        size_t size = sizeof(nb_inst);
-        if (!value) {
-            // Internal storage: space for the object and padding for alignment
-            size += t->size;
-            if (align > sizeof(void *))
-                size += align - sizeof(void *);
-        }
+    if (NB_LIKELY(self)) {
+        const type_data *t = nb_type_data(tp);
+        uint32_t align = (uint32_t) t->align;
+        bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
-        self = (nb_inst *) PyObject_Malloc(size);
+        uintptr_t payload = (uintptr_t) (self + 1);
+
+        if (NB_UNLIKELY(align > sizeof(void *)))
+            payload = (payload + align - 1) / align * align;
+
+        self->offset = (int32_t) ((intptr_t) payload - (intptr_t) self);
+        self->direct = 1;
+        self->internal = 1;
+        self->ready = 0;
+        self->destruct = 0;
+        self->cpp_delete = 0;
+        self->clear_keep_alive = 0;
+        self->intrusive = intrusive;
+        self->unused = 0;
+
+        // Update hash table that maps from C++ to Python instance
+        auto [it, success] = internals->inst_c2p.try_emplace((void *) payload, self);
+        check(success, "nanobind::detail::inst_new_int(): unexpected collision!");
+    }
+
+    return (PyObject *) self;
+
+}
+
+/// Allocate memory for a nb_type instance with external storage
+PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
+    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+
+    nb_inst *self;
+    if (NB_LIKELY(!gc)) {
+        self = (nb_inst *) PyObject_Malloc(sizeof(nb_inst));
         if (!self)
             return PyErr_NoMemory();
-        memset(self, 0, sizeof(nb_inst));
         PyObject_Init((PyObject *) self, tp);
     } else {
         self = (nb_inst *) PyType_GenericAlloc(tp, 0);
+        if (!self)
+            return nullptr;
     }
 
-    if (!value) {
-        // Compute suitably aligned instance payload pointer
-        uintptr_t payload = (uintptr_t) (self + 1);
-        payload = (payload + align - 1) / align * align;
+    // Compute offset to instance value
+    int32_t offset = (int32_t) ((intptr_t) value - (intptr_t) self);
 
-        // Encode offset to aligned payload
-        self->offset = (int32_t) ((intptr_t) payload - (intptr_t) self);
-        self->direct = true;
-        self->internal = true;
+    bool direct = (intptr_t) self + offset == (intptr_t) value;
+    if (NB_UNLIKELY(!direct)) {
+        // Location is not representable as signed 32 bit offset
+        if (!gc) {
+            /// Allocate memory for an extra pointer
+            nb_inst *self_2 =
+                (nb_inst *) PyObject_Realloc(self, sizeof(nb_inst) + sizeof(void *));
 
-        value = (void *) payload;
-    } else {
-        // Compute offset to instance value
-        int32_t offset = (int32_t) ((intptr_t) value - (intptr_t) self);
-
-        if ((intptr_t) self + offset == (intptr_t) value) {
-            // Offset *is* representable as 32 bit value
-            self->offset = offset;
-            self->direct = true;
-        } else {
-            if (!gc) {
-                // Offset *not* representable, allocate extra memory for a pointer
-                nb_inst *self_2 =
-                    (nb_inst *) PyObject_Realloc(self, sizeof(nb_inst) + sizeof(void *));
-
-                if (!self_2) {
-                    PyObject_Free(self);
-                    return PyErr_NoMemory();
-                }
-
-                self = self_2;
+            if (NB_UNLIKELY(!self_2)) {
+                PyObject_Free(self);
+                return PyErr_NoMemory();
             }
 
-            *(void **) (self + 1) = value;
-            self->offset = (int32_t) sizeof(nb_inst);
-            self->direct = false;
+            self = self_2;
         }
 
-        self->internal = false;
+        *(void **) (self + 1) = value;
+        offset = (int32_t) sizeof(nb_inst);
     }
 
-    self->intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+    const type_data *t = nb_type_data(tp);
+    bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+
+    self->offset = offset;
+    self->direct = direct;
+    self->internal = 0;
+    self->ready = 0;
+    self->destruct = 0;
+    self->cpp_delete = 0;
+    self->clear_keep_alive = 0;
+    self->intrusive = intrusive;
+    self->unused = 0;
 
     // Update hash table that maps from C++ to Python instance
     auto [it, success] = internals->inst_c2p.try_emplace(value, self);
@@ -125,7 +147,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         // Potentially convert the map value into linked list format
         if (!nb_is_seq(entry)) {
             nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-            check(first, "nanobind::detail::inst_new(): list element "
+            check(first, "nanobind::detail::inst_new_ext(): list element "
                          "allocation failed!");
             first->inst = (PyObject *) entry;
             first->next = nullptr;
@@ -135,7 +157,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
         nb_inst_seq *seq = nb_get_seq(entry);
         while (true) {
             check((nb_inst *) seq->inst != self,
-                  "nanobind::detail::inst_new(): duplicate instance!");
+                  "nanobind::detail::inst_new_ext(): duplicate instance!");
             if (!seq->next)
                 break;
             seq = seq->next;
@@ -143,7 +165,7 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
 
         nb_inst_seq *next = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
         check(next,
-              "nanobind::detail::inst_new(): list element allocation failed!");
+              "nanobind::detail::inst_new_ext(): list element allocation failed!");
 
         next->inst = (PyObject *) self;
         next->next = nullptr;
@@ -153,22 +175,18 @@ PyObject *inst_new_impl(PyTypeObject *tp, void *value) {
     return (PyObject *) self;
 }
 
-// Allocate a new instance with co-located storage
-static PyObject *inst_new(PyTypeObject *type, PyObject *, PyObject *) {
-    return inst_new_impl(type, nullptr);
-}
-
 static void inst_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
     const type_data *t = nb_type_data(tp);
 
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
-    if (gc)
+    if (NB_UNLIKELY(gc)) {
         PyObject_GC_UnTrack(self);
 
-    if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
-        PyObject *&dict = *nb_dict_ptr(self);
-        Py_CLEAR(dict);
+        if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
+            PyObject *&dict = *nb_dict_ptr(self);
+            Py_CLEAR(dict);
+        }
     }
 
     nb_inst *inst = (nb_inst *) self;
@@ -731,6 +749,10 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         if (base_basicsize > basicsize)
             basicsize = base_basicsize;
     }
+
+    bool base_intrusive_ptr =
+        tb && (tb->flags & (uint32_t) type_flags::intrusive_ptr);
+
     char *name_copy = NB_STRDUP(name.c_str());
 
     constexpr size_t nb_type_max_slots = 10,
@@ -752,7 +774,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         *s++ = { Py_tp_base, (void *) base };
 
     *s++ = { Py_tp_init, (void *) inst_init };
-    *s++ = { Py_tp_new, (void *) inst_new };
+    *s++ = { Py_tp_new, (void *) inst_new_int };
     *s++ = { Py_tp_dealloc, (void *) inst_dealloc };
 
     if (has_doc)
@@ -780,10 +802,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     bool has_traverse = false;
-    for (PyType_Slot *ts = slots; ts != s; ++ts) {
-        if (ts->slot == Py_tp_traverse)
-            has_traverse = true;
-    }
+    for (PyType_Slot *ts = slots; ts != s; ++ts)
+        has_traverse |= ts->slot == Py_tp_traverse;
 
     if (has_dynamic_attr) {
         // realign to sizeof(void*), add one pointer
@@ -825,8 +845,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     *to = *t; // note: slices off _init parts
     to->flags &= ~(uint32_t) type_init_flags::all_init_flags;
 
-    if (!intrusive_ptr && tb &&
-        (tb->flags & (uint32_t) type_flags::intrusive_ptr)) {
+    if (!intrusive_ptr && base_intrusive_ptr) {
         to->flags |= (uint32_t) type_flags::intrusive_ptr;
         to->set_self_py = tb->set_self_py;
     }
@@ -1111,10 +1130,14 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     if (intrusive)
         rvp = rv_policy::take_ownership;
 
-    const bool store_in_obj = rvp == rv_policy::copy || rvp == rv_policy::move;
+    const bool create_new = rvp == rv_policy::copy || rvp == rv_policy::move;
 
-    nb_inst *inst =
-        (nb_inst *) inst_new_impl(t->type_py, store_in_obj ? nullptr : value);
+    nb_inst *inst;
+    if (create_new)
+        inst = (nb_inst *) inst_new_int(t->type_py);
+    else
+        inst = (nb_inst *) inst_new_ext(t->type_py, value);
+
     if (!inst)
         return nullptr;
 
@@ -1166,7 +1189,7 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     // same thing done by the <nanobind/stl/shared_ptr.h> caster when
     // returning shared_ptr<T> to Python explicitly.
     if ((t->flags & (uint32_t) type_flags::has_shared_from_this) &&
-        !store_in_obj && t->keep_shared_from_this_alive((PyObject *) inst))
+        !create_new && t->keep_shared_from_this_alive((PyObject *) inst))
         rvp = rv_policy::reference;
     else if (is_new)
         *is_new = true;
@@ -1483,14 +1506,14 @@ void *nb_type_supplement(PyObject *t) noexcept {
 }
 
 PyObject *nb_inst_alloc(PyTypeObject *t) {
-    PyObject *result = inst_new_impl(t, nullptr);
+    PyObject *result = inst_new_int(t);
     if (!result)
         raise_python_error();
     return result;
 }
 
 PyObject *nb_inst_wrap(PyTypeObject *t, void *ptr) {
-    PyObject *result = inst_new_impl(t, ptr);
+    PyObject *result = inst_new_ext(t, ptr);
     if (!result)
         raise_python_error();
     return result;

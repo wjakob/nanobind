@@ -50,25 +50,27 @@ struct nb_inst { // usually: 24 bytes
      * relative offset to a pointer that must be dereferenced to get to the
      * instance data. 'direct' is 'true' in the former case.
      */
-    bool direct : 1;
+    uint32_t direct : 1;
 
     /// Is the instance data co-located with the Python object?
-    bool internal : 1;
+    uint32_t internal : 1;
 
     /// Is the instance properly initialized?
-    bool ready : 1;
+    uint32_t ready : 1;
 
     /// Should the destructor be called when this instance is GCed?
-    bool destruct : 1;
+    uint32_t destruct : 1;
 
     /// Should nanobind call 'operator delete' when this instance is GCed?
-    bool cpp_delete : 1;
+    uint32_t cpp_delete : 1;
 
     /// Does this instance hold reference to others? (via internals.keep_alive)
-    bool clear_keep_alive : 1;
+    uint32_t clear_keep_alive : 1;
 
     /// Does this instance use intrusive reference counting?
-    bool intrusive : 1;
+    uint32_t intrusive : 1;
+
+    uint32_t unused: 25;
 };
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
@@ -255,7 +257,8 @@ extern PyTypeObject *nb_meta_cache;
 extern char *type_name(const std::type_info *t);
 
 // Forward declarations
-extern PyObject *inst_new_impl(PyTypeObject *tp, void *value);
+extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
+extern PyObject *inst_new_int(PyTypeObject *tp);
 extern PyTypeObject *nb_static_property_tp() noexcept;
 
 /// Fetch the nanobind function record from a 'nb_func' instance

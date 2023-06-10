@@ -674,7 +674,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     error_handler = nb_func_error_overload;
 
 done:
-    cleanup.release();
+    if (NB_UNLIKELY(cleanup.used()))
+        cleanup.release();
 
     if (NB_UNLIKELY(error_handler))
         result = error_handler(self, args_in, nargs_in, kwargs_in);
@@ -774,7 +775,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     error_handler = nb_func_error_overload;
 
 done:
-    cleanup.release();
+    if (NB_UNLIKELY(cleanup.used()))
+        cleanup.release();
 
     if (NB_UNLIKELY(error_handler))
         result = error_handler(self, args_in, nargs_in, kwargs_in);

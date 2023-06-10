@@ -934,9 +934,6 @@ found:
             fprintf(stderr,
                     "nanobind: implicit conversion from type '%s' to type '%s' "
                     "failed!\n", name, dst_type->name);
-#if defined(_WIN32)
-            fflush(stderr);
-#endif
 
 #if defined(Py_LIMITED_API)
             Py_DECREF(name_py);
@@ -964,7 +961,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     nb_type_map &type_c2p = internals->type_c2p;
 
     // If 'src' is a nanobind-bound type
-    if (src_is_nb_type) {
+    if (NB_LIKELY(src_is_nb_type)) {
         type_data *t = nb_type_data(src_type);
         cpp_type_src = t->type;
 
@@ -972,7 +969,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         bool valid = cpp_type == cpp_type_src || *cpp_type == *cpp_type_src;
 
         // If not, look up the Python type and check the inheritance chain
-        if (!valid) {
+        if (NB_UNLIKELY(!valid)) {
             auto it = type_c2p.find(std::type_index(*cpp_type));
             if (it != type_c2p.end()) {
                 dst_type = it->second;
@@ -981,15 +978,14 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         }
 
         // Success, return the pointer if the instance is correctly initialized
-        if (valid) {
+        if (NB_LIKELY(valid)) {
             nb_inst *inst = (nb_inst *) src;
 
-            if (((flags & (uint8_t) cast_flags::construct) != 0) == inst->ready) {
+            if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) != 0) == inst->ready)) {
                 PyErr_WarnFormat(
                     PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
                     inst->ready
-                        ? "attempted to initialize an already-initialized "
-                          "instance"
+                        ? "attempted to initialize an already-initialized instance"
                         : "attempted to access an uninitialized instance",
                     t->name);
                 return false;

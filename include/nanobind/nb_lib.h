@@ -50,6 +50,9 @@ public:
     /// Decrease the reference count of all appended objects
     void release() noexcept;
 
+    /// Does the list contain any entries?
+    inline bool used() { return m_size != 1; }
+
 protected:
     /// Out of memory, expand..
     void expand() noexcept;

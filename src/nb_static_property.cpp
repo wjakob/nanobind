@@ -23,37 +23,25 @@ PyTypeObject *nb_static_property_tp() noexcept {
     PyTypeObject *tp = internals->nb_static_property;
 
     if (NB_UNLIKELY(!tp)) {
-        PyType_Slot members;
+        PyMemberDef *members;
 
-        #if PY_VERSION_HEX >= 0x030C0000
-            int basicsize = - (int) sizeof(PyObject *),
-                itemsize = 0;
-
-            // See https://github.com/python/cpython/issues/98963
-            PyMemberDef members_def[] = {
-                { "__doc__", T_OBJECT, 0, Py_RELATIVE_OFFSET, nullptr },
-                { nullptr, 0, 0, 0, nullptr }
-            };
-
-            members = { Py_tp_members, members_def };
+        #if defined(Py_LIMITED_API)
+            members = (PyMemberDef *) PyType_GetSlot(&PyProperty_Type, Py_tp_members);
         #else
-            int basicsize = (int) PyProperty_Type.tp_basicsize,
-                itemsize = (int) PyProperty_Type.tp_itemsize;
-
-            members = { Py_tp_members, PyProperty_Type.tp_members };
+            members = PyProperty_Type.tp_members;
         #endif
 
         PyType_Slot slots[] = {
             { Py_tp_base, &PyProperty_Type },
             { Py_tp_descr_get, (void *) nb_static_property_descr_get },
-            members,
+            { Py_tp_members, members },
             { 0, nullptr }
         };
 
         PyType_Spec spec = {
             /* .name = */ "nanobind.nb_static_property",
-            /* .basicsize = */ basicsize,
-            /* .itemsize = */ itemsize,
+            /* .basicsize = */ 0,
+            /* .itemsize = */ 0,
             /* .flags = */ Py_TPFLAGS_DEFAULT,
             /* .slots = */ slots
         };

@@ -277,7 +277,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
 bool ndarray_check(PyObject *o) noexcept {
     PyTypeObject *tp = Py_TYPE(o);
 
-    PyObject *name = nb_type_name(tp);
+    PyObject *name = nb_type_name((PyObject *) tp);
     check(name, "Could not obtain type name! (1)");
 
     const char *tp_name = PyUnicode_AsUTF8AndSize(name, nullptr);

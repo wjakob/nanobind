@@ -276,6 +276,9 @@ NB_CORE size_t nb_type_size(PyObject *t) noexcept;
 /// Return the alignment of the type wrapped by the given nanobind type object
 NB_CORE size_t nb_type_align(PyObject *t) noexcept;
 
+/// Return a unicode string representing the long-form name of the given type
+NB_CORE PyObject *nb_type_name(PyObject *t) noexcept;
+
 /// Return the C++ type_info wrapped by the given nanobind type object
 NB_CORE const std::type_info *nb_type_info(PyObject *t) noexcept;
 

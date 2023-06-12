@@ -338,7 +338,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     *t = *t_b;
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
-    PyObject *name = nb_type_name((PyTypeObject *) self);
+    PyObject *name = nb_type_name(self);
     t->name = NB_STRDUP(PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
     t->type_py = (PyTypeObject *) self;
@@ -1607,15 +1607,15 @@ type_data *nb_type_data_static(PyTypeObject *o) noexcept {
 }
 #endif
 
-PyObject *nb_type_name(PyTypeObject *tp) noexcept {
+PyObject *nb_type_name(PyObject *t) noexcept {
 #if PY_VERSION_HEX >= 0x030B0000
-    PyObject *result = PyType_GetName(tp);
+    PyObject *result = PyType_GetName((PyTypeObject *) t);
 #else
-    PyObject *result = PyObject_GetAttrString((PyObject *) tp, "__name__");
+    PyObject *result = PyObject_GetAttrString(t, "__name__");
 #endif
 
-    if (PyType_HasFeature(tp, Py_TPFLAGS_HEAPTYPE)) {
-        PyObject *mod = PyObject_GetAttrString((PyObject *) tp, "__module__");
+    if (PyType_HasFeature((PyTypeObject *) t, Py_TPFLAGS_HEAPTYPE)) {
+        PyObject *mod = PyObject_GetAttrString(t, "__module__");
         PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);
         Py_DECREF(mod);
         Py_DECREF(result);

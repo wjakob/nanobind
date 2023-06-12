@@ -2066,6 +2066,10 @@ Type objects
    incorrect supplement type may crash the interpreter.
    See :cpp:class:`supplement`.
 
+.. cpp:function:: str type_name(handle h)
+
+   Return the full (module-qualified) name of a type object as a Python string.
+
 Instances
 ^^^^^^^^^
 

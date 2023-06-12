@@ -363,10 +363,8 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     const uint32_t count = (uint32_t) Py_SIZE(self);
     func_data *f = nb_func_data(self);
 
-    if (f->flags & (uint32_t) func_flags::is_operator) {
-        Py_INCREF(Py_NotImplemented);
-        return Py_NotImplemented;
-    }
+    if (f->flags & (uint32_t) func_flags::is_operator)
+        return not_implemented().release().ptr();
 
     buf.clear();
     buf.put_dstr(f->name);

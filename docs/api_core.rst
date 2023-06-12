@@ -960,7 +960,15 @@ Wrapper classes
 
    .. cpp:function:: ellipsis()
 
-      Create a wrapper referencing the unique Python `Ellipsis` object.
+      Create a wrapper referencing the unique Python ``Ellipsis`` object.
+
+.. cpp:class:: not_implemented: public object
+
+   Wrapper class representing a Python ``NotImplemented`` object.
+
+   .. cpp:function:: not_implemented()
+
+      Create a wrapper referencing the unique Python ``NotImplemented`` object.
 
 .. cpp:class:: callable: public object
 

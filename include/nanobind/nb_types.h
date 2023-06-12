@@ -566,6 +566,14 @@ public:
     ellipsis() : object(Py_Ellipsis, detail::borrow_t()) {}
 };
 
+class not_implemented : public object {
+    static bool is_not_implemented(PyObject *obj) { return obj == Py_NotImplemented; }
+
+public:
+    NB_OBJECT(not_implemented, object, "NotImplementedType", is_not_implemented)
+    not_implemented() : object(Py_NotImplemented, detail::borrow_t()) {}
+};
+
 class callable : public object {
 public:
     NB_OBJECT(callable, object, "Callable[..., object]", PyCallable_Check)

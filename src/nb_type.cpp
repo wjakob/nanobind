@@ -201,13 +201,13 @@ static void inst_dealloc(PyObject *self) {
     }
 
     if (inst->cpp_delete) {
-        if (t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__)
+        if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
             operator delete(p);
         else
             operator delete(p, std::align_val_t(t->align));
     }
 
-    if (inst->clear_keep_alive) {
+    if (NB_UNLIKELY(inst->clear_keep_alive)) {
         nb_ptr_map &keep_alive = internals->keep_alive;
         nb_ptr_map::iterator it = keep_alive.find(self);
         check(it != keep_alive.end(),
@@ -1607,20 +1607,22 @@ type_data *nb_type_data_static(PyTypeObject *o) noexcept {
 }
 #endif
 
-/// Fetch the name of an instance as 'char *' (must be deallocated using 'free'!)
 PyObject *nb_type_name(PyTypeObject *tp) noexcept {
-    PyObject *name = PyObject_GetAttrString((PyObject *) tp, "__name__");
+#if PY_VERSION_HEX >= 0x030B0000
+    PyObject *result = PyType_GetName(tp);
+#else
+    PyObject *result = PyObject_GetAttrString((PyObject *) tp, "__name__");
+#endif
 
     if (PyType_HasFeature(tp, Py_TPFLAGS_HEAPTYPE)) {
-        PyObject *mod      = PyObject_GetAttrString((PyObject *) tp, "__module__"),
-                 *combined = PyUnicode_FromFormat("%U.%U", mod, name);
-
+        PyObject *mod = PyObject_GetAttrString((PyObject *) tp, "__module__");
+        PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);
         Py_DECREF(mod);
-        Py_DECREF(name);
-        name = combined;
+        Py_DECREF(result);
+        result = combined;
     }
 
-    return name;
+    return result;
 }
 
 bool nb_inst_python_derived(PyObject *o) noexcept {

@@ -417,8 +417,13 @@ include directive:
 
    #include <nanobind/ndarray.h>
 
-Detailed documentation including example code is provided
-in a :ref:`separate section <ndarrays>`.
+Detailed documentation including example code is provided in a :ref:`separate
+section <ndarrays>`.
+
+.. cpp:function:: bool ndarray_check(handle h) noexcept
+
+   Test whether the Python object represents an ndarray. Currently, the
+   function considers NumPy, PyTorch, TensorFlow, and XLA arrays.
 
 .. cpp:class:: template <typename... Args> ndarray
 

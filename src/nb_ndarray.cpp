@@ -274,6 +274,30 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     });
 }
 
+bool ndarray_check(PyObject *o) noexcept {
+    PyTypeObject *tp = Py_TYPE(o);
+
+    PyObject *name = nb_type_name(tp);
+    check(name, "Could not obtain type name! (1)");
+
+    const char *tp_name = PyUnicode_AsUTF8AndSize(name, nullptr);
+    check(tp_name, "Could not obtain type name! (2)");
+
+    bool result =
+        // NumPy
+        strcmp(tp_name, "ndarray") == 0 ||
+        // PyTorch
+        strcmp(tp_name, "torch.Tensor") == 0 ||
+        // XLA
+        strcmp(tp_name, "jaxlib.xla_extension.ArrayImpl") == 0 ||
+        // Tensorflow
+        strcmp(tp_name, "tensorflow.python.framework.ops.EagerTensor") == 0;
+
+    Py_DECREF(name);
+    return result;
+}
+
+
 ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
                                bool convert) noexcept {
     object capsule;

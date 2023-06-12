@@ -376,6 +376,8 @@ private:
     dlpack::dltensor m_dltensor;
 };
 
+inline bool ndarray_check(handle h) { return detail::ndarray_check(h.ptr()); }
+
 NAMESPACE_BEGIN(detail)
 
 template <typename... Args> struct type_caster<ndarray<Args...>> {

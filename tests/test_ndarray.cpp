@@ -190,4 +190,6 @@ NB_MODULE(test_ndarray_ext, m) {
 
     m.def("accept_rw", [](nb::ndarray<float, nb::shape<2>> a) { return a(0); });
     m.def("accept_ro", [](nb::ndarray<const float, nb::shape<2>> a) { return a(0); });
+
+    m.def("check", [](nb::handle h) { return nb::ndarray_check(h); });
 }

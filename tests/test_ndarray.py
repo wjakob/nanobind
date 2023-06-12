@@ -443,3 +443,19 @@ def test22_return_ro():
     with pytest.raises(ValueError) as excinfo:
         x[0,0] =1
     assert 'read-only' in str(excinfo.value)
+
+@needs_numpy
+def test23_check_numpy():
+    assert t.check(np.zeros(1))
+
+@needs_torch
+def test24_check_torch():
+    assert t.check(torch.zeros((1)))
+
+@needs_tensorflow
+def test25_check_tensorflow():
+    assert t.check(tf.zeros((1)))
+
+@needs_jax
+def test26_check_jax():
+    assert t.check(jnp.zeros((1)))

@@ -410,6 +410,9 @@ NB_CORE void ndarray_dec_ref(ndarray_handle *) noexcept;
 NB_CORE PyObject *ndarray_wrap(ndarray_handle *, int framework,
                                rv_policy policy) noexcept;
 
+/// Check if an object is a known ndarray type (NumPy, PyTorch, Tensorflow, JAX)
+NB_CORE bool ndarray_check(PyObject *o) noexcept;
+
 // ========================================================================
 
 /// Print to stdout using Python

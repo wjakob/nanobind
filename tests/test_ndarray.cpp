@@ -11,7 +11,7 @@ int destruct_count = 0;
 static const float f_const[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 
 NB_MODULE(test_ndarray_ext, m) {
-    m.def("get_shape", [](const nb::ndarray<> &t) {
+    m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
         nb::list l;
         for (size_t i = 0; i < t.ndim(); ++i)
             l.append(t.shape(i));

@@ -77,6 +77,7 @@ struct numpy { };
 struct tensorflow { };
 struct pytorch { };
 struct jax { };
+struct ro { };
 
 NAMESPACE_BEGIN(detail)
 
@@ -171,7 +172,17 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_same_v<std::remo
     static void apply(ndarray_req &tr) {
         tr.dtype = dtype<T>();
         tr.req_dtype = true;
-        tr.req_ro = std::is_const_v<T>;
+        tr.req_ro |= std::is_const_v<T>;
+    }
+};
+
+template<> struct ndarray_arg<ro> {
+    static constexpr size_t size = 0;
+
+    static constexpr auto name = const_name("writable=False");
+
+    static void apply(ndarray_req &tr) {
+        tr.req_ro = true;
     }
 };
 

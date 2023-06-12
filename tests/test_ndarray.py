@@ -68,7 +68,7 @@ def test01_metadata():
 
 
 def test02_docstr():
-    assert t.get_shape.__doc__ == "get_shape(array: ndarray[]) -> list"
+    assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False]) -> list"
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
     assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
     assert t.pass_bool.__doc__ == "pass_bool(array: ndarray[dtype=bool]) -> None"

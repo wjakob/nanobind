@@ -24,16 +24,10 @@ struct ndarray_handle {
 };
 
 static void nb_ndarray_dealloc(PyObject *self) {
+    PyTypeObject *tp = Py_TYPE(self);
     ndarray_dec_ref(((nb_ndarray *) self)->th);
-
-    freefunc tp_free;
-#if defined(Py_LIMITED_API)
-    tp_free = (freefunc) PyType_GetSlot(Py_TYPE(self), Py_tp_free);
-#else
-    tp_free = Py_TYPE(self)->tp_free;
-#endif
-
-    tp_free(self);
+    PyObject_Free(self);
+    Py_DECREF(tp);
 }
 
 static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
@@ -626,12 +620,13 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
 
     if ((ndarray_framework) framework == ndarray_framework::numpy) {
         try {
-            object o = steal(PyType_GenericAlloc(nd_ndarray_tp(), 0));
-            if (!o.is_valid())
+            nb_ndarray *h = PyObject_New(nb_ndarray, nd_ndarray_tp());
+            if (!h)
                 return nullptr;
-            ((nb_ndarray *) o.ptr())->th = th;
+            h->th = th;
             ndarray_inc_ref(th);
 
+            object o = steal((PyObject *) h);
             return module_::import_("numpy")
                 .attr("array")(o, arg("copy") = copy)
                 .release()

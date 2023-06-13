@@ -382,8 +382,8 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
 
 template <typename T>
 object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
-    handle h = detail::make_caster<T>::from_cpp(
-        (detail::forward_t<T>) value, detail::infer_policy<T>(policy), nullptr);
+    handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
+                                                policy, nullptr);
     if (!h.is_valid())
         detail::raise_cast_error();
     return steal(h);
@@ -401,9 +401,9 @@ tuple make_tuple(Args &&...args) {
     PyObject *o = result.ptr();
 
     (NB_TUPLE_SET_ITEM(o, nargs++,
-                      detail::make_caster<Args>::from_cpp(
-                          (detail::forward_t<Args>) args,
-                          detail::infer_policy<Args>(policy), nullptr).ptr()),
+                       detail::make_caster<Args>::from_cpp(
+                           (detail::forward_t<Args>) args, policy, nullptr)
+                           .ptr()),
      ...);
 
     detail::tuple_check(o, sizeof...(Args));

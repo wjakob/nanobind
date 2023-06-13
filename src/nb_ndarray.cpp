@@ -607,15 +607,53 @@ static void ndarray_capsule_destructor(PyObject *o) {
 }
 
 PyObject *ndarray_wrap(ndarray_handle *th, int framework,
-                       rv_policy policy) noexcept {
+                       rv_policy policy, cleanup_list *cleanup) noexcept {
     if (!th)
         return none().release().ptr();
 
-    bool copy = policy == rv_policy::copy || policy == rv_policy::move;
+    bool copy;
+    switch (policy) {
+        case rv_policy::reference_internal:
+            if (cleanup->self() != th->owner) {
+                if (th->owner) {
+                    PyErr_SetString(PyExc_RuntimeError,
+                                    "nanobind::detail::ndarray_wrap(): "
+                                    "reference_internal policy cannot be "
+                                    "applied (ndarray already has an owner)");
+                    return nullptr;
+                } else {
+                    th->owner = cleanup->self();
+                    Py_INCREF(th->owner);
+                }
+            }
+            [[fallthrough]];
 
-    if (th->self && !copy) {
-        Py_INCREF(th->self);
-        return th->self;
+        case rv_policy::automatic:
+            copy = th->owner == nullptr && th->self == nullptr;
+            break;
+
+        case rv_policy::copy:
+            copy = true;
+            break;
+
+        case rv_policy::move:
+            PyErr_SetString(PyExc_RuntimeError,
+                            "nanobind::detail::ndarray_wrap(): rv_policy::move "
+                            "is not supported!");
+            return nullptr;
+
+        default:
+            copy = false;
+            break;
+    }
+
+    if (!copy) {
+        if (th->self) {
+            Py_INCREF(th->self);
+            return th->self;
+        } else if (policy == rv_policy::none) {
+            return nullptr;
+        }
     }
 
     if ((ndarray_framework) framework == ndarray_framework::numpy) {
@@ -670,10 +708,15 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
         return nullptr;
     }
 
-    object o = steal(PyCapsule_New(th->ndarray, "dltensor",
-                                   ndarray_capsule_destructor));
+    object o;
+    if (copy && (ndarray_framework) framework == ndarray_framework::none && th->self) {
+        o = borrow(th->self);
+    } else {
+        o = steal(PyCapsule_New(th->ndarray, "dltensor",
+                                       ndarray_capsule_destructor));
+        ndarray_inc_ref(th);
+    }
 
-       ndarray_inc_ref(th);
 
     if (package.is_valid()) {
         try {

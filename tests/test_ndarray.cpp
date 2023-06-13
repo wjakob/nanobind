@@ -8,7 +8,7 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 int destruct_count = 0;
-static const float f_const[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+static float f_global[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 
 NB_MODULE(test_ndarray_ext, m) {
     m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
@@ -134,7 +134,9 @@ NB_MODULE(test_ndarray_ext, m) {
 
         return nb::ndarray<float, nb::shape<2, 4>>(f, 2, shape, deleter);
     });
-    m.def("passthrough", [](nb::ndarray<> a) { return a; });
+
+    m.def("passthrough", [](nb::ndarray<> a) { return a; }, nb::rv_policy::none);
+    m.def("passthrough_copy", [](nb::ndarray<> a) { return a; }, nb::rv_policy::copy);
 
     m.def("ret_numpy", []() {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
@@ -146,12 +148,16 @@ NB_MODULE(test_ndarray_ext, m) {
         });
 
         return nb::ndarray<nb::numpy, float, nb::shape<2, 4>>(f, 2, shape,
-                                                             deleter);
+                                                              deleter);
     });
 
-    m.def("ret_numpy_const", []() {
+    m.def("ret_numpy_const_ref", []() {
         size_t shape[2] = { 2, 4 };
-        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_const, 2, shape);
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, 2, shape);
+    }, nb::rv_policy::reference);
+
+    m.def("ret_numpy_const", []() {
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, { 2, 4 });
     });
 
     m.def("ret_pytorch", []() {
@@ -164,7 +170,7 @@ NB_MODULE(test_ndarray_ext, m) {
         });
 
         return nb::ndarray<nb::pytorch, float, nb::shape<2, 4>>(f, 2, shape,
-                                                               deleter);
+                                                                deleter);
     });
 
     m.def("ret_array_scalar", []() {
@@ -192,4 +198,25 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("accept_ro", [](nb::ndarray<const float, nb::shape<2>> a) { return a(0); });
 
     m.def("check", [](nb::handle h) { return nb::ndarray_check(h); });
+
+
+    struct Cls {
+        auto f1() { return nb::ndarray<nb::numpy, float>(data, { 10 }); }
+        auto f2() { return nb::ndarray<nb::numpy, float>(data, { 10 }, nb::cast(this, nb::rv_policy::none)); }
+        auto f3(nb::handle owner) { return nb::ndarray<nb::numpy, float>(data, { 10 }, owner); }
+
+        ~Cls() {
+           destruct_count++;
+        }
+
+        float data [10] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    };
+
+    nb::class_<Cls>(m, "Cls")
+        .def(nb::init<>())
+        .def("f1", &Cls::f1)
+        .def("f2", &Cls::f2)
+        .def("f1_ri", &Cls::f1, nb::rv_policy::reference_internal)
+        .def("f2_ri", &Cls::f2, nb::rv_policy::reference_internal)
+        .def("f3_ri", &Cls::f3, nb::rv_policy::reference_internal);
 }

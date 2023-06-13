@@ -301,31 +301,9 @@ def test14_consume_numpy():
 
 @needs_numpy
 def test15_passthrough():
-    collect()
-    class wrapper:
-        def __init__(self, value):
-            self.value = value
-        def __dlpack__(self):
-            return self.value
-    dc = t.destruct_count()
-    a = t.return_dlpack()
+    a = t.ret_numpy()
     b = t.passthrough(a)
-    if hasattr(np, '_from_dlpack'):
-        y = np._from_dlpack(wrapper(b))
-    elif hasattr(np, 'from_dlpack'):
-        y = np.from_dlpack(wrapper(b))
-    else:
-        pytest.skip('your version of numpy is too old')
-
-    del a
-    del b
-    collect()
-    assert dc == t.destruct_count()
-    assert y.shape == (2, 4)
-    assert np.all(y == [[1, 2, 3, 4], [5, 6, 7, 8]])
-    del y
-    collect()
-    assert t.destruct_count() - dc == 1
+    assert a is b
 
     a = np.array([1,2,3])
     b = t.passthrough(a)
@@ -436,7 +414,7 @@ def test22_ro_array():
 
 @needs_numpy
 def test22_return_ro():
-    x = t.ret_numpy_const()
+    x = t.ret_numpy_const_ref()
     assert t.ret_numpy_const.__doc__  == 'ret_numpy_const() -> numpy.ndarray[dtype=float32, writable=False, shape=(2, 4)]'
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
@@ -459,3 +437,106 @@ def test25_check_tensorflow():
 @needs_jax
 def test26_check_jax():
     assert t.check(jnp.zeros((1)))
+
+@needs_numpy
+def test27_rv_policy():
+    def p(a):
+        return a.__array_interface__['data']
+
+    x1 = t.ret_numpy_const_ref()
+    x2 = t.ret_numpy_const_ref()
+    y1 = t.ret_numpy_const()
+    y2 = t.ret_numpy_const()
+
+    z1 = t.passthrough(y1)
+    z2 = t.passthrough(y2)
+    q1 = t.passthrough_copy(y1)
+    q2 = t.passthrough_copy(y2)
+
+    assert p(x1) == p(x2)
+    assert p(y1) != p(y2)
+
+    assert z1 is y1
+    assert z2 is y2
+    assert q1 is not y1
+    assert q2 is not y2
+    assert p(q1) != p(y1)
+    assert p(q2) != p(y2)
+
+@needs_numpy
+def test28_reference_internal():
+    collect()
+    dc = t.destruct_count()
+    c = t.Cls()
+
+    v1_a = c.f1()
+    v1_b = c.f1()
+    v2_a = c.f2()
+    v2_b = c.f2()
+    del c
+
+    assert np.all(v1_a == np.arange(10, dtype=np.float32))
+    assert np.all(v1_b == np.arange(10, dtype=np.float32))
+
+    v1_a += 1
+    v1_b += 2
+
+    assert np.all(v1_a == np.arange(10, dtype=np.float32) + 1)
+    assert np.all(v1_b == np.arange(10, dtype=np.float32) + 2)
+    del v1_a
+    del v1_b
+
+    assert np.all(v2_a == np.arange(10, dtype=np.float32))
+    assert np.all(v2_b == np.arange(10, dtype=np.float32))
+
+    v2_a += 1
+    v2_b += 2
+
+    assert np.all(v2_a == np.arange(10, dtype=np.float32) + 3)
+    assert np.all(v2_b == np.arange(10, dtype=np.float32) + 3)
+
+    del v2_a
+    collect()
+    assert t.destruct_count() == dc
+
+    del v2_b
+    collect()
+    dc += 1
+    assert t.destruct_count() == dc
+
+    for i in range(2):
+        c2 = t.Cls()
+
+        if i == 0:
+            v3_a = c2.f1_ri()
+            v3_b = c2.f1_ri()
+        else:
+            v3_a = c2.f2_ri()
+            v3_b = c2.f2_ri()
+        del c2
+
+        assert np.all(v3_a == np.arange(10, dtype=np.float32))
+        assert np.all(v3_b == np.arange(10, dtype=np.float32))
+
+        v3_a += 1
+        v3_b += 2
+
+        assert np.all(v3_a == np.arange(10, dtype=np.float32) + 3)
+        assert np.all(v3_b == np.arange(10, dtype=np.float32) + 3)
+        del v3_a
+
+        collect()
+        assert t.destruct_count() == dc
+
+        del v3_b
+        collect()
+        dc += 1
+        assert t.destruct_count() == dc
+
+    c3 = t.Cls()
+    c3_t = (c3,)
+    with pytest.raises(RuntimeError) as excinfo:
+        c3.f3_ri(c3_t)
+
+    msg = 'nanobind::detail::ndarray_wrap(): reference_internal policy cannot be applied (ndarray already has an owner)'
+    assert msg in str(excinfo.value)

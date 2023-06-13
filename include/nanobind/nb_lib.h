@@ -411,7 +411,7 @@ NB_CORE void ndarray_dec_ref(ndarray_handle *) noexcept;
 
 /// Wrap a ndarray_handle* into a PyCapsule
 NB_CORE PyObject *ndarray_wrap(ndarray_handle *, int framework,
-                               rv_policy policy) noexcept;
+                               rv_policy policy, cleanup_list *cleanup) noexcept;
 
 /// Check if an object is a known ndarray type (NumPy, PyTorch, Tensorflow, JAX)
 NB_CORE bool ndarray_check(PyObject *o) noexcept;

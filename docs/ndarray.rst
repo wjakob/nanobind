@@ -329,6 +329,32 @@ when all of them have expired:
        );
    });
 
+Return value policies
+---------------------
+
+Function bindings that return ndarrays admit additional return value policy
+annotations to determine whether or not a copy should be made. They are
+interpreted as follows:
+
+- :cpp:enumerator:`rv_policy::automatic` causes the array to be copied when it
+  has no owner and when ti is not already associated with a Python object.
+
+- :cpp:enumerator:`rv_policy::automatic_reference` and
+  :cpp:enumerator:`rv_policy::reference`
+  ``automatic_reference`` and ``reference`` never copy.
+
+- :cpp:enumerator:`rv_policy::copy` always copies.
+
+- :cpp:enumerator:`rv_policy::none` refuses the cast unless the array is
+  already associated with an existing Python object (e.g. a NumPy array), in
+  which case that object is returned.
+
+- :cpp:enumerator:`rv_policy::reference_internal` retroactively sets the
+  ndarray's ``owner`` field to a method's ``self`` argument. It fails with an
+  error if there is already a different owner.
+
+- :cpp:enumerator:`rv_policy::move` is unsupported.
+
 Limitations
 -----------
 

@@ -458,7 +458,9 @@ section <ndarrays>`.
       Create an array wrapping an existing memory allocation. The following
       parameters can be specified:
 
-      - `value`: pointer address of the memory region.
+      - `value`: pointer address of the memory region. When the ndarray is
+        parameterized by a constant scalar type to indicate read-only access, a
+        const pointer must be passed instead.
 
       - `ndim`: the number of dimensions.
 
@@ -475,6 +477,13 @@ section <ndarrays>`.
 
       - The `device_type` and `device_id` indicate the device and address
         space associated with the pointer `value`.
+
+   .. cpp:function:: ndarray(void * value, const std::initializer_list<size_t> shape, handle owner = nanobind::handle(), std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+
+      Alternative form of the above constructor, which accepts the ``shape``
+      and ``strides`` arguments using a ``std::initializer_list``. It
+      automatically infers the value of ``ndim`` based on the size of
+      ``shape``.
 
    .. cpp:function:: dlpack::dtype dtype() const
 

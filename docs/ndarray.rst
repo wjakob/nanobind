@@ -263,6 +263,24 @@ a C-style ordering. Both ``strides`` and ``shape`` will be copied by the
 constructor, hence the targets of these pointers don’t need to remain
 valid following the call.
 
+An alternative form of the constructor takes ``std::initializer_list`` instead
+of shape/stride arrays for brace-initialization and infers ``ndim``:
+
+.. code-block:: cpp
+
+   ndarray(void *value,
+           std::initializer_list<size_t> shape,
+           handle owner = nb::handle(),
+           st::initializer_list<int64_t> strides = { },
+           dlpack::dtype dtype = nb::dtype<Scalar>(),
+           int32_t device_type = nb::device::cpu::value,
+           int32_t device_id = 0) { .. }
+
+If no ``strides`` parameter is provided, the implementation will assume
+a C-style ordering. Both ``strides`` and ``shape`` will be copied by the
+constructor, hence the targets of these pointers don’t need to remain
+valid following the call.
+
 The ``owner`` parameter can be used to keep another Python object alive
 while the ndarray data is referenced by a consumer. This mechanism can be
 used to implement a data destructor as follows:
@@ -272,14 +290,13 @@ used to implement a data destructor as follows:
    m.def("ret_pytorch", []() {
        // Dynamically allocate 'data'
        float *data = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
-       size_t shape[2] = { 2, 4 };
 
        // Delete 'data' when the 'owner' capsule expires
        nb::capsule owner(data, [](void *p) noexcept {
           delete[] (float *) p;
        });
 
-       return nb::ndarray<nb::pytorch, float>(data, 2, shape, owner);
+       return nb::ndarray<nb::pytorch, float>(data, { 2, 4 }, owner);
    });
 
 In other situations, it may be helpful to have the capsule manage the lifetime
@@ -303,12 +320,12 @@ when all of them have expired:
            delete (Temp *) p;
        });
 
-       size_t shape_1[1] = { temp->vec_1.size() };
-       size_t shape_2[1] = { temp->vec_2.size() };
+       size_t size_1 = temp->vec_1.size();
+       size_t size_2 = temp->vec_2.size();
 
        return std::make_pair(
-           nb::ndarray<nb::pytorch, float>(temp->vec_1.data(), 1, shape_1, deleter),
-           nb::ndarray<nb::pytorch, float>(temp->vec_2.data(), 1, shape_2, deleter)
+           nb::ndarray<nb::pytorch, float>(temp->vec_1.data(), { size_1 }, deleter),
+           nb::ndarray<nb::pytorch, float>(temp->vec_2.data(), { size_2 }, deleter)
        );
    });
 

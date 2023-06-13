@@ -13,6 +13,7 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
+#include <initializer_list>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
@@ -286,6 +287,20 @@ public:
             int32_t device_id = 0) {
         m_handle = detail::ndarray_create(
             (void *) value, ndim, shape, owner.ptr(), strides, &dtype,
+            std::is_const_v<Scalar>, device_type, device_id);
+        m_dltensor = *detail::ndarray_inc_ref(m_handle);
+    }
+
+    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> value,
+            std::initializer_list<size_t> shape,
+            handle owner = nanobind::handle(),
+            std::initializer_list<int64_t> strides = { },
+            dlpack::dtype dtype = nanobind::dtype<Scalar>(),
+            int32_t device_type = device::cpu::value,
+            int32_t device_id = 0) {
+        m_handle = detail::ndarray_create(
+            (void *) value, shape.size(), shape.begin(), owner.ptr(),
+            (strides.size() == 0) ? nullptr : strides.begin(), &dtype,
             std::is_const_v<Scalar>, device_type, device_id);
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }

@@ -423,7 +423,7 @@ detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
 }
 
 template <typename T> void list::append(T &&value) {
-    object o = nanobind::cast(value);
+    object o = nanobind::cast((detail::forward_t<T>) value);
     if (PyList_Append(m_ptr, o.ptr()))
         detail::raise_python_error();
 }

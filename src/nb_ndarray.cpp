@@ -611,12 +611,12 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
     if (!th)
         return none().release().ptr();
 
-    if (th->self) {
+    bool copy = policy == rv_policy::copy || policy == rv_policy::move;
+
+    if (th->self && !copy) {
         Py_INCREF(th->self);
         return th->self;
     }
-
-    bool copy = policy == rv_policy::copy || policy == rv_policy::move;
 
     if ((ndarray_framework) framework == ndarray_framework::numpy) {
         try {

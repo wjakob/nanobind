@@ -298,10 +298,15 @@ public:
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int32_t device_type = device::cpu::value,
             int32_t device_id = 0) {
+
+        if (strides.size() != 0 && strides.size() != shape.size())
+            detail::fail("ndarray(): shape and strides have incompatible size!");
+
         m_handle = detail::ndarray_create(
             (void *) value, shape.size(), shape.begin(), owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), &dtype,
             std::is_const_v<Scalar>, device_type, device_id);
+
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 

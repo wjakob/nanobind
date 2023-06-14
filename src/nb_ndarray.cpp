@@ -614,7 +614,7 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
     bool copy;
     switch (policy) {
         case rv_policy::reference_internal:
-            if (cleanup->self() != th->owner) {
+            if (cleanup && cleanup->self() != th->owner) {
                 if (th->owner) {
                     PyErr_SetString(PyExc_RuntimeError,
                                     "nanobind::detail::ndarray_wrap(): "
@@ -633,14 +633,9 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
             break;
 
         case rv_policy::copy:
+        case rv_policy::move:
             copy = true;
             break;
-
-        case rv_policy::move:
-            PyErr_SetString(PyExc_RuntimeError,
-                            "nanobind::detail::ndarray_wrap(): rv_policy::move "
-                            "is not supported!");
-            return nullptr;
 
         default:
             copy = false;

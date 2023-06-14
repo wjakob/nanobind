@@ -353,7 +353,8 @@ interpreted as follows:
   ndarray's ``owner`` field to a method's ``self`` argument. It fails with an
   error if there is already a different owner.
 
-- :cpp:enumerator:`rv_policy::move` is unsupported.
+- :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
+  :cpp:enumerator:`rv_policy::copy`.
 
 Limitations
 -----------

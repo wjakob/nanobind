@@ -2136,6 +2136,10 @@ Instances
 
    Copy-construct the contents of `src` into `dst` and mark `dst` as *ready*.
 
+.. cpp:function:: str inst_name(handle h)
+
+   Return the full (module-qualified) name of the instance's type object as a Python string.
+
 
 Global flags
 ------------

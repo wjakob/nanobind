@@ -280,9 +280,6 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
 }
 
 extern PyObject *nb_type_name(PyObject *o) noexcept;
-inline PyObject *nb_inst_name(PyObject *o) noexcept {
-        return nb_type_name((PyObject *) Py_TYPE(o));
-}
 
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);

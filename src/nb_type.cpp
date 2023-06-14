@@ -1625,6 +1625,10 @@ PyObject *nb_type_name(PyObject *t) noexcept {
     return result;
 }
 
+PyObject *nb_inst_name(PyObject *o) noexcept {
+        return nb_type_name((PyObject *) Py_TYPE(o));
+}
+
 bool nb_inst_python_derived(PyObject *o) noexcept {
     return nb_type_data(Py_TYPE(o))->flags &
            (uint32_t) type_flags::is_python_type;

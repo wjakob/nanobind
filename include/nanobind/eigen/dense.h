@@ -197,16 +197,15 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
             T *temp = new T(std::move(v));
             owner = capsule(temp, [](void *p) noexcept { delete (T *) p; });
             ptr = temp->data();
+            policy = rv_policy::reference;
         } else if (policy == rv_policy::reference_internal) {
             owner = borrow(cleanup->self());
+            policy = rv_policy::reference;
         }
-
-        rv_policy array_rv_policy =
-            policy == rv_policy::move ? rv_policy::reference : policy;
 
         object o = steal(NDArrayCaster::from_cpp(
             NDArray(ptr, ndim_v<T>, shape, owner, strides),
-            array_rv_policy, cleanup));
+            policy, cleanup));
 
         return o.release();
     }

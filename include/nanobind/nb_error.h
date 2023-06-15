@@ -10,11 +10,21 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// RAII wrapper that temporarily clears any Python error state
+#if PY_VERSION_HEX >= 0x030C0000
+struct error_scope {
+    error_scope() { value = PyErr_GetRaisedException(); }
+    ~error_scope() { PyErr_SetRaisedException(value); }
+private:
+    PyObject *value;
+};
+#else
 struct error_scope {
     error_scope() { PyErr_Fetch(&type, &value, &trace); }
     ~error_scope() { PyErr_Restore(type, value, trace); }
+private:
     PyObject *type, *value, *trace;
 };
+#endif
 
 /// Wraps a Python error state as a C++ exception
 class NB_EXPORT python_error : public std::exception {
@@ -25,7 +35,11 @@ public:
     NB_EXPORT_SHARED ~python_error() override;
 
     bool matches(handle exc) const noexcept {
+#if PY_VERSION_HEX < 0x030C0000
         return PyErr_GivenExceptionMatches(m_type, exc.ptr()) != 0;
+#else
+        return PyErr_GivenExceptionMatches(m_value, exc.ptr()) != 0;
+#endif
     }
 
     /// Move the error back into the Python domain. This may only be called
@@ -42,16 +56,28 @@ public:
         PyErr_WriteUnraisable(context.ptr());
     }
 
-    handle type() const { return m_type; }
     handle value() const { return m_value; }
-    handle trace() const { return m_trace; }
+
+#if PY_VERSION_HEX < 0x030C0000
+    handle type() const { return m_type; }
+    object traceback() const { return steal(m_traceback); }
+#else
+    handle type() const { return value().type(); }
+    object traceback() const { return steal(PyException_GetTraceback(m_value)); }
+#endif
+    [[deprecated]]
+    object trace() const { return traceback(); }
 
     NB_EXPORT_SHARED const char *what() const noexcept override;
 
 private:
+#if PY_VERSION_HEX < 0x030C0000
     mutable PyObject *m_type = nullptr;
     mutable PyObject *m_value = nullptr;
-    mutable PyObject *m_trace = nullptr;
+    mutable PyObject *m_traceback = nullptr;
+#else
+    mutable PyObject *m_value = nullptr;
+#endif
     mutable char *m_what = nullptr;
 };
 

@@ -132,6 +132,7 @@
 -U _PyErr_FormatV
 -U _PyErr_GetExcInfo
 -U _PyErr_GetHandledException
+-U _PyErr_GetRaisedException
 -U _PyErr_GivenExceptionMatches
 -U _PyErr_NewException
 -U _PyErr_NewExceptionWithDoc
@@ -161,6 +162,7 @@
 -U _PyErr_SetInterruptEx
 -U _PyErr_SetNone
 -U _PyErr_SetObject
+-U _PyErr_SetRaisedException
 -U _PyErr_SetString
 -U _PyErr_SyntaxLocation
 -U _PyErr_SyntaxLocationEx

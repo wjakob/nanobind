@@ -1095,7 +1095,7 @@ the reference section on :ref:`class binding <class_binding>`.
 
       Returns a handle to the exception value
 
-   .. cpp:function:: handle traceback() const
+   .. cpp:function:: object traceback() const
 
       Returns a handle to the exception's traceback object
 

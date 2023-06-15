@@ -8,6 +8,7 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <cstdarg>
 #include "buffer.h"
 #include "nb_internals.h"
 
@@ -248,4 +249,70 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
 }
 
 NAMESPACE_END(detail)
+
+static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
+#if PY_VERSION_HEX >= 0x030C0000
+    PyObject *value = PyErr_GetRaisedException();
+    check(value, "nanobind::detail::raise_from(): error status is not set!");
+#else
+    PyObject *tp = nullptr, *value = nullptr, *traceback = nullptr;
+
+    PyErr_Fetch(&tp, &value, &traceback);
+    check(tp, "nanobind::detail::raise_from(): error status is not set!");
+
+    PyErr_NormalizeException(&tp, &value, &traceback);
+    if (traceback) {
+        PyException_SetTraceback(value, traceback);
+        Py_DECREF(traceback);
+    }
+
+    Py_DECREF(tp);
+#endif
+
+#if !defined(PYPY_VERSION)
+    PyErr_FormatV(type.ptr(), fmt, args);
+#else
+    PyObject *exc_str = PyUnicode_FromFormatV(fmt, args);
+    check(exc_str, "nanobind::detail::raise_from(): PyUnicode_FromFormatV() failed!");
+    PyErr_SetObject(type.ptr(), exc_str);
+    Py_DECREF(exc_str);
+#endif
+
+    PyObject *value_2 = nullptr;
+#if PY_VERSION_HEX >= 0x030C0000
+    value_2 = PyErr_GetRaisedException();
+#else
+    PyErr_Fetch(&tp, &value_2, &traceback);
+    PyErr_NormalizeException(&tp, &value_2, &traceback);
+#endif
+
+    Py_INCREF(value);
+    PyException_SetCause(value_2, value); // steals
+    PyException_SetContext(value_2, value); // steals
+
+#if PY_VERSION_HEX >= 0x030C0000
+    PyErr_SetRaisedException(value_2);
+#else
+    PyErr_Restore(tp, value_2, traceback);
+#endif
+}
+
+void chain_error(handle type, const char *fmt, ...) noexcept {
+    va_list args;
+    va_start(args, fmt);
+    chain_error_v(type, fmt, args);
+    va_end(args);
+}
+
+void raise_from(python_error &e, handle type, const char *fmt, ...) {
+    e.restore();
+
+    va_list args;
+    va_start(args, fmt);
+    chain_error_v(type, fmt, args);
+    va_end(args);
+
+    detail::raise_python_error();
+}
+
 NAMESPACE_END(NB_NAMESPACE)

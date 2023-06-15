@@ -49,4 +49,14 @@ NB_MODULE(test_exception_ext, m) {
 
     nb::exception<MyError3>(m, "MyError3");
     m.def("raise_my_error_3", [] { throw MyError3(); });
+
+    m.def("raise_nested", [](nb::callable c) {
+            int arg = 123;
+            try {
+                c(arg);
+            } catch (nb::python_error &e) {
+                nb::raise_from(e, PyExc_RuntimeError, "Call with value %i failed", arg);
+            }
+        }
+    );
 }

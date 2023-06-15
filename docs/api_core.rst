@@ -1087,6 +1087,11 @@ the reference section on :ref:`class binding <class_binding>`.
       Example use case: handling a Python error that occurs in a C++
       destructor where you cannot raise a C++ exception.
 
+   .. cpp:function:: void discard_as_unraisable(const char * context) noexcept
+
+      Convenience wrapper around the above function, which takes a C-style
+      string for the ``context`` argument.
+
    .. cpp:function:: handle type() const
 
       Returns a handle to the exception type
@@ -1207,6 +1212,24 @@ the reference section on :ref:`class binding <class_binding>`.
    interface provided by :cpp:class:`exception` class. This function provides
    an escape hatch for more specialized use cases.
 
+.. cpp:function:: void chain_error(handle type, const char * fmt, ...) noexcept
+
+   Raise a Python error of type ``type`` using the format string ``fmt``
+   interpreted by ``PyErr_FormatV``.
+
+   This newly created error is chained on top of an already existing error
+   status that must be set before calling the function.
+
+.. cpp:function:: void raise_from(python_error &e, handle type, const char * fmt, ...)
+
+   Convenience wrapper around :cpp:func:`chain_error <chain_error>`. It takes
+   an existing Python error (e.g. caught in a ``catch`` block) and creates an
+   additional Python exception with the current error as cause. It then
+   re-raises :cpp:class:`python_error`. The argument ``fmt`` is a
+   ``printf``-style format string interpreted by ``PyErr_FormatV``.
+
+   Usage of this function is explained in the documentation section on
+   :ref:`exception chaining <exception_chaining>`.
 
 Casting
 -------

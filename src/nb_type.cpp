@@ -1000,7 +1000,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         if (NB_LIKELY(valid)) {
             nb_inst *inst = (nb_inst *) src;
 
-            if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) != 0) == inst->ready)) {
+            if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) != 0) == (bool) inst->ready)) {
                 PyErr_WarnFormat(
                     PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
                     inst->ready
@@ -1386,8 +1386,8 @@ static void nb_type_put_unique_finalize(PyObject *o,
     nb_inst *inst = (nb_inst *) o;
 
     if (cpp_delete) {
-        check(inst->ready == is_new && inst->destruct == is_new &&
-                  inst->cpp_delete == is_new,
+        check((bool) inst->ready == is_new && (bool) inst->destruct == is_new &&
+                  (bool) inst->cpp_delete == is_new,
               "nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
               "unexpected status flags! (ready=%i, destruct=%i, cpp_delete=%i)",
               type_name(cpp_type), cpp_delete, inst->ready, inst->destruct,

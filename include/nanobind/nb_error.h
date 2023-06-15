@@ -56,6 +56,11 @@ public:
         PyErr_WriteUnraisable(context.ptr());
     }
 
+    void discard_as_unraisable(const char *context) noexcept {
+        object context_s = steal(PyUnicode_FromString(context));
+        discard_as_unraisable(context_s);
+    }
+
     handle value() const { return m_value; }
 
 #if PY_VERSION_HEX < 0x030C0000
@@ -141,5 +146,8 @@ class exception : public object {
             }, m_ptr);
     }
 };
+
+NB_CORE void chain_error(handle type, const char *fmt, ...) noexcept;
+NB_CORE void raise_from(python_error &e, handle type, const char *fmt, ...);
 
 NAMESPACE_END(NB_NAMESPACE)

@@ -218,3 +218,74 @@ Alternately, to ignore the error, call `PyErr_Clear()
 <https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Clear>`__. Any
 Python error must be thrown or cleared, or nanobind will be left in an
 invalid state.
+
+.. _exception_chaining:
+
+Chaining exceptions ('raise from')
+----------------------------------
+
+Python has a mechanism for indicating that exceptions were caused by other
+exceptions:
+
+.. code-block:: py
+
+    try:
+        print(1 / 0)
+    except Exception as exc:
+        raise RuntimeError("could not divide by zero") from exc
+
+To do a similar thing in pybind11, you can use the :cpp:func:`nb::raise_from
+<raise_from>` function, which requires a :cpp:class:`nb::python_error
+<python_error>` and re-raises it with a chained exception object.
+
+.. code-block:: cpp
+
+    nb::callable f = ...;
+    int arg = 123;
+    try {
+        f(arg);
+    } catch (nb::python_error &e) {
+        nb::raise_from(e, PyExc_RuntimeError, "Could not call 'f' with %i", arg);
+    }
+
+The function is internally based on the Python function ``PyErr_FormatV`` and
+takes ``printf``-style arguments following the format descriptor.
+
+An even lower-level interface is available via :cpp:func:`nb::chain_error
+<chain_error>`.
+
+Handling unraisable exceptions
+------------------------------
+
+If a Python function invoked from a C++ destructor or any function marked
+``noexcept(true)`` (collectively, "noexcept functions") throws an exception, there
+is no way to propagate the exception, as such functions may not throw.
+Should they throw or fail to catch any exceptions in their call graph,
+the C++ runtime calls ``std::terminate()`` to abort immediately.
+
+Similarly, Python exceptions raised in a class's ``__del__`` method do not
+propagate, but are logged by Python as an unraisable error. In Python 3.8+, a
+`system hook is triggered
+<https://docs.python.org/3/library/sys.html#sys.unraisablehook>`_
+and an auditing event is logged.
+
+Any noexcept function should have a try-catch block that traps
+:cpp:class:`nb::python_error <python_error>` (or any other exception that can
+occur). A useful approach is to convert them to Python exceptions and then
+``discard_as_unraisable`` as shown below.
+
+.. code-block:: cpp
+
+    void nonthrowing_func() noexcept(true) {
+        try {
+            // ...
+        } catch (nb::python_error &e) {
+            // Discard the Python error using Python APIs, using the C++ magic
+            // variable __func__. Python already knows the type and value and of the
+            // exception object.
+            e.discard_as_unraisable(__func__);
+        } catch (const std::exception &e) {
+            // Log and discard C++ exceptions.
+            third_party::log(e);
+        }
+    }

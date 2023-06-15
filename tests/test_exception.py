@@ -93,3 +93,12 @@ def test19_raise_my_error_3():
     with pytest.raises(t.MyError3) as excinfo:
         assert t.raise_my_error_3()
     assert str(excinfo.value) == 'MyError3'
+
+def test20_nested():
+    def foo(arg):
+        return arg / 0
+    with pytest.raises(RuntimeError) as excinfo:
+        t.raise_nested(foo)
+    assert str(excinfo.value) == 'Call with value 123 failed'
+    assert str(excinfo.value.__cause__) == 'division by zero'
+

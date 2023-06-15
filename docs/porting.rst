@@ -327,7 +327,6 @@ Removed features include:
   pybind11, however.
 - ● Buffer protocol binding (``.def_buffer()``) was removed in favor of
   :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>`.
-- ● Nested exceptions are not supported.
 - ● Features to facilitate pickling and unpickling were removed.
 - ● Support for evaluating Python code strings was removed.
 

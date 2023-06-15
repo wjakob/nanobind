@@ -15,6 +15,34 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+
+Version 1.5.0 (TBA)
+-------------------
+
+* Support for exception chaining. (commit `041520
+  <https://github.com/wjakob/nanobind/commit/0415208e83885dba038516d86c2f4cca5f81df5f>`__).
+* The :cpp:func:`nb::list::append() <list::append>` method now performs perfect
+  forwarding. (commit `2219d0
+  <https://github.com/wjakob/nanobind/commit/2219d0b0fec5e6cc4fce96bc3dbad6bfa148a57d>`__).
+* Many improvements to the handling of return value policies in
+  :cpp:class:`nb::ndarray\<..\> <ndarray>` to avoid unnecessary copies. (commit `ffd22b
+  <https://github.com/wjakob/nanobind/commit/ffd22b069ba95a546baeca0bdb6711fb9059cad8>`__,
+  `a79575
+  <https://github.com/wjakob/nanobind/commit/a79575165134c72c0a26e46772290d0404eae7a3>`__,
+  and `6f0c3f
+  <https://github.com/wjakob/nanobind/commit/6f0c3feaf088e78c75f2abee90164f20446eba08>`__).
+* The :cpp:class:`nb::ndarray\<..\> <ndarray>` class now has an additional
+  convenience constructor that takes the shape and (optionally) strides using
+  ``std::initializer_list``. (commit `de1117
+  <https://github.com/wjakob/nanobind/commit/de111766b21fe893a41cd4614a346b0da251f7f2>`__).
+* Inference of ``automatic*`` return value policy was entirely moved to the
+  base C++ class type caster. (commit `1ff9df
+  <https://github.com/wjakob/nanobind/commit/1ff9df03fb56a16f56854b4cecd1f388f73d3b53>`__).
+* Switch to the new Python 3.12 error status API if available. (commit `36751c
+  <https://github.com/wjakob/nanobind/commit/36751cb05994a96a3801bf511c846a7bc68e2f09>`__).
+* Various minor fixes and improvements.
+* ABI version 10.
+
 Version 1.4.0 (June 8, 2023)
 ----------------------------
 

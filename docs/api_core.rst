@@ -1217,8 +1217,9 @@ the reference section on :ref:`class binding <class_binding>`.
    Raise a Python error of type ``type`` using the format string ``fmt``
    interpreted by ``PyErr_FormatV``.
 
-   This newly created error is chained on top of an already existing error
-   status that must be set before calling the function.
+   If a Python error state was already set prior to calling this method, then
+   the new error is *chained* on top of the existing one. Otherwise, the
+   function creates a new error without initializing its ``__cause__`` field.
 
 .. cpp:function:: void raise_from(python_error &e, handle type, const char * fmt, ...)
 

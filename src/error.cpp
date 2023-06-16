@@ -253,20 +253,21 @@ NAMESPACE_END(detail)
 static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
 #if PY_VERSION_HEX >= 0x030C0000
     PyObject *value = PyErr_GetRaisedException();
-    check(value, "nanobind::detail::raise_from(): error status is not set!");
 #else
     PyObject *tp = nullptr, *value = nullptr, *traceback = nullptr;
 
     PyErr_Fetch(&tp, &value, &traceback);
-    check(tp, "nanobind::detail::raise_from(): error status is not set!");
 
-    PyErr_NormalizeException(&tp, &value, &traceback);
-    if (traceback) {
-        PyException_SetTraceback(value, traceback);
-        Py_DECREF(traceback);
+    if (tp) {
+        PyErr_NormalizeException(&tp, &value, &traceback);
+        if (traceback) {
+            PyException_SetTraceback(value, traceback);
+            Py_DECREF(traceback);
+        }
+
+        Py_DECREF(tp);
+        tp = traceback = nullptr;
     }
-
-    Py_DECREF(tp);
 #endif
 
 #if !defined(PYPY_VERSION)
@@ -277,6 +278,9 @@ static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
     PyErr_SetObject(type.ptr(), exc_str);
     Py_DECREF(exc_str);
 #endif
+
+    if (!value)
+        return;
 
     PyObject *value_2 = nullptr;
 #if PY_VERSION_HEX >= 0x030C0000

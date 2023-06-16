@@ -148,6 +148,6 @@ class exception : public object {
 };
 
 NB_CORE void chain_error(handle type, const char *fmt, ...) noexcept;
-NB_CORE void raise_from(python_error &e, handle type, const char *fmt, ...);
+[[noreturn]] NB_CORE void raise_from(python_error &e, handle type, const char *fmt, ...);
 
 NAMESPACE_END(NB_NAMESPACE)

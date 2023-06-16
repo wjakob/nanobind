@@ -16,14 +16,15 @@ isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
 
-Version 1.5.0 (TBA)
--------------------
+Version 1.5.0 (Aug 7, 2023)
+---------------------------
 
-* Support for exception chaining. (commit `041520
-  <https://github.com/wjakob/nanobind/commit/0415208e83885dba038516d86c2f4cca5f81df5f>`__).
-* The :cpp:func:`nb::list::append() <list::append>` method now performs perfect
-  forwarding. (commit `2219d0
-  <https://github.com/wjakob/nanobind/commit/2219d0b0fec5e6cc4fce96bc3dbad6bfa148a57d>`__).
+* Support for creating :ref:`chained exceptions <exception_chaining>` via the
+  :cpp:func:`nb::raise_from() <chain_error>` and :cpp:func:`nb::chain_error()
+  <chain_error>` functions. (commits `041520
+  <https://github.com/wjakob/nanobind/commit/0415208e83885dba038516d86c2f4cca5f81df5f>`__
+  and `beb699
+  <https://github.com/wjakob/nanobind/commit/beb6999b7ce92ba5e3aaea60cd7f2acc9ba3cdc3>`__).
 * Many improvements to the handling of return value policies in
   :cpp:class:`nb::ndarray\<..\> <ndarray>` to avoid unnecessary copies. (commit `ffd22b
   <https://github.com/wjakob/nanobind/commit/ffd22b069ba95a546baeca0bdb6711fb9059cad8>`__,
@@ -35,6 +36,26 @@ Version 1.5.0 (TBA)
   convenience constructor that takes the shape and (optionally) strides using
   ``std::initializer_list``. (commit `de1117
   <https://github.com/wjakob/nanobind/commit/de111766b21fe893a41cd4614a346b0da251f7f2>`__).
+* Added a non-throwing function :cpp:func:`nb::try_cast() <try_cast>` as an
+  alternative to :cpp:func:`nb::cast() <cast>`. (commit `6ca852
+  <https://github.com/wjakob/nanobind/commit/6ca852cc881ee7cd35b674135030709a6b57b8f6>`__).
+* The ``nb::list`` and ``nb::tuple`` default constructors now construct an empty list/tuple instead
+  of an invalid null-initialized handle.
+  (commit `506185 <https://github.com/wjakob/nanobind/commit/506185dca821c9cc1268c33b4cc867ae20f0fc4b>`__)
+* New low-level interface for wrapping existing C++ instances via
+  :cpp:func:`nb::inst_take_ownership() <inst_take_ownership>`
+  :cpp:func:`nb::inst_reference() <inst_reference>`. Also added convenience
+  functions to replace the contents of an instance with that of another.
+  :cpp:func:`nb::inst_replace_copy() <inst_replace_copy>` along with
+  :cpp:func:`nb::inst_replace_move() <inst_replace_move>` (commit `1c462d
+  <https://github.com/wjakob/nanobind/commit/1c462d6e3a112e49686acf33c9cb6e34f996dd6b>`__).
+* Added a low-level abstraction around :cpp:func:`nb::type_get_slot()
+  <type_get_slot>` around ``PyType_GetSlot``, but with more consistent behavior
+  across Python versions. (commit `d555e9
+  https://github.com/wjakob/nanobind/commit/d555e9de1c45394f5be5d62dc999c603d651c8c4`__).
+* The :cpp:func:`nb::list::append() <list::append>` method now performs perfect
+  forwarding. (commit `2219d0
+  <https://github.com/wjakob/nanobind/commit/2219d0b0fec5e6cc4fce96bc3dbad6bfa148a57d>`__).
 * Inference of ``automatic*`` return value policy was entirely moved to the
   base C++ class type caster. (commit `1ff9df
   <https://github.com/wjakob/nanobind/commit/1ff9df03fb56a16f56854b4cecd1f388f73d3b53>`__).

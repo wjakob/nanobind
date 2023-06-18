@@ -440,7 +440,9 @@ public:
         return *this;
     }
 
-    template <typename Getter, typename Setter, typename... Extra>
+    template <
+        typename Getter, typename Setter, typename... Extra,
+        detail::enable_if_t<((!std::is_same_v<Extra, arg> && !std::is_same_v<Extra, arg_v>) && ...)> = 0>
     NB_INLINE class_ &def_prop_rw(const char *name_, Getter &&getter,
                                   Setter &&setter, const Extra &...extra) {
         object get_p, set_p;
@@ -459,6 +461,26 @@ public:
     }
 
     template <typename Getter, typename Setter, typename... Extra>
+    NB_INLINE class_ &def_prop_rw(const char *name_, Getter &&getter, Setter &&setter,
+                                  const arg &arg_, const Extra &...extra) {
+        object get_p, set_p;
+
+        if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
+            get_p = cpp_function((detail::forward_t<Getter>) getter,
+                                 scope(*this), is_method(),
+                                 rv_policy::reference_internal, extra...);
+
+        if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
+            set_p = cpp_function((detail::forward_t<Setter>) setter,
+                                 scope(*this), is_method(), arg_, extra...);
+
+        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr());
+        return *this;
+    }
+
+    template <
+        typename Getter, typename Setter, typename... Extra,
+        detail::enable_if_t<((!std::is_same_v<Extra, arg> && !std::is_same_v<Extra, arg_v>) && ...)> = 0>
     NB_INLINE class_ &def_prop_rw_static(const char *name_, Getter &&getter,
                                          Setter &&setter,
                                          const Extra &...extra) {
@@ -471,6 +493,24 @@ public:
         if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
             set_p = cpp_function((detail::forward_t<Setter>) setter,
                                  scope(*this), extra...);
+
+        detail::property_install_static(m_ptr, name_, get_p.ptr(), set_p.ptr());
+        return *this;
+    }
+
+    template <typename Getter, typename Setter, typename... Extra>
+    NB_INLINE class_ &def_prop_rw_static(const char *name_, Getter &&getter,
+                                         Setter &&setter,
+                                         const arg &arg_, const Extra &...extra) {
+        object get_p, set_p;
+
+        if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
+            get_p = cpp_function((detail::forward_t<Getter>) getter,
+                                 scope(*this), rv_policy::reference, extra...);
+
+        if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
+            set_p = cpp_function((detail::forward_t<Setter>) setter,
+                                 scope(*this), arg_, extra...);
 
         detail::property_install_static(m_ptr, name_, get_p.ptr(), set_p.ptr());
         return *this;

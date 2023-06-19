@@ -31,7 +31,7 @@ The high-level interface consists of just one CMake command:
 
    .. code-block:: cmake
 
-      nanobind_build_library(
+      nanobind_add_module(
         my_ext                   # Target name
         NB_STATIC STABLE_ABI LTO # Optional flags (see below)
         my_ext.h                 # Source code files below

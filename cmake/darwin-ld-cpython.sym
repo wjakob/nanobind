@@ -877,6 +877,7 @@
 -U __PyWeakref_CallableProxyType
 -U __PyWeakref_ProxyType
 -U __PyWeakref_RefType
+-U __Py_IsFinalizing
 -U __Py_BuildValue_SizeT
 -U __Py_CheckFunctionResult
 -U __Py_CheckRecursionLimit

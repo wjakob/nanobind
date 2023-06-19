@@ -359,6 +359,25 @@ class int_ : public object {
     }
 };
 
+class float_ : public object {
+    NB_OBJECT_DEFAULT(float_, object, "float", PyFloat_Check)
+
+    explicit float_(handle h)
+        : object(detail::float_from_obj(h.ptr()), detail::steal_t{}) { }
+
+    explicit float_(double value)
+        : object(PyFloat_FromDouble(value), detail::steal_t{}) {
+        if (!m_ptr)
+            detail::raise_python_error();
+    }
+
+#if !defined(Py_LIMITED_API)
+    explicit operator double() const { return PyFloat_AS_DOUBLE(m_ptr); }
+#else
+    explicit operator double() const { return PyFloat_AsDouble(m_ptr); }
+#endif
+};
+
 class str : public object {
     NB_OBJECT_DEFAULT(str, object, "str", PyUnicode_Check)
 

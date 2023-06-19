@@ -808,6 +808,24 @@ Wrapper classes
       Convert a Python integer into a C++ arithmetic type.
 
 
+.. cpp:class:: float_: public object
+
+   This wrapper class represents Python ``float`` instances.
+
+   .. cpp:function:: float_(handle h)
+
+      Performs an floating point cast within Python. This is equivalent to the
+      Python expression ``float(h)``.
+
+   .. cpp:function:: explicit float_(double value)
+
+      Convert an C++ double value into a Python float objecct
+
+   .. cpp:function:: explicit operator double() const
+
+      Convert a Python float object into a C++ double value
+
+
 .. cpp:class:: str: public object
 
    This wrapper class represents Python unicode ``str`` instances.

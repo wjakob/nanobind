@@ -519,6 +519,13 @@ PyObject *int_from_obj(PyObject *o) {
     return result;
 }
 
+PyObject *float_from_obj(PyObject *o) {
+    PyObject *result = PyNumber_Float(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
 // ========================================================================
 
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {

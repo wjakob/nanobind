@@ -119,8 +119,11 @@ NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
 
 // ========================================================================
 
-/// Convert a Python object into a Python integer
+/// Convert a Python object into a Python integer object
 NB_CORE PyObject *int_from_obj(PyObject *o);
+
+/// Convert a Python object into a Python floating point object
+NB_CORE PyObject *float_from_obj(PyObject *o);
 
 // ========================================================================
 

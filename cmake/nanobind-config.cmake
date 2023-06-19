@@ -247,7 +247,7 @@ function (nanobind_lto name)
     INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 endfunction()
 
-function (nanobind_compile_options)
+function (nanobind_compile_options name)
   if (MSVC)
     target_compile_options(${name} PRIVATE /bigobj /MP)
   endif()

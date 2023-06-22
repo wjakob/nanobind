@@ -63,8 +63,8 @@ template <typename T> struct intrusive_ptr {
 };
 
 struct type_slots {
-    type_slots (PyType_Slot *value) : value(value) { }
-    PyType_Slot *value;
+    type_slots (const PyType_Slot *value) : value(value) { }
+    const PyType_Slot *value;
 };
 
 struct type_slots_callback {

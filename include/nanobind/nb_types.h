@@ -413,7 +413,8 @@ class bytes : public object {
 };
 
 class tuple : public object {
-    NB_OBJECT_DEFAULT(tuple, object, "tuple", PyTuple_Check)
+    NB_OBJECT(tuple, object, "tuple", PyTuple_Check)
+    tuple() : object(PyTuple_New(0), detail::steal_t()) { }
     size_t size() const { return (size_t) NB_TUPLE_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;

@@ -131,7 +131,7 @@ const char *python_error::what() const noexcept {
 #if PY_VERSION_HEX < 0x030C0000
     PyErr_NormalizeException(&m_type, &m_value, &m_traceback);
     check(m_type,
-          "nanobind::python_error::what(): PyNormalize_Exception() failed!");
+          "nanobind::python_error::what(): PyErr_NormalizeException() failed!");
 
     if (m_traceback) {
         if (PyException_SetTraceback(m_value, m_traceback) < 0)

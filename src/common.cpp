@@ -179,7 +179,7 @@ fail:
 // ========================================================================
 
 size_t obj_len(PyObject *o) {
-    Py_ssize_t res = PyObject_Length(o);
+    Py_ssize_t res = PyObject_Size(o);
     if (res < 0)
         raise_python_error();
     return (size_t) res;

@@ -180,6 +180,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
          has_args       = f->flags & (uint32_t) func_flags::has_args,
          has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
          has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
+         has_doc        = f->flags & (uint32_t) func_flags::has_doc,
          is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
          is_method      = f->flags & (uint32_t) func_flags::is_method,
          return_ref     = f->flags & (uint32_t) func_flags::return_ref,
@@ -279,7 +280,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     func_data *fc = nb_func_data(func) + to_copy;
     memcpy(fc, f, sizeof(func_data_prelim<0>));
-
+    if (has_doc && fc->doc[0] == '\n')
+        fc->doc++;
 
     if (is_constructor)
         fc->flags |= (uint32_t) func_flags::is_constructor;

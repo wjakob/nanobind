@@ -348,6 +348,29 @@ struct type_caster : type_caster_base<Type> { };
 NAMESPACE_END(detail)
 
 template <typename T, typename Derived>
+bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept {
+    using Caster = detail::make_caster<T>;
+    using Output = typename Caster::template Cast<T>;
+
+    static_assert(!std::is_same_v<const char *, T>,
+                  "nanobind::try_cast(): cannot return a reference to a temporary.");
+
+    Caster caster;
+    if (caster.from_python(value.derived().ptr(),
+                           convert ? (uint8_t) detail::cast_flags::convert
+                                   : (uint8_t) 0, nullptr)) {
+        if constexpr (Caster::IsClass)
+            out = caster.operator Output();
+        else
+            out = std::move(caster.operator Output&&());
+
+        return true;
+    }
+
+    return false;
+}
+
+template <typename T, typename Derived>
 T cast(const detail::api<Derived> &value, bool convert = true) {
     if constexpr (std::is_same_v<T, void>) {
         return;

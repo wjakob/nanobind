@@ -488,4 +488,29 @@ NB_MODULE(test_classes_ext, m) {
     m.def("factory_2", []() { return (Base *) new AnotherSubclass(); });
 
     m.def("check_shared", [](Shared *) { });
+
+    m.def("try_cast_1", [](nb::handle h) {
+        Struct s;
+        bool rv = nb::try_cast<Struct>(h, s);
+        return std::make_pair(rv, std::move(s));
+    });
+
+    m.def("try_cast_2", [](nb::handle h) {
+        Struct s;
+        Struct &s2 = s;
+        bool rv = nb::try_cast<Struct &>(h, s2);
+        return std::make_pair(rv, std::move(s2));
+    });
+
+    m.def("try_cast_3", [](nb::handle h) {
+        Struct *sp = nullptr;
+        bool rv = nb::try_cast<Struct *>(h, sp);
+        return std::make_pair(rv, sp);
+    }, nb::rv_policy::none);
+
+    m.def("try_cast_4", [](nb::handle h) {
+        int i = 0;
+        bool rv = nb::try_cast<int>(h, i);
+        return std::make_pair(rv, i);
+    });
 }

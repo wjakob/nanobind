@@ -666,3 +666,47 @@ def test38_pickle(clean):
         unpickled=1,
         destructed=2
     )
+
+def test39_try_cast(clean):
+    s = t.Struct(123)
+
+    assert_stats(value_constructed=1)
+    t.reset()
+
+    rv, s2 = t.try_cast_1(s)
+    assert rv is True and s2 is not s and s.value() == 123 and s2.value() == 123
+    del s2
+    assert_stats(default_constructed=1, move_constructed=2, copy_assigned=1, destructed=3)
+    t.reset()
+
+    rv, s2 = t.try_cast_2(s)
+    assert rv is True and s2 is not s and s.value() == 123 and s2.value() == 123
+    del s2
+    assert_stats(default_constructed=1, move_constructed=2, copy_assigned=1, destructed=3)
+    t.reset()
+
+    rv, s2 = t.try_cast_3(s)
+    assert rv is True and s2 is s and s.value() == 123
+    del s2
+    assert_stats()
+    t.reset()
+
+    rv, s2 = t.try_cast_2(1)
+    assert rv is False
+    del s2
+    assert_stats(default_constructed=1, move_constructed=2, destructed=3)
+    t.reset()
+
+    rv, s2 = t.try_cast_3(1)
+    assert rv is False and s2 is None
+    del s2
+    assert_stats()
+    t.reset()
+
+    rv, s2 = t.try_cast_4(s)
+    assert rv is False and s2 == 0
+    rv, s2 = t.try_cast_4(123)
+    assert rv is True and s2 is 123
+    del s, s2
+
+    assert_stats(destructed=1)

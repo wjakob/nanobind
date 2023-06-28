@@ -1262,6 +1262,20 @@ Casting
    implementation may also attempt *implicit conversions* to perform the cast.
 
    The function raises a :cpp:type:`cast_error` when the conversion fails.
+   See :cpp:func:`try_cast()` for an alternative that never raises.
+
+.. cpp:function:: template <typename T, typename Derived> bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept
+
+   Convert the Python object `value` (typically a :cpp:class:`handle` or a
+   :cpp:class:`object` subclass) into a C++ object of type `T`, and store it
+   in the output parameter `out`.
+
+   When the `convert` argument is set to ``true`` (the default), the
+   implementation may also attempt *implicit conversions* to perform the cast.
+
+   The function returns `false` when the conversion fails. In this case, the
+   `out` parameter is left untouched. See :cpp:func:`cast()` for an alternative
+   that instead raises an exception in this case.
 
 .. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy = rv_policy::automatic_reference)
 

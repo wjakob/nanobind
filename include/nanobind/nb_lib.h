@@ -300,6 +300,9 @@ NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
 /// Allocate an instance of type 't'
 NB_CORE PyObject *nb_inst_alloc(PyTypeObject *t);
 
+/// Allocate an zero-initialized instance of type 't'
+NB_CORE PyObject *nb_inst_alloc_zero(PyTypeObject *t);
+
 /// Allocate an instance of type 't' referencing the existing 'ptr'
 NB_CORE PyObject *nb_inst_wrap(PyTypeObject *t, void *ptr);
 

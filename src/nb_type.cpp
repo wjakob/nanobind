@@ -1525,9 +1525,20 @@ void *nb_inst_ptr(PyObject *o) noexcept {
 
 void nb_inst_zero(PyObject *o) noexcept {
     nb_inst *nbi = (nb_inst *) o;
-    type_data *t = nb_type_data(Py_TYPE(o));
-    memset(inst_ptr(nbi), 0, t->size);
+    type_data *td = nb_type_data(Py_TYPE(o));
+    memset(inst_ptr(nbi), 0, td->size);
     nbi->ready = nbi->destruct = true;
+}
+
+PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
+    PyObject *result = inst_new_int(t);
+    if (!result)
+        raise_python_error();
+    nb_inst *nbi = (nb_inst *) result;
+    type_data *td = nb_type_data(t);
+    memset(inst_ptr(nbi), 0, td->size);
+    nbi->ready = nbi->destruct = true;
+    return result;
 }
 
 void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept {

@@ -247,6 +247,7 @@ inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) { return steal<str>(detail::nb_inst_name(h.ptr())); };
 inline object inst_alloc(handle h) { return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr())); }
+inline object inst_alloc_zero(handle h) { return steal(detail::nb_inst_alloc_zero((PyTypeObject *) h.ptr())); }
 inline object inst_wrap(handle h, void *p) { return steal(detail::nb_inst_wrap((PyTypeObject *) h.ptr(), p)); }
 inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
 inline void inst_set_state(handle h, bool ready, bool destruct) { detail::nb_inst_set_state(h.ptr(), ready, destruct); }

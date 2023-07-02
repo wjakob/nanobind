@@ -2154,6 +2154,13 @@ Instances
    Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
    allocate an uninitialized Python object of type `h` and return it.
 
+.. cpp:function:: object inst_alloc_zero(handle h)
+
+   Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
+   allocate a zero-initialized Python object of type `h` and return it. This
+   operation is equilvalent to calling :cpp:func:`inst_alloc` followed by
+   :cpp:func:`inst_zero`.
+
 .. cpp:function:: object inst_wrap(handle h, void * p)
 
    Assuming that `h` represents an instance of a type that was previously bound

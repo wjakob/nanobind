@@ -620,6 +620,15 @@ Wrapper classes
 
    Wrapper class representing Python ``tuple`` instances.
 
+   .. cpp:function:: tuple()
+
+      Create an empty tuple
+
+   .. cpp:function:: tuple(handle h)
+
+      Attempt to convert a given Python object into a tuple. Analogous to the
+      expression ``tuple(h)`` in Python.
+
    .. cpp:function:: size_t size() const
 
       Return the number of tuple elements.
@@ -647,6 +656,15 @@ Wrapper classes
 .. cpp:class:: list : public object
 
    Wrapper class representing Python ``list`` instances.
+
+   .. cpp:function:: list()
+
+      Create an empty list
+
+   .. cpp:function:: list(handle h)
+
+      Attempt to convert a given Python object into a list. Analogous to the
+      expression ``list(h)`` in Python.
 
    .. cpp:function:: size_t size() const
 

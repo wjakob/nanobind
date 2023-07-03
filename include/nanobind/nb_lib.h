@@ -135,6 +135,14 @@ NB_CORE PyObject *float_from_obj(PyObject *o);
 
 // ========================================================================
 
+/// Convert a Python object into a Python list
+NB_CORE PyObject *list_from_obj(PyObject *o);
+
+/// Convert a Python object into a Python tuple
+NB_CORE PyObject *tuple_from_obj(PyObject *o);
+
+// ========================================================================
+
 /// Get an object attribute or raise an exception
 NB_CORE PyObject *getattr(PyObject *obj, const char *key);
 NB_CORE PyObject *getattr(PyObject *obj, PyObject *key);

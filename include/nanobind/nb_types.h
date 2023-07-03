@@ -415,7 +415,10 @@ class bytes : public object {
 };
 
 class tuple : public object {
-    NB_OBJECT_DEFAULT(tuple, object, "tuple", PyTuple_Check)
+    NB_OBJECT(tuple, object, "tuple", PyTuple_Check)
+    tuple() : object(PyTuple_New(0), detail::steal_t()) { }
+    explicit tuple(handle h)
+        : object(detail::tuple_from_obj(h.ptr()), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_TUPLE_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
@@ -433,6 +436,8 @@ class type_object : public object {
 class list : public object {
     NB_OBJECT(list, object, "list", PyList_Check)
     list() : object(PyList_New(0), detail::steal_t()) { }
+    explicit list(handle h)
+        : object(detail::list_from_obj(h.ptr()), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_LIST_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);

@@ -552,6 +552,22 @@ PyObject *float_from_obj(PyObject *o) {
 
 // ========================================================================
 
+PyObject *tuple_from_obj(PyObject *o) {
+    PyObject *result = PySequence_Tuple(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *list_from_obj(PyObject *o) {
+    PyObject *result = PySequence_List(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+// ========================================================================
+
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {
     PyObject *temp = nullptr;
     size_t size = 0;

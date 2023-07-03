@@ -90,9 +90,8 @@ private:
 using cast_error = std::bad_cast;
 
 enum class exception_type {
-    stop_iteration, index_error, key_error, value_error,
-    type_error, buffer_error, import_error, attribute_error,
-    next_overload
+    runtime_error, stop_iteration, index_error, key_error, value_error,
+    type_error, buffer_error, import_error, attribute_error, next_overload
 };
 
 // Base interface used to expose common Python exceptions in C++

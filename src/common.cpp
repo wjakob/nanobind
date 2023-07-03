@@ -13,6 +13,27 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+NB_NOINLINE static builtin_exception
+create_exception(exception_type type, const char *fmt, va_list args_) {
+    char buf[512];
+    va_list args;
+
+    va_copy(args, args_);
+    int size = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+
+    if (size < (int) sizeof(buf)) {
+        return builtin_exception(type, buf);
+    } else {
+        scoped_pymalloc<char> temp(size + 1);
+
+        va_copy(args, args_);
+        vsnprintf(temp.get(), size + 1, fmt, args);
+        va_end(args);
+
+        return builtin_exception(type, temp.get());
+    }
+}
 
 #if defined(__GNUC__)
     __attribute__((noreturn, __format__ (__printf__, 1, 2)))
@@ -20,23 +41,26 @@ NAMESPACE_BEGIN(detail)
     [[noreturn]]
 #endif
 void raise(const char *fmt, ...) {
-    char buf[512];
     va_list args;
-
     va_start(args, fmt);
-    int size = vsnprintf(buf, sizeof(buf), fmt, args);
+    builtin_exception err =
+        create_exception(exception_type::runtime_error, fmt, args);
     va_end(args);
+    throw err;
+}
 
-    if (size < (int) sizeof(buf))
-        throw std::runtime_error(buf);
-
-    scoped_pymalloc<char> temp(size + 1);
-
+#if defined(__GNUC__)
+    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
+#else
+    [[noreturn]]
+#endif
+void raise_type_error(const char *fmt, ...) {
+    va_list args;
     va_start(args, fmt);
-    vsnprintf(temp.get(), size + 1, fmt, args);
+    builtin_exception err =
+        create_exception(exception_type::type_error, fmt, args);
     va_end(args);
-
-    throw std::runtime_error(temp.get());
+    throw err;
 }
 
 /// Abort the process with a fatal error

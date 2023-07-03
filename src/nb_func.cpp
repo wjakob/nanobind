@@ -141,6 +141,7 @@ static bool set_builtin_exception_status(builtin_exception &e) {
     PyObject *o;
 
     switch (e.type()) {
+        case exception_type::runtime_error: o = PyExc_RuntimeError; break;
         case exception_type::stop_iteration: o = PyExc_StopIteration; break;
         case exception_type::index_error: o = PyExc_IndexError; break;
         case exception_type::key_error: o = PyExc_KeyError; break;

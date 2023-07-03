@@ -66,13 +66,21 @@ protected:
 
 // ========================================================================
 
-/// Raise a std::runtime_error with the given message
+/// Raise a runtime error with the given message
 #if defined(__GNUC__)
     __attribute__((noreturn, __format__ (__printf__, 1, 2)))
 #else
     [[noreturn]]
 #endif
 NB_CORE void raise(const char *fmt, ...);
+
+/// Raise a type error with the given message
+#if defined(__GNUC__)
+    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
+#else
+    [[noreturn]]
+#endif
+NB_CORE void raise_type_error(const char *fmt, ...);
 
 /// Abort the process with a fatal error
 #if defined(__GNUC__)

@@ -247,6 +247,8 @@ struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
 public:
     NB_TYPE_CASTER(T, T::Name)
 
+    type_caster() : value(nullptr, ::nanobind::detail::steal_t()) { }
+
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (!isinstance<T>(src))
             return false;

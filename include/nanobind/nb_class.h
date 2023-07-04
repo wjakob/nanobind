@@ -258,6 +258,14 @@ inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
 inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
+inline void *type_get_slot(handle h, int slot_id) {
+#if PY_VERSION_HEX < 0x030A0000
+    return detail::type_get_slot((PyTypeObject *) h.ptr(), slot_id);
+#else
+    return PyType_GetSlot((PyTypeObject *) h.ptr(), slot_id);
+#endif
+}
+
 
 template <typename... Args> struct init {
     template <typename T, typename... Ts> friend class class_;

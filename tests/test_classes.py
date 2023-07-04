@@ -710,3 +710,8 @@ def test39_try_cast(clean):
     del s, s2
 
     assert_stats(destructed=1)
+
+def test40_slots():
+    if not hasattr(t, "test_slots"):
+        pytest.skip()
+    assert t.test_slots() == (True, True, True)

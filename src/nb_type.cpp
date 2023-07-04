@@ -386,32 +386,62 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
 }
 
 #if PY_VERSION_HEX < 0x030C0000
-#  if PY_VERSION_HEX < 0x03090000
-#    define Py_bf_getbuffer 1
-#    define Py_bf_releasebuffer 2
-#  endif
 
-template <size_t I1, size_t I2, size_t Offset> uint8_t constexpr Ei() {
+struct nb_slot {
+#if PY_VERSION_HEX < 0x030A0000
+    uint8_t indirect_1;
+    uint8_t indirect_2;
+#endif
+    uint8_t direct;
+};
+
+template <size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexpr Ei() {
     // Compile-time check to ensure that indices and alignment match our expectation
-    static_assert(I1 == I2 && (Offset % sizeof(void *)) == 0,
-                  "type_slots: internal error");
-    return (uint8_t) (Offset / sizeof(void *));
+    static_assert(I1 == I2 && (Offset1 % sizeof(void *)) == 0 && (Offset2 % sizeof(void *)) == 0,
+                  "nb_slot construction: internal error");
+
+#if PY_VERSION_HEX < 0x030A0000
+    size_t o = 0;
+    switch (Offset1) {
+        case offsetof(PyHeapTypeObject, as_async):    o = offsetof(PyTypeObject, tp_as_async); break;
+        case offsetof(PyHeapTypeObject, as_number):   o = offsetof(PyTypeObject, tp_as_number); break;
+        case offsetof(PyHeapTypeObject, as_mapping):  o = offsetof(PyTypeObject, tp_as_mapping); break;
+        case offsetof(PyHeapTypeObject, as_sequence): o = offsetof(PyTypeObject, tp_as_sequence); break;
+        case offsetof(PyHeapTypeObject, as_buffer):   o = offsetof(PyTypeObject, tp_as_buffer); break;
+        default: break;
+    }
+
+    return {
+        (uint8_t) (o / sizeof(void *)),
+        (uint8_t) ((Offset2 - Offset1) / sizeof(void *)),
+        (uint8_t) (Offset2 / sizeof(void *)),
+    };
+#else
+    return { (uint8_t) (Offset2 / sizeof(void *)) };
+#endif
 }
 
-#define E(i1, p1, p2, name)                                                    \
-    Ei<i1, Py_##p2##_##name, offsetof(PyHeapTypeObject, p1.p2##_##name)>()
-
 // Precomputed mapping from type slot ID to an entry in the data structure
-static const uint8_t type_slots[] {
-    E(1, as_buffer, bf, getbuffer),
-    E(2, as_buffer, bf, releasebuffer),
-    E(3, as_mapping, mp, ass_subscript),
-    E(4, as_mapping, mp, length),
-    E(5, as_mapping, mp, subscript),
-    E(6, as_number, nb, absolute),
-    E(7, as_number, nb, add),
-    E(8, as_number, nb, and),
-    E(9, as_number, nb, bool),
+#define E(i1, p1, p2, name)                            \
+    Ei<i1, Py_##p2##_##name,                           \
+       offsetof(PyHeapTypeObject, p1),                 \
+       offsetof(PyHeapTypeObject, p1.p2##_##name)>()
+
+#if PY_VERSION_HEX < 0x03090000
+#  define Py_bf_getbuffer 1
+#  define Py_bf_releasebuffer 2
+#endif
+
+static constexpr nb_slot type_slots[] {
+    E(1,  as_buffer, bf, getbuffer),
+    E(2,  as_buffer, bf, releasebuffer),
+    E(3,  as_mapping, mp, ass_subscript),
+    E(4,  as_mapping, mp, length),
+    E(5,  as_mapping, mp, subscript),
+    E(6,  as_number, nb, absolute),
+    E(7,  as_number, nb, add),
+    E(8,  as_number, nb, and),
+    E(9,  as_number, nb, bool),
     E(10, as_number, nb, divmod),
     E(11, as_number, nb, float),
     E(12, as_number, nb, floor_divide),
@@ -488,6 +518,21 @@ static const uint8_t type_slots[] {
 #endif
 };
 
+#if PY_VERSION_HEX < 0x030A0000
+void *type_get_slot(PyTypeObject *t, int slot_id) {
+    nb_slot slot = type_slots[slot_id - 1];
+
+    if (PyType_HasFeature(t, Py_TPFLAGS_HEAPTYPE)) {
+        return ((void **) t)[slot.direct];
+    } else {
+        if (slot.indirect_1)
+            return ((void ***) t)[slot.indirect_1][slot.indirect_2];
+        else
+            return ((void **) t)[slot.indirect_2];
+    }
+}
+#endif
+
 #endif
 
 static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
@@ -553,8 +598,8 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
         if (slot == 0) {
             break;
-        } else if (slot < (int) sizeof(type_slots)) {
-            *(((void **) ht) + type_slots[slot - 1]) = ts->pfunc;
+        } else if (slot * sizeof(nb_slot) < (int) sizeof(type_slots)) {
+            *(((void **) ht) + type_slots[slot - 1].direct) = ts->pfunc;
         } else {
             PyErr_Format(PyExc_RuntimeError,
                          "nb_type_from_metaclass(): unhandled slot %i", slot);
@@ -1619,6 +1664,8 @@ type_data *nb_type_data_static(PyTypeObject *o) noexcept {
 #endif
 
 PyObject *nb_type_name(PyObject *t) noexcept {
+    error_scope s;
+
 #if PY_VERSION_HEX >= 0x030B0000
     PyObject *result = PyType_GetName((PyTypeObject *) t);
 #else

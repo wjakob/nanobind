@@ -2152,6 +2152,14 @@ Type objects
 
    Return the full (module-qualified) name of a type object as a Python string.
 
+.. cpp:function:: void * type_get_slot(handle h, int slot_id)
+
+   On Python 3.10+, this function is a simple wrapper around the Python C API
+   function ``PyType_GetSlot`` that provides stable API-compatible access to
+   type object members. On Python 3.9 and earlier, the official function did
+   not work on non-heap types. The nanobind version consistently works on heap
+   and non-heap types across Python versions.
+
 Instances
 ^^^^^^^^^
 
@@ -2220,7 +2228,6 @@ Instances
 .. cpp:function:: str inst_name(handle h)
 
    Return the full (module-qualified) name of the instance's type object as a Python string.
-
 
 Global flags
 ------------

@@ -219,9 +219,9 @@ size_t obj_len_hint(PyObject *o) noexcept {
     return (size_t) res;
 #else
     PyTypeObject *tp = Py_TYPE(o);
-    lenfunc l = (lenfunc) PyType_GetSlot(tp, Py_sq_length);
+    lenfunc l = (lenfunc) type_get_slot(tp, Py_sq_length);
     if (!l)
-        l = (lenfunc) PyType_GetSlot(tp, Py_mp_length);
+        l = (lenfunc) type_get_slot(tp, Py_mp_length);
 
     if (l) {
         Py_ssize_t res = l(o);

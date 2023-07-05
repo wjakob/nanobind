@@ -245,18 +245,35 @@ inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())
 
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
-inline str inst_name(handle h) { return steal<str>(detail::nb_inst_name(h.ptr())); };
-inline object inst_alloc(handle h) { return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr())); }
-inline object inst_alloc_zero(handle h) { return steal(detail::nb_inst_alloc_zero((PyTypeObject *) h.ptr())); }
-inline object inst_wrap(handle h, void *p) { return steal(detail::nb_inst_wrap((PyTypeObject *) h.ptr(), p)); }
+inline str inst_name(handle h) {
+    return steal<str>(detail::nb_inst_name(h.ptr()));
+};
+inline object inst_alloc(handle h) {
+    return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr()));
+}
+inline object inst_alloc_zero(handle h) {
+    return steal(detail::nb_inst_alloc_zero((PyTypeObject *) h.ptr()));
+}
+inline object inst_take_ownership(handle h, void *p) {
+    return steal(detail::nb_inst_take_ownership((PyTypeObject *) h.ptr(), p));
+}
+inline object inst_reference(handle h, void *p, handle parent = handle()) {
+    return steal(detail::nb_inst_reference((PyTypeObject *) h.ptr(), p, parent.ptr()));
+}
 inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
-inline void inst_set_state(handle h, bool ready, bool destruct) { detail::nb_inst_set_state(h.ptr(), ready, destruct); }
-inline std::pair<bool, bool> inst_state(handle h) { return detail::nb_inst_state(h.ptr()); }
+inline void inst_set_state(handle h, bool ready, bool destruct) {
+    detail::nb_inst_set_state(h.ptr(), ready, destruct);
+}
+inline std::pair<bool, bool> inst_state(handle h) {
+    return detail::nb_inst_state(h.ptr());
+}
 inline void inst_mark_ready(handle h) { inst_set_state(h, true, true); }
 inline bool inst_ready(handle h) { return inst_state(h).first; }
 inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
 inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
+inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_replace_copy(dst.ptr(), src.ptr()); }
+inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_replace_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 inline void *type_get_slot(handle h, int slot_id) {
 #if PY_VERSION_HEX < 0x030A0000

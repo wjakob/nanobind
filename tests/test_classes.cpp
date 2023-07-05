@@ -421,13 +421,19 @@ NB_MODULE(test_classes_ext, m) {
         if (!nb::inst_ready(py_inst))
             throw std::runtime_error("Internal error! (7)");
 
-        nb::object py_inst_3 = nb::inst_wrap(py_type, new Struct(345));
-        if (!(nb::inst_check(py_inst_3) && py_inst_3.type().is(py_type) &&
-              !nb::inst_ready(py_inst_3)))
-            throw std::runtime_error("Internal error! (2)");
-        nb::inst_mark_ready(py_inst_3);
+        nb::handle py_type_pair = nb::type<PairStruct>();
+        PairStruct *ps = new PairStruct{Struct(123), Struct(456)};
+        nb::object py_inst_3 = nb::inst_take_ownership(py_type_pair, ps);
+        if (!(nb::inst_check(py_inst_3) && py_inst_3.type().is(py_type_pair) &&
+              nb::inst_state(py_inst_3) == std::make_pair(true, true)))
+            throw std::runtime_error("Internal error! (8)");
 
-        return nb::make_tuple(py_inst, py_inst_2, py_inst_3);
+        nb::object py_inst_4 = nb::inst_reference(py_type, &ps->s1, py_inst_3);
+        if (!(nb::inst_check(py_inst_4) && py_inst_4.type().is(py_type) &&
+              nb::inst_state(py_inst_4) == std::make_pair(true, false)))
+            throw std::runtime_error("Internal error! (9)");
+
+        return nb::make_tuple(py_inst, py_inst_2, py_inst_3, py_inst_4);
     });
 
     // test22_handle_t

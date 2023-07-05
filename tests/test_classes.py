@@ -468,16 +468,23 @@ def test21_type_callback():
 
 
 def test22_low_level(clean):
-    s1, s2, s3 = t.test_lowlevel()
-    assert s1.value() == 123 and s2.value() == 0 and s3.value() == 345
+    s1, s2, s3, s4 = t.test_lowlevel()
+    assert s1.value() == 123 and s2.value() == 0 and s4.value() == 123
+    assert s3.s1.value() == 123 and s3.s2.value() == 456
+    assert s3.s1 is s4
     del s1
     del s2
     del s3
+    import gc
+    gc.collect()
+    gc.collect()
+    assert s4.value() == 123
+    del s4
     assert_stats(
-        value_constructed=2,
+        value_constructed=3,
         copy_constructed=1,
         move_constructed=1,
-        destructed=4
+        destructed=5
     )
 
 

@@ -1557,10 +1557,25 @@ PyObject *nb_inst_alloc(PyTypeObject *t) {
     return result;
 }
 
-PyObject *nb_inst_wrap(PyTypeObject *t, void *ptr) {
+PyObject *nb_inst_reference(PyTypeObject *t, void *ptr, PyObject *parent) {
     PyObject *result = inst_new_ext(t, ptr);
     if (!result)
         raise_python_error();
+    nb_inst *nbi = (nb_inst *) result;
+    nbi->destruct = nbi->cpp_delete = false;
+    nbi->ready = true;
+    if (parent)
+        keep_alive(result, parent);
+    return result;
+}
+
+PyObject *nb_inst_take_ownership(PyTypeObject *t, void *ptr) {
+    PyObject *result = inst_new_ext(t, ptr);
+    if (!result)
+        raise_python_error();
+    nb_inst *nbi = (nb_inst *) result;
+    nbi->destruct = nbi->cpp_delete = true;
+    nbi->ready = true;
     return result;
 }
 
@@ -1655,6 +1670,24 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
     }
 
     nbi->ready = nbi->destruct = true;
+}
+
+void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept {
+    nb_inst *nbi = (nb_inst *) dst;
+    bool destruct = nbi->destruct;
+    nbi->destruct = true;
+    nb_inst_destruct(dst);
+    nb_inst_move(dst, src);
+    nbi->destruct = destruct;
+}
+
+void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
+    nb_inst *nbi = (nb_inst *) dst;
+    bool destruct = nbi->destruct;
+    nbi->destruct = true;
+    nb_inst_destruct(dst);
+    nb_inst_copy(dst, src);
+    nbi->destruct = destruct;
 }
 
 #if defined(Py_LIMITED_API)

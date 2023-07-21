@@ -157,8 +157,8 @@ the desired type.
 
 .. code-block:: cpp
 
-   nb::class_<MyType>(m, "MyType")
-       .def(nb::init([](int) { return MyType(...); }));
+   py::class_<MyType>(m, "MyType")
+       .def(py::init([](int) { return MyType(...); }));
 
 Unfortunately, the implementation of this feature was quite complex and
 often required further internal calls to the move or copy

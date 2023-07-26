@@ -33,6 +33,7 @@ nanobind_add_module(test_ndarray_ext test_ndarray.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${NB_EXTRA_ARGS})
 nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_python_multiple_inheritance_ext test_python_multiple_inheritance.cpp ${NB_EXTRA_ARGS})
 
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)
@@ -67,6 +68,7 @@ set(TEST_FILES
   test_inter_module.py
   test_intrusive.py
   test_make_iterator.py
+  test_python_multiple_inheritance.py
   test_stl.py
   test_stl_bind_map.py
   test_stl_bind_vector.py

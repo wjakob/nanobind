@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/citation-file-format/citation-file-format/main/schema.json
+cff-version: 1.2.0
+message: "Please use the following to cite nanobind in scientific discourse:"
+authors:
+  - family-names: "Jakob"
+    given-names: "Wenzel"
+    orcid: "https://orcid.org/0000-0002-6090-1121"
+title: "nanobind: tiny and efficient C++/Python bindings"
+date-released: "2022-10-14" # initial v0.0.1 release
+url: "https://github.com/wjakob/nanobind"
+license: BSD-3-Clause

@@ -52,7 +52,7 @@ Version 1.5.0 (Aug 7, 2023)
 * Added a low-level abstraction around :cpp:func:`nb::type_get_slot()
   <type_get_slot>` around ``PyType_GetSlot``, but with more consistent behavior
   across Python versions. (commit `d555e9
-  https://github.com/wjakob/nanobind/commit/d555e9de1c45394f5be5d62dc999c603d651c8c4`__).
+  <https://github.com/wjakob/nanobind/commit/d555e9de1c45394f5be5d62dc999c603d651c8c4>`__).
 * The :cpp:func:`nb::list::append() <list::append>` method now performs perfect
   forwarding. (commit `2219d0
   <https://github.com/wjakob/nanobind/commit/2219d0b0fec5e6cc4fce96bc3dbad6bfa148a57d>`__).

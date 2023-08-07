@@ -17,4 +17,4 @@ How to make a new release?
 
 7. Run ``python setup.py bdist_wheel``
 
-8. Upload: ``twine upload <filename>``
+8. Upload: ``twine upload --repository nanobind <filename>``

@@ -88,7 +88,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         if constexpr (!std::is_trivially_destructible_v<capture>) {
             f.flags |= (uint32_t) func_flags::has_free;
-            f.free = [](void *p) {
+            f.free_capture = [](void *p) {
                 ((capture *) p)->~capture();
             };
         }
@@ -97,7 +97,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         cap[0] = new capture{ (forward_t<Func>) func };
 
         f.flags |= (uint32_t) func_flags::has_free;
-        f.free = [](void *p) {
+        f.free_capture = [](void *p) {
             delete (capture *) ((void **) p)[0];
         };
     }

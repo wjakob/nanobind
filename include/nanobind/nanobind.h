@@ -22,7 +22,7 @@
 #endif
 
 #define NB_VERSION_MAJOR 1
-#define NB_VERSION_MINOR 4
+#define NB_VERSION_MINOR 5
 #define NB_VERSION_PATCH 0
 
 // Core C++ headers that nanobind depends on

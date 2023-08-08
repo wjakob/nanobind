@@ -91,7 +91,7 @@ void nb_func_dealloc(PyObject *self) {
 
         for (size_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_free)
-                f->free(f->capture);
+                f->free_capture(f->capture);
 
             if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {

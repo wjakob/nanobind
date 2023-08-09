@@ -755,7 +755,7 @@ def test66_replace_extension():
     assert t.parent_path(PseudoStrPath()) == Path("foo")
     assert t.parent_path(PseudoBytesPath()) == Path("foo")
 
-def test66_vector_bool():
+def test67_vector_bool():
     bool_vector = [True, False, True, False]
     result = t.flip_vector_bool(bool_vector)
     assert result == [not x for x in bool_vector]

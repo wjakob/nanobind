@@ -439,7 +439,7 @@ example, updating the code as follows fixes the problem:
    #include <nanobind/stl/shared_ptr.h>
 
    struct DogHouse {
-       std::share_ptr<Dog> dog;
+       std::shared_ptr<Dog> dog;
    };
 
 .. code-block:: pycon

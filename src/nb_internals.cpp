@@ -317,7 +317,7 @@ NB_NOINLINE void init(const char *name) {
         return;
     }
 
-    nb_internals *p = new nb_internals();
+    auto *p = new nb_internals();
 
     str nb_name("nanobind");
     p->nb_module = PyModule_NewObject(nb_name.ptr());

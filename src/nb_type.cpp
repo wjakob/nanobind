@@ -1428,7 +1428,7 @@ static void nb_type_put_unique_finalize(PyObject *o,
           "ownership status has become corrupted.",
           type_name(cpp_type), cpp_delete);
 
-    nb_inst *inst = (nb_inst *) o;
+    auto *inst = (nb_inst *) o;
 
     if (cpp_delete) {
         check((bool) inst->ready == is_new && (bool) inst->destruct == is_new &&
@@ -1479,7 +1479,7 @@ PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
 }
 
 void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
-    nb_inst *inst = (nb_inst *) o;
+    auto *inst = (nb_inst *) o;
 
     // This function is called to indicate ownership *changes*
     check(inst->ready,
@@ -1561,7 +1561,7 @@ PyObject *nb_inst_reference(PyTypeObject *t, void *ptr, PyObject *parent) {
     PyObject *result = inst_new_ext(t, ptr);
     if (!result)
         raise_python_error();
-    nb_inst *nbi = (nb_inst *) result;
+    auto *nbi = (nb_inst *) result;
     nbi->destruct = nbi->cpp_delete = false;
     nbi->ready = true;
     if (parent)
@@ -1573,7 +1573,7 @@ PyObject *nb_inst_take_ownership(PyTypeObject *t, void *ptr) {
     PyObject *result = inst_new_ext(t, ptr);
     if (!result)
         raise_python_error();
-    nb_inst *nbi = (nb_inst *) result;
+    auto *nbi = (nb_inst *) result;
     nbi->destruct = nbi->cpp_delete = true;
     nbi->ready = true;
     return result;
@@ -1584,7 +1584,7 @@ void *nb_inst_ptr(PyObject *o) noexcept {
 }
 
 void nb_inst_zero(PyObject *o) noexcept {
-    nb_inst *nbi = (nb_inst *) o;
+    auto *nbi = (nb_inst *) o;
     type_data *td = nb_type_data(Py_TYPE(o));
     memset(inst_ptr(nbi), 0, td->size);
     nbi->ready = nbi->destruct = true;
@@ -1594,7 +1594,7 @@ PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
     PyObject *result = inst_new_int(t);
     if (!result)
         raise_python_error();
-    nb_inst *nbi = (nb_inst *) result;
+    auto *nbi = (nb_inst *) result;
     type_data *td = nb_type_data(t);
     memset(inst_ptr(nbi), 0, td->size);
     nbi->ready = nbi->destruct = true;
@@ -1602,19 +1602,19 @@ PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
 }
 
 void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept {
-    nb_inst *nbi = (nb_inst *) o;
+    auto *nbi = (nb_inst *) o;
     nbi->ready = ready;
     nbi->destruct = destruct;
     nbi->cpp_delete = destruct && !nbi->internal;
 }
 
 std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept {
-    nb_inst *nbi = (nb_inst *) o;
+    auto *nbi = (nb_inst *) o;
     return { (bool) nbi->ready, (bool) nbi->destruct };
 }
 
 void nb_inst_destruct(PyObject *o) noexcept {
-    nb_inst *nbi = (nb_inst *) o;
+    auto *nbi = (nb_inst *) o;
     type_data *t = nb_type_data(Py_TYPE(o));
 
     if (nbi->destruct) {
@@ -1638,7 +1638,7 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
               (t->flags & (uint32_t) type_flags::is_copy_constructible),
           "nanobind::detail::nb_inst_copy(): invalid arguments!");
 
-    nb_inst *nbi = (nb_inst *) dst;
+    auto *nbi = (nb_inst *) dst;
     const void *src_data = inst_ptr((nb_inst *) src);
     void *dst_data = inst_ptr(nbi);
 
@@ -1658,7 +1658,7 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
               (t->flags & (uint32_t) type_flags::is_move_constructible),
           "nanobind::detail::nb_inst_move(): invalid arguments!");
 
-    nb_inst *nbi = (nb_inst *) dst;
+    auto *nbi = (nb_inst *) dst;
     void *src_data = inst_ptr((nb_inst *) src);
     void *dst_data = inst_ptr(nbi);
 
@@ -1673,7 +1673,7 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
 }
 
 void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept {
-    nb_inst *nbi = (nb_inst *) dst;
+    auto *nbi = (nb_inst *) dst;
     bool destruct = nbi->destruct;
     nbi->destruct = true;
     nb_inst_destruct(dst);
@@ -1682,7 +1682,7 @@ void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept {
 }
 
 void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
-    nb_inst *nbi = (nb_inst *) dst;
+    auto *nbi = (nb_inst *) dst;
     bool destruct = nbi->destruct;
     nbi->destruct = true;
     nb_inst_destruct(dst);

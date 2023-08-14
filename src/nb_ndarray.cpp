@@ -31,7 +31,7 @@ static void nb_ndarray_dealloc(PyObject *self) {
 }
 
 static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
-    nb_ndarray *self = (nb_ndarray *) exporter;
+    auto *self = (nb_ndarray *) exporter;
 
     dlpack::dltensor &t = self->th->ndarray->dltensor;
 
@@ -221,7 +221,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
 
     mt->deleter = [](managed_dltensor *mt2) {
         gil_scoped_acquire guard;
-        Py_buffer *buf = (Py_buffer *) mt2->manager_ctx;
+        auto *buf = (Py_buffer *) mt2->manager_ctx;
         PyBuffer_Release(buf);
         PyMem_Free(mt2->dltensor.shape);
         PyMem_Free(mt2->dltensor.strides);
@@ -376,7 +376,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
         int64_t accum = 1;
 
         if (req->req_order == 'C' || !t.strides) {
-            for (size_t i = (size_t) (t.ndim - 1);;) {
+            for (auto i = (size_t) (t.ndim - 1);;) {
                 strides[i] = accum;
                 accum *= t.shape[i];
                 if (i == 0)
@@ -552,7 +552,7 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
 
     auto deleter = [](managed_dltensor *mt) {
         gil_scoped_acquire guard;
-        ndarray_handle *th = (ndarray_handle *) mt->manager_ctx;
+        auto *th = (ndarray_handle *) mt->manager_ctx;
         ndarray_dec_ref(th);
     };
 
@@ -597,7 +597,7 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
 
 static void ndarray_capsule_destructor(PyObject *o) {
     error_scope scope; // temporarily save any existing errors
-    managed_dltensor *mt =
+    auto *mt =
         (managed_dltensor *) PyCapsule_GetPointer(o, "dltensor");
 
     if (mt)

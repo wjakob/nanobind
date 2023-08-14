@@ -246,7 +246,7 @@ NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
 // ========================================================================
 
 /// Create a Python function object for the given function record
-NB_CORE PyObject *nb_func_new(const void *data) noexcept;
+NB_CORE PyObject *nb_func_new(const void *data);
 
 // ========================================================================
 
@@ -357,11 +357,11 @@ NB_CORE std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept;
 
 // Create and install a Python property object
 NB_CORE void property_install(PyObject *scope, const char *name,
-                              PyObject *getter, PyObject *setter) noexcept;
+                              PyObject *getter, PyObject *setter);
 
 NB_CORE void property_install_static(PyObject *scope, const char *name,
                                      PyObject *getter,
-                                     PyObject *setter) noexcept;
+                                     PyObject *setter);
 
 // ========================================================================
 

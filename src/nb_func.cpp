@@ -35,7 +35,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
 static void nb_func_render_signature(const func_data *f) noexcept;
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
-    size_t size = (size_t) Py_SIZE(self);
+    auto size = (size_t) Py_SIZE(self);
 
     if (size) {
         func_data *f = nb_func_data(self);
@@ -54,7 +54,7 @@ int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
 }
 
 int nb_func_clear(PyObject *self) {
-    size_t size = (size_t) Py_SIZE(self);
+    auto size = (size_t) Py_SIZE(self);
 
     if (size) {
         func_data *f = nb_func_data(self);
@@ -111,21 +111,21 @@ void nb_func_dealloc(PyObject *self) {
 }
 
 int nb_bound_method_traverse(PyObject *self, visitproc visit, void *arg) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    auto *mb = (nb_bound_method *) self;
     Py_VISIT((PyObject *) mb->func);
     Py_VISIT(mb->self);
     return 0;
 }
 
 int nb_bound_method_clear(PyObject *self) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    auto *mb = (nb_bound_method *) self;
     Py_CLEAR(mb->func);
     Py_CLEAR(mb->self);
     return 0;
 }
 
 void nb_bound_method_dealloc(PyObject *self) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    auto *mb = (nb_bound_method *) self;
     PyObject_GC_UnTrack(self);
     Py_DECREF((PyObject *) mb->func);
     Py_DECREF(mb->self);
@@ -172,7 +172,7 @@ void *malloc_check(size_t size) {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *nb_func_new(const void *in_) noexcept {
+PyObject *nb_func_new(const void *in_) {
     func_data_prelim<0> *f = (func_data_prelim<0> *) in_;
     arg_data *args_in = std::launder((arg_data *) f->args);
 
@@ -242,7 +242,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     // Create a new function and destroy the old one
     Py_ssize_t to_copy = func_prev ? Py_SIZE(func_prev) : 0;
-    nb_func *func = (nb_func *) PyType_GenericAlloc(
+    auto *func = (nb_func *) PyType_GenericAlloc(
         is_method ? internals->nb_method : internals->nb_func, to_copy + 1);
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           has_name ? f->name : "<anonymous>");
@@ -363,7 +363,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
                        size_t nargs_in, PyObject *kwargs_in) noexcept {
-    const uint32_t count = (uint32_t) Py_SIZE(self);
+    const auto count = (uint32_t) Py_SIZE(self);
     func_data *f = nb_func_data(self);
 
     if (f->flags & (uint32_t) func_flags::is_operator)
@@ -659,7 +659,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor) {
-                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    auto *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
                     self_arg_nb->ready = true;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
@@ -692,8 +692,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     uint8_t args_flags[NB_MAXARGS_SIMPLE];
     func_data *fr = nb_func_data(self);
 
-    const size_t count         = (size_t) Py_SIZE(self),
-                 nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    const auto count         = (size_t) Py_SIZE(self),
+               nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
     const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
@@ -1009,7 +1009,7 @@ static PyObject *nb_func_get_module(PyObject *self) {
 
 PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    auto count = (uint32_t) Py_SIZE(self);
 
     buf.clear();
 

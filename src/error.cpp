@@ -151,7 +151,7 @@ const char *python_error::what() const noexcept {
 #else
     buf.clear();
     if (exc_traceback.is_valid()) {
-        PyTracebackObject *to = (PyTracebackObject *) exc_traceback.ptr();
+        auto *to = (PyTracebackObject *) exc_traceback.ptr();
 
         // Get the deepest trace possible
         while (to->tb_next)
@@ -210,7 +210,7 @@ const char *python_error::what() const noexcept {
 
 builtin_exception::builtin_exception(exception_type type, const char *what)
     : std::runtime_error(what ? what : ""), m_type(type) { }
-builtin_exception::~builtin_exception() { }
+builtin_exception::~builtin_exception() = default;
 
 NAMESPACE_BEGIN(detail)
 

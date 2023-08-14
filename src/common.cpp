@@ -275,8 +275,8 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
     PyObject *res = nullptr;
     bool gil_error = false, cast_error = false;
 
-    size_t nargs_total = (size_t) (NB_VECTORCALL_NARGS(nargsf) +
-                         (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
+    auto nargs_total = (size_t) (NB_VECTORCALL_NARGS(nargsf) +
+                       (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
 
 #if !defined(Py_LIMITED_API)
     if (!PyGILState_Check()) {
@@ -775,12 +775,12 @@ static void property_install_impl(PyTypeObject *tp, PyObject *scope,
 }
 
 void property_install(PyObject *scope, const char *name, PyObject *getter,
-                      PyObject *setter) noexcept {
+                      PyObject *setter) {
     property_install_impl(&PyProperty_Type, scope, name, getter, setter);
 }
 
 void property_install_static(PyObject *scope, const char *name,
-                             PyObject *getter, PyObject *setter) noexcept {
+                             PyObject *getter, PyObject *setter) {
     property_install_impl(nb_static_property_tp(), scope, name, getter,
                           setter);
 }
@@ -884,7 +884,7 @@ template <typename T, bool Recurse = true>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
-        PyLongObject *l = (PyLongObject *) o;
+        auto *l = (PyLongObject *) o;
 
         // Fast path for compact integers
         if (NB_LIKELY(PyUnstable_Long_IsCompact(l))) {

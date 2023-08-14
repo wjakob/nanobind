@@ -513,7 +513,7 @@ static constexpr nb_slot type_slots[] {
     E(78, as_async, am, aiter),
     E(79, as_async, am, anext),
     E(80, ht_type, tp, finalize),
-#if PY_VERSION_HEX >= 0x030A0000
+#if PY_VERSION_HEX >= 0x030A0000 && !defined(PYPY_VERSION)
     E(81, as_async, am, send),
 #endif
 };

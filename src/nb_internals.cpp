@@ -319,7 +319,6 @@ NB_NOINLINE void init(const char *name) {
 
     nb_internals *p = new nb_internals();
 
-
     str nb_name("nanobind");
     p->nb_module = PyModule_NewObject(nb_name.ptr());
 

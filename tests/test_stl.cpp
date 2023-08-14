@@ -418,8 +418,8 @@ NB_MODULE(test_stl_ext, m) {
         .def_rw("movable", &ClassWithMovableField::movable);
 
     // test67 std::vector<bool>
-    m.def("flip_vector_bool", [](std::vector<bool> vec) { 
-        vec.flip(); 
+    m.def("flip_vector_bool", [](std::vector<bool> vec) {
+        vec.flip();
         return vec;
     });
 }

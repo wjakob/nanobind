@@ -268,6 +268,7 @@
 -U _PyPyFloat_AS_DOUBLE
 -U _PyPyFloat_AsDouble
 -U _PyPyFloat_Check
+-U _PyPyFloat_CheckExact
 -U _PyPyFloat_FromDouble
 -U _PyPyFloat_FromString
 -U _PyPyFloat_Type
@@ -557,6 +558,7 @@
 -U _PyPySet_Pop
 -U _PyPySet_Size
 -U _PyPySet_Type
+-U _PyPySlice_AdjustIndices
 -U _PyPySlice_GetIndices
 -U _PyPySlice_GetIndicesEx
 -U _PyPySlice_New

@@ -267,6 +267,7 @@
 -U _PyPyFile_WriteString
 -U _PyPyFloat_AS_DOUBLE
 -U _PyPyFloat_AsDouble
+-U _PyPyFloat_Check
 -U _PyPyFloat_FromDouble
 -U _PyPyFloat_FromString
 -U _PyPyFloat_Type

@@ -385,10 +385,10 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     return NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 }
 
-#if PY_VERSION_HEX < 0x030C0000
+#if NB_TYPE_FROM_METACLASS_IMPL || NB_TYPE_GET_SLOT_IMPL
 
 struct nb_slot {
-#if PY_VERSION_HEX < 0x030A0000
+#if NB_TYPE_GET_SLOT_IMPL
     uint8_t indirect_1;
     uint8_t indirect_2;
 #endif
@@ -400,7 +400,7 @@ template <size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexp
     static_assert(I1 == I2 && (Offset1 % sizeof(void *)) == 0 && (Offset2 % sizeof(void *)) == 0,
                   "nb_slot construction: internal error");
 
-#if PY_VERSION_HEX < 0x030A0000
+#if NB_TYPE_GET_SLOT_IMPL
     size_t o = 0;
     switch (Offset1) {
         case offsetof(PyHeapTypeObject, as_async):    o = offsetof(PyTypeObject, tp_as_async); break;
@@ -518,7 +518,7 @@ static constexpr nb_slot type_slots[] {
 #endif
 };
 
-#if PY_VERSION_HEX < 0x030A0000
+#if NB_TYPE_GET_SLOT_IMPL
 void *type_get_slot(PyTypeObject *t, int slot_id) {
     nb_slot slot = type_slots[slot_id - 1];
 
@@ -537,7 +537,7 @@ void *type_get_slot(PyTypeObject *t, int slot_id) {
 
 static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
                                         PyType_Spec *spec) {
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_TYPE_FROM_METACLASS_IMPL == 0
     // Life is good, PyType_FromMetaclass() is available
     return PyType_FromMetaclass(meta, mod, spec, nullptr);
 #else

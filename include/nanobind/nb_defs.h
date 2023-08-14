@@ -139,6 +139,22 @@
 #  define NB_DOMAIN_STR nullptr
 #endif
 
+#if !defined(PYPY_VERSION)
+#  if PY_VERSION_HEX < 0x030A0000
+#    define NB_TYPE_GET_SLOT_IMPL 1 // Custom implementation of nb::type_get_slot
+#  else
+#    define NB_TYPE_GET_SLOT_IMPL 0
+#  endif
+#  if PY_VERSION_HEX < 0x030C0000
+#    define NB_TYPE_FROM_METACLASS_IMPL 1 // Custom implementation of PyType_FromMetaclass
+#  else
+#    define NB_TYPE_FROM_METACLASS_IMPL 0
+#  endif
+#else
+#  define NB_TYPE_FROM_METACLASS_IMPL 1
+#  define NB_TYPE_GET_SLOT_IMPL 1
+#endif
+
 #define NB_MODULE_IMPL(name)                                                   \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name();           \
     extern "C" NB_EXPORT PyObject *PyInit_##name()

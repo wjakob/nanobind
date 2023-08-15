@@ -142,7 +142,7 @@ build. The message at the top warns users attempting to do this.
 .. code-block:: cmake
 
    # Set the minimum CMake version and policies for highest tested version
-   cmake_minimum_required(VERSION 3.15...3.26)
+   cmake_minimum_required(VERSION 3.15...3.27)
 
    # Set up the project and ensure there is a working C++ compiler
    project(my_ext LANGUAGES CXX)

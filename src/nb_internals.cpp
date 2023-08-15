@@ -56,8 +56,11 @@
 #endif
 
 /// On Linux/OSX, changes in __GXX_ABI_VERSION__ indicate ABI incompatibility.
+/// Also keep potentially ABI-incompatible visual studio builds apart.
 #if defined(__GXX_ABI_VERSION)
 #  define NB_BUILD_ABI "_cxxabi" NB_TOSTRING(__GXX_ABI_VERSION)
+#elif defined(_MSC_VER)
+#  define NB_BUILD_ABI "_mscver" NB_TOSTRING(_MSC_VER)
 #else
 #  define NB_BUILD_ABI ""
 #endif

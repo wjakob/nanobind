@@ -453,4 +453,20 @@ template <typename T> void list::append(T &&value) {
         detail::raise_python_error();
 }
 
+template <typename T> bool dict::contains(T&& key) const {
+    object o = nanobind::cast((detail::forward_t<T>) key);
+    int rv = PyDict_Contains(m_ptr, o.ptr());
+    if (rv == -1)
+        detail::raise_python_error();
+    return rv == 1;
+}
+
+template <typename T> bool mapping::contains(T&& key) const {
+    object o = nanobind::cast((detail::forward_t<T>) key);
+    int rv = PyMapping_HasKey(m_ptr, o.ptr());
+    if (rv == -1)
+        detail::raise_python_error();
+    return rv == 1;
+}
+
 NAMESPACE_END(NB_NAMESPACE)

@@ -15,6 +15,13 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.6.0 (TBA)
+---------------------------
+
+* Added the methods :cpp:func:`nb::dict::contains() <dict::contains>` and
+  :cpp:func:`nb::mapping::contains() <mapping::contains>` to the Python type
+  wrappers.
+
 Version 1.5.2 (Aug 24, 2023)
 -------------------
 

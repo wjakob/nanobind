@@ -670,7 +670,7 @@ Wrapper classes
 
       Return the number of list elements.
 
-   .. cpp:function:: template <typename T> void append(T &&value)
+   .. cpp:function:: template <typename T> void append(T&& value)
 
       Append an element to the list. When `T` does not already represent a
       wrapped Python object, the function performs a cast.
@@ -706,6 +706,11 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the number of dictionary elements.
+
+   .. cpp:function:: template <typename T> bool contains(T&& key) const
+
+      Check whether the dictionary contains a particular key. When `T` does not
+      already represent a wrapped Python object, the function performs a cast.
 
    .. cpp:function:: detail::dict_iterator begin() const
 
@@ -912,6 +917,11 @@ Wrapper classes
 .. cpp:class:: mapping : public object
 
    Wrapper class representing arbitrary Python mapping types.
+
+   .. cpp:function:: template <typename T> bool contains(T&& key) const
+
+      Check whether the map contains a particular key. When `T` does not
+      already represent a wrapped Python object, the function performs a cast.
 
    .. cpp:function:: list keys() const
 

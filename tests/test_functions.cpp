@@ -138,6 +138,10 @@ NB_MODULE(test_functions_ext, m) {
         return result;
     });
 
+    m.def("test_10_contains", [](nb::dict d) {
+        return d.contains(nb::str("foo"));
+    });
+
     // Test implicit conversion of various types
     m.def("test_11_sl",  [](signed long x)      { return x; });
     m.def("test_11_ul",  [](unsigned long x)        { return x; });

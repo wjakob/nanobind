@@ -463,6 +463,7 @@ class dict : public object {
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Keys)); }
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
+    template <typename T> bool contains(T&& key) const;
 };
 
 class sequence : public object {
@@ -474,6 +475,7 @@ class mapping : public object {
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Keys)); }
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
+    template <typename T> bool contains(T&& key) const;
 };
 
 class args : public tuple {

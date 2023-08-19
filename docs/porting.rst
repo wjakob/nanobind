@@ -178,6 +178,15 @@ then either run an in-place constructor and return normally (in which case
 the instance is assumed to be correctly constructed) or fail by raising an
 exception.
 
+To turn an existing factory function into a constructor, you will need to
+combine the above pattern with an invocation of the move/copy-constructor,
+e.g.:
+
+.. code-block:: cpp
+
+   nb::class_<MyType>(m, "MyType")
+       .def("__init__", [](MyType *t) { new (t) MyType(MyType::create()); });
+
 Implicit conversions
 --------------------
 

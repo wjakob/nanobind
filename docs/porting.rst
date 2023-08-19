@@ -273,17 +273,31 @@ changes are needed:
   a Python exception, the function should *leave the error set* (note the
   asymmetry compared to ``from_python()``) and return ``nullptr``.
 
-Both functions must be marked as ``noexcept``.
-
 Note that the cleanup list is only available when ``from_python()`` or
 ``from_cpp()`` are called as part of function dispatch, while usage by
 :cpp:func:`nb::cast() <cast>` sets ``cleanup`` to ``nullptr``. This case should
 be handled gracefully by refusing the conversion if the cleanup list is
 absolutely required.
 
+Type casters may not raise C++ exceptions. Both ``from_python()`` and
+``from_cpp()`` must be annotated with ``noexcept``. Exceptions or failure
+conditions caused by a conversion should instead be caught *within* the
+function body and handled as follows:
+
+- ``from_python()``: return ``false``. That's it. (Failed Python to C++
+  conversion occur all the time while dispatching calls, causing nanobind
+  to simply move to the next function overload. Dedicated error reporting would
+  add undesirable overheads). In case of a severe internal error, use the
+  CPython warning API (e.g., ``PyErr_Warn()``) to notify the user.
+
+- ``from_cpp()``: a failure here is more serious, since a return value of a
+  successfully evaluated cannot be converted, causing the call to fail. To
+  provide further detail, use the CPython error API (e.g., ``PyErr_Format()``)
+  and return an invalid handle (``return nb::handle();``).
+
 The ``std::pair<T1, T2>`` type caster (`link
 <https://github.com/wjakob/nanobind/blob/master/include/nanobind/stl/pair.h>`_)
-may be useful as a reference for these changes.
+may be useful as a starting point of custom implementations.
 
 .. _removed:
 

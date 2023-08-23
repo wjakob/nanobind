@@ -65,7 +65,7 @@ public:
 
 #if PY_VERSION_HEX < 0x030C0000
     handle type() const { return m_type; }
-    object traceback() const { return steal(m_traceback); }
+    object traceback() const { return borrow(m_traceback); }
 #else
     handle type() const { return value().type(); }
     object traceback() const { return steal(PyException_GetTraceback(m_value)); }

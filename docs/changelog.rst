@@ -21,11 +21,12 @@ Version 1.6.0 (TBA)
 Version 1.5.1 (Aug 23, 2023)
 ---------------------------
 
-* Fixed serious reference counting issue affecting the functions
-  :cpp:func:`python_error::traceback()` and :cpp:func:`python_error::what()`,
-  which caused undefined behavior via use-after-free. Also addressed an
-  unrelated UB sanitizer warning. (issue `#277
-  <https://github.com/wjakob/nanobind/issues/277>`__, commits `30d30c
+* Fixed serious reference counting issue introduced in nanobind version 1.5.0,
+  which affected the functions :cpp:func:`python_error::traceback()` and
+  :cpp:func:`python_error::what()`, causing undefined behavior via
+  use-after-free. Also addressed an unrelated minor UB sanitizer warning.
+  (issue `#277 <https://github.com/wjakob/nanobind/issues/277>`__, commits
+  `30d30c
   <https://github.com/wjakob/nanobind/commit/30d30caaa3e834122944b28833b9c0315ef19a5d>`__
   and `c48b18
   <https://github.com/wjakob/nanobind/commit/c48b180834b4929f2f77ce658f2a50ee78482fb7>`__).

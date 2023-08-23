@@ -77,8 +77,8 @@ python_error::~python_error() {
         /* With GIL held */ {
             // Clear error status in case the following executes Python code
             error_scope scope;
-            Py_XDECREF(m_value);
             Py_XDECREF(m_type);
+            Py_XDECREF(m_value);
             Py_XDECREF(m_traceback);
         }
     }

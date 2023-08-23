@@ -540,3 +540,24 @@ def test28_reference_internal():
 
     msg = 'nanobind::detail::ndarray_wrap(): reference_internal policy cannot be applied (ndarray already has an owner)'
     assert msg in str(excinfo.value)
+
+@needs_numpy
+def test29_force_contig_pytorch():
+    a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    b = t.make_contig(a)
+    assert b is a
+    a = a.T
+    b = t.make_contig(a)
+    assert b is not a
+    assert np.all(b == a)
+
+@needs_torch
+@pytest.mark.filterwarnings
+def test30_force_contig_pytorch():
+    a = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    b = t.make_contig(a)
+    assert b is a
+    a = a.T
+    b = t.make_contig(a)
+    assert b is not a
+    assert torch.all(b == a)

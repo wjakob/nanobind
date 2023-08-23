@@ -69,6 +69,8 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("check_order", [](nb::ndarray<nb::f_contig>) -> char { return 'F'; });
     m.def("check_order", [](nb::ndarray<>) -> char { return '?'; });
 
+    m.def("make_contig", [](nb::ndarray<nb::c_contig> a) { return a; });
+
     m.def("check_device", [](nb::ndarray<nb::device::cpu>) -> const char * { return "cpu"; });
     m.def("check_device", [](nb::ndarray<nb::device::cuda>) -> const char * { return "cuda"; });
 

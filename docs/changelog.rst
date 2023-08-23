@@ -15,6 +15,35 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.6.0 (TBA)
+-------------------
+
+Version 1.5.1 (Aug 23, 2023)
+---------------------------
+
+* Fixed serious reference counting issue affecting the functions
+  :cpp:func:`python_error::traceback()` and :cpp:func:`python_error::what()`,
+  which caused undefined behavior via use-after-free. Also addressed an
+  unrelated UB sanitizer warning. (issue `#277
+  <https://github.com/wjakob/nanobind/issues/277>`__, commits `30d30c
+  <https://github.com/wjakob/nanobind/commit/30d30caaa3e834122944b28833b9c0315ef19a5d>`__
+  and `c48b18
+  <https://github.com/wjakob/nanobind/commit/c48b180834b4929f2f77ce658f2a50ee78482fb7>`__).
+* Extended the internal data structure tag so that it isolates different MSVC
+  versions from each other (they are often not ABI compatible, see pybind11
+  issue `#4779 <https://github.com/pybind/pybind11/pull/4779>`__). This means
+  that nanobind 1.5.1 effectively bumps the ABI version to "10.5" when
+  compiling for MSVC, and the internals will be isolated from extensions built
+  with nanobind v1.5.0 or older. (commit `c7f3cd
+  <https://github.com/wjakob/nanobind/commit/c7f3cd6a7023dec55c63b995ba50c9f5d4b9147a>`__).
+* Incorporated fixes so that nanobind works with PyPy 3.10. (commits `fb5508
+  <https://github.com/wjakob/nanobind/commit/fb5508955e1b1455adfe1372b49748ba706b4d87>`__
+  and `2ed10a
+  <https://github.com/wjakob/nanobind/commit/2ed108a73bd5fbe0e1c43a8db07e40a165fc265f>`__).
+* Fixed type caster for ``std::vector<bool>``. (PR `#256
+  <https://github.com/wjakob/nanobind/pull/256>`__).
+* Fixed compilation in debug mode on MSVC. (PR `#253
+  <https://github.com/wjakob/nanobind/pull/253`__).
 
 Version 1.5.0 (Aug 7, 2023)
 ---------------------------

@@ -43,7 +43,7 @@ Version 1.5.1 (Aug 23, 2023)
 * Fixed type caster for ``std::vector<bool>``. (PR `#256
   <https://github.com/wjakob/nanobind/pull/256>`__).
 * Fixed compilation in debug mode on MSVC. (PR `#253
-  <https://github.com/wjakob/nanobind/pull/253`__).
+  <https://github.com/wjakob/nanobind/pull/253>`__).
 
 Version 1.5.0 (Aug 7, 2023)
 ---------------------------

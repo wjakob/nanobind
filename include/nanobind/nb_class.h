@@ -305,11 +305,11 @@ private:
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Args...>) {
                     if (!detail::nb_inst_python_derived(v.h.ptr())) {
-                        new ((Type *) v.p) Type{ (detail::forward_t<Args>) args... };
+                        new (v.p) Type{ (detail::forward_t<Args>) args... };
                         return;
                     }
                 }
-                new ((Alias *) v.p) Alias{ (detail::forward_t<Args>) args... };
+                new ((void *) v.p) Alias{ (detail::forward_t<Args>) args... };
             },
             extra...);
     }

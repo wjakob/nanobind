@@ -22,9 +22,9 @@ notation to bind operators to python. See the :ref:`operator overloading
    This is an internal class that should be accessed through the singleton
    :cpp:var:`self` value.
 
-   It supports the overloaded operators listed below. Depending on whether or
-   not :cpp:var:`self` is the left or right argument of a binary operation, the
-   binding will map to different Python methods as shown below.
+   It supports the overloaded operators listed below. Depending on whether
+   :cpp:var:`self` is the left or right argument of a binary operation,
+   the binding will map to different Python methods as shown below.
 
    .. list-table::
       :header-rows: 1

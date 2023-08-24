@@ -33,6 +33,7 @@ nanobind_add_module(test_ndarray_ext test_ndarray.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${NB_EXTRA_ARGS})
 nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
 
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)

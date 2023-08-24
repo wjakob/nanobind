@@ -870,8 +870,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         spec.basicsize = (int) basicsize;
     }
 
-    if (has_traverse && (!base || (PyType_GetFlags((PyTypeObject *) base) &
-                                   Py_TPFLAGS_HAVE_GC) == 0))
+    if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
 
     *s++ = { 0, nullptr };

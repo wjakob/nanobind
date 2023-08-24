@@ -15,8 +15,19 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.6.0 (TBA)
+Version 1.5.2 (Aug 24, 2023)
 -------------------
+
+* Fixed a severe issue with inheritance of the ``Py_TPFLAGS_HAVE_GC`` flag
+  affecting classes that derive from other classes with a
+  :cpp:class:`nb::dynamic_attr <dynamic_attr>` annotation. (issue `#279
+  <https://github.com/wjakob/nanobind/issues/279>`__ commit `dbedad
+  <https://github.com/wjakob/nanobind/commit/dbedadc294a7529bf401f01dbc97d4b47b677bc9>`__).
+* Implicit conversion of nd-arrays to conform to contiguity constraints such as
+  :cpp:class:`c_contig` and :cpp:class:`f_contig` previously failed in some
+  cases that are now addressed. (issue `#278
+  <https://github.com/wjakob/nanobind/issues/278>`__ commit `ed929b
+  <https://github.com/wjakob/nanobind/commit/ed929b7c6789e7d5e1760d515bc23ce6f7cedf8c>`__).
 
 Version 1.5.1 (Aug 23, 2023)
 ---------------------------

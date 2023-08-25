@@ -866,7 +866,7 @@ Wrapper classes
 
       Convert a C-style string in UTF-8 encoding of length ``n`` bytes into a Python string.
 
-   .. cpp:function:: const char * c_str()
+   .. cpp:function:: const char * c_str() const
 
       Convert a Python string into a null-terminated C-style string with UTF-8
       encoding.
@@ -897,7 +897,7 @@ Wrapper classes
 
       Convert a null-terminated C-style string encoding of length ``n`` bytes into a Python ``bytes`` object.
 
-   .. cpp:function:: const char * c_str()
+   .. cpp:function:: const char * c_str() const
 
       Convert a Python bytes object into a null-terminated C-style string.
 

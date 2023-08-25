@@ -397,7 +397,7 @@ class str : public object {
 
     template <typename... Args> str format(Args&&... args);
 
-    const char *c_str() { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
+    const char *c_str() const { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };
 
 class bytes : public object {
@@ -412,7 +412,7 @@ class bytes : public object {
     explicit bytes(const char *s, size_t n)
         : object(detail::bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
-    const char *c_str() { return PyBytes_AsString(m_ptr); }
+    const char *c_str() const { return PyBytes_AsString(m_ptr); }
 
     size_t size() const { return (size_t) PyBytes_Size(m_ptr); }
 };

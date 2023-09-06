@@ -30,8 +30,6 @@ template <typename T1> struct type_caster<std::complex<T1>> {
         (void)cleanup;
 
         PyObject* obj = src.ptr();
-        // Real and Imaginary parts of a python complex object are always double:
-        //   https://docs.python.org/3/c-api/complex.html#c.Py_complex
         value.real(PyComplex_RealAsDouble(obj));
         value.imag(PyComplex_ImagAsDouble(obj));
 
@@ -43,9 +41,7 @@ template <typename T1> struct type_caster<std::complex<T1>> {
                            cleanup_list *cleanup) noexcept {
 
         // Conversion from 2xfloat to 2xdouble if needs be
-        PyObject* r = PyComplex_FromDoubles(value.real(), value.imag());
-
-        return r;
+        return PyComplex_FromDoubles(value.real(), value.imag());
     }
 };
 

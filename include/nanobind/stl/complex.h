@@ -19,10 +19,7 @@ NAMESPACE_BEGIN(detail)
 
 template <typename T1> struct type_caster<std::complex<T1>> {
 
-    // Sub type caster
-    // TODO This definition seems useless, but I can't find a neat way to replace `Caster::Name` below.
-    using Caster = make_caster<T1>; 
-    NB_TYPE_CASTER(std::complex<T1>, const_name("complex [") + Caster::Name + const_name("]") )
+    NB_TYPE_CASTER(std::complex<T1>, const_name("complex") )
 
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {

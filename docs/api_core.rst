@@ -905,7 +905,6 @@ Wrapper classes
 
       Return the size in bytes.
 
-
 .. cpp:class:: type_object: public object
 
    Wrapper class representing Python ``type`` instances.
@@ -1019,6 +1018,15 @@ Wrapper classes
 .. cpp:class:: callable: public object
 
    Wrapper class representing a callable Python object.
+
+.. cpp:class:: weakref: public object
+
+   Wrapper class representing a Python weak reference object.
+
+   .. cpp:function:: explicit weakref(handle obj, handle callback = { })
+
+      Construct a new weak reference that points to `obj`. If provided,
+      Python will invoke the callable `callback` when `obj` expires.
 
 .. cpp:class:: args : public tuple
 

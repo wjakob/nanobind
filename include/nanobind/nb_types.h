@@ -611,6 +611,17 @@ public:
     using object::object;
 };
 
+class weakref : public object {
+public:
+    NB_OBJECT(weakref, object, "weakref", PyWeakref_Check)
+
+    explicit weakref(handle obj, handle callback = {})
+        : object(PyWeakref_NewRef(obj.ptr(), callback.ptr()), detail::steal_t{}) {
+        if (!m_ptr)
+            detail::raise_python_error();
+    }
+};
+
 template <typename T> class handle_t : public handle {
 public:
     static constexpr auto Name = detail::make_caster<T>::Name;

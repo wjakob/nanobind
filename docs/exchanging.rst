@@ -387,6 +387,7 @@ directives:
 :cpp:class:`iterator`, :cpp:class:`list`, :cpp:class:`mapping`,
 :cpp:class:`module_`, :cpp:class:`object`, :cpp:class:`sequence`,
 :cpp:class:`slice`, :cpp:class:`str`, :cpp:class:`tuple`,
+:cpp:class:`weakref`,
 :cpp:class:`type_object`, :cpp:class:`type_object_t\<T\> <handle_t>`,
 :cpp:class:`args`, and :cpp:class:`kwargs`.
 

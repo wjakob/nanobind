@@ -431,6 +431,18 @@ section <ndarrays>`.
 
       Create an invalid array.
 
+   .. cpp:function:: template <typename... Args2> explicit ndarray(const ndarray<Args2...> &other)
+
+      Reinterpreting constructor that wraps an existing nd-array (parameterized
+      by `Args`) into a new ndarray (parameterized by `Args2`).   No copy or
+      conversion is made.
+
+      Dropping parameters is always safe. For example, a function that
+      returns different array types could call it to convert ``ndarray<T>`` to
+      ``ndarray<>``.  When adding constraints, the constructor is only safe to
+      use following a runtime check to ensure that newly created array actually
+      possesses the advertised properties. 
+
    .. cpp:function:: ndarray(const ndarray &)
 
       Copy constructor. Increases the reference count of the referenced array.

@@ -571,3 +571,10 @@ def test32_half():
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
 
+@needs_numpy
+def test33_cast():
+    a = t.cast(False)
+    b = t.cast(True)
+    assert a.ndim == 0 and b.ndim == 0
+    assert a.dtype == np.int32 and b.dtype == np.float32
+    assert a == 1 and b == 1

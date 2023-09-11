@@ -279,10 +279,13 @@ template <typename... Ts> struct ndarray_info<jax, Ts...> : ndarray_info<Ts...> 
     constexpr static ndarray_framework framework = ndarray_framework::jax;
 };
 
+
 NAMESPACE_END(detail)
 
 template <typename... Args> class ndarray {
 public:
+    template <typename...> friend class ndarray;
+
     using Info = detail::ndarray_info<Args...>;
     using Scalar = typename Info::scalar_type;
 
@@ -292,6 +295,9 @@ public:
         if (handle)
             m_dltensor = *detail::ndarray_inc_ref(handle);
     }
+
+    template <typename... Args2>
+    explicit ndarray(const ndarray<Args2...> &other) : ndarray(other.m_handle) { }
 
     ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> value,
             size_t ndim,

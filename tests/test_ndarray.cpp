@@ -245,4 +245,12 @@ NB_MODULE(test_ndarray_ext, m) {
                                                                deleter);
     });
 #endif
+
+    m.def("cast", [](bool b) -> nb::ndarray<nb::numpy> {
+        using Ret = nb::ndarray<nb::numpy>;
+        if (b)
+            return Ret(nb::ndarray<nb::numpy, float, nb::shape<>>(f_global, 0, nullptr));
+        else
+            return Ret(nb::ndarray<nb::numpy, int, nb::shape<>>(i_global, 0, nullptr));
+    });
 }

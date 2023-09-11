@@ -452,7 +452,7 @@ interpreted as follows:
 - :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
   :cpp:enumerator:`rv_policy::copy`.
 
-.. _ndarray_nonstandard_arithmetic:
+.. _ndarray-nonstandard:
 
 Nonstandard arithmetic types
 ----------------------------
@@ -496,7 +496,7 @@ nanobind's :cpp:class:`nb::ndarray\<...\> <ndarray>` is based on the `DLPack
 <https://github.com/dmlc/dlpack>`__ array exchange protocol, which causes it to
 be more restrictive. Presently supported dtypes include signed/unsigned
 integers, floating point values, and boolean values. Some :ref:`nonstandard
-arithmetic types <ndarray_nonstandard_arithmetic>` can be supported as well.
+arithmetic types <ndarray-nonstandard>` can be supported as well.
 
 Nanobind can receive and return read-only arrays via the buffer protocol used
 to exchange data with NumPy. The DLPack interface currently ignores this

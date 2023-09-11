@@ -18,17 +18,31 @@ below inherit that of the preceding release.
 Version 1.6.0 (TBA)
 -------------------
 
-* Two small :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements. (commit
-  `7abcdd
-  <https://github.com/wjakob/nanobind/commit/7abcdd3cdf51bbc60984d48b3a4e82ce96f30500>`__).
+* Several :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements: 
 
-  1. Added the ability to impose additional ndarray constraints following
-     runtime checks via the :cpp:func:`.impose() <ndarray::impose>` method.
-     See the :ref:`ndarray documentation <ndarray-runtime-specialization>` for
-     an example.
+  1. CPU loops involving nanobind ndarrays weren't getting properly vectorized.
+     This release of nanobind adds *views*, which provide an efficient
+     abstraction that enables better code generation. See the documentation
+     section on :ref:`array views <ndarray-views>` for details.
+     (commit `8f602e
+     <https://github.com/wjakob/nanobind/commit/8f602e187b0634e1df13ba370352cf092e9042c0>`__).
 
-  2. Shape constraints like ``nb::shape<nb::any, nb::any, nb::any>``
-     are tedious to write. Now, there is a shorter form: ``nb::ndim<3>``.
+  2. Added support for nonstandard arithmetic types (e.g., ``__int128`` or
+     ``__fp16``) in ndarrays. See the :ref:`documentation section
+     <ndarray-nonstandard>` for details. (commit `49eab2
+     <https://github.com/wjakob/nanobind/commit/49eab2845530f84a1f029c5c1c5541ab3c1f9adc>`__).
+
+  3. Shape constraints like :py:class:`nb::shape\<nb::any, nb::any, nb::any\>
+     <shape>` are tedious to write. Now, there is a shorter form:
+     :py:class:`nb::ndim\<3\> <ndim>`. (commit `1350a5
+     <https://github.com/wjakob/nanobind/commit/1350a5e15b28e80ffc2130a779f3b8c559ddb620>`__).
+
+  4. Added an explicit constructor that can be used to add or remove ndarray
+     constraints. (commit `a1ac207
+     <https://github.com/wjakob/nanobind/commit/a1ac207ab82206b8e50fe456f577c02270014fb3>`__).
+
+* Added the wrapper class :cpp:class:`nb::weakref <weakref>`. (commit `78887f
+  <https://github.com/wjakob/nanobind/commit/78887fc167196a7568a5cef8f8dfbbee09aa7dc4>`__).
 
 * Added the methods :cpp:func:`nb::dict::contains() <dict::contains>` and
   :cpp:func:`nb::mapping::contains() <mapping::contains>` to the Python type

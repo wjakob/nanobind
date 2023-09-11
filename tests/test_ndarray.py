@@ -561,3 +561,13 @@ def test30_force_contig_pytorch():
     b = t.make_contig(a)
     assert b is not a
     assert torch.all(b == a)
+
+@needs_numpy
+def test32_half():
+    if not hasattr(t, 'ret_numpy_half'):
+        pytest.skip('half precision test is missing')
+    x = t.ret_numpy_half()
+    assert x.dtype == np.float16
+    assert x.shape == (2, 4)
+    assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+

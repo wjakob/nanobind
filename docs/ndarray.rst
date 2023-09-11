@@ -388,3 +388,25 @@ integers, floating point values, and boolean values.
 Nanobind can receive and return read-only arrays via the buffer protocol used
 to exchange data with NumPy. The DLPack interface currently ignores this
 annotation.
+
+Supporting nonstandard arithmetic types
+---------------------------------------
+
+Low or extended-precision arithmetic types (e.g., ``int128``, ``float16``,
+``bfloat``) are sometimes used but don't have standardized C++ equivalents. If
+you wish to exchange arrays based on such types, you must register a partial
+overload of ``nanobind::ndarray_traits`` to inform nanobind about it.
+
+For example, the following snippet makes ``__fp16`` (half-precision type on
+``aarch64``) available:
+
+.. code-block:: cpp
+
+   namespace nanobind {
+       template <> struct ndarray_traits<__fp16> {
+           static constexpr bool is_float  = true;
+           static constexpr bool is_bool   = false;
+           static constexpr bool is_int    = false;
+           static constexpr bool is_signed = true;
+       };
+   };

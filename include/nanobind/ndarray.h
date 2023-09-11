@@ -80,10 +80,19 @@ struct pytorch { };
 struct jax { };
 struct ro { };
 
+template <typename T> struct ndarray_traits {
+    static constexpr bool is_float  = std::is_floating_point_v<T>;
+    static constexpr bool is_bool   = std::is_same_v<std::remove_cv_t<T>, bool>;
+    static constexpr bool is_int    = std::is_integral_v<T> && !is_bool;
+    static constexpr bool is_signed = std::is_signed_v<T>;
+};
+
 NAMESPACE_BEGIN(detail)
 
-template<typename T> constexpr bool is_ndarray_scalar_v =
-std::is_floating_point_v<T> || std::is_integral_v<T>;
+template <typename T>
+constexpr bool is_ndarray_scalar_v =
+    ndarray_traits<T>::is_float || ndarray_traits<T>::is_int ||
+    ndarray_traits<T>::is_bool;
 
 template <typename> struct ndim_shape;
 template <size_t... S> struct ndim_shape<std::index_sequence<S...>> {
@@ -102,9 +111,9 @@ template <typename T> constexpr dlpack::dtype dtype() {
 
     dlpack::dtype result;
 
-    if constexpr (std::is_floating_point_v<T>)
+    if constexpr (ndarray_traits<T>::is_float)
         result.code = (uint8_t) dlpack::dtype_code::Float;
-    else if constexpr (std::is_signed_v<T>)
+    else if constexpr (ndarray_traits<T>::is_signed)
         result.code = (uint8_t) dlpack::dtype_code::Int;
     else if constexpr (std::is_same_v<std::remove_cv_t<T>, bool>)
         result.code = (uint8_t) dlpack::dtype_code::Bool;
@@ -139,7 +148,7 @@ template <typename T, typename = int> struct ndarray_arg {
     static void apply(ndarray_req &) { }
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<std::is_floating_point_v<T>>> {
+template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_float>> {
     static constexpr size_t size = 0;
 
     static constexpr auto name =
@@ -154,7 +163,7 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_floating_point_v
     }
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>>> {
+template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_int>> {
     static constexpr size_t size = 0;
 
     static constexpr auto name =
@@ -170,7 +179,7 @@ template <typename T> struct ndarray_arg<T, enable_if_t<std::is_integral_v<T> &&
     }
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<std::is_same_v<std::remove_cv_t<T>, bool>>> {
+template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_bool>> {
     static constexpr size_t size = 0;
 
     static constexpr auto name =
@@ -242,8 +251,8 @@ template <typename... Ts> struct ndarray_info {
 
 template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_info<Ts...> {
     using scalar_type =
-        std::conditional_t<std::is_scalar_v<T>, T,
-                           typename ndarray_info<Ts...>::scalar_type>;
+        std::conditional_t<ndarray_traits<T>::is_float || ndarray_traits<T>::is_int ||
+                           ndarray_traits<T>::is_bool, T, typename ndarray_info<Ts...>::scalar_type>;
 };
 
 template <size_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {

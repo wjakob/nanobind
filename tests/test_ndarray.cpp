@@ -9,6 +9,18 @@ using namespace nb::literals;
 
 int destruct_count = 0;
 static float f_global[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+static int i_global[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+#if defined(__aarch64__)
+namespace nanobind {
+   template <> struct ndarray_traits<__fp16> {
+       static constexpr bool is_float  = true;
+       static constexpr bool is_bool   = false;
+       static constexpr bool is_int    = false;
+       static constexpr bool is_signed = true;
+   };
+};
+#endif
 
 NB_MODULE(test_ndarray_ext, m) {
     m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
@@ -218,4 +230,19 @@ NB_MODULE(test_ndarray_ext, m) {
         .def("f1_ri", &Cls::f1, nb::rv_policy::reference_internal)
         .def("f2_ri", &Cls::f2, nb::rv_policy::reference_internal)
         .def("f3_ri", &Cls::f3, nb::rv_policy::reference_internal);
+
+#if defined(__aarch64__)
+    m.def("ret_numpy_half", []() {
+        __fp16 *f = new __fp16[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+
+        nb::capsule deleter(f, [](void *data) noexcept {
+            destruct_count++;
+            delete[] (__fp16*) data;
+        });
+
+        return nb::ndarray<nb::numpy, __fp16, nb::shape<2, 4>>(f, 2, shape,
+                                                               deleter);
+    });
+#endif
 }

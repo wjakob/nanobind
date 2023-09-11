@@ -231,6 +231,36 @@ NB_MODULE(test_ndarray_ext, m) {
         .def("f2_ri", &Cls::f2, nb::rv_policy::reference_internal)
         .def("f3_ri", &Cls::f3, nb::rv_policy::reference_internal);
 
+    m.def("fill_view_1", [](nb::ndarray<> x) {
+        if (x.ndim() == 2 && x.dtype() == nb::dtype<float>()) {
+            auto v = x.view<float, nb::ndim<2>>();
+            for (size_t i = 0; i < v.shape(0); i++)
+                for (size_t j = 0; j < v.shape(1); j++)
+                    v(i, j) *= 2;
+        }
+    }, "x"_a.noconvert());
+
+    m.def("fill_view_2", [](nb::ndarray<float, nb::ndim<2>, nb::device::cpu> x) {
+        auto v = x.view();
+        for (size_t i = 0; i < v.shape(0); ++i)
+            for (size_t j = 0; j < v.shape(1); ++j)
+                v(i, j) = (float) (i * 10 + j);
+    }, "x"_a.noconvert());
+
+    m.def("fill_view_3", [](nb::ndarray<float, nb::shape<3, 4>, nb::c_contig, nb::device::cpu> x) {
+        auto v = x.view();
+        for (size_t i = 0; i < v.shape(0); ++i)
+            for (size_t j = 0; j < v.shape(1); ++j)
+                v(i, j) = (float) (i * 10 + j);
+    }, "x"_a.noconvert());
+
+    m.def("fill_view_4", [](nb::ndarray<float, nb::shape<3, 4>, nb::f_contig, nb::device::cpu> x) {
+        auto v = x.view();
+        for (size_t i = 0; i < v.shape(0); ++i)
+            for (size_t j = 0; j < v.shape(1); ++j)
+                v(i, j) = (float) (i * 10 + j);
+    }, "x"_a.noconvert());
+
 #if defined(__aarch64__)
     m.def("ret_numpy_half", []() {
         __fp16 *f = new __fp16[8] { 1, 2, 3, 4, 5, 6, 7, 8 };

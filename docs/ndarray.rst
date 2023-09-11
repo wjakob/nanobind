@@ -83,13 +83,12 @@ should therefore prevent such undefined behavior.
 :cpp:class:`nb::ndarray\<...\> <ndarray>` accepts template arguments to
 specify such constraints. For example the function interface below
 guarantees that the implementation is only invoked when it is provided with
-a ``MxNx3`` array of 8-bit unsigned integers that is furthermore stored
-contiguously in CPU memory using a C-style array ordering convention.
+a ``MxNx3`` array of 8-bit unsigned integers.
 
 .. code-block:: cpp
 
    m.def("process", [](nb::ndarray<uint8_t, nb::shape<nb::any, nb::any, 3>,
-                                   nb::c_contig, nb::device::cpu> data) {
+                                   nb::device::cpu> data) {
        // Double brightness of the MxNx3 RGB image
        for (size_t y = 0; y < data.shape(0); ++y)
            for (size_t x = 0; x < data.shape(1); ++x)
@@ -100,15 +99,16 @@ contiguously in CPU memory using a C-style array ordering convention.
 
 The above example also demonstrates the use of
 :cpp:func:`nb::ndarray\<...\>::operator() <ndarray::operator()>`, which
-provides direct (i.e., high-performance) read/write access to the array
-data. Note that this function is only available when the underlying data
-type and ndarray rank are specified. It should only be used when the
-array storage is reachable via CPU’s virtual memory address space.
+provides direct read/write access to the array contents. Note that this
+function is only available when the underlying data type and ndarray dimension
+are specified via the :cpp:type:`ndarray\<..\> <ndarray>` template parameters.
+It should only be used when the array storage is accessible through the CPU's
+virtual memory address space.
 
 .. _ndarray-constraints-1:
 
 Constraint types
-~~~~~~~~~~~~~~~~
+----------------
 
 The following constraints are available
 
@@ -152,6 +152,94 @@ count until they go out of scope. It is legal call
 :cpp:class:`nb::ndarray\<...\> <ndarray>` members from multithreaded code even
 when the `GIL <https://wiki.python.org/moin/GlobalInterpreterLock>`__ is not
 held.
+
+.. _ndarray-views:
+
+Fast array views
+----------------
+
+The following advice applies to performance-sensitive CPU code that reads and
+writes arrays using loops that invoke :cpp:func:`nb::ndarray\<...\>::operator()
+<ndarray::operator()>`. It does not apply to GPU arrays because they are
+usually not accessed in this way.
+
+Consider the following snippet, which fills a 2D array with data:
+
+.. code-block:: cpp
+
+   void fill(nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu> arg) {
+       for (size_t i = 0; i < array.shape(0); ++i)
+           for (size_t j = 0; j < array.shape(1); ++j)
+               arg(i, j) = /* ... */;
+   }
+
+While functional, this code is not perfect. The problem is that to compute the
+address of an entry, ``operator()`` accesses the DLPack array descriptor. This
+indirection can break certain compiler optimizations.
+
+nanobind provides the method :cpp:func:`ndarray\<...\>::view() <ndarray::view>`
+to fix this. It creates a tiny data structure that provides all information
+needed to access the array contents, and which can be held within CPU
+registers. All relevant compile-time information (:cpp:class:`nb::ndim <ndim>`,
+:cpp:class:`nb::shape <shape>`, :cpp:class:`nb::c_contig <c_contig>`,
+:cpp:class:`nb::f_contig <f_contig>`) is materialized in this view, which
+enables constant propagation, auto-vectorization, and loop unrolling.
+
+An improved version of the example using such a view is shown below:
+
+.. code-block:: cpp
+
+   void fill(nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu> arg) {
+       auto v = array.view(); /// <-- new!
+
+       for (size_t i = 0; i < v.shape(0); ++i) // Important; use 'v' instead of 'arg' everywhere in loop
+           for (size_t j = 0; j < v.shape(1); ++j)
+               v(i, j) = /* ... */;
+   }
+
+Note that the view performs no reference counting. You may not store it in a way
+that exceeds the lifetime of the original array.
+
+When using OpenMP to parallelize expensive array operations, pass the
+``firstprivate(view_1, view_2, ...)`` so that each worker thread can copy the
+view into its register file.
+
+.. code-block:: cpp
+
+   auto v = array.view();
+   #pragma omp parallel for schedule(static) firstprivate(v)
+   for (...) { /* parallel loop */ }
+
+.. _ndarray-runtime-specialization:
+
+Specializing views at runtime
+-----------------------------
+
+As mentioned earlier, element access via ``operator()`` only works when both
+the array's scalar type and its dimension are specified within the type (i.e.,
+when they are known at compile time); the same is also true for array views.
+However, sometimes, it is useful that a function can be called with different
+array types.
+
+You may use the :cpp:func:`ndarray\<...\>::view() <ndarray::view>` method to
+create *specialized* views if a run-time check determines that it is safe to
+do so. For example, the function below accepts contiguous CPU arrays and
+performs a loop over a specialized 2D ``float`` view when the array is of
+this type.
+
+.. code-block:: cpp
+
+   void fill(nb::ndarray<nb::c_contig, nb::device::cpu> arg) {
+       if (arg.dtype() == nb::dtype<float>() && arg.ndim() == 2) {
+           auto v = array.view<float, nb::ndim<2>>(); // <-- new!
+
+           for (size_t i = 0; i < v.shape(0); ++i) {
+               for (size_t j = 0; j < v.shape(1); ++j) {
+                   v(i, j) = /* ... */;
+               }
+           }
+        } else { /* ... */ }
+   }
 
 Constraints in type signatures
 ------------------------------
@@ -364,33 +452,10 @@ interpreted as follows:
 - :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
   :cpp:enumerator:`rv_policy::copy`.
 
-Limitations
------------
+.. _ndarray_nonstandard_arithmetic:
 
-.. _dtype_restrictions:
-
-Libraries like `NumPy <https://numpy.org>`__ support arrays with flexible
-internal representations (*dtypes*), including
-
-- Floating point and integer arrays with various bit depths
-
-- Null-terminated strings
-
-- Arbitrary Python objects
-
-- Heterogeneous data structures composed of multiple fields
-
-nanobind's :cpp:class:`nb::ndarray\<...\> <ndarray>` is based on the `DLPack
-<https://github.com/dmlc/dlpack>`__ array exchange protocol, which causes it to
-be more restrictive. Presently supported dtypes include signed/unsigned
-integers, floating point values, and boolean values.
-
-Nanobind can receive and return read-only arrays via the buffer protocol used
-to exchange data with NumPy. The DLPack interface currently ignores this
-annotation.
-
-Supporting nonstandard arithmetic types
----------------------------------------
+Nonstandard arithmetic types
+----------------------------
 
 Low or extended-precision arithmetic types (e.g., ``int128``, ``float16``,
 ``bfloat``) are sometimes used but don't have standardized C++ equivalents. If
@@ -410,3 +475,29 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
            static constexpr bool is_signed = true;
        };
    };
+
+Limitations
+-----------
+
+.. _dtype_restrictions:
+
+Libraries like `NumPy <https://numpy.org>`__ support arrays with flexible
+internal representations (*dtypes*), including
+
+- Floating point and integer arrays with various bit depths
+
+- Null-terminated strings
+
+- Arbitrary Python objects
+
+- Heterogeneous data structures composed of multiple fields
+
+nanobind's :cpp:class:`nb::ndarray\<...\> <ndarray>` is based on the `DLPack
+<https://github.com/dmlc/dlpack>`__ array exchange protocol, which causes it to
+be more restrictive. Presently supported dtypes include signed/unsigned
+integers, floating point values, and boolean values. Some :ref:`nonstandard
+arithmetic types <ndarray_nonstandard_arithmetic>` can be supported as well.
+
+Nanobind can receive and return read-only arrays via the buffer protocol used
+to exchange data with NumPy. The DLPack interface currently ignores this
+annotation.

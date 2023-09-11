@@ -563,6 +563,29 @@ def test30_force_contig_pytorch():
     assert torch.all(b == a)
 
 @needs_numpy
+def test31_view():
+    # 1
+    x1 = np.array([[1,2],[3,4]], dtype=np.float32)
+    x2 = np.array([[1,2],[3,4]], dtype=np.float64)
+    assert np.allclose(x1, x2)
+    t.fill_view_1(x1)
+    assert np.allclose(x1, x2*2)
+    t.fill_view_1(x2)
+    assert np.allclose(x1, x2*2)
+
+    #2
+    x1 = np.zeros((3, 4), dtype=np.float32, order='C')
+    x2 = np.zeros((3, 4), dtype=np.float32, order='F')
+    t.fill_view_2(x1)
+    t.fill_view_2(x2)
+    x3 = np.zeros((3, 4), dtype=np.float32, order='C')
+    t.fill_view_3(x3)
+    x4 = np.zeros((3, 4), dtype=np.float32, order='F')
+    t.fill_view_4(x4)
+
+    assert np.all(x1 == x2) and np.all(x2 == x3) and np.all(x3 == x4)
+
+@needs_numpy
 def test32_half():
     if not hasattr(t, 'ret_numpy_half'):
         pytest.skip('half precision test is missing')

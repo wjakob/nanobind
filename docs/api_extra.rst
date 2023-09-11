@@ -565,6 +565,17 @@ section <ndarrays>`.
       Return a mutable pointer to the array data. Only enabled when `Scalar` is
       not itself ``const``.
 
+   .. cpp:function:: template <typename... Extra> auto view()
+
+      Returns an nd-array view that is optimized for fast array access on the
+      CPU. You may optionally specify additional ndarray constraints via the
+      `Extra` parameter (though a runtime check should first be performed to
+      ensure that the array possesses these properties).
+
+      The returned view provides the operations ``data()``, ``ndim()``,
+      ``shape()``, ``stride()``, and ``operator()`` following the conventions
+      of the `ndarray` type.
+
    .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
 
       Return a mutable reference to the element at stored at the provided

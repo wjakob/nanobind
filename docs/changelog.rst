@@ -16,19 +16,32 @@ isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
 Version 1.6.0 (TBA)
----------------------------
+-------------------
+
+* Two small :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements. (commit
+  `7abcdd
+  <https://github.com/wjakob/nanobind/commit/7abcdd3cdf51bbc60984d48b3a4e82ce96f30500>`__).
+
+  1. Added the ability to impose additional ndarray constraints following
+     runtime checks via the :cpp:func:`.impose() <ndarray::impose>` method.
+     See the :ref:`ndarray documentation <ndarray-runtime-specialization>` for
+     an example.
+
+  2. Shape constraints like ``nb::shape<nb::any, nb::any, nb::any>``
+     are tedious to write. Now, there is a shorter form: ``nb::ndim<3>``.
 
 * Added the methods :cpp:func:`nb::dict::contains() <dict::contains>` and
   :cpp:func:`nb::mapping::contains() <mapping::contains>` to the Python type
-  wrappers.
+  wrappers. (commit `64d87a
+  <https://github.com/wjakob/nanobind/commit/64d87ae01355c247123613f140cef8e71bc98fc7>`__).
 
 Version 1.5.2 (Aug 24, 2023)
--------------------
+----------------------------
 
 * Fixed a severe issue with inheritance of the ``Py_TPFLAGS_HAVE_GC`` flag
   affecting classes that derive from other classes with a
   :cpp:class:`nb::dynamic_attr <dynamic_attr>` annotation. (issue `#279
-  <https://github.com/wjakob/nanobind/issues/279>`__ commit `dbedad
+  <https://github.com/wjakob/nanobind/issues/279>`__, commit `dbedad
   <https://github.com/wjakob/nanobind/commit/dbedadc294a7529bf401f01dbc97d4b47b677bc9>`__).
 * Implicit conversion of nd-arrays to conform to contiguity constraints such as
   :cpp:class:`c_contig` and :cpp:class:`f_contig` previously failed in some
@@ -37,7 +50,7 @@ Version 1.5.2 (Aug 24, 2023)
   <https://github.com/wjakob/nanobind/commit/ed929b7c6789e7d5e1760d515bc23ce6f7cedf8c>`__).
 
 Version 1.5.1 (Aug 23, 2023)
----------------------------
+----------------------------
 
 * Fixed serious reference counting issue introduced in nanobind version 1.5.0,
   which affected the functions :cpp:func:`python_error::traceback()` and

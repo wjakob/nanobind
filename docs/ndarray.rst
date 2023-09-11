@@ -119,9 +119,14 @@ The following constraints are available
   if you plan to call nanobind functions with arrays that do not permit write
   access.
 
-- The :cpp:class:`nb::shape <shape>` annotation simultaneously constrains the
-  number of array dimensions and the size per dimension. A :cpp:var:`nb::any
-  <any>` entry leaves the corresponding dimension unconstrained.
+- The :cpp:class:`nb::shape <shape>` annotation (as in ``nb::shape<nb::any,
+  3>``) simultaneously constrains the number of array dimensions and the size
+  per dimension. A value of :cpp:var:`nb::any <any>` leaves the corresponding
+  dimension unconstrained.
+
+  :cpp:class:`nb::ndim <ndim>` is shorter to write when only the dimension
+  should be constrained. For example, ``nb::ndim<2>`` is equivalent to
+  ``nb::shape<nb::any, nb::any>``.
 
 - Device tags like :cpp:class:`nb::device::cpu <device::cpu>` or
   :cpp:class:`nb::device::cuda <device::cuda>` constrain the source device
@@ -133,6 +138,9 @@ The following constraints are available
   row-major storage, and F-contiguous corresponds to column-major storage.
   Without this tag, non-contiguous representations (e.g. produced by slicing
   operations) and other unusual layouts are permitted.
+
+  This tag is mainly useful when directly accessing the array contents via
+  :cpp:func:`nb::ndarray\<...\>::data() <ndarray::data>`.
 
 Passing arrays in C++ code
 --------------------------

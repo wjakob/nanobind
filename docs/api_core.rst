@@ -1309,7 +1309,7 @@ Casting
    When the `convert` argument is set to ``true`` (the default), the
    implementation may also attempt *implicit conversions* to perform the cast.
 
-   The function returns `false` when the conversion fails. In this case, the
+   The function returns ``false`` when the conversion fails. In this case, the
    `out` parameter is left untouched. See :cpp:func:`cast()` for an alternative
    that instead raises an exception in this case.
 

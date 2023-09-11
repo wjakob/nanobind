@@ -85,7 +85,14 @@ NAMESPACE_BEGIN(detail)
 template<typename T> constexpr bool is_ndarray_scalar_v =
 std::is_floating_point_v<T> || std::is_integral_v<T>;
 
+template <typename> struct ndim_shape;
+template <size_t... S> struct ndim_shape<std::index_sequence<S...>> {
+    using type = shape<((void) S, any)...>;
+};
+
 NAMESPACE_END(detail)
+
+template <size_t N> using ndim = typename detail::ndim_shape<std::make_index_sequence<N>>::type;
 
 template <typename T> constexpr dlpack::dtype dtype() {
     static_assert(

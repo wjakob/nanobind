@@ -188,13 +188,10 @@ NB_MODULE(test_ndarray_ext, m) {
     });
 
     m.def("noop_3d_c_contig",
-          [](nb::ndarray<float, nb::shape<nb::any, nb::any, nb::any>,
-                         nb::c_contig>) { return; });
+          [](nb::ndarray<float, nb::ndim<3>, nb::c_contig>) { return; });
 
     m.def("noop_2d_f_contig",
-          [](nb::ndarray<float, nb::shape<nb::any, nb::any>, nb::f_contig>) {
-              return;
-          });
+          [](nb::ndarray<float, nb::ndim<2>, nb::f_contig>) { return; });
 
     m.def("accept_rw", [](nb::ndarray<float, nb::shape<2>> a) { return a(0); });
     m.def("accept_ro", [](nb::ndarray<const float, nb::shape<2>> a) { return a(0); });

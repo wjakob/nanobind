@@ -63,3 +63,54 @@ jobs:
       run: >
         cd build;
         python -m pytest
+
+  linux_with_libcpp:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12.0-rc.1', 'pypy3.9', 'pypy3.10']
+
+    name: "Python ${{ matrix.python }} / ${{ matrix.os }} / libc++"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Setup Python ${{ matrix.python }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Update CMake
+        uses: jwlawson/actions-setup-cmake@v1.13
+
+      - name: Install Eigen
+        run: sudo apt-get -y install libeigen3-dev
+
+      - name: Install libc++
+        run: sudo apt-get -y install clang libc++-dev
+
+      - name: Install PyTest
+        run: |
+          python -m pip install pytest pytest-github-actions-annotate-failures
+
+      - name: Install NumPy
+        if: matrix.python != 'pypy3.9' && matrix.python != 'pypy3.10' && matrix.python != '3.12.0-rc.1'
+        run: |
+          python -m pip install numpy scipy
+
+      - name: Configure
+        run: |
+          # compile in debug mode to produce better error msg
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
+
+      - name: Build C++
+        run: cmake --build build -j 2
+
+      - name: Run tests
+        run: >
+          cd build;
+          python -m pytest -s

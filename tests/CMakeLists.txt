@@ -34,6 +34,8 @@ nanobind_add_module(test_intrusive_ext test_intrusive.cpp object.cpp object.h ${
 nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_unique_type_index_base_ext test_unique_type_index_base.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_unique_type_index_derived_ext test_unique_type_index_derived.cpp ${NB_EXTRA_ARGS})
 
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)
@@ -73,6 +75,7 @@ set(TEST_FILES
   test_stl_bind_vector.py
   test_chrono.py
   test_ndarray.py
+  test_unique_type_index.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

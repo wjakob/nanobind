@@ -51,6 +51,7 @@
 #include "nb_func.h"
 #include "nb_class.h"
 #include "nb_misc.h"
+#include "nb_eval.h"
 
 #if defined(_MSC_VER)
 #  pragma warning(pop)

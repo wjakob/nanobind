@@ -64,7 +64,7 @@ object eval(const str &expr, object global = globals(), object local = object())
        this seems to be the only alternative */
     // TODO error: no matching function for call to
     // ‘std::__cxx11::basic_string<char>::basic_string(const nanobind::str&)’
-    std::string buffer = std::string("# -*- coding: utf-8 -*-\n") + (std::string) expr;
+    std::string buffer = std::string("# -*- coding: utf-8 -*-\n") + std::string(expr.c_str());
 
     int start = 0;
     switch (mode) {

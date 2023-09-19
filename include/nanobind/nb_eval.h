@@ -21,7 +21,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-inline void ensure_builtins_in_globals(object &global) {
+inline void ensure_builtins_in_globals(dict &global) {
 #if defined(PYPY_VERSION) || PY_VERSION_HEX < 0x03080000
     // Running exec and eval adds `builtins` module under `__builtins__` key to
     // globals if not yet present.  Python 3.8 made PyRun_String behave

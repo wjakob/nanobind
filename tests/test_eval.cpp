@@ -1,7 +1,7 @@
 /*
     tests/test_eval.cpp -- Usage of eval() and eval_file()
 
-    Adapted from pybind11's test_eval.cpp with
+    Adapted by Nico Schlömer from pybind11's test_eval.cpp with
 
     Copyright (c) 2016 Klemens D. Morgenstern
 

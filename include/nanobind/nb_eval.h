@@ -19,22 +19,6 @@
 #include <utility>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
-NAMESPACE_BEGIN(detail)
-
-inline void ensure_builtins_in_globals(dict &global) {
-#if defined(PYPY_VERSION) || PY_VERSION_HEX < 0x03080000
-    // Running exec and eval adds `builtins` module under `__builtins__` key to
-    // globals if not yet present.  Python 3.8 made PyRun_String behave
-    // similarly. Let's also do that for older versions, for consistency. This
-    // was missing from PyPy3.8 7.3.7.
-    if (!global.contains("__builtins__"))
-        global["__builtins__"] = module_::import_("builtins");
-#else
-    (void) global;
-#endif
-}
-
-NAMESPACE_END(detail)
 
 /// \ingroup python_builtins
 /// Return a dictionary representing the global variables in the current execution frame,
@@ -60,8 +44,6 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
     if (!local) {
         local = global;
     }
-
-    detail::ensure_builtins_in_globals(global);
 
     /* PyRun_String does not accept a PyObject / encoding specifier,
        this seems to be the only alternative */

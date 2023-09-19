@@ -71,9 +71,9 @@ NB_MODULE(test_eval_ext, m) {
 
     // test_eval_empty_globals
     m.def("eval_empty_globals", [](nb::dict global) {
-        if (global.is_none()) {
-            global = nb::dict();
-        }
+        // if (global.is_none()) {
+        //     global = nb::dict();
+        // }
         auto int_class = nb::eval("isinstance(42, int)", global);
         return global;
     });

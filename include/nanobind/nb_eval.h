@@ -1,6 +1,8 @@
 /*
-    pybind11/eval.h: Support for evaluating Python expressions and statements
-    from strings and files
+    nanobind/nb_eval.h: Support for evaluating Python expressions and statements
+                        from strings and files
+
+    Adapted from pybind11's eval.h with
 
     Copyright (c) 2016 Klemens Morgenstern <klemens.morgenstern@ed-chemnitz.de> and
                        Wenzel Jakob <wenzel.jakob@epfl.ch>
@@ -13,6 +15,7 @@
 
 #include <nanobind/nanobind.h>
 
+#include <string>
 #include <utility>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)

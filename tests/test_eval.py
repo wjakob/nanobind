@@ -5,10 +5,10 @@ import pytest
 import test_eval_ext as m
 
 
-def test_evals(capture):
-    with capture:
-        assert m.test_eval_statements()
-    assert capture == "Hello World!"
+def test_evals(capsys):
+    assert m.test_eval_statements()
+    captured = capsys.readouterr()
+    assert captured.out == "Hello World!\n"
 
     assert m.test_eval()
     assert m.test_eval_single_statement()

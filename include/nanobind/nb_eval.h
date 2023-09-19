@@ -65,8 +65,6 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
 
     /* PyRun_String does not accept a PyObject / encoding specifier,
        this seems to be the only alternative */
-    // TODO error: no matching function for call to
-    // ‘std::__cxx11::basic_string<char>::basic_string(const nanobind::str&)’
     std::string buffer = std::string("# -*- coding: utf-8 -*-\n") + std::string(expr.c_str());
 
     int start = 0;
@@ -113,65 +111,5 @@ template <size_t N>
 void exec(const char (&s)[N], dict global = globals(), object local = object()) {
     eval<eval_statements>(s, std::move(global), std::move(local));
 }
-
-#if defined(PYPY_VERSION)
-template <eval_mode mode = eval_statements>
-object eval_file(str, object, object) {
-    detail::fail("eval_file not supported in PyPy3. Use eval");
-}
-template <eval_mode mode = eval_statements>
-object eval_file(str, object) {
-    detail::fail("eval_file not supported in PyPy3. Use eval");
-}
-template <eval_mode mode = eval_statements>
-object eval_file(str) {
-    detail::fail("eval_file not supported in PyPy3. Use eval");
-}
-#else
-template <eval_mode mode = eval_statements>
-object eval_file(str fname, dict global = globals(), object local = object()) {
-    if (!local) {
-        local = global;
-    }
-
-    detail::ensure_builtins_in_globals(global);
-
-    int start = 0;
-    switch (mode) {
-        case eval_expr:
-            start = Py_eval_input;
-            break;
-        case eval_single_statement:
-            start = Py_single_input;
-            break;
-        case eval_statements:
-            start = Py_file_input;
-            break;
-        default:
-            detail::fail("invalid evaluation mode");
-    }
-
-    int closeFile = 1;
-    std::string fname_str = std::string(fname.c_str());
-    FILE *f = _Py_fopen_obj(fname.ptr(), "r");
-    if (!f) {
-        PyErr_Clear();
-        detail::fail(("File \"" + fname_str + "\" could not be opened!").c_str());
-    }
-
-    // TODO error: ‘class nanobind::object’ has no member named ‘contains’
-    if (!global.contains("__file__")) {
-        global["__file__"] = std::move(fname);
-    }
-
-    PyObject *result
-        = PyRun_FileEx(f, fname_str.c_str(), start, global.ptr(), local.ptr(), closeFile);
-
-    if (!result) {
-        throw python_error();
-    }
-    return steal<object>(result);
-}
-#endif
 
 NAMESPACE_END(NB_NAMESPACE)

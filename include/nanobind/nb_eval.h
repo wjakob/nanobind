@@ -84,10 +84,17 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
             detail::fail("invalid evaluation mode");
     }
 
-    PyObject *result = PyRun_String(buffer.c_str(), start, global.ptr(), local.ptr());
+    // This used to be PyRun_String, but that function isn't in the stable ABI.
+    PyObject *codeobj = Py_CompileString(buffer.c_str(), "<string>", start);
+    if (!codeobj)
+    {
+        throw python_error();
+    }
+    PyObject *result = PyEval_EvalCode(codeobj, global.ptr(), local.ptr());
     if (!result) {
         throw python_error();
     }
+
     return steal<object>(result);
 }
 

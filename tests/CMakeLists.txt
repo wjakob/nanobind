@@ -63,6 +63,7 @@ set(TEST_FILES
   test_classes.py
   test_eigen.py
   test_enum.py
+  test_eval.py
   test_exception.py
   test_functions.py
   test_holders.py

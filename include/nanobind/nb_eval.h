@@ -145,7 +145,7 @@ object eval_file(str fname, dict global = globals(), object local = object()) {
     }
 
     int closeFile = 1;
-    std::string fname_str = (std::string) fname;
+    std::string fname_str = std::string(fname.c_str());
     FILE *f = _Py_fopen_obj(fname.ptr(), "r");
     if (!f) {
         PyErr_Clear();

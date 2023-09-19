@@ -2,7 +2,6 @@ import os
 
 import pytest
 
-import env  # noqa: F401
 import test_eval_ext as m
 
 

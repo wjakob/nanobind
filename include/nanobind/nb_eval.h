@@ -28,7 +28,7 @@ inline void ensure_builtins_in_globals(dict &global) {
     // similarly. Let's also do that for older versions, for consistency. This
     // was missing from PyPy3.8 7.3.7.
     if (!global.contains("__builtins__"))
-        global["__builtins__"] = module_::import_(PYBIND11_BUILTINS_MODULE);
+        global["__builtins__"] = module_::import_("builtins");
 #else
     (void) global;
 #endif

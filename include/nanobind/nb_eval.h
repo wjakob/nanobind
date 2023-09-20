@@ -15,7 +15,6 @@
 
 #include <nanobind/nanobind.h>
 
-#include <string>
 #include <utility>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -37,10 +36,6 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
         local = global;
     }
 
-    /* PyRun_String does not accept a PyObject / encoding specifier,
-       this seems to be the only alternative */
-    std::string buffer = std::string("# -*- coding: utf-8 -*-\n") + std::string(expr.c_str());
-
     int start = 0;
     switch (mode) {
         case eval_expr:
@@ -57,7 +52,7 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
     }
 
     // This used to be PyRun_String, but that function isn't in the stable ABI.
-    PyObject *codeobj = Py_CompileString(buffer.c_str(), "<string>", start);
+    PyObject *codeobj = Py_CompileString(expr.c_str(), "<string>", start);
     if (!codeobj)
     {
         throw python_error();

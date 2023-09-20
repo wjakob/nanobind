@@ -20,35 +20,20 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 enum eval_mode {
-    /// Evaluate a string containing an isolated expression
-    eval_expr,
+    // Evaluate a string containing an isolated expression
+    eval_expr = Py_eval_input,
 
-    /// Evaluate a string containing a single statement. Returns \c none
-    eval_single_statement,
+    // Evaluate a string containing a single statement. Returns \c none
+    eval_single_statement = Py_single_input,
 
-    /// Evaluate a string containing a sequence of statement. Returns \c none
-    eval_statements
+    // Evaluate a string containing a sequence of statement. Returns \c none
+    eval_statements = Py_file_input
 };
 
-template <eval_mode mode = eval_expr>
+template <eval_mode start = eval_expr>
 object eval(const str &expr, object global = object(), object local = object()) {
     if (!local) {
         local = global;
-    }
-
-    int start = 0;
-    switch (mode) {
-        case eval_expr:
-            start = Py_eval_input;
-            break;
-        case eval_single_statement:
-            start = Py_single_input;
-            break;
-        case eval_statements:
-            start = Py_file_input;
-            break;
-        default:
-            detail::fail("invalid evaluation mode");
     }
 
     // This used to be PyRun_String, but that function isn't in the stable ABI.
@@ -65,11 +50,11 @@ object eval(const str &expr, object global = object(), object local = object()) 
     return steal<object>(result);
 }
 
-template <eval_mode mode = eval_expr, size_t N>
+template <eval_mode start = eval_expr, size_t N>
 object eval(const char (&s)[N], object global = object(), object local = object()) {
-    /* Support raw string literals by removing common leading whitespace */
+    // Support raw string literals by removing common leading whitespace
     auto expr = (s[0] == '\n') ? str(module_::import_("textwrap").attr("dedent")(s)) : str(s);
-    return eval<mode>(expr, std::move(global), std::move(local));
+    return eval<start>(expr, std::move(global), std::move(local));
 }
 
 inline void exec(const str &expr, object global = object(), object local = object()) {

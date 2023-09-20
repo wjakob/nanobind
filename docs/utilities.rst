@@ -17,7 +17,7 @@ used.
 .. code-block:: cpp
 
     // At beginning of file
-    #include <nanobind/nb_eval.h>
+    #include <nanobind/eval.h>
 
     ...
 

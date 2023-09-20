@@ -1,6 +1,6 @@
 /*
-    nanobind/nb_eval.h: Support for evaluating Python expressions and
-                        statements from strings
+    nanobind/eval.h: Support for evaluating Python expressions and
+                     statements from strings
 
     Adapted by Nico Schlömer from pybind11's eval.h.
 

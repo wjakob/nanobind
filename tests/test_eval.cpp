@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/eval.h>
 #include <nanobind/stl/pair.h>
 
 // #include "pybind11_tests.h"

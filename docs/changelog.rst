@@ -49,6 +49,9 @@ Version 1.6.0 (TBA)
   wrappers. (commit `64d87a
   <https://github.com/wjakob/nanobind/commit/64d87ae01355c247123613f140cef8e71bc98fc7>`__).
 
+* Added :cpp:func:`nb::exec() <exec>` and :cpp:func:`nb:eval() <eval>`. (PR `#299`
+  <https://github.com/wjakob/nanobind/pull/299>`__).
+
 Version 1.5.2 (Aug 24, 2023)
 ----------------------------
 

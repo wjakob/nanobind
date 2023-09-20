@@ -350,7 +350,7 @@ Removed features include:
   pybind11, however.
 - ● Buffer protocol binding (``.def_buffer()``) was removed in favor of
   :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>`.
-- ● Support for evaluating Python code strings was removed.
+- ● Support for evaluating Python files was removed.
 
 Bullet points marked with ● may be reintroduced eventually, but this will
 need to be done in a careful opt-in manner that does not affect code

@@ -28,7 +28,7 @@ enum eval_mode {
 };
 
 template <eval_mode start = eval_expr>
-object eval(const str &expr, object global = object(), object local = object()) {
+object eval(const str &expr, handle global = handle(), handle local = handle()) {
     if (!local)
         local = global;
 
@@ -45,19 +45,19 @@ object eval(const str &expr, object global = object(), object local = object()) 
 }
 
 template <eval_mode start = eval_expr, size_t N>
-object eval(const char (&s)[N], object global = object(), object local = object()) {
+object eval(const char (&s)[N], handle global = handle(), handle local = handle()) {
     // Support raw string literals by removing common leading whitespace
     auto expr = (s[0] == '\n') ? str(module_::import_("textwrap").attr("dedent")(s)) : str(s);
-    return eval<start>(expr, std::move(global), std::move(local));
+    return eval<start>(expr, global, local);
 }
 
-inline void exec(const str &expr, object global = object(), object local = object()) {
-    eval<eval_statements>(expr, std::move(global), std::move(local));
+inline void exec(const str &expr, handle global = handle(), handle local = handle()) {
+    eval<eval_statements>(expr, global, local);
 }
 
 template <size_t N>
-void exec(const char (&s)[N], object global = object(), object local = object()) {
-    eval<eval_statements>(s, std::move(global), std::move(local));
+void exec(const char (&s)[N], handle global = handle(), handle local = handle()) {
+    eval<eval_statements>(s, global, local);
 }
 
 NAMESPACE_END(NB_NAMESPACE)

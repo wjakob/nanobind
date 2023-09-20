@@ -1,14 +1,3 @@
-/*
-    tests/test_eval.cpp -- Usage of eval() and eval_file()
-
-    Adapted by Nico Schlömer from pybind11's test_eval.cpp with
-
-    Copyright (c) 2016 Klemens D. Morgenstern
-
-    All rights reserved. Use of this source code is governed by a
-    BSD-style license that can be found in the LICENSE file.
-*/
-
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
 

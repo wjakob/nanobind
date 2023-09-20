@@ -1,11 +1,8 @@
 /*
-    nanobind/nb_eval.h: Support for evaluating Python expressions and statements
-                        from strings and files
+    nanobind/nb_eval.h: Support for evaluating Python expressions and
+                        statements from strings
 
-    Adapted by Nico Schlömer from pybind11's eval.h with
-
-    Copyright (c) 2016 Klemens Morgenstern <klemens.morgenstern@ed-chemnitz.de> and
-                       Wenzel Jakob <wenzel.jakob@epfl.ch>
+    Adapted by Nico Schlömer from pybind11's eval.h.
 
     All rights reserved. Use of this source code is governed by a
     BSD-style license that can be found in the LICENSE file.

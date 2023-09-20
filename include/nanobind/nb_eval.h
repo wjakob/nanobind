@@ -55,11 +55,11 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
     PyObject *codeobj = Py_CompileString(expr.c_str(), "<string>", start);
     if (!codeobj)
     {
-        throw python_error();
+        detail::raise_python_error();
     }
     PyObject *result = PyEval_EvalCode(codeobj, global.ptr(), local.ptr());
     if (!result) {
-        throw python_error();
+        detail::raise_python_error();
     }
 
     return steal<object>(result);

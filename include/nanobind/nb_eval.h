@@ -41,7 +41,7 @@ object eval(const str &expr, object global = object(), object local = object()) 
     if (!result)
         detail::raise_python_error();
 
-    return steal<object>(result);
+    return steal(result);
 }
 
 template <eval_mode start = eval_expr, size_t N>

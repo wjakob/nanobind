@@ -31,7 +31,7 @@ enum eval_mode {
 };
 
 template <eval_mode mode = eval_expr>
-object eval(const str &expr, dict global = globals(), object local = object()) {
+object eval(const str &expr, object global = object(), object local = object()) {
     if (!local) {
         local = global;
     }
@@ -66,18 +66,18 @@ object eval(const str &expr, dict global = globals(), object local = object()) {
 }
 
 template <eval_mode mode = eval_expr, size_t N>
-object eval(const char (&s)[N], dict global = globals(), object local = object()) {
+object eval(const char (&s)[N], object global = object(), object local = object()) {
     /* Support raw string literals by removing common leading whitespace */
     auto expr = (s[0] == '\n') ? str(module_::import_("textwrap").attr("dedent")(s)) : str(s);
     return eval<mode>(expr, std::move(global), std::move(local));
 }
 
-inline void exec(const str &expr, dict global = globals(), object local = object()) {
+inline void exec(const str &expr, object global = object(), object local = object()) {
     eval<eval_statements>(expr, std::move(global), std::move(local));
 }
 
 template <size_t N>
-void exec(const char (&s)[N], dict global = globals(), object local = object()) {
+void exec(const char (&s)[N], object global = object(), object local = object()) {
     eval<eval_statements>(s, std::move(global), std::move(local));
 }
 

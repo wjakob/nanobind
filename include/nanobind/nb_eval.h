@@ -20,14 +20,6 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-/// \ingroup python_builtins
-/// Return a dictionary representing the global variables in the current execution frame,
-/// or ``__main__.__dict__`` if there is no frame (usually when the interpreter is embedded).
-inline dict globals() {
-    PyObject *p = PyEval_GetGlobals();
-    return borrow<dict>(p ? p : module_::import_("__main__").attr("__dict__").ptr());
-}
-
 enum eval_mode {
     /// Evaluate a string containing an isolated expression
     eval_expr,

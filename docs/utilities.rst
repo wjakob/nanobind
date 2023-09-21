@@ -10,9 +10,9 @@ Utilities
 Evaluating Python expressions from strings
 ==========================================
 
-nanobind provides the ``eval`` and ``exec`` functions to evaluate Python
-expressions and statements. The following example illustrates how they can be
-used.
+nanobind provides the :py:func:`eval` and :py:func:`exec` functions to evaluate
+Python expressions and statements. The following example illustrates how they
+can be used.
 
 .. code-block:: cpp
 
@@ -34,8 +34,9 @@ used.
         scope);
 
 C++11 raw string literals are also supported and quite handy for this purpose.
-The only requirement is that the first statement must be on a new line following
-the raw string delimiter ``R"(``, ensuring all lines have common leading indent:
+The only requirement is that the first statement must be on a new line
+following the raw string delimiter ``R"(``, ensuring all lines have common
+leading indent:
 
 .. code-block:: cpp
 

@@ -27,12 +27,12 @@ enum eval_mode {
 
 template <eval_mode start = eval_expr>
 object eval(const str &expr, handle global = handle(), handle local = handle()) {
-    if (!local)
+    if (!local.is_valid())
         local = global;
 
     // This used to be PyRun_String, but that function isn't in the stable ABI.
     object codeobj = steal(Py_CompileString(expr.c_str(), "<string>", start));
-    if (!codeobj)
+    if (!codeobj.is_valid())
         detail::raise_python_error();
 
     PyObject *result = PyEval_EvalCode(codeobj.ptr(), global.ptr(), local.ptr());
@@ -45,7 +45,7 @@ object eval(const str &expr, handle global = handle(), handle local = handle()) 
 template <eval_mode start = eval_expr, size_t N>
 object eval(const char (&s)[N], handle global = handle(), handle local = handle()) {
     // Support raw string literals by removing common leading whitespace
-    auto expr = (s[0] == '\n') ? str(module_::import_("textwrap").attr("dedent")(s)) : str(s);
+    str expr = (s[0] == '\n') ? str(module_::import_("textwrap").attr("dedent")(s)) : str(s);
     return eval<start>(expr, global, local);
 }
 

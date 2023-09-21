@@ -921,8 +921,8 @@ section <eval>`.
 
 .. cpp:enum-class:: eval_mode
 
-   This enumeration characterizes the start symbol for different kinds of
-   expressions. Used in Py_CompileString().
+   This enumeration specifies how the content of a string should be
+   interpreted. Used in Py_CompileString().
 
    .. cpp:enumerator:: eval_expr = Py_eval_input
 
@@ -930,7 +930,7 @@ section <eval>`.
 
    .. cpp:enumerator:: eval_single_statement = Py_single_input
 
-      Evaluate a string containing a single statement. Returns \c none
+      Evaluate a string containing a single statement. Returns \c None
 
    .. cpp:enumerator:: eval_statements = Py_file_input
 

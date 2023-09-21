@@ -2,10 +2,6 @@
 #include <nanobind/eval.h>
 #include <nanobind/stl/pair.h>
 
-// #include "pybind11_tests.h"
-
-// #include <utility>
-
 namespace nb = nanobind;
 
 NB_MODULE(test_eval_ext, m) {

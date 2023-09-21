@@ -917,7 +917,7 @@ expressions. They require an additional include directive:
    #include <nanobind/eval.h>
 
 Detailed documentation including example code is provided in a :ref:`separate
-section <eval>`.
+section <utilities_eval>`.
 
 .. cpp:enum-class:: eval_mode
 
@@ -934,7 +934,7 @@ section <eval>`.
 
    .. cpp:enumerator:: eval_statements = Py_file_input
 
-      Evaluate a string containing a sequence of statement. Returns \c none
+      Evaluate a string containing a sequence of statement. Returns \c None
 
 .. cpp:function:: template <eval_mode start = eval_expr, size_t N> object eval(const char (&s)[N], handle global = handle(), handle local = handle())
 

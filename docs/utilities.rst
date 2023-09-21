@@ -10,9 +10,9 @@ Utilities
 Evaluating Python expressions from strings
 ==========================================
 
-nanobind provides the :py:func:`eval` and :py:func:`exec` functions to evaluate
-Python expressions and statements. The following example illustrates how they
-can be used.
+nanobind provides the :cpp:func:`eval` and :cpp:func:`exec` functions to
+evaluate Python expressions and statements. The following example illustrates
+how they can be used.
 
 .. code-block:: cpp
 

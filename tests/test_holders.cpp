@@ -83,8 +83,12 @@ NB_MODULE(test_holders_ext, m) {
     m.def("query_shared_1", [](Example *shared) { return shared->value; });
     m.def("query_shared_2",
           [](std::shared_ptr<Example> &shared) { return shared->value; });
+    m.def("query_shared_3",
+          [](std::shared_ptr<const Example> &shared) { return shared->value; });
     m.def("passthrough",
           [](std::shared_ptr<Example> shared) { return shared; });
+    m.def("passthrough_2",
+          [](std::shared_ptr<const Example> shared) { return shared; });
 
     // ------- enable_shared_from_this -------
 

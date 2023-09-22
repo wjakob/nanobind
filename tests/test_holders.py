@@ -16,6 +16,7 @@ def test01_create(clean):
     assert e.value == 123
     assert t.query_shared_1(e) == 123
     assert t.query_shared_2(e) == 123
+    assert t.query_shared_3(e) == 123
     del e
     collect()
     assert t.stats() == (1, 1)
@@ -46,8 +47,10 @@ def test02_sharedptr_from_python(clean):
 def test03_sharedptr_from_cpp(clean):
     e = t.Example.make(5)
     assert t.passthrough(e) is e
+    assert t.passthrough_2(e) is e
     assert t.query_shared_1(e) == 5
     assert t.query_shared_2(e) == 5
+    assert t.query_shared_3(e) == 5
 
     w = t.SharedWrapper(e)
     assert e is not w.value
@@ -59,7 +62,9 @@ def test03_sharedptr_from_cpp(clean):
     e = t.Example.make_shared(6)
     assert t.query_shared_1(e) == 6
     assert t.query_shared_2(e) == 6
+    assert t.query_shared_3(e) == 6
     assert t.passthrough(e) is e
+    assert t.passthrough_2(e) is e
 
     w = t.SharedWrapper(e)
     assert e is not w.value

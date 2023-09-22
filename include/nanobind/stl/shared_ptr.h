@@ -58,8 +58,9 @@ inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
 }
 
 template <typename T> struct type_caster<std::shared_ptr<T>> {
+    using Td = std::decay_t<T>;
     using Value = std::shared_ptr<T>;
-    using Caster = make_caster<T>;
+    using Caster = make_caster<Td>;
     static_assert(Caster::IsClass,
                   "Binding 'shared_ptr<T>' requires that 'T' can also be bound "
                   "by nanobind. It appears that you specified a type which "
@@ -78,7 +79,7 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         if (!caster.from_python(src, flags, cleanup))
             return false;
 
-        T *ptr = caster.operator T *();
+        Td *ptr = caster.operator Td *();
         if constexpr (has_shared_from_this_v<T>) {
             if (ptr) {
                 if (auto sp = ptr->weak_from_this().lock()) {
@@ -110,15 +111,15 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         bool is_new = false;
         handle result;
 
-        T *ptr = value.get();
-        const std::type_info *type = &typeid(T);
+        Td *ptr = (Td *) value.get();
+        const std::type_info *type = &typeid(Td);
 
         constexpr bool has_type_hook =
-            !std::is_base_of_v<std::false_type, type_hook<T>>;
+            !std::is_base_of_v<std::false_type, type_hook<Td>>;
         if constexpr (has_type_hook)
-            type = type_hook<T>::get(ptr);
+            type = type_hook<Td>::get(ptr);
 
-        if constexpr (!std::is_polymorphic_v<T>) {
+        if constexpr (!std::is_polymorphic_v<Td>) {
             result = nb_type_put(type, ptr, rv_policy::reference,
                                  cleanup, &is_new);
         } else {
@@ -129,9 +130,14 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                                    cleanup, &is_new);
         }
 
-        if (is_new)
-            shared_from_cpp(std::static_pointer_cast<void>(value),
-                            result.ptr());
+        if (is_new) {
+            std::shared_ptr<void> pp;
+            if constexpr (std::is_const_v<T>)
+                pp = std::static_pointer_cast<void>(std::const_pointer_cast<Td>(value));
+            else
+                pp = std::static_pointer_cast<void>(value);
+            shared_from_cpp(std::move(pp), result.ptr());
+        }
 
         return result;
     }

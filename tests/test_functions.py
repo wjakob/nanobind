@@ -322,3 +322,13 @@ def test37_test_str():
     assert t.test_cast_str('abc') == 'abc'
     with pytest.raises(RuntimeError):
         assert t.test_cast_str(123)
+
+def test38_set():
+    x = t.test_set()
+    assert isinstance(x, set)
+    assert len(x) == 2
+    assert 123 in x and '123' in x
+    assert t.test_set_contains(x, 123)
+    assert t.test_set_contains(x, '123')
+    assert not t.test_set_contains(x, '1234')
+    assert not t.test_set_contains(x, 1234)

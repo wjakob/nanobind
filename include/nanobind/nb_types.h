@@ -464,6 +464,20 @@ class dict : public object {
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
     template <typename T> bool contains(T&& key) const;
+    void clear() { PyDict_Clear(m_ptr); }
+};
+
+
+class set : public object {
+    NB_OBJECT(set, object, "set", PySet_Check)
+    set() : object(PySet_New(nullptr), detail::steal_t()) { }
+    size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
+    template <typename T> bool contains(T&& key) const;
+    template <typename T> void add(T &&value);
+    void clear() {
+        if (PySet_Clear(m_ptr))
+            detail::raise_python_error();
+    }
 };
 
 class sequence : public object {
@@ -549,6 +563,7 @@ NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &l) { return (size_t) NB_LIST_GET_SIZE(l.ptr()); }
 NB_INLINE size_t len(const dict &d) { return (size_t) NB_DICT_GET_SIZE(d.ptr()); }
+NB_INLINE size_t len(const set &d) { return (size_t) NB_SET_GET_SIZE(d.ptr()); }
 
 inline void print(handle value, handle end = handle(), handle file = handle()) {
     detail::print(value.ptr(), end.ptr(), file.ptr());

@@ -583,6 +583,10 @@ Size queries
 
    Equivalent to ``len(d)`` in Python. Optimized variant for dictionaries.
 
+.. cpp:function:: size_t len(const set &d)
+
+   Equivalent to ``len(d)`` in Python. Optimized variant for sets.
+
 .. cpp:function:: size_t len_hint(handle h)
 
    Equivalent to ``operator.length_hint(h)`` in Python. Raises
@@ -620,6 +624,13 @@ Wrapper classes
 
    Wrapper class representing Python ``tuple`` instances.
 
+   Use the standard ``operator[]`` C++ operator with an integer argument to
+   read tuple elements (the bindings for this operator are provided by the
+   parent class and not listed here). Once created, the set is immutable and
+   its elements cannot be replaced.
+
+   Use the :py:func:`make_tuple` function to create new tuples.
+
    .. cpp:function:: tuple()
 
       Create an empty tuple
@@ -647,7 +658,7 @@ Wrapper classes
 
       Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic
       type (e.g., an integer). The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
-      that it can be read and written.
+      that it can be read and converted. Write access is not possible.
 
       The function overrides the generic version in :cpp:class:`detail::api`
       and is more efficient for tuples.
@@ -656,6 +667,10 @@ Wrapper classes
 .. cpp:class:: list : public object
 
    Wrapper class representing Python ``list`` instances.
+
+   Use the standard ``operator[]`` C++ operator with an integer argument to
+   read and write list elements (the bindings for this operator are provided by
+   the parent class and not listed here).
 
    .. cpp:function:: list()
 
@@ -697,7 +712,11 @@ Wrapper classes
 
 .. cpp:class:: dict: public object
 
-   Wrapper class representing Python ``dict`` instances.
+   Wrapper class representing Python ``dict`` instances. 
+
+   Use the standard ``operator[]`` C++ operator to read and write dictionary
+   elements (the bindings for this operator are provided by the parent class
+   and not listed here).
 
    .. cpp:function:: dict()
 
@@ -733,6 +752,35 @@ Wrapper classes
 
       Return a list containing all dictionary items as ``(key, value)`` pairs.
 
+   .. cpp:function:: void clear()
+
+      Clear the contents of the dictionary.
+
+.. cpp:class:: set: public object
+
+   Wrapper class representing Python ``set`` instances.
+
+   .. cpp:function:: set()
+
+      Create an empty set
+
+   .. cpp:function:: size_t size() const
+
+      Return the number of set elements.
+
+   .. cpp:function:: template <typename T> void add(T&& key)
+
+      Add a key to the set. When `T` does not already represent a wrapped
+      Python object, the function performs a cast.
+
+   .. cpp:function:: template <typename T> bool contains(T&& key) const
+
+      Check whether the set contains a particular key. When `T` does not
+      already represent a wrapped Python object, the function performs a cast.
+
+   .. cpp:function:: void clear()
+
+      Clear the contents of the set
 
 .. cpp:class:: module_: public object
 

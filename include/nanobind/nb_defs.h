@@ -119,6 +119,7 @@
 #  define NB_LIST_GET_ITEM PyList_GetItem
 #  define NB_LIST_SET_ITEM PyList_SetItem
 #  define NB_DICT_GET_SIZE PyDict_Size
+#  define NB_SET_GET_SIZE PySet_Size
 #else
 #  define NB_TUPLE_GET_SIZE PyTuple_GET_SIZE
 #  define NB_TUPLE_GET_ITEM PyTuple_GET_ITEM
@@ -127,6 +128,7 @@
 #  define NB_LIST_GET_ITEM PyList_GET_ITEM
 #  define NB_LIST_SET_ITEM PyList_SET_ITEM
 #  define NB_DICT_GET_SIZE PyDict_GET_SIZE
+#  define NB_SET_GET_SIZE PySet_GET_SIZE
 #endif
 
 #if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x07030a00

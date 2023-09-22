@@ -461,6 +461,23 @@ template <typename T> bool dict::contains(T&& key) const {
     return rv == 1;
 }
 
+template <typename T> bool set::contains(T&& key) const {
+    object o = nanobind::cast((detail::forward_t<T>) key);
+    int rv = PySet_Contains(m_ptr, o.ptr());
+    if (rv == -1)
+        detail::raise_python_error();
+    return rv == 1;
+}
+
+
+template <typename T> void set::add(T&& key) {
+    object o = nanobind::cast((detail::forward_t<T>) key);
+    int rv = PySet_Add(m_ptr, o.ptr());
+    if (rv == -1)
+        detail::raise_python_error();
+}
+
+
 template <typename T> bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PyMapping_HasKey(m_ptr, o.ptr());

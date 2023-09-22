@@ -904,3 +904,43 @@ converting to Python.
     number of seconds, and fractional seconds are supported to the
     extent representable. The resulting timepoint will be that many
     seconds after the target clock's epoch time.
+
+
+Evaluating Python expressions from strings
+------------------------------------------
+
+The following functions can be used to evaluate Python functions and
+expressions. They require an additional include directive:
+
+.. code-block:: cpp
+
+   #include <nanobind/eval.h>
+
+Detailed documentation including example code is provided in a :ref:`separate
+section <utilities_eval>`.
+
+.. cpp:enum-class:: eval_mode
+
+   This enumeration specifies how the content of a string should be
+   interpreted. Used in Py_CompileString().
+
+   .. cpp:enumerator:: eval_expr = Py_eval_input
+
+      Evaluate a string containing an isolated expression
+
+   .. cpp:enumerator:: eval_single_statement = Py_single_input
+
+      Evaluate a string containing a single statement. Returns \c None
+
+   .. cpp:enumerator:: eval_statements = Py_file_input
+
+      Evaluate a string containing a sequence of statement. Returns \c None
+
+.. cpp:function:: template <eval_mode start = eval_expr, size_t N> object eval(const char (&s)[N], handle global = handle(), handle local = handle())
+
+   Evaluate the given Python code in the given global/local scopes, and return
+   the value.
+
+.. cpp:function:: inline void exec(const str &expr, handle global = handle(), handle local = handle())
+
+   Execute the given Python code in the given global/local scopes.

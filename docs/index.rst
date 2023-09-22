@@ -123,6 +123,7 @@ The nanobind logo was designed by `AndoTwin Studio
    exceptions
    ndarray_index
    packaging
+   utilities
 
 .. toctree::
    :caption: Advanced

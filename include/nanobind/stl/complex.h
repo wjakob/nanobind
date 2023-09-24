@@ -12,8 +12,6 @@
 #include <nanobind/nanobind.h>
 #include <complex>
 
-#include <iostream>
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -36,6 +34,8 @@ template <typename T1> struct type_caster<std::complex<T1>> {
     template <typename T>
     static handle from_cpp(T &&value, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
+        (void)policy;
+        (void)cleanup;
 
         // Conversion from 2xfloat to 2xdouble if needs be
         return PyComplex_FromDoubles(value.real(), value.imag());

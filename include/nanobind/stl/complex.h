@@ -37,7 +37,8 @@ template <typename T1> struct type_caster<std::complex<T1>> {
         (void)policy;
         (void)cleanup;
 
-        // Conversion from 2xfloat to 2xdouble if needs be
+        // There is no such float32 in Python, so always build as double.
+        // We could build a numpy.float32, though it would force dependency to numpy.
         return PyComplex_FromDoubles(value.real(), value.imag());
     }
 };

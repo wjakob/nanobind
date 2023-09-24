@@ -12,6 +12,7 @@
 #include <nanobind/stl/unordered_set.h>
 #include <nanobind/stl/set.h>
 #include <nanobind/stl/filesystem.h>
+#include <nanobind/stl/complex.h>
 
 NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
@@ -422,4 +423,20 @@ NB_MODULE(test_stl_ext, m) {
         vec.flip();
         return vec;
     });
+
+
+    m.def("complex_value_float", [](const std::complex<float>& x){
+        return x;
+    });
+    m.def("complex_value_double", [](const std::complex<double>& x){
+        return x;
+    });
+
+    m.def("complex_array_float", [](const std::vector<std::complex<float>>& x){
+        return x;
+    });
+    m.def("complex_array_double", [](const std::vector<std::complex<double>>& x){
+        return x;
+    });
+
 }

@@ -3,6 +3,7 @@ import pytest
 import sys
 from common import collect, skip_on_pypy
 
+import numpy as np
 
 @pytest.fixture
 def clean():
@@ -759,3 +760,47 @@ def test67_vector_bool():
     bool_vector = [True, False, True, False]
     result = t.flip_vector_bool(bool_vector)
     assert result == [not x for x in bool_vector]
+
+
+def test68_complex_value():
+
+    # double: 64bits
+    assert t.complex_value_double(1.0) == 1.0
+    assert t.complex_value_double(1.0j) == 1.0j
+    assert t.complex_value_double(0.0) == 0.0
+    assert t.complex_value_double(0.0j) == 0.0j
+    assert t.complex_value_double(2.7+3.2j) == (2.7+3.2j)
+    assert t.complex_value_double(2.7-3.2j) == (2.7-3.2j)
+    assert t.complex_value_double(np.complex128(2.7-3.2j)) == (2.7-3.2j)
+    assert t.complex_value_double(np.complex64(2.7-3.2j)) == (2.700000047683716-3.200000047683716j) # written as double, converted to complex of float32 (difference introduced), converted to complex of float64 (no difference introduced) -> difference introduced
+
+    # float: 32bits
+    assert t.complex_value_float(1.0) == 1.0
+    assert t.complex_value_float(1.0j) == 1.0j
+    assert t.complex_value_float(0.0) == 0.0
+    assert t.complex_value_float(0.0j) == 0.0j
+    # written as double, converted to complex of float32 (difference introduced) -> difference introduced
+    assert t.complex_value_float(2.7+3.2j) == (2.700000047683716+3.200000047683716j)
+    # same as above
+    assert t.complex_value_float(2.7-3.2j) == (2.700000047683716-3.200000047683716j)
+    
+    # written as double, converted to complex of float64 (no difference introduced), converted to complex of float32 (difference introduced) -> difference introduced
+    assert t.complex_value_float(np.complex128(2.7-3.2j)) == (2.700000047683716-3.200000047683716j)
+
+    # written as double, converted to complex of float32 (difference introduced), converted to complex of float32 (no difference introduced) -> difference introduced
+    assert t.complex_value_float(np.complex64(2.7-3.2j)) == (2.700000047683716-3.200000047683716j)
+
+def test69_complex_array():
+
+    # double: 64bits
+    assert t.complex_array_double([2.7-3.2j, -1j, +3.1415]) == [(2.7-3.2j), (-0-1j), (+3.1415)]
+    assert t.complex_array_double(np.array([2.7-3.2j, -1j, +3.1415])) == [(2.7-3.2j), (-0-1j), (+3.1415)]
+    assert t.complex_array_double(np.array([2.7-3.2j, -1j, +3.1415],dtype=np.complex128)) == [(2.7-3.2j), (-0-1j), (+3.1415)]
+    assert t.complex_array_double(np.array([2.7-3.2j, -1j, +3.1415],dtype=np.complex64)) == [(2.700000047683716-3.200000047683716j), (-0-1j), (3.1414999961853027+0j)]
+
+    # float: 32bits
+    # Always go through double to float conversion bcs python's complex numbers are always written as double (there is no such thing as 1.0f notation)
+    assert t.complex_array_float([2.7-3.2j, -1j, +3.1415]) == [(2.700000047683716-3.200000047683716j), (-0-1j), (3.1414999961853027+0j)]
+    assert t.complex_array_float(np.array([2.7-3.2j, -1j, +3.1415])) == [(2.700000047683716-3.200000047683716j), (-0-1j), (3.1414999961853027+0j)]
+    assert t.complex_array_float(np.array([2.7-3.2j, -1j, +3.1415],dtype=np.complex128)) == [(2.700000047683716-3.200000047683716j), (-0-1j), (3.1414999961853027+0j)]
+    assert t.complex_array_float(np.array([2.7-3.2j, -1j, +3.1415],dtype=np.complex64)) == [(2.700000047683716-3.200000047683716j), (-0-1j), (3.1414999961853027+0j)]

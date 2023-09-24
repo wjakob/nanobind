@@ -25,8 +25,13 @@ template <typename T1> struct type_caster<std::complex<T1>> {
         (void)cleanup;
 
         PyObject* obj = src.ptr();
-        value.real(PyComplex_RealAsDouble(obj));
-        value.imag(PyComplex_ImagAsDouble(obj));
+
+        // TODO Faster way to get real part without string mapping? (and imag part below)
+        PyObject* obj_real = PyObject_GetAttrString(obj, "real");
+        // TODO If T1==float32 and obj==numpy.float32, PyFloat_AsDouble implies 2 useless conversions
+        value.real(PyFloat_AsDouble(obj_real));
+        PyObject* obj_imag = PyObject_GetAttrString(obj, "imag");
+        value.imag(PyFloat_AsDouble(obj_imag));
 
         return true;
     }

@@ -49,8 +49,12 @@ Version 1.6.0 (TBA)
   wrappers. (commit `64d87a
   <https://github.com/wjakob/nanobind/commit/64d87ae01355c247123613f140cef8e71bc98fc7>`__).
 
-* Added :cpp:func:`nb::exec() <exec>` and :cpp:func:`nb:eval() <eval>`. (PR `#299`
+* Added :cpp:func:`nb::exec() <exec>` and :cpp:func:`nb:eval() <eval>`. (PR `#299
   <https://github.com/wjakob/nanobind/pull/299>`__).
+
+* Added a type caster for ``std::complex<T>``. (PR `#292
+  <https://github.com/wjakob/nanobind/pull/292>`__, commit `dcbed4
+  <https://github.com/wjakob/nanobind/commit/dcbed4fe1500383ad1f4dff47cacbf0f2e6b1d3f>`__).
 
 * Fixed a serious issue involving combinations of bound types (e.g., ``T``) and
   type casters (e.g., ``std::vector<T>``), where nanobind was too aggressive in
@@ -63,7 +67,7 @@ Version 1.6.0 (TBA)
   implementation where moves were actually possible but not done (e.g., for
   functions taking an STL vector by value). Some binding projects may see
   speedups as a consequence of this change. (issue `#307
-  <https://github.com/wjakob/nanobind/issues/307>`, commit `122015
+  <https://github.com/wjakob/nanobind/issues/307>`__, commit `122015
   <https://github.com/wjakob/nanobind/commit/1220156961ce2d0c96a525f3c27b88e824b997ce>`__).
 
 

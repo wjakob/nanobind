@@ -3,7 +3,6 @@ import pytest
 import sys
 from common import collect, skip_on_pypy
 
-
 @pytest.fixture
 def clean():
     collect()
@@ -758,3 +757,66 @@ def test67_vector_bool():
     bool_vector = [True, False, True, False]
     result = t.flip_vector_bool(bool_vector)
     assert result == [not x for x in bool_vector]
+
+
+def test68_complex_value():
+    # double: 64bits
+    assert t.complex_value_double(1.0) == 1.0
+    assert t.complex_value_double(1.0j) == 1.0j
+    assert t.complex_value_double(0.0) == 0.0
+    assert t.complex_value_double(0.0j) == 0.0j
+    assert t.complex_value_double(0) == 0
+    assert t.complex_value_float(1.0) == 1.0
+    assert t.complex_value_float(1.0j) == 1.0j
+    assert t.complex_value_float(0.0) == 0.0
+    assert t.complex_value_float(0.0j) == 0.0j
+    assert t.complex_value_float(0) == 0
+
+    val_64 = 2.7-3.2j
+    val_32 = 2.700000047683716-3.200000047683716j
+    assert val_64 != val_32
+
+    assert t.complex_value_float(val_32) == val_32
+    assert t.complex_value_float(val_64) == val_32
+    assert t.complex_value_double(val_32) == val_32
+    assert t.complex_value_double(val_64) == val_64
+
+    try:
+        import numpy as np
+        assert t.complex_value_float(np.complex64(val_32)) == val_32
+        assert t.complex_value_float(np.complex64(val_64)) == val_32
+        assert t.complex_value_double(np.complex64(val_32)) == val_32
+        assert t.complex_value_double(np.complex64(val_64)) == val_32
+        assert t.complex_value_float(np.complex128(val_32)) == val_32
+        assert t.complex_value_float(np.complex128(val_64)) == val_32
+        assert t.complex_value_double(np.complex128(val_32)) == val_32
+        assert t.complex_value_double(np.complex128(val_64)) == val_64
+    except ImportError:
+        pass
+
+def test69_complex_array():
+    val1_64 = 2.7-3.2j
+    val1_32 = 2.700000047683716-3.200000047683716j
+    val2_64 = 3.1415
+    val2_32 = 3.1414999961853027+0j
+
+    # test 64 bit casts
+    assert t.complex_array_double([val1_64, -1j, val2_64]) == [val1_64, -0-1j, val2_64]
+
+    # test 32 bit casts
+    assert t.complex_array_float([val1_64, -1j, val2_64]) == [val1_32, (-0-1j), val2_32]
+
+    try:
+        import numpy as np
+
+        # test 64 bit casts
+        assert t.complex_array_double(np.array([val1_64, -1j, val2_64])) == [val1_64, -0-1j, val2_64]
+        assert t.complex_array_double(np.array([val1_64, -1j, val2_64],dtype=np.complex128)) == [val1_64, -0-1j, val2_64]
+        assert t.complex_array_double(np.array([val1_64, -1j, val2_64],dtype=np.complex64)) == [val1_32, -0-1j, val2_32]
+
+        # test 32 bit casts
+        assert t.complex_array_float(np.array([val1_64, -1j, val2_64])) == [val1_32, (-0-1j), val2_32]
+        assert t.complex_array_float(np.array([val1_64, -1j, val2_64],dtype=np.complex128)) == [val1_32, (-0-1j), val2_32]
+        assert t.complex_array_float(np.array([val1_64, -1j, val2_64],dtype=np.complex64)) == [val1_32, (-0-1j), val2_32]
+    except ImportError:
+        pass

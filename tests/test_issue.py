@@ -27,3 +27,11 @@ def test01_issue_279(variant):
     top = Top()
     str(top.model_a)
     str(top.model_a.a)
+
+
+# Issue #307: move constructor unexpectedly called
+def test02_issue_307():
+    l = [m.Example("A"), m.Example("B")]
+    assert str(l) == '[Example("A"), Example("B")]'
+    m.process(l)
+    assert str(l) == '[Example("A"), Example("B")]'

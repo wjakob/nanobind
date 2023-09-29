@@ -218,7 +218,6 @@ struct type_caster<T, enable_if_t<is_eigen_xpr_v<T> &&
     using Array = Eigen::Array<typename T::Scalar, T::RowsAtCompileTime,
                                T::ColsAtCompileTime>;
     using Caster = make_caster<Array>;
-    static constexpr bool IsClass = false;
     static constexpr auto Name = Caster::Name;
     template <typename T_> using Cast = T;
 
@@ -249,7 +248,6 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
                                                   const typename Map::Scalar,
                                                   typename Map::Scalar>>;
     using NDArrayCaster = type_caster<NDArray>;
-    static constexpr bool IsClass = false;
     static constexpr auto Name = NDArrayCaster::Name;
     template <typename T_> using Cast = Map;
 
@@ -395,7 +393,6 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
     static constexpr bool DMapConstructorOwnsData =
         !Eigen::internal::traits<Ref>::template match<DMap>::type::value;
 
-    static constexpr bool IsClass = false;
     static constexpr auto Name =
         const_name<MaybeConvert>(DMapCaster::Name, MapCaster::Name);
 

@@ -1,5 +1,6 @@
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 #include <unordered_map>
 
 namespace nb = nanobind;
@@ -42,4 +43,19 @@ NB_MODULE(test_issue_ext, m) {
         .def("_get_param", &Model::get_param, "name"_a)
         .def("_add_param", &Model::add_param, "name"_a, "p"_a);
     nb::class_<ModelA, Model>(m, "ModelA").def(nb::init<>{});
+
+    /// Issue #307: move constructor unexpectedly called
+    struct Example { std::string text; };
+
+    nb::class_<Example>(m, "Example")
+        .def(nb::init<const std::string&>())
+        .def("__repr__",
+             [](const Example& e) {
+                 return std::string("Example(\"") + e.text + "\")";
+             });
+
+    m.def("process",
+          [](const std::vector<Example>& v) {
+              return v.size();
+          }, nb::arg("v"));
 }

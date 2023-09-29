@@ -255,12 +255,11 @@ def test23_vec_return_copyable(clean):
 
 
 def test24_vec_movable_in_value(clean):
-    t.vec_moveable_in_value([t.Movable(i) for i in range(10)])
+    t.vec_movable_in_value([t.Movable(i) for i in range(10)])
     assert_stats(
         value_constructed=10,
         copy_constructed=10,
-        move_constructed=10,
-        destructed=30
+        destructed=20
     )
 
 
@@ -268,22 +267,22 @@ def test25_vec_movable_in_value(clean):
     t.vec_copyable_in_value([t.Copyable(i) for i in range(10)])
     assert_stats(
         value_constructed=10,
-        copy_constructed=20,
-        destructed=30
+        copy_constructed=10,
+        destructed=20
     )
 
 
 def test26_vec_movable_in_lvalue_ref(clean):
-    t.vec_moveable_in_lvalue_ref([t.Movable(i) for i in range(10)])
+    t.vec_movable_in_lvalue_ref([t.Movable(i) for i in range(10)])
     assert_stats(
         value_constructed=10,
-        move_constructed=10,
+        copy_constructed=10,
         destructed=20
     )
 
 
 def test27_vec_movable_in_ptr_2(clean):
-    t.vec_moveable_in_ptr_2([t.Movable(i) for i in range(10)])
+    t.vec_movable_in_ptr_2([t.Movable(i) for i in range(10)])
     assert_stats(
         value_constructed=10,
         destructed=10
@@ -291,10 +290,10 @@ def test27_vec_movable_in_ptr_2(clean):
 
 
 def test28_vec_movable_in_rvalue_ref(clean):
-    t.vec_moveable_in_rvalue_ref([t.Movable(i) for i in range(10)])
+    t.vec_movable_in_rvalue_ref([t.Movable(i) for i in range(10)])
     assert_stats(
         value_constructed=10,
-        move_constructed=10,
+        copy_constructed=10,
         destructed=20
     )
 
@@ -365,7 +364,7 @@ def test32_std_function_gc():
 
 def test33_vec_type_check():
     with pytest.raises(TypeError) as excinfo:
-        t.vec_moveable_in_value(0)
+        t.vec_movable_in_value(0)
 
 
 def test34_list():
@@ -708,7 +707,7 @@ def test65_class_with_movable_field(clean):
 
     assert_stats(
         value_constructed=2,
-        move_constructed=2
+        copy_constructed=2
     )
 
     del m1, m2
@@ -716,7 +715,7 @@ def test65_class_with_movable_field(clean):
 
     assert_stats(
         value_constructed=2,
-        move_constructed=2,
+        copy_constructed=2,
         destructed=2
     )
 
@@ -725,7 +724,7 @@ def test65_class_with_movable_field(clean):
 
     assert_stats(
         value_constructed=2,
-        move_constructed=2,
+        copy_constructed=2,
         destructed=4
     )
 

@@ -39,7 +39,7 @@ template <typename Value_, typename Key> struct set_caster {
             if (!success)
                 break;
 
-            value.emplace(((KeyCaster &&) key_caster).operator cast_t<Key&&>());
+            value.emplace(key_caster.operator cast_t<Key>());
         }
 
         if (PyErr_Occurred()) {

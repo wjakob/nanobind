@@ -45,6 +45,7 @@ NAMESPACE_BEGIN(detail)
 
 template <typename T, typename Deleter>
 struct type_caster<std::unique_ptr<T, Deleter>> {
+    static constexpr bool IsClass = true;
     using Value = std::unique_ptr<T, Deleter>;
     using Caster = make_caster<T>;
 
@@ -53,17 +54,18 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     static constexpr bool IsNanobindDeleter =
         std::is_same_v<Deleter, deleter<T>>;
 
-    static_assert(Caster::IsClass,
-                  "Binding 'std::unique_ptr<T>' requires that 'T' can also be "
-                  "bound by nanobind. It appears that you specified a type which "
-                  "would undergo conversion/copying, which is not allowed.");
+    static_assert(is_base_caster_v<Caster>,
+                  "Conversion of ``unique_ptr<T>`` requires that ``T`` is "
+                  "handled by nanobind's regular class binding mechanism. "
+                  "However, a type caster was registered to intercept this "
+                  "particular type, which is not allowed.");
 
     static_assert(IsDefaultDeleter || IsNanobindDeleter,
-                  "Binding std::unique_ptr<T, Deleter> requires that 'Deleter' is either "
-                  "'std::default_delete<T>' or 'nanobind::deleter<T>'");
+                  "Binding std::unique_ptr<T, Deleter> requires that "
+                  "'Deleter' is either 'std::default_delete<T>' or "
+                  "'nanobind::deleter<T>'");
 
     static constexpr auto Name = Caster::Name;
-    static constexpr bool IsClass = true;
     template <typename T_> using Cast = Value;
 
     Caster caster;

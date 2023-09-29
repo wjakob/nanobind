@@ -58,20 +58,17 @@ inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
 }
 
 template <typename T> struct type_caster<std::shared_ptr<T>> {
-    using Td = std::decay_t<T>;
-    using Value = std::shared_ptr<T>;
-    using Caster = make_caster<Td>;
-    static_assert(Caster::IsClass,
-                  "Binding 'shared_ptr<T>' requires that 'T' can also be bound "
-                  "by nanobind. It appears that you specified a type which "
-                  "would undergo conversion/copying, which is not allowed.");
-
-    static constexpr auto Name = Caster::Name;
     static constexpr bool IsClass = true;
+    using Caster = make_caster<T>;
+    using Td = std::decay_t<T>;
 
-    template <typename T_> using Cast = movable_cast_t<T_>;
+    NB_TYPE_CASTER(std::shared_ptr<T>, Caster::Name)
 
-    Value value;
+    static_assert(is_base_caster_v<Caster>,
+                  "Conversion of ``shared_ptr<T>`` requires that ``T`` is "
+                  "handled by nanobind's regular class binding mechanism. "
+                  "However, a type caster was registered to intercept this "
+                  "particular type, which is not allowed.");
 
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {
@@ -97,13 +94,6 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                 shared_from_python(static_cast<void *>(ptr), src));
         }
         return true;
-    }
-
-    static handle from_cpp(const Value *value, rv_policy policy,
-                           cleanup_list *cleanup) noexcept {
-        if (!value)
-            return (PyObject *) nullptr;
-        return from_cpp(*value, policy, cleanup);
     }
 
     static handle from_cpp(const Value &value, rv_policy,
@@ -141,10 +131,6 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
 
         return result;
     }
-
-    explicit operator Value *() { return &value; }
-    explicit operator Value &() { return value; }
-    explicit operator Value &&() && { return (Value &&) value; }
 };
 
 NAMESPACE_END(detail)

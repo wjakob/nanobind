@@ -9,7 +9,6 @@
 
 #define NB_TYPE_CASTER(Value_, descr)                                          \
     using Value = Value_;                                                      \
-    static constexpr bool IsClass = false;                                     \
     static constexpr auto Name = descr;                                        \
     template <typename T_> using Cast = movable_cast_t<T_>;                    \
     static handle from_cpp(Value *p, rv_policy policy, cleanup_list *list) {   \
@@ -17,9 +16,9 @@
             return none().release();                                           \
         return from_cpp(*p, policy, list);                                     \
     }                                                                          \
-    explicit operator Value *() { return &value; }                             \
-    explicit operator Value &() { return value; }                              \
-    explicit operator Value &&() && { return (Value &&) value; }               \
+    explicit operator Value*() { return &value; }                              \
+    explicit operator Value&() { return (Value &) value; }                     \
+    explicit operator Value&&() { return (Value &&) value; }                   \
     Value value;
 
 #define NB_MAKE_OPAQUE(...)                                                    \
@@ -38,14 +37,45 @@ enum cast_flags : uint8_t {
     construct = (1 << 1)
 };
 
+/**
+ * Type casters expose a member 'Cast<T>' which users of a type caster must
+ * query to determine what the caster actually can (and prefers) to produce.
+ * The convenience alias ``cast_t<T>`` defined below performs this query for a
+ * given type ``T``.
+ *
+ * Often ``cast_t<T>`` is simply equal to ``T`` or ``T&``. More significant
+ * deviations are also possible, which could be due to one of the following
+ * two reasons:
+ *
+ * 1. Efficiency: most STL type casters create a local copy (``value`` member)
+ *    of the value being cast. The caller should move this value to its
+ *    intended destination instead of making further copies along the way.
+ *    Consequently, ``cast_t<std::vector<T>>`` yields ``cast_t<std::vector<T>>
+ *    &&`` to enable such behavior.
+ *
+ * 2. STL pairs may contain references, and such pairs aren't
+ *    default-constructible. The STL pair caster therefore cannot create a local
+ *    copy and must construct the pair on the fly, which in turns means that it
+ *    cannot return references. Therefore, ``cast_t<const std::pair<T1, T2>&>``
+ *    yields ``std::pair<T1, T2>``.
+ */
+
+/// Ask a type caster what flavors of a type it can actually produce -- may be different from 'T'
 template <typename T> using cast_t = typename make_caster<T>::template Cast<T>;
 
-template <typename T>
-using simple_cast_t =
-    std::conditional_t<is_pointer_v<T>, intrinsic_t<T> *, intrinsic_t<T> &>;
-
+/// This is a default choice for the 'Cast' type alias described above. It
+/// prefers to return rvalue references to allow the caller to move the object.
 template <typename T>
 using movable_cast_t =
+    std::conditional_t<is_pointer_v<T>, intrinsic_t<T> *,
+                       std::conditional_t<std::is_lvalue_reference_v<T>,
+                                          intrinsic_t<T> &, intrinsic_t<T> &&>>;
+
+/// This version is more careful about what the caller actually requested and
+/// only moves when this was explicitly requested. It is the default for the
+/// base type caster (i.e., types bound via ``nanobind::class_<..>``)
+template <typename T>
+using precise_cast_t =
     std::conditional_t<is_pointer_v<T>, intrinsic_t<T> *,
                        std::conditional_t<std::is_rvalue_reference_v<T>,
                                           intrinsic_t<T> &&, intrinsic_t<T> &>>;
@@ -105,13 +135,11 @@ public:
 
 template <> struct type_caster<void_type> {
     static constexpr auto Name = const_name("None");
-    static constexpr bool IsClass = false;
 };
 
 template <> struct type_caster<void> {
     template <typename T_> using Cast = void *;
     using Value = void*;
-    static constexpr bool IsClass = false;
     static constexpr auto Name = const_name("capsule");
     explicit operator void *() { return value; }
     Value value;
@@ -175,7 +203,6 @@ template <> struct type_caster<bool> {
 template <> struct type_caster<char> {
     using Value = const char *;
     Value value;
-    static constexpr bool IsClass = false;
     static constexpr auto Name = const_name("str");
     template <typename T_>
     using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
@@ -289,12 +316,10 @@ template <typename T> NB_INLINE rv_policy infer_policy(rv_policy policy) {
 
 template <typename T, typename SFINAE = int> struct type_hook : std::false_type { };
 
-template <typename Type_> struct type_caster_base {
+template <typename Type_> struct type_caster_base : type_caster_base_tag {
     using Type = Type_;
     static constexpr auto Name = const_name<Type>();
-    static constexpr bool IsClass = true;
-
-    template <typename T> using Cast = movable_cast_t<T>;
+    template <typename T> using Cast = precise_cast_t<T>;
 
     NB_INLINE bool from_python(handle src, uint8_t flags,
                                cleanup_list *cleanup) noexcept {
@@ -335,7 +360,7 @@ template <typename Type_> struct type_caster_base {
         return *value;
     }
 
-    operator Type&&() && {
+    operator Type&&() {
         raise_next_overload_if_null(value);
         return (Type &&) *value;
     }
@@ -352,7 +377,6 @@ NAMESPACE_END(detail)
 template <typename T, typename Derived>
 bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept {
     using Caster = detail::make_caster<T>;
-    using Output = typename Caster::template Cast<T>;
 
     static_assert(!std::is_same_v<const char *, T>,
                   "nanobind::try_cast(): cannot return a reference to a temporary.");
@@ -361,11 +385,7 @@ bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) no
     if (caster.from_python(value.derived().ptr(),
                            convert ? (uint8_t) detail::cast_flags::convert
                                    : (uint8_t) 0, nullptr)) {
-        if constexpr (Caster::IsClass)
-            out = caster.operator Output();
-        else
-            out = std::move(caster.operator Output&&());
-
+        out = caster.operator detail::cast_t<T>();
         return true;
     }
 
@@ -378,11 +398,11 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
         return;
     } else {
         using Caster = detail::make_caster<T>;
-        using Output = typename Caster::template Cast<T>;
 
         static_assert(
-            !(std::is_reference_v<T> || std::is_pointer_v<T>) || Caster::IsClass ||
-            std::is_same_v<const char *, T>,
+            !(std::is_reference_v<T> || std::is_pointer_v<T>) ||
+                detail::is_base_caster_v<Caster> ||
+                std::is_same_v<const char *, T>,
             "nanobind::cast(): cannot return a reference to a temporary.");
 
         Caster caster;
@@ -397,7 +417,7 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
           #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
         #endif
 
-        return caster.operator Output();
+        return caster.operator detail::cast_t<T>();
 
         #if defined(__GNUC__) && !defined(__clang__)
           #pragma GCC diagnostic pop
@@ -411,6 +431,7 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
                                                 policy, nullptr);
     if (!h.is_valid())
         detail::raise_cast_error();
+
     return steal(h);
 }
 

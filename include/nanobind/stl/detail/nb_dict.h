@@ -51,8 +51,8 @@ template <typename Value_, typename Key, typename Element> struct dict_caster {
                 break;
             }
 
-            value.emplace(((KeyCaster &&) key_caster).operator cast_t<Key &&>(),
-                          ((ElementCaster &&) element_caster).operator cast_t<Element &&>());
+            value.emplace(key_caster.operator cast_t<Key>(),
+                          element_caster.operator cast_t<Element>());
         }
 
         Py_DECREF(items);

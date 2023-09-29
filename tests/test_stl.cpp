@@ -160,7 +160,7 @@ NB_MODULE(test_stl_ext, m) {
         return x;
     });
 
-    m.def("vec_moveable_in_value", [](std::vector<Movable> x) {
+    m.def("vec_movable_in_value", [](std::vector<Movable> x) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
@@ -178,7 +178,7 @@ NB_MODULE(test_stl_ext, m) {
     });
 
 
-    m.def("vec_moveable_in_lvalue_ref", [](std::vector<Movable> &x) {
+    m.def("vec_movable_in_lvalue_ref", [](std::vector<Movable> &x) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
@@ -187,7 +187,7 @@ NB_MODULE(test_stl_ext, m) {
     });
 
 
-    m.def("vec_moveable_in_rvalue_ref", [](std::vector<Movable> &&x) {
+    m.def("vec_movable_in_rvalue_ref", [](std::vector<Movable> &&x) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
@@ -195,7 +195,7 @@ NB_MODULE(test_stl_ext, m) {
                 fail();
     });
 
-    m.def("vec_moveable_in_ptr_2", [](std::vector<Movable *> x) {
+    m.def("vec_movable_in_ptr_2", [](std::vector<Movable *> x) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)

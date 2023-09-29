@@ -293,12 +293,6 @@ private:
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
         using Type = typename Class::Type;
         using Alias = typename Class::Alias;
-        static_assert(
-            detail::make_caster<Type>::IsClass,
-            "Attempted to create a constructor for a type that won't be "
-            "handled by the nanobind's class type caster. Is it possible that "
-            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
-
         cl.def(
             "__init__",
             [](pointer_and_handle<Type> v, Args... args) {
@@ -324,12 +318,6 @@ private:
     NB_INLINE static void execute(Class &cl, const Extra&... extra) {
         using Type = typename Class::Type;
         using Alias = typename Class::Alias;
-        using Caster = detail::make_caster<Arg>;
-        static_assert(
-            detail::make_caster<Type>::IsClass,
-            "Attempted to create a constructor for a type that won't be "
-            "handled by the nanobind's class type caster. Is it possible that "
-            "you forgot to add NB_MAKE_OPAQUE() somewhere?");
 
         cl.def(
             "__init__",
@@ -344,7 +332,9 @@ private:
                 new ((Alias *) v.p) Alias{ (detail::forward_t<Arg>) arg };
             }, is_implicit(), extra...);
 
-        if constexpr (!Caster::IsClass) {
+        using Caster = detail::make_caster<Arg>;
+
+        if constexpr (!detail::is_class_caster_v<Caster>) {
             detail::implicitly_convertible(
                 [](PyTypeObject *, PyObject *src,
                    detail::cleanup_list *cleanup) noexcept -> bool {
@@ -364,11 +354,21 @@ public:
     using Base  = typename detail::extract<T, detail::is_base,  Ts...>::type;
     using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;
 
-    static_assert(sizeof(Alias) < (1 << 24), "instance size is too big!");
-    static_assert(alignof(Alias) < (1 << 8), "instance alignment is too big!");
+    static_assert(sizeof(Alias) < (1 << 24), "Instance size is too big!");
+    static_assert(alignof(Alias) < (1 << 8), "Instance alignment is too big!");
     static_assert(
         sizeof...(Ts) == !std::is_same_v<Base, T> + !std::is_same_v<Alias, T>,
         "nanobind::class_<> was invoked with extra arguments that could not be handled");
+
+    static_assert(
+        detail::is_base_caster_v<detail::make_caster<Type>>,
+        "You attempted to bind a type that is already intercepted by a type "
+        "caster. Having both at the same time is not allowed. Are you perhaps "
+        "binding an STL type, while at the same time including a matching "
+        "type caster from <nanobind/stl/*>? Or did you perhaps forget to "
+        "declare NB_MAKE_OPAQUE(..) to specifically disable the type caster "
+        "catch-all for a specific type? Please review the documentation "
+        "to learn about the difference between bindings and type casters.");
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
@@ -521,7 +521,9 @@ public:
         static_assert(std::is_base_of_v<C, T>,
                       "def_rw() requires a (base) class member!");
 
-        using Q = std::conditional_t<detail::make_caster<D>::IsClass, const D &, D &&>;
+        using Q =
+            std::conditional_t<detail::is_base_caster_v<detail::make_caster<D>>,
+                               const D &, D &&>;
 
         def_prop_rw(name,
             [p](const T &c) -> const D & { return c.*p; },
@@ -534,7 +536,9 @@ public:
     template <typename D, typename... Extra>
     NB_INLINE class_ &def_rw_static(const char *name, D *p,
                                     const Extra &...extra) {
-        using Q = std::conditional_t<detail::make_caster<D>::IsClass, const D &, D &&>;
+        using Q =
+            std::conditional_t<detail::is_base_caster_v<detail::make_caster<D>>,
+                               const D &, D &&>;
 
         def_prop_rw_static(name,
             [p](handle) -> const D & { return *p; },
@@ -624,7 +628,7 @@ public:
 template <typename Source, typename Target> void implicitly_convertible() {
     using Caster = detail::make_caster<Source>;
 
-    if constexpr (Caster::IsClass) {
+    if constexpr (detail::is_base_caster_v<Caster>) {
         detail::implicitly_convertible(&typeid(Source), &typeid(Target));
     } else {
         detail::implicitly_convertible(

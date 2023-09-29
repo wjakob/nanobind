@@ -121,12 +121,12 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
-            cap->func(((make_caster<Args>&&) in.template get<Is>()).operator cast_t<Args>()...);
+            cap->func(in.template get<Is>().operator cast_t<Args>()...);
             result = Py_None;
             Py_INCREF(result);
         } else {
             result = cast_out::from_cpp(
-                       cap->func(((make_caster<Args> &&) in.template get<Is>())
+                       cap->func((in.template get<Is>())
                                      .operator cast_t<Args>()...),
                        policy, cleanup).ptr();
         }

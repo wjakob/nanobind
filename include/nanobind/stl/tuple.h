@@ -22,11 +22,14 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     using Value = std::tuple<Ts...>;
     using Indices = std::make_index_sequence<N>;
 
-    static constexpr bool IsClass = false;
     static constexpr auto Name = const_name(NB_TYPING_TUPLE "[") +
                                  concat(make_caster<Ts>::Name...) +
                                  const_name("]");
 
+    /// This caster constructs instances on the fly (otherwise it would not be
+    /// able to handle tuples containing references_). Because of this, only the
+    /// `operator Value()` cast operator is implemented below, and the type
+    /// alias below informs users of this class of this fact.
     template <typename T> using Cast = Value;
 
     bool from_python(handle src, uint8_t flags,
@@ -35,7 +38,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     }
 
     template <size_t... Is>
-    NB_INLINE bool from_python_impl(handle src, uint8_t flags,
+    bool from_python_impl(handle src, uint8_t flags,
                                     cleanup_list *cleanup,
                                     std::index_sequence<Is...>) noexcept {
         (void) src; (void) flags; (void) cleanup;
@@ -66,7 +69,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     }
 
     template <typename T, size_t... Is>
-    static NB_INLINE handle from_cpp_impl(T &&value, rv_policy policy,
+    static handle from_cpp_impl(T &&value, rv_policy policy,
                                           cleanup_list *cleanup,
                                           std::index_sequence<Is...>) noexcept {
         (void) value; (void) policy; (void) cleanup;
@@ -86,22 +89,10 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         return r;
     }
 
-    explicit operator Value() & {
-        return cast_impl(Indices{});
-    }
+    explicit operator Value() { return cast_impl(Indices{}); }
 
-    explicit operator Value() && {
-        return ((type_caster &&) *this).cast_impl(Indices{});
-    }
-
-    template <size_t... Is>
-    NB_INLINE Value cast_impl(std::index_sequence<Is...>) & {
+    template <size_t... Is> Value cast_impl(std::index_sequence<Is...>) {
         return Value(std::get<Is>(casters).operator cast_t<Ts>()...);
-    }
-
-    template <size_t... Is>
-    NB_INLINE Value cast_impl(std::index_sequence<Is...>) && {
-        return Value(((make_caster<Ts> &&) std::get<Is>(casters)).operator cast_t<Ts>()...);
     }
 
     std::tuple<make_caster<Ts>...> casters;

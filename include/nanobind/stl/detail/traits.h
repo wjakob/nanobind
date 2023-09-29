@@ -62,7 +62,7 @@ template <typename T>
 constexpr bool is_copy_assignable_v = is_copy_assignable<T>::value;
 
 // Analogous template for checking comparability
-template<typename T> using comparable_test = decltype(std::declval<T>() == std::declval<T>());
+template <typename T> using comparable_test = decltype(std::declval<T>() == std::declval<T>());
 
 template <typename T, typename SFINAE = int>
 struct is_equality_comparable {

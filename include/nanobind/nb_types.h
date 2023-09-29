@@ -551,7 +551,7 @@ template <typename T>
 NB_INLINE bool isinstance(handle h) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(h);
-    else if constexpr (detail::make_caster<T>::IsClass)
+    else if constexpr (detail::is_base_caster_v<detail::make_caster<T>>)
         return detail::nb_type_isinstance(h.ptr(), &typeid(detail::intrinsic_t<T>));
     else
         return detail::make_caster<T>().from_python(h, 0, nullptr);

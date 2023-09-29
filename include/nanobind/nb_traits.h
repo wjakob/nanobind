@@ -142,6 +142,21 @@ template <typename T>
 constexpr bool has_shared_from_this_v =
     decltype(has_shared_from_this_impl((T *) nullptr))::value;
 
+/// Base of all type casters for traditional bindings created via nanobind::class_<>
+struct type_caster_base_tag {
+    static constexpr bool IsClass = true;
+};
+
+/// Check if a type caster represents traditional bindings created via nanobind::class_<>
+template <typename Caster>
+constexpr bool is_base_caster_v = std::is_base_of_v<type_caster_base_tag, Caster>;
+
+template <typename T> using is_class_caster_test = std::enable_if_t<T::IsClass>;
+
+/// Generalized version of the is_base_caster_v test that also accepts unique_ptr/shared_ptr
+template <typename Caster>
+constexpr bool is_class_caster_v = detail::detector<void, is_class_caster_test, Caster>::value;
+
 NAMESPACE_END(detail)
 
 template <typename... Args>

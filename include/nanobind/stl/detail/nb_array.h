@@ -27,7 +27,7 @@ template <typename Value_, typename Entry, size_t Size> struct array_caster {
                     break;
                 }
 
-                value[i] = ((Caster &&) caster).operator cast_t<Entry &&>();
+                value[i] = caster.operator cast_t<Entry>();
             }
 
             Py_XDECREF(temp);

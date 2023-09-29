@@ -44,7 +44,7 @@ template <typename Value_, typename Entry> struct list_caster {
                 break;
             }
 
-            value.push_back(((Caster &&) caster).operator cast_t<Entry &&>());
+            value.push_back(caster.operator cast_t<Entry>());
         }
 
         Py_XDECREF(temp);

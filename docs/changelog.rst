@@ -52,6 +52,21 @@ Version 1.6.0 (TBA)
 * Added :cpp:func:`nb::exec() <exec>` and :cpp:func:`nb:eval() <eval>`. (PR `#299`
   <https://github.com/wjakob/nanobind/pull/299>`__).
 
+* Fixed a serious issue involving combinations of bound types (e.g., ``T``) and
+  type casters (e.g., ``std::vector<T>``), where nanobind was too aggressive in
+  its use of *move semantics*. Calling a bound function from Python taking such
+  a list (e.g., ``f([t1, t2, ..])``) would destruct ``t1, t2, ..`` if the type
+  ``T`` exposed a move constructor, which is highly non-intuitive and no
+  longer happens as of this fix.
+
+  Further investigation also revealed inefficiencies in the previous
+  implementation where moves were actually possible but not done (e.g., for
+  functions taking an STL vector by value). Some binding projects may see
+  speedups as a consequence of this change. (issue `#307
+  <https://github.com/wjakob/nanobind/issues/307>`, commit `122015
+  <https://github.com/wjakob/nanobind/commit/1220156961ce2d0c96a525f3c27b88e824b997ce>`__).
+
+
 Version 1.5.2 (Aug 24, 2023)
 ----------------------------
 

@@ -431,7 +431,7 @@ function ``bark_later()`` that calls :cpp:func:`nb::cpp_function()
    nb::class_<Dog>(m, "Dog")
        // ... skipped ...
        .def("bark_later", [](const Dog &p) {
-           auto callback = [name = p.name()] {
+           auto callback = [name = p.name] {
                nb::print(nb::str("{}: woof!").format(name));
            };
            return nb::cpp_function(callback);

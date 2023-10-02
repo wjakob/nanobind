@@ -16,6 +16,8 @@
 
 #include "counter.h"
 
+NAMESPACE_BEGIN(nanobind)
+
 /**
  * \brief RAII scoped reference counting helper class
  *
@@ -110,27 +112,28 @@ private:
 
 // Registar a type caster for ``ref<T>`` if nanobind was previously #included
 #if defined(NB_VERSION_MAJOR)
-namespace nanobind::detail {
-    template <typename T> struct type_caster<ref<T>> {
-        using Caster = make_caster<T>;
-        static constexpr bool IsClass = true;
-        NB_TYPE_CASTER(ref<T>, Caster::Name);
+NAMESPACE_BEGIN(detail)
+template <typename T> struct type_caster<nanobind::ref<T>> {
+    using Caster = make_caster<T>;
+    static constexpr bool IsClass = true;
+    NB_TYPE_CASTER(ref<T>, Caster::Name);
 
-        bool from_python(handle src, uint8_t flags,
-                         cleanup_list *cleanup) noexcept {
-            Caster caster;
-            if (!caster.from_python(src, flags, cleanup))
-                return false;
+    bool from_python(handle src, uint8_t flags,
+                     cleanup_list *cleanup) noexcept {
+        Caster caster;
+        if (!caster.from_python(src, flags, cleanup))
+            return false;
 
-            value = Value(caster.operator T *());
-            return true;
-        }
+        value = Value(caster.operator T *());
+        return true;
+    }
 
-        static handle from_cpp(const ref<T> &value, rv_policy policy,
-                               cleanup_list *cleanup) noexcept {
-            return Caster::from_cpp(value.get(), policy, cleanup);
-        }
-    };
+    static handle from_cpp(const ref<T> &value, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(value.get(), policy, cleanup);
+    }
 };
-
+NAMESPACE_END(detail)
 #endif
+
+NAMESPACE_END(nanobind)

@@ -19,7 +19,7 @@ public:
     virtual int value(int i) const { return 123 + i; }
 
     static Test *create_raw() { return new Test(); }
-    static ref<Test> create_ref() { return new Test(); }
+    static nb::ref<Test> create_ref() { return new Test(); }
 };
 
 class PyTest : Test {
@@ -60,7 +60,7 @@ NB_MODULE(test_intrusive_ext, m) {
         return { test_constructed, test_destructed };
     });
 
-    m.def("get_value_1", [](Test *o) { ref<Test> x(o); return x->value(1); });
-    m.def("get_value_2", [](ref<Test> x) { return x->value(2); });
-    m.def("get_value_3", [](const ref<Test> &x) { return x->value(3); });
+    m.def("get_value_1", [](Test *o) { nb::ref<Test> x(o); return x->value(1); });
+    m.def("get_value_2", [](nb::ref<Test> x) { return x->value(2); });
+    m.def("get_value_3", [](const nb::ref<Test> &x) { return x->value(3); });
 }

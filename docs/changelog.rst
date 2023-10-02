@@ -15,6 +15,13 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.6.1 (Oct 2, 2023)
+-------------------
+
+* Added missing namespace declaration to the :cpp:class:`ref` intrusive
+  reference counting RAII helper class added in version 1.6.0. (commit `1a4df2
+  <https://github.com/wjakob/nanobind/commit/1a4df20265bb2a301f831c00e52c9ac8099c8675>`__).
+
 Version 1.6.0 (Oct 2, 2023)
 -------------------
 

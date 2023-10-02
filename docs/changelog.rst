@@ -58,7 +58,8 @@ Version 1.6.0 (TBA)
 
 * Added an officially supported sample implementation of :ref:`intrusive
   reference counting <intrusive>` via the :cpp:class:`intrusive_counter`
-  :cpp:class:`intrusive_base`, and :cpp:class:`ref` classes.
+  :cpp:class:`intrusive_base`, and :cpp:class:`ref` classes. (commit `3fa1af
+  <https://github.com/wjakob/nanobind/commit/3fa1af5e9e6fd0b08d13e16bb425a18963854829>`__).
 
 * Fixed a serious issue involving combinations of bound types (e.g., ``T``) and
   type casters (e.g., ``std::vector<T>``), where nanobind was too aggressive in

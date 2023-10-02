@@ -364,9 +364,9 @@ Intrusive reference counting is the most flexible and efficient way of handling
 shared ownership. The main downside is that you must adapt the base class of
 your object hierarchy to the needs of nanobind.
 
-The core idea is to define base class (e.g. ``Object``) that is common to all bound
-types requiring shared ownership. That class contains a builtin
-atomic counter to keep track of the number of outstanding references. 
+The core idea is to define base class (e.g. ``Object``) common to all bound
+types requiring shared ownership. That class contains a builtin atomic counter
+(e.g., ``m_ref_count``) and a Python object pointer (e.g., ``m_py_object``).
 
 .. code-block:: cpp
 
@@ -374,9 +374,27 @@ atomic counter to keep track of the number of outstanding references.
    ...
    private:
        mutable std::atomic<size_t> m_ref_count { 0 };
+       PyObject *m_py_object = nullptr;
    };
 
-With a few extra modifications, nanobind can unify this reference count so that
-it accounts for references in both languages. Please see the :ref:`detailed
-section on intrusive reference counting <intrusive>` for a concrete example on
-how to set this up.
+The core idea is that such ``Object`` instances can either be managed by C++ or
+Python. In the former case, the ``m_ref_count`` field keeps track of the number
+of outstanding references. In the latter case, reference counting is handled by
+Python, and the ``m_ref_count`` field remains unused.
+
+This is actually little wasteful---nanobind therefore ships with a more
+efficient reference counter sample implementation that supports both use cases
+while requiring only ``sizeof(void*)`` bytes of storage:
+
+.. code-block:: cpp
+
+   #include <nanobind/intrusive/counter.h>
+
+   class Object {
+   ...
+   private:
+       intrusive_counter m_ref_count;
+   };
+
+Please read the dedicated :ref:`section on intrusive reference counting
+<intrusive>` for more details on how to set this up.

@@ -32,14 +32,16 @@ template <typename T> struct type_caster<std::complex<T>> {
             return true;
         }
 
-        if (Recursive && !PyFloat_CheckExact(src.ptr()) &&
-            !PyLong_CheckExact(src.ptr()) &&
-            PyObject_HasAttrString(src.ptr(), "imag")) {
-            try {
-                object tmp = handle(&PyComplex_Type)(src);
-                return from_python<false>(tmp, flags, cleanup);
-            } catch (...) {
-                return false;
+        if constexpr (Recursive) {
+            if (!PyFloat_CheckExact(src.ptr()) &&
+                !PyLong_CheckExact(src.ptr()) &&
+                PyObject_HasAttrString(src.ptr(), "imag")) {
+                try {
+                    object tmp = handle(&PyComplex_Type)(src);
+                    return from_python<false>(tmp, flags, cleanup);
+                } catch (...) {
+                    return false;
+                }
             }
         }
 

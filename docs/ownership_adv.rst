@@ -14,10 +14,10 @@ pointer conversion is implemented in nanobind.
 Intrusive reference counting
 ----------------------------
 
-nanobind provides a custom intrusive reference counting solution that is
-both efficient and also completely solves the issue of shared C++/Python
-object ownership. It addresses :ref:`annoying corner cases
-<enable_shared_from_this>` that exist with shared pointers.
+nanobind provides a custom intrusive reference counting solution that
+completely solves the issue of shared C++/Python object ownership, while
+avoiding the overheads and complexities of traditional C++ shared pointers
+(``std::shared_ptr<T>``).
 
 The main limitation is that it requires adapting the base class of an object
 hierarchy according to the needs of nanobind, which may not always be possible.
@@ -80,29 +80,131 @@ We can solve the problem by using just one counter:
   created from Python, or by being returned from a bound C++ function),
   lifetime management switches over to Python.
 
-The files `tests/object.h
-<https://github.com/wjakob/nanobind/blob/master/tests/object.h>`_ and
-`tests/object.cpp
-<https://github.com/wjakob/nanobind/blob/master/tests/object.cpp>`_ contain an
-example implementation of a suitable base class named ``Object``. It contains
-an extra optimization to use a single field of type ``std::atomic<uintptr_t>``
-(8 bytes) to store *either* a reference counter or a pointer to a
-``PyObject*``. The example class is designed to work even when used in a
-context where Python is not available.
+The file `nanobind/intrusive/counter.h
+<https://github.com/wjakob/nanobind/blob/master/include/nanobind/intrusive/counter.h>`_
+includes an official sample implementation of this functionality. It contains an extra optimization to pack *either*
+a reference counter or a pointer to a ``PyObject*`` into a single
+``sizeof(void*)``-sized field.
+
+The most basic interface, :cpp:class:`intrusive_counter` represents an atomic
+counter that can be increased (via :cpp:func:`intrusive_counter::inc_ref()`) or
+decreased (via :cpp:func:`intrusive_counter::dec_ref()`). When the counter
+reaches zero, the object should be deleted, which ``dec_ref()`` indicates by
+returning ``true``.
+
+In addition to this simple counting mechanism, ownership of the object can also
+be transferred to Python (via :cpp:func:`intrusive_counter::set_self_py()`). In
+this case, subsequent calls to ``inc_ref()`` and ``dec_ref()`` modify the
+reference count of the underlying Python object. 
+
+To incorporate intrusive reference counting into your own project, you would
+usually add an :cpp:class:`intrusive_counter`-typed member to the base class of an object
+hierarchy and expose it as follows:
+
+.. code-block:: cpp
+
+   #include <nanobind/intrusive/counter.h>
+
+   class Object {
+   public:
+       void inc_ref() noexcept { m_ref_count.inc_ref(); }
+       bool dec_ref() noexcept { return m_ref_count.dec_ref(); }
+
+       // Important: must declare virtual destructor
+       virtual ~Object() = default;
+
+       void set_self_py(PyObject *self) noexcept {
+           m_ref_count.set_self_py(self);
+       }
+
+   private:
+       nb::intrusive_counter m_ref_count;
+   };
+
+   // Convenience function for increasing the reference count of an instance
+   inline void inc_ref(Object *o) noexcept {
+       if (o)
+          o->inc_ref();
+   }
+
+   // Convenience function for decreasing the reference count of an instance
+   // and potentially deleting it when the count reaches zero
+   inline void dec_ref(Object *o) noexcept {
+       if (o && o->dec_ref())
+           delete o;
+   }
+
+Alternatively, you could also inherit from :cpp:class:`intrusive_base`, which
+obviates the need for all of the above declarations:
+
+.. code-block:: cpp
+
+   class Object : public nb::intrusive_base {
+   public:
+       // ...
+   };
 
 The main change in the bindings is that the base class must specify a
 :cpp:class:`nb::intrusive_ptr <intrusive_ptr>` annotation to inform an instance
 that lifetime management has been taken over by Python. This annotation is
 automatically inherited by all subclasses. In the linked example, this is done
 via the ``Object::set_self_py()`` method that we can now call from the class
-binding annotation.
+binding annotation:
 
 .. code-block:: cpp
 
    nb::class_<Object>(
-       m, "Object",
-       nb::intrusive_ptr<Object>(
-           [](Object *o, PyObject *po) noexcept { o->set_self_py(po); }));
+     m, "Object",
+     nb::intrusive_ptr<Object>(
+         [](Object *o, PyObject *po) noexcept { o->set_self_py(po); }));
+
+Also, somewhere in your binding initialization code, you must register Python
+reference counting hooks with the intrusive reference counter class. This
+allows its implementation of the code in ``nanobind/intrusive/counter.h`` to
+*not* depend on Python (this means that it can be used in projects where Python
+bindings are an optional component).
+
+.. code-block:: cpp
+
+   nb::intrusive_init(
+       [](PyObject *o) noexcept {
+           nb::gil_scoped_acquire guard;
+           Py_INCREF(o);
+       },
+       [](PyObject *o) noexcept {
+           nb::gil_scoped_acquire guard;
+           Py_DECREF(o);
+       });
+
+These ``counter.h`` include file references several functions that must be
+compiled somewhere inside the project, which can be accomplished by including
+the following file from a single ``.cpp`` file.
+
+.. code-block:: cpp
+
+   #include <nanobind/intrusive/counter.inl>
+
+Having to call :cpp:func:`inc_ref()` and :cpp:func:`dec_ref()` many times to
+perform manual reference counting in project code can quickly become tedious.
+Nanobind also ships with a :cpp:class:`ref\<T\> <ref>` RAII helper class to
+help with this.
+
+.. code-block:: cpp
+
+   #include <nanobind/intrusive/ref.h>
+
+   void foo() {
+       /// Assignment to ref<T> automatically increases the object's reference count
+       ref<MyObject> x = new MyObject();
+
+       // ref<T> can be used like a normal pointer
+       x->func();
+
+   } // <-- ref::~ref() calls dec_ref(), which deletes the now-unreferenced instance
+
+When the file ``nanobind/intrusive/ref.h`` is included following
+``nanobind/nanobind.h``, it also exposes a custom type caster to bind functions
+taking or returning ``ref<T>``-typed values.
 
 That's it. If you use this approach, any potential issues involving shared
 pointers, return value policies, reference leaks with trampolines, etc., can

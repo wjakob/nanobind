@@ -441,7 +441,7 @@ section <ndarrays>`.
       returns different array types could call it to convert ``ndarray<T>`` to
       ``ndarray<>``.  When adding constraints, the constructor is only safe to
       use following a runtime check to ensure that newly created array actually
-      possesses the advertised properties. 
+      possesses the advertised properties.
 
    .. cpp:function:: ndarray(const ndarray &)
 
@@ -944,3 +944,244 @@ section <utilities_eval>`.
 .. cpp:function:: inline void exec(const str &expr, handle global = handle(), handle local = handle())
 
    Execute the given Python code in the given global/local scopes.
+
+Intrusive reference counting helpers
+------------------------------------
+
+The following functions and classes can be used to augment user-provided
+classes with intrusive reference counting that greatly simplifies shared
+ownership in larger C++/Python binding projects.
+
+This functionality requires the following include directives:
+
+.. code-block:: cpp
+
+   #include <nanobind/intrusive/counter.h>
+   #include <nanobind/intrusive/ref.h>
+
+These headers reference several functions, whose implementation must be
+provided. You can do so by including the following file from a single ``.cpp``
+file of your project:
+
+.. code-block:: cpp
+
+   #include <nanobind/intrusive/counter.inl>
+
+The functionality in these files consist of the following classes and
+functions:
+
+.. cpp:class:: intrusive_counter
+
+   Simple atomic reference counter that can optionally switch over to
+   Python-based reference counting.
+
+   The various copy/move assignment/constructors intentionally don't transfer
+   the reference count. This is so that the contents of classes containing an
+   ``intrusive_counter`` can be copied/moved without disturbing the reference
+   counts of the associated instances.
+
+   .. cpp:function:: intrusive_counter() noexcept = default
+
+      Initialize with a reference count of zero.
+
+   .. cpp:function:: intrusive_counter(const intrusive_counter &o)
+
+      Copy constructor, which produces a zero-initialized counter.
+      Does *not* copy the reference count from `o`.
+
+   .. cpp:function:: intrusive_counter(intrusive_counter &&o)
+
+      Move constructor, which produces a zero-initialized counter.
+      Does *not* copy the reference count from `o`.
+
+   .. cpp:function:: intrusive_counter &operator=(const intrusive_counter &o)
+
+      Copy assignment operator. Does *not* copy the reference count from `o`.
+
+   .. cpp:function:: intrusive_counter &operator=(intrusive_counter &&o)
+
+      Move assignment operator. Does *not* copy the reference count from `o`.
+
+   .. cpp:function:: void inc_ref() const noexcept
+
+      Increase the reference count. When the counter references an object
+      managed by Python, the operation calls ``Py_INCREF()`` to increase
+      the reference count of the Python object instead.
+
+      The :cpp:func:`inc_ref() <nanobind::inc_ref>` top-level function
+      encapsulates this logic for subclasses of :cpp:class:`intrusive_base`.
+
+   .. cpp:function:: bool dec_ref() const noexcept
+
+      Decrease the reference count. When the counter references an object
+      managed by Python, the operation calls ``Py_DECREF()`` to decrease
+      the reference count of the Python object instead.
+
+      When the C++-managed reference count reaches zero, the operation returns
+      ``true`` to signal to the caller that it should use a *delete expression*
+      to destroy the instance.
+
+      The :cpp:func:`dec_ref() <nanobind::dec_ref>` top-level function
+      encapsulates this logic for subclasses of :cpp:class:`intrusive_base`.
+
+   .. cpp:function:: void set_self_py(PyObject * self)
+
+      Set the Python object associated with this instance. This operation
+      is usually called by nanobind when ownership is transferred to the
+      Python side.
+
+      Any references from prior calls to
+      :cpp:func:`intrusive_counter::inc_ref()` are converted into Python
+      references by calling ``Py_INCREF()`` repeatedly.
+
+   .. cpp:function:: PyObject * self_py()
+
+      Return the Python object associated with this instance (or ``nullptr``).
+
+.. cpp:class:: intrusive_base
+
+   Simple polymorphic base class for a intrusively reference-counted object
+   hierarchy. The member functions expose corresponding functionality of
+   :cpp:class:`intrusive_counter`.
+
+   .. cpp:function:: void inc_ref() const noexcept
+
+      See :cpp:func:`intrusive_counter::inc_ref()`.
+
+   .. cpp:function:: bool dec_ref() const noexcept
+
+      See :cpp:func:`intrusive_counter::dec_ref()`.
+
+   .. cpp:function:: void set_self_py(PyObject * self)
+
+      See :cpp:func:`intrusive_counter::set_self_py()`.
+
+   .. cpp:function:: PyObject * self_py()
+
+      See :cpp:func:`intrusive_counter::self_py()`.
+
+.. cpp:function:: void intrusive_init(void (* intrusive_inc_ref_py)(PyObject * ) noexcept, void (* intrusive_dec_ref_py)(PyObject * ) noexcept)
+
+   Function to register reference counting hooks with the intrusive reference
+   counter class. This allows its implementation to not depend on Python.
+
+   You would usually call this function as follows from the initialization
+   routine of a Python extension:
+
+   .. code-block:: cpp
+
+      NB_MODULE(my_ext, m) {
+          nb::intrusive_init(
+              [](PyObject * o) noexcept {
+                  nb::gil_scoped_acquire guard;
+                  Py_INCREF(o);
+              },
+              [](PyObject * o) noexcept {
+                  nb::gil_scoped_acquire guard;
+                  Py_DECREF(o);
+              });
+
+          // ...
+      }
+
+.. cpp:function:: inline void inc_ref(intrusive_base * o) noexcept
+
+   Reference counting helper function that calls ``o->inc_ref()`` if ``o`` is
+   not equal to ``nullptr``.
+
+.. cpp:function:: inline void dec_ref(intrusive_base * o) noexcept
+
+   Reference counting helper function that calls ``o->dec_ref()`` if ``o`` is
+   not equal to ``nullptr`` and ``delete o`` when the reference count reaches
+   zero.
+
+.. cpp:class:: template <typename T> ref
+
+   RAII scoped reference counting helper class
+
+   :cpp:class:`ref\<T\> <ref>` is a simple RAII wrapper class that encapsulates a
+   pointer to an instance with intrusive reference counting.
+
+   It takes care of increasing and decreasing the reference count as needed and
+   deleting the instance when the count reaches zero.
+
+   For this to work, compatible functions :cpp:func:`inc_ref()` and
+   :cpp:func:`dec_ref()` must be defined before including the file
+   ``nanobind/intrusive/ref.h``. Default implementations for subclasses of the
+   type :cpp:class:`intrusive_base` are already provided as part of the file
+   ``counter.h``.
+
+   .. cpp:function:: ref() = default
+
+      Create a null reference
+
+   .. cpp:function:: ref(T * ptr)
+
+      Create a reference from a pointer. Increases the reference count of the
+      object (if not ``nullptr``).
+
+   .. cpp:function:: ref(const ref &r)
+
+      Copy a reference. Increase the reference count of the object (if not
+      ``nullptr``).
+
+   .. cpp:function:: ref(ref &&r) noexcept
+
+      Move a reference. Object reference counts are unaffected by this operation.
+
+   .. cpp:function:: ~ref()
+
+      Destroy a reference. Decreases the reference count of the object (if not
+      ``nullptr``).
+
+   .. cpp:function:: ref& operator=(ref &&r) noexcept
+
+      Move-assign another reference into this one.
+
+   .. cpp:function:: ref& operator=(const ref &r)
+
+      Copy-assign another reference into this one.
+
+   .. cpp:function:: ref& operator=(const T * ptr)
+
+      Overwrite this reference with a pointer to another object
+
+   .. cpp:function:: bool operator==(const ref &r) const
+
+      Compare this reference with another reference (pointer equality)
+
+   .. cpp:function:: bool operator!=(const ref &r) const
+
+      Compare this reference with another reference (pointer inequality)
+
+   .. cpp:function:: bool operator==(const T * ptr) const
+
+      Compare this reference with another object (pointer equality)
+
+   .. cpp:function:: bool operator!=(const T * ptr) const
+
+      Compare this reference with another object (pointer inequality)
+
+   .. cpp:function:: T * operator->()
+
+      Access the object referenced by this reference
+
+   .. cpp:function:: const T * operator->() const
+
+      Access the object referenced by this reference (const version)
+
+   .. cpp:function:: T& operator*()
+
+      Return a C++ reference to the referenced object
+
+   .. cpp:function:: const T& operator*() const
+
+      Return a C++ reference to the referenced object (const version)
+
+   .. cpp:function:: T* get()
+
+      Return a C++ pointer to the referenced object
+
+   .. cpp:function:: const T* get() const
+
+      Return a C++ pointer to the referenced object (const version)

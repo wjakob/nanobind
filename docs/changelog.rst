@@ -56,6 +56,10 @@ Version 1.6.0 (TBA)
   <https://github.com/wjakob/nanobind/pull/292>`__, commit `dcbed4
   <https://github.com/wjakob/nanobind/commit/dcbed4fe1500383ad1f4dff47cacbf0f2e6b1d3f>`__).
 
+* Added an officially supported sample implementation of :ref:`intrusive
+  reference counting <intrusive>` via the :cpp:class:`intrusive_counter`
+  :cpp:class:`intrusive_base`, and :cpp:class:`ref` classes.
+
 * Fixed a serious issue involving combinations of bound types (e.g., ``T``) and
   type casters (e.g., ``std::vector<T>``), where nanobind was too aggressive in
   its use of *move semantics*. Calling a bound function from Python taking such

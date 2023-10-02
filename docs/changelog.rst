@@ -15,7 +15,7 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.6.0 (TBA)
+Version 1.6.0 (Oct 2, 2023)
 -------------------
 
 * Several :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements: 

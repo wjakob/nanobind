@@ -19,8 +19,9 @@ Version 1.6.1 (Oct 2, 2023)
 -------------------
 
 * Added missing namespace declaration to the :cpp:class:`ref` intrusive
-  reference counting RAII helper class added in version 1.6.0. (commit `1a4df2
-  <https://github.com/wjakob/nanobind/commit/1a4df20265bb2a301f831c00e52c9ac8099c8675>`__).
+  reference counting RAII helper class added in version 1.6.0. (commit `3ba352
+  <https://github.com/wjakob/nanobind/commit/3ba3522e99c8f1f4bcc7c172abd2006eeaa8eaf8>`__).
+  
 
 Version 1.6.0 (Oct 2, 2023)
 -------------------

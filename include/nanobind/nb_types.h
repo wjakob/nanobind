@@ -816,4 +816,12 @@ inline detail::fast_iterator list::end() const {
 }
 #endif
 
+/// \ingroup python_builtins
+/// Return a dictionary representing the global variables in the current execution frame,
+/// or ``__main__.__dict__`` if there is no frame.
+inline dict globals() {
+    PyObject *p = PyEval_GetGlobals();
+    return borrow<dict>(p ? p : module_::import_("__main__").attr("__dict__").ptr());
+}
+
 NAMESPACE_END(NB_NAMESPACE)

@@ -7,7 +7,6 @@
     BSD-style license that can be found in the LICENSE file.
 */
 NAMESPACE_BEGIN(NB_NAMESPACE)
-NAMESPACE_BEGIN(detail)
 
 /// \ingroup python_builtins
 /// Return a dictionary representing the global variables in the current execution frame,

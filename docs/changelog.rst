@@ -15,6 +15,13 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.6.2 (TBA)
+-------------------
+
+* Added :cpp:func:`nb::globals() <globals>`. (PR `#311
+  <https://github.com/wjakob/nanobind/pull/311>`__).
+
+
 Version 1.6.1 (Oct 2, 2023)
 -------------------
 

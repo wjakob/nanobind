@@ -15,18 +15,25 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 1.6.2 (Oct 3, 2023)
+-------------------
+
+* Added a missing include file used by the new intrusive reference counting
+  sample implementation from v1.6.0. (commit `31d115
+  <https://github.com/wjakob/nanobind/commit/31d115fce310475fed0f539b9446cc41ba9ff4d4>`__).
+
 Version 1.6.1 (Oct 2, 2023)
 -------------------
 
 * Added missing namespace declaration to the :cpp:class:`ref` intrusive
   reference counting RAII helper class added in version 1.6.0. (commit `3ba352
   <https://github.com/wjakob/nanobind/commit/3ba3522e99c8f1f4bcc7c172abd2006eeaa8eaf8>`__).
-  
+
 
 Version 1.6.0 (Oct 2, 2023)
 -------------------
 
-* Several :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements: 
+* Several :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements:
 
   1. CPU loops involving nanobind ndarrays weren't getting properly vectorized.
      This release of nanobind adds *views*, which provide an efficient
@@ -209,7 +216,7 @@ Version 1.3.2 (June 2, 2023)
 Version 1.3.1 (May 31, 2023)
 ----------------------------
 
-* CMake build system improvements for stable ABI wheel generation. 
+* CMake build system improvements for stable ABI wheel generation.
   (PR `#222 <https://github.com/wjakob/nanobind/pull/222>`__).
 
 Version 1.3.0 (May 31, 2023)

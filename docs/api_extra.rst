@@ -1146,6 +1146,11 @@ functions:
 
       Overwrite this reference with a pointer to another object
 
+   .. cpp:function:: void reset()
+
+      Clear the reference and reduces the reference count of the object (if not
+      ``nullptr``)
+
    .. cpp:function:: bool operator==(const ref &r) const
 
       Compare this reference with another reference (pointer equality)

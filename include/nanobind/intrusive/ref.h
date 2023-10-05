@@ -73,6 +73,12 @@ public:
         return *this;
     }
 
+    /// Clear the currently stored reference
+    void reset() {
+        dec_ref(m_ptr);
+        m_ptr = nullptr;
+    }
+
     /// Compare this reference with another reference
     bool operator==(const ref &r) const { return m_ptr == r.m_ptr; }
 

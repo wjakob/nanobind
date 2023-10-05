@@ -439,4 +439,10 @@ NB_MODULE(test_stl_ext, m) {
         return x;
     });
 
+    m.def("vector_str", [](const std::vector<std::string>& x){
+        return x;
+    });
+    m.def("vector_str", [](std::string& x){
+        return x;
+    });
 }

@@ -1123,6 +1123,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     } else {
         PyObject *callback =
             PyCFunction_New(&keep_alive_callback_def, patient);
+
         PyObject *weakref = PyWeakref_NewRef(nurse, callback);
         if (!weakref) {
             Py_DECREF(callback);

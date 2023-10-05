@@ -577,6 +577,12 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
        goes wrong, it fails gracefully without reporting errors. Other
        overloads will then be tried. */
 
+    if (PyUnicode_CheckExact(seq) || PyBytes_CheckExact(seq)) {
+        *size_out = 0;
+        *temp_out = nullptr;
+        return nullptr;
+    }
+
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     if (PyTuple_CheckExact(seq)) {
         size = (size_t) PyTuple_GET_SIZE(seq);

@@ -233,6 +233,9 @@ struct nb_internals {
     /// Should nanobind print warnings after implicit cast failures?
     bool print_implicit_cast_warnings = true;
 
+    /// Pointer to a boolean that denotes if nanobind is fully initialized.
+    bool *is_alive_ptr = nullptr;
+
 #if defined(Py_LIMITED_API)
     // Cache important functions from PyType_Type and PyProperty_Type
     freefunc PyType_Type_tp_free;

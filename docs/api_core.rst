@@ -2383,6 +2383,11 @@ Global flags
    implicit conversion, and when that conversion is not successful. Call this
    function to disable or re-enable the warnings.
 
+.. cpp:function:: inline bool is_alive() noexcept
+
+   The function returns ``true`` when nanobind is initialized and ready for
+   use. It returns ``false`` when the Python interpreter has shut down, causing
+   the destruction various nanobind-internal data structures.
 
 Miscellaneous
 -------------

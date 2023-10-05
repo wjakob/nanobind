@@ -498,6 +498,8 @@ NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,
 NB_CORE PyObject *repr_list(PyObject *o);
 NB_CORE PyObject *repr_map(PyObject *o);
 
+NB_CORE bool is_alive() noexcept;
+
 #if NB_TYPE_GET_SLOT_IMPL
 NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 #endif

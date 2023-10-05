@@ -39,4 +39,8 @@ inline void set_implicit_cast_warnings(bool value) noexcept {
     detail::set_implicit_cast_warnings(value);
 }
 
+inline bool is_alive() noexcept {
+    return detail::is_alive();
+}
+
 NAMESPACE_END(NB_NAMESPACE)

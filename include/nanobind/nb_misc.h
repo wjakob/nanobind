@@ -44,7 +44,9 @@ inline void set_implicit_cast_warnings(bool value) noexcept {
 /// or ``__main__.__dict__`` if there is no frame.
 inline dict globals() {
     PyObject *p = PyEval_GetGlobals();
-    return borrow<dict>(p ? p : module_::import_("__main__").attr("__dict__").ptr());
+    if (!p)
+        detail::raise_python_error();
+    return borrow<dict>(p);
 }
 
 NAMESPACE_END(NB_NAMESPACE)

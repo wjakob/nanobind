@@ -820,3 +820,7 @@ def test69_complex_array():
         assert t.complex_array_float(np.array([val1_64, -1j, val2_64],dtype=np.complex64)) == [val1_32, (-0-1j), val2_32]
     except ImportError:
         pass
+
+def test70_vec_char():
+    assert isinstance(t.vector_str("123"), str)
+    assert isinstance(t.vector_str(["123", "345"]), list)

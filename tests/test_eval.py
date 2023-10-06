@@ -31,3 +31,14 @@ def test_eval_closure():
     assert "func_local" not in global_
     with pytest.raises(NameError):
         local["func_local"]()
+
+a = 1
+
+def test_read_globals():
+    assert m.globals_contains_a()
+
+
+def test_write_globals():
+    assert "b" not in globals()
+    m.globals_add_b()
+    assert globals()["b"] == 123

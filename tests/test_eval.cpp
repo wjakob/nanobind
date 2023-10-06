@@ -74,4 +74,14 @@ NB_MODULE(test_eval_ext, m) {
                  local);
         return std::make_pair(global, local);
     });
+
+    m.def("globals_contains_a", []() {
+        return nb::globals().contains("a");
+    });
+
+    m.def("globals_add_b", []() {
+        auto globals = nb::globals();
+        globals["b"] = 123;
+        return globals;
+    });
 }

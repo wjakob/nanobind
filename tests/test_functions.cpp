@@ -236,4 +236,7 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     m.def("test_set_contains", [](nb::set s, nb::handle h) { return s.contains(h); });
+
+    m.def("test_del_list", [](nb::list l) { nb::del(l[2]); });
+    m.def("test_del_dict", [](nb::dict l) { nb::del(l["a"]); });
 }

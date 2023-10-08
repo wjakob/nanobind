@@ -11,6 +11,8 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Impl> class accessor : public api<accessor<Impl>> {
+    template <typename T> friend void nanobind::del(accessor<T> &);
+    template <typename T> friend void nanobind::del(accessor<T> &&);
 public:
     static constexpr auto Name = const_name("object");
 
@@ -34,6 +36,9 @@ public:
     }
     NB_INLINE handle base() const { return m_base; }
     NB_INLINE object key() const { return steal(Impl::key(m_key)); }
+
+private:
+    NB_INLINE void del () { Impl::del(m_base, m_key); }
 
 private:
     PyObject *m_base;
@@ -87,6 +92,10 @@ struct str_item {
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
         setitem(obj, key, v);
     }
+
+    NB_INLINE static void del(PyObject *obj, const char *key) {
+        delitem(obj, key);
+    }
 };
 
 struct obj_item {
@@ -100,6 +109,10 @@ struct obj_item {
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
         setitem(obj, key.ptr(), v);
     }
+
+    NB_INLINE static void del(PyObject *obj, handle key) {
+        delitem(obj, key.ptr());
+    }
 };
 
 struct num_item {
@@ -112,6 +125,10 @@ struct num_item {
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
         setitem(obj, index, v);
+    }
+
+    NB_INLINE static void del(PyObject *obj, Py_ssize_t index) {
+        delitem(obj, index);
     }
 };
 
@@ -133,6 +150,10 @@ struct num_item_list {
 #if !defined(Py_LIMITED_API)
         Py_DECREF(old);
 #endif
+    }
+
+    NB_INLINE static void del(PyObject *obj, Py_ssize_t index) {
+        delitem(obj, index);
     }
 };
 

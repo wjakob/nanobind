@@ -816,4 +816,7 @@ inline detail::fast_iterator list::end() const {
 }
 #endif
 
+template <typename T> void del(detail::accessor<T> &a) { a.del(); }
+template <typename T> void del(detail::accessor<T> &&a) { a.del(); }
+
 NAMESPACE_END(NB_NAMESPACE)

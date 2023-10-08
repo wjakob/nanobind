@@ -563,6 +563,24 @@ Attribute access
    Equivalent to ``del h.key`` and ``delattr(h, key)`` in Python.
    Raises :cpp:class:`python_error` if the operation fails.
 
+.. cpp:function:: template <typename T> void del(detail::accessor<T> &)
+
+   Remove an element from a sequence or mapping. The C++ statement
+
+   .. code-block:: cpp
+
+      nb::del(o[key]);
+
+   is equivalent to ``del o[key]`` in Python.
+
+   When the element cannot be removed, the function will raise
+   :cpp:class:`python_error` wrapping either a Python ``IndexError`` (for
+   sequence types) or a ``KeyError`` (for mapping types).
+
+.. cpp:function:: template <typename T> void del(detail::accessor<T> &&)
+
+   Rvalue equivalent of the above expression.
+
 Size queries
 ------------
 
@@ -672,6 +690,8 @@ Wrapper classes
    read and write list elements (the bindings for this operator are provided by
    the parent class and not listed here).
 
+   Use the :cpp:func:`nb::del <del>` function to remove elements.
+
    .. cpp:function:: list()
 
       Create an empty list
@@ -717,6 +737,8 @@ Wrapper classes
    Use the standard ``operator[]`` C++ operator to read and write dictionary
    elements (the bindings for this operator are provided by the parent class
    and not listed here).
+
+   Use the :cpp:func:`nb::del <del>` function to remove elements.
 
    .. cpp:function:: dict()
 

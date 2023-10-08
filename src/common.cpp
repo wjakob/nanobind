@@ -488,6 +488,36 @@ void setitem(PyObject *obj, PyObject *key, PyObject *value) {
         raise_python_error();
 }
 
+void delitem(PyObject *obj, Py_ssize_t key_) {
+    PyObject *key = PyLong_FromSsize_t(key_);
+    if (!key)
+        raise_python_error();
+
+    int rv = PyObject_DelItem(obj, key);
+    Py_DECREF(key);
+
+    if (rv)
+        raise_python_error();
+}
+
+void delitem(PyObject *obj, const char *key_) {
+    PyObject *key = PyUnicode_FromString(key_);
+    if (!key)
+        raise_python_error();
+
+    int rv = PyObject_DelItem(obj, key);
+    Py_DECREF(key);
+
+    if (rv)
+        raise_python_error();
+}
+
+void delitem(PyObject *obj, PyObject *key) {
+    int rv = PyObject_DelItem(obj, key);
+    if (rv)
+        raise_python_error();
+}
+
 // ========================================================================
 
 PyObject *str_from_obj(PyObject *o) {

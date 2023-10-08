@@ -332,3 +332,19 @@ def test38_set():
     assert t.test_set_contains(x, '123')
     assert not t.test_set_contains(x, '1234')
     assert not t.test_set_contains(x, 1234)
+
+
+def test39_del():
+    l = [0,1,2,3,4]
+    t.test_del_list(l)
+    assert l == [0, 1, 3, 4]
+
+    l = {'a' : 0, 'b' : 1}
+    t.test_del_dict(l)
+    assert l == {'b' : 1}
+
+    with pytest.raises(IndexError):
+        t.test_del_list([])
+
+    with pytest.raises(KeyError):
+        t.test_del_dict({})

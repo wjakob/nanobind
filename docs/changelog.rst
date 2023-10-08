@@ -21,6 +21,16 @@ Version 1.7.0 (TBA)
 * Added :cpp:func:`nb::globals() <globals>`. (PR `#311
   <https://github.com/wjakob/nanobind/pull/311>`__).
 
+* Added :cpp:func:`nb::del() <del>` that takes an arbitrary accessor object.
+  With this new function, the C++ statement
+
+  .. code-block:: cpp
+
+     nb::del(o[key]);
+
+  is equivalent to ``del o[key]`` in Python.
+
+
 Version 1.6.2 (Oct 3, 2023)
 -------------------
 

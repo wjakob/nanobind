@@ -175,6 +175,11 @@ NB_CORE void setitem(PyObject *obj, Py_ssize_t, PyObject *value);
 NB_CORE void setitem(PyObject *obj, const char *key, PyObject *value);
 NB_CORE void setitem(PyObject *obj, PyObject *key, PyObject *value);
 
+/// Set an item or raise an exception
+NB_CORE void delitem(PyObject *obj, Py_ssize_t);
+NB_CORE void delitem(PyObject *obj, const char *key);
+NB_CORE void delitem(PyObject *obj, PyObject *key);
+
 // ========================================================================
 
 /// Determine the length of a Python object

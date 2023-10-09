@@ -256,7 +256,7 @@ NB_MODULE(test_stl_ext, m) {
 
     // ----- test43-test50 ------
     m.def("variant_copyable", [](std::variant<Copyable, int> &) {});
-    m.def("variant_copyable_none", [](std::variant<std::monostate, Copyable, int> &) {}, nb::arg("x").none());
+    m.def("variant_copyable_none", [](std::variant<int, Copyable, std::monostate> &) {}, nb::arg("x").none());
     m.def("variant_copyable_ptr", [](std::variant<Copyable *, int> &) {});
     m.def("variant_copyable_ptr_none", [](std::variant<Copyable *, int> &) {}, nb::arg("x").none());
     m.def("variant_ret_var_copyable", []() { return std::variant<Copyable, int>(); });

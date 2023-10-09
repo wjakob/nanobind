@@ -464,7 +464,7 @@ def test44_std_variant_copyable_none(clean):
     t.variant_copyable_none(5)
     t.variant_copyable_none(None)
     assert t.variant_copyable_none.__doc__ == (
-        "variant_copyable_none(x: Optional[Union[test_stl_ext.Copyable, int]]) -> None"
+        "variant_copyable_none(x: Optional[Union[int, test_stl_ext.Copyable]]) -> None"
     )
     assert_stats(
         default_constructed=1,

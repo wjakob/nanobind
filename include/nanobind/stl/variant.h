@@ -28,9 +28,7 @@ template <> struct type_caster<std::monostate> {
     NB_TYPE_CASTER(std::monostate, const_name("None"));
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
-        if (src.is_none())
-            return true;
-        return false;
+        return src.is_none();
     }
 
     static handle from_cpp(const std::monostate &, rv_policy,
@@ -53,6 +51,11 @@ template <typename... Ts> struct type_caster<std::variant<Ts...>> {
             "by nanobind's regular class binding mechanism. However, a "
             "type caster was registered to intercept this particular "
             "type, which is not allowed.");
+
+        if constexpr (!std::is_pointer_v<T> && is_base_caster_v<CasterT>) {
+            if (src.is_none())
+                return false;
+        }
 
         CasterT caster;
 

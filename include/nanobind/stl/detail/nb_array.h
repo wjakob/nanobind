@@ -5,8 +5,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename Value_, typename Entry, size_t Size> struct array_caster {
-    NB_TYPE_CASTER(Value_, const_name(NB_TYPING_LIST "[") +
+template <typename Array, typename Entry, size_t Size> struct array_caster {
+    NB_TYPE_CASTER(Array, const_name(NB_TYPING_LIST "[") +
                                make_caster<Entry>::Name + const_name("]"));
 
     using Caster = make_caster<Entry>;
@@ -19,6 +19,9 @@ template <typename Value_, typename Entry, size_t Size> struct array_caster {
 
         Caster caster;
         bool success = o != nullptr;
+
+        if (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
+            flags |= (uint8_t) cast_flags::none_disallowed;
 
         if (success) {
             for (size_t i = 0; i < Size; ++i) {

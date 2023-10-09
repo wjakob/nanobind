@@ -14,8 +14,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename Value_, typename Entry> struct list_caster {
-    NB_TYPE_CASTER(Value_, const_name(NB_TYPING_LIST "[") +
+template <typename List, typename Entry> struct list_caster {
+    NB_TYPE_CASTER(List, const_name(NB_TYPING_LIST "[") +
                                make_caster<Entry>::Name + const_name("]"));
 
     using Caster = make_caster<Entry>;
@@ -32,11 +32,14 @@ template <typename Value_, typename Entry> struct list_caster {
 
         value.clear();
 
-        if constexpr (is_detected_v<has_reserve, Value_>)
+        if constexpr (is_detected_v<has_reserve, List>)
             value.reserve(size);
 
         Caster caster;
         bool success = o != nullptr;
+
+        if (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
+            flags |= (uint8_t) cast_flags::none_disallowed;
 
         for (size_t i = 0; i < size; ++i) {
             if (!caster.from_python(o[i], flags, cleanup)) {

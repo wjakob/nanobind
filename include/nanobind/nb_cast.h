@@ -34,7 +34,10 @@ enum cast_flags : uint8_t {
     convert = (1 << 0),
 
     // Passed to the 'self' argument in a constructor call (__init__)
-    construct = (1 << 1)
+    construct = (1 << 1),
+
+    // Don't accept 'None' Python objects in the base class caster
+    none_disallowed = (1 << 2),
 };
 
 /**

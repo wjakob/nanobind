@@ -14,23 +14,26 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename Value_, typename Key> struct set_caster {
-    NB_TYPE_CASTER(Value_, const_name(NB_TYPING_SET "[") + make_caster<Key>::Name + const_name("]"));
+template <typename Set, typename Key> struct set_caster {
+    NB_TYPE_CASTER(Set, const_name(NB_TYPING_SET "[") + make_caster<Key>::Name + const_name("]"));
 
-    using KeyCaster = make_caster<Key>;
+    using Caster = make_caster<Key>;
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
         PyObject* iter = obj_iter(src.ptr());
-        if (iter == nullptr) {
+        if (!iter) {
             PyErr_Clear();
             return false;
         }
 
         bool success = true;
-        KeyCaster key_caster;
+        Caster key_caster;
         PyObject *key;
+
+        if (is_base_caster_v<Caster> && !std::is_pointer_v<Key>)
+            flags |= (uint8_t) cast_flags::none_disallowed;
 
         while ((key = PyIter_Next(iter)) != nullptr) {
             success &= key_caster.from_python(key, flags, cleanup);
@@ -59,7 +62,7 @@ template <typename Value_, typename Key> struct set_caster {
         if (ret.is_valid()) {
             for (auto& key : src) {
                 object k = steal(
-                    KeyCaster::from_cpp(forward_like<T>(key), policy, cleanup));
+                    Caster::from_cpp(forward_like<T>(key), policy, cleanup));
 
                 if (!k.is_valid() || PySet_Add(ret.ptr(), k.ptr()) != 0) {
                     ret.reset();

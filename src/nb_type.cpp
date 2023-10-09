@@ -1013,7 +1013,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     // Convert None -> nullptr
     if (src == Py_None) {
         *out = nullptr;
-        return true;
+        return (flags & (uint8_t) cast_flags::none_disallowed) == 0;
     }
 
     PyTypeObject *src_type = Py_TYPE(src);

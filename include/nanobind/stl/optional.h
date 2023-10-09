@@ -29,8 +29,10 @@ struct type_caster<std::optional<T>> {
     type_caster() : value(std::nullopt) { }
 
     bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (src.is_none())
+        if (src.is_none()) {
+            value = std::nullopt;
             return true;
+        }
 
         Caster caster;
         if (!caster.from_python(src, flags, cleanup))

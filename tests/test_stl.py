@@ -824,3 +824,9 @@ def test69_complex_array():
 def test70_vec_char():
     assert isinstance(t.vector_str("123"), str)
     assert isinstance(t.vector_str(["123", "345"]), list)
+
+def test71_null_input():
+    with pytest.raises(TypeError):
+        t.vec_movable_in_value([None])
+    with pytest.raises(TypeError):
+        t.map_copyable_in_value({'a': None})

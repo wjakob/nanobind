@@ -218,8 +218,7 @@ template <> struct type_caster<char> {
 
     static handle from_cpp(const char *value, rv_policy,
                            cleanup_list *) noexcept {
-        if (value == nullptr)
-        {
+        if (value == nullptr) {
             PyObject* result = Py_None;
             Py_INCREF(result);
             return result;

@@ -72,11 +72,11 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
 
       Obtain a const reference to the derived class.
 
-   .. cpp:function:: handle inc_ref() const noexcept
+   .. cpp:function:: handle inc_ref() const
 
       Increases the reference count and returns a reference to the Python object.
 
-   .. cpp:function:: handle ref_ref() const noexcept
+   .. cpp:function:: handle ref_ref() const
 
       Decreases the reference count and returns a reference to the Python object.
 
@@ -353,6 +353,16 @@ Without reference counting
 
       Check if the handle refers to a valid Python object. Equivalent to
       :cpp:func:`detail::api::is_valid()`
+
+   .. cpp:function:: handle inc_ref() const noexcept
+
+      Increases the reference count and returns a reference to the Python object.
+      Never raises an exception.
+
+   .. cpp:function:: handle ref_ref() const noexcept
+
+      Decreases the reference count and returns a reference to the Python object.
+      Never raises an exception.
 
    .. cpp:function:: PyObject * ptr() const
 

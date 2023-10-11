@@ -722,3 +722,25 @@ def test40_slots():
     if not hasattr(t, "test_slots"):
         pytest.skip()
     assert t.test_slots() == (True, True, True)
+
+def test41_weak_references():
+    import weakref
+    import gc
+    import time
+    o = t.StructWithWeakrefs(42)
+    w = weakref.ref(o)
+    assert w() is o
+    del o
+    gc.collect()
+    gc.collect()
+    assert w() is None
+
+    p = t.StructWithWeakrefsAndDynamicAttrs(43)
+    p.a_dynamic_attr = 101
+    w = weakref.ref(p)
+    assert w() is p
+    assert w().a_dynamic_attr == 101
+    del p
+    gc.collect()
+    gc.collect()
+    assert w() is None

@@ -830,6 +830,7 @@
 -U _Py_InitializeEx
 -U _Py_Is
 -U _Py_IsFalse
+-U _Py_IsFinalizing
 -U _Py_IsInitialized
 -U _Py_IsNone
 -U _Py_IsTrue

@@ -510,4 +510,9 @@ NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 #endif
 
 NAMESPACE_END(detail)
+
+using detail::raise;
+using detail::raise_type_error;
+using detail::raise_python_error;
+
 NAMESPACE_END(NB_NAMESPACE)

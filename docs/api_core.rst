@@ -742,7 +742,7 @@ Wrapper classes
 
 .. cpp:class:: dict: public object
 
-   Wrapper class representing Python ``dict`` instances. 
+   Wrapper class representing Python ``dict`` instances.
 
    Use the standard ``operator[]`` C++ operator to read and write dictionary
    elements (the bindings for this operator are provided by the parent class
@@ -1365,6 +1365,25 @@ the reference section on :ref:`class binding <class_binding>`.
 
    Usage of this function is explained in the documentation section on
    :ref:`exception chaining <exception_chaining>`.
+
+.. cpp:function:: void raise(const char * fmt, ...)
+
+   This function takes a ``printf``-style format string with arguments and then
+   raises a ``std::runtime_error`` with the formatted string. The function has
+   no dependence on Python, and nanobind merely includes it for convenience.
+
+.. cpp:function:: void raise_type_error(const char * fmt, ...)
+
+   This function is analogous to :cpp:func:`raise`, except that it raises a
+   :cpp:class:`builtin_exception` that will convert into a Python ``TypeError``
+   when crossing the language interface.
+
+.. cpp:function:: void raise_python_error()
+
+   This function should only be called if a Python error status was set by a
+   prior operation, which should now be raised as a C++ exception. The function
+   is analogous to the statement ``throw python_error();`` but compiles into
+   more compact code.
 
 Casting
 -------
@@ -2211,7 +2230,7 @@ Low-level type and instance access
 nanobind exposes a low-level interface to provide fine-grained control over
 the sequence of steps that instantiates a Python object wrapping a C++
 instance. An thorough explanation of these features is provided in a
-:ref:`separate section <lowlevel>`. 
+:ref:`separate section <lowlevel>`.
 
 Type objects
 ^^^^^^^^^^^^

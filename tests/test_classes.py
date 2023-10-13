@@ -475,9 +475,7 @@ def test22_low_level(clean):
     del s1
     del s2
     del s3
-    import gc
-    gc.collect()
-    gc.collect()
+    collect()
     assert s4.value() == 123
     del s4
     assert_stats(

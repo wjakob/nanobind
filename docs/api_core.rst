@@ -2460,7 +2460,9 @@ Global flags
 
    The function returns ``true`` when nanobind is initialized and ready for
    use. It returns ``false`` when the Python interpreter has shut down, causing
-   the destruction various nanobind-internal data structures.
+   the destruction various nanobind-internal data structures. Having access to
+   this liveness status can be useful to avoid operations that are illegal in
+   the latter context.
 
 Miscellaneous
 -------------

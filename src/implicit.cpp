@@ -36,7 +36,8 @@ void implicitly_convertible(const std::type_info *src,
 
     void **data = (void **) malloc(sizeof(void *) * (size + 2));
 
-    memcpy(data, t->implicit, size * sizeof(void *));
+    if (size)
+        memcpy(data, t->implicit, size * sizeof(void *));
     data[size] = (void *) src;
     data[size + 1] = nullptr;
     free(t->implicit);
@@ -66,7 +67,8 @@ void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
     }
 
     void **data = (void **) malloc(sizeof(void *) * (size + 2));
-    memcpy(data, t->implicit_py, size * sizeof(void *));
+    if (size)
+        memcpy(data, t->implicit_py, size * sizeof(void *));
     data[size] = (void *) predicate;
     data[size + 1] = nullptr;
     free(t->implicit_py);

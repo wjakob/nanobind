@@ -2495,6 +2495,10 @@ Miscellaneous
 
    Return the ``__builtins__`` dictionary.
 
+.. cpp:function:: dict globals()
+
+   Return the ``globals()`` dictionary.
+
 .. cpp:function:: template <typename Source, typename Target> void implicitly_convertible()
 
    Indicate that the type `Source` is implicitly convertible into `Target`

@@ -33,11 +33,11 @@ object eval(const str &expr, handle global = handle(), handle local = handle()) 
     // This used to be PyRun_String, but that function isn't in the stable ABI.
     object codeobj = steal(Py_CompileString(expr.c_str(), "<string>", start));
     if (!codeobj.is_valid())
-        detail::raise_python_error();
+        raise_python_error();
 
     PyObject *result = PyEval_EvalCode(codeobj.ptr(), global.ptr(), local.ptr());
     if (!result)
-        detail::raise_python_error();
+        raise_python_error();
 
     return steal(result);
 }

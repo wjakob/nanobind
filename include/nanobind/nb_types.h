@@ -352,7 +352,7 @@ class int_ : public object {
               detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr),
               detail::steal_t{}) {
         if (!m_ptr)
-            detail::raise_python_error();
+            raise_python_error();
     }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
@@ -373,7 +373,7 @@ class float_ : public object {
     explicit float_(double value)
         : object(PyFloat_FromDouble(value), detail::steal_t{}) {
         if (!m_ptr)
-            detail::raise_python_error();
+            raise_python_error();
     }
 
 #if !defined(Py_LIMITED_API)
@@ -476,7 +476,7 @@ class set : public object {
     template <typename T> void add(T &&value);
     void clear() {
         if (PySet_Clear(m_ptr))
-            detail::raise_python_error();
+            raise_python_error();
     }
 };
 
@@ -586,7 +586,7 @@ public:
     slice(handle start, handle stop, handle step) {
         m_ptr = PySlice_New(start.ptr(), stop.ptr(), step.ptr());
         if (!m_ptr)
-            detail::raise_python_error();
+            raise_python_error();
     }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
@@ -633,7 +633,7 @@ public:
     explicit weakref(handle obj, handle callback = {})
         : object(PyWeakref_NewRef(obj.ptr(), callback.ptr()), detail::steal_t{}) {
         if (!m_ptr)
-            detail::raise_python_error();
+            raise_python_error();
     }
 };
 

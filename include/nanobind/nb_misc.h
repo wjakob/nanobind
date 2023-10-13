@@ -42,7 +42,7 @@ inline void set_implicit_cast_warnings(bool value) noexcept {
 inline dict globals() {
     PyObject *p = PyEval_GetGlobals();
     if (!p)
-        detail::raise("nanobind::globals(): no frame is currently executing!");
+        raise("nanobind::globals(): no frame is currently executing!");
     return borrow<dict>(p);
 }
 

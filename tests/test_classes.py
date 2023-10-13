@@ -722,3 +722,24 @@ def test40_slots():
     if not hasattr(t, "test_slots"):
         pytest.skip()
     assert t.test_slots() == (True, True, True)
+
+def test41_implicit_conversion_keep_alive():
+    # Check that keep_alive references implicitly constructed arguments
+    # as opposed to the original function arguments
+    collect()
+    t.get_destructed()
+
+    a = t.Struct(5)
+    b = t.get_incrementing_struct_value(a)
+    d1 = t.get_destructed()
+    assert b.value() == 106
+    del a
+    collect()
+    d2 = t.get_destructed()
+    collect()
+    del b
+    collect()
+    d3 = t.get_destructed()
+    assert d1 == []
+    assert d2 == [5]
+    assert d3 == [106, 6]

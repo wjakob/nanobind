@@ -1533,20 +1533,42 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
 .. cpp:struct:: template <size_t Nurse, size_t Patient> keep_alive
 
-   Following the function evaluation, keep object ``Patient`` alive while the
-   object ``Nurse`` exists. The function uses the following indexing
-   convention:
+   Following evaluation of the bound function, keep the object referenced by
+   index ``Patient`` alive *as long as* the object with index ``Nurse`` exists.
+   This uses the following indexing convention:
 
-   - Index ``0`` refers to the return value of methods. (It should not be used in
-     constructors)
+   - Index ``0`` refers to the return value of methods. It should not be used
+     in constructors or functions that do not return a result.
 
-   - Index ``1`` refers to the first argument. In methods and constructors, index ``1``
-     refers to the implicit ``this`` pointer, while regular arguments begin at index ``2``.
+   - Index ``1`` refers to the first argument. In methods and constructors,
+     index ``1`` refers to the implicit ``this`` pointer, while regular
+     arguments begin at index ``2``.
 
-    When the nurse or patient equal ``None``, the annotation does nothing.
+   The annotation has the following runtime characteristics:
 
-    nanobind will raise an exception when the nurse object is neither a
-    nanobind-registered type nor weak-referenceable.
+    - It does nothing when the nurse or patient object are ``None``.
+
+    - It raises an exception when the nurse object is neither
+      weak-referenceable nor an instance of a binding created via
+      :cpp:class:`nb::class_\<..\> <class_>`.
+
+   Two additional caveats regarding :cpp:class:`keep_alive <keep_alive>` are
+   noteworthy:
+
+   - It *usually* doesn't make sense to specify a ``Nurse`` or ``Patient`` for an
+     argument or return value handled by a :ref:`type caster <type_caster>` (e.g.,
+     a STL vector handled via the include directive ``#include
+     <nanobind/stl/vector.h>``). That's because type casters copy-convert the
+     Python object into an equivalent C++ object, whose lifetime is decoupled
+     from the original Python object. However, the :cpp:class:`keep_alive
+     <keep_alive>` annotation *only* affects the lifetime of Python objects
+     *and not their C++ copy*.
+
+   - Dispatching a Python → C++ function call may require the :ref:`implicit
+     conversion <noconvert>` of function arguments. In this case, the objects
+     passed to the C++ function differ from the originally specified arguments.
+     The ``Nurse`` and ``Patient`` annotation always refer to the *final* object
+     following implicit conversion.
 
 .. cpp:struct:: raw_doc
 

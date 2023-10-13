@@ -540,14 +540,14 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
                                         concat_maybe(detail::ndarray_arg<Args>::name...) +
                                         const_name("]"));
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         constexpr size_t size = (0 + ... + detail::ndarray_arg<Args>::size);
         size_t shape[size + 1];
         detail::ndarray_req req;
         req.shape = shape;
         (detail::ndarray_arg<Args>::apply(req), ...);
         value = ndarray<Args...>(ndarray_import(
-            src.ptr(), &req, flags & (uint8_t) cast_flags::convert));
+            src.ptr(), &req, flags & (uint8_t) cast_flags::convert, cleanup));
         return value.is_valid();
     }
 

@@ -50,8 +50,14 @@ public:
     /// Decrease the reference count of all appended objects
     void release() noexcept;
 
-    /// Does the list contain any entries?
-    inline bool used() { return m_size != 1; }
+    /// Does the list contain any entries? (besides the 'self' argument)
+    bool used() { return m_size != 1; }
+
+    /// Return the size of the cleanup stack
+    size_t size() const { return m_size; }
+
+    /// Subscript operator
+    PyObject *operator[](size_t index) const { return m_data[index]; }
 
 protected:
     /// Out of memory, expand..
@@ -382,6 +388,7 @@ NB_CORE void keep_alive(PyObject *nurse, PyObject *patient);
 NB_CORE void keep_alive(PyObject *nurse, void *payload,
                         void (*deleter)(void *) noexcept) noexcept;
 
+
 // ========================================================================
 
 /// Indicate to nanobind that an implicit constructor can convert 'src' -> 'dst'
@@ -424,7 +431,8 @@ NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
 
 // Try to import a reference-counted ndarray object via DLPack
 NB_CORE ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
-                                       bool convert) noexcept;
+                                       bool convert,
+                                       cleanup_list *cleanup) noexcept;
 
 // Describe a local ndarray object using a DLPack capsule
 NB_CORE ndarray_handle *ndarray_create(void *value, size_t ndim,

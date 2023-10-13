@@ -90,7 +90,7 @@ enum class func_flags : uint32_t {
 
     /// Did the user specify a name for this function, or is it anonymous?
     has_name = (1 << 4),
-    /// Did the user specify a scope where this function should be installed?
+    /// Did the user specify a scope in which this function should be installed?
     has_scope = (1 << 5),
     /// Did the user specify a docstring?
     has_doc = (1 << 6),
@@ -100,7 +100,7 @@ enum class func_flags : uint32_t {
     has_var_args = (1 << 8),
     /// Does the function signature contain an *kwargs-style argument?
     has_var_kwargs = (1 << 9),
-    /// Is this function a class method?
+    /// Is this function a method of a class?
     is_method = (1 << 10),
     /// Is this function a method called __init__? (automatically generated)
     is_constructor = (1 << 11),
@@ -113,7 +113,9 @@ enum class func_flags : uint32_t {
     /// Should the func_new() call return a new reference?
     return_ref = (1 << 15),
     /// Does this overload specify a raw docstring that should take precedence?
-    raw_doc = (1 << 16)
+    raw_doc = (1 << 16),
+    /// Does this function have one or more nb::keep_alive() annotations?
+    has_keep_alive = (1 << 17)
 };
 
 struct arg_data {
@@ -226,30 +228,38 @@ template <typename F, typename... Ts>
 NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t &) {}
 
 template <typename F, size_t Nurse, size_t Patient>
-NB_INLINE void func_extra_apply(F &, nanobind::keep_alive<Nurse, Patient>,
-                                size_t &) {}
+NB_INLINE void func_extra_apply(F &f, nanobind::keep_alive<Nurse, Patient>, size_t &) {
+    f.flags |= (uint32_t) func_flags::has_keep_alive;
+}
 
-template <typename... Ts> struct extract_guard { using type = void; };
-
-template <typename T, typename... Ts> struct extract_guard<T, Ts...> {
-    using type = typename extract_guard<Ts...>::type;
+template <typename... Ts> struct func_extra_info {
+    using call_guard = void;
+    static constexpr bool keep_alive = false;
 };
 
+template <typename T, typename... Ts> struct func_extra_info<T, Ts...>
+    : func_extra_info<Ts...> { };
+
 template <typename... Cs, typename... Ts>
-struct extract_guard<call_guard<Cs...>, Ts...> {
-    static_assert(std::is_same_v<typename extract_guard<Ts...>::type, void>,
+struct func_extra_info<nanobind::call_guard<Cs...>, Ts...> : func_extra_info<Ts...> {
+    static_assert(std::is_same_v<typename func_extra_info<Ts...>::call_guard, void>,
                   "call_guard<> can only be specified once!");
-    using type = call_guard<Cs...>;
+    using call_guard = nanobind::call_guard<Cs...>;
+};
+
+template <size_t Nurse, size_t Patient, typename... Ts>
+struct func_extra_info<nanobind::keep_alive<Nurse, Patient>, Ts...> : func_extra_info<Ts...> {
+    static constexpr bool keep_alive = true;
 };
 
 template <typename T>
-NB_INLINE void process_keep_alive(PyObject **, PyObject *, T *) {}
+NB_INLINE void process_keep_alive(PyObject **, PyObject *, T *) { }
 
 template <size_t Nurse, size_t Patient>
 NB_INLINE void
 process_keep_alive(PyObject **args, PyObject *result,
                    nanobind::keep_alive<Nurse, Patient> *) {
-    keep_alive(Nurse == 0 ? result : args[Nurse - 1],
+    keep_alive(Nurse   == 0 ? result : args[Nurse - 1],
                Patient == 0 ? result : args[Patient - 1]);
 }
 

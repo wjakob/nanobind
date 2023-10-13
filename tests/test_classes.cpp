@@ -20,6 +20,7 @@ static int default_constructed = 0, value_constructed = 0, copy_constructed = 0,
 
 struct Struct;
 std::unique_ptr<Struct> struct_tmp;
+static std::vector<int> struct_destructed;
 
 struct Struct {
     int i = 5;
@@ -30,7 +31,7 @@ struct Struct {
     Struct(Struct &&s) noexcept : i(s.i) { s.i = 0; move_constructed++; }
     Struct &operator=(const Struct &s) { i = s.i; copy_assigned++; return *this; }
     Struct &operator=(Struct &&s) noexcept { i = s.i; s.i = 0; move_assigned++; return *this; }
-    ~Struct() { destructed++; }
+    ~Struct() { destructed++; struct_destructed.push_back(i); }
 
     int value() const { return i; }
     int getstate() const { ++pickled; return i; }
@@ -530,4 +531,27 @@ NB_MODULE(test_classes_ext, m) {
         );
     });
 #endif
+
+    // Used by test41_implicit_conversion_keep_alive
+    struct IncrementingStruct : Struct {
+        IncrementingStruct(const Struct &s) : Struct(s) {
+            i++;
+        }
+    };
+
+    nb::class_<IncrementingStruct, Struct>(m, "IncrementingStruct")
+        .def(nb::init_implicit<const Struct &>());
+
+    m.def("get_destructed", []() {
+        nb::list out;
+        for (int i : struct_destructed)
+            out.append(i);
+        struct_destructed.clear();
+        return out;
+    });
+
+    m.def(
+        "get_incrementing_struct_value",
+        [](IncrementingStruct &s) { return new Struct(s.i + 100); },
+        nb::keep_alive<0, 1>());
 }

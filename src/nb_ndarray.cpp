@@ -293,7 +293,7 @@ bool ndarray_check(PyObject *o) noexcept {
 
 
 ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
-                               bool convert) noexcept {
+                               bool convert, cleanup_list *cleanup) noexcept {
     object capsule;
     bool is_pycapsule = PyCapsule_CheckExact(o);
 
@@ -456,10 +456,15 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
         } catch (...) { converted.reset(); }
 
         // Potentially try again recursively
-        if (!converted.is_valid())
+        if (!converted.is_valid()) {
             return nullptr;
-        else
-            return ndarray_import(converted.ptr(), req, false);
+        } else {
+            ndarray_handle *h =
+                ndarray_import(converted.ptr(), req, false, nullptr);
+            if (h && cleanup)
+                cleanup->append(converted.release().ptr());
+            return h;
+        }
     }
 
     if (!pass_dtype || !pass_device || !pass_shape || !pass_order)

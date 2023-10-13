@@ -14,9 +14,9 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 public:                                                                        \
     static constexpr auto Name = ::nanobind::detail::const_name(Str);          \
     NB_INLINE Type(handle h, ::nanobind::detail::borrow_t)                     \
-        : Parent(h, ::nanobind::detail::borrow_t{}) {}                         \
+        : Parent(h, ::nanobind::detail::borrow_t{}) { }                        \
     NB_INLINE Type(handle h, ::nanobind::detail::steal_t)                      \
-        : Parent(h, ::nanobind::detail::steal_t{}) {}                          \
+        : Parent(h, ::nanobind::detail::steal_t{}) { }                         \
     NB_INLINE static bool check_(handle h) {                                   \
         return Check(h.ptr());                                                 \
     }

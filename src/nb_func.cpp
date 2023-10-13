@@ -181,6 +181,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
          has_args       = f->flags & (uint32_t) func_flags::has_args,
          has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
          has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
+         has_keep_alive = f->flags & (uint32_t) func_flags::has_keep_alive,
          has_doc        = f->flags & (uint32_t) func_flags::has_doc,
          is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
          is_method      = f->flags & (uint32_t) func_flags::is_method,
@@ -248,7 +249,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
           has_name ? f->name : "<anonymous>");
 
     func->max_nargs_pos = f->nargs;
-    func->complex_call = has_args || has_var_args || has_var_kwargs;
+    func->complex_call = has_args || has_var_args || has_var_kwargs || has_keep_alive;
 
     if (func_prev) {
         func->complex_call |= ((nb_func *) func_prev)->complex_call;

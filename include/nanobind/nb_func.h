@@ -10,17 +10,33 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+template <typename Caster>
+bool from_python_keep_alive(Caster &c, PyObject **args, uint8_t *args_flags,
+                            cleanup_list *cleanup, size_t index) {
+    size_t size_before = cleanup->size();
+    if (!c.from_python(args[index], args_flags[index], cleanup))
+        return false;
+
+    // If an implicit conversion took place, update the 'args' array so that
+    // the keep_alive annotation can later process this change
+    size_t size_after = cleanup->size();
+    if (size_after != size_before)
+        args[index] = (*cleanup)[size_after - 1];
+
+    return true;
+}
+
 template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
           typename... Args, size_t... Is, typename... Extra>
 NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                                 std::index_sequence<Is...> is,
                                 const Extra &...extra) {
-    using Guard = typename extract_guard<Extra...>::type;
+    using Info = func_extra_info<Extra...>;
 
-    if constexpr (CheckGuard && !std::is_same_v<Guard, void>) {
+    if constexpr (CheckGuard && !std::is_same_v<typename Info::call_guard, void>) {
         return func_create<ReturnRef, false>(
             [func = (forward_t<Func>) func](Args... args) NB_INLINE_LAMBDA {
-                typename Guard::type g;
+                typename Info::call_guard::type g;
                 (void) g;
                 return func((forward_t<Args>) args...);
             },
@@ -43,7 +59,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     constexpr bool is_method_det =
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
 
-    /// A few compile-time consistency checks
+    // A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
         "Repeated use of nb::kwargs or nb::args in the function signature!");
     static_assert(nargs_provided == 0 || nargs_provided + is_method_det == nargs,
@@ -104,7 +120,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     f.impl = [](void *p, PyObject **args, uint8_t *args_flags, rv_policy policy,
                 cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
-        (void)p; (void)args; (void)args_flags; (void)policy; (void)cleanup;
+        (void) p; (void) args; (void) args_flags; (void) policy; (void) cleanup;
 
         const capture *cap;
         if constexpr (sizeof(capture) <= sizeof(f.capture))
@@ -115,9 +131,15 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         tuple<make_caster<Args>...> in;
         (void) in;
 
-        if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
-                                                cleanup) || ...))
-            return NB_NEXT_OVERLOAD;
+        if constexpr (Info::keep_alive) {
+            if ((!from_python_keep_alive(in.template get<Is>(), args,
+                                         args_flags, cleanup, Is) || ...))
+                return NB_NEXT_OVERLOAD;
+        } else {
+            if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
+                                                    cleanup) || ...))
+                return NB_NEXT_OVERLOAD;
+        }
 
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
@@ -131,7 +153,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                        policy, cleanup).ptr();
         }
 
-        (process_keep_alive(args, result, (Extra *) nullptr), ...);
+        if constexpr (Info::keep_alive)
+            (process_keep_alive(args, result, (Extra *) nullptr), ...);
 
         return result;
     };

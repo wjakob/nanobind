@@ -319,17 +319,24 @@ appends an entry to a log data structure.
 
     nb::class_<Log>(m, "Log")
         .def("append",
-             [](Log &log, Entry *entry) { ... },
+             [](Log &log, Entry *entry) -> void { ... },
              nb::keep_alive<1, 2>());
 
 Here, ``Nurse = 1`` refers to the ``log`` argument, while ``Patient = 2``
-refers to ``entry``. See the definition of :cpp:class:`nb::keep_alive
-<keep_alive>` for details on the numbering convention.
+refers to ``entry``. Setting ``Nurse/Patient = 0`` would select the function
+return value (here, the function doesn't return anything, so ``0`` is not a
+valid choice).
 
 The example uses the annotation to tie the lifetime of the ``entry`` to that of
-the ``log``. Without it, Python may delete the ``Entry`` instance at a later
-point, which would be problematic if ``Log`` did not make a copy but references
-the instance through its pointer address.
+``log``. Without it, Python could potentially delete ``entry`` *before*
+``log``, which would be problematic if the ``log.append()`` operation causes
+``log`` to reference ``entry`` through a pointer address instead of making a
+copy. Whether or not this is a good design is another question (for example,
+shared ownership via ``std::shared_ptr<T>`` or intrusive reference counting
+would avoid the problem altogether).
+
+See the definition of :cpp:class:`nb::keep_alive <keep_alive>` for further
+discussion and limitations of this method.
 
 .. _call_guards:
 

@@ -334,8 +334,11 @@ def test12_cast():
     vec2 = vec[::2]
     vecf = np.float32(vec)
     assert_array_equal(t.castToMapVXi(vec), vec)
+    assert_array_equal(t.castToMapCnstVXi(vec), vec)
     assert_array_equal(t.castToRefVXi(vec), vec)
     assert_array_equal(t.castToRefCnstVXi(vec), vec)
+    assert t.castToMapVXi(vec).flags.writeable
+    assert not t.castToMapCnstVXi(vec).flags.writeable
     assert_array_equal(t.castToDRefCnstVXi(vec), vec)
     for v in vec2, vecf:
         with pytest.raises(RuntimeError, match="bad[_ ]cast"):

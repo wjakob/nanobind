@@ -244,7 +244,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
                                is_ndarray_scalar_v<typename T::Scalar>>> {
     using Map = Eigen::Map<T, Options, StrideType>;
     using NDArray =
-        array_for_eigen_t<Map, std::conditional_t<std::is_const_v<Map>,
+        array_for_eigen_t<Map, std::conditional_t<std::is_const_v<T>,
                                                   const typename Map::Scalar,
                                                   typename Map::Scalar>>;
     using NDArrayCaster = type_caster<NDArray>;

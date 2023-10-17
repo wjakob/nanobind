@@ -199,9 +199,12 @@ NB_MODULE(test_eigen_ext, m) {
         .def(nb::init<>())
         .def_rw("member", &ClassWithEigenMember::member);
 
-    m.def("castToMapVXi", [](nb::object obj) -> Eigen::Map<Eigen::VectorXi> {
+    m.def("castToMapVXi", [](nb::object obj) {
         return nb::cast<Eigen::Map<Eigen::VectorXi>>(obj);
     });
+    m.def("castToMapCnstVXi", [](nb::object obj) {
+      return nb::cast<Eigen::Map<const Eigen::VectorXi>>(obj);
+      });
     m.def("castToRefVXi", [](nb::object obj) -> Eigen::VectorXi {
         return nb::cast<Eigen::Ref<Eigen::VectorXi>>(obj);
     });

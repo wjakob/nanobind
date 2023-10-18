@@ -113,7 +113,7 @@ Constraint types
 The following constraints are available
 
 - A scalar type (``float``, ``uint8_t``, etc.) constrains the representation
-  of the ndarray. 
+  of the ndarray.
   
   For a complex type (``std::complex<F32>``, ``std::complex<F64>``, etc.),
   the header ``<nanobind/stl/complex.h>`` must be included.

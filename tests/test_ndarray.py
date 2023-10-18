@@ -71,6 +71,7 @@ def test02_docstr():
     assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False]) -> list"
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
     assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
+    assert t.pass_complex64.__doc__ == "pass_complex64(array: ndarray[dtype=complex64]) -> None"
     assert t.pass_bool.__doc__ == "pass_bool(array: ndarray[dtype=bool]) -> None"
     assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(array: ndarray[dtype=float32, shape=(3, *, 4)]) -> None"
     assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: ndarray[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
@@ -82,10 +83,12 @@ def test02_docstr():
 def test03_constrain_dtype():
     a_u32 = np.array([1], dtype=np.uint32)
     a_f32 = np.array([1], dtype=np.float32)
+    a_cf64 = np.array([1+1j], dtype=np.complex64)
     a_bool = np.array([1], dtype=np.bool_)
 
     t.pass_uint32(a_u32)
     t.pass_float32(a_f32)
+    t.pass_complex64(a_cf64)
     t.pass_bool(a_bool)
 
     with pytest.raises(TypeError) as excinfo:
@@ -94,6 +97,10 @@ def test03_constrain_dtype():
 
     with pytest.raises(TypeError) as excinfo:
         t.pass_float32(a_u32)
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+    with pytest.raises(TypeError) as excinfo:
+        t.pass_complex64(a_u32)
     assert 'incompatible function arguments' in str(excinfo.value)
 
     with pytest.raises(TypeError) as excinfo:
@@ -573,7 +580,7 @@ def test31_view():
     t.fill_view_1(x2)
     assert np.allclose(x1, x2*2)
 
-    #2
+    # 2
     x1 = np.zeros((3, 4), dtype=np.float32, order='C')
     x2 = np.zeros((3, 4), dtype=np.float32, order='F')
     t.fill_view_2(x1)
@@ -584,6 +591,15 @@ def test31_view():
     t.fill_view_4(x4)
 
     assert np.all(x1 == x2) and np.all(x2 == x3) and np.all(x3 == x4)
+
+    # 3
+    x1 = np.array([[1+2j, 3+4j], [5+6j, 7+8j]], dtype=np.complex64)
+    x2 = x1 * 2
+    t.fill_view_1(x1.view(np.float32))
+    assert np.allclose(x1, x2)
+    x2 = x1 * (-1+2j)
+    t.fill_view_5(x1)
+    assert np.allclose(x1, x2)
 
 @needs_numpy
 def test32_half():
@@ -601,3 +617,10 @@ def test33_cast():
     assert a.ndim == 0 and b.ndim == 0
     assert a.dtype == np.int32 and b.dtype == np.float32
     assert a == 1 and b == 1
+
+@needs_numpy
+def test34_complex_decompose():
+    x1 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64)
+
+    assert np.all(x1.real == np.array([1, 3, 5], dtype=np.float32))
+    assert np.all(x1.imag == np.array([2, 4, 6], dtype=np.float32))

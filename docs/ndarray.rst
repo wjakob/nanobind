@@ -115,6 +115,10 @@ The following constraints are available
 - A scalar type (``float``, ``uint8_t``, etc.) constrains the representation
   of the ndarray.
 
+  Complex arrays (i.e., ones based on ``std::complex<float>`` or
+  ``std::complex<double>``) are supported but additionally require including
+  the header file ``<nanobind/stl/complex.h>``.
+
 - This scalar type can be further annotated with ``const``, which is necessary
   if you plan to call nanobind functions with arrays that do not permit write
   access.
@@ -468,10 +472,11 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
 
    namespace nanobind {
        template <> struct ndarray_traits<__fp16> {
-           static constexpr bool is_float  = true;
-           static constexpr bool is_bool   = false;
-           static constexpr bool is_int    = false;
-           static constexpr bool is_signed = true;
+           static constexpr bool is_complex = false;
+           static constexpr bool is_float   = true;
+           static constexpr bool is_bool    = false;
+           static constexpr bool is_int     = false;
+           static constexpr bool is_signed  = true;
        };
    };
 

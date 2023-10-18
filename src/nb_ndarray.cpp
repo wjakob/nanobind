@@ -69,6 +69,13 @@ static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
             }
             break;
 
+        case dlpack::dtype_code::Complex:
+            switch (t.dtype.bits) {
+                case 64: format = "Zf"; break;
+                case 128: format = "Zd"; break;
+            }
+            break;
+
         case dlpack::dtype_code::Bool:
             format = "?";
             break;

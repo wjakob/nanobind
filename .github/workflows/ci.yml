@@ -36,8 +36,8 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
 
-    - name: Update CMake
-      uses: jwlawson/actions-setup-cmake@v1.13
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
 
     - name: Install Eigen
       if: matrix.os == 'ubuntu-latest'

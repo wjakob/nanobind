@@ -580,7 +580,7 @@ def test31_view():
     t.fill_view_1(x2)
     assert np.allclose(x1, x2*2)
 
-    #2
+    # 2
     x1 = np.zeros((3, 4), dtype=np.float32, order='C')
     x2 = np.zeros((3, 4), dtype=np.float32, order='F')
     t.fill_view_2(x1)
@@ -591,6 +591,15 @@ def test31_view():
     t.fill_view_4(x4)
 
     assert np.all(x1 == x2) and np.all(x2 == x3) and np.all(x3 == x4)
+
+    # 3
+    x1 = np.array([[1+2j, 3+4j], [5+6j, 7+8j]], dtype=np.complex64)
+    x2 = x1 * 2
+    t.fill_view_1(x1.view(np.float32))
+    assert np.allclose(x1, x2)
+    x2 = x1 * (-1+2j)
+    t.fill_view_5(x1)
+    assert np.allclose(x1, x2)
 
 @needs_numpy
 def test32_half():

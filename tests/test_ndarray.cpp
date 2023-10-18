@@ -264,6 +264,13 @@ NB_MODULE(test_ndarray_ext, m) {
                 v(i, j) = (float) (i * 10 + j);
     }, "x"_a.noconvert());
 
+    m.def("fill_view_5", [](nb::ndarray<std::complex<float>, nb::shape<2, 2>, nb::c_contig, nb::device::cpu> x) {
+        auto v = x.view();
+        for (size_t i = 0; i < v.shape(0); ++i)
+            for (size_t j = 0; j < v.shape(1); ++j)
+                v(i, j) *= std::complex<float>(-1.0f, 2.0f);
+    }, "x"_a.noconvert());
+
 #if defined(__aarch64__)
     m.def("ret_numpy_half", []() {
         __fp16 *f = new __fp16[8] { 1, 2, 3, 4, 5, 6, 7, 8 };

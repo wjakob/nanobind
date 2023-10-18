@@ -275,7 +275,7 @@ into C- or F-contiguous arrays (if requested) and perform type
 conversion. This, e.g., makes possible to call a function expecting a
 ``float32`` array with ``float64`` data. Implicit conversions create
 temporary ndarrays containing a copy of the data, which can be
-undesirable. To suppress then, add a
+undesirable. To suppress them, add a
 :cpp:func:`nb::arg("my_array_arg").noconvert() <arg::noconvert>`
 or
 :cpp:func:`"my_array_arg"_a.noconvert() <arg::noconvert>` or
@@ -332,10 +332,14 @@ values:
    representing the `DLPack <https://github.com/dmlc/dlpack>`__
    metadata.
 
-Note that shape and order annotations like :cpp:class:`nb::shape <shape>` and
-:cpp:class:`nb::c_contig <c_contig>` enter into the docstring, but nanobind
-won't spend time on additional checks. It trusts that your method returns what
-it declares. Furthermore, non-CPU ndarrays must be explicitly indicate the
+When returning arrays, nanobind will not perform implicit conversions. Shape
+and order annotations like :cpp:class:`nb::shape <shape>`, :cpp:class:`nb::ndim
+<ndim>`, :cpp:class:`nb::c_contig <c_contig>`, and :cpp:class:`nb::f_contig
+<f_contig>`, are shown in the docstring, but nanobind won't check that they are
+actually satisfied. It will never convert an incompatible result into the right
+format.
+
+Furthermore, non-CPU ndarrays must be explicitly indicate the
 device type and device ID using special parameters of the :cpp:func:`ndarray()
 <ndarray::ndarray()>` constructor shown below. Device types indicated via
 template arguments, e.g., ``nb::ndarray<..., nb::device::cuda>``, are only used
@@ -354,10 +358,10 @@ The full signature of the ndarray constructor is:
            int32_t device_type = nb::device::cpu::value,
            int32_t device_id = 0) { .. }
 
-If no ``strides`` parameter is provided, the implementation will assume
-a C-style ordering. Both ``strides`` and ``shape`` will be copied by the
-constructor, hence the targets of these pointers don’t need to remain
-valid following the call.
+If no ``strides`` parameter is provided, the implementation will assume a
+C-style ordering. Both ``strides`` and ``shape`` will be copied by the
+constructor, hence the targets of these pointers don't need to remain valid
+following the call.
 
 An alternative form of the constructor takes ``std::initializer_list`` instead
 of shape/stride arrays for brace-initialization and infers ``ndim``:
@@ -371,11 +375,6 @@ of shape/stride arrays for brace-initialization and infers ``ndim``:
            dlpack::dtype dtype = nb::dtype<Scalar>(),
            int32_t device_type = nb::device::cpu::value,
            int32_t device_id = 0) { .. }
-
-If no ``strides`` parameter is provided, the implementation will assume
-a C-style ordering. Both ``strides`` and ``shape`` will be copied by the
-constructor, hence the targets of these pointers don’t need to remain
-valid following the call.
 
 The ``owner`` parameter can be used to keep another Python object alive
 while the ndarray data is referenced by a consumer. This mechanism can be

@@ -20,7 +20,7 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
         Caster caster;
         bool success = o != nullptr;
 
-        if (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
+        if constexpr (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
             flags |= (uint8_t) cast_flags::none_disallowed;
 
         if (success) {

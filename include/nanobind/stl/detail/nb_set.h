@@ -32,7 +32,7 @@ template <typename Set, typename Key> struct set_caster {
         Caster key_caster;
         PyObject *key;
 
-        if (is_base_caster_v<Caster> && !std::is_pointer_v<Key>)
+        if constexpr (is_base_caster_v<Caster> && !std::is_pointer_v<Key>)
             flags |= (uint8_t) cast_flags::none_disallowed;
 
         while ((key = PyIter_Next(iter)) != nullptr) {

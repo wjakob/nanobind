@@ -38,7 +38,7 @@ template <typename List, typename Entry> struct list_caster {
         Caster caster;
         bool success = o != nullptr;
 
-        if (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
+        if constexpr (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
             flags |= (uint8_t) cast_flags::none_disallowed;
 
         for (size_t i = 0; i < size; ++i) {

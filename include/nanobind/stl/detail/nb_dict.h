@@ -36,9 +36,9 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
 
         uint8_t flags_key = flags, flags_val = flags;
 
-        if (is_base_caster_v<KeyCaster> && !std::is_pointer_v<Key>)
+        if constexpr (is_base_caster_v<KeyCaster> && !std::is_pointer_v<Key>)
             flags_key |= (uint8_t) cast_flags::none_disallowed;
-        if (is_base_caster_v<ValCaster> && !std::is_pointer_v<Val>)
+        if constexpr (is_base_caster_v<ValCaster> && !std::is_pointer_v<Val>)
             flags_val |= (uint8_t) cast_flags::none_disallowed;
 
         KeyCaster key_caster;

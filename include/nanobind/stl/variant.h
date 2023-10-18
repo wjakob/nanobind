@@ -52,7 +52,7 @@ template <typename... Ts> struct type_caster<std::variant<Ts...>> {
             "type caster was registered to intercept this particular "
             "type, which is not allowed.");
 
-        if (is_base_caster_v<CasterT> && !std::is_pointer_v<T>)
+        if constexpr (is_base_caster_v<CasterT> && !std::is_pointer_v<T>)
             flags |= (uint8_t) cast_flags::none_disallowed;
 
         CasterT caster;

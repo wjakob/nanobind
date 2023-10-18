@@ -21,6 +21,12 @@ Version 1.7.0 (TBA)
 New features
 ^^^^^^^^^^^^
 
+* The nd-array class :cpp:class:`nb::ndarray\<T\> <ndarray>` now supports
+  complex-valued ``T`` (e.g., ``std::complex<double>``). For this, the header
+  file ``nanobind/stl/complex.h`` must be included. (PR `#319
+  <https://github.com/wjakob/nanobind/pull/319>`__, commit `6cbd13
+  <https://github.com/wjakob/nanobind/commit/6cbd1387753ea8f519ac0fe2242f0a54dd670ede>`__).
+
 * Added the function :cpp:func:`nb::del() <del>`, which takes an arbitrary
   accessor object as input and tries to delete the associated entry.
   The C++ statement

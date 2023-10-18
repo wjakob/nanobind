@@ -18,24 +18,8 @@ below inherit that of the preceding release.
 Version 1.7.0 (TBA)
 -------------------
 
-* The behavior of the :cpp:class:`nb::keep_alive\<Nurse, Patient\>
-  <keep_alive>` function binding annotation was changed as follows: when the
-  function call requires the implicit conversion of an argument, the lifetime
-  constraint now applies to the newly produced argument instead of the original
-  object. The former behavior seems highly undesirable and bug-prone. (commit
-  `9d4b2e
-  <https://github.com/wjakob/nanobind/commit/9d4b2e317dbf32efab4ed41b6c275f9dbbbcf29f>`__).
-
-* STL type casters previously raised an exception when casting a Python container
-  containing a ``None`` element into a C++ container that was not able to
-  represent ``nullptr`` (e.g., ``std::vector<T>`` instead of
-  ``std::vector<T*>``). However, this exception was raised in a context where
-  exceptions were not allowed, causing the process to be ``abort()``-ed, which
-  is very bad. This issue is now fixed, and such conversions are refused. (PR
-  `#318 <https://github.com/wjakob/nanobind/pull/318>`__, commits `d1ad3b
-  <https://github.com/wjakob/nanobind/commit/d1ad3b91346a1566f42fdf194a3ed9c3eeec5858>`__
-  and `5f25ae
-  <https://github.com/wjakob/nanobind/commit/5f25ae0eb9691fbe03a20bcb9f604277ccc1884b>`__).
+New features
+^^^^^^^^^^^^
 
 * Added the function :cpp:func:`nb::del() <del>`, which takes an arbitrary
   accessor object as input and tries to delete the associated entry.
@@ -63,10 +47,6 @@ Version 1.7.0 (TBA)
   <https://github.com/wjakob/nanobind/pull/317>`__, commit `30a6ba
   <https://github.com/wjakob/nanobind/commit/30a6bac97a89bfafad82c2c5b6ef4516c00c35d6>`__).
 
-* The STL sequence casters (``std::vector<T>``, etc.) now refuse to unpack
-  ``str`` and ``bytes`` objects analogous to pybind11. (commit `7e4a88
-  <https://github.com/wjakob/nanobind/commit/7e4a88b7ccc047ce34ae8ae99492d46b1acf341a>`__).
-
 * Added the function :cpp:func:`nb::is_alive() <is_alive>`, which returns
   ``false`` when nanobind was destructed by Python (e.g., during interpreter
   shutdown) making further use of the API illegal. (commit `b431d0
@@ -75,6 +55,32 @@ Version 1.7.0 (TBA)
 * Minor fixes and improvements.
 
 * ABI version 11.
+
+Bugfixes
+^^^^^^^^
+
+* The behavior of the :cpp:class:`nb::keep_alive\<Nurse, Patient\>
+  <keep_alive>` function binding annotation was changed as follows: when the
+  function call requires the implicit conversion of an argument, the lifetime
+  constraint now applies to the newly produced argument instead of the original
+  object. The change was rolled into a minor release since the former behavior
+  is arguably undesirable and dangerous. (commit `9d4b2e
+  <https://github.com/wjakob/nanobind/commit/9d4b2e317dbf32efab4ed41b6c275f9dbbbcf29f>`__).
+
+* STL type casters previously raised an exception when casting a Python container
+  containing a ``None`` element into a C++ container that was not able to
+  represent ``nullptr`` (e.g., ``std::vector<T>`` instead of
+  ``std::vector<T*>``). However, this exception was raised in a context where
+  exceptions were not allowed, causing the process to be ``abort()``-ed, which
+  is very bad. This issue is now fixed, and such conversions are refused. (PR
+  `#318 <https://github.com/wjakob/nanobind/pull/318>`__, commits `d1ad3b
+  <https://github.com/wjakob/nanobind/commit/d1ad3b91346a1566f42fdf194a3ed9c3eeec5858>`__
+  and `5f25ae
+  <https://github.com/wjakob/nanobind/commit/5f25ae0eb9691fbe03a20bcb9f604277ccc1884b>`__).
+
+* The STL sequence casters (``std::vector<T>``, etc.) now refuse to unpack
+  ``str`` and ``bytes`` objects analogous to pybind11. (commit `7e4a88
+  <https://github.com/wjakob/nanobind/commit/7e4a88b7ccc047ce34ae8ae99492d46b1acf341a>`__).
 
 
 Version 1.6.2 (Oct 3, 2023)
@@ -94,6 +100,9 @@ Version 1.6.1 (Oct 2, 2023)
 
 Version 1.6.0 (Oct 2, 2023)
 -------------------
+
+New features
+^^^^^^^^^^^^
 
 * Several :cpp:class:`nb::ndarray\<..\> <ndarray>` improvements:
 
@@ -137,6 +146,9 @@ Version 1.6.0 (Oct 2, 2023)
   reference counting <intrusive>` via the :cpp:class:`intrusive_counter`
   :cpp:class:`intrusive_base`, and :cpp:class:`ref` classes. (commit `3fa1af
   <https://github.com/wjakob/nanobind/commit/3fa1af5e9e6fd0b08d13e16bb425a18963854829>`__).
+
+Bugfixes
+^^^^^^^^
 
 * Fixed a serious issue involving combinations of bound types (e.g., ``T``) and
   type casters (e.g., ``std::vector<T>``), where nanobind was too aggressive in

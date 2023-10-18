@@ -14,7 +14,6 @@
 
 #include <nanobind/nanobind.h>
 #include <initializer_list>
-#include <complex>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
@@ -66,15 +65,18 @@ struct dltensor {
 
 NAMESPACE_END(dlpack)
 
+NAMESPACE_BEGIN(detail)
+
+template <typename T>
+struct is_complex : public std::false_type { };
+
+NAMESPACE_END(detail)
+
 constexpr size_t any = (size_t) -1;
 
 template <size_t... Is> struct shape {
     static constexpr size_t size = sizeof...(Is);
 };
-
-template<typename T> struct is_complex_t : public std::false_type {};
-template<typename T> struct is_complex_t<std::complex<T>> : public std::true_type {};
-template<typename T> struct is_complex_t<const std::complex<T>> : public std::true_type {};
 
 struct c_contig { };
 struct f_contig { };
@@ -86,7 +88,7 @@ struct jax { };
 struct ro { };
 
 template <typename T> struct ndarray_traits {
-    static constexpr bool is_complex = is_complex_t<T>::value;
+    static constexpr bool is_complex = detail::is_complex<T>::value;
     static constexpr bool is_float   = std::is_floating_point_v<T>;
     static constexpr bool is_bool    = std::is_same_v<std::remove_cv_t<T>, bool>;
     static constexpr bool is_int     = std::is_integral_v<T> && !is_bool;

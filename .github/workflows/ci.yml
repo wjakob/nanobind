@@ -35,6 +35,7 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python }}
+        cache: 'pip'
 
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest

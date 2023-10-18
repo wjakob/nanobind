@@ -276,7 +276,8 @@ template <typename... Ts> struct ndarray_info {
 template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_info<Ts...> {
     using scalar_type =
         std::conditional_t<ndarray_traits<T>::is_float || ndarray_traits<T>::is_int ||
-                           ndarray_traits<T>::is_bool, T, typename ndarray_info<Ts...>::scalar_type>;
+                           ndarray_traits<T>::is_bool || ndarray_traits<T>::is_complex, 
+                           T, typename ndarray_info<Ts...>::scalar_type>;
 };
 
 template <size_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {

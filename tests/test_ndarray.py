@@ -608,3 +608,10 @@ def test33_cast():
     assert a.ndim == 0 and b.ndim == 0
     assert a.dtype == np.int32 and b.dtype == np.float32
     assert a == 1 and b == 1
+
+@needs_numpy
+def test34_complex_decompose():
+    x1 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64)
+    
+    assert np.all(x1.real == np.array([1, 3, 5], dtype=np.float32))
+    assert np.all(x1.imag == np.array([2, 4, 6], dtype=np.float32))

@@ -71,6 +71,7 @@ def test02_docstr():
     assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False]) -> list"
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
     assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
+    assert t.pass_complex64.__doc__ == "pass_complex64(array: ndarray[dtype=complex64]) -> None"
     assert t.pass_bool.__doc__ == "pass_bool(array: ndarray[dtype=bool]) -> None"
     assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(array: ndarray[dtype=float32, shape=(3, *, 4)]) -> None"
     assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: ndarray[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
@@ -82,10 +83,12 @@ def test02_docstr():
 def test03_constrain_dtype():
     a_u32 = np.array([1], dtype=np.uint32)
     a_f32 = np.array([1], dtype=np.float32)
+    a_cf64 = np.array([1+1j], dtype=np.complex64)
     a_bool = np.array([1], dtype=np.bool_)
 
     t.pass_uint32(a_u32)
     t.pass_float32(a_f32)
+    t.pass_complex64(a_cf64)
     t.pass_bool(a_bool)
 
     with pytest.raises(TypeError) as excinfo:
@@ -94,6 +97,10 @@ def test03_constrain_dtype():
 
     with pytest.raises(TypeError) as excinfo:
         t.pass_float32(a_u32)
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+    with pytest.raises(TypeError) as excinfo:
+        t.pass_complex64(a_u32)
     assert 'incompatible function arguments' in str(excinfo.value)
 
     with pytest.raises(TypeError) as excinfo:

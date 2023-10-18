@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/complex.h>
 #include <algorithm>
 #include <vector>
 
@@ -68,6 +69,7 @@ NB_MODULE(test_ndarray_ext, m) {
     });
 
     m.def("pass_float32", [](const nb::ndarray<float> &) { }, "array"_a.noconvert());
+    m.def("pass_complex64", [](const nb::ndarray<std::complex<float>> &) { }, "array"_a.noconvert());
     m.def("pass_uint32", [](const nb::ndarray<uint32_t> &) { }, "array"_a.noconvert());
     m.def("pass_bool", [](const nb::ndarray<bool> &) { }, "array"_a.noconvert());
     m.def("pass_float32_shaped",
@@ -119,10 +121,11 @@ NB_MODULE(test_ndarray_ext, m) {
         }
         printf("Tensor is on CPU? %i\n", ndarray.device_type() == nb::device::cpu::value);
         printf("Device ID = %u\n", ndarray.device_id());
-        printf("Tensor dtype check: int16=%i, uint32=%i, float32=%i\n",
+        printf("Tensor dtype check: int16=%i, uint32=%i, float32=%i complex64=%i\n",
             ndarray.dtype() == nb::dtype<int16_t>(),
             ndarray.dtype() == nb::dtype<uint32_t>(),
-            ndarray.dtype() == nb::dtype<float>()
+            ndarray.dtype() == nb::dtype<float>(),
+            ndarray.dtype() == nb::dtype<std::complex<float>>()
         );
     });
 

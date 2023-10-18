@@ -74,6 +74,7 @@ template <size_t... Is> struct shape {
 
 template<typename T> struct is_complex_t : public std::false_type {};
 template<typename T> struct is_complex_t<std::complex<T>> : public std::true_type {};
+template<typename T> struct is_complex_t<const std::complex<T>> : public std::true_type {};
 
 struct c_contig { };
 struct f_contig { };

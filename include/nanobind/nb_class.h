@@ -473,7 +473,7 @@ public:
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
             get_p = cpp_function((detail::forward_t<Getter>) getter,
-                                 scope(*this), is_method(),
+                                 scope(*this), is_method(), is_getter(),
                                  rv_policy::reference_internal, extra...);
 
         if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
@@ -491,7 +491,7 @@ public:
         object get_p, set_p;
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
-            get_p = cpp_function((detail::forward_t<Getter>) getter,
+            get_p = cpp_function((detail::forward_t<Getter>) getter, is_getter(),
                                  scope(*this), rv_policy::reference, extra...);
 
         if constexpr (!std::is_same_v<Setter, std::nullptr_t>)

@@ -236,4 +236,14 @@ NB_MODULE(test_holders_ext, m) {
                 throw std::runtime_error("Internal error");
         }
     });
+
+    struct ExampleWrapper {
+        Example value{5};
+        std::shared_ptr<Example> value_nullable;
+    };
+
+    nb::class_<ExampleWrapper>(m, "ExampleWrapper")
+        .def(nb::init<>())
+        .def_rw("value", &ExampleWrapper::value)
+        .def_rw("value_nullable", &ExampleWrapper::value_nullable, nb::arg().none());
 }

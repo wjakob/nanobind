@@ -79,6 +79,8 @@ struct raw_doc {
     raw_doc(const char *doc) : value(doc) {}
 };
 
+struct is_getter { };
+
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
 NAMESPACE_END(literals)
@@ -190,6 +192,9 @@ template <typename F>
 NB_INLINE void func_extra_apply(F &f, is_method, size_t &) {
     f.flags |= (uint32_t) func_flags::is_method;
 }
+
+template <typename F>
+NB_INLINE void func_extra_apply(F &, is_getter, size_t &) { }
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, is_implicit, size_t &) {

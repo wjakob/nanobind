@@ -350,3 +350,18 @@ def test13_shared_from_this_create_derived_in_cpp(clean):
     del e, w
     collect()
     assert t.stats() == (1, 1)
+
+
+def test14_nullable_properties():
+    a = t.ExampleWrapper()
+    assert a.value is not None
+    assert a.value.value == 5
+    assert a.value_nullable is None
+    a.value = t.Example(123)
+    a.value_nullable = t.Example(456)
+    assert a.value.value == 123
+    assert a.value_nullable.value == 456
+    a.value_nullable = None
+    assert a.value_nullable is None
+    with pytest.raises(TypeError):
+        a.value = None

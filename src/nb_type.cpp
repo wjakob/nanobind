@@ -909,6 +909,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         weaklistoffset, READONLY,
         nullptr };
         ++num_members;
+        if (!has_traverse) {
+            *s++ = { Py_tp_traverse, (void*)inst_traverse };
+            *s++ = { Py_tp_clear, (void*)inst_clear };
+            has_traverse = true;
+        }
         spec.basicsize = (int)basicsize;
     }
 

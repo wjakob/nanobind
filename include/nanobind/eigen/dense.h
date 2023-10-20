@@ -372,6 +372,12 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         // Restrict to contiguous 'T' (limitation in Eigen, see PR #215)
         can_map_contiguous_memory_v<Ref>;
 
+    using NDArray =
+        array_for_eigen_t<Ref, std::conditional_t<std::is_const_v<T>,
+                                                  const typename Ref::Scalar,
+                                                  typename Ref::Scalar>>;
+    using NDArrayCaster = type_caster<NDArray>;
+
     /// Eigen::Map<T> caster with fixed strides
     using Map = Eigen::Map<T, Options, StrideType>;
     using MapCaster = make_caster<Map>;
@@ -427,6 +433,25 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         }
 
         return false;
+    }
+
+    static handle from_cpp(const Ref &v, rv_policy, cleanup_list *cleanup) noexcept {
+        size_t shape[ndim_v<T>];
+        int64_t strides[ndim_v<T>];
+
+        if constexpr (ndim_v<T> == 1) {
+            shape[0] = v.size();
+            strides[0] = v.innerStride();
+        } else {
+            shape[0] = v.rows();
+            shape[1] = v.cols();
+            strides[0] = v.rowStride();
+            strides[1] = v.colStride();
+        }
+
+        return NDArrayCaster::from_cpp(
+            NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
+            rv_policy::reference, cleanup);
     }
 
     operator Ref() {

@@ -13,7 +13,7 @@ endif()
 if (MSVC)
   add_compile_options(/W4)
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
+  add_compile_options(-Wall -Wextra -pedantic -Wno-unused-local-typedefs)
 endif()
 
 if (UNIX AND (CMAKE_SIZEOF_VOID_P EQUAL 4) AND (CMAKE_SYSTEM_PROCESSOR STREQUAL i686))

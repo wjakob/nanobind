@@ -47,7 +47,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
 
     NB_TYPE_CASTER(T, const_name<RowMajor>("scipy.sparse.csr_matrix[",
                                            "scipy.sparse.csc_matrix[")
-                   + make_caster<Scalar>::Name + const_name("]"));
+                   + make_caster<Scalar>::Name + const_name("]"))
 
     ScalarCaster data_caster;
     StorageIndexCaster indices_caster, indptr_caster;

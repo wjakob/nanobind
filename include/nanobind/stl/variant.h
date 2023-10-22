@@ -25,7 +25,7 @@ template <typename... Ts> struct remove_opt_mono<std::variant<Ts...>>
     : concat_variant<std::conditional_t<std::is_same_v<std::monostate, Ts>, std::variant<>, std::variant<Ts>>...> {};
 
 template <> struct type_caster<std::monostate> {
-    NB_TYPE_CASTER(std::monostate, const_name("None"));
+    NB_TYPE_CASTER(std::monostate, const_name("None"))
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         return src.is_none();
@@ -39,7 +39,7 @@ template <> struct type_caster<std::monostate> {
 
 template <typename... Ts> struct type_caster<std::variant<Ts...>> {
     NB_TYPE_CASTER(std::variant<Ts...>,
-        const_name("Union[") + concat(make_caster<Ts>::Name...) + const_name("]"));
+        const_name("Union[") + concat(make_caster<Ts>::Name...) + const_name("]"))
 
     template <typename T>
     bool try_variant(const handle &src, uint8_t flags, cleanup_list *cleanup) {

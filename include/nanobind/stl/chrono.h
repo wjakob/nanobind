@@ -99,7 +99,7 @@ public:
         return pack_timedelta(dd.count(), ss.count(), us.count());
     }
 
-    NB_TYPE_CASTER(type, const_name("datetime.timedelta"));
+    NB_TYPE_CASTER(type, const_name("datetime.timedelta"))
 };
 
 template <class... Args>
@@ -208,7 +208,7 @@ public:
                              localtime.tm_sec,
                              (int) us.count());
     }
-    NB_TYPE_CASTER(type, const_name("datetime.datetime"));
+    NB_TYPE_CASTER(type, const_name("datetime.datetime"))
 };
 
 // Other clocks that are not the system clock are not measured as

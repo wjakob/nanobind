@@ -13,8 +13,8 @@
 
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
-#include <typeindex>
 #include <cstring>
+#include "hash.h"
 
 #if defined(_MSC_VER)
 #  define NB_THREAD_LOCAL __declspec(thread)
@@ -100,22 +100,11 @@ struct nb_bound_method {
 /// Pointers require a good hash function to randomize the mapping to buckets
 struct ptr_hash {
     size_t operator()(const void *p) const {
-        uintptr_t v = (uintptr_t) p;
         // fmix32/64 from MurmurHash by Austin Appleby (public domain)
-        if constexpr (sizeof(void *) == 4) {
-            v ^= v >> 16;
-            v *= 0x85ebca6b;
-            v ^= v >> 13;
-            v *= 0xc2b2ae35;
-            v ^= v >> 16;
-        } else {
-            v ^= v >> 33;
-            v *= (uintptr_t) 0xff51afd7ed558ccdull;
-            v ^= v >> 33;
-            v *= (uintptr_t) 0xc4ceb9fe1a85ec53ull;
-            v ^= v >> 33;
-        }
-        return (size_t) v;
+        if constexpr (sizeof(void *) == 4)
+            return (size_t) fmix32((uint32_t) (uintptr_t) p);
+        else
+            return (size_t) fmix64((uint64_t) (uintptr_t) p);
     }
 };
 
@@ -141,14 +130,16 @@ public:
     void deallocate(T *p, size_type /*n*/) noexcept { PyMem_Free(p); }
 };
 
-template <typename key, typename value, typename hash = std::hash<key>,
-          typename eq = std::equal_to<key>>
-using py_map = tsl::robin_map<key, value, hash, eq>;
-
 // Linked list of instances with the same pointer address. Usually just 1.
 struct nb_inst_seq {
     PyObject *inst;
     nb_inst_seq *next;
+};
+
+// Linked list of type aliases when there are multiple shared libraries with duplicate RTTI data
+struct nb_alias_chain {
+    const std::type_info *value;
+    nb_alias_chain *next;
 };
 
 // Weak reference list. Usually, there is just one entry
@@ -158,11 +149,26 @@ struct nb_weakref_seq {
     nb_weakref_seq *next;
 };
 
-using nb_type_map = py_map<std::type_index, type_data *>;
+struct std_typeinfo_hash {
+    size_t operator()(const std::type_info *a) const {
+        const char *name = a->name();
+        return (size_t) MurmurHash3_x64_64(name, strlen(name), 0);
+    }
+};
+
+struct std_typeinfo_eq {
+    bool operator()(const std::type_info *a, const std::type_info *b) const {
+        return a->name() == b->name() || strcmp(a->name(), b->name()) == 0;
+    }
+};
+
+using nb_type_map_fast = tsl::robin_map<const std::type_info *, type_data *, ptr_hash>;
+using nb_type_map_slow = tsl::robin_map<const std::type_info *, type_data *,
+                                        std_typeinfo_hash, std_typeinfo_eq>;
 
 /// A simple pointer-to-pointer map that is reused a few times below (even if
 /// not 100% ideal) to avoid template code generation bloat.
-using nb_ptr_map  = py_map<void *, void*, ptr_hash>;
+using nb_ptr_map  = tsl::robin_map<void *, void*, ptr_hash>;
 
 /// Convenience functions to deal with the pointer encoding in 'internals.inst_c2p'
 
@@ -215,8 +221,11 @@ struct nb_internals {
      */
     nb_ptr_map inst_c2p;
 
-    /// C++ -> Python type map
-    nb_type_map type_c2p;
+    /// C++ -> Python type map -- fast version based on std::type_info pointer equality
+    nb_type_map_fast type_c2p_fast;
+
+    /// C++ -> Python type map -- slow fallback version based on hashed strings
+    nb_type_map_slow type_c2p_slow;
 
     /// Dictionary storing keep_alive references
     nb_ptr_map keep_alive;
@@ -263,6 +272,8 @@ extern char *type_name(const std::type_info *t);
 extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
 extern PyObject *inst_new_int(PyTypeObject *tp);
 extern PyTypeObject *nb_static_property_tp() noexcept;
+extern type_data *nb_type_c2p(nb_internals *internals,
+                              const std::type_info *type);
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 NB_INLINE func_data *nb_func_data(void *o) {

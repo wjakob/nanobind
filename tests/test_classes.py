@@ -741,3 +741,25 @@ def test41_implicit_conversion_keep_alive():
     assert d1 == []
     assert d2 == [5]
     assert d3 == [106, 6]
+
+def test42_weak_references():
+    import weakref
+    import gc
+    import time
+    o = t.StructWithWeakrefs(42)
+    w = weakref.ref(o)
+    assert w() is o
+    del o
+    gc.collect()
+    gc.collect()
+    assert w() is None
+
+    p = t.StructWithWeakrefsAndDynamicAttrs(43)
+    p.a_dynamic_attr = 101
+    w = weakref.ref(p)
+    assert w() is p
+    assert w().a_dynamic_attr == 101
+    del p
+    gc.collect()
+    gc.collect()
+    assert w() is None

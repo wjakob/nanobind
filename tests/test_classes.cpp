@@ -90,6 +90,10 @@ struct Wrapper {
     std::shared_ptr<Wrapper> value;
 };
 
+struct StructWithWeakrefs : Struct { };
+
+struct StructWithWeakrefsAndDynamicAttrs : Struct { };
+
 int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
 
@@ -554,4 +558,11 @@ NB_MODULE(test_classes_ext, m) {
         "get_incrementing_struct_value",
         [](IncrementingStruct &s) { return new Struct(s.i + 100); },
         nb::keep_alive<0, 1>());
+
+    nb::class_<StructWithWeakrefs, Struct>(m, "StructWithWeakrefs", nb::weak_referenceable())
+        .def(nb::init<int>());
+
+    nb::class_<StructWithWeakrefsAndDynamicAttrs, Struct>(m, "StructWithWeakrefsAndDynamicAttrs",
+               nb::weak_referenceable(), nb::dynamic_attr())
+        .def(nb::init<int>());
 }

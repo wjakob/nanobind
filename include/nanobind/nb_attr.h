@@ -157,11 +157,7 @@ template <size_t Size> struct func_data_prelim {
     const char *doc;
     PyObject *scope;
 
-// #if defined(_MSC_VER)
-    arg_data args[Size == 0 ? 1 : Size];
-// #else
-    // arg_data args[Size];
-// #endif
+    arg_data args[Size == 0 ? 1 : Size];  // avoid zero-sized arrays
 };
 
 template <typename F>

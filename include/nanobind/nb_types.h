@@ -340,6 +340,20 @@ class capsule : public object {
     void *data() const { return PyCapsule_GetPointer(m_ptr, name()); }
 };
 
+class bool_ : public object {
+    NB_OBJECT_DEFAULT(bool_, object, "bool", PyBool_Check)
+
+    explicit bool_(handle h)
+        : object(detail::bool_from_obj(h.ptr()), detail::borrow_t{}) { }
+
+    explicit bool_(bool value)
+        : object(value ? Py_True : Py_False, detail::borrow_t{}) { }
+
+    explicit operator bool() const {
+        return (m_ptr != nullptr) && PyLong_AsLong(m_ptr) != 0;
+    }
+};
+
 class int_ : public object {
     NB_OBJECT_DEFAULT(int_, object, "int", PyLong_Check)
 

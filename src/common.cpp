@@ -566,6 +566,14 @@ PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
 
 // ========================================================================
 
+PyObject *bool_from_obj(PyObject *o) {
+    const auto value = PyObject_IsTrue(o);
+    if (value == -1) {
+        raise_python_error();
+    }
+    return (value != 0 ? Py_True : Py_False);
+}
+
 PyObject *int_from_obj(PyObject *o) {
     PyObject *result = PyNumber_Long(o);
     if (!result)

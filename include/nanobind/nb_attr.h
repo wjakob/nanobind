@@ -157,7 +157,16 @@ template <size_t Size> struct func_data_prelim {
     const char *doc;
     PyObject *scope;
 
-    arg_data args[Size == 0 ? 1 : Size];  // avoid zero-sized arrays
+#if defined(_MSC_VER)
+    arg_data args[Size == 0 ? 1 : Size];
+#elif defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wzero-length-array"
+    arg_data args[Size];
+    #pragma GCC diagnostic pop
+#else
+    arg_data args[Size];
+#endif
 };
 
 template <typename F>

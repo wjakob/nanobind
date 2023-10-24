@@ -442,6 +442,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
                 case (uint8_t) dlpack::dtype_code::Int: prefix = "int"; break;
                 case (uint8_t) dlpack::dtype_code::UInt: prefix = "uint"; break;
                 case (uint8_t) dlpack::dtype_code::Float: prefix = "float"; break;
+                case (uint8_t) dlpack::dtype_code::Complex: prefix = "complex"; break;
                 default:
                     return nullptr;
             }

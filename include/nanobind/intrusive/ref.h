@@ -122,7 +122,7 @@ NAMESPACE_BEGIN(detail)
 template <typename T> struct type_caster<nanobind::ref<T>> {
     using Caster = make_caster<T>;
     static constexpr bool IsClass = true;
-    NB_TYPE_CASTER(ref<T>, Caster::Name);
+    NB_TYPE_CASTER(ref<T>, Caster::Name)
 
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {

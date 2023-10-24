@@ -7,7 +7,7 @@ NAMESPACE_BEGIN(detail)
 
 template <typename Array, typename Entry, size_t Size> struct array_caster {
     NB_TYPE_CASTER(Array, const_name(NB_TYPING_LIST "[") +
-                               make_caster<Entry>::Name + const_name("]"));
+                               make_caster<Entry>::Name + const_name("]"))
 
     using Caster = make_caster<Entry>;
 

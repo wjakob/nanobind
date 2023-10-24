@@ -16,7 +16,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <> struct type_caster<std::string_view> {
-    NB_TYPE_CASTER(std::string_view, const_name("str"));
+    NB_TYPE_CASTER(std::string_view, const_name("str"))
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         Py_ssize_t size;

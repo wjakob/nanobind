@@ -71,7 +71,7 @@ struct type_caster<std::filesystem::path> {
         return success;
     }
 
-    NB_TYPE_CASTER(std::filesystem::path, const_name("os.PathLike"));
+    NB_TYPE_CASTER(std::filesystem::path, const_name("os.PathLike"))
 
 private:
     static str to_py_str(const std::string &s) {

@@ -25,7 +25,7 @@ template <typename T>
 struct is_complex<const std::complex<T>> : public std::true_type { };
 
 template <typename T> struct type_caster<std::complex<T>> {
-    NB_TYPE_CASTER(std::complex<T>, const_name("complex") )
+    NB_TYPE_CASTER(std::complex<T>, const_name("complex"))
 
     template <bool Recursive = true>
     bool from_python(handle src, uint8_t flags,

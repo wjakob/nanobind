@@ -127,7 +127,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
     using NDArray = array_for_eigen_t<T>;
     using NDArrayCaster = make_caster<NDArray>;
 
-    NB_TYPE_CASTER(T, NDArrayCaster::Name);
+    NB_TYPE_CASTER(T, NDArrayCaster::Name)
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         // We're in any case making a copy, so non-writable inputs area also okay

@@ -564,7 +564,7 @@ NAMESPACE_BEGIN(detail)
 template <typename... Args> struct type_caster<ndarray<Args...>> {
     NB_TYPE_CASTER(ndarray<Args...>, Value::Info::name + const_name("[") +
                                         concat_maybe(detail::ndarray_arg<Args>::name...) +
-                                        const_name("]"));
+                                        const_name("]"))
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         constexpr size_t size = (0 + ... + detail::ndarray_arg<Args>::size);

@@ -52,7 +52,7 @@ struct type_caster<std::function<Return(Args...)>> {
     NB_TYPE_CASTER(std::function <Return(Args...)>,
                    const_name("Callable[[") +
                        concat(make_caster<Args>::Name...) + const_name("], ") +
-                       ReturnCaster::Name + const_name("]"));
+                       ReturnCaster::Name + const_name("]"))
 
     struct pyfunc_wrapper_t : pyfunc_wrapper {
         using pyfunc_wrapper::pyfunc_wrapper;

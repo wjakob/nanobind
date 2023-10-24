@@ -133,7 +133,7 @@ public:
         }
     }
 
-    NB_TYPE_CASTER(T, const_name<std::is_integral_v<T>>("int", "float"));
+    NB_TYPE_CASTER(T, const_name<std::is_integral_v<T>>("int", "float"))
 };
 
 template <> struct type_caster<void_type> {
@@ -180,7 +180,7 @@ template <> struct type_caster<std::nullptr_t> {
         return none().release();
     }
 
-    NB_TYPE_CASTER(std::nullptr_t, const_name("None"));
+    NB_TYPE_CASTER(std::nullptr_t, const_name("None"))
 };
 
 template <> struct type_caster<bool> {
@@ -200,7 +200,7 @@ template <> struct type_caster<bool> {
         return handle(src ? Py_True : Py_False).inc_ref();
     }
 
-    NB_TYPE_CASTER(bool, const_name("bool"));
+    NB_TYPE_CASTER(bool, const_name("bool"))
 };
 
 template <> struct type_caster<char> {

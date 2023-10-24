@@ -24,7 +24,7 @@ struct type_caster<std::optional<T>> {
 
     NB_TYPE_CASTER(std::optional<T>, const_name("Optional[") +
                                          concat(Caster::Name) +
-                                         const_name("]"));
+                                         const_name("]"))
 
     type_caster() : value(std::nullopt) { }
 

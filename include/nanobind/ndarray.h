@@ -13,7 +13,6 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
-#include <nanobind/stl/complex.h>
 #include <initializer_list>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -65,6 +64,12 @@ struct dltensor {
 };
 
 NAMESPACE_END(dlpack)
+
+NAMESPACE_BEGIN(detail)
+
+template <typename T> struct is_complex : std::false_type { };
+
+NAMESPACE_END(detail)
 
 constexpr size_t any = (size_t) -1;
 

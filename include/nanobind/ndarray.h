@@ -13,6 +13,7 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/complex.h>
 #include <initializer_list>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -65,13 +66,6 @@ struct dltensor {
 
 NAMESPACE_END(dlpack)
 
-NAMESPACE_BEGIN(detail)
-
-template <typename T>
-struct is_complex : public std::false_type { };
-
-NAMESPACE_END(detail)
-
 constexpr size_t any = (size_t) -1;
 
 template <size_t... Is> struct shape {
@@ -121,10 +115,10 @@ template <typename T> constexpr dlpack::dtype dtype() {
 
     if constexpr (ndarray_traits<T>::is_float)
         result.code = (uint8_t) dlpack::dtype_code::Float;
-    else if constexpr (ndarray_traits<T>::is_signed)
-        result.code = (uint8_t) dlpack::dtype_code::Int;
     else if constexpr (ndarray_traits<T>::is_complex)
         result.code = (uint8_t) dlpack::dtype_code::Complex;
+    else if constexpr (ndarray_traits<T>::is_signed)
+        result.code = (uint8_t) dlpack::dtype_code::Int;
     else if constexpr (std::is_same_v<std::remove_cv_t<T>, bool>)
         result.code = (uint8_t) dlpack::dtype_code::Bool;
     else

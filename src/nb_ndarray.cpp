@@ -211,6 +211,9 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
             case 'f':
             case 'd': dt.code = (uint8_t) dlpack::dtype_code::Float; break;
 
+            case 'Zf':
+            case 'Zd': dt.code = (uint8_t) dlpack::dtype_code::Complex; break;
+
             case '?': dt.code = (uint8_t) dlpack::dtype_code::Bool; break;
 
             default:

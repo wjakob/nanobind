@@ -16,7 +16,7 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename T>
-struct is_complex;
+struct is_complex  : std::false_type {};
 
 template <typename T>
 struct is_complex<std::complex<T>> : public std::true_type { };

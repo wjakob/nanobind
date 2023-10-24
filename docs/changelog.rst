@@ -15,8 +15,20 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.7.0 (Oct 19, 2023)
+Version 1.8.0 (TBA)
 -------------------
+
+* nanobind now considers two C++ ``std::type_info`` instances to be equal when
+  their mangled names match. The previously used pointer comparison was fast
+  but fragile and often caused multi-part extensions to not recognize each
+  other's types. This version introduces a two-level caching scheme (search by
+  pointer, then by name) to fix such problems once and for all, while avoiding
+  the cost of constantly comparing very long mangled names. (commit `b515b1
+  <https://github.com/wjakob/nanobind/commit/b515b1f7f2f4ecc0357818e6201c94a9f4cbfdc2>`__).
+
+
+Version 1.7.0 (Oct 19, 2023)
+----------------------------
 
 New features
 ^^^^^^^^^^^^

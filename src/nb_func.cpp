@@ -942,9 +942,9 @@ static void nb_func_render_signature(const func_data *f) noexcept {
                       "nb::detail::nb_func_render_signature(): missing type!");
 
                 if (!(is_method && arg_index == 0)) {
-                    auto it = internals->type_c2p.find(std::type_index(**descr_type));
+                    auto it = internals->type_c2p_slow.find(*descr_type);
 
-                    if (it != internals->type_c2p.end()) {
+                    if (it != internals->type_c2p_slow.end()) {
                         handle th((PyObject *) it->second->type_py);
                         buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                         buf.put('.');

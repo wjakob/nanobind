@@ -15,14 +15,10 @@ NAMESPACE_BEGIN(detail)
 
 void implicitly_convertible(const std::type_info *src,
                             const std::type_info *dst) noexcept {
-    nb_type_map &type_c2p = internals->type_c2p;
+    type_data *t = nb_type_c2p(internals, dst);
+    check(t, "nanobind::detail::implicitly_convertible(src=%s, dst=%s): "
+             "destination type unknown!", type_name(src), type_name(dst));
 
-    nb_type_map::iterator it = type_c2p.find(std::type_index(*dst));
-    check(it != type_c2p.end(),
-          "nanobind::detail::implicitly_convertible(src=%s, dst=%s): "
-          "destination type unknown!", type_name(src), type_name(dst));
-
-    type_data *t = it->second;
     size_t size = 0;
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
@@ -47,14 +43,10 @@ void implicitly_convertible(const std::type_info *src,
 void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
                                               cleanup_list *),
                             const std::type_info *dst) noexcept {
-    nb_type_map &type_c2p = internals->type_c2p;
+    type_data *t = nb_type_c2p(internals, dst);
+    check(t, "nanobind::detail::implicitly_convertible(src=<predicate>, dst=%s): "
+             "destination type unknown!", type_name(dst));
 
-    nb_type_map::iterator it = type_c2p.find(std::type_index(*dst));
-    check(it != type_c2p.end(),
-          "nanobind::detail::implicitly_convertible(src=<predicate>, dst=%s): "
-          "destination type unknown!", type_name(dst));
-
-    type_data *t = it->second;
     size_t size = 0;
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {

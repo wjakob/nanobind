@@ -77,6 +77,9 @@ enum class type_init_flags : uint32_t {
     all_init_flags           = (0x1f << 19)
 };
 
+// See internals.h
+struct nb_alias_chain;
+
 /// Information about a type that persists throughout its lifetime
 struct type_data {
     uint32_t size;
@@ -84,6 +87,7 @@ struct type_data {
     uint32_t flags : 24;
     const char *name;
     const std::type_info *type;
+    nb_alias_chain *alias_chain;
     PyTypeObject *type_py;
     void (*destruct)(void *);
     void (*copy)(void *, const void *);

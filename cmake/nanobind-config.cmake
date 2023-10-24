@@ -152,6 +152,8 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/eigen/sparse.h
 
     ${NB_DIR}/src/buffer.h
+    ${NB_DIR}/src/hash.h
+    ${NB_DIR}/src/hash.cpp
     ${NB_DIR}/src/nb_internals.h
     ${NB_DIR}/src/nb_internals.cpp
     ${NB_DIR}/src/nb_func.cpp

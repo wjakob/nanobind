@@ -17,7 +17,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 11
+#  define NB_INTERNALS_VERSION 12
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!
@@ -252,12 +252,13 @@ static void internals_cleanup() {
         leak = true;
     }
 
-    if (!internals->type_c2p.empty()) {
+    if (!internals->type_c2p_slow.empty() ||
+        !internals->type_c2p_fast.empty()) {
         if (internals->print_leak_warnings) {
             fprintf(stderr, "nanobind: leaked %zu types!\n",
-                    internals->type_c2p.size());
+                    internals->type_c2p_slow.size());
             int ctr = 0;
-            for (const auto &kv : internals->type_c2p) {
+            for (const auto &kv : internals->type_c2p_slow) {
                 fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
                 if (ctr++ == 10) {
                     fprintf(stderr, " - ... skipped remainder\n");

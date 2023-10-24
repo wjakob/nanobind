@@ -236,56 +236,6 @@ will:
    definition is changed, only a subset of the binding code will generally need
    to be recompiled.
 
-Nanobind cannot pass instances of my type in a multi-library/extension project
-------------------------------------------------------------------------------
-
-Suppose that nanobind unexpectedly raises a ``TypeError`` when passing or
-returning an instance of a bound type. There is usually a simple explanation:
-the type (let's call it "``Foo``") is defined in a library compiled separately
-from the main nanobind extension (let's call it ``libfoo``). The problem can
-also arise when there are multiple extension libraries that all make use of
-``Foo``.
-
-The problem is that the runtime type information ("RTTI") describing ``Foo`` is
-is not synchronized among these different libraries, at which point it appears
-to nanobind that there are multiple identically named but distinct types called
-``Foo``. The dynamic linker is normally responsible for merging the RTTI
-records, but it can only do so when the shared library exports them correctly.
-
-On Windows you must specify a DLL export/import annotation, and on other
-platforms it suffices to raise the visibility of the associated symbols.
-
-.. code-block:: cpp
-
-   /* TODO: Change 'MYLIB' to the name of your project. It's probably best to put
-      these into a common header file included by all parts of the project */
-   #if defined(_WIN32)
-   #  define MYLIB_EXPORT __declspec(dllexport)
-   #  define MYLIB_IMPORT __declspec(dllimport)
-   #else
-   #  define MYLIB_EXPORT __attribute__ ((visibility("default")))
-   #  define MYLIB_IMPORT __attribute__ ((visibility("default")))
-   #endif
-
-   #if defined(MYLIB_BUILD)
-   #  define MYLIB_API MYLIB_EXPORT
-   #else
-   #  define MYLIB_API MYLIB_IMPORT
-   #endif
-
-   /// Important: annotate the Class declaration with MYLIB_API
-   class MYLIB_API Foo {
-       // ... Foo definitions ..
-   };
-
-In the CMake build system, you must furthermore specify the ``-DMYLIB_BUILD``
-definition so that symbols are exported when building ``libfoo`` and imported
-by consumers of ``libfoo``.
-
-.. code-block:: cmake
-
-   target_compile_definitions(libfoo PRIVATE MYLIB_BUILD)
-
 .. _type-visibility:
 
 How can I avoid conflicts with other projects using nanobind?

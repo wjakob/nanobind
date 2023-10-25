@@ -168,34 +168,34 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
         return nullptr;
     }
 
-    char format = 'B';
+    char format_c = 'B';
     const char *format_str = view->format;
     if (format_str)
-        format = *format_str;
+        format_c = *format_str;
 
-    bool skip_first = format == '@' || format == '=';
+    bool skip_first = format_c == '@' || format_c == '=';
 
     int32_t num = 1;
     if(*(uint8_t *) &num == 1) {
-        if (format == '<')
+        if (format_c == '<')
             skip_first = true;
     } else {
-        if (format == '!' || format == '>')
+        if (format_c == '!' || format_c == '>')
             skip_first = true;
     }
 
     if (skip_first && format_str)
-        format = *++format_str;
+        format_c = *++format_str;
 
     bool is_complex = format_str[0] == 'Z';
     if (is_complex)
-        format_str++;
+        format_c = *++format_str;
 
     dlpack::dtype dt { };
     bool fail = format_str && format_str[1] != '\0';
 
     if (!fail) {
-        switch (format) {
+        switch (format_c) {
             case 'c':
             case 'b':
             case 'h':

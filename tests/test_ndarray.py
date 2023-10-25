@@ -91,6 +91,14 @@ def test03_constrain_dtype():
     t.pass_complex64(a_cf64)
     t.pass_bool(a_bool)
 
+    a_f32_const = a_f32.copy()
+    a_f32_const.flags.writeable = False
+    t.pass_float32_const(a_f32_const)
+
+    a_cf64_const = a_cf64.copy()
+    a_cf64_const.flags.writeable = False
+    t.pass_complex64_const(a_cf64_const)
+
     with pytest.raises(TypeError) as excinfo:
         t.pass_uint32(a_f32)
     assert 'incompatible function arguments' in str(excinfo.value)

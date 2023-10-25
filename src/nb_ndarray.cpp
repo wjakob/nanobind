@@ -187,6 +187,10 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     if (skip_first && format_str)
         format = *++format_str;
 
+    bool is_complex = format_str[0] == 'Z';
+    if (is_complex)
+        format_str++;
+
     dlpack::dtype dt { };
     bool fail = format_str && format_str[1] != '\0';
 
@@ -211,13 +215,15 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
             case 'f':
             case 'd': dt.code = (uint8_t) dlpack::dtype_code::Float; break;
 
-            // case 'Zf':
-            // case 'Zd': dt.code = (uint8_t) dlpack::dtype_code::Complex; break;
-
             case '?': dt.code = (uint8_t) dlpack::dtype_code::Bool; break;
 
             default:
                 fail = true;
+        }
+
+        if (is_complex) {
+            fail |= dt.code != (uint8_t) dlpack::dtype_code::Float;
+            dt.code = (uint8_t) dlpack::dtype_code::Complex;
         }
 
         dt.lanes = 1;

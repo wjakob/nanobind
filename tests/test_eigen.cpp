@@ -1,5 +1,6 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
+#include <nanobind/trampoline.h>
 
 namespace nb = nanobind;
 
@@ -205,17 +206,46 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("castToMapCnstVXi", [](nb::object obj) {
       return nb::cast<Eigen::Map<const Eigen::VectorXi>>(obj);
       });
-    m.def("castToRefVXi", [](nb::object obj) -> Eigen::VectorXi {
+    m.def("castToRefVXi", [](nb::object obj) {
         return nb::cast<Eigen::Ref<Eigen::VectorXi>>(obj);
     });
-    m.def("castToRefCnstVXi", [](nb::object obj) -> Eigen::VectorXi {
+    m.def("castToRefCnstVXi", [](nb::object obj) {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi>>(obj);
     });
-    m.def("castToDRefCnstVXi", [](nb::object obj) -> Eigen::VectorXi {
+    m.def("castToDRefCnstVXi", [](nb::object obj) {
         return nb::cast<nb::DRef<const Eigen::VectorXi>>(obj);
     });
-    m.def("castToRef03CnstVXi", [](nb::object obj) -> Eigen::VectorXi {
+    m.def("castToRef03CnstVXi", [](nb::object obj) {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi, Eigen::Unaligned, Eigen::InnerStride<3>>>(obj);
     });
 
+    class Base {
+        public:
+            ~Base() {};
+            virtual void modRefData(Eigen::Ref<Eigen::VectorXd> a) {};
+            virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd> a) {};
+    };
+
+    class PyBase : public Base {
+        NB_TRAMPOLINE(Base, 2);
+        public:
+            void modRefData(Eigen::Ref<Eigen::VectorXd> a) override {NB_OVERRIDE_PURE(modRefData, a);}
+            void modRefDataConst(Eigen::Ref<const Eigen::VectorXd> a) override {NB_OVERRIDE_PURE(modRefDataConst, a);}
+    };
+
+    nb::class_<Base, PyBase>(m, "Base")
+        .def(nb::init<>())
+        .def("modRefData", &Base::modRefData)
+        .def("modRefDataConst", &Base::modRefDataConst);
+
+    m.def("modifyRef", [](Base* base) {
+        Eigen::Vector2d input {{1.0}, {2.0}};
+        base->modRefData(input);
+        return input;
+    });
+    m.def("modifyRefConst", [](Base* base) {
+        Eigen::Vector2d input {{1.0}, {2.0}};
+        base->modRefDataConst(input);
+        return input;
+    });
 }

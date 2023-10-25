@@ -70,7 +70,9 @@ NB_MODULE(test_ndarray_ext, m) {
     });
 
     m.def("pass_float32", [](const nb::ndarray<float> &) { }, "array"_a.noconvert());
+    m.def("pass_float32_const", [](const nb::ndarray<const float> &) { }, "array"_a.noconvert());
     m.def("pass_complex64", [](const nb::ndarray<std::complex<float>> &) { }, "array"_a.noconvert());
+    m.def("pass_complex64_const", [](nb::ndarray<const std::complex<float>>) { }, "array"_a.noconvert());
     m.def("pass_uint32", [](const nb::ndarray<uint32_t> &) { }, "array"_a.noconvert());
     m.def("pass_bool", [](const nb::ndarray<bool> &) { }, "array"_a.noconvert());
     m.def("pass_float32_shaped",

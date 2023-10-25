@@ -26,6 +26,8 @@ Version 1.8.0 (TBA)
   the cost of constantly comparing very long mangled names. (commit `b515b1
   <https://github.com/wjakob/nanobind/commit/b515b1f7f2f4ecc0357818e6201c94a9f4cbfdc2>`__).
 
+* ABI version 12.
+
 
 Version 1.7.0 (Oct 19, 2023)
 ----------------------------

@@ -187,6 +187,10 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     if (skip_first && format_str)
         format = *++format_str;
 
+    bool is_complex = format_str[0] == 'Z';
+    if (is_complex)
+        format_str++;
+
     dlpack::dtype dt { };
     bool fail = format_str && format_str[1] != '\0';
 
@@ -215,6 +219,11 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
 
             default:
                 fail = true;
+        }
+
+        if (is_complex) {
+            fail |= dt.code != (uint8_t) dlpack::dtype_code::Float;
+            dt.code = (uint8_t) dlpack::dtype_code::Complex;
         }
 
         dt.lanes = 1;
@@ -439,6 +448,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
                 case (uint8_t) dlpack::dtype_code::Int: prefix = "int"; break;
                 case (uint8_t) dlpack::dtype_code::UInt: prefix = "uint"; break;
                 case (uint8_t) dlpack::dtype_code::Float: prefix = "float"; break;
+                case (uint8_t) dlpack::dtype_code::Complex: prefix = "complex"; break;
                 default:
                     return nullptr;
             }

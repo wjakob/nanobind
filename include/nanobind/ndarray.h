@@ -67,8 +67,7 @@ NAMESPACE_END(dlpack)
 
 NAMESPACE_BEGIN(detail)
 
-template <typename T>
-struct is_complex : public std::false_type { };
+template <typename T> struct is_complex : std::false_type { };
 
 NAMESPACE_END(detail)
 
@@ -121,10 +120,10 @@ template <typename T> constexpr dlpack::dtype dtype() {
 
     if constexpr (ndarray_traits<T>::is_float)
         result.code = (uint8_t) dlpack::dtype_code::Float;
-    else if constexpr (ndarray_traits<T>::is_signed)
-        result.code = (uint8_t) dlpack::dtype_code::Int;
     else if constexpr (ndarray_traits<T>::is_complex)
         result.code = (uint8_t) dlpack::dtype_code::Complex;
+    else if constexpr (ndarray_traits<T>::is_signed)
+        result.code = (uint8_t) dlpack::dtype_code::Int;
     else if constexpr (std::is_same_v<std::remove_cv_t<T>, bool>)
         result.code = (uint8_t) dlpack::dtype_code::Bool;
     else

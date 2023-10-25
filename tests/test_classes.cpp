@@ -525,9 +525,9 @@ NB_MODULE(test_classes_ext, m) {
     m.def("test_slots", []() {
         nb::object wrapper_tp = nb::module_::import_("test_classes_ext").attr("Wrapper");
         return nb::make_tuple(
-            nb::type_get_slot(wrapper_tp, Py_tp_traverse) == wrapper_tp_traverse,
-            nb::type_get_slot(&PyLong_Type, Py_tp_init) == PyLong_Type.tp_init,
-            nb::type_get_slot(&PyLong_Type, Py_nb_add) == PyLong_Type.tp_as_number->nb_add
+            nb::type_get_slot(wrapper_tp, Py_tp_traverse) == (void *) wrapper_tp_traverse,
+            nb::type_get_slot(&PyLong_Type, Py_tp_init) == (void *) PyLong_Type.tp_init,
+            nb::type_get_slot(&PyLong_Type, Py_nb_add) == (void *) PyLong_Type.tp_as_number->nb_add
         );
     });
 #endif

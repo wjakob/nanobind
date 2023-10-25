@@ -100,7 +100,9 @@ bool intrusive_counter::dec_ref() const noexcept {
     while (true) {
         if (v & 1) {
             if (v == 1) {
-                fprintf(stderr, "intrusive_counter::dec_ref(%p): reference count underflow!", this);
+                fprintf(stderr,
+                        "intrusive_counter::dec_ref(%p): reference count "
+                        "underflow!", (void *) this);
                 abort();
             } else if (v == 3) {
                 return true;
@@ -126,7 +128,9 @@ void intrusive_counter::set_self_py(PyObject *o) noexcept {
 
         NB_ATOMIC_STORE(&m_state, (uintptr_t) o);
     } else {
-        fprintf(stderr, "intrusive_counter::set_self_py(%p): a Python object was already present!", this);
+        fprintf(stderr,
+                "intrusive_counter::set_self_py(%p): a Python object was "
+                "already present!", (void *) this);
         abort();
     }
 }

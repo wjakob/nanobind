@@ -1,0 +1,23 @@
+name: Other
+description: Ask a question or request a new feature
+title: "[OTHER]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Important information
+        For all types of questions, feature requests, and other issues that aren't nanobind bugs, please start a post on the separate "Discussions" tab and *not* under "Issues".
+
+        If have found a nanobind bug, then please open a ticket with a reproducer using the separate "Bug Report" template.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Please don't use.
+      placeholder: >-
+        For all types of questions, feature requests, and other issues that aren't nanobind bugs, please start a post on the separate "Discussions" tab and *not* under "Issues".
+
+        If have found a nanobind bug, then please open a ticket with a reproducer using the separate "Bug Report" template.
+
+    validations:
+      required: true

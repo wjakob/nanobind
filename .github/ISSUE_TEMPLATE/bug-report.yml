@@ -25,9 +25,9 @@ body:
     attributes:
       label: Reproducible example code
       placeholder: >-
-        The code should be minimal, have no external dependencies, isolate the
-        function(s) that cause breakage. Submit matched and complete C++ and
+        The code should be minimal, have no external dependencies, and isolate the
+        function(s) that cause breakage. Please submit matched and complete C++ and
         Python snippets that can be easily compiled and run to diagnose the
-        issue. If possible, make a PR with a new, failing test to provide a
-        starting point to work on!
+        issue. If possible, make a PR with a failing test to provide a
+        starting point for me to work on.
       render: text

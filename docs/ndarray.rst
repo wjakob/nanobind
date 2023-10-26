@@ -480,8 +480,23 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
        };
    };
 
-Limitations
------------
+Frequently asked questions
+--------------------------
+
+nanobind does not accept my NumPy array
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When binding a function that takes an ``nb::ndarray<T, ...>`` as input, nanobind
+will by default require that array to be writable. This means that the function
+cannot be called using NumPy arrays that are marked as constant.
+
+If you wish your function to be callable with constant input, either change the
+parameter to ``nb::ndarray<const T, ...>`` (if the array is parameterized by
+type), or write ``nb::ndarray<nb::ro>`` to accept a read-only array of any
+type.
+
+Limitations related to ``dtypes``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _dtype_restrictions:
 

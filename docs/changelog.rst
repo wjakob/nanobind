@@ -26,6 +26,13 @@ Version 1.8.0 (TBA)
   the cost of constantly comparing very long mangled names. (commit `b515b1
   <https://github.com/wjakob/nanobind/commit/b515b1f7f2f4ecc0357818e6201c94a9f4cbfdc2>`__).
 
+* Fixed casting of complex-valued constant :cpp:class:`nb::ndarray\<T\>
+  <ndarray>` instances. (PR `#338
+  (https://github.com/wjakob/nanobind/pull/338>`__, commit `ba8c7f
+  <https://github.com/wjakob/nanobind/commit/ba8c7fa55f2d0ad748cad1dd4af2b22979ebc46a>`__).
+
+* Minor fixes and improvements.
+
 * ABI version 12.
 
 

@@ -57,8 +57,14 @@ endif()
 if (NOT TARGET Python::Module OR NOT TARGET Python::Interpreter)
   set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
 
+  if (CMAKE_VERSION VERSION_LESS 3.18)
+    set(NB_PYTHON_DEV_MODULE Development)
+  else()
+    set(NB_PYTHON_DEV_MODULE Development.Module)
+  endif()
+
   find_package(Python 3.8
-    REQUIRED COMPONENTS Interpreter Development.Module
+    REQUIRED COMPONENTS Interpreter ${NB_PYTHON_DEV_MODULE}
     OPTIONAL_COMPONENTS Development.SABIModule)
 endif()
 

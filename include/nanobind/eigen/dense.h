@@ -435,6 +435,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         return false;
     }
 
+    /*Duplicate of Eigen::Map caster*/
     static handle from_cpp(const Ref &v, rv_policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];

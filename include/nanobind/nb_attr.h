@@ -166,7 +166,7 @@ template <size_t Size> struct func_data_prelim {
     #pragma clang diagnostic pop
 #elif defined(__GNUC__) && !defined(__clang__)
     #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
+    #pragma GCC diagnostic ignored "-Werror=pedantic"
     arg_data args[Size];
     #pragma GCC diagnostic pop
 #else

@@ -159,11 +159,11 @@ template <size_t Size> struct func_data_prelim {
 
 #if defined(_MSC_VER)
     arg_data args[Size == 0 ? 1 : Size];
-#elif defined(__GNUC__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wzero-length-array"
+#elif defined(__clang__)
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wzero-length-array"
     arg_data args[Size];
-    #pragma GCC diagnostic pop
+    #pragma clang diagnostic pop
 #else
     arg_data args[Size];
 #endif

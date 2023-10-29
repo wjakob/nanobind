@@ -46,10 +46,6 @@ struct ticket {
     NB_INLINE ~ticket() noexcept { trampoline_leave(this); }
 };
 
-#if defined(__GNUC__)
-#  pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
-#endif
-
 #define NB_TRAMPOLINE(base, size)                                              \
     using NBBase = base;                                                       \
     using NBBase::NBBase;                                                      \

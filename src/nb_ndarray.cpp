@@ -440,7 +440,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
             return nullptr;
 
         const char *prefix = nullptr;
-        char dtype[9];
+        char dtype[11];
         if (dt.code == (uint8_t) dlpack::dtype_code::Bool) {
             std::strcpy(dtype, "bool");
         } else {

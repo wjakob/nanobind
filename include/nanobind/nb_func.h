@@ -95,8 +95,9 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     func_data_prelim<nargs_provided> f;
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |
-              (nargs_provided       ? (uint32_t) func_flags::has_args       : 0) |
-              (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0);
+              (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
+              (nargs_provided &&
+               !is_getter_det       ? (uint32_t) func_flags::has_args       : 0);
 
     /* Store captured function inside 'func_data_prelim' if there is space. Issues
        with aliasing are resolved via separate compilation of libnanobind. */

@@ -34,6 +34,9 @@ Version 1.8.0 (TBA)
 * Added an importer for ``std::nullopt_t`` (PR `#350
   <https://github.com/wjakob/nanobind/pull/350>`__).
 
+* Added a C++ → Python type caster for ``Eigen::Ref<..>`` (PR `#334
+  <https://github.com/wjakob/nanobind/pull/334>`__).
+
 * Minor fixes and improvements.
 
 * ABI version 12.

@@ -438,12 +438,14 @@ def test41_std_optional_ret_opt_none():
 
 
 def test42_std_optional_unbound_type():
-    assert t.optional_unbound_type(3) == 3
-    assert t.optional_unbound_type(None) is None
-    assert t.optional_unbound_type() is None
-    assert t.optional_unbound_type.__doc__ == (
-        "optional_unbound_type(x: Optional[int] = None) -> Optional[int]"
-    )
+    for method_name in ("optional_unbound_type", "optional_unbound_type_with_nullopt_as_default"):
+        method = getattr(t, method_name)
+        assert method(3) == 3
+        assert method(None) is None
+        assert method() is None
+        assert method.__doc__ == (
+            f"{method_name}(x: Optional[int] = None) -> Optional[int]"
+        )
 
 
 def test43_std_variant_copyable(clean):

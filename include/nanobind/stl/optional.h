@@ -59,5 +59,20 @@ struct type_caster<std::optional<T>> {
     }
 };
 
+
+template <> struct type_caster<std::nullopt_t> {
+  bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    if (src.is_none())
+      return true;
+    return false;
+  }
+
+  static handle from_cpp(std::nullopt_t, rv_policy, cleanup_list *) noexcept {
+    return none().release();
+  }
+
+  NB_TYPE_CASTER(std::nullopt_t, const_name("None"));
+};
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

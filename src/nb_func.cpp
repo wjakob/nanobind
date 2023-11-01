@@ -167,6 +167,18 @@ void *malloc_check(size_t size) {
     return ptr;
 }
 
+char *strdup_check(const char *s) {
+    char *result;
+    #if defined(_WIN32)
+        result = _strdup(s);
+    #else
+        result = strdup(s);
+    #endif
+    if (!result)
+        fail("nanobind: strdup() failed!");
+    return result;
+}
+
 /**
  * \brief Wrap a C++ function into a Python function object
  *
@@ -1108,7 +1120,7 @@ NB_NOINLINE char *type_name(const std::type_info *t) {
     int status = 0;
     char *name = abi::__cxa_demangle(name_in, nullptr, nullptr, &status);
 #else
-    char *name = NB_STRDUP(name_in);
+    char *name = strdup_check(name_in);
     strexc(name, "class ");
     strexc(name, "struct ");
     strexc(name, "enum ");

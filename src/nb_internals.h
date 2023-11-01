@@ -320,5 +320,7 @@ private:
     T *ptr{ nullptr };
 };
 
+extern char *strdup_check(const char *);
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

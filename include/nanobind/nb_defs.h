@@ -28,7 +28,6 @@
 #  define NB_INLINE        __forceinline
 #  define NB_INLINE_LAMBDA
 #  define NB_NOINLINE      __declspec(noinline)
-# define  NB_STRDUP        _strdup
 #else
 #  define NB_EXPORT        __attribute__ ((visibility("default")))
 #  define NB_IMPORT        NB_EXPORT
@@ -39,7 +38,6 @@
 #else
 #    define NB_INLINE_LAMBDA
 #endif
-#  define NB_STRDUP        strdup
 #endif
 
 #if defined(__GNUC__)

@@ -46,7 +46,7 @@ python_error::python_error(const python_error &e)
         Py_INCREF(m_value);
     }
     if (e.m_what)
-        m_what = NB_STRDUP(e.m_what);
+        m_what = detail::strdup_check(e.m_what);
 }
 
 python_error::python_error(python_error &&e) noexcept
@@ -95,7 +95,7 @@ python_error::python_error(const python_error &e)
         Py_XINCREF(m_traceback);
     }
     if (e.m_what)
-        m_what = NB_STRDUP(e.m_what);
+        m_what = detail::strdup_check(e.m_what);
 }
 
 python_error::python_error(python_error &&e) noexcept
@@ -147,7 +147,7 @@ const char *python_error::what() const noexcept {
 #if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
     object mod = module_::import_("traceback"),
            result = mod.attr("format_exception")(exc_type, exc_value, exc_traceback);
-    m_what = NB_STRDUP(borrow<str>(str("\n").attr("join")(result)).c_str());
+    m_what = detail::strdup_check(borrow<str>(str("\n").attr("join")(result)).c_str());
 #else
     buf.clear();
     if (exc_traceback.is_valid()) {

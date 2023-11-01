@@ -388,7 +388,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
     PyObject *name = nb_type_name(self);
-    t->name = NB_STRDUP(PyUnicode_AsUTF8AndSize(name, nullptr));
+    t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
     t->type_py = (PyTypeObject *) self;
     t->implicit = nullptr;
@@ -846,7 +846,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool base_intrusive_ptr =
         tb && (tb->flags & (uint32_t) type_flags::intrusive_ptr);
 
-    char *name_copy = NB_STRDUP(name.c_str());
+    char *name_copy = strdup_check(name.c_str());
 
     constexpr size_t nb_type_max_slots = 10,
                      nb_extra_slots = 80,

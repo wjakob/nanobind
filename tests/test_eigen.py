@@ -352,3 +352,18 @@ def test12_cast():
     for v in vec, vec2, vecf:
         with pytest.raises(RuntimeError, match='bad[_ ]cast'):
             t.castToRef03CnstVXi(v)
+
+@needs_numpy_and_eigen
+def test13_mutate_python():
+    class Derived(t.Base):
+        def modRefData(self, input):
+            input[0] = 3.0
+
+        def modRefDataConst(self, input):
+            input[0] = 3.0
+
+    vecRef = np.array([3.0, 2.0])
+    der = Derived()
+    assert_array_equal(t.modifyRef(der), vecRef)
+    with pytest.raises(ValueError):
+        t.modifyRefConst(der)

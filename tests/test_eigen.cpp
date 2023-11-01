@@ -1,5 +1,6 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
+#include <nanobind/trampoline.h>
 
 namespace nb = nanobind;
 
@@ -218,4 +219,35 @@ NB_MODULE(test_eigen_ext, m) {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi, Eigen::Unaligned, Eigen::InnerStride<3>>>(obj);
     });
 
+    struct Base {
+        ~Base() {};
+        virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) { };
+        virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd>) { };
+    };
+
+    struct PyBase : Base {
+        NB_TRAMPOLINE(Base, 2);
+        void modRefData(Eigen::Ref<Eigen::VectorXd> a) override {
+            NB_OVERRIDE_PURE(modRefData, a);
+        }
+        void modRefDataConst(Eigen::Ref<const Eigen::VectorXd> a) override {
+            NB_OVERRIDE_PURE(modRefDataConst, a);
+        }
+    };
+
+    nb::class_<Base, PyBase>(m, "Base")
+        .def(nb::init<>())
+        .def("modRefData", &Base::modRefData)
+        .def("modRefDataConst", &Base::modRefDataConst);
+
+    m.def("modifyRef", [](Base* base) {
+        Eigen::Vector2d input {{1.0}, {2.0}};
+        base->modRefData(input);
+        return input;
+    });
+    m.def("modifyRefConst", [](Base* base) {
+        Eigen::Vector2d input {{1.0}, {2.0}};
+        base->modRefDataConst(input);
+        return input;
+    });
 }

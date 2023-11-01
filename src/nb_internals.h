@@ -14,6 +14,8 @@
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
 #include <cstring>
+#include <string>
+#include <functional>
 #include "hash.h"
 
 #if defined(_MSC_VER)
@@ -151,8 +153,7 @@ struct nb_weakref_seq {
 
 struct std_typeinfo_hash {
     size_t operator()(const std::type_info *a) const {
-        const char *name = a->name();
-        return (size_t) MurmurHash3_x64_64(name, strlen(name), 0);
+        return std::hash<std::string>()(a->name());
     }
 };
 

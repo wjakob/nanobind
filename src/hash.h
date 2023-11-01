@@ -35,5 +35,3 @@ inline uint64_t fmix64(uint64_t k) {
     k ^= k >> 33;
     return k;
 }
-
-extern uint64_t MurmurHash3_x64_64(const void *key, size_t len, uint32_t seed);

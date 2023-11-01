@@ -28,8 +28,11 @@ Version 1.8.0 (TBA)
 
 * Fixed casting of complex-valued constant :cpp:class:`nb::ndarray\<T\>
   <ndarray>` instances. (PR `#338
-  (https://github.com/wjakob/nanobind/pull/338>`__, commit `ba8c7f
+  <https://github.com/wjakob/nanobind/pull/338>`__, commit `ba8c7f
   <https://github.com/wjakob/nanobind/commit/ba8c7fa55f2d0ad748cad1dd4af2b22979ebc46a>`__).
+
+* Added an importer for ``std::nullopt_t`` (PR `#350
+  <https://github.com/wjakob/nanobind/pull/350>`__).
 
 * Minor fixes and improvements.
 

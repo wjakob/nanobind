@@ -253,6 +253,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("optional_ret_opt_movable_ptr", []() { return new std::optional<Movable *>(new Movable()); });
     m.def("optional_ret_opt_none", []() { return std::optional<Movable>(); });
     m.def("optional_unbound_type", [](std::optional<int> &x) { return x; }, nb::arg("x") = nb::none());
+    m.def("optional_unbound_type_with_nullopt_as_default", [](std::optional<int> &x) { return x; }, nb::arg("x") = std::nullopt);
 
     // ----- test43-test50 ------
     m.def("variant_copyable", [](std::variant<Copyable, int> &) {});

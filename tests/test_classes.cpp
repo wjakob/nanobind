@@ -31,7 +31,7 @@ struct Struct {
     Struct(Struct &&s) noexcept : i(s.i) { s.i = 0; move_constructed++; }
     Struct &operator=(const Struct &s) { i = s.i; copy_assigned++; return *this; }
     Struct &operator=(Struct &&s) noexcept { i = s.i; s.i = 0; move_assigned++; return *this; }
-    ~Struct() { destructed++; struct_destructed.push_back(i); }
+    ~Struct() { destructed++; if (nb::is_alive()) struct_destructed.push_back(i); }
 
     int value() const { return i; }
     int getstate() const { ++pickled; return i; }

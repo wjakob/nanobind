@@ -100,6 +100,7 @@ void nb_func_dealloc(PyObject *self) {
                 }
             }
 
+            free((char *) f->name);
             free(f->args);
             free((char *) f->descr);
             free(f->descr_types);
@@ -304,6 +305,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     if (!has_name)
         fc->name = "";
+    fc->name = strdup_check(fc->name);
 
     if (is_implicit) {
         check(fc->flags & (uint32_t) func_flags::is_constructor,

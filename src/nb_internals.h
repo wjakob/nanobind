@@ -14,7 +14,7 @@
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
 #include <cstring>
-#include <string>
+#include <string_view>
 #include <functional>
 #include "hash.h"
 
@@ -153,7 +153,8 @@ struct nb_weakref_seq {
 
 struct std_typeinfo_hash {
     size_t operator()(const std::type_info *a) const {
-        return std::hash<std::string>()(a->name());
+        const char *name = a->name();
+        return std::hash<std::string_view>()({name, strlen(name)});
     }
 };
 

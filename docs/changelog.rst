@@ -15,7 +15,12 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.8.0 (TBA)
+Version 1.9.0 (TBA)
+-------------------
+
+* Nothing yet
+
+Version 1.8.0 (Nov 2, 2023)
 -------------------
 
 * nanobind now considers two C++ ``std::type_info`` instances to be equal when

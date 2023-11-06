@@ -250,11 +250,11 @@ Iterator bindings
 
 Use of the :cpp:func:`nb::make_iterator() <make_iterator>`,
 :cpp:func:`nb::make_key_iterator() <make_key_iterator>`, and
-:cpp:func:`nb::make_value_iterator() <make_value_iterator>` requires including
-the additional header file ``nanobind/make_iterator.h``. The interface of these
-functions has also slightly changed: all take a Python scope and a name as
-first and second arguments, which are used to permanently "install" the
-iterator type (which is created on demand). See the `test suite
+:cpp:func:`nb::make_value_iterator() <make_value_iterator>` functions requires
+including the additional header file ``nanobind/make_iterator.h``. The
+interface of these functions has also slightly changed: all take a Python scope
+and a name as first and second arguments, which are used to permanently
+"install" the iterator type (which is created on demand). See the `test suite
 <https://github.com/wjakob/nanobind/blob/master/tests/test_make_iterator.cpp>`_
 for a worked out example.
 

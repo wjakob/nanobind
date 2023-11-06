@@ -213,16 +213,6 @@ the following example:
         m.def("sub", [](int a, int b) { return a - b; });
     }
 
-:command:`python`:
-
-.. code-block:: pycon
-
-    >>> import example
-    >>> example.add(1, 2)
-    3
-    >>> example.sub(1, 1)
-    0
-
 As shown above, the various ``init_ex`` functions should be contained in
 separate files that can be compiled independently from one another, and then
 linked together into the same final shared object.  Following this approach
@@ -275,6 +265,41 @@ named domain to avoid conflicts with other extensions. To do so, specify the
 
 In this case, inter-extension type visibility is furthermore restricted to
 extensions in the ``"my_project"`` domain.
+
+I'd like to use this project, but with $BUILD_SYSTEM instead of CMake
+---------------------------------------------------------------------
+
+A difficult aspect of C++ software development is the sheer number of competing
+build systems, including
+
+- `CMake <https://cmake.org>`__,
+- `Meson <https://mesonbuild.com>`__,
+- `xmake <https://xmake.io/#/>`__,
+- `vcpkg <https://vcpkg.io/en/>`__,
+- `Premake <https://premake.github.io>`__,
+- `Bazel <https://bazel.build>`__,
+- `Conan <https://docs.conan.io/2/>`__,
+- `Autotools <https://www.gnu.org/software/automake>`__,
+- and many others.
+
+The author of this project is familiar with CMake but lacks expertise with this
+large space of alternative tools. Maintaining and shipping support for other
+build systems is therefore considered beyond the scope of this *nano* project
+(see also the :ref:`why? <why>` part of the documentation for the rationale of
+being somewhat disapproving towards external contributions).
+
+If you wish to create and maintain an alternative interface to nanobind, then
+my request would be that you create and maintain separate repository (see,
+e.g., `pybind11_bazel <https://github.com/pybind/pybind11_bazel>`__ as an
+example how how this was handled in the case of pybind11). In this case, please
+carefully review the functionality of `nanobind-config.cmake
+<https://github.com/wjakob/nanobind/blob/master/cmake/nanobind-config.cmake>`__.
+Besides getting things to compile, it specifies a number of platform-dependent
+compiler and linker options that are needed to produce an *optimal* (small and
+efficient) binary.
+
+Once your alternative build system is sufficiently complete, it can be listed
+as part of this documentation.
 
 How to cite this project?
 -------------------------

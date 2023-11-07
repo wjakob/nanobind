@@ -202,8 +202,20 @@ function (nanobind_build_library TARGET_NAME)
   target_compile_definitions(${TARGET_NAME} PRIVATE
     $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
 
-  target_include_directories(${TARGET_NAME} PRIVATE
-    ${NB_DIR}/ext/robin_map/include)
+  # If nanobind was installed without submodule dependencies, then the
+  # dependencies directory won't exist and we need to find them.
+  # However, if the directory _does_ exist, then the user is free to choose
+  # whether nanobind uses them (based on `NB_USE_SUBMODULE_DEPS`), with a
+  # preference to choose them if `NB_USE_SUBMODULE_DEPS` is not defined
+  if (NOT IS_DIRECTORY ${NB_DIR}/ext/robin_map/include OR
+      (DEFINED NB_USE_SUBMODULE_DEPS AND NOT NB_USE_SUBMODULE_DEPS))
+    include(CMakeFindDependencyMacro)
+    find_dependency(tsl-robin-map)
+    target_link_libraries(${TARGET_NAME} PRIVATE tsl::robin_map)
+  else()
+    target_include_directories(${TARGET_NAME} PRIVATE
+      ${NB_DIR}/ext/robin_map/include)
+  endif()
 
   target_include_directories(${TARGET_NAME} PUBLIC
     ${Python_INCLUDE_DIRS}

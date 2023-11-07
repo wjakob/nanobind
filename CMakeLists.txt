@@ -11,6 +11,9 @@ else()
   set(NB_MASTER_PROJECT OFF)
 endif()
 
+option(NB_CREATE_INSTALL_RULES "Create installation rules" ${NB_MASTER_PROJECT})
+option(NB_USE_SUBMODULE_DEPS   "Use submodule'd dependencies" ON)
+
 option(NB_TEST              "Compile nanobind tests?" ${NB_MASTER_PROJECT})
 option(NB_TEST_STABLE_ABI   "Test the stable ABI interface?" OFF)
 option(NB_TEST_SHARED_BUILD "Build a shared nanobind library for the test suite?" OFF)
@@ -30,10 +33,55 @@ endif()
 # Check whether all dependencies are present
 # ---------------------------------------------------------------------------
 
-if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/robin_map/include")
+if (NB_USE_SUBMODULE_DEPS AND NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/robin_map/include")
   message(FATAL_ERROR "The nanobind dependencies are missing! "
     "You probably did not clone the project with --recursive. It is possible to recover "
     "by invoking\n$ git submodule update --init --recursive")
+endif()
+
+# ---------------------------------------------------------------------------
+# Installation rules
+# ---------------------------------------------------------------------------
+
+if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
+  set(CMAKE_INSTALL_DATAROOTDIR "share"
+    CACHE PATH "Installation path for read-only architecture-independent data root")
+
+  # Normally these would be configurable by the user, but we can't allow that
+  # because the lookup paths are hard-coded in 'cmake/nanobind-config.cmake'
+  set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/include")
+  set(NB_INSTALL_SRCDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/src")
+  set(NB_INSTALL_EXTDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/ext")
+  set(NB_INSTALL_CMAKEDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/cmake")
+
+  install(
+    DIRECTORY include/
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  )
+
+  install(
+    DIRECTORY src/
+    DESTINATION "${NB_INSTALL_SRCDIR}"
+    PATTERN "*.py" EXCLUDE
+  )
+
+  if(NB_USE_SUBMODULE_DEPS)
+    install(
+      DIRECTORY ext/robin_map/include/
+      DESTINATION "${NB_INSTALL_EXTDIR}/robin_map/include"
+    )
+    install(
+      FILES
+        "ext/robin_map/tsl-robin-map.natvis"
+        "ext/robin_map/CMakeLists.txt"
+      DESTINATION "${NB_INSTALL_EXTDIR}/robin_map"
+    )
+  endif()
+
+  install(
+    DIRECTORY cmake/
+    DESTINATION "${NB_INSTALL_CMAKEDIR}"
+  )
 endif()
 
 # ---------------------------------------------------------------------------

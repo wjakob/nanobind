@@ -44,15 +44,16 @@ endif()
 # ---------------------------------------------------------------------------
 
 if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
-  set(CMAKE_INSTALL_DATAROOTDIR "share"
-    CACHE PATH "Installation path for read-only architecture-independent data root")
+  include(GNUInstallDirs)
+  set(NB_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/nanobind"
+    CACHE PATH "Installation path for read-only architecture-independent nanobind data files")
 
   # Normally these would be configurable by the user, but we can't allow that
   # because the lookup paths are hard-coded in 'cmake/nanobind-config.cmake'
-  set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/include")
-  set(NB_INSTALL_SRCDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/src")
-  set(NB_INSTALL_EXTDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/ext")
-  set(NB_INSTALL_CMAKEDIR "${CMAKE_INSTALL_DATAROOTDIR}/nanobind/cmake")
+  set(CMAKE_INSTALL_INCLUDEDIR "${NB_INSTALL_DATADIR}/include")
+  set(NB_INSTALL_SRCDIR "${NB_INSTALL_DATADIR}/src")
+  set(NB_INSTALL_EXTDIR "${NB_INSTALL_DATADIR}/ext")
+  set(NB_INSTALL_CMAKEDIR "${NB_INSTALL_DATADIR}/cmake")
 
   install(
     DIRECTORY include/

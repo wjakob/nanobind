@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15...3.27)
-project(nanobind LANGUAGES CXX)
+project(nanobind LANGUAGES NONE)
 
 # ---------------------------------------------------------------------------
 # Only build tests by default if this is the top-level CMake project
@@ -44,6 +44,8 @@ endif()
 # ---------------------------------------------------------------------------
 
 if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
+  # Silence warning in GNUInstallDirs due to no enabled languages
+  set(CMAKE_INSTALL_LIBDIR "")
   include(GNUInstallDirs)
   set(NB_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/nanobind"
     CACHE PATH "Installation path for read-only architecture-independent nanobind data files")
@@ -81,6 +83,14 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
     DIRECTORY cmake/
     DESTINATION "${NB_INSTALL_CMAKEDIR}"
   )
+endif()
+
+# Return early to skip finding needless dependencies if the user only wishes to
+# install nanobind
+if (NB_MASTER_PROJECT AND NOT NB_TEST)
+  return()
+else()
+  enable_language(CXX)
 endif()
 
 # ---------------------------------------------------------------------------

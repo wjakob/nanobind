@@ -12,7 +12,7 @@ else()
 endif()
 
 option(NB_CREATE_INSTALL_RULES "Create installation rules" ${NB_MASTER_PROJECT})
-option(NB_USE_SUBMODULE_DEPS   "Use submodule'd dependencies" ON)
+option(NB_USE_SUBMODULE_DEPS   "Use the nanobind dependencies shipped as a git submodule of this repository" ON)
 
 option(NB_TEST              "Compile nanobind tests?" ${NB_MASTER_PROJECT})
 option(NB_TEST_STABLE_ABI   "Test the stable ABI interface?" OFF)
@@ -72,9 +72,7 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
       DESTINATION "${NB_INSTALL_EXTDIR}/robin_map/include"
     )
     install(
-      FILES
-        "ext/robin_map/tsl-robin-map.natvis"
-        "ext/robin_map/CMakeLists.txt"
+      FILES ext/robin_map/CMakeLists.txt
       DESTINATION "${NB_INSTALL_EXTDIR}/robin_map"
     )
   endif()

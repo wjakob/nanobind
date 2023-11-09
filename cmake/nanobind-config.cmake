@@ -189,12 +189,10 @@ function (nanobind_build_library TARGET_NAME)
     target_compile_options(${TARGET_NAME} PRIVATE -fno-strict-aliasing)
   endif()
 
-  if (WIN32)
-    if (${TARGET_NAME} MATCHES "abi3")
-      target_link_libraries(${TARGET_NAME} PUBLIC Python::SABIModule)
-    else()
-      target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
-    endif()
+  if (${TARGET_NAME} MATCHES "abi3")
+    target_link_libraries(${TARGET_NAME} PUBLIC Python::SABIModule)
+  else()
+    target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't
@@ -217,9 +215,7 @@ function (nanobind_build_library TARGET_NAME)
       ${NB_DIR}/ext/robin_map/include)
   endif()
 
-  target_include_directories(${TARGET_NAME} PUBLIC
-    ${Python_INCLUDE_DIRS}
-    ${NB_DIR}/include)
+  target_include_directories(${TARGET_NAME} PUBLIC ${NB_DIR}/include)
 
   target_compile_features(${TARGET_NAME} PUBLIC cxx_std_17)
   nanobind_set_visibility(${TARGET_NAME})

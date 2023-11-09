@@ -8,7 +8,7 @@ Utilities
 .. _utilities_eval:
 
 Evaluating Python expressions from strings
-==========================================
+------------------------------------------
 
 nanobind provides the :cpp:func:`eval` and :cpp:func:`exec` functions to
 evaluate Python expressions and statements. The following example illustrates

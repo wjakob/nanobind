@@ -44,6 +44,12 @@ struct Copyable {
     ~Copyable() { destructed++; }
 };
 
+struct NonAssignable {
+  int value = 5;
+
+  NonAssignable &operator=(const NonAssignable &) = delete;
+};
+
 struct StructWithReadonlyMap {
     std::map<std::string, uint64_t> map;
 };
@@ -101,6 +107,10 @@ NB_MODULE(test_stl_ext, m) {
         .def(nb::init<>())
         .def(nb::init<int>())
         .def_rw("value", &Copyable::value);
+
+    nb::class_<NonAssignable>(m, "NonAssignable")
+        .def(nb::init<>())
+        .def_rw("value", &NonAssignable::value);
 
     nb::class_<StructWithReadonlyMap>(m, "StructWithReadonlyMap")
         .def(nb::init<>())
@@ -254,6 +264,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("optional_ret_opt_none", []() { return std::optional<Movable>(); });
     m.def("optional_unbound_type", [](std::optional<int> &x) { return x; }, nb::arg("x") = nb::none());
     m.def("optional_unbound_type_with_nullopt_as_default", [](std::optional<int> &x) { return x; }, nb::arg("x") = std::nullopt);
+    m.def("optional_non_assignable", [](std::optional<NonAssignable> &x) { return x; });
 
     // ----- test43-test50 ------
     m.def("variant_copyable", [](std::variant<Copyable, int> &) {});

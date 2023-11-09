@@ -45,7 +45,7 @@ struct type_caster<std::optional<T>> {
             "type caster was registered to intercept this particular "
             "type, which is not allowed.");
 
-        value = caster.operator cast_t<T>();
+        value.emplace(caster.operator cast_t<T>());
 
         return true;
     }

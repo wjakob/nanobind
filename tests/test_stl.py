@@ -448,6 +448,10 @@ def test42_std_optional_unbound_type():
         )
 
 
+def test42a_std_optional_non_assignable():
+    assert t.optional_non_assignable(t.NonAssignable()).value == 5
+
+
 def test43_std_variant_copyable(clean):
     t.variant_copyable(t.Copyable())
     t.variant_copyable(5)

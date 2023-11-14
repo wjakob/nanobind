@@ -21,7 +21,7 @@ Version 1.9.0 (TBA)
 * Nothing yet
 
 Version 1.8.0 (Nov 2, 2023)
--------------------
+---------------------------
 
 * nanobind now considers two C++ ``std::type_info`` instances to be equal when
   their mangled names match. The previously used pointer comparison was fast
@@ -122,14 +122,14 @@ Bugfixes
 
 
 Version 1.6.2 (Oct 3, 2023)
--------------------
+---------------------------
 
 * Added a missing include file used by the new intrusive reference counting
   sample implementation from v1.6.0. (commit `31d115
   <https://github.com/wjakob/nanobind/commit/31d115fce310475fed0f539b9446cc41ba9ff4d4>`__).
 
 Version 1.6.1 (Oct 2, 2023)
--------------------
+---------------------------
 
 * Added missing namespace declaration to the :cpp:class:`ref` intrusive
   reference counting RAII helper class added in version 1.6.0. (commit `3ba352
@@ -137,7 +137,7 @@ Version 1.6.1 (Oct 2, 2023)
 
 
 Version 1.6.0 (Oct 2, 2023)
--------------------
+---------------------------
 
 New features
 ^^^^^^^^^^^^

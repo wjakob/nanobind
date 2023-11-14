@@ -76,7 +76,7 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
 
       Increases the reference count and returns a reference to the Python object.
 
-   .. cpp:function:: handle ref_ref() const
+   .. cpp:function:: handle dec_ref() const
 
       Decreases the reference count and returns a reference to the Python object.
 
@@ -1556,8 +1556,8 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
    noteworthy:
 
    - It *usually* doesn't make sense to specify a ``Nurse`` or ``Patient`` for an
-     argument or return value handled by a :ref:`type caster <type_caster>` (e.g.,
-     a STL vector handled via the include directive ``#include
+     argument or return value handled by a :ref:`type caster <type_casters>`
+     (e.g., a STL vector handled via the include directive ``#include
      <nanobind/stl/vector.h>``). That's because type casters copy-convert the
      Python object into an equivalent C++ object, whose lifetime is decoupled
      from the original Python object. However, the :cpp:class:`keep_alive

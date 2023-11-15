@@ -36,10 +36,11 @@ Version 1.8.0 (Nov 2, 2023)
   <https://github.com/wjakob/nanobind/pull/338>`__, commit `ba8c7f
   <https://github.com/wjakob/nanobind/commit/ba8c7fa55f2d0ad748cad1dd4af2b22979ebc46a>`__).
 
-* Added an importer for ``std::nullopt_t`` (PR `#350
+* Added a type caster for ``std::nullopt_t`` (PR `#350
   <https://github.com/wjakob/nanobind/pull/350>`__).
 
-* Added a C++ → Python type caster for ``Eigen::Ref<..>`` (PR `#334
+* Added the missing C++ → Python portion of the type caster for
+  ``Eigen::Ref<..>`` (PR `#334
   <https://github.com/wjakob/nanobind/pull/334>`__).
 
 * Minor fixes and improvements.

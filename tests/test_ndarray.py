@@ -632,3 +632,15 @@ def test34_complex_decompose():
 
     assert np.all(x1.real == np.array([1, 3, 5], dtype=np.float32))
     assert np.all(x1.imag == np.array([2, 4, 6], dtype=np.float32))
+
+@needs_numpy
+@pytest.mark.parametrize("variant", [1, 2])
+def test_uint32_complex_do_not_convert(variant):
+    if variant == 1:
+        arg = 1
+    else:
+        arg = np.uint32(1)
+    data = np.array([1.0 + 2.0j, 3.0 + 4.0j])
+    t.set_item(data, arg)
+    data2 = np.array([123, 3.0 + 4.0j])
+    assert np.all(data == data2)

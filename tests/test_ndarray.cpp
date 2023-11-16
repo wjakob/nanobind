@@ -296,4 +296,13 @@ NB_MODULE(test_ndarray_ext, m) {
         else
             return Ret(nb::ndarray<nb::numpy, int, nb::shape<>>(i_global, 0, nullptr));
     });
+
+    // issue #365
+    m.def("set_item", [](nb::ndarray<double, nb::ndim<1>, nb::c_contig> data, uint32_t) {
+        data(0) = 123;
+    });
+    m.def("set_item",
+          [](nb::ndarray<std::complex<double>, nb::ndim<1>, nb::c_contig> data, uint32_t) {
+            data(0) = 123;
+          });
 }

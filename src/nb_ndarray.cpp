@@ -424,9 +424,12 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
         }
     }
 
+    bool refused_conversion = t.dtype.code == (uint8_t) dlpack::dtype_code::Complex &&
+                              req->dtype.code != (uint8_t) dlpack::dtype_code::Complex;
+
     // Support implicit conversion of 'dtype' and order
     if (pass_device && pass_shape && (!pass_dtype || !pass_order) && convert &&
-        capsule.ptr() != o) {
+        capsule.ptr() != o && !refused_conversion) {
         PyTypeObject *tp = Py_TYPE(o);
         str module_name_o = borrow<str>(handle(tp).attr("__module__"));
         const char *module_name = module_name_o.c_str();

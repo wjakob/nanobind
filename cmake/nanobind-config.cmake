@@ -213,11 +213,11 @@ function (nanobind_build_library TARGET_NAME)
     find_dependency(tsl-robin-map)
     target_link_libraries(${TARGET_NAME} PRIVATE tsl::robin_map)
   else()
-    target_include_directories(${TARGET_NAME} PRIVATE
+    target_include_directories(${TARGET_NAME} SYSTEM PRIVATE
       ${NB_DIR}/ext/robin_map/include)
   endif()
 
-  target_include_directories(${TARGET_NAME} PUBLIC
+  target_include_directories(${TARGET_NAME} SYSTEM PUBLIC
     ${Python_INCLUDE_DIRS}
     ${NB_DIR}/include)
 

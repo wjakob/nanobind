@@ -47,6 +47,8 @@ struct Copyable {
 struct NonAssignable {
   int value = 5;
 
+  NonAssignable() = default;
+  NonAssignable(const NonAssignable &x) : value(x.value) { }
   NonAssignable &operator=(const NonAssignable &) = delete;
 };
 

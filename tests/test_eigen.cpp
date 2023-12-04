@@ -220,7 +220,7 @@ NB_MODULE(test_eigen_ext, m) {
     });
 
     struct Base {
-        ~Base() {};
+        virtual ~Base() = default;
         virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) { };
         virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd>) { };
     };

@@ -537,6 +537,8 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
     if (rc_value == 0) {
         check(false, "ndarray_dec_ref(): reference count became negative!");
     } else if (rc_value == 1) {
+        gil_scoped_acquire guard;
+
         Py_XDECREF(th->owner);
         Py_XDECREF(th->self);
         managed_dltensor *mt = th->ndarray;

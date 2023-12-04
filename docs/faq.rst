@@ -152,6 +152,13 @@ Leaks mainly occur for four reasons:
      if __name__ == '__main__':
          run()
 
+- **Exceptions**. Some exceptions such as ``AttributeError`` have been observed
+  to hold references, e.g. to the object which lacked the desired attribute. If
+  the last exception raised by the program references a nanobind instance, then
+  this may be reported as a leak since Python finalization appears not to
+  release the exception object. See `issue #376
+  <https://github.com/wjakob/nanobind/issues/376>` for a discussion.
+
 If you find leak warnings to be a nuisance, then you can disable them in the
 C++ binding code via the :cpp:func:`nb::set_leak_warnings() <set_leak_warnings>`
 function.

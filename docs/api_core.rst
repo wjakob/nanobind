@@ -892,6 +892,24 @@ Wrapper classes
       Return the pointer wrapped by the capsule.
 
 
+.. cpp:class:: bool_: public object
+
+   This wrapper class represents Python ``bool`` instances.
+
+   .. cpp:function:: int_(handle h)
+
+      Performs a boolean cast within Python. This is equivalent to the Python
+      expression ``bool(h)``.
+
+   .. cpp:function:: explicit bool_(bool value)
+
+      Convert an C++ boolean instance into a Python ``bool``.
+
+   .. cpp:function:: explicit operator bool() const
+
+      Extract the boolean value underlying this object.
+
+
 .. cpp:class:: int_: public object
 
    This wrapper class represents Python ``int`` instances. It can handle large

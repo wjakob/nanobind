@@ -350,7 +350,7 @@ class bool_ : public object {
         : object(value ? Py_True : Py_False, detail::borrow_t{}) { }
 
     explicit operator bool() const {
-        return (m_ptr != nullptr) && PyLong_AsLong(m_ptr) != 0;
+        return m_ptr == Py_True;
     }
 };
 

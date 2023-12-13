@@ -262,7 +262,7 @@ endfunction()
 
 function (nanobind_compile_options name)
   if (MSVC)
-    target_compile_options(${name} PRIVATE /bigobj /MP)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/bigobj /MP>)
   endif()
 endfunction()
 

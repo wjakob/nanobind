@@ -231,9 +231,9 @@ endfunction()
 
 function(nanobind_opt_size name)
   if (MSVC)
-    target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:/Os>)
+    target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:$<$<COMPILE_LANGUAGE:CXX>:/Os>>)
   else()
-    target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:-Os>)
+    target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:$<$<COMPILE_LANGUAGE:CXX>:-Os>>)
   endif()
 endfunction()
 

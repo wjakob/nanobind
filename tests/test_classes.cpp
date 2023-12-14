@@ -500,20 +500,20 @@ NB_MODULE(test_classes_ext, m) {
         Struct s;
         bool rv = nb::try_cast<Struct>(h, s);
         return std::make_pair(rv, std::move(s));
-    });
+    }, nb::arg().none());
 
     m.def("try_cast_2", [](nb::handle h) {
         Struct s;
         Struct &s2 = s;
         bool rv = nb::try_cast<Struct &>(h, s2);
         return std::make_pair(rv, std::move(s2));
-    });
+    }, nb::arg().none());
 
     m.def("try_cast_3", [](nb::handle h) {
         Struct *sp = nullptr;
         bool rv = nb::try_cast<Struct *>(h, sp);
         return std::make_pair(rv, sp);
-    }, nb::rv_policy::none);
+    }, nb::arg().none(), nb::rv_policy::none);
 
     m.def("try_cast_4", [](nb::handle h) {
         int i = 0;

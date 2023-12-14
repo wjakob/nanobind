@@ -684,16 +684,34 @@ def test39_try_cast(clean):
     assert_stats(default_constructed=1, move_constructed=2, copy_assigned=1, destructed=3)
     t.reset()
 
+    rv, s2 = t.try_cast_1(None)
+    assert rv is False and s2 is not s and s2.value() == 5
+    del s2
+    assert_stats(default_constructed=1, move_constructed=2, copy_assigned=0, destructed=3)
+    t.reset()
+
     rv, s2 = t.try_cast_2(s)
     assert rv is True and s2 is not s and s.value() == 123 and s2.value() == 123
     del s2
     assert_stats(default_constructed=1, move_constructed=2, copy_assigned=1, destructed=3)
     t.reset()
 
+    rv, s2 = t.try_cast_2(None)
+    assert rv is False and s2 is not s and s2.value() == 5
+    del s2
+    assert_stats(default_constructed=1, move_constructed=2, copy_assigned=0, destructed=3)
+    t.reset()
+
     rv, s2 = t.try_cast_3(s)
     assert rv is True and s2 is s and s.value() == 123
     del s2
     assert_stats()
+    t.reset()
+
+    rv, s2 = t.try_cast_3(None)
+    assert rv is True and s2 is None
+    del s2
+    assert_stats(default_constructed=0, move_constructed=0, copy_assigned=0, destructed=0)
     t.reset()
 
     rv, s2 = t.try_cast_2(1)

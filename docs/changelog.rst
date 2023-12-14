@@ -18,7 +18,12 @@ below inherit that of the preceding release.
 Version 1.9.0 (TBA)
 -------------------
 
-* Nothing yet
+* :cpp:func:`nb::try_cast() <try_cast>` no longer crashes the interpreter
+  when attempting to cast a Python ``None`` to a C++ type that was bound
+  using ``nb::class_<>``. Previously this would raise an exception from the
+  cast operator, which would result in a call to ``std::terminate()``
+  because ``try_cast()`` is declared ``noexcept``. (PR `#386
+  <https://github.com/wjakob/nanobind/pull/386>`__.)
 
 Version 1.8.0 (Nov 2, 2023)
 ---------------------------

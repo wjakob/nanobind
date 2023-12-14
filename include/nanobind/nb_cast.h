@@ -393,8 +393,12 @@ bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) no
     if (caster.from_python(value.derived().ptr(),
                            convert ? (uint8_t) detail::cast_flags::convert
                                    : (uint8_t) 0, nullptr)) {
-        out = caster.operator detail::cast_t<T>();
-        return true;
+        try {
+            out = caster.operator detail::cast_t<T>();
+            return true;
+        } catch (...) {
+            return false;
+        }
     }
 
     return false;

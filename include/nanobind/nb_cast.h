@@ -396,7 +396,7 @@ bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) no
         try {
             out = caster.operator detail::cast_t<T>();
             return true;
-        } catch (...) {
+        } catch (const builtin_exception&) {
             return false;
         }
     }

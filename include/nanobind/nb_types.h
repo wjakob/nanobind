@@ -260,6 +260,12 @@ template <typename T> NB_INLINE T borrow(handle h) {
     return { h, detail::borrow_t() };
 }
 
+template <typename T = object, typename T2,
+          std::enable_if_t<std::is_base_of_v<object, T2> && !std::is_lvalue_reference_v<T2>, int> = 0>
+NB_INLINE T borrow(T2 &&o) {
+    return { o.release(), detail::steal_t() };
+}
+
 template <typename T> NB_INLINE T steal(handle h) {
     return { h, detail::steal_t() };
 }

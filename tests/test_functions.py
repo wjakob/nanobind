@@ -348,3 +348,14 @@ def test39_del():
 
     with pytest.raises(KeyError):
         t.test_del_dict({})
+
+def test40_constant_values():
+    assert t.test_40(True) is True
+    assert t.test_40(False) is False
+    assert t.test_40(None) is None
+    assert t.test_40() is None
+    assert (
+        t.test_40.__doc__ == "test_40(arg: Literal[True], /) -> Literal[True]\n"
+        "test_40(arg: Literal[False], /) -> Literal[False]\n"
+        "test_40(arg: Optional[Literal[None]] = None) -> Literal[None]"
+    )

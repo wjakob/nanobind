@@ -593,7 +593,6 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
-inline object none() { return borrow(Py_None); }
 inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 
 inline iterator iter(handle h) {
@@ -648,12 +647,12 @@ public:
     false_() : object(Py_False, detail::borrow_t()) {}
 };
 
-class none_ : public object {
+class none : public object {
     static bool is_none(PyObject *obj) { return obj == Py_None; }
 
 public:
-    NB_OBJECT(none_, object, "Literal[None]", is_none)
-    none_() : object(Py_None, detail::borrow_t()) {}
+    NB_OBJECT(none, object, "Literal[None]", is_none)
+    none() : object(Py_None, detail::borrow_t()) {}
 };
 
 class not_implemented : public object {

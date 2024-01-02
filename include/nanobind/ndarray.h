@@ -497,7 +497,7 @@ public:
                                   byte_offset(indices...));
     }
 
-    template <typename... Extra> NB_INLINE auto view() {
+    template <typename... Extra> NB_INLINE auto view() const {
         using Info2 = typename ndarray<Args..., Extra...>::Info;
         using Scalar2 = typename Info2::scalar_type;
         using Shape2 = typename Info2::shape_type;

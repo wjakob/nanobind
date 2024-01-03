@@ -491,6 +491,8 @@
 -U _PyObject_CheckReadBuffer
 -U _PyObject_ClearWeakRefs
 -U _PyObject_CopyData
+-U _PyObject_DelAttr
+-U _PyObject_DelAttrString
 -U _PyObject_DelItem
 -U _PyObject_DelItemString
 -U _PyObject_Dir

@@ -240,6 +240,12 @@ static void internals_cleanup() {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: leaked %zu instances!\n",
                     internals->inst_c2p.size());
+            #if !defined(Py_LIMITED_API)
+                for (auto [k, v]: internals->inst_c2p) {
+                    PyTypeObject *tp = Py_TYPE(v);
+                    fprintf(stderr, " - leaked instance %p of type \"%s\"\n", k, tp->tp_name);
+                }
+            #endif
         }
         leak = true;
     }

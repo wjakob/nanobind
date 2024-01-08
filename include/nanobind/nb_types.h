@@ -7,6 +7,9 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+#include <chrono>
+#include "datetime.h"
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// Macro defining functions/constructors for nanobind::handle subclasses
@@ -435,6 +438,13 @@ class bytes : public object {
     const char *c_str() const { return PyBytes_AsString(m_ptr); }
 
     size_t size() const { return (size_t) PyBytes_Size(m_ptr); }
+};
+
+class datetime : public object {
+  NB_OBJECT_DEFAULT(datetime, object, "datetime", PyDateTime_Check)
+
+  explicit datetime(std::chrono::system_clock::time_point tp)
+    : object(detail::datetime_from_time_point(tp), detail::steal_t{}) { }
 };
 
 class tuple : public object {

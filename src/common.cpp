@@ -10,6 +10,8 @@
 #include <nanobind/nanobind.h>
 #include "nb_internals.h"
 
+#include <datetime.h>
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -562,6 +564,26 @@ PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
     if (!result)
         raise("nanobind::detail::bytes_from_cstr_and_size(): conversion error!");
     return result;
+}
+
+// ========================================================================
+
+PyObject *datetime_from_time_point(const std::chrono::system_clock::time_point &tp) {
+  const auto seconds_since_epoch = std::chrono::time_point_cast<std::chrono::seconds>(tp);
+  const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(tp - seconds_since_epoch);
+  const auto usec = std::chrono::duration_cast<
+    std::chrono::microseconds>(tp.time_since_epoch()) - seconds;
+
+  const auto tt = std::chrono::system_clock::to_time_t(tp);
+  const auto tm = *std::localtime(&tt);
+
+  PyObject *result = PyDateTime_FromDateAndTime(tm.tm_year, tm.tm_mon,
+                                                tm.tm_mday, tm.tm_hour,
+                                                tm.tm_min, tm.tm_sec,
+                                                usec.count());
+  if (!result)
+    raise("nanobind::detail::datetime_from_time_point(); conversion error!");
+  return result;
 }
 
 // ========================================================================

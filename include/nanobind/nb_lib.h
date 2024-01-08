@@ -7,6 +7,8 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+#include <chrono>
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 // Forward declarations for types in dlpack.h (1)
@@ -130,6 +132,10 @@ NB_CORE PyObject *bytes_from_cstr(const char *c);
 
 /// Convert an UTF8 C string + size into a Python byte string
 NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
+
+// ========================================================================
+
+NB_CORE PyObject *datetime_from_time_point(const std::chrono::system_clock::time_point &tp);
 
 // ========================================================================
 

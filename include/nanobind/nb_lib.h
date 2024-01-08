@@ -135,7 +135,8 @@ NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
 
 // ========================================================================
 
-NB_CORE PyObject *datetime_from_time_point(const std::chrono::system_clock::time_point &tp);
+NB_CORE PyObject *datetime_from_time_point(const std::chrono::system_clock::time_point
+                                           &tp);
 
 // ========================================================================
 

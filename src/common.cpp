@@ -570,8 +570,10 @@ PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
 
 PyObject *datetime_from_time_point(const std::chrono::system_clock::time_point &tp) {
   const auto ttepoch = tp.time_since_epoch();
-  const auto rem = ttepoch - std::chrono::duration_cast<std::chrono::seconds>(ttepoch);
-  const auto usec = std::chrono::duration_cast<std::chrono::microseconds>(rem);
+  const auto rem = ttepoch - std::chrono::duration_cast<
+    std::chrono::seconds>(ttepoch);
+  const auto usec = std::chrono::duration_cast<
+    std::chrono::microseconds>(rem);
 
   const auto tt = std::chrono::system_clock::to_time_t(tp);
   const auto tm = *std::localtime(&tt);

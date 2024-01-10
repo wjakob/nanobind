@@ -22,8 +22,8 @@ name and tested CMake version range. The third line line searches for Python >=
 
 .. code-block:: cmake
 
-    project(my_project) # Replace 'my_project' with the name of your project
     cmake_minimum_required(VERSION 3.15...3.27)
+    project(my_project) # Replace 'my_project' with the name of your project
     find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 
 Add the following lines below. They configure CMake to perform an optimized

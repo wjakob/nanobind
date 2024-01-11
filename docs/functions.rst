@@ -158,10 +158,30 @@ to reflect this fact.
    >>> my_ext.bark.__doc__
    'bark(dog: Optional[my_ext.Dog]) -> str'
 
+You may also specify a ``None`` default argument value, in which case the
+annotation can be omitted:
+
+.. code-block:: cpp
+
+   m.def("bark", &bark, nb::arg("dog") = nb::none());
+
 Note that passing values *by pointer* (including null pointers) is only
 supported for :ref:`bound <bindings>` types. :ref:`Type casters <type_casters>`
 and :ref:`wrappers <wrappers>` cannot be used in such cases and will produce
 compile-time errors.
+
+Alternatively, you can also use ``std::optional<T>`` to pass an optional
+argument *by value*. To use it, you must include the header file associated
+needed by its type caster:
+
+.. code-block:: cpp
+
+   #include <nanobind/stl/optional.h>
+
+   NB_MODULE(my_ext, m) {
+       m.def("bark", [](std::optional<Dog> d) { ... }, nb::arg("dog") = nb::none());
+   }
+
 
 .. _overload_resolution:
 

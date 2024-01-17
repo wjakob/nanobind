@@ -42,6 +42,13 @@ if (TARGET Eigen3::Eigen)
   target_link_libraries(test_eigen_ext PRIVATE Eigen3::Eigen)
 endif()
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+find_package (PyArrow)
+if (TARGET nanobind::pyarrow)
+  nanobind_add_module(test_pyarrow_ext test_pyarrow.cpp ${NB_EXTRA_ARGS})
+  target_link_libraries(test_pyarrow_ext PRIVATE nanobind::pyarrow)
+endif()
+
 add_library(
   inter_module
   SHARED
@@ -75,6 +82,7 @@ set(TEST_FILES
   test_stl_bind_vector.py
   test_chrono.py
   test_ndarray.py
+  test_pyarrow.py
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

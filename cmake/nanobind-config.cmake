@@ -150,7 +150,19 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/stl/vector.h
     ${NB_DIR}/include/nanobind/eigen/dense.h
     ${NB_DIR}/include/nanobind/eigen/sparse.h
-
+    ${NB_DIR}/include/nanobind/pyarrow/detail/array_caster.h
+    ${NB_DIR}/include/nanobind/pyarrow/detail/caster.h
+    ${NB_DIR}/include/nanobind/pyarrow/array_binary.h
+    ${NB_DIR}/include/nanobind/pyarrow/array_nested.h
+    ${NB_DIR}/include/nanobind/pyarrow/array_primitive.h
+    ${NB_DIR}/include/nanobind/pyarrow/buffer.h
+    ${NB_DIR}/include/nanobind/pyarrow/chunked_array.h
+    ${NB_DIR}/include/nanobind/pyarrow/datatype.h
+    ${NB_DIR}/include/nanobind/pyarrow/pyarrow_import.h
+    ${NB_DIR}/include/nanobind/pyarrow/scalar.h
+    ${NB_DIR}/include/nanobind/pyarrow/sparse_tensor.h
+    ${NB_DIR}/include/nanobind/pyarrow/tabular.h
+    ${NB_DIR}/include/nanobind/pyarrow/tensor.h
     ${NB_DIR}/src/buffer.h
     ${NB_DIR}/src/hash.h
     ${NB_DIR}/src/nb_internals.h

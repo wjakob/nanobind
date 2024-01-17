@@ -4,6 +4,7 @@
 #include <nanobind/pyarrow/pyarrow_import.h>
 #include <nanobind/pyarrow/array_primitive.h>
 #include <nanobind/pyarrow/array_binary.h>
+#include <nanobind/pyarrow/array_nested.h>
 #include <nanobind/pyarrow/chunked_array.h>
 #include <nanobind/pyarrow/tabular.h>
 #include <nanobind/pyarrow/scalar.h>

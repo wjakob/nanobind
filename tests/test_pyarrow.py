@@ -36,6 +36,11 @@ def test_string_array(dtype):
     assert func(arr).equals(arr)
     check_chunked_array(arr)
 
+def test_list_array():
+    values = pa.array([1, 2, 3, 4])
+    offsets = pa.array([0, 2, 4])
+    arr = pa.ListArray.from_arrays(offsets, values)
+    assert t.test_list_array(arr).equals(arr)
 
 @pytest.mark.parametrize("construct,func", [(pa.RecordBatch, t.test_record_batch), (pa.Table, t.test_table)])
 def test_tabular(construct, func):
@@ -167,6 +172,16 @@ def test_tensor():
     arr = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
     tensor = pa.Tensor.from_numpy(arr, dim_names=["dim1","dim2"])
     assert t.test_tensor(tensor).equals(tensor)
+
+def test_failure_01():
+    arr = pa.array([1., 2., 3.])
+    with pytest.raises(TypeError, match=r".*test_int64_array\(arg: pyarrow\.lib\.Int64Array, /\) -> pyarrow\.lib\.Int64Array\n\nInvoked with types: DoubleArray.*"):
+        t.test_int64_array(arr)
+
+def test_failure_02():
+    schema = pa.schema([('some_int', pa.int32()),('some_string', pa.string())])
+    with pytest.raises(TypeError, match=r".*test_double_array\(arg: pyarrow\.lib\.DoubleArray, /\) -> pyarrow\.lib\.DoubleArray\n\nInvoked with types: Schema.*"):
+        t.test_double_array(schema)
 
 if __name__ == "__main__":
     test_data_types(pa.date32())

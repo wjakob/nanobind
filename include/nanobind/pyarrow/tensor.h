@@ -33,19 +33,19 @@ template<>                                                                      
 struct type_caster<std::shared_ptr<arrow::name>> : pyarrow::pyarrow_tensor_caster<arrow::name> {};
 
 NB_REGISTER_PYARROW_TENSOR(Tensor)
-NB_REGISTER_PYARROW_TENSOR(HalfFloatArray)
-NB_REGISTER_PYARROW_TENSOR(FloatArray)
-NB_REGISTER_PYARROW_TENSOR(DoubleArray)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::HalfFloatArray>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::FloatArray>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::DoubleArray>)
 
-NB_REGISTER_PYARROW_TENSOR(Int8Array)
-NB_REGISTER_PYARROW_TENSOR(Int16Array)
-NB_REGISTER_PYARROW_TENSOR(Int32Array)
-NB_REGISTER_PYARROW_TENSOR(Int64Array)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::Int8Array>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::Int16Array>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::Int32Array>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::Int64Array>)
 
-NB_REGISTER_PYARROW_TENSOR(UInt8Array)
-NB_REGISTER_PYARROW_TENSOR(UInt16Array)
-NB_REGISTER_PYARROW_TENSOR(UInt32Array)
-NB_REGISTER_PYARROW_TENSOR(UInt64Array)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::UInt8Array>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::UInt16Array>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::UInt32Array>)
+NB_REGISTER_PYARROW_TENSOR(NumericTensor<arrow::UInt64Array>)
 
 #undef NB_REGISTER_PYARROW_TENSOR
 

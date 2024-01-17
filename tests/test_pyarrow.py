@@ -57,53 +57,50 @@ def test_schema():
 
 
 @pytest.mark.parametrize(['value', 'ty', 'callback'], [
-    (False, None, pa.BooleanScalar),
-    (True, None, pa.BooleanScalar),
-    (1, None, pa.Int64Scalar),
-    (-1, None, pa.Int64Scalar),
-    (1, pa.int8(), pa.Int8Scalar),
-    (1, pa.uint8(), pa.UInt8Scalar),
-    (1, pa.int16(), pa.Int16Scalar),
-    (1, pa.uint16(), pa.UInt16Scalar),
-    (1, pa.int32(), pa.Int32Scalar),
-    (1, pa.uint32(), pa.UInt32Scalar),
-    (1, pa.int64(), pa.Int64Scalar),
-    (1, pa.uint64(), pa.UInt64Scalar),
-    (1.0, None, pa.DoubleScalar),
-    (np.float16(1.0), pa.float16(), pa.HalfFloatScalar),
-    (1.0, pa.float32(), pa.FloatScalar),
+    (False, None, "boolean"),
+    (True, None, "boolean"),
+    (1, None, "int64"),
+    (-1, None, "int64"),
+    (1, pa.int8(), "int8"),
+    (1, pa.uint8(), "uint8"),
+    (1, pa.int16(), "int16"),
+    (1, pa.uint16(), "uint16"),
+    (1, pa.int32(), "int32"),
+    (1, pa.uint32(), "uint32"),
+    (1, pa.int64(), "int64"),
+    (1, pa.uint64(), "uint64"),
+    (1.0, None, "double"),
+    (np.float16(1.0), pa.float16(), "halffloat"),
+    (1.0, pa.float32(), "float"),
     (decimal.Decimal("1.123"), None, "decimal128"),
     (decimal.Decimal("1.1234567890123456789012345678901234567890"),
      None, "decimal256"),
-    ("string", None, pa.StringScalar),
-    (b"bytes", None, pa.BinaryScalar),
-    ("largestring", pa.large_string(), pa.LargeStringScalar),
-    (b"largebytes", pa.large_binary(), pa.LargeBinaryScalar),
-    (b"abc", pa.binary(3), pa.FixedSizeBinaryScalar),
-    ([1, 2, 3], None, pa.ListScalar),
-    ([1, 2, 3, 4], pa.large_list(pa.int8()), pa.LargeListScalar),
-    ([1, 2, 3, 4, 5], pa.list_(pa.int8(), 5), pa.FixedSizeListScalar),
-    (datetime.date.today(), None, pa.Date32Scalar),
-    (datetime.date.today(), pa.date64(), pa.Date64Scalar),
-    (datetime.datetime.now(), None, pa.TimestampScalar),
+    ("string", None, "string"),
+    (b"bytes", None, "binary"),
+    ("largestring", pa.large_string(), "largestring"),
+    (b"largebytes", pa.large_binary(), "largebinary"),
+    (b"abc", pa.binary(3), "fixedsizebinary"),
+    ([1, 2, 3], None, "list"),
+    ([1, 2, 3, 4], pa.large_list(pa.int8()), "largelist"),
+    ([1, 2, 3, 4, 5], pa.list_(pa.int8(), 5),"fixedsizelist"),
+    (datetime.date.today(), None, "date32"),
+    (datetime.date.today(), pa.date64(), "date64"),
+    (datetime.datetime.now(), None, "timestamp"),
     (datetime.datetime.now().time().replace(microsecond=0), pa.time32('s'),
-     pa.Time32Scalar),
-    (datetime.datetime.now().time(), None, pa.Time64Scalar),
-    (datetime.timedelta(days=1), None, pa.DurationScalar),
+     "time32"),
+    (datetime.datetime.now().time(), None, "time64"),
+    (datetime.timedelta(days=1), None, "duration"),
     (pa.MonthDayNano([1, -1, -10100]), None,
-     pa.MonthDayNanoIntervalScalar),
-    ({'a': 1, 'b': [1, 2]}, None, pa.StructScalar),
-    ([('a', 1), ('b', 2)], pa.map_(pa.string(), pa.int8()), pa.MapScalar),
+     "monthdaynanointerval"),
+    ({'a': 1, 'b': [1, 2]}, None, "struct"),
+    ([('a', 1), ('b', 2)], pa.map_(pa.string(), pa.int8()), "map"),
 ])
 def test_scalar(value, ty, callback):
     s = pa.scalar(value, type=ty)
     s.validate()
     s.validate(full=True)
-    if isinstance(callback, str):
-        func = getattr(t, f"test_{callback}_scalar")
-        assert func(s).equals(s)
-    else:
-        assert isinstance(s, callback)
+    func = getattr(t, f"test_{callback}_scalar")
+    assert func(s).equals(s)
 
 @pytest.mark.parametrize("data_type", [
     pa.null(),
@@ -166,8 +163,14 @@ def test_buffer():
     assert t.test_mutable_buffer(buffer).equals(buffer)
     assert t.test_resizable_buffer(buffer).equals(buffer)
 
+def test_tensor():
+    arr = np.array([[2, 2, 4], [4, 5, 100]], np.int32)
+    tensor = pa.Tensor.from_numpy(arr, dim_names=["dim1","dim2"])
+    assert t.test_tensor(tensor).equals(tensor)
+
 if __name__ == "__main__":
     test_data_types(pa.date32())
+    test_scalar(False, None, pa.BooleanScalar)
     test_scalar(decimal.Decimal("1.123"), None, "decimal128")
     test_numeric_array(np.float64)
     test_tabular(pa.Table, t.test_table)

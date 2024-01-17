@@ -159,10 +159,12 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/pyarrow/chunked_array.h
     ${NB_DIR}/include/nanobind/pyarrow/datatype.h
     ${NB_DIR}/include/nanobind/pyarrow/pyarrow_import.h
+    ${NB_DIR}/include/nanobind/pyarrow/record_batch.h
     ${NB_DIR}/include/nanobind/pyarrow/scalar.h
     ${NB_DIR}/include/nanobind/pyarrow/sparse_tensor.h
-    ${NB_DIR}/include/nanobind/pyarrow/tabular.h
+    ${NB_DIR}/include/nanobind/pyarrow/table.h
     ${NB_DIR}/include/nanobind/pyarrow/tensor.h
+    ${NB_DIR}/include/nanobind/pyarrow/type.h
     ${NB_DIR}/src/buffer.h
     ${NB_DIR}/src/hash.h
     ${NB_DIR}/src/nb_internals.h

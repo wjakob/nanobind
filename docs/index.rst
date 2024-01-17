@@ -122,6 +122,7 @@ The nanobind logo was designed by `AndoTwin Studio
    classes
    exceptions
    ndarray_index
+   pyarrow
    packaging
    utilities
 

@@ -6,7 +6,9 @@
 #include <nanobind/pyarrow/array_binary.h>
 #include <nanobind/pyarrow/array_nested.h>
 #include <nanobind/pyarrow/chunked_array.h>
-#include <nanobind/pyarrow/tabular.h>
+#include <nanobind/pyarrow/table.h>
+#include <nanobind/pyarrow/record_batch.h>
+#include <nanobind/pyarrow/type.h>
 #include <nanobind/pyarrow/scalar.h>
 #include <nanobind/pyarrow/datatype.h>
 #include <nanobind/pyarrow/buffer.h>

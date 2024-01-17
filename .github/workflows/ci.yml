@@ -53,6 +53,11 @@ jobs:
       run: |
         python -m pip install numpy scipy
 
+    - name: Install pyarrow
+      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      run: |
+        python -m pip install pyarrow
+
     - name: Configure
       run: >
         cmake -S . -B build -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"

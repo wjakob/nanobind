@@ -104,7 +104,7 @@ if (MSVC)
     add_compile_options(/W4)
   endif()
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-  add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
+  add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-local-typedefs)
 endif()
 
 # ---------------------------------------------------------------------------

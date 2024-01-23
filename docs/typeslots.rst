@@ -47,8 +47,8 @@ builtin features:
 .. code-block:: cpp
 
    nb::class_<MyClass>(m, "MyClass")
-       .def("__mul__",
-            [](const MyClass &a, const MyClass &b) { return a + b; },
+       .def("__add__",
+            [](const MyClass &a, const MyClass &b) { return a * b; },
             nb::is_operator())
 
 The next section introduces a more interesting use case.

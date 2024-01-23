@@ -76,7 +76,7 @@ The remainder of this section goes through each of these options.
 Return value policies
 ---------------------
 
-nanobind provides a several *return value policy* annotations that can be
+nanobind provides several *return value policy* annotations that can be
 passed to :func:`module_::def`, :func:`class_::def`, and :func:`cpp_function`.
 The default policy is :cpp:enumerator:`rv_policy::automatic`, which is usually
 a reasonable default (but not in this case!).
@@ -167,8 +167,8 @@ options below. In particular, the following policies are available:
 
   This return value policy is *dangerous* and should be used cautiously.
   Undefined behavior will ensue when the C++ side deletes the instance while it
-  is still being used by Python. If need to use this policy, combine it with a
-  :cpp:struct:`keep_alive` function binding annotation to manage the lifetime.
+  is still being used by Python. If you need to use this policy, combine it with
+  a :cpp:struct:`keep_alive` function binding annotation to manage the lifetime.
   Or use the simple and safe :cpp:enumerator:`reference_internal
   <rv_policy::reference_internal>` alternative described next.
 
@@ -190,7 +190,7 @@ options below. In particular, the following policies are available:
   field without making a copy, and without transferring ownership to Python.
 
   Furthermore, it ensures that the instance owning the field (implicit
-  ``this``/``self`` argument) cannot be not garbage collected while an object
+  ``this``/``self`` argument) cannot be garbage collected while an object
   representing the field is alive.
 
   The example below uses this policy to implement a *getter* that permits

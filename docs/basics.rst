@@ -195,7 +195,7 @@ function arguments:
 Without it, you would have to change every occurrence of the pattern ``"..."_a``
 to the more verbose ``nb::arg("...")``.
 
-The function binding declaration includes several changes. It common to pile
+The function binding declaration includes several changes. It is common to pile
 on a few attributes and modifiers in :cpp:func:`.def(...) <module_::def()>`
 binding declarations, which can be specified in any order.
 

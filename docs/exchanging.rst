@@ -84,7 +84,8 @@ directive to pull in the right header file. Complex nested types (e.g.
 vectors of hash tables of strings) work automatically by combining type
 casters recursively.
 
-The following table lists the currently available type casters:
+The following table lists the currently available type casters along with links
+to external projects that provide further casters:
 
 .. list-table::
   :widths: 42 48
@@ -140,6 +141,10 @@ The following table lists the currently available type casters:
     - ``#include <nanobind/eigen/dense.h>``
   * - ``Eigen::SparseMatrix<..>``
     - ``#include <nanobind/eigen/sparse.h>``
+  * - Apache Arrow types
+    -  `https://github.com/maximiliank/nanobind_pyarrow <https://github.com/maximiliank/nanobind_pyarrow>`__
+  * - ...
+    - Please reach out if you have additions to this list.
 
 
 **Con**: Every transition between the Python and C++ side will generally require a

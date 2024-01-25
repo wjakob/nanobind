@@ -16,6 +16,8 @@ somewhat opinionated, however. For this reason, nanobind also provides an
 alternative :ref:`low level <lowlevel-cmake>` interface that decomposes it into
 smaller steps.
 
+The last part of this section explains how a Git submodule dependency can be
+:ref:`avoided <submodule_deps>` in exchange for system-provided versions.
 
 .. _highlevel-cmake:
 
@@ -351,3 +353,14 @@ The various commands are described below:
 
       nanobind_musl_static_libcpp(my_target)
 
+.. _submodule_deps:
+
+Submodule dependencies
+----------------------
+
+nanobind includes a dependency (a fast hash map named ``tsl::robin_map``) as a
+Git submodule. If you prefer to use another (e.g., system-provided) version of
+this dependency, set the ``NB_USE_SUBMODULE_DEPS`` variable before importing
+nanobind into CMake. In this case, nanobind's CMake scripts will internally
+invoke ``find_dependency(tsl-robin-map)`` to locate the associated header
+files.

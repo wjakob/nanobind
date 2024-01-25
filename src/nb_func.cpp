@@ -100,6 +100,9 @@ void nb_func_dealloc(PyObject *self) {
                 }
             }
 
+            if (f->flags & (uint32_t) func_flags::has_doc)
+                free((char *) f->doc);
+
             free((char *) f->name);
             free(f->args);
             free((char *) f->descr);
@@ -295,8 +298,12 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     func_data *fc = nb_func_data(func) + to_copy;
     memcpy(fc, f, sizeof(func_data_prelim<0>));
-    if (has_doc && fc->doc[0] == '\n')
-        fc->doc++;
+    if (has_doc) {
+        if (fc->doc[0] == '\n') {
+            fc->doc++;
+        }
+        fc->doc = strdup_check(fc->doc);
+    }
 
     if (is_constructor)
         fc->flags |= (uint32_t) func_flags::is_constructor;

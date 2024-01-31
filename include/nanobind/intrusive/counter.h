@@ -212,10 +212,10 @@ public:
     /// Decrease the object's reference count, return ``true`` if it should be deallocated
     bool dec_ref() noexcept { return m_ref_count.dec_ref(); }
 
-    /// Return the Python object associated with this instance (or NULL)
+    /// Set the Python object associated with this instance
     void set_self_py(PyObject *self) noexcept { m_ref_count.set_self_py(self); }
 
-    /// Set the Python object associated with this instance
+    /// Return the Python object associated with this instance (or NULL)
     PyObject *self_py() const noexcept { return m_ref_count.self_py(); }
 
     /// Virtual destructor

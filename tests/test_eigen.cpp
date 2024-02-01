@@ -1,3 +1,4 @@
+#include <nanobind/stl/complex.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 #include <nanobind/trampoline.h>
@@ -165,6 +166,7 @@ NB_MODULE(test_eigen_ext, m) {
         assert(!m.isCompressed());
         return m.markAsRValue();
     });
+    m.def("sparse_complex", []() -> Eigen::SparseMatrix<std::complex<double>> { return {}; });
 
     /// issue #166
     using Matrix1d = Eigen::Matrix<double,1,1>;

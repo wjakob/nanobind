@@ -131,9 +131,9 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
         StorageIndexNDArray inner_indices(src->innerIndexPtr(), 1, data_shape, owner);
 
         try {
-            return matrix_type(make_tuple(
+            return matrix_type(nanobind::make_tuple(
                                    std::move(data), std::move(inner_indices), std::move(outer_indices)),
-                               make_tuple(rows, cols))
+                               nanobind::make_tuple(rows, cols))
                 .release();
         } catch (python_error &e) {
             e.restore();

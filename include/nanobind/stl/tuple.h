@@ -38,9 +38,8 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     }
 
     template <size_t... Is>
-    bool from_python_impl(handle src, uint8_t flags,
-                                    cleanup_list *cleanup,
-                                    std::index_sequence<Is...>) noexcept {
+    bool from_python_impl(handle src, uint8_t flags, cleanup_list *cleanup,
+                          std::index_sequence<Is...>) noexcept {
         (void) src; (void) flags; (void) cleanup;
 
         PyObject *temp; // always initialized by the following line
@@ -70,8 +69,8 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
 
     template <typename T, size_t... Is>
     static handle from_cpp_impl(T &&value, rv_policy policy,
-                                          cleanup_list *cleanup,
-                                          std::index_sequence<Is...>) noexcept {
+                                cleanup_list *cleanup,
+                                std::index_sequence<Is...>) noexcept {
         (void) value; (void) policy; (void) cleanup;
         object o[N1];
 

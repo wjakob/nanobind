@@ -70,7 +70,7 @@ template <> struct type_caster<std::nullopt_t> {
         return none().release();
     }
 
-    NB_TYPE_CASTER(std::nullopt_t, const_name("None"));
+    NB_TYPE_CASTER(std::nullopt_t, const_name("None"))
 };
 
 NAMESPACE_END(detail)

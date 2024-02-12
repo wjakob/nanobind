@@ -423,17 +423,7 @@ T cast(const detail::api<Derived> &value, bool convert = true) {
                                         : (uint8_t) 0, nullptr))
             detail::raise_cast_error();
 
-        // GCC misses that from_python will return or ensure orderly initialization
-        #if defined(__GNUC__) && !defined(__clang__)
-          #pragma GCC diagnostic push
-          #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-        #endif
-
         return caster.operator detail::cast_t<T>();
-
-        #if defined(__GNUC__) && !defined(__clang__)
-          #pragma GCC diagnostic pop
-        #endif
     }
 }
 

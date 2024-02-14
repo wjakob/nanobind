@@ -104,12 +104,13 @@ bool intrusive_counter::dec_ref() const noexcept {
                         "intrusive_counter::dec_ref(%p): reference count "
                         "underflow!", (void *) this);
                 abort();
-            } else if (v == 3) {
-                return true;
             }
 
             if (!NB_ATOMIC_CMPXCHG(&m_state, &v, v - 2))
                 continue;
+
+            if (v == 1)
+                return true;
         } else {
             intrusive_dec_ref_py((PyObject *) v);
         }

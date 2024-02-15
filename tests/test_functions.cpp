@@ -143,10 +143,10 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     // Test implicit conversion of various types
-    m.def("test_11_sl",  [](signed long x)      { return x; });
-    m.def("test_11_ul",  [](unsigned long x)        { return x; });
-    m.def("test_11_sll", [](signed long long x) { return x; });
-    m.def("test_11_ull", [](unsigned long long x)   { return x; });
+    m.def("test_11_sl",  [](signed long x)        { return x; });
+    m.def("test_11_ul",  [](unsigned long x)      { return x; });
+    m.def("test_11_sll", [](signed long long x)   { return x; });
+    m.def("test_11_ull", [](unsigned long long x) { return x; });
 
     // Test string caster
     m.def("test_12", [](const char *c) { return nb::str(c); });

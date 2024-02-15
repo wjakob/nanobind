@@ -32,7 +32,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
-static void nb_func_render_signature(const func_data *f) noexcept;
+static uint32_t nb_func_render_signature(const func_data *f,
+                                         bool nb_signature_mode = false) noexcept;
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
     size_t size = (size_t) Py_SIZE(self);
@@ -860,7 +861,8 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 
 
 /// Render the function signature of a single function
-static void nb_func_render_signature(const func_data *f) noexcept {
+static uint32_t nb_func_render_signature(const func_data *f,
+                                         bool nb_signature_mode) noexcept {
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
                has_args       = f->flags & (uint32_t) func_flags::has_args,
                has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
@@ -868,7 +870,7 @@ static void nb_func_render_signature(const func_data *f) noexcept {
 
     const std::type_info **descr_type = f->descr_types;
 
-    uint32_t arg_index = 0;
+    uint32_t arg_index = 0, n_default_args = 0;
     buf.put_dstr(f->name);
 
     for (const char *pc = f->descr; *pc != '\0'; ++pc) {
@@ -927,26 +929,31 @@ static void nb_func_render_signature(const func_data *f) noexcept {
 
                     if (f->args[arg_index].value) {
                         PyObject *o = f->args[arg_index].value;
-                        PyObject *str = PyObject_Str(o);
-                        bool is_str = PyUnicode_Check(o);
-
-                        if (str) {
-                            Py_ssize_t size = 0;
-                            const char *cstr =
-                                PyUnicode_AsUTF8AndSize(str, &size);
-                            if (!cstr) {
-                                PyErr_Clear();
-                            } else {
-                                buf.put(" = ");
-                                if (is_str)
-                                    buf.put('\'');
-                                buf.put(cstr, (size_t) size);
-                                if (is_str)
-                                    buf.put('\'');
-                            }
-                            Py_DECREF(str);
+                        if (nb_signature_mode) {
+                            buf.put(" = \\");
+                            buf.put_uint32(n_default_args++);
                         } else {
-                            PyErr_Clear();
+                            PyObject *str = PyObject_Str(o);
+                            bool is_str = PyUnicode_Check(o);
+
+                            if (str) {
+                                Py_ssize_t size = 0;
+                                const char *cstr =
+                                    PyUnicode_AsUTF8AndSize(str, &size);
+                                if (!cstr) {
+                                    PyErr_Clear();
+                                } else {
+                                    buf.put(" = ");
+                                    if (is_str)
+                                        buf.put('\'');
+                                    buf.put(cstr, (size_t) size);
+                                    if (is_str)
+                                        buf.put('\'');
+                                }
+                                Py_DECREF(str);
+                            } else {
+                                PyErr_Clear();
+                            }
                         }
                     }
                 }
@@ -971,9 +978,13 @@ static void nb_func_render_signature(const func_data *f) noexcept {
                         buf.put('.');
                         buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
                     } else {
+                        if (nb_signature_mode)
+                            buf.put('"');
                         char *name = type_name(*descr_type);
                         buf.put_dstr(name);
                         free(name);
+                        if (nb_signature_mode)
+                            buf.put('"');
                     }
                 }
 
@@ -989,6 +1000,8 @@ static void nb_func_render_signature(const func_data *f) noexcept {
     check(arg_index == f->nargs && !*descr_type,
           "nanobind::detail::nb_func_render_signature(%s): arguments inconsistent.",
           f->name);
+
+    return n_default_args;
 }
 
 static PyObject *nb_func_get_name(PyObject *self) {
@@ -1027,6 +1040,50 @@ static PyObject *nb_func_get_module(PyObject *self) {
         Py_INCREF(Py_None);
         return Py_None;
     }
+}
+
+PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
+    func_data *f = nb_func_data(self);
+    uint32_t count = (uint32_t) Py_SIZE(self);
+    PyObject *result = PyTuple_New(count);
+
+    for (uint32_t i = 0; i < count; ++i) {
+        const func_data *fi = f + i;
+        PyObject *docstr;
+
+        if (fi->flags & (uint32_t) func_flags::has_doc && fi->doc[0] != '\0') {
+            docstr = PyUnicode_FromString(fi->doc);
+        } else {
+            docstr = Py_None;
+            Py_INCREF(docstr);
+        }
+
+        buf.clear();
+        uint32_t n_default_args = nb_func_render_signature(fi, true),
+                 pos = 2;
+
+        PyObject *item = PyTuple_New(2 + n_default_args);
+        NB_TUPLE_SET_ITEM(item, 0, PyUnicode_FromString(buf.get()));
+        NB_TUPLE_SET_ITEM(item, 1, docstr);
+
+        if (fi->flags & (uint32_t) func_flags::has_args) {
+            for (uint32_t j = 0; j < fi->nargs; ++j) {
+                PyObject *value = fi->args[j].value;
+                if (!value)
+                    continue;
+                Py_INCREF(value);
+                NB_TUPLE_SET_ITEM(item, pos, value);
+                pos++;
+            }
+        }
+
+        check(pos == n_default_args + 2,
+              "__nb_signature__: default argument counting inconsistency!");
+
+        NB_TUPLE_SET_ITEM(result, (Py_ssize_t) i, item);
+    }
+
+    return result;
 }
 
 PyObject *nb_func_get_doc(PyObject *self, void *) {

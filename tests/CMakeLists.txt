@@ -1,5 +1,5 @@
 # If leaks are found, abort() during interpreter shutdown to catch this in the CI
-add_definitions(-DNB_ABORT_ON_LEAK=1)
+add_definitions(-DNB_ABORT_ON_LEAK)
 
 if (NB_TEST_STABLE_ABI)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} STABLE_ABI)

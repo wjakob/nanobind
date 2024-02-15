@@ -259,8 +259,10 @@ static void internals_cleanup() {
     }
 
     // Only report function/type leaks if actual nanobind instances were leaked
+#if !defined(NB_ABORT_ON_LEAK)
     if (!leak)
         print_leak_warnings = false;
+#endif
 
     if (!internals->type_c2p_slow.empty() ||
         !internals->type_c2p_fast.empty()) {
@@ -306,7 +308,7 @@ static void internals_cleanup() {
                             "counting issue in the binding code.\n");
         }
 
-        #if NB_ABORT_ON_LEAK == 1
+        #if defined(NB_ABORT_ON_LEAK)
             abort(); // Extra-strict behavior for the CI server
         #endif
     }

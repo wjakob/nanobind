@@ -264,11 +264,13 @@ def test30_noexcept():
     assert t.test_31(123) == 123
     assert t.test_32(123) == 123
 
-@pytest.mark.parametrize("func", [ t.identity_i8,  t.identity_u8,
-                                   t.identity_i16, t.identity_u16,
-                                   t.identity_i32, t.identity_u32,
-                                   t.identity_i64, t.identity_u64 ])
-def test31_range(func):
+@pytest.mark.parametrize("func_name", [ 'identity_i8',  'identity_u8',
+                                        'identity_i16', 'identity_u16',
+                                        'identity_i32', 'identity_u32',
+                                        'identity_i64', 'identity_u64' ])
+def test31_range(func_name):
+    func = getattr(t, func_name)
+
     values = [
         0, -1, 1, 2**7, 2**7-1, 2**8, 2**8-1, 2**15, 2**15-1, 2**16, 2**16-1,
         2**29, 2**29-1, 2**30, 2**30-1, 2**31, 2**31-1, 2**32, 2**32-1, 2**63,

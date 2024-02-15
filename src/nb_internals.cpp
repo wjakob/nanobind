@@ -81,6 +81,7 @@ NAMESPACE_BEGIN(detail)
 
 extern PyObject *nb_func_getattro(PyObject *, PyObject *);
 extern PyObject *nb_func_get_doc(PyObject *, void *);
+extern PyObject *nb_func_get_nb_signature(PyObject *, void *);
 extern PyObject *nb_bound_method_getattro(PyObject *, PyObject *);
 extern int nb_func_traverse(PyObject *, visitproc, void *);
 extern int nb_func_clear(PyObject *);
@@ -117,6 +118,7 @@ static PyMemberDef nb_func_members[] = {
 
 static PyGetSetDef nb_func_getset[] = {
     { "__doc__", nb_func_get_doc, nullptr, nullptr, nullptr },
+    { "__nb_signature__", nb_func_get_nb_signature, nullptr, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 

@@ -322,6 +322,7 @@ private:
 };
 
 extern char *strdup_check(const char *);
+extern void *malloc_check(size_t size);
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

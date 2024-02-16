@@ -371,6 +371,21 @@ static void nb_type_dealloc(PyObject *o) {
 
     free((char *) t->name);
 
+
+    if ((t->flags & (uint32_t) type_flags::is_enum)) {
+        PyTypeObject *tp = (PyTypeObject *) o;
+        #if defined(Py_LIMITED_API)
+            PyGetSetDef *getset = (PyGetSetDef *) PyType_GetSlot(tp, Py_tp_getset);
+        #else
+            PyGetSetDef *getset = tp->tp_getset;
+        #endif
+        if (getset && getset[0].doc) {
+            // nb_enum with a custom top-level docstring
+            free((char *) getset[0].doc);
+            free(getset);
+        }
+    }
+
     NB_SLOT(PyType_Type, tp_dealloc)(o);
 }
 

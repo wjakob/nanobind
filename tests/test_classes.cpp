@@ -144,7 +144,7 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<PairStruct>(m, "PairStruct")
         .def(nb::init<>())
-        .def_rw("s1", &PairStruct::s1)
+        .def_rw("s1", &PairStruct::s1, "A documented property")
         .def_rw("s2", &PairStruct::s2);
 
     m.def("stats", []{
@@ -175,7 +175,7 @@ NB_MODULE(test_classes_ext, m) {
 
     // test06_big
 
-    nb::class_<Big>(m, "Big")
+    nb::class_<Big>(m, "Big", "A class\nwith a multi-line\ndocstring..")
         .def(nb::init<>());
 
     nb::class_<BigAligned>(m, "BigAligned")
@@ -239,8 +239,8 @@ NB_MODULE(test_classes_ext, m) {
     struct Foo { };
 
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
-        .def(nb::init<>())
-        .def("name", &Animal::name)
+        .def(nb::init<>(), "A constructor")
+        .def("name", &Animal::name, "A method")
         .def("what", &Animal::what);
 
     nb::class_<Dog, Animal, PyDog>(m, "Dog")
@@ -341,8 +341,8 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<MyClass> mcls(m, "MyClass");
     nb::class_<MyClass::NestedClass> ncls(mcls, "NestedClass");
     mcls.def(nb::init<>());
-    mcls.def("f", []{});
-    ncls.def("f", []{});
+    mcls.def("f", [](MyClass&){});
+    ncls.def("f", [](MyClass::NestedClass&){});
 
     // test18_static_properties
     nb::class_<StaticProperties>(m, "StaticProperties")

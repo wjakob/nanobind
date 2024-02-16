@@ -15,7 +15,9 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Set, typename Key> struct set_caster {
-    NB_TYPE_CASTER(Set, const_name(NB_TYPING_SET "[") + make_caster<Key>::Name + const_name("]"))
+    NB_TYPE_CASTER(Set, io_name("AbstractSet", NB_TYPING_SET) +
+                            const_name("[") + make_caster<Key>::Name +
+                            const_name("]"))
 
     using Caster = make_caster<Key>;
 

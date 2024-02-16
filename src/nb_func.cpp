@@ -869,6 +869,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 
     const std::type_info **descr_type = f->descr_types;
+    bool rv = false;
 
     uint32_t arg_index = 0, n_default_args = 0;
     buf.put_dstr(f->name);
@@ -877,6 +878,25 @@ static uint32_t nb_func_render_signature(const func_data *f,
         char c = *pc;
 
         switch (c) {
+            case '@':
+                // Handle types that differ depending on whether they appear
+                // in an argument or a return value position
+                if (!rv) {
+                    pc++;
+                    while (*pc && *pc != ',')
+                        buf.put(*pc++);
+                    while (*pc && *pc != '@')
+                        pc++;
+                } else {
+                    while (*pc && *pc != ',')
+                        pc++;
+                    if (*pc == ',')
+                        pc++;
+                    while (*pc && *pc != '@')
+                        buf.put(*pc++);
+                }
+                break;
+
             case '{':
                 {
                     const char *arg_name = has_args ? f->args[arg_index].name : nullptr;
@@ -990,6 +1010,13 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
                 descr_type++;
                 break;
+
+            case '-':
+                if (pc[1] == '>')
+                    rv = true;
+                buf.put(c);
+                break;
+
 
             default:
                 buf.put(c);

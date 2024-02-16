@@ -39,7 +39,7 @@ static PyType_Slot color_slots[] = {
 };
 
 NB_MODULE(test_enum_ext, m) {
-    nb::enum_<Enum>(m, "Enum")
+    nb::enum_<Enum>(m, "Enum", "enum-level docstring")
         .value("A", Enum::A, "Value A")
         .value("B", Enum::B, "Value B")
         .value("C", Enum::C, "Value C")

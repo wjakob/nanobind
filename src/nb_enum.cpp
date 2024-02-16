@@ -295,14 +295,27 @@ Py_hash_t nb_enum_hash(PyObject *o) {
 
 void nb_enum_prepare(const type_init_data *td,
                      PyType_Slot *&t, size_t max_slots) noexcept {
-    /* 22 is the number of slot assignments below. Update it if you add more.
+    /* 23 is the number of slot assignments below. Update it if you add more.
        These built-in slots are added before any user-defined ones. */
-    check(max_slots >= 22,
+    check(max_slots >= 23,
           "nanobind::detail::nb_enum_prepare(\"%s\"): ran out of "
           "type slots!", td->name);
 
     const enum_init_data *ed = static_cast<const enum_init_data *>(td);
     auto int_fn = ed->is_signed ? nb_enum_int_signed : nb_enum_int_unsigned;
+
+    // HACK: Don't let the nb_type constructor set 'tp_doc', which interferes
+    // with the '__doc__' getset_descriptor used to expose per-entry
+    // docstrings. Instead, stash the docstring in the __doc__ attribute of
+    // the descriptor itself. nb_type_dealloc frees the allocations created here.
+    const PyGetSetDef *getset = nb_enum_getset;
+    if (t[-1].slot == Py_tp_doc) {
+        PyGetSetDef *d = (PyGetSetDef *) malloc_check(sizeof(nb_enum_getset));
+        memcpy(d, nb_enum_getset, sizeof(nb_enum_getset));
+        d[0].doc = strdup_check((const char *) t[-1].pfunc);
+        getset = d;
+        --t;
+    }
 
     *t++ = { Py_tp_new, (void *) nb_enum_new };
     *t++ = { Py_tp_init, (void *) nb_enum_init };
@@ -310,7 +323,7 @@ void nb_enum_prepare(const type_init_data *td,
     *t++ = { Py_tp_richcompare, (void *) nb_enum_richcompare };
     *t++ = { Py_nb_int, (void *) int_fn };
     *t++ = { Py_nb_index, (void *) int_fn };
-    *t++ = { Py_tp_getset, (void *) nb_enum_getset };
+    *t++ = { Py_tp_getset, (void *) getset };
     *t++ = { Py_tp_traverse, (void *) nb_enum_traverse };
     *t++ = { Py_tp_clear, (void *) nb_enum_clear };
     *t++ = { Py_tp_hash, (void *) nb_enum_hash };

@@ -1,5 +1,6 @@
 import test_enum_ext as t
 import pytest
+import platform
 
 def test01_unsigned_enum():
     assert repr(t.Enum.A) == 'test_enum_ext.Enum.A'
@@ -8,6 +9,11 @@ def test01_unsigned_enum():
     assert t.Enum.A.__name__ == 'A'
     assert t.Enum.B.__name__ == 'B'
     assert t.Enum.C.__name__ == 'C'
+
+    # The following fails on PyPy: https://github.com/pypy/pypy/issues/4898
+    if platform.python_implementation() != 'PyPy':
+        assert t.Enum.__doc__.__doc__ == 'enum-level docstring'
+
     assert t.Enum.A.__doc__ == 'Value A'
     assert t.Enum.B.__doc__ == 'Value B'
     assert t.Enum.C.__doc__ == 'Value C'

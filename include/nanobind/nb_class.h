@@ -53,6 +53,10 @@ enum class type_flags : uint32_t {
     is_weak_referenceable    = (1 << 13),
 
     // Five more flag bits available (12 through 18) without needing
+    /// Indicate that a type refers to an enumeration
+    is_enum                  = (1 << 14),
+
+    // Four more flag bits available (15 through 18) without needing
     // a larger reorganization
 };
 
@@ -609,6 +613,7 @@ public:
                    (uint32_t) detail::type_flags::is_copy_constructible |
                    (uint32_t) detail::type_flags::is_move_constructible |
                    (uint32_t) detail::type_flags::is_destructible |
+                   (uint32_t) detail::type_flags::is_enum |
                    (uint32_t) detail::type_flags::is_final);
         d.align = (uint8_t) alignof(T);
         d.size = (uint32_t) sizeof(T);

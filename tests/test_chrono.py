@@ -264,13 +264,15 @@ def test_chrono_misc():
 
 
 @pytest.mark.parametrize(
-    "test_type,roundtrip",
+    "test_type,roundtrip_name",
     [
-        (datetime.timedelta, m.test_chrono7),
-        (datetime.datetime, m.test_nano_timepoint_roundtrip),
+        (datetime.timedelta, 'test_chrono7'),
+        (datetime.datetime, 'test_nano_timepoint_roundtrip'),
     ]
 )
-def test_chrono_invalid(test_type, roundtrip):
+def test_chrono_invalid(test_type, roundtrip_name):
+    roundtrip = getattr(m, roundtrip_name)
+
     # Can't pass None or an integer where a duration or timepoint is expected
     with pytest.raises(TypeError, match="incompatible function arguments"):
         roundtrip(None)

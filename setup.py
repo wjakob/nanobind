@@ -48,7 +48,7 @@ with TemporaryDirectory() as temp_dir:
                         os.path.join(temp_dir, name),
                         dirs_exist_ok=True)
 
-    for fname in ['__init__.py', '__main__.py']:
+    for fname in ['__init__.py', '__main__.py', 'stubgen.py']:
         shutil.move(os.path.join(temp_dir, 'src', fname),
                     os.path.join(temp_dir, fname))
 

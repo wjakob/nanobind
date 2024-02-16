@@ -557,62 +557,37 @@ def test51_map_return_copyable_value():
 
 def test52_map_movable_in_value():
     t.map_movable_in_value(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.map_movable_in_value.__doc__ == (
-            "map_movable_in_value(x: Dict[str, test_stl_ext.Movable]) -> None"
-        )
-    else:
-        assert t.map_movable_in_value.__doc__ == (
-            "map_movable_in_value(x: dict[str, test_stl_ext.Movable]) -> None"
-        )
+    assert t.map_movable_in_value.__doc__ == (
+        "map_movable_in_value(x: Mapping[str, test_stl_ext.Movable]) -> None"
+    )
 
 
 def test53_map_copyable_in_value():
     t.map_copyable_in_value(dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.map_copyable_in_value.__doc__ == (
-            "map_copyable_in_value(x: Dict[str, test_stl_ext.Copyable]) -> None"
-        )
-    else:
-        assert t.map_copyable_in_value.__doc__ == (
-            "map_copyable_in_value(x: dict[str, test_stl_ext.Copyable]) -> None"
-        )
+    assert t.map_copyable_in_value.__doc__ == (
+        "map_copyable_in_value(x: Mapping[str, test_stl_ext.Copyable]) -> None"
+    )
 
 
 def test54_map_movable_in_lvalue_ref():
     t.map_movable_in_lvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.map_movable_in_lvalue_ref.__doc__ == (
-            "map_movable_in_lvalue_ref(x: Dict[str, test_stl_ext.Movable]) -> None"
-        )
-    else:
-        assert t.map_movable_in_lvalue_ref.__doc__ == (
-            "map_movable_in_lvalue_ref(x: dict[str, test_stl_ext.Movable]) -> None"
-        )
+    assert t.map_movable_in_lvalue_ref.__doc__ == (
+        "map_movable_in_lvalue_ref(x: Mapping[str, test_stl_ext.Movable]) -> None"
+    )
 
 
 def test55_map_movable_in_rvalue_ref():
     t.map_movable_in_rvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.map_movable_in_rvalue_ref.__doc__ == (
-            "map_movable_in_rvalue_ref(x: Dict[str, test_stl_ext.Movable]) -> None"
-        )
-    else:
-        assert t.map_movable_in_rvalue_ref.__doc__ == (
-            "map_movable_in_rvalue_ref(x: dict[str, test_stl_ext.Movable]) -> None"
-        )
+    assert t.map_movable_in_rvalue_ref.__doc__ == (
+        "map_movable_in_rvalue_ref(x: Mapping[str, test_stl_ext.Movable]) -> None"
+    )
 
 
 def test56_map_movable_in_ptr():
     t.map_movable_in_ptr(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.map_movable_in_ptr.__doc__ == (
-            "map_movable_in_ptr(x: Dict[str, test_stl_ext.Movable]) -> None"
-        )
-    else:
-        assert t.map_movable_in_ptr.__doc__ == (
-            "map_movable_in_ptr(x: dict[str, test_stl_ext.Movable]) -> None"
-        )
+    assert t.map_movable_in_ptr.__doc__ == (
+        "map_movable_in_ptr(x: Mapping[str, test_stl_ext.Movable]) -> None"
+    )
 
 
 def test57_map_return_readonly_value():
@@ -658,39 +633,21 @@ def test60_set_return_value():
 def test61_set_in_value():
     t.set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     t.unordered_set_in_value(set([chr(ord("a") + i) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.set_in_value.__doc__ == (
-            "set_in_value(x: Set[str]) -> None")
-        assert t.unordered_set_in_value.__doc__ == (
-            "unordered_set_in_value(x: Set[str]) -> None")
-    else:
-        assert t.set_in_value.__doc__ == (
-            "set_in_value(x: set[str]) -> None")
-        assert t.unordered_set_in_value.__doc__ == (
-            "unordered_set_in_value(x: set[str]) -> None")
+    assert t.set_in_value.__doc__ == (
+        "set_in_value(x: AbstractSet[str]) -> None")
+    assert t.unordered_set_in_value.__doc__ == (
+        "unordered_set_in_value(x: AbstractSet[str]) -> None")
 
 
 def test62_set_in_lvalue_ref():
     t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.set_in_lvalue_ref.__doc__ == (
-            "set_in_lvalue_ref(x: Set[str]) -> None"
-        )
-    else:
-        assert t.set_in_lvalue_ref.__doc__ == (
-            "set_in_lvalue_ref(x: set[str]) -> None"
-        )
+    assert t.set_in_lvalue_ref.__doc__ == (
+        "set_in_lvalue_ref(x: AbstractSet[str]) -> None")
 
 def test63_set_in_rvalue_ref():
     t.set_in_rvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
-    if sys.version_info < (3, 9):
-        assert t.set_in_rvalue_ref.__doc__ == (
-            "set_in_rvalue_ref(x: Set[str]) -> None"
-        )
-    else:
-        assert t.set_in_rvalue_ref.__doc__ == (
-            "set_in_rvalue_ref(x: set[str]) -> None"
-        )
+    assert t.set_in_rvalue_ref.__doc__ == (
+        "set_in_rvalue_ref(x: AbstractSet[str]) -> None")
 
 
 def test64_set_in_failure():

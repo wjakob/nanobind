@@ -96,6 +96,15 @@ class StubGen:
             r"\b(numpy.ndarray|ndarray|torch.Tensor)\[([^\]]*)\]"
         )
 
+        # Precompile a regular expression used to extract a few other types
+        self.misc_re = re.compile(r"\b(pathlib|os).(Path|PathLike)\b")
+
+        # Regular expression to strip away the module name
+        if module:
+            self.module_re = re.compile(f'\\b{self.module.__name__}\\.')
+        else:
+            self.module_re = None
+
     def write(self, s):
         """Append raw characters to the output"""
         self.output += s
@@ -218,6 +227,13 @@ class StubGen:
         else:
             is_enum = self.is_enum(tp)
             self.write_ln(f"class {tp.__name__}:")
+            if tp.__bases__ != (object,):
+                self.output = self.output[:-2] + '('
+                for i, base in enumerate(tp.__bases__):
+                    if i:
+                        self.write(', ')
+                    self.write(self.type_str(base))
+                self.write('):\n')
             output_len = len(self.output)
             self.depth += 1
             docstr = tp.__doc__
@@ -258,9 +274,14 @@ class StubGen:
 
     def replace_standard_types(self, s):
         """Detect standard types (e.g. typing.Optional) within a type signature"""
-        s = re.sub(r"\bcapsule\b", "CapsuleType", s)
-        s = self.typing_re.sub(lambda m: self.import_object("typing", m.group(0)), s)
-        s = self.types_re.sub(lambda m: self.import_object("types", m.group(0)), s)
+        if self.module_re:
+            s = self.module_re.sub('', s)
+
+        # tuple[] is not a valid type annotation
+        s = s.replace('tuple[]', 'tuple[()]').replace('Tuple[]', 'Tuple[()]')
+        s = self.typing_re.sub(lambda m: self.import_object("typing", m.group(1)), s)
+        s = self.types_re.sub(lambda m: self.import_object("types", m.group(1)), s)
+        s = self.misc_re.sub(lambda m: self.import_object(m.group(1), m.group(2)), s)
 
         def replace_ndarray(m):
             s = m.group(2)
@@ -318,7 +339,10 @@ class StubGen:
         tp = type(value)
         tp_mod, tp_name = tp.__module__, tp.__name__
 
-        if len(self.stack) == 1 and inspect.ismodule(value):
+        if  inspect.ismodule(value):
+            if len(self.stack) != 1:
+                # Do not recurse into submodules
+                return
             for name, child in inspect.getmembers(value):
                 self.put(child, module=value.__name__, name=name, parent=value)
         elif tp_mod == "nanobind":
@@ -359,25 +383,15 @@ class StubGen:
         """
         if module == "builtins":
             return name
-        key = (module, name)
-        if key not in self.imports:
-            cleanup = True
+        if module not in self.imports:
+            self.imports[module] =  { }
+        if name not in self.imports[module]:
+            as_name = name
             if self.module is not None:
-                while hasattr(self.module, name):
-                    # Ooops, a conflict was found
-                    value = getattr(self.module, name)
-
-                    # Check if it is a real one
-                    try:
-                        if getattr(importlib.import_module(module), name) is value:
-                            cleanup = False
-                            break
-                    except: # noqa: E722
-                        pass
-                    name = "_" + name
-
-            self.imports[key] = (name, cleanup)
-        return self.imports[key][0]
+                while hasattr(self.module, as_name):
+                    as_name = "_" + as_name
+            self.imports[module][name] = as_name
+        return self.imports[module][name]
 
     def expr_str(self, e):
         """Attempt to convert a value into a Python expression to generate that value"""
@@ -390,24 +404,37 @@ class StubGen:
         elif issubclass(tp, type):
             return self.type_str(e)
         elif issubclass(tp, str):
-            e = repr(e)
-            if len(e) < self.max_expr_length:
-                return e
+            s = repr(e)
+            if len(s) < self.max_expr_length:
+                return s
         elif issubclass(tp, list) or issubclass(tp, tuple):
             e = [self.expr_str(v) for v in e]
             if None in e:
                 return None
             if issubclass(tp, list):
-                e = "[" + " ,".join(e) + "]"
+                s = "[" + ", ".join(e) + "]"
             else:
-                e = "(" + " ,".join(e) + ")"
-            if len(e) < self.max_expr_length:
-                return e
+                s = "(" + ", ".join(e) + ")"
+            if len(s) < self.max_expr_length:
+                return s
+        elif issubclass(tp, dict):
+            e = [(self.expr_str(k), self.expr_str(v)) for k, v in e.items()]
+            s = '{'
+            for i, (k, v) in enumerate(e):
+                if k == None or v == None:
+                    return None
+                s += k + ' : ' + v
+                if i + 1 < len(e):
+                    s += ', '
+            s += '}'
+            if len(s) < self.max_expr_length:
+                return s
+            pass
         return None
 
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
-        if tp.__module__ == "builtins":
+        if tp.__module__ == "builtins" or (self.module is not None and tp.__module__ == self.module.__name__):
             return tp.__name__
         else:
             return tp.__module__ + "." + tp.__qualname__
@@ -415,18 +442,25 @@ class StubGen:
     def get(self):
         """Generate the final stub output"""
         s = ""
-        for (module, name), (alias, _) in sorted(self.imports.items()):
-            s += f"from {module} import {name}"
-            if alias != name:
-                s += f" as {alias}"
-            s += "\n"
-        if s != "":
+        for module in sorted(self.imports):
+            si = ''
+            imports = self.imports[module]
+            for i, (k, v) in enumerate(imports.items()):
+                si += k if k == v else f"{k} as {v}"
+                if i + 1 < len(imports):
+                    si += ",";
+                    if len(si) > 50:
+                        si += '\n    '
+                    else:
+                        si += ' '
+            if '\n' in si:
+                s += f"from {module} import (\n    {si}\n)\n"
+            else:
+                s += f"from {module} import {si}\n"
+        if s:
             s += "\n"
         s += self.output
-        for kv, (alias, cleanup) in self.imports.items():
-            if cleanup:
-                s += f"del {alias}\n"
-        return s.rstrip()
+        return s.rstrip() + '\n'
 
 
 def parse_options(args):

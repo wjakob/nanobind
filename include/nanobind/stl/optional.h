@@ -22,9 +22,7 @@ template <typename T>
 struct type_caster<std::optional<T>> {
     using Caster = make_caster<T>;
 
-    NB_TYPE_CASTER(std::optional<T>, const_name("Optional[") +
-                                         concat(Caster::Name) +
-                                         const_name("]"))
+    NB_TYPE_CASTER(std::optional<T>, optional_name(Caster::Name))
 
     type_caster() : value(std::nullopt) { }
 

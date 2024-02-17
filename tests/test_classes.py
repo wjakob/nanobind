@@ -528,8 +528,12 @@ def test25_none_arg():
     assert t.none_0.__doc__ == 'none_0(arg: test_classes_ext.Struct, /) -> bool'
     assert t.none_1.__doc__ == 'none_1(arg: test_classes_ext.Struct) -> bool'
     assert t.none_2.__doc__ == 'none_2(arg: test_classes_ext.Struct) -> bool'
-    assert t.none_3.__doc__ == 'none_3(arg: Optional[test_classes_ext.Struct]) -> bool'
-    assert t.none_4.__doc__ == 'none_4(arg: Optional[test_classes_ext.Struct]) -> bool'
+    if sys.version_info < (3, 10):
+        assert t.none_3.__doc__ == 'none_3(arg: Optional[test_classes_ext.Struct]) -> bool'
+        assert t.none_4.__doc__ == 'none_4(arg: Optional[test_classes_ext.Struct]) -> bool'
+    else:
+        assert t.none_3.__doc__ == 'none_3(arg: test_classes_ext.Struct | None) -> bool'
+        assert t.none_4.__doc__ == 'none_4(arg: test_classes_ext.Struct | None) -> bool'
 
 
 def test26_is_final():

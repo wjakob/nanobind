@@ -1,6 +1,5 @@
 from numpy.typing import ArrayLike
-from typing import Annotated
-from typing import overload
+from typing import Annotated, overload
 
 class Cls:
     def __init__(self) -> None: ...
@@ -125,7 +124,3 @@ def set_item(arg0: Annotated[ArrayLike, dict(dtype='float64', shape=(None), orde
 
 @overload
 def set_item(arg0: Annotated[ArrayLike, dict(dtype='complex128', shape=(None), order='C')], arg1: int, /) -> None: ...
-
-del Annotated
-del ArrayLike
-del overload

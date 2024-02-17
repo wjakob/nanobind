@@ -143,7 +143,7 @@ template <> struct type_caster<void_type> {
 template <> struct type_caster<void> {
     template <typename T_> using Cast = void *;
     using Value = void*;
-    static constexpr auto Name = const_name("capsule");
+    static constexpr auto Name = const_name("CapsuleType");
     explicit operator void *() { return value; }
     Value value;
 

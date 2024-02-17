@@ -269,7 +269,7 @@ NB_MODULE(test_classes_ext, m) {
     // test11_large_pointers
     nb::class_<Foo>(m, "Foo");
     m.def("i2p", [](uintptr_t x) { return (Foo *) x; }, nb::rv_policy::reference);
-    m.def("p2i", [](Foo *x) { return (uintptr_t) x; });
+    m.def("p2i", [](Foo *x) { return (uintptr_t) x; }, "x"_a = nullptr);
 
     // test12_implicitly_convertible
     struct A { int a; };
@@ -565,4 +565,14 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<StructWithWeakrefsAndDynamicAttrs, Struct>(m, "StructWithWeakrefsAndDynamicAttrs",
                nb::is_weak_referenceable(), nb::dynamic_attr())
         .def(nb::init<int>());
+
+    nb::module_ sm = m.def_submodule("submodule");
+    sm.def("f", [] { });
+
+    /// Tested by the stub generator
+    nb::dict d;
+    nb::list l;
+    l.append(123);
+    d["a"] = nb::make_tuple("b", l);
+    m.attr("pytree") = d;
 }

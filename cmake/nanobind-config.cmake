@@ -358,3 +358,52 @@ function(nanobind_add_module name)
 
   nanobind_set_visibility(${name})
 endfunction()
+
+function (nanobind_add_stub name)
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE" "MODULE;OUTPUT;MARKER_FILE" "PYTHON_PATH;DEPENDS")
+
+  if (EXISTS ${NB_DIR}/src/stubgen.py)
+    set(NB_STUBGEN ${NB_DIR}/src/stubgen.py)
+  elseif (EXISTS ${NB_DIR}/stubgen.py)
+    set(NB_STUBGEN ${NB_DIR}/stubgen.py)
+  else()
+    message(FATAL_ERROR "nanobind_add_stub(): could not locate 'stubgen.py'!")
+  endif()
+  if (NOT ARG_VERBOSE)
+    list(APPEND NB_STUBGEN_ARGS -q)
+  else()
+    set(NB_STUBGEN_EXTRA USES_TERMINAL)
+  endif()
+
+  foreach (TMP IN LISTS ARG_PYTHON_PATH)
+    list(APPEND NB_STUBGEN_ARGS -i "${TMP}")
+  endforeach()
+
+  if (ARG_MARKER_FILE)
+    list(APPEND NB_STUBGEN_ARGS -M "${ARG_MARKER_FILE}")
+    list(APPEND NB_STUBGEN_OUTPUTS "${ARG_MARKER_FILE}")
+  endif()
+
+  if (NOT ARG_MODULE)
+    message(FATAL_ERROR "nanobind_add_stub(): a 'MODULE' argument must be specified!")
+  else()
+    list(APPEND NB_STUBGEN_ARGS -m "${ARG_MODULE}")
+  endif()
+
+  if (NOT ARG_OUTPUT)
+    message(FATAL_ERROR "nanobind_add_stub(): an 'OUTPUT' argument must be specified!")
+  else()
+    list(APPEND NB_STUBGEN_ARGS -o "${ARG_OUTPUT}")
+    list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
+  endif()
+
+  add_custom_command(
+    OUTPUT ${NB_STUBGEN_OUTPUTS}
+    COMMAND "${Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    DEPENDS ${ARG_DEPENDS}
+    ${NB_STUBGEN_EXTRA}
+  )
+
+  add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})
+endfunction()

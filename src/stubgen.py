@@ -45,7 +45,6 @@ import inspect
 import textwrap
 import importlib
 import types
-import io
 import re
 
 
@@ -83,7 +82,7 @@ class StubGen:
 
         # Precompile a regular expression used to extract types from 'typing.*'
         self.typing_re = re.compile(
-            r"\b(Callable|Union|Optional|Tuple|Set|Dict|List|Sequence|Mapping)(?=\[)"
+            r"\b(Callable|Union|Optional|Tuple|Set|Dict|List|Sequence|Mapping|AbstractSet)(?=\[)"
         )
 
         # Precompile a regular expression used to extract types from 'types.*'
@@ -372,7 +371,7 @@ class StubGen:
                         if getattr(importlib.import_module(module), name) is value:
                             cleanup = False
                             break
-                    except:
+                    except: # noqa: E722
                         pass
                     name = "_" + name
 
@@ -382,7 +381,7 @@ class StubGen:
     def expr_str(self, e):
         """Attempt to convert a value into a Python expression to generate that value"""
         tp = type(e)
-        for t in [bool, int, float, types.NoneType, types.EllipsisType]:
+        for t in [bool, int, float, type(None), type(...)]:
             if issubclass(tp, t):
                 return repr(e)
         if self.is_enum(type(e)):
@@ -450,8 +449,8 @@ def parse_options(args):
         "--output-dir",
         metavar="PATH",
         dest="output_dir",
-        default="out",
-        help="write generated stubs to the specified directory [default: %(default)s]",
+        default=None,
+        help="write generated stubs to the specified directory",
     )
 
     parser.add_argument(
@@ -472,6 +471,15 @@ def parse_options(args):
         dest="modules",
         default=[],
         help="generate a stub for the specified module (can specify multiple times)",
+    )
+
+    parser.add_argument(
+        "-M",
+        "--marker",
+        metavar="PATH",
+        dest="marker",
+        default=None,
+        help="generate a marker file (usually named 'py.typed')",
     )
 
     parser.add_argument(
@@ -524,7 +532,7 @@ def main(args = None):
     for i in opt.imports:
         sys.path.insert(0, i)
 
-    if not opt.output_file:
+    if opt.output_dir:
         os.makedirs(opt.output_dir, exist_ok=True)
 
     for i, mod in enumerate(opt.modules):
@@ -543,20 +551,32 @@ def main(args = None):
 
         if not opt.quiet:
             print("  - analyzing ..")
+
         sg.put(mod_imported)
 
+        file = Path(mod_imported.__file__)
+
         if opt.output_file:
-            filename = opt.output_file
+            file = Path(opt.output_file)
         else:
-            filename = os.path.join(
-                opt.output_dir, Path(mod_imported.__file__).stem + ".pyi"
-            )
+            ext_loader = importlib.machinery.ExtensionFileLoader
+            if isinstance(mod_imported.__loader__, ext_loader):
+                file = file.with_name(mod_imported.__name__)
+            file = file.with_suffix('.pyi')
+
+            if opt.output_dir:
+                file = Path(opt.output_dir, file.name)
 
         if not opt.quiet:
-            print('  - writing stub "%s" ..' % filename)
+            print('  - writing stub "%s" ..' % str(file))
 
-        with open(filename, "w") as f:
+        with open(file, "w") as f:
             f.write(sg.get())
+
+    if opt.marker:
+        if not opt.quiet:
+            print('  - writing marker file "%s" ..' % opt.marker)
+        Path(opt.marker).touch()
 
 
 if __name__ == "__main__":

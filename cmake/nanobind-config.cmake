@@ -360,12 +360,12 @@ function(nanobind_add_module name)
 endfunction()
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS" "MODULE;OUTPUT;MARKER_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;COMPONENT" "MODULE;OUTPUT;MARKER_FILE" "PYTHON_PATH;DEPENDS")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
-    set(NB_STUBGEN ${NB_DIR}/src/stubgen.py)
+    set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
   elseif (EXISTS ${NB_DIR}/stubgen.py)
-    set(NB_STUBGEN ${NB_DIR}/stubgen.py)
+    set(NB_STUBGEN "${NB_DIR}/stubgen.py")
   else()
     message(FATAL_ERROR "nanobind_add_stub(): could not locate 'stubgen.py'!")
   endif()
@@ -406,13 +406,22 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
   endif()
 
-  add_custom_command(
-    OUTPUT ${NB_STUBGEN_OUTPUTS}
-    COMMAND "${Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    DEPENDS ${ARG_DEPENDS}
-    ${NB_STUBGEN_EXTRA}
-  )
+  set(NB_STUBGEN_CMD "${Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
 
-  add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})
+  if (NOT ARG_INSTALL_TIME)
+    add_custom_command(
+      OUTPUT ${NB_STUBGEN_OUTPUTS}
+      COMMAND ${NB_STUBGEN_CMD}
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      DEPENDS ${ARG_DEPENDS}
+      ${NB_STUBGEN_EXTRA}
+    )
+    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})
+  else()
+    set(NG_STUBGEN_EXTRA "")
+    if (ARG_COMPONENT)
+      set(NG_STUBGEN_EXTRA "COMPONENT ${ARG_COMPONENT}")
+    endif()
+    install(CODE "set(CMD \"${NB_STUBGEN_CMD}\")\nexecute_process(\n COMMAND \$\{CMD\}\n WORKING_DIRECTORY \"${CMAKE_INSTALL_PREFIX}\"\n)" ${NB_STUBGEN_EXTRA})
+  endif()
 endfunction()

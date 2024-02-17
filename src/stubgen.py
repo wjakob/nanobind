@@ -2,8 +2,8 @@
 """
 stubgen.py: nanobind stub generation tool
 
-This file provides both an API (``nanobind.StubGen``) and a command line
-interface to generate stubs for nanobind extensions.
+This file provides both an API (``nanobind.stubgen.StubGen``) and a command
+line interface to generate stubs for nanobind extensions.
 
 To generate stubs on the command line, invoke the stub generator with a module
 name, which will place the newly generated ``.pyi`` file directly into the
@@ -13,10 +13,10 @@ module folder.
 python -m nanobind.stubgen <module name>
 ```
 
-Specify ``-o <filename>`` to redirect the output somewhere else in case this is
-not desired.
+Specify ``-o <filename>`` or ``-O <path>`` to redirect the output somewhere
+else in case this is not desired.
 
-To programatically generate stubs, construct an instance of the ``StubGen``
+To programmatically generate stubs, construct an instance of the ``StubGen``
 class and repeatedly call ``.put()`` to register modules or contents within the
 modules (specific methods, classes, etc.). Afterwards, the ``.get()`` method
 returns a string containing the stub declarations.
@@ -38,7 +38,7 @@ on an internal ``__nb_signature__`` property that nanobind functions expose
 specifically to simplify stub generation.
 
 (Note that for now, the StubGen API is considered experimental and not subject
- to the semantic versioning policy used by the the nanobind project.)
+ to the semantic versioning policy used by the nanobind project.)
 """
 
 import inspect
@@ -65,7 +65,8 @@ class StubGen:
         # Should docstrings be included in the generated stub?
         self.include_docstrings = include_docstrings
 
-        # Should private members (starting with '_') be included?
+        # Should private members (that start or end with 
+        # a single underscore) be included?
         self.include_private = include_private
 
         # Current depth / indentation level
@@ -432,6 +433,7 @@ def parse_options(args):
     import argparse
 
     parser = argparse.ArgumentParser(
+        prog='python -m nanobind.stubgen',
         description="Generate stubs for nanobind-based extensions."
     )
 
@@ -476,7 +478,7 @@ def parse_options(args):
     parser.add_argument(
         "-M",
         "--marker",
-        metavar="PATH",
+        metavar="FILE",
         dest="marker",
         default=None,
         help="generate a marker file (usually named 'py.typed')",
@@ -488,7 +490,7 @@ def parse_options(args):
         dest="include_private",
         default=False,
         action="store_true",
-        help="include private members (with leading or trailing underscore)",
+        help="include private members (with single leading or trailing underscore)",
     )
 
     parser.add_argument(

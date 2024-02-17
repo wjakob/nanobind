@@ -251,7 +251,7 @@ NB_MODULE(test_stl_ext, m) {
     nb::class_<FuncWrapper>(m, "FuncWrapper", nb::type_slots(slots))
         .def(nb::init<>())
         .def_rw("f", &FuncWrapper::f)
-        .def_ro_static("alive", &FuncWrapper::alive);
+        .def_ro_static("alive", &FuncWrapper::alive, "static read-only property");
 
     // ----- test35 ------
     m.def("identity_string", [](std::string& x) { return x; });

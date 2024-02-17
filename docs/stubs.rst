@@ -65,11 +65,15 @@ the following subsections.
 CMake interface
 ---------------
 
-In CMake, you can use the :cmake:command:`nanobind_add_stub` command to
-generate individual ``.pyi`` files. The command requires a target name (e.g.,
-``my_ext_stub``) that must be unique but has no other significance. Once all
-dependencies (``DEPENDS`` parameter) are met, it will invoke ``stubgen`` to turn a
-single module (``MODULE`` parameter) into a stub file (``OUTPUT`` parameter).
+nanobind's CMake interface provides the :cmake:command:`nanobind_add_stub`
+command for stub generation at build or install time. It generates a single
+stub at a time--more complex cases involving large numbers of stubs are easily
+handled using standard CMake constructs (e.g. a ``foreach()`` loop).
+
+The command requires a target name (e.g., ``my_ext_stub``) that must be unique
+but has no other significance. Once all dependencies (``DEPENDS`` parameter)
+are met, it will invoke ``stubgen`` to turn a single module (``MODULE``
+parameter) into a stub file (``OUTPUT`` parameter).
 
 For this to work, the module must be importable. ``stubgen`` will add all paths
 specified as part of the ``PYTHON_PATH`` parameter and then execute ``import
@@ -78,24 +82,70 @@ my_ext``, raising an error if this fails.
 .. code-block:: cmake
 
    nanobind_add_stub(
-       my_ext_stub
-       MODULE my_ext
-       OUTPUT my_ext.pyi
-       PYTHON_PATH $<TARGET_FILE_DIR:my_ext>
-       DEPENDS my_ext
+     my_ext_stub
+     MODULE my_ext
+     OUTPUT my_ext.pyi
+     PYTHON_PATH $<TARGET_FILE_DIR:my_ext>
+     DEPENDS my_ext
    )
 
-Typed extensions identify themselves via the presence of an empty file named
-``py.typed`` in each module directory. The :cmake:command:`nanobind_add_stub`
-command can optionally generate this file as well.
+Typed extensions normally identify themselves via the presence of an empty file
+named ``py.typed`` in each module directory. :cmake:command:`nanobind_add_stub`
+can optionally generate this file as well.
 
 .. code-block:: cmake
 
    nanobind_add_stub(
-       ...
-       MARKER_FILE py.typed
-       ...
+     ...
+     MARKER_FILE py.typed
+     ...
    )
+
+CMake tracks the generated outputs in its dependency graph. The combination of
+compiled extension module, stub, and marker file can subsequently be installed
+by subsequent ``install()`` directives.
+
+.. code-block:: cmake
+
+  install(TARGETS my_ext DESTINATION ".")
+  install(FILES py.typed my_ext.pyi DESTINATION ".")
+
+In certain situations, it may be tricky to import an extension that is built
+but not yet installed to its final destination. To handle such cases, specify
+the ``INSTALL_TIME`` parameter to :cmake:command:`nanobind_add_stub` to delay
+stub generation to the installation phase.
+
+.. code-block:: cmake
+
+    install(TARGETS my_ext DESTINATION ".")
+
+    nanobind_add_stub(
+      my_ext_stub
+      INSTALL_TIME
+      MODULE my_ext
+      OUTPUT my_ext.pyi
+      PYTHON_PATH "."
+    )
+
+This requires several changes:
+
+1. ``PYTHON_PATH`` must be adjusted so that it references a location relative
+   to ``CMAKE_INSTALL_PREFIX`` from which the installed module is importable.
+
+2. The :cmake:command:`nanobind_add_stub` command should be preceded by
+   ``install(TARGETS my_ext)`` and ``install(FILES`` commands that place all
+   data (compiled extension files, plain Python code, etc.) needed to bring the
+   module into an importable state.
+
+   Place all relevant ``install()`` directives within the same
+   ``CMakeLists.txt`` file to ensure that these steps are executed
+   sequentially.
+
+3. Dependencies (``DEPENDS``) no longer need to be listed. These are build-time
+   constraints that do not apply in the installation phase.
+
+4. The output file path (``OUTPUT``) is relative to ``CMAKE_INSTALL_PREFIX``
+   and may need adjustments as well.
 
 The :cmake:command:`nanobind_add_stub` command has a few other options, please
 refer to its documentation for details.

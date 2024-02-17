@@ -360,7 +360,7 @@ function(nanobind_add_module name)
 endfunction()
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE" "MODULE;OUTPUT;MARKER_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS" "MODULE;OUTPUT;MARKER_FILE" "PYTHON_PATH;DEPENDS")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN ${NB_DIR}/src/stubgen.py)
@@ -369,10 +369,19 @@ function (nanobind_add_stub name)
   else()
     message(FATAL_ERROR "nanobind_add_stub(): could not locate 'stubgen.py'!")
   endif()
+
   if (NOT ARG_VERBOSE)
     list(APPEND NB_STUBGEN_ARGS -q)
   else()
     set(NB_STUBGEN_EXTRA USES_TERMINAL)
+  endif()
+
+  if (ARG_INCLUDE_PRIVATE)
+    list(APPEND NB_STUBGEN_ARGS -P)
+  endif()
+
+  if (ARG_EXCLUDE_DOCSTRINGS)
+    list(APPEND NB_STUBGEN_ARGS -D)
   endif()
 
   foreach (TMP IN LISTS ARG_PYTHON_PATH)

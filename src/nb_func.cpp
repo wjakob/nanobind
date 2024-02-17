@@ -881,16 +881,18 @@ static uint32_t nb_func_render_signature(const func_data *f,
             case '@':
                 // Handle types that differ depending on whether they appear
                 // in an argument or a return value position
+                pc++;
                 if (!rv) {
-                    pc++;
-                    while (*pc && *pc != ',')
+                    while (*pc && *pc != '@')
                         buf.put(*pc++);
+                    if (*pc == '@')
+                        pc++;
                     while (*pc && *pc != '@')
                         pc++;
                 } else {
-                    while (*pc && *pc != ',')
+                    while (*pc && *pc != '@')
                         pc++;
-                    if (*pc == ',')
+                    if (*pc == '@')
                         pc++;
                     while (*pc && *pc != '@')
                         buf.put(*pc++);
@@ -936,16 +938,26 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     }
 
                     buf.put(": ");
-                    if (has_args && f->args[arg_index].none)
-                        buf.put("Optional[");
+                    if (has_args && f->args[arg_index].none) {
+                        #if PY_VERSION_HEX < 0x030A0000
+                            buf.put("Optional[");
+                        #else
+                            // See below
+                        #endif
+                    }
                 }
                 break;
 
             case '}':
                 // Default argument
                 if (has_args) {
-                    if (f->args[arg_index].none)
-                        buf.put(']');
+                    if (f->args[arg_index].none) {
+                        #if PY_VERSION_HEX < 0x030A0000
+                            buf.put(']');
+                        #else
+                            buf.put(" | None");
+                        #endif
+                    }
 
                     if (f->args[arg_index].value) {
                         PyObject *o = f->args[arg_index].value;

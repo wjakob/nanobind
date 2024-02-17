@@ -1,8 +1,5 @@
-from types import CapsuleType
-from types import EllipsisType
-from typing import Callable
-from typing import Optional
-from typing import overload
+from types import CapsuleType, EllipsisType
+from typing import overload, Callable
 
 def call_guard_value() -> int: ...
 
@@ -92,7 +89,7 @@ def test_22() -> CapsuleType: ...
 
 def test_23() -> CapsuleType: ...
 
-def test_24(p: Optional[CapsuleType]) -> int: ...
+def test_24(p: CapsuleType | None) -> int: ...
 
 def test_25(arg: slice, /) -> slice: ...
 
@@ -157,9 +154,3 @@ def test_tuple() -> tuple: ...
 
 @overload
 def test_tuple(arg: tuple, /) -> int: ...
-
-del overload
-del CapsuleType
-del Optional
-del EllipsisType
-del Callable

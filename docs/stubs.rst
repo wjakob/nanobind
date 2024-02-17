@@ -12,10 +12,6 @@ are needed to enable autocompletion and static type checking in tools like
 <https://github.com/microsoft/pyright>`__ and `PyType
 <https://github.com/google/pytype>`__.
 
-nanobind can automate the process of stub generation to turn modules containing
-a mixture of ordinary Python and nanobind declarations into an associated
-``.pyi`` file.
-
 Take for example the following function:
 
 .. code-block:: python
@@ -39,7 +35,9 @@ An undocumented stub replaces the entire body with the Python ellipsis object
    def square(x: int) -> int: ...
 
 Complex default arguments are often also abbreviated with ``...`` to improve
-the readability of signatures. You can read more about stub files in the `MyPy
+the readability of signatures. You can read more about stub files in the
+`typing documentation
+<https://typing.readthedocs.io/en/latest/source/stubs.html>`__ and the `MyPy
 documentation <https://mypy.readthedocs.io/en/stable/stubs.html>`__.
 
 nanobind's ``stubgen`` tool automates the process of stub generation to turn
@@ -50,9 +48,9 @@ The main challenge here is that C++ bindings are unlike ordinary Python
 objects, which causes standard mechanisms to extract their signature to fail.
 Existing tools like MyPy's `stubgen
 <https://mypy.readthedocs.io/en/stable/stubgen.html>`__ and `pybind11-stubgen
-<https://github.com/sizmailov/pybind11-stubgen>`__ must parse docstrings to infer
-function signatures, which is brittle and does not always produce high-quality
-output.
+<https://github.com/sizmailov/pybind11-stubgen>`__ must therefore parse
+docstrings to infer function signatures, which is brittle and does not always
+produce high-quality output.
 
 nanobind functions expose a ``__nb_signature__`` property, which provides
 structured information about typed function signatures, overload chains, and

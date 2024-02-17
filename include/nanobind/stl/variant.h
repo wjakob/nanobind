@@ -38,8 +38,7 @@ template <> struct type_caster<std::monostate> {
 };
 
 template <typename... Ts> struct type_caster<std::variant<Ts...>> {
-    NB_TYPE_CASTER(std::variant<Ts...>,
-        const_name("Union[") + concat(make_caster<Ts>::Name...) + const_name("]"))
+    NB_TYPE_CASTER(std::variant<Ts...>, union_name(make_caster<Ts>::Name...))
 
     template <typename T>
     bool try_variant(const handle &src, uint8_t flags, cleanup_list *cleanup) {

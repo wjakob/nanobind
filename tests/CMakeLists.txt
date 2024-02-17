@@ -36,6 +36,25 @@ nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
 
+foreach (NAME functions classes ndarray stl)
+  if (NAME STREQUAL stl)
+    set(EXTRA MARKER_FILE py.typed)
+  endif()
+
+  if (MSVC)
+    # On MSVC, put stubs in the 'Debug' / 'Release' /.. folders
+    set(PYI_PREFIX $<CONFIG>/)
+  endif()
+
+  nanobind_add_stub(
+    ${NAME}_ext_stub
+    MODULE test_${NAME}_ext
+    OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
+    DEPENDS test_${NAME}_ext
+    ${EXTRA})
+endforeach()
+
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)
   nanobind_add_module(test_eigen_ext test_eigen.cpp ${NB_EXTRA_ARGS})
@@ -75,6 +94,13 @@ set(TEST_FILES
   test_stl_bind_vector.py
   test_chrono.py
   test_ndarray.py
+  test_stubs.py
+
+  # Stub reference files
+  test_functions_ext.pyi.ref
+  test_stl_ext.pyi.ref
+  test_ndarray_ext.pyi.ref
+  test_classes_ext.pyi.ref
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

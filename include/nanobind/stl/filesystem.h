@@ -71,7 +71,11 @@ struct type_caster<std::filesystem::path> {
         return success;
     }
 
-    NB_TYPE_CASTER(std::filesystem::path, const_name("os.PathLike"))
+#if PY_VERSION_HEX < 0x03090000
+    NB_TYPE_CASTER(std::filesystem::path, io_name("Union[str, os.PathLike]", "pathlib.Path"))
+#else
+    NB_TYPE_CASTER(std::filesystem::path, io_name("str | os.PathLike", "pathlib.Path"))
+#endif
 
 private:
     static str to_py_str(const std::string &s) {

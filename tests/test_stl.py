@@ -390,9 +390,14 @@ def test35_string_and_string_view():
 
 def test36_std_optional_copyable(clean):
     t.optional_copyable(t.Copyable())
-    assert t.optional_copyable.__doc__ == (
-        "optional_copyable(x: Optional[test_stl_ext.Copyable]) -> None"
-    )
+    if sys.version_info < (3, 10):
+        assert t.optional_copyable.__doc__ == (
+            "optional_copyable(x: Optional[test_stl_ext.Copyable]) -> None"
+        )
+    else:
+        assert t.optional_copyable.__doc__ == (
+            "optional_copyable(x: test_stl_ext.Copyable | None) -> None"
+        )
     assert_stats(
         default_constructed=1,
         copy_constructed=1,
@@ -401,9 +406,14 @@ def test36_std_optional_copyable(clean):
 
 def test37_std_optional_copyable_ptr(clean):
     t.optional_copyable_ptr(t.Copyable())
-    assert t.optional_copyable_ptr.__doc__ == (
-        "optional_copyable_ptr(x: Optional[test_stl_ext.Copyable]) -> None"
-    )
+    if sys.version_info < (3, 10):
+        assert t.optional_copyable_ptr.__doc__ == (
+            "optional_copyable_ptr(x: Optional[test_stl_ext.Copyable]) -> None"
+        )
+    else:
+        assert t.optional_copyable_ptr.__doc__ == (
+            "optional_copyable_ptr(x: test_stl_ext.Copyable | None) -> None"
+        )
     assert_stats(
         default_constructed=1,
         destructed=1
@@ -416,9 +426,14 @@ def test38_std_optional_none():
 
 def test39_std_optional_ret_opt_movable(clean):
     assert t.optional_ret_opt_movable().value == 5
-    assert t.optional_ret_opt_movable.__doc__ == (
-        "optional_ret_opt_movable() -> Optional[test_stl_ext.Movable]"
-    )
+    if sys.version_info < (3, 10):
+        assert t.optional_ret_opt_movable.__doc__ == (
+            "optional_ret_opt_movable() -> Optional[test_stl_ext.Movable]"
+        )
+    else:
+        assert t.optional_ret_opt_movable.__doc__ == (
+            "optional_ret_opt_movable() -> test_stl_ext.Movable | None"
+        )
     assert_stats(
         default_constructed=1,
         move_constructed=2,
@@ -443,9 +458,14 @@ def test42_std_optional_unbound_type():
         assert method(3) == 3
         assert method(None) is None
         assert method() is None
-        assert method.__doc__ == (
-            f"{method_name}(x: Optional[int] = None) -> Optional[int]"
-        )
+        if sys.version_info < (3, 10):
+            assert method.__doc__ == (
+                f"{method_name}(x: Optional[int] = None) -> Optional[int]"
+            )
+        else:
+            assert method.__doc__ == (
+                f"{method_name}(x: int | None = None) -> int | None"
+            )
 
 
 def test42a_std_optional_non_assignable():
@@ -455,9 +475,14 @@ def test42a_std_optional_non_assignable():
 def test43_std_variant_copyable(clean):
     t.variant_copyable(t.Copyable())
     t.variant_copyable(5)
-    assert t.variant_copyable.__doc__ == (
-        "variant_copyable(arg: Union[test_stl_ext.Copyable, int], /) -> None"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_copyable.__doc__ == (
+            "variant_copyable(arg: Union[test_stl_ext.Copyable, int], /) -> None"
+        )
+    else:
+        assert t.variant_copyable.__doc__ == (
+            "variant_copyable(arg: test_stl_ext.Copyable | int, /) -> None"
+        )
     assert_stats(
         default_constructed=3,
         copy_assigned=1,
@@ -469,9 +494,14 @@ def test44_std_variant_copyable_none(clean):
     t.variant_copyable_none(t.Copyable())
     t.variant_copyable_none(5)
     t.variant_copyable_none(None)
-    assert t.variant_copyable_none.__doc__ == (
-        "variant_copyable_none(x: Optional[Union[int, test_stl_ext.Copyable]]) -> None"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_copyable_none.__doc__ == (
+            "variant_copyable_none(x: Optional[Union[int, test_stl_ext.Copyable]]) -> None"
+        )
+    else:
+        assert t.variant_copyable_none.__doc__ == (
+            "variant_copyable_none(x: int | test_stl_ext.Copyable | None) -> None"
+        )
     assert_stats(
         default_constructed=1,
         copy_constructed=1,
@@ -482,9 +512,14 @@ def test44_std_variant_copyable_none(clean):
 def test45_std_variant_copyable_ptr(clean):
     t.variant_copyable_ptr(t.Copyable())
     t.variant_copyable_ptr(5)
-    assert t.variant_copyable_ptr.__doc__ == (
-        "variant_copyable_ptr(arg: Union[test_stl_ext.Copyable, int], /) -> None"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_copyable_ptr.__doc__ == (
+            "variant_copyable_ptr(arg: Union[test_stl_ext.Copyable, int], /) -> None"
+        )
+    else:
+        assert t.variant_copyable_ptr.__doc__ == (
+            "variant_copyable_ptr(arg: test_stl_ext.Copyable | int, /) -> None"
+        )
     assert_stats(
         default_constructed=1,
         destructed=1
@@ -495,9 +530,14 @@ def test46_std_variant_copyable_ptr_none(clean):
     t.variant_copyable_ptr_none(t.Copyable())
     t.variant_copyable_ptr_none(5)
     t.variant_copyable_ptr_none(None)
-    assert t.variant_copyable_ptr_none.__doc__ == (
-        "variant_copyable_ptr_none(x: Optional[Union[test_stl_ext.Copyable, int]]) -> None"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_copyable_ptr_none.__doc__ == (
+            "variant_copyable_ptr_none(x: Optional[Union[test_stl_ext.Copyable, int]]) -> None"
+        )
+    else:
+        assert t.variant_copyable_ptr_none.__doc__ == (
+            "variant_copyable_ptr_none(x: test_stl_ext.Copyable | int | None) -> None"
+        )
     assert_stats(
         default_constructed=1,
         destructed=1
@@ -505,16 +545,26 @@ def test46_std_variant_copyable_ptr_none(clean):
 
 def test47_std_variant_ret_var_copyable():
     assert t.variant_ret_var_copyable().value == 5
-    assert t.variant_ret_var_copyable.__doc__ == (
-        "variant_ret_var_copyable() -> Union[test_stl_ext.Copyable, int]"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_ret_var_copyable.__doc__ == (
+            "variant_ret_var_copyable() -> Union[test_stl_ext.Copyable, int]"
+        )
+    else:
+        assert t.variant_ret_var_copyable.__doc__ == (
+            "variant_ret_var_copyable() -> test_stl_ext.Copyable | int"
+        )
 
 
 def test48_std_variant_ret_var_none():
     assert t.variant_ret_var_none() is None
-    assert t.variant_ret_var_none.__doc__ == (
-        "variant_ret_var_none() -> Union[None, test_stl_ext.Copyable, int]"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_ret_var_none.__doc__ == (
+            "variant_ret_var_none() -> Union[None, test_stl_ext.Copyable, int]"
+        )
+    else:
+        assert t.variant_ret_var_none.__doc__ == (
+            "variant_ret_var_none() -> None | test_stl_ext.Copyable | int"
+        )
 
 
 def test49_std_variant_unbound_type():
@@ -523,10 +573,16 @@ def test49_std_variant_unbound_type():
     assert t.variant_unbound_type([5]) == [5]
     assert t.variant_unbound_type((1,2,3)) == (1,2,3)
     assert t.variant_unbound_type(5) == 5
-    assert t.variant_unbound_type.__doc__ == (
-        "variant_unbound_type(x: Optional[Union[list, tuple, int]] = None)"
-        " -> Union[None, list, tuple, int]"
-    )
+    if sys.version_info < (3, 10):
+        assert t.variant_unbound_type.__doc__ == (
+            "variant_unbound_type(x: Optional[Union[list, tuple, int]] = None)"
+            " -> Union[None, list, tuple, int]"
+        )
+    else:
+        assert t.variant_unbound_type.__doc__ == (
+            "variant_unbound_type(x: list | tuple | int | None = None)"
+            " -> None | list | tuple | int"
+        )
 
 def test50_map_return_movable_value():
     for i, (k, v) in enumerate(sorted(t.map_return_movable_value().items())):

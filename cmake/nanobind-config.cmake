@@ -413,7 +413,7 @@ function (nanobind_add_stub name)
       OUTPUT ${NB_STUBGEN_OUTPUTS}
       COMMAND ${NB_STUBGEN_CMD}
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-      DEPENDS ${ARG_DEPENDS}
+      DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}"
       ${NB_STUBGEN_EXTRA}
     )
     add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})

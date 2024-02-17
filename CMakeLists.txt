@@ -52,36 +52,43 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
 
   # Normally these would be configurable by the user, but we can't allow that
   # because the lookup paths are hard-coded in 'cmake/nanobind-config.cmake'
-  set(CMAKE_INSTALL_INCLUDEDIR "${NB_INSTALL_DATADIR}/include")
-  set(NB_INSTALL_SRCDIR "${NB_INSTALL_DATADIR}/src")
-  set(NB_INSTALL_EXTDIR "${NB_INSTALL_DATADIR}/ext")
-  set(NB_INSTALL_CMAKEDIR "${NB_INSTALL_DATADIR}/cmake")
+  set(NB_INSTALL_INC_DIR "${NB_INSTALL_DATADIR}/include")
+  set(NB_INSTALL_SRC_DIR "${NB_INSTALL_DATADIR}/src")
+  set(NB_INSTALL_EXT_DIR "${NB_INSTALL_DATADIR}/ext")
+  set(NB_INSTALL_MODULE_DIR "${NB_INSTALL_DATADIR}")
+  set(NB_INSTALL_CMAKE_DIR "${NB_INSTALL_DATADIR}/cmake")
 
   install(
     DIRECTORY include/
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    DESTINATION "${NB_INSTALL_INC_DIR}"
   )
 
   install(
     DIRECTORY src/
-    DESTINATION "${NB_INSTALL_SRCDIR}"
+    DESTINATION "${NB_INSTALL_SRC_DIR}"
     PATTERN "*.py" EXCLUDE
+  )
+
+  install(
+    DIRECTORY src/
+    DESTINATION "${NB_INSTALL_MODULE_DIR}"
+    FILES_MATCHING PATTERN "*\.py"
   )
 
   if(NB_USE_SUBMODULE_DEPS)
     install(
       DIRECTORY ext/robin_map/include/
-      DESTINATION "${NB_INSTALL_EXTDIR}/robin_map/include"
+      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include"
     )
     install(
       FILES ext/robin_map/CMakeLists.txt
-      DESTINATION "${NB_INSTALL_EXTDIR}/robin_map"
+      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map"
     )
   endif()
 
   install(
     DIRECTORY cmake/
-    DESTINATION "${NB_INSTALL_CMAKEDIR}"
+    DESTINATION "${NB_INSTALL_CMAKE_DIR}"
   )
 endif()
 

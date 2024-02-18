@@ -449,3 +449,8 @@ Nanobind's CMake tooling includes a convenience command to interface with the
         - Specify a component when ``INSTALL_TIME`` stub generation is used.
           This is analogous to ``install(..., COMPONENT [name])`` in other
           install targets.
+      * - ``EXCLUDE_FROM_ALL``
+        - If specified, the file is only installed as part of a
+          component-specific installation when ``INSTALL_TIME`` stub generation
+          is used. This is analogous to ``install(..., EXCLUDE_FROM_ALL)`` in
+          other install targets.

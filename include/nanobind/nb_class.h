@@ -49,6 +49,9 @@ enum class type_flags : uint32_t {
     /// If so, type_data::keep_shared_from_this_alive is also set.
     has_shared_from_this     = (1 << 12),
 
+    /// Instances of this type can be referenced by 'weakref'
+    is_weak_referenceable    = (1 << 13),
+
     // Six more flag bits available (13 through 18) without needing
     // a larger reorganization
 };
@@ -98,6 +101,7 @@ struct type_data {
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
     size_t dictoffset;
+    size_t weaklistoffset;
 #endif
 };
 
@@ -150,6 +154,10 @@ NB_INLINE void type_extra_apply(type_init_data &t, is_final) {
 
 NB_INLINE void type_extra_apply(type_init_data &t, dynamic_attr) {
     t.flags |= (uint32_t) type_flags::has_dynamic_attr;
+}
+
+NB_INLINE void type_extra_apply(type_data & t, weak_referenceable) {
+    t.flags |= (uint32_t)type_flags::is_weak_referenceable;
 }
 
 template <typename T>

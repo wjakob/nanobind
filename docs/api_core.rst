@@ -1685,6 +1685,11 @@ parameter of the constructor :cpp:func:`class_::class_`.
 
    Indicate that instances of a type require a Python dictionary to support the dynamic addition of attributes.
 
+.. cpp:struct:: weak_referenceable
+
+   Indicate that instances of a type require weak reference list so that they
+   can be referenced by the Python ``weakref`` type.
+
 .. cpp:struct:: template <typename T> supplement
 
    Indicate that ``sizeof(T)`` bytes of memory should be set aside to

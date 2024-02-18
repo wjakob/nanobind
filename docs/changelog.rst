@@ -18,6 +18,11 @@ below inherit that of the preceding release.
 Version 1.9.0 (TBA)
 -------------------
 
+* Nanobind instances can now be :ref:`made weak-referenceable <weak_refs>` by
+  specifying the :cpp:class:`nb::weak_referenceable <weak_referenceable>` tag
+  in the :cpp:class:`nb::class_\<..\> <class_>` constructor. (PR `#335
+  <https://github.com/wjakob/nanobind/pull/335>`__.)
+
 * :cpp:func:`nb::try_cast() <try_cast>` no longer crashes the interpreter
   when attempting to cast a Python ``None`` to a C++ type that was bound
   using ``nb::class_<>``. Previously this would raise an exception from the

@@ -52,7 +52,7 @@ enum class type_flags : uint32_t {
     /// Instances of this type can be referenced by 'weakref'
     is_weak_referenceable    = (1 << 13),
 
-    // Six more flag bits available (13 through 18) without needing
+    // Five more flag bits available (12 through 18) without needing
     // a larger reorganization
 };
 

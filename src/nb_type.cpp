@@ -202,7 +202,7 @@ static void inst_dealloc(PyObject *self) {
         }
     }
 
-    if (t->flags & (uint32_t)type_flags::is_weak_referenceable &&
+    if (t->flags & (uint32_t) type_flags::is_weak_referenceable &&
         nb_weaklist_ptr(self) != nullptr) {
 #if defined(PYPY_VERSION)
         PyObject **weaklist = nb_weaklist_ptr(self);
@@ -1012,7 +1012,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     if (is_weak_referenceable) {
-        to->flags |= (uint32_t)type_flags::is_weak_referenceable;
+        to->flags |= (uint32_t) type_flags::is_weak_referenceable;
         #if defined(Py_LIMITED_API)
             to->weaklistoffset = weaklistoffset;
         #endif

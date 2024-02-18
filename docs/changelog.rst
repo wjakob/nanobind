@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 1.9.0 (TBA)
--------------------
+Version 1.9.0 (Feb 18, 2024)
+----------------------------
 
 * Nanobind instances can now be :ref:`made weak-referenceable <weak_refs>` by
   specifying the :cpp:class:`nb::weak_referenceable <weak_referenceable>` tag
@@ -24,7 +24,7 @@ Version 1.9.0 (TBA)
   <https://github.com/wjakob/nanobind/pull/335>`__, commit `fc7709
   <https://github.com/wjakob/nanobind/commit/fc770930468313e5a69364cfd1bbdab9bc0ab208>`__).
 
-* Added a :py:class:`nb:bool_ <bool_>` wrapper type. (PR `#382
+* Added a :cpp:class:`nb::bool_ <bool_>` wrapper type. (PR `#382
   <https://github.com/wjakob/nanobind/pull/382>`__, commit `90dfba
   <https://github.com/wjakob/nanobind/commit/90dfbaf4c8c410d819cb9be44a3455898c8c2638>`__).
 
@@ -41,7 +41,7 @@ Version 1.9.0 (TBA)
   ``noexcept``. (PR `#386 <https://github.com/wjakob/nanobind/pull/386>`__).
 
 * Fixed memory corruption in a PyPy-specific codepath in
-  :cpp:func:`nb::module_::def_submodule <module_::def_submodule>` (commit
+  :cpp:func:`nb::module_::def_submodule() <module_::def_submodule>` (commit
   `21eaff
   <https://github.com/wjakob/nanobind/commit/21eaffc263c13a5373546d8957e4152e65b1e8ac>`__).
 
@@ -58,7 +58,7 @@ Version 1.9.0 (TBA)
   `#393 <https://github.com/wjakob/nanobind/pull/393>`__, commit `b3b6f4
   <https://github.com/wjakob/nanobind/commit/b3b6f44e55948986e02cdbf67e04d9cdd11c4aa4>`__).
 
-* Don't pass compiler flags if the may be unsupported by the used compiler.
+* Don't pass compiler flags if they may be unsupported by the used compiler.
   This gets NVCC to work out of the box (that said, this change does not
   elevate NVCC to being an *officially* supported compiler). (issue `#383
   <https://github.com/wjakob/nanobind/pull/383>`__, commit `a307ea
@@ -211,9 +211,9 @@ New features
      <ndarray-nonstandard>` for details. (commit `49eab2
      <https://github.com/wjakob/nanobind/commit/49eab2845530f84a1f029c5c1c5541ab3c1f9adc>`__).
 
-  3. Shape constraints like :py:class:`nb::shape\<nb::any, nb::any, nb::any\>
+  3. Shape constraints like :cpp:class:`nb::shape\<nb::any, nb::any, nb::any\>
      <shape>` are tedious to write. Now, there is a shorter form:
-     :py:class:`nb::ndim\<3\> <ndim>`. (commit `1350a5
+     :cpp:class:`nb::ndim\<3\> <ndim>`. (commit `1350a5
      <https://github.com/wjakob/nanobind/commit/1350a5e15b28e80ffc2130a779f3b8c559ddb620>`__).
 
   4. Added an explicit constructor that can be used to add or remove ndarray
@@ -479,7 +479,7 @@ Miscellaneous fixes and improvements
 
   * Enum equality comparisons (``==`` and ``!=``) now can only be true
     if both operands have the same enum type, or if one is an enum and
-    the other is an :py:class:`int`. This resolves some confusing
+    the other is an ``int``. This resolves some confusing
     results and ensures that enumerators of different types have a
     distinct identity, which is important if they're being put into
     the same set or used as keys in the same dictionary. All of the

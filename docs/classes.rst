@@ -340,8 +340,9 @@ Trying to set any other attribute results in an error:
    >>> p.age = 2  # fail
    AttributeError: 'Pet' object has no attribute 'age'
 
-To enable dynamic attributes for C++ classes, the :class:`nb::dynamic_attr` tag
-must be added to the :class:`nb::class_` constructor:
+To enable dynamic attributes for C++ classes, the :class:`nb::dynamic_attr
+<dynamic_attr>` tag must be added to the :class:`nb::class_ <class_>`
+constructor:
 
 .. code-block:: cpp
 
@@ -373,9 +374,10 @@ Weak references
 By default, nanobind instances cannot be referenced via Python's ``weakref``
 class, and attempting to do so will raise an exception.
 
-To support this, add the :class:`nb::is_weak_referenceable` tag to the
-:class:`nb::class_` constructor. Note that this will increase the size of every
-instance by ``sizeof(void*)`` due to the need to store a weak reference list.
+To support this, add the :class:`nb::is_weak_referenceable
+<is_weak_referenceable>` tag to the :class:`nb::class_ <class_>` constructor.
+Note that this will increase the size of every instance by ``sizeof(void*)``
+due to the need to store a weak reference list.
 
 .. code-block:: cpp
 

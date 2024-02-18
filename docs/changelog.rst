@@ -21,14 +21,58 @@ Version 1.9.0 (TBA)
 * Nanobind instances can now be :ref:`made weak-referenceable <weak_refs>` by
   specifying the :cpp:class:`nb::weak_referenceable <weak_referenceable>` tag
   in the :cpp:class:`nb::class_\<..\> <class_>` constructor. (PR `#335
-  <https://github.com/wjakob/nanobind/pull/335>`__.)
+  <https://github.com/wjakob/nanobind/pull/335>`__, commit `fc7709
+  <https://github.com/wjakob/nanobind/commit/fc770930468313e5a69364cfd1bbdab9bc0ab208>`__).
 
-* :cpp:func:`nb::try_cast() <try_cast>` no longer crashes the interpreter
-  when attempting to cast a Python ``None`` to a C++ type that was bound
-  using ``nb::class_<>``. Previously this would raise an exception from the
-  cast operator, which would result in a call to ``std::terminate()``
-  because ``try_cast()`` is declared ``noexcept``. (PR `#386
-  <https://github.com/wjakob/nanobind/pull/386>`__.)
+* Added a :py:class:`nb:bool_ <bool_>` wrapper type. (PR `#382
+  <https://github.com/wjakob/nanobind/pull/382>`__, commit `90dfba
+  <https://github.com/wjakob/nanobind/commit/90dfbaf4c8c410d819cb9be44a3455898c8c2638>`__).
+
+* Ensure that the GIL is held when releasing :cpp:class:`nb::ndarray
+  <ndarray>`. (issue `#377 <https://github.com/wjakob/nanobind/issues/377>`__,
+  commit `a968e8
+  <https://github.com/wjakob/nanobind/commit/a958e8d966f5af64c84412ca801a405042bbcc0b>`__).
+
+* :cpp:func:`nb::try_cast() <try_cast>` no longer crashes the interpreter when
+  attempting to cast a Python ``None`` to a C++ type that was bound using
+  :cpp:class:`nb::class_<...> <class_>`. Previously this would raise an
+  exception from the cast operator, which would result in a call to
+  ``std::terminate()`` because :cpp:func:`try_cast() <try_cast>` is declared
+  ``noexcept``. (PR `#386 <https://github.com/wjakob/nanobind/pull/386>`__).
+
+* Fixed memory corruption in a PyPy-specific codepath in
+  :cpp:func:`nb::module_::def_submodule <module_::def_submodule>` (commit
+  `21eaff
+  <https://github.com/wjakob/nanobind/commit/21eaffc263c13a5373546d8957e4152e65b1e8ac>`__).
+
+* Don't implicitly convert complex to non-complex nd-arrays. (issue `#364
+  <https://github.com/wjakob/nanobind/issues/364>`__, commit `ea2569
+  <https://github.com/wjakob/nanobind/commit/ea2569f705b9d12185eea67db399a373d37c75aa>`__).
+
+* Support for non-assignable types in the ``std::optional<T>`` type caster (PR
+  `#358 <https://github.com/wjakob/nanobind/pull/358>`__, commit `9c9b64
+  <https://github.com/wjakob/nanobind/commit/0c9b6489cd3fe8a0a5a858e364983e99b06101ce>`__).
+
+* nanobind no longer assumes that docstrings provided to function binding (of
+  type ``const char *``) have an infinite lifetime and it makes copy. (issue
+  `#393 <https://github.com/wjakob/nanobind/pull/393>`__, commit `b3b6f4
+  <https://github.com/wjakob/nanobind/commit/b3b6f44e55948986e02cdbf67e04d9cdd11c4aa4>`__).
+
+* Don't pass compiler flags if the may be unsupported by the used compiler.
+  This gets NVCC to work out of the box (that said, this change does not
+  elevate NVCC to being an *officially* supported compiler). (issue `#383
+  <https://github.com/wjakob/nanobind/pull/383>`__, commit `a307ea
+  <https://github.com/wjakob/nanobind/commit/a307eacaa9902daa190adc428168cf64007dff9e>`__
+
+* Added a CMake install target to the nanobind build system. (PR `#356
+  <https://github.com/wjakob/nanobind/pull/356>`__, commit `6bde65
+  <https://github.com/wjakob/nanobind/commit/5bde6527dc43535982a36ffa02d41275c5e484d9>`__,
+  commit `978dbb
+  <https://github.com/wjakob/nanobind/commit/978dbb1d6aaeee7530d57cf3e8d558e099a4eec6>`__,
+  commit `f5d8de
+  <https://github.com/wjakob/nanobind/commit/f5d8defc68a5c6a79b0e64de016ee52dde6ea54d>`__).
+
+* Minor fixes and improvements.
 
 Version 1.8.0 (Nov 2, 2023)
 ---------------------------

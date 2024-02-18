@@ -325,7 +325,7 @@ public:
     /// Import and return a module or throws `python_error`.
     NB_INLINE module_ def_submodule(const char *name,
                                     const char *doc = nullptr) {
-        return borrow<module_>(detail::module_new_submodule(m_ptr, name, doc));
+        return steal<module_>(detail::module_new_submodule(m_ptr, name, doc));
     }
 };
 

@@ -164,6 +164,7 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
         goto fail;
 
     name_py = PyUnicode_FromFormat("%U.%s", base_name, name);
+    Py_DECREF(base_name);
 #else
     const char *base_name = PyModule_GetName(base);
     if (!base_name)
@@ -179,25 +180,32 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
 #else
     res = PyImport_AddModule(PyUnicode_AsUTF8(name_py));
 #endif
+    Py_DECREF(name_py);
+    if (!res)
+        goto fail;
 
     if (doc) {
         PyObject *doc_py = PyUnicode_FromString(doc);
-        if (!doc_py || PyObject_SetAttrString(res, "__doc__", doc_py))
+        if (!doc_py)
             goto fail;
+        int rv = PyObject_SetAttrString(res, "__doc__", doc_py);
         Py_DECREF(doc_py);
+        if (rv)
+            goto fail;
     }
 
-    Py_DECREF(name_py);
-    Py_DECREF(base_name);
+    Py_INCREF(res); // extra reference for PyModule_AddObject
 
-    Py_INCREF(res);
-    if (PyModule_AddObject(base, name, res))
+    if (PyModule_AddObject(base, name, res)) { // steals on success
+        Py_DECREF(res);
         goto fail;
+    }
 
+    Py_INCREF(res); // turned borrowed into new reference
     return res;
 
 fail:
-    check(false, "nanobind::detail::module_new_submodule(): failed.");
+    raise_python_error();
 }
 
 // ========================================================================

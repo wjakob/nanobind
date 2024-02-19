@@ -108,6 +108,7 @@ void nb_func_dealloc(PyObject *self) {
             free(f->args);
             free((char *) f->descr);
             free(f->descr_types);
+            free(f->signature);
             ++f;
         }
     }
@@ -200,6 +201,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
          has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
          has_keep_alive = f->flags & (uint32_t) func_flags::has_keep_alive,
          has_doc        = f->flags & (uint32_t) func_flags::has_doc,
+         has_signature  = f->flags & (uint32_t) func_flags::has_signature,
          is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
          is_method      = f->flags & (uint32_t) func_flags::is_method,
          return_ref     = f->flags & (uint32_t) func_flags::return_ref,
@@ -208,10 +210,20 @@ PyObject *nb_func_new(const void *in_) noexcept {
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
 
+    const char *name_cstr = strdup_check(has_name ? f->name : "");
+    if (has_signature) {
+        char *brace = (char *) strchr(name_cstr, '(');
+        check(brace != nullptr,
+              "nb::detail::nb_func_new(\"%s\"): custom signature must contain "
+              "an opening brace '('.", name_cstr);
+        has_name = brace != name_cstr;
+        *brace = '\0';
+    }
+
     // Check for previous overloads
     if (has_scope && has_name) {
-        name = PyUnicode_FromString(f->name);
-        check(name, "nb::detail::nb_func_new(\"%s\"): invalid name.", f->name);
+        name = PyUnicode_FromString(name_cstr);
+        check(name, "nb::detail::nb_func_new(\"%s\"): invalid name.", name_cstr);
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
@@ -223,18 +235,18 @@ PyObject *nb_func_new(const void *in_) noexcept {
                           (f->flags & (uint32_t) func_flags::is_method),
                       "nb::detail::nb_func_new(\"%s\"): mismatched static/"
                       "instance method flags in function overloads!",
-                      f->name);
+                      name_cstr);
 
                 /* Never append a method to an overload chain of a parent class;
                    instead, hide the parent's overloads in this case */
                 if (fp->scope != f->scope)
                     Py_CLEAR(func_prev);
-            } else if (f->name[0] == '_') {
+            } else if (name_cstr[0] == '_') {
                 Py_CLEAR(func_prev);
             } else {
                 check(false,
                       "nb::detail::nb_func_new(\"%s\"): cannot overload "
-                      "existing non-function object of the same name!", f->name);
+                      "existing non-function object of the same name!", name_cstr);
             }
         } else {
             PyErr_Clear();
@@ -242,8 +254,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         // Is this method a constructor that takes a class binding as first parameter?
         is_constructor = is_method &&
-                         (strcmp(f->name, "__init__") == 0 ||
-                          strcmp(f->name, "__setstate__") == 0) &&
+                         (strcmp(name_cstr, "__init__") == 0 ||
+                          strcmp(name_cstr, "__setstate__") == 0) &&
                          strncmp(f->descr, "({%}", 4) == 0;
 
         // Don't use implicit conversions in copy constructors (causes infinite recursion)
@@ -263,7 +275,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     nb_func *func = (nb_func *) PyType_GenericAlloc(
         is_method ? internals->nb_method : internals->nb_func, to_copy + 1);
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
-          has_name ? f->name : "<anonymous>");
+          name_cstr);
 
     func->max_nargs_pos = f->nargs;
     func->complex_call = has_args || has_var_args || has_var_kwargs || has_keep_alive;
@@ -311,19 +323,18 @@ PyObject *nb_func_new(const void *in_) noexcept {
     if (has_args)
         fc->flags |= (uint32_t) func_flags::has_args;
 
-    if (!has_name)
-        fc->name = "";
-    fc->name = strdup_check(fc->name);
+    fc->name = name_cstr;
+    fc->signature = has_signature ? strdup_check(f->name) : nullptr;
 
     if (is_implicit) {
         check(fc->flags & (uint32_t) func_flags::is_constructor,
               "nb::detail::nb_func_new(\"%s\"): nanobind::is_implicit() "
               "should only be specified for constructors.",
-              f->name);
+              name_cstr);
         check(f->nargs == 2,
               "nb::detail::nb_func_new(\"%s\"): implicit constructors "
               "should only have one argument.",
-              f->name);
+              name_cstr);
 
         if (f->descr_types[1])
             implicitly_convertible(f->descr_types[1], f->descr_types[0]);
@@ -369,7 +380,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     if (has_scope && name) {
         int rv = PyObject_SetAttr(f->scope, name, (PyObject *) func);
         check(rv == 0, "nb::detail::nb_func_new(\"%s\"): setattr. failed.",
-              f->name);
+              name_cstr);
     }
 
     Py_XDECREF(name);
@@ -866,7 +877,13 @@ static uint32_t nb_func_render_signature(const func_data *f,
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
                has_args       = f->flags & (uint32_t) func_flags::has_args,
                has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
-               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
+               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
+               has_signature  = f->flags & (uint32_t) func_flags::has_signature;
+
+    if (has_signature) {
+        buf.put_dstr(f->signature);
+        return 0;
+    }
 
     const std::type_info **descr_type = f->descr_types;
     bool rv = false;
@@ -1085,6 +1102,8 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
     uint32_t count = (uint32_t) Py_SIZE(self);
     PyObject *result = PyTuple_New(count);
+    if (!result)
+        return nullptr;
 
     for (uint32_t i = 0; i < count; ++i) {
         const func_data *fi = f + i;
@@ -1101,11 +1120,20 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         uint32_t n_default_args = nb_func_render_signature(fi, true),
                  pos = 2;
 
-        PyObject *item = PyTuple_New(2 + n_default_args);
-        NB_TUPLE_SET_ITEM(item, 0, PyUnicode_FromString(buf.get()));
+        PyObject *item = PyTuple_New(2 + n_default_args),
+                 *sigstr = PyUnicode_FromString(buf.get());
+        if (!docstr || !sigstr || !item) {
+            Py_XDECREF(docstr);
+            Py_XDECREF(sigstr);
+            Py_XDECREF(item);
+            Py_DECREF(result);
+            return nullptr;
+        }
+
+        NB_TUPLE_SET_ITEM(item, 0, sigstr);
         NB_TUPLE_SET_ITEM(item, 1, docstr);
 
-        if (fi->flags & (uint32_t) func_flags::has_args) {
+        if (n_default_args) {
             for (uint32_t j = 0; j < fi->nargs; ++j) {
                 PyObject *value = fi->args[j].value;
                 if (!value)
@@ -1134,9 +1162,6 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
     size_t doc_count = 0;
     for (uint32_t i = 0; i < count; ++i) {
         const func_data *fi = f + i;
-        if (fi->flags & (uint32_t) func_flags::raw_doc)
-            return PyUnicode_FromString(fi->doc);
-
         nb_func_render_signature(fi);
         buf.put('\n');
         if ((fi->flags & (uint32_t) func_flags::has_doc) && fi->doc[0] != '\0')

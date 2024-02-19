@@ -37,6 +37,7 @@ NAMESPACE_BEGIN(detail)
 /// Nanobind function metadata (overloads, etc.)
 struct func_data : func_data_prelim<0> {
     arg_data *args;
+    char *signature;
 };
 
 /// Python object representing an instance of a bound C++ type

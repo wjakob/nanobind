@@ -75,9 +75,9 @@ struct type_slots_callback {
     cb_t callback;
 };
 
-struct raw_doc {
+struct signature {
     const char *value;
-    raw_doc(const char *doc) : value(doc) {}
+    signature(const char *doc) : value(doc) { }
 };
 
 struct is_getter { };
@@ -115,8 +115,8 @@ enum class func_flags : uint32_t {
     has_free = (1 << 14),
     /// Should the func_new() call return a new reference?
     return_ref = (1 << 15),
-    /// Does this overload specify a raw docstring that should take precedence?
-    raw_doc = (1 << 16),
+    /// Does this overload specify a custom function signature (for docstrings, typing)
+    has_signature = (1 << 16),
     /// Does this function have one or more nb::keep_alive() annotations?
     has_keep_alive = (1 << 17)
 };
@@ -206,9 +206,9 @@ NB_INLINE void func_extra_apply(F &f, const scope &scope, size_t &) {
 }
 
 template <typename F>
-NB_INLINE void func_extra_apply(F &f, const raw_doc &d, size_t &) {
-    f.flags |= (uint32_t) func_flags::has_doc | (uint32_t) func_flags::raw_doc;
-    f.doc = d.value;
+NB_INLINE void func_extra_apply(F &f, const signature &d, size_t &) {
+    f.flags |= (uint32_t) func_flags::has_signature;
+    f.name = d.value;
 }
 
 template <typename F>

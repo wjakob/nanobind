@@ -1478,7 +1478,11 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    .. cpp:function:: name(const char * value)
 
-      Captures the name of the function.
+      Specify this annotation to override the name of the function.
+
+      nanobind will internally copy the string when creating a function
+      binding, hence dynamically generated arguments with a limited lifetime
+      are legal.
 
 .. cpp:struct:: arg
 
@@ -1588,11 +1592,22 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
      The ``Nurse`` and ``Patient`` annotation always refer to the *final* object
      following implicit conversion.
 
-.. cpp:struct:: raw_doc
+.. cpp:struct:: signature
 
-   .. cpp:function:: raw_doc(const char * value)
+   .. cpp:function:: signature(const char * value)
 
-      Take complete control over the docstring of a bound function and replace it with `value`.
+      This annotation enables taking complete control over a function's type
+      signature by replacing the automatically generated version with
+      ``value``.
+
+      The provided string should have the form ``function_name(arg_1: type_1 =
+      default_value_1, arg_2: type_2 = default_value_2, ...) ->
+      return_value_type`` (in particular, nanobind expects to find a function
+      name followed by an opening parenthesis).
+
+      nanobind will internally copy the string when creating a function
+      binding, hence dynamically generated arguments with a limited lifetime
+      are legal.
 
 .. cpp:enum-class:: rv_policy
 
@@ -2556,8 +2571,8 @@ Miscellaneous
     annotation of a function argument or return value in generated
     docstrings. It is particularly helpful when the type signature is
     not obvious and must be computed at compile time.  Otherwise, the
-    :cpp:class:`raw_doc` attribute provides a simpler alternative for
-    taking full control of docstrings and type annotations.
+    :cpp:class:`signature` attribute provides a simpler alternative for
+    taking full control function type annotations.
 
     Consider the following binding that iterates over a Python list.
 

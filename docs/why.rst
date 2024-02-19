@@ -183,30 +183,24 @@ The following lists minor-but-useful additions relative to pybind11.
   overload when the underlying Python type object is a subtype of the C++ type
   ``T``.
 
-- **Raw docstrings**: In cases where absolute control over docstrings is
-  required (for example, so that complex cases can be parsed by a tool like
-  `Sphinx <https://www.sphinx-doc.org>`__), the :cpp:class:`nb::raw_doc`
-  attribute can be specified to functions. In this case, nanobind will *skip*
-  generation of a combined docstring that enumerates overloads along with type
-  information.
+- **Function signature overrides**: it may sometimes be necessary to tweak the
+  type signature of a function to provide richer type information to static
+  type checkers like `MyPy <https://github.com/python/mypy>`__ or `PyRight
+  <https://github.com/microsoft/pyright>`__. In such cases, specify the
+  :cpp:class:`nb::signature` attribute to override the default
+  nanobind-provided signature.
 
-  Example:
+  For example, the following signature annotation creates an overload that
+  should only be called with an ``1``-valued integer literal. While the
+  function also includes a runtime-check, a type checker can now statically
+  enforce this constraint.
 
   .. code-block:: cpp
 
-     m.def("identity", [](float arg) { return arg; });
-     m.def("identity", [](int arg) { return arg; },
-           nb::raw_doc(
-               "identity(arg)\n"
-               "An identity function for integers and floats\n"
-               "\n"
-               "Args:\n"
-               "    arg (float | int): Input value\n"
-               "\n"
-               "Returns:\n"
-               "    float | int: Result of the identity operation"));
-
-  Writing detailed docstrings in this way is rather tedious. In practice, they
-  would usually be extracted from C++ headers using a tool like `pybind11_mkdoc
-  <https://github.com/pybind/pybind11_mkdoc>`_ (which also works fine with
-  nanobind despite the name).
+     m.def("f",
+           [](int arg) {
+               if (arg != 1)
+                  nb::raise("invalid input");
+               return arg;
+           },
+           nb::signature("f(arg: typing.Literal[1], /) -> int"));

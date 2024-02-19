@@ -45,11 +45,11 @@ def test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]: ...
 
 @overload
 def test_08(arg: int, /) -> int:
-    """ignored"""
+    """first docstring"""
 
 @overload
-def test_08(arg: float, /) -> int:
-    """raw"""
+def test_08(x: Annotated[float, 'foo']) -> int:
+    """another docstring"""
 
 def test_09(arg: type, /) -> bool: ...
 

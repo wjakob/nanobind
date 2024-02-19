@@ -18,6 +18,10 @@ option(NB_TEST              "Compile nanobind tests?" ${NB_MASTER_PROJECT})
 option(NB_TEST_STABLE_ABI   "Test the stable ABI interface?" OFF)
 option(NB_TEST_SHARED_BUILD "Build a shared nanobind library for the test suite?" OFF)
 
+if (NOT MSVC)
+  option(NB_TEST_SANITZE    "Build tests with address and undefined behavior sanitizers?" OFF)
+endif()
+
 # ---------------------------------------------------------------------------
 # Do a release build if nothing was specified
 # ---------------------------------------------------------------------------

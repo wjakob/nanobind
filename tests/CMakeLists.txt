@@ -21,6 +21,12 @@ if (UNIX AND (CMAKE_SIZEOF_VOID_P EQUAL 4) AND (CMAKE_SYSTEM_PROCESSOR STREQUAL 
   add_compile_options(-mfpmath=sse -msse2)
 endif()
 
+if (NB_TEST_SANITIZE)
+  add_compile_options(-fsanitize=address,undefined)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
+
 nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})

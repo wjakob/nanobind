@@ -120,6 +120,16 @@ nanobind includes a number of quality-of-live improvements for developers:
   vision is still relatively far out, however: it will require Python 3.12+ to
   be widely deployed.
 
+- **Stub generation**: nanobind ships with a custom :ref:`stub generator
+  <stubs>` and CMake integration to automatically create high quality stubs as
+  part of the build process. `Stubs
+  <https://typing.readthedocs.io/en/latest/source/stubs.html>`__ make compiled
+  extension code compatible with visual autocomplete in editors like `Visual
+  Studio Code <https://code.visualstudio.com>`__ and static type checkers like
+  `MyPy <https://github.com/python/mypy>`__, `PyRight
+  <https://github.com/microsoft/pyright>`__ and `PyType
+  <https://github.com/google/pytype>`__.
+
 - **Leak warnings**: When the Python interpreter shuts down, nanobind reports
   instance, type, and function leaks related to bindings, which is useful for
   tracking down reference counting issues.  If these warnings are undesired,

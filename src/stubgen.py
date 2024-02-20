@@ -590,11 +590,11 @@ def main(args = None):
 
         sg.put(mod_imported)
 
-        file = Path(mod_imported.__file__)
-
         if opt.output_file:
             file = Path(opt.output_file)
         else:
+            file = Path(mod_imported.__file__)
+
             ext_loader = importlib.machinery.ExtensionFileLoader
             if isinstance(mod_imported.__loader__, ext_loader):
                 file = file.with_name(mod_imported.__name__)

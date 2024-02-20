@@ -65,7 +65,7 @@ class StubGen:
         # Should docstrings be included in the generated stub?
         self.include_docstrings = include_docstrings
 
-        # Should private members (that start or end with 
+        # Should private members (that start or end with
         # a single underscore) be included?
         self.include_private = include_private
 
@@ -101,7 +101,7 @@ class StubGen:
 
         # Regular expression to strip away the module name
         if module:
-            self.module_re = re.compile(f'\\b{self.module.__name__}\\.')
+            self.module_re = re.compile(f"\\b{self.module.__name__}\\.")
         else:
             self.module_re = None
 
@@ -228,12 +228,12 @@ class StubGen:
             is_enum = self.is_enum(tp)
             self.write_ln(f"class {tp.__name__}:")
             if tp.__bases__ != (object,):
-                self.output = self.output[:-2] + '('
+                self.output = self.output[:-2] + "("
                 for i, base in enumerate(tp.__bases__):
                     if i:
-                        self.write(', ')
+                        self.write(", ")
                     self.write(self.type_str(base))
-                self.write('):\n')
+                self.write("):\n")
             output_len = len(self.output)
             self.depth += 1
             docstr = tp.__doc__
@@ -275,10 +275,10 @@ class StubGen:
     def replace_standard_types(self, s):
         """Detect standard types (e.g. typing.Optional) within a type signature"""
         if self.module_re:
-            s = self.module_re.sub('', s)
+            s = self.module_re.sub("", s)
 
         # tuple[] is not a valid type annotation
-        s = s.replace('tuple[]', 'tuple[()]').replace('Tuple[]', 'Tuple[()]')
+        s = s.replace("tuple[]", "tuple[()]").replace("Tuple[]", "Tuple[()]")
         s = self.typing_re.sub(lambda m: self.import_object("typing", m.group(1)), s)
         s = self.types_re.sub(lambda m: self.import_object("types", m.group(1)), s)
         s = self.misc_re.sub(lambda m: self.import_object(m.group(1), m.group(2)), s)
@@ -339,7 +339,7 @@ class StubGen:
         tp = type(value)
         tp_mod, tp_name = tp.__module__, tp.__name__
 
-        if  inspect.ismodule(value):
+        if inspect.ismodule(value):
             if len(self.stack) != 1:
                 # Do not recurse into submodules
                 return
@@ -384,7 +384,7 @@ class StubGen:
         if module == "builtins":
             return name
         if module not in self.imports:
-            self.imports[module] =  { }
+            self.imports[module] = {}
         if name not in self.imports[module]:
             as_name = name
             if self.module is not None:
@@ -419,14 +419,14 @@ class StubGen:
                 return s
         elif issubclass(tp, dict):
             e = [(self.expr_str(k), self.expr_str(v)) for k, v in e.items()]
-            s = '{'
+            s = "{"
             for i, (k, v) in enumerate(e):
                 if k == None or v == None:
                     return None
-                s += k + ' : ' + v
+                s += k + " : " + v
                 if i + 1 < len(e):
-                    s += ', '
-            s += '}'
+                    s += ", "
+            s += "}"
             if len(s) < self.max_expr_length:
                 return s
             pass
@@ -434,7 +434,9 @@ class StubGen:
 
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
-        if tp.__module__ == "builtins" or (self.module is not None and tp.__module__ == self.module.__name__):
+        if tp.__module__ == "builtins" or (
+            self.module is not None and tp.__module__ == self.module.__name__
+        ):
             return tp.__name__
         else:
             return tp.__module__ + "." + tp.__qualname__
@@ -443,32 +445,32 @@ class StubGen:
         """Generate the final stub output"""
         s = ""
         for module in sorted(self.imports):
-            si = ''
+            si = ""
             imports = self.imports[module]
             for i, (k, v) in enumerate(imports.items()):
                 si += k if k == v else f"{k} as {v}"
                 if i + 1 < len(imports):
-                    si += ",";
+                    si += ","
                     if len(si) > 50:
-                        si += '\n    '
+                        si += "\n    "
                     else:
-                        si += ' '
-            if '\n' in si:
+                        si += " "
+            if "\n" in si:
                 s += f"from {module} import (\n    {si}\n)\n"
             else:
                 s += f"from {module} import {si}\n"
         if s:
             s += "\n"
         s += self.output
-        return s.rstrip() + '\n'
+        return s.rstrip() + "\n"
 
 
 def parse_options(args):
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog='python -m nanobind.stubgen',
-        description="Generate stubs for nanobind-based extensions."
+        prog="python -m nanobind.stubgen",
+        description="Generate stubs for nanobind-based extensions.",
     )
 
     parser.add_argument(
@@ -554,7 +556,7 @@ def parse_options(args):
     return opt
 
 
-def main(args = None):
+def main(args=None):
     from pathlib import Path
     import sys
     import os
@@ -593,12 +595,20 @@ def main(args = None):
         if opt.output_file:
             file = Path(opt.output_file)
         else:
-            file = Path(mod_imported.__file__)
+            file = getattr(mod_imported, "__file__", None)
+            if file is None:
+                raise Exception(
+                    'the module lacks a "__file__" attribute, hence '
+                    "stubgen cannot infer where to place the generated "
+                    "stub. You must specify the -o parameter to provide "
+                    "the name of an output file."
+                )
+            file = Path(file)
 
             ext_loader = importlib.machinery.ExtensionFileLoader
             if isinstance(mod_imported.__loader__, ext_loader):
                 file = file.with_name(mod_imported.__name__)
-            file = file.with_suffix('.pyi')
+            file = file.with_suffix(".pyi")
 
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)

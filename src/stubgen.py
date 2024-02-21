@@ -431,6 +431,8 @@ class StubGen:
             "__loader__",
             "__package__",
             "__file__",
+            "__dict__",
+            "__weakref__",
             "@entries",
         ):
             return

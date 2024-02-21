@@ -566,10 +566,14 @@ NB_MODULE(test_classes_ext, m) {
                nb::is_weak_referenceable(), nb::dynamic_attr())
         .def(nb::init<int>());
 
+    // The following declarations are here to test the stub generator
     nb::module_ sm = m.def_submodule("submodule");
+    struct F { };
     sm.def("f", [] { });
+    nb::class_<F>(sm, "F");
+    m.attr("f2") = sm.attr("f");
+    m.attr("F") = sm.attr("F");
 
-    /// Tested by the stub generator
     nb::dict d;
     nb::list l;
     l.append(123);

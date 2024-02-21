@@ -39,4 +39,9 @@ NB_MODULE(test_make_iterator_ext, m) {
     m.def("iterator_passthrough", [mod](nb::iterator s) -> nb::iterator {
         return nb::make_iterator(mod, "pt_iterator", std::begin(s), std::end(s));
     });
+
+    nb::list all;
+    all.append("iterator_passthrough");
+    all.append("StringMap");
+    m.attr("__all__") = all;
 }

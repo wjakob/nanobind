@@ -14,4 +14,6 @@ class StringMap:
 
     def values(self) -> Iterator[str]: ...
 
+__all__: list = ['iterator_passthrough', 'StringMap']
+
 def iterator_passthrough(arg: Iterator, /) -> Iterator: ...

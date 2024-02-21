@@ -114,11 +114,11 @@ class StubGen:
         )
 
         # Precompile a regular expression used to extract a few other types
-        self.misc_re = re.compile(sep + r"\b(pathlib|os).(Path|PathLike)\b")
+        self.misc_re = re.compile(sep + r"(pathlib|os)\.(Path|PathLike)\b")
 
         # Regular expression to strip away the module name
         if module:
-            self.module_re = re.compile(f"\\b{self.module.__name__}\\.")
+            self.module_re = re.compile(sep + f"{self.module.__name__}\\.")
         else:
             self.module_re = None
 
@@ -272,8 +272,8 @@ class StubGen:
         """Check if the given type is an enumeration"""
         return hasattr(tp, "@entries")
 
-    def put_value(self, value, name, parent):
-        value_str = self.expr_str(value)
+    def put_value(self, value, name, parent, abbrev=True):
+        value_str = self.expr_str(value, abbrev)
         if value_str is None:
             value_str = "..."
 
@@ -391,7 +391,8 @@ class StubGen:
                     return
                 self.put_function(value)
             else:
-                self.put_value(value, name, parent)
+                abbrev = name != '__all__'
+                self.put_value(value, name, parent, abbrev=abbrev)
         else:
             self.put_value(value, name, parent)
 
@@ -425,7 +426,7 @@ class StubGen:
             self.imports[module_abbrev][name] = as_name
         return self.imports[module_abbrev][name]
 
-    def expr_str(self, e):
+    def expr_str(self, e, abbrev=True):
         """Attempt to convert a value into a Python expression to generate that value"""
         tp = type(e)
         for t in [bool, int, float, type(None), type(...)]:
@@ -437,20 +438,20 @@ class StubGen:
             return self.type_str(e)
         elif issubclass(tp, str):
             s = repr(e)
-            if len(s) < self.max_expr_length:
+            if len(s) < self.max_expr_length or not abbrev:
                 return s
         elif issubclass(tp, list) or issubclass(tp, tuple):
-            e = [self.expr_str(v) for v in e]
+            e = [self.expr_str(v, abbrev) for v in e]
             if None in e:
                 return None
             if issubclass(tp, list):
                 s = "[" + ", ".join(e) + "]"
             else:
                 s = "(" + ", ".join(e) + ")"
-            if len(s) < self.max_expr_length:
+            if len(s) < self.max_expr_length or not abbrev:
                 return s
         elif issubclass(tp, dict):
-            e = [(self.expr_str(k), self.expr_str(v)) for k, v in e.items()]
+            e = [(self.expr_str(k, abbrev), self.expr_str(v, abbrev)) for k, v in e.items()]
             s = "{"
             for i, (k, v) in enumerate(e):
                 if k == None or v == None:
@@ -459,7 +460,7 @@ class StubGen:
                 if i + 1 < len(e):
                     s += ", "
             s += "}"
-            if len(s) < self.max_expr_length:
+            if len(s) < self.max_expr_length or not abbrev:
                 return s
             pass
         return None

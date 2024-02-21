@@ -82,46 +82,63 @@ class StubGen:
         # Maximal length (in characters) before an expression gets abbreviated as '...'
         self.max_expr_length = max_expr_length
 
-        # Negative lookbehind matching boundaries except '.'
-        sep = r'(?<![\\B\.])'
+        # Negative lookbehind matching word boundaries except '.'
+        sep_before = r"(?<![\\B\.])"
 
-        # Positive lookafter matching an opening bracket
-        bracket = r'(?=\[)'
+        # Negative lookforward matching word boundaries except '.'
+        sep_after = r"(?![\\B\.])"
+
+        # Positive lookforward matching an opening bracket
+        bracket = r"(?=\[)"
 
         # Regexp matching a Python identifier
-        identifier = r'[^\d\W]\w*'
+        identifier = r"[^\d\W]\w*"
 
         # Regexp matching a sequence of identifiers separated by periods
-        identifier_seq = sep + '((?:' + identifier + r'\.)+)(' + identifier + r')\b'
+        identifier_seq = (
+            sep_before
+            + "((?:"
+            + identifier
+            + r"\.)+)("
+            + identifier
+            + r")\b"
+            + sep_after
+        )
 
         # Precompile a regular expression used to extract types from 'typing.*'
         self.typing_re = re.compile(
-            sep + r'(Union|Optional|Tuple|Dict|List|Annotated)' + bracket
+            sep_before + r"(Union|Optional|Tuple|Dict|List|Annotated)" + bracket
         )
 
         # ditto, for 'typing.*' or 'collections.abc.*' depending on the Python version
         self.abc_re = re.compile(
-            sep + r"(Callable|Tuple|Sequence|Mapping|Set|Iterator|Iterable)\b"
+            sep_before + r"(Callable|Tuple|Sequence|Mapping|Set|Iterator|Iterable)\b"
         )
 
         # Precompile a regular expression used to extract types from 'types.*'
         self.types_re = re.compile(
-            sep + r"(ModuleType|CapsuleType|NoneType|EllipsisType)\b"
+            sep_before + r"(ModuleType|CapsuleType|NoneType|EllipsisType)\b"
         )
 
         # Precompile a regular expression used to extract nanobind nd-arrays
         self.ndarray_re = re.compile(
-            sep + r"(numpy.ndarray|ndarray|torch.Tensor)\[([^\]]*)\]"
+            sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor)\[([^\]]*)\]"
         )
+
+        # Regular expression matching `builtins.*` types
+        self.builtins_re = re.compile(sep_before + r"builtins\.(" + identifier + ")")
 
         # Precompile a regular expression used to extract a few other types
         self.identifier_seq_re = re.compile(identifier_seq)
 
-        # Regular expression to strip away the module name
+        # Regular expression to strip away the module for locals
         if module:
-            self.module_re = re.compile(sep + f"{self.module.__name__}\\.")
+            module_name_re = self.module.__name__.replace(".", r"\.")
+            self.module_member_re = re.compile(
+                sep_before + module_name_re + r"\.(" + identifier + ")" + sep_after
+            )
         else:
-            self.module_re = None
+            self.module_member_re = None
 
     def write(self, s):
         """Append raw characters to the output"""
@@ -183,6 +200,12 @@ class StubGen:
 
     def put_nb_func(self, fn, name=None):
         """Append an 'nb_func' function object"""
+        module = getattr(fn, "__module__", None)
+        if name and module and self.module and module != self.module.__name__:
+            # Check if this function is is an alias
+            self.put_value(fn, name, None)
+            return
+
         sigs = fn.__nb_signature__
         count = len(sigs)
         assert count > 0
@@ -195,7 +218,13 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
-    def put_function(self, fn):
+    def put_function(self, fn, name=None):
+        module = getattr(fn, "__module__", None)
+        if name and module and self.module and module != self.module.__name__:
+            # Check if this function is is an alias
+            self.put_value(fn, name, None)
+            return
+
         sig = inspect.signature(fn)
         sig_str = f"{fn.__name__}{str(sig):}"
         docstr = fn.__doc__
@@ -238,10 +267,7 @@ class StubGen:
     def put_nb_type(self, tp, module, name):
         """Append a 'nb_type' type object"""
         if name is not None and (name != tp.__name__ or module != tp.__module__):
-            # If the type is not where it is supposed to be, generate an assignment
-            type_name = self.import_object(tp.__module__, tp.__name__)
-            if name != type_name:
-                self.write_ln(f"{name}: {self.type_str(type(tp))} = {type_name}\n")
+            self.put_value(tp, name, None)
         else:
             is_enum = self.is_enum(tp)
             self.write_ln(f"class {tp.__name__}:")
@@ -273,35 +299,61 @@ class StubGen:
         """Check if the given type is an enumeration"""
         return hasattr(tp, "@entries")
 
-    def put_value(self, value, name, parent, abbrev=True):
-        value_str = self.expr_str(value, abbrev)
-        if value_str is None:
-            value_str = "..."
+    def is_function(self, tp):
+        return issubclass(tp, types.FunctionType) or \
+               issubclass(tp, types.BuiltinFunctionType) or \
+               issubclass(tp, types.BuiltinMethodType) or \
+               issubclass(tp, types.WrapperDescriptorType) or\
+               (tp.__module__ == 'nanobind' and tp.__name__ == 'nb_func')
 
-        if (
+    def put_value(self, value, name, parent, abbrev=True):
+        tp = type(value)
+        is_function = self.is_function(tp)
+        is_enum_entry = (
             isinstance(parent, type)
-            and isinstance(value, parent)
+            and issubclass(tp, parent)
             and self.is_enum(parent)
-        ):
-            self.write_ln(f"{name}: {self.type_str(type(value))}")
+        )
+
+        if is_enum_entry:
+            self.write_ln(f"{name}: {self.type_str(tp)}")
             if value.__doc__ and self.include_docstrings:
                 self.put_docstr(value.__doc__)
             self.write("\n")
+        elif is_function or isinstance(value, type):
+            self.import_object(
+                value.__module__,
+                value.__name__,
+                name
+            )
         else:
-            self.write_ln(f"{name}: {self.type_str(type(value))} = {value_str}\n")
+            value_str = self.expr_str(value, abbrev)
+            if value_str is None:
+                value_str = "..."
+            self.write_ln(f"{name}: {self.type_str(tp)} = {value_str}\n")
 
     def replace_standard_types(self, s):
         """Detect standard types (e.g. typing.Optional) within a type signature"""
-        if self.module_re:
-            s = self.module_re.sub("", s)
+
+        # Strip module from types declared in the same module
+        if self.module_member_re:
+            s = self.module_member_re.sub(lambda m: m.group(1), s)
+
+        # Remove 'builtins.*'
+        s = self.builtins_re.sub(lambda m: m.group(1), s)
 
         # tuple[] is not a valid type annotation
         s = s.replace("tuple[]", "tuple[()]").replace("Tuple[]", "Tuple[()]")
+
+        # Rewrite typings/collection.abc types
         s = self.typing_re.sub(lambda m: self.import_object("typing", m.group(1)), s)
         source_pkg = "typing" if sys.version_info < (3, 9, 0) else "collections.abc"
         s = self.abc_re.sub(lambda m: self.import_object(source_pkg, m.group(1)), s)
+
+        # Import a few types from 'types.*' as needed
         s = self.types_re.sub(lambda m: self.import_object("types", m.group(1)), s)
 
+        # Process nd-array type annotations so that MyPy accepts them
         def replace_ndarray(m):
             s = m.group(2)
 
@@ -317,11 +369,12 @@ class StubGen:
 
         s = self.ndarray_re.sub(replace_ndarray, s)
 
+        # For types from other modules, add suitable import statements
         def ensure_module_imported(m):
             self.import_object(m.group(1)[:-1], None)
             return m.group(0)
-
         s = self.identifier_seq_re.sub(ensure_module_imported, s)
+
         return s
 
     def put(self, value, module=None, name=None, parent=None):
@@ -367,7 +420,7 @@ class StubGen:
         if inspect.ismodule(value):
             if len(self.stack) != 1:
                 # Do not recurse into submodules, but include a directive to import them
-                self.import_object('.', name)
+                self.import_object(".", name)
                 return
             for name, child in inspect.getmembers(value):
                 self.put(child, module=value.__name__, name=name, parent=value)
@@ -385,51 +438,53 @@ class StubGen:
         elif tp_mod == "builtins":
             if tp is property:
                 self.put_property(value, name)
-            elif tp in (
-                types.FunctionType,
-                types.BuiltinFunctionType,
-                types.BuiltinMethodType,
-                types.WrapperDescriptorType,
-            ):
+            elif self.is_function(tp):
                 # Don't generate a constructor for nanobind classes that aren't constructible
                 if name == "__init__" and type(parent).__name__.startswith("nb_type"):
                     return
-                self.put_function(value)
+                self.put_function(value, name)
             else:
-                abbrev = name != '__all__'
+                abbrev = name != "__all__"
                 self.put_value(value, name, parent, abbrev=abbrev)
         else:
             self.put_value(value, name, parent)
 
         self.stack.pop()
 
-    def import_object(self, module, name):
+    def import_object(self, module, name, as_name=None):
         """
         Import a type (e.g. typing.Optional) used within the stub,
         ensuring that this does not cause conflicts
         """
         if module == "builtins":
             return name
+        if self.module and module.startswith(self.module.__name__):
+            module = module[len(self.module.__name__):]
+
         if module not in self.imports:
             self.imports[module] = {}
-        module_abbrev = module
-        if self.module and module == self.module.__name__:
-            module_abbrev = '.'
-        if name not in self.imports[module_abbrev]:
-            as_name = name
-            if name and self.module is not None:
+        if name not in self.imports[module]:
+            if as_name is None and name and self.module:
+                # Perform conflict resolution if possible
+                as_name = name
                 while True:
                     if not hasattr(self.module, as_name):
                         break
                     try:
-                        value = getattr(importlib.import_module(self.module.__name__), as_name)
+                        value = getattr(
+                            importlib.import_module(self.module.__name__), as_name
+                        )
                     except ImportError as e:
                         value = None
                     if getattr(self.module, as_name) is value:
                         break
                     as_name = "_" + as_name
-            self.imports[module_abbrev][name] = as_name
-        return self.imports[module_abbrev][name]
+                if as_name == name:
+                    as_name = None
+            self.imports[module][name] = as_name
+
+        as_name = self.imports[module][name]
+        return name if as_name is None else as_name
 
     def expr_str(self, e, abbrev=True):
         """Attempt to convert a value into a Python expression to generate that value"""
@@ -456,7 +511,10 @@ class StubGen:
             if len(s) < self.max_expr_length or not abbrev:
                 return s
         elif issubclass(tp, dict):
-            e = [(self.expr_str(k, abbrev), self.expr_str(v, abbrev)) for k, v in e.items()]
+            e = [
+                (self.expr_str(k, abbrev), self.expr_str(v, abbrev))
+                for k, v in e.items()
+            ]
             s = "{"
             for i, (k, v) in enumerate(e):
                 if k == None or v == None:
@@ -472,12 +530,7 @@ class StubGen:
 
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
-        if tp.__module__ == "builtins" or (
-            self.module is not None and tp.__module__ == self.module.__name__
-        ):
-            return tp.__name__
-        else:
-            return tp.__module__ + "." + tp.__qualname__
+        return self.replace_standard_types(tp.__module__ + "." + tp.__qualname__)
 
     def get(self):
         """Generate the final stub output"""
@@ -486,9 +539,9 @@ class StubGen:
             si = ""
             imports = self.imports[module]
             for i, (k, v) in enumerate(imports.items()):
-                if v is None:
+                if k == None:
                     continue
-                si += k if k == v else f"{k} as {v}"
+                si += k if v is None else f"{k} as {v}"
                 if i + 1 < len(imports):
                     si += ","
                     if len(si) > 50:

@@ -52,7 +52,7 @@ def test01_check_stub_refs(p_ref):
         print(
             '\nWarning: generated stubs do not match their references. If you\n'
             'intentionally changed a test suite extension, it may be necessary\n'
-            'to replace the .pyi.ref file with the generated .py file. But\n'
+            'to replace the .pyi.ref file with the generated .pyi file. But\n'
             'please double-check that the change makes sense.',
             file=sys.stderr
         )

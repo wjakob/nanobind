@@ -598,11 +598,8 @@ class StubGen:
         if not self.abstract_enum:
             return s
 
-        type_var = self.import_object("typing", "TypeVar")
-        self_t = '_EnumT'
-        s += f"_EnumT = {type_var}('_EnumT', bound='_Enum')\n\n"
         s += f"class _Enum:\n"
-        s += f"    def __init__(self: {self_t}, arg: _EnumT, /) -> None: ...\n"
+        s += f"    def __init__(self, arg: object, /) -> None: ...\n"
         s += f"    def __repr__(self, /) -> str: ...\n"
         s += f"    def __hash__(self, /) -> int: ...\n"
         s += f"    def __int__(self, /) -> int: ...\n"
@@ -612,19 +609,19 @@ class StubGen:
             s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
 
         for op in ["gt", "ge", "lt", "le"]:
-            s += f"    def __{op}__(self: {self_t}, arg: {self_t} | int, /) -> bool: ...\n"
+            s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
         s += '\n'
 
         if not self.abstract_enum_arith:
             return s
 
+        self_t = '_EnumArithT'
         s += f"class _EnumArith(_Enum):\n"
         for op in ["abs", "neg", "invert"]:
-            s += f"    def __{op}__(self: {self_t}) -> {self_t}: ...\n"
-
+            s += f"    def __{op}__(self) -> int: ...\n"
         for op in ["add", "sub", "mul", "floordiv", "lshift", "rshift", "and", "or", "xor"]:
-            s += f"    def __{op}__(self: {self_t}, arg: {self_t} | int, /) -> {self_t}: ...\n"
-            s += f"    def __r{op}__(self: {self_t}, arg: {self_t} | int, /) -> {self_t}: ...\n"
+            s += f"    def __{op}__(self, arg: object, /) -> int: ...\n"
+            s += f"    def __r{op}__(self, arg: object, /) -> int: ...\n"
 
         s += "\n"
         return s

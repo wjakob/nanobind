@@ -1,3 +1,4 @@
+from . import submodule
 from typing import overload
 
 class A:

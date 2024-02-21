@@ -520,10 +520,16 @@ class StubGen:
     def expr_str(self, e, abbrev=True):
         """Attempt to convert a value into a Python expression to generate that value"""
         tp = type(e)
-        for t in [bool, int, float, type(None), type(...)]:
+        for t in [bool, int, type(None), type(...)]:
             if issubclass(tp, t):
                 return repr(e)
-        if self.is_enum(type(e)):
+        if issubclass(tp, float):
+            s = repr(e)
+            if 'inf' in s or 'nan' in s:
+                return f"float('{s}')"
+            else:
+                return s
+        elif self.is_enum(tp):
             return self.type_str(type(e)) + '.' + e.__name__
         elif issubclass(tp, type):
             return self.type_str(e)

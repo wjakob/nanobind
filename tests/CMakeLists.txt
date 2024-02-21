@@ -42,9 +42,11 @@ nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
 
-foreach (NAME functions classes ndarray stl)
+foreach (NAME functions classes ndarray stl make_iterator)
   if (NAME STREQUAL stl)
     set(EXTRA MARKER_FILE py.typed)
+  else()
+    set(EXTRA "")
   endif()
 
   if (MSVC)

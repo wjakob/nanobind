@@ -46,6 +46,7 @@ import textwrap
 import importlib
 import types
 import re
+import sys
 
 
 class StubGen:
@@ -81,23 +82,39 @@ class StubGen:
         # Maximal length (in characters) before an expression gets abbreviated as '...'
         self.max_expr_length = max_expr_length
 
+        # Negative lookbehind matching to find word boundaries and prevent '.' expressions
+        sep = r'(?<![\\B\.])'
+
+        # Lookafter matching an opening bracket
+        bracket = r'(?=\[)'
+
         # Precompile a regular expression used to extract types from 'typing.*'
         self.typing_re = re.compile(
-            r"\b(Callable|Union|Optional|Tuple|Set|Dict|List|Sequence|Mapping|AbstractSet)(?=\[)"
+            sep + r'(Union|Optional|Tuple|Dict|List|Annotated)' + bracket
+        )
+
+        # ditto, for 'typing.*' or 'collections.abc.*' depending on the Python version
+        self.abc_re = re.compile(
+            sep + r"(Callable|Tuple|Sequence|Mapping|Set|Iterator|Iterable)\b"
         )
 
         # Precompile a regular expression used to extract types from 'types.*'
         self.types_re = re.compile(
-            r"\b(ModuleType|CapsuleType|NoneType|EllipsisType)\b"
+            sep + r"(ModuleType|CapsuleType|NoneType|EllipsisType)\b"
         )
 
         # Precompile a regular expression used to extract nanobind nd-arrays
         self.ndarray_re = re.compile(
-            r"\b(numpy.ndarray|ndarray|torch.Tensor)\[([^\]]*)\]"
+            sep + r"(numpy.ndarray|ndarray|torch.Tensor)\[([^\]]*)\]"
+        )
+
+        # Precompile a regular expression used to extract weak references
+        self.weakref_re = re.compile(
+            sep + r"weakref.ReferenceType\b"
         )
 
         # Precompile a regular expression used to extract a few other types
-        self.misc_re = re.compile(r"\b(pathlib|os).(Path|PathLike)\b")
+        self.misc_re = re.compile(sep + r"\b(pathlib|os).(Path|PathLike)\b")
 
         # Regular expression to strip away the module name
         if module:
@@ -280,8 +297,11 @@ class StubGen:
         # tuple[] is not a valid type annotation
         s = s.replace("tuple[]", "tuple[()]").replace("Tuple[]", "Tuple[()]")
         s = self.typing_re.sub(lambda m: self.import_object("typing", m.group(1)), s)
+        source_pkg = "typing" if sys.version_info < (3, 9, 0) else "collections.abc"
+        s = self.abc_re.sub(lambda m: self.import_object(source_pkg, m.group(1)), s)
         s = self.types_re.sub(lambda m: self.import_object("types", m.group(1)), s)
         s = self.misc_re.sub(lambda m: self.import_object(m.group(1), m.group(2)), s)
+        s = self.weakref_re.sub(lambda m: self.import_object('weakref', "ReferenceType"), s)
 
         def replace_ndarray(m):
             s = m.group(2)

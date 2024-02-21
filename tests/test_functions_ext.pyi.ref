@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from types import CapsuleType, EllipsisType
-from typing import overload, Callable
+from typing import overload, Annotated
 
 def call_guard_value() -> int: ...
 

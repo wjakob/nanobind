@@ -128,7 +128,7 @@ class StubGen:
 
         # Precompile a regular expression used to extract types from 'types.*'
         self.types_re = re.compile(
-            sep_before + r"(ModuleType|CapsuleType|NoneType|EllipsisType)\b"
+            sep_before + r"(ModuleType|CapsuleType|EllipsisType)\b"
         )
 
         # Precompile a regular expression used to extract nanobind nd-arrays
@@ -137,6 +137,7 @@ class StubGen:
         )
 
         # Regular expression matching `builtins.*` types
+        self.none_re = re.compile(sep_before + r"builtins\.(None)Type\b")
         self.builtins_re = re.compile(sep_before + r"builtins\.(" + identifier + ")")
 
         # Precompile a regular expression used to extract a few other types
@@ -370,6 +371,7 @@ class StubGen:
             s = self.module_member_re.sub(lambda m: m.group(1), s)
 
         # Remove 'builtins.*'
+        s = self.none_re.sub(lambda m: m.group(1), s)
         s = self.builtins_re.sub(lambda m: m.group(1), s)
 
         # tuple[] is not a valid type annotation

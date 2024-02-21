@@ -361,7 +361,8 @@ class StubGen:
 
         if inspect.ismodule(value):
             if len(self.stack) != 1:
-                # Do not recurse into submodules
+                # Do not recurse into submodules, but include a directive to import them
+                self.import_object('.', name)
                 return
             for name, child in inspect.getmembers(value):
                 self.put(child, module=value.__name__, name=name, parent=value)
@@ -405,13 +406,24 @@ class StubGen:
             return name
         if module not in self.imports:
             self.imports[module] = {}
-        if name not in self.imports[module]:
+        module_abbrev = module
+        if self.module and module == self.module.__name__:
+            module_abbrev = '.'
+        if name not in self.imports[module_abbrev]:
             as_name = name
             if self.module is not None:
-                while hasattr(self.module, as_name):
+                while True:
+                    if not hasattr(self.module, as_name):
+                        break
+                    try:
+                        value = getattr(importlib.import_module(self.module.__name__), as_name)
+                    except ImportError as e:
+                        value = None
+                    if getattr(self.module, as_name) is value:
+                        break
                     as_name = "_" + as_name
-            self.imports[module][name] = as_name
-        return self.imports[module][name]
+            self.imports[module_abbrev][name] = as_name
+        return self.imports[module_abbrev][name]
 
     def expr_str(self, e):
         """Attempt to convert a value into a Python expression to generate that value"""

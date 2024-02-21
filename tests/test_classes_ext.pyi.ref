@@ -29,6 +29,7 @@ class Big:
     with a multi-line
     docstring..
     """
+
     def __init__(self) -> None: ...
 
 class BigAligned:
@@ -136,6 +137,7 @@ class StaticProperties2(StaticProperties):
 
 class Struct:
     """Some documentation"""
+
     @overload
     def __init__(self) -> None: ...
 

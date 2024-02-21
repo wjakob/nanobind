@@ -48,6 +48,14 @@ import types
 import re
 import sys
 
+# Standard operations supported by arithmetic enumerations
+# fmt: off
+ENUM_OPS = [
+    "add", "sub", "mul", "floordiv", "eq", "ne", "gt", "ge", "lt", "le",
+    "index", "repr", "hash", "int", "rshift", "lshift", "and", "or", "xor",
+    "neg", "abs", "invert",
+]  # fmt: on
+
 
 class StubGen:
     def __init__(
@@ -57,11 +65,9 @@ class StubGen:
         module=None,
         max_expr_length=50,
     ):
-        # Check for conflicts within 'module'
+        # Store the module (if available) so that we can check for naming
+        # conflicts when introducing temporary variables needed within the stub
         self.module = module
-
-        # Needed include directives from 'typing.*'
-        self.imports = {}
 
         # Should docstrings be included in the generated stub?
         self.include_docstrings = include_docstrings
@@ -69,6 +75,11 @@ class StubGen:
         # Should private members (that start or end with
         # a single underscore) be included?
         self.include_private = include_private
+
+        # Maximal length (in characters) before an expression gets abbreviated as '...'
+        self.max_expr_length = max_expr_length
+
+        # ---------- Internal fields ----------
 
         # Current depth / indentation level
         self.depth = 0
@@ -79,8 +90,8 @@ class StubGen:
         # A stack to avoid infinite recursion
         self.stack = []
 
-        # Maximal length (in characters) before an expression gets abbreviated as '...'
-        self.max_expr_length = max_expr_length
+        # Dictionary to keep track of import directives added by the stub generator
+        self.imports = {}
 
         # Negative lookbehind matching word boundaries except '.'
         sep_before = r"(?<![\\B\.])"
@@ -139,6 +150,10 @@ class StubGen:
             )
         else:
             self.module_member_re = None
+
+        # Should we insert a dummy base class to handle enumerations?
+        self.abstract_enum = False
+        self.abstract_enum_arith = False
 
     def write(self, s):
         """Append raw characters to the output"""
@@ -270,22 +285,41 @@ class StubGen:
             self.put_value(tp, name, None)
         else:
             is_enum = self.is_enum(tp)
-            self.write_ln(f"class {tp.__name__}:")
-            if tp.__bases__ != (object,):
-                self.output = self.output[:-2] + "("
-                for i, base in enumerate(tp.__bases__):
-                    if i:
-                        self.write(", ")
-                    self.write(self.type_str(base))
-                self.write("):\n")
-            output_len = len(self.output)
-            self.depth += 1
             docstr = tp.__doc__
+            tp_dict = dict(tp.__dict__)
+            tp_bases = [self.type_str(base) for base in tp.__bases__]
+
             if is_enum:
                 docstr = docstr.__doc__
+                is_arith = "__add__" in tp_dict
+                self.abstract_enum = True
+                self.abstract_enum_arith |= is_arith
+                self.import_object("typing", "TypeVar")
+
+                tp_bases = ["_Enum" + ("Arith" if is_arith else "")]
+                for op in ENUM_OPS:
+                    name, rname = f"__{op}__", f"__r{op}__"
+                    if name in tp_dict:
+                        del tp_dict[name]
+                    if rname in tp_dict:
+                        del tp_dict[rname]
+
+            self.write_ln(f"class {tp.__name__}:")
+            if tp_bases != ["object"]:
+                self.output = self.output[:-2] + "("
+                for i, base in enumerate(tp_bases):
+                    if i:
+                        self.write(", ")
+                    self.write(base)
+                self.write("):\n")
+            output_len = len(self.output)
+
+            self.depth += 1
             if docstr and self.include_docstrings:
                 self.put_docstr(docstr)
-            for k, v in tp.__dict__.items():
+                if len(tp_dict):
+                    self.write("\n")
+            for k, v in tp_dict.items():
                 self.put(v, module, k, tp)
             if output_len == len(self.output):
                 self.write_ln("pass\n")
@@ -300,19 +334,19 @@ class StubGen:
         return hasattr(tp, "@entries")
 
     def is_function(self, tp):
-        return issubclass(tp, types.FunctionType) or \
-               issubclass(tp, types.BuiltinFunctionType) or \
-               issubclass(tp, types.BuiltinMethodType) or \
-               issubclass(tp, types.WrapperDescriptorType) or\
-               (tp.__module__ == 'nanobind' and tp.__name__ == 'nb_func')
+        return (
+            issubclass(tp, types.FunctionType)
+            or issubclass(tp, types.BuiltinFunctionType)
+            or issubclass(tp, types.BuiltinMethodType)
+            or issubclass(tp, types.WrapperDescriptorType)
+            or (tp.__module__ == "nanobind" and tp.__name__ == "nb_func")
+        )
 
     def put_value(self, value, name, parent, abbrev=True):
         tp = type(value)
         is_function = self.is_function(tp)
         is_enum_entry = (
-            isinstance(parent, type)
-            and issubclass(tp, parent)
-            and self.is_enum(parent)
+            isinstance(parent, type) and issubclass(tp, parent) and self.is_enum(parent)
         )
 
         if is_enum_entry:
@@ -321,11 +355,7 @@ class StubGen:
                 self.put_docstr(value.__doc__)
             self.write("\n")
         elif is_function or isinstance(value, type):
-            self.import_object(
-                value.__module__,
-                value.__name__,
-                name
-            )
+            self.import_object(value.__module__, value.__name__, name)
         else:
             value_str = self.expr_str(value, abbrev)
             if value_str is None:
@@ -373,6 +403,7 @@ class StubGen:
         def ensure_module_imported(m):
             self.import_object(m.group(1)[:-1], None)
             return m.group(0)
+
         s = self.identifier_seq_re.sub(ensure_module_imported, s)
 
         return s
@@ -383,7 +414,7 @@ class StubGen:
             return
         self.stack.append(value)
 
-        # Don't explictily include various standard elements found
+        # Don't explicitly include various standard elements found
         # in modules, classes, etc.
         if name in (
             "__doc__",
@@ -459,7 +490,7 @@ class StubGen:
         if module == "builtins":
             return name
         if self.module and module.startswith(self.module.__name__):
-            module = module[len(self.module.__name__):]
+            module = module[len(self.module.__name__) :]
 
         if module not in self.imports:
             self.imports[module] = {}
@@ -493,7 +524,7 @@ class StubGen:
             if issubclass(tp, t):
                 return repr(e)
         if self.is_enum(type(e)):
-            return str(e)
+            return self.type_str(type(e)) + '.' + e.__name__
         elif issubclass(tp, type):
             return self.type_str(e)
         elif issubclass(tp, str):
@@ -535,6 +566,7 @@ class StubGen:
     def get(self):
         """Generate the final stub output"""
         s = ""
+
         for module in sorted(self.imports):
             si = ""
             imports = self.imports[module]
@@ -557,8 +589,45 @@ class StubGen:
                     s += f"from {module} import {si}\n"
         if s:
             s += "\n"
+        s += self.put_abstract_enum_class()
         s += self.output
         return s.rstrip() + "\n"
+
+    def put_abstract_enum_class(self):
+        s = ""
+        if not self.abstract_enum:
+            return s
+
+        type_var = self.import_object("typing", "TypeVar")
+        self_t = '_EnumT'
+        s += f"_EnumT = {type_var}('_EnumT', bound='_Enum')\n\n"
+        s += f"class _Enum:\n"
+        s += f"    def __init__(self: {self_t}, arg: _EnumT, /) -> None: ...\n"
+        s += f"    def __repr__(self, /) -> str: ...\n"
+        s += f"    def __hash__(self, /) -> int: ...\n"
+        s += f"    def __int__(self, /) -> int: ...\n"
+        s += f"    def __index__(self, /) -> int: ...\n"
+
+        for op in ["eq", "ne"]:
+            s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
+
+        for op in ["gt", "ge", "lt", "le"]:
+            s += f"    def __{op}__(self: {self_t}, arg: {self_t} | int, /) -> bool: ...\n"
+        s += '\n'
+
+        if not self.abstract_enum_arith:
+            return s
+
+        s += f"class _EnumArith(_Enum):\n"
+        for op in ["abs", "neg", "invert"]:
+            s += f"    def __{op}__(self: {self_t}) -> {self_t}: ...\n"
+
+        for op in ["add", "sub", "mul", "floordiv", "lshift", "rshift", "and", "or", "xor"]:
+            s += f"    def __{op}__(self: {self_t}, arg: {self_t} | int, /) -> {self_t}: ...\n"
+            s += f"    def __r{op}__(self: {self_t}, arg: {self_t} | int, /) -> {self_t}: ...\n"
+
+        s += "\n"
+        return s
 
 
 def parse_options(args):

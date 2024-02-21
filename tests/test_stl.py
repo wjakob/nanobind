@@ -690,20 +690,20 @@ def test61_set_in_value():
     t.set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     t.unordered_set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_value.__doc__ == (
-        "set_in_value(x: AbstractSet[str]) -> None")
+        "set_in_value(x: Set[str]) -> None")
     assert t.unordered_set_in_value.__doc__ == (
-        "unordered_set_in_value(x: AbstractSet[str]) -> None")
+        "unordered_set_in_value(x: Set[str]) -> None")
 
 
 def test62_set_in_lvalue_ref():
     t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_lvalue_ref.__doc__ == (
-        "set_in_lvalue_ref(x: AbstractSet[str]) -> None")
+        "set_in_lvalue_ref(x: Set[str]) -> None")
 
 def test63_set_in_rvalue_ref():
     t.set_in_rvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_rvalue_ref.__doc__ == (
-        "set_in_rvalue_ref(x: AbstractSet[str]) -> None")
+        "set_in_rvalue_ref(x: Set[str]) -> None")
 
 
 def test64_set_in_failure():

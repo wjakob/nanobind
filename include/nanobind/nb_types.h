@@ -330,7 +330,7 @@ public:
 };
 
 class capsule : public object {
-    NB_OBJECT_DEFAULT(capsule, object, "capsule", PyCapsule_CheckExact)
+    NB_OBJECT_DEFAULT(capsule, object, "CapsuleType", PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
         m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
@@ -527,7 +527,7 @@ public:
     using reference = const handle;
     using pointer = const handle *;
 
-    NB_OBJECT_DEFAULT(iterator, object, "iterator", PyIter_Check)
+    NB_OBJECT_DEFAULT(iterator, object, "Iterator", PyIter_Check)
 
     iterator& operator++() {
         m_value = steal(detail::obj_iter_next(m_ptr));
@@ -557,9 +557,18 @@ private:
     mutable object m_value;
 };
 
+template <typename T> class iterator_t : public iterator {
+public:
+    using iterator::iterator;
+    static constexpr auto Name =
+        detail::const_name("Iterator[") +
+        detail::make_caster<T>::Name + detail::const_name("]");
+};
+
 class iterable : public object {
 public:
-    NB_OBJECT_DEFAULT(iterable, object, "Iterable", detail::iterable_check)
+    NB_OBJECT_DEFAULT(iterable, object, "Iterable",
+                      detail::iterable_check)
 };
 
 /// Retrieve the Python type object associated with a C++ class
@@ -648,7 +657,7 @@ public:
 
 class weakref : public object {
 public:
-    NB_OBJECT(weakref, object, "weakref", PyWeakref_Check)
+    NB_OBJECT(weakref, object, "weakref.ReferenceType", PyWeakref_Check)
 
     explicit weakref(handle obj, handle callback = {})
         : object(PyWeakref_NewRef(obj.ptr(), callback.ptr()), detail::steal_t{}) {

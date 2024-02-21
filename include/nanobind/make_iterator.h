@@ -44,9 +44,9 @@ template <typename Iterator> struct iterator_value_access {
 
 template <typename Access, rv_policy Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
-iterator make_iterator_impl(handle scope, const char *name,
-                            Iterator &&first, Sentinel &&last,
-                            Extra &&...extra) {
+iterator_t<ValueType> make_iterator_impl(handle scope, const char *name,
+                                         Iterator &&first, Sentinel &&last,
+                                         Extra &&...extra) {
     using State = iterator_state<Access, Policy, Iterator, Sentinel, ValueType, Extra...>;
 
     if (!type<State>().is_valid()) {
@@ -70,8 +70,8 @@ iterator make_iterator_impl(handle scope, const char *name,
                  Policy);
     }
 
-    return borrow<iterator>(cast(State{ std::forward<Iterator>(first),
-                                        std::forward<Sentinel>(last), true }));
+    return borrow<iterator_t<ValueType>>(cast(State{ std::forward<Iterator>(first),
+                                                     std::forward<Sentinel>(last), true }));
 }
 
 NAMESPACE_END(detail)
@@ -82,7 +82,7 @@ template <rv_policy Policy = rv_policy::reference_internal,
           typename Sentinel,
           typename ValueType = typename detail::iterator_access<Iterator>::result_type,
           typename... Extra>
-iterator make_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&last, Extra &&...extra) {
+auto make_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&last, Extra &&...extra) {
     return detail::make_iterator_impl<detail::iterator_access<Iterator>, Policy,
                                       Iterator, Sentinel, ValueType, Extra...>(
         scope, name, std::forward<Iterator>(first),
@@ -96,8 +96,8 @@ template <rv_policy Policy = rv_policy::reference_internal, typename Iterator,
           typename KeyType =
               typename detail::iterator_key_access<Iterator>::result_type,
           typename... Extra>
-iterator make_key_iterator(handle scope, const char *name, Iterator &&first,
-                           Sentinel &&last, Extra &&...extra) {
+auto make_key_iterator(handle scope, const char *name, Iterator &&first,
+                       Sentinel &&last, Extra &&...extra) {
     return detail::make_iterator_impl<detail::iterator_key_access<Iterator>,
                                       Policy, Iterator, Sentinel, KeyType,
                                       Extra...>(
@@ -112,7 +112,7 @@ template <rv_policy Policy = rv_policy::reference_internal,
           typename Sentinel,
           typename ValueType = typename detail::iterator_value_access<Iterator>::result_type,
           typename... Extra>
-iterator make_value_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&last, Extra &&...extra) {
+auto make_value_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&last, Extra &&...extra) {
     return detail::make_iterator_impl<detail::iterator_value_access<Iterator>,
                                       Policy, Iterator, Sentinel, ValueType,
                                       Extra...>(
@@ -124,7 +124,7 @@ iterator make_value_iterator(handle scope, const char *name, Iterator &&first, S
 template <rv_policy Policy = rv_policy::reference_internal,
           typename Type,
           typename... Extra>
-iterator make_iterator(handle scope, const char *name, Type &value, Extra &&...extra) {
+auto make_iterator(handle scope, const char *name, Type &value, Extra &&...extra) {
     return make_iterator<Policy>(scope, name, std::begin(value),
                                  std::end(value),
                                  std::forward<Extra>(extra)...);

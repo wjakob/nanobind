@@ -82,11 +82,17 @@ class StubGen:
         # Maximal length (in characters) before an expression gets abbreviated as '...'
         self.max_expr_length = max_expr_length
 
-        # Negative lookbehind matching to find word boundaries and prevent '.' expressions
+        # Negative lookbehind matching boundaries except '.'
         sep = r'(?<![\\B\.])'
 
-        # Lookafter matching an opening bracket
+        # Positive lookafter matching an opening bracket
         bracket = r'(?=\[)'
+
+        # Regexp matching a Python identifier
+        identifier = r'[^\d\W]\w*'
+
+        # Regexp matching a sequence of identifiers separated by periods
+        identifier_seq = sep + '((?:' + identifier + r'\.)+)(' + identifier + r')\b'
 
         # Precompile a regular expression used to extract types from 'typing.*'
         self.typing_re = re.compile(
@@ -108,13 +114,8 @@ class StubGen:
             sep + r"(numpy.ndarray|ndarray|torch.Tensor)\[([^\]]*)\]"
         )
 
-        # Precompile a regular expression used to extract weak references
-        self.weakref_re = re.compile(
-            sep + r"weakref.ReferenceType\b"
-        )
-
         # Precompile a regular expression used to extract a few other types
-        self.misc_re = re.compile(sep + r"(pathlib|os)\.(Path|PathLike)\b")
+        self.identifier_seq_re = re.compile(identifier_seq)
 
         # Regular expression to strip away the module name
         if module:
@@ -300,8 +301,6 @@ class StubGen:
         source_pkg = "typing" if sys.version_info < (3, 9, 0) else "collections.abc"
         s = self.abc_re.sub(lambda m: self.import_object(source_pkg, m.group(1)), s)
         s = self.types_re.sub(lambda m: self.import_object("types", m.group(1)), s)
-        s = self.misc_re.sub(lambda m: self.import_object(m.group(1), m.group(2)), s)
-        s = self.weakref_re.sub(lambda m: self.import_object('weakref', "ReferenceType"), s)
 
         def replace_ndarray(m):
             s = m.group(2)
@@ -317,6 +316,12 @@ class StubGen:
                 return ndarray
 
         s = self.ndarray_re.sub(replace_ndarray, s)
+
+        def ensure_module_imported(m):
+            self.import_object(m.group(1)[:-1], None)
+            return m.group(0)
+
+        s = self.identifier_seq_re.sub(ensure_module_imported, s)
         return s
 
     def put(self, value, module=None, name=None, parent=None):
@@ -412,7 +417,7 @@ class StubGen:
             module_abbrev = '.'
         if name not in self.imports[module_abbrev]:
             as_name = name
-            if self.module is not None:
+            if name and self.module is not None:
                 while True:
                     if not hasattr(self.module, as_name):
                         break
@@ -481,6 +486,8 @@ class StubGen:
             si = ""
             imports = self.imports[module]
             for i, (k, v) in enumerate(imports.items()):
+                if v is None:
+                    continue
                 si += k if k == v else f"{k} as {v}"
                 if i + 1 < len(imports):
                     si += ","
@@ -488,10 +495,13 @@ class StubGen:
                         si += "\n    "
                     else:
                         si += " "
-            if "\n" in si:
-                s += f"from {module} import (\n    {si}\n)\n"
-            else:
-                s += f"from {module} import {si}\n"
+            if None in imports:
+                s += f"import {module}\n"
+            if si:
+                if "\n" in si:
+                    s += f"from {module} import (\n    {si}\n)\n"
+                else:
+                    s += f"from {module} import {si}\n"
         if s:
             s += "\n"
         s += self.output

@@ -207,10 +207,10 @@ static_assert(
 class NB_INTRUSIVE_EXPORT intrusive_base {
 public:
     /// Increase the object's reference count
-    void inc_ref() noexcept { m_ref_count.inc_ref(); }
+    void inc_ref() const noexcept { m_ref_count.inc_ref(); }
 
     /// Decrease the object's reference count, return ``true`` if it should be deallocated
-    bool dec_ref() noexcept { return m_ref_count.dec_ref(); }
+    bool dec_ref() const noexcept { return m_ref_count.dec_ref(); }
 
     /// Set the Python object associated with this instance
     void set_self_py(PyObject *self) noexcept { m_ref_count.set_self_py(self); }
@@ -222,14 +222,14 @@ public:
     virtual ~intrusive_base() = default;
 
 private:
-    intrusive_counter m_ref_count;
+    mutable intrusive_counter m_ref_count;
 };
 
 /**
  * \brief Increase the reference count of an intrusively reference-counted
  * object ``o`` if ``o`` is non-NULL.
  */
-inline void inc_ref(intrusive_base *o) noexcept {
+inline void inc_ref(const intrusive_base *o) noexcept {
     if (o)
         o->inc_ref();
 }
@@ -238,7 +238,7 @@ inline void inc_ref(intrusive_base *o) noexcept {
  * \brief Decrease the reference count and potentially delete an intrusively
  * reference-counted object ``o`` if ``o`` is non-NULL.
  */
-inline void dec_ref(intrusive_base *o) noexcept {
+inline void dec_ref(const intrusive_base *o) noexcept {
     if (o && o->dec_ref())
         delete o;
 }

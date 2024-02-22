@@ -109,7 +109,7 @@ bool intrusive_counter::dec_ref() const noexcept {
             if (!NB_ATOMIC_CMPXCHG(&m_state, &v, v - 2))
                 continue;
 
-            if (v == 1)
+            if (v == 3)
                 return true;
         } else {
             intrusive_dec_ref_py((PyObject *) v);

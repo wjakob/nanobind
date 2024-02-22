@@ -433,6 +433,8 @@ class StubGen:
             "__spec__",
             "__loader__",
             "__package__",
+            "__getattribute__",
+            "__setattribute__",
             "__file__",
             "__dict__",
             "__weakref__",

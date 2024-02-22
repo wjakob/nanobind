@@ -1064,6 +1064,13 @@ Wrapper classes
 
       Iterator inequality comparison operator.
 
+.. cpp:class:: template <typename T> iterator_t : public iterator
+
+   Type-parameterized form of the iterator class. Note that the use of this
+   class does not enable any kind of type checking within nanobind. It is
+   mainly useful to annotate arguments and return values so that they are
+   rendered as ``collections.abc.Iterator[T]`` in typing :ref:`stubs <stubs>`.
+
 .. cpp:class:: iterable : public object
 
    Wrapper class representing an object that can be iterated upon (in the sense

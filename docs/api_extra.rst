@@ -362,7 +362,7 @@ include directive:
 
    #include <nanobind/make_iterator.h>
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
 
    Create a Python iterator wrapping the C++ iterator represented by the range
    ``[first, last)``. The `Extra` parameter can be used to pass additional
@@ -372,6 +372,9 @@ include directive:
    `name`, which is stored in the given `scope`. Usually, some kind of
    :cpp:class:`keep_alive` annotation is needed to tie the lifetime of the
    parent container to that of the iterator.
+
+   The return value is a typed iterator (:cpp:class:`iterator_t`), whose
+   template parameter is given by the type of ``*first``.
 
    Here is an example of what this might look like for a STL vector:
 
@@ -387,7 +390,7 @@ include directive:
               }, nb::keep_alive<0, 1>());
 
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Type, typename... Extra> iterator make_iterator(handle scope, const char * name, Type &value, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Type, typename... Extra> auto make_iterator(handle scope, const char * name, Type &value, Extra &&...extra)
 
    This convenience wrapper calls the above `make_iterator` variant with
    ``first`` and ``last`` set to ``std::begin(value)`` and ``std::end(value)``,
@@ -399,12 +402,18 @@ include directive:
    key-value pairs. `make_key_iterator` returns the first pair element to
    iterate over keys.
 
+   The return value is a typed iterator (:cpp:class:`iterator_t`), whose
+   template parameter is given by the type of ``(*first).first``.
+
 
 .. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_value_iterator` returns the second pair element to
    iterate over values.
+
+   The return value is a typed iterator (:cpp:class:`iterator_t`), whose
+   template parameter is given by the type of ``(*first).second``.
 
 N-dimensional array type
 ------------------------

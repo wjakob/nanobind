@@ -295,7 +295,6 @@ class StubGen:
                 is_arith = "__add__" in tp_dict
                 self.abstract_enum = True
                 self.abstract_enum_arith |= is_arith
-                self.import_object("typing", "TypeVar")
 
                 tp_bases = ["_Enum" + ("Arith" if is_arith else "")]
                 for op in ENUM_OPS:
@@ -367,8 +366,11 @@ class StubGen:
         """Detect standard types (e.g. typing.Optional) within a type signature"""
 
         # Strip module from types declared in the same module
+        is_local = False
         if self.module_member_re:
+            s_old = s
             s = self.module_member_re.sub(lambda m: m.group(1), s)
+            is_local = s != s_old
 
         # Remove 'builtins.*'
         s = self.none_re.sub(lambda m: m.group(1), s)
@@ -406,7 +408,8 @@ class StubGen:
             self.import_object(m.group(1)[:-1], None)
             return m.group(0)
 
-        s = self.identifier_seq_re.sub(ensure_module_imported, s)
+        if not is_local:
+            s = self.identifier_seq_re.sub(ensure_module_imported, s)
 
         return s
 

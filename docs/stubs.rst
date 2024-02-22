@@ -217,3 +217,48 @@ containing the stub declarations.
 Note that for now, the ``nanobind.stubgen.StubGen`` API is considered
 experimental and not subject to the semantic versioning policy used by the
 nanobind project.
+
+Signature customization
+-----------------------
+
+In larger binding projects, some customization is often needed so that static
+type checkers accept the generated stubs. The stub produced by the following
+binding
+
+.. code-block:: cpp
+
+   nb::class_<Int>(m, "Int")
+       .def(nb::self == nb::self);
+
+is likely rejected because the nanobind-derived ``__eq__`` function signature
+
+.. code-block:: text
+
+   __eq__(self, arg: Int, /) -> bool
+
+is more specific than that of the parent class ``object``:
+
+.. code-block:: text
+
+   __eq__(self, arg: object, /) -> bool
+
+In this case, MyPy, e.g., reports
+
+.. code-block:: text
+
+    error: Argument 1 of "__eq__" is incompatible with supertype "object"; supertype defines the argument type as "object"  [override]
+
+To handle such cases, you can use the :cpp:class:`nb::signature <signature>`
+function binding attribute, which overrides the complete function signature
+with a custom string.
+
+.. code-block:: cpp
+
+   nb::class_<Int>(m, "Int")
+       .def(nb::self == nb::self,
+            nb::signature("__eq__(self, arg: object, /) -> bool"));
+
+Note that this *must* be a valid Python function signature of the form
+``name(...) -> ...``, where ``name`` must furthermore match the name given to
+the binding declaration (this comment applies to ``.def("name", ...)``-style
+bindings with explicit name).

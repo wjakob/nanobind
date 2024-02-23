@@ -16,7 +16,7 @@ isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
 
-Version 1.9.1 (Feb 23, 2024)
+Version 1.9.2 (Feb 23, 2024)
 ----------------------------
 
 * Nanobind instances can now be :ref:`made weak-referenceable <weak_refs>` by
@@ -77,11 +77,11 @@ Version 1.9.1 (Feb 23, 2024)
 
 * Minor fixes and improvements.
 
-Version 1.9.0 (Feb 18, 2024)
-----------------------------
+Version 1.9.0-1.9.1 (Feb 18, 2024)
+----------------------------------
 
-Release withdrawn because of a regression. The changes of this release are
-listed above in the 1.9.1 release notes.
+Releases withdrawn because of a regression. The associated changes are
+listed above in the 1.9.2 release notes.
 
 Version 1.8.0 (Nov 2, 2023)
 ---------------------------

@@ -15,6 +15,40 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.0.0 (TBA)
+-------------------
+
+This version adds a major new feature: automatic generation of `stubs
+<https://typing.readthedocs.io/en/latest/source/stubs.html>`__, which make
+compiled extension code compatible with visual autocomplete in editors like
+`Visual Studio Code <https://code.visualstudio.com>`__ and static type checkers
+like `MyPy <https://github.com/python/mypy>`__, `PyRight
+<https://github.com/microsoft/pyright>`__ and `PyType
+<https://github.com/google/pytype>`__. The process is fully integrated into
+nanobind's CMake-based build system and explained in a :ref:`new documentation
+section <stubs>`.
+
+Additionally, the release bundles two changes that break compatibility at both
+API and ABI level, requiring new major version according to `SemVer
+<http://semver.org>`__.
+
+- The ability to override the combined docstring and overload signature listing
+  with a raw string (formerly ``nb::raw_doc``) was replaced with a more
+  fine-grained annotation named :cpp:class:`nb::signature`.
+
+  The new interface enables changing the signature of individual overloads
+  without touching the docstring part. This change was needed by the new stub
+  generator. Existing use of ``nb::raw_doc`` must be reworked into this format,
+  see :ref:`here <fsig_override>` for an example.  
+
+- The release improves many type caster so that they produce more accurate type
+  signatures. For example, the STL ``std::vector<T>`` type caster now renders
+  as ``collections.abc.Sequence[T]`` in stubs when it is used as an *input*,
+  and ``list[T]`` when it is used as part of a return value. The
+  :cpp:func:`nb::make_iterator() <make_iterator>` API now returns typed
+  iterators.
+
+* ABI version 14.
 
 Version 1.9.2 (Feb 23, 2024)
 ----------------------------
@@ -22,8 +56,9 @@ Version 1.9.2 (Feb 23, 2024)
 * Nanobind instances can now be :ref:`made weak-referenceable <weak_refs>` by
   specifying the :cpp:class:`nb::is_weak_referenceable <is_weak_referenceable>` tag
   in the :cpp:class:`nb::class_\<..\> <class_>` constructor. (PR `#335
-  <https://github.com/wjakob/nanobind/pull/335>`__, commit `fc7709
-  <https://github.com/wjakob/nanobind/commit/fc770930468313e5a69364cfd1bbdab9bc0ab208>`__).
+  <https://github.com/wjakob/nanobind/pull/335>`__, commits `fc7709
+  <https://github.com/wjakob/nanobind/commit/fc770930468313e5a69364cfd1bbdab9bc0ab208>`__,
+  `3562f6 <https://github.com/wjakob/nanobind/commit/3562f692409f29bd9cef0d9eec2ee7e26e53a055>`__).
 
 * Added a :cpp:class:`nb::bool_ <bool_>` wrapper type. (PR `#382
   <https://github.com/wjakob/nanobind/pull/382>`__, commit `90dfba

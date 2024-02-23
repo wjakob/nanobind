@@ -193,6 +193,8 @@ The following lists minor-but-useful additions relative to pybind11.
   overload when the underlying Python type object is a subtype of the C++ type
   ``T``.
 
+.. _fsig_override:
+
 - **Function signature overrides**: it may sometimes be necessary to tweak the
   type signature of a function to provide richer type information to static
   type checkers like `MyPy <https://github.com/python/mypy>`__ or `PyRight

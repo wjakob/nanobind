@@ -216,16 +216,9 @@ class StubGen:
 
     def put_nb_func(self, fn, name=None):
         """Append an 'nb_func' function object"""
-        module = getattr(fn, "__module__", None)
-        if name and module and self.module and module != self.module.__name__:
-            # Check if this function is is an alias
-            self.put_value(fn, name, None)
-            return
-
         sigs = fn.__nb_signature__
         count = len(sigs)
         assert count > 0
-
         if count == 1:
             self.put_nb_overload(fn, sigs[0], name)
         else:
@@ -234,15 +227,36 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
-    def put_function(self, fn, name=None):
-        module = getattr(fn, "__module__", None)
-        if name and module and self.module and module != self.module.__name__:
-            # Check if this function is is an alias
-            self.put_value(fn, name, None)
+    def put_function(self, fn, name=None, parent = None):
+        """Append a function of an arbitrary type"""
+        # Don't generate a constructor for nanobind classes that aren't constructible
+        if name == "__init__" and type(parent).__name__.startswith("nb_type"):
             return
 
+        if self.module:
+            fn_module = getattr(fn, "__module__", None)
+            fn_name = getattr(fn, "__name__", None)
+
+            # Check if this function is an alias from another module
+            if fn_module and fn_module != self.module.__name__:
+                self.put_value(fn, name, None)
+                return
+
+            # Check if this function is an alias from the same module
+            if name and fn_name and name != fn_name:
+                self.write_ln(f"{name} = {fn_name}\n")
+                return
+
+        # Special handling for nanobind functions with overloads
+        if type(fn).__module__ == 'nanobind':
+            self.put_nb_func(fn, name)
+            return
+
+        if name is None:
+            name = fn.__name__
+
         sig = inspect.signature(fn)
-        sig_str = f"{fn.__name__}{str(sig):}"
+        sig_str = f"{name}{str(sig):}"
         docstr = fn.__doc__
 
         sig_str = self.replace_standard_types(sig_str)
@@ -282,8 +296,12 @@ class StubGen:
 
     def put_nb_type(self, tp, module, name):
         """Append a 'nb_type' type object"""
-        if name is not None and (name != tp.__name__ or module != tp.__module__):
-            self.put_value(tp, name, None)
+        if name and (name != tp.__name__ or module.__name__ != tp.__module__):
+            # This is an alias of a type in the same module or a different one
+            if module.__name__ == tp.__module__:
+                self.write_ln(f"{name} = {tp.__name__}\n")
+            else:
+                self.put_value(tp, name, None)
         else:
             is_enum = self.is_enum(tp)
             docstr = tp.__doc__
@@ -417,86 +435,82 @@ class StubGen:
         # Avoid infinite recursion due to cycles
         if value in self.stack:
             return
-        self.stack.append(value)
+        try:
+            self.stack.append(value)
 
-        # Don't explicitly include various standard elements found
-        # in modules, classes, etc.
-        if name in (
-            "__doc__",
-            "__module__",
-            "__name__",
-            "__new__",
-            "__builtins__",
-            "__cached__",
-            "__path__",
-            "__version__",
-            "__spec__",
-            "__loader__",
-            "__package__",
-            "__getattribute__",
-            "__setattribute__",
-            "__file__",
-            "__dict__",
-            "__weakref__",
-            "@entries",
-        ):
-            return
-
-        # Potentially exclude private members
-        if (
-            not self.include_private
-            and name
-            and len(name) > 2
-            and (
-                (name[0] == "_" and name[1] != "_")
-                or (name[-1] == "_" and name[-2] != "_")
-            )
-        ):
-            return
-
-        tp = type(value)
-        tp_mod, tp_name = tp.__module__, tp.__name__
-
-        if inspect.ismodule(value):
-            if len(self.stack) != 1:
-                # Do not recurse into submodules, but include a directive to import them
-                self.import_object(".", name)
+            # Don't explicitly include various standard elements found
+            # in modules, classes, etc.
+            if name in (
+                "__doc__",
+                "__module__",
+                "__name__",
+                "__new__",
+                "__builtins__",
+                "__cached__",
+                "__path__",
+                "__version__",
+                "__spec__",
+                "__loader__",
+                "__package__",
+                "__getattribute__",
+                "__setattribute__",
+                "__file__",
+                "__dict__",
+                "__weakref__",
+                "@entries",
+            ):
                 return
-            for name, child in inspect.getmembers(value):
-                self.put(child, module=value.__name__, name=name, parent=value)
-        elif tp_mod == "nanobind":
-            if tp_name == "nb_func":
-                self.put_nb_func(value, name)
-            elif tp_name == "nb_method":
-                self.put_nb_func(value, name)
-            elif tp_name == "nb_static_property":
-                self.put_nb_static_property(parent, name, value)
-            elif tp_name.startswith("nb_type"):
-                self.put_nb_type(value, module, name)
-        elif issubclass(tp, type):
-            self.put_type(value, module, name)
-        elif tp_mod == "builtins":
-            if tp is property:
-                self.put_property(value, name)
-            elif self.is_function(tp):
-                # Don't generate a constructor for nanobind classes that aren't constructible
-                if name == "__init__" and type(parent).__name__.startswith("nb_type"):
-                    return
-                self.put_function(value, name)
-            else:
-                abbrev = name != "__all__"
-                self.put_value(value, name, parent, abbrev=abbrev)
-        else:
-            self.put_value(value, name, parent)
 
-        self.stack.pop()
+            # Potentially exclude private members
+            if (
+                not self.include_private
+                and name
+                and len(name) > 2
+                and (
+                    (name[0] == "_" and name[1] != "_")
+                    or (name[-1] == "_" and name[-2] != "_")
+                )
+            ):
+                return
+
+            tp = type(value)
+            tp_mod, tp_name = tp.__module__, tp.__name__
+
+            if inspect.ismodule(value):
+                if len(self.stack) != 1:
+                    # Do not recurse into submodules, but include a directive to import them
+                    self.import_object(".", name)
+                    return
+                for name, child in inspect.getmembers(value):
+                    self.put(child, module=value, name=name, parent=value)
+            elif self.is_function(tp):
+                self.put_function(value, name, parent)
+            elif tp_mod == "nanobind":
+                if tp_name == "nb_method":
+                    self.put_nb_func(value, name)
+                elif tp_name == "nb_static_property":
+                    self.put_nb_static_property(parent, name, value)
+                elif tp_name.startswith("nb_type"):
+                    self.put_nb_type(value, module, name)
+            elif issubclass(tp, type):
+                self.put_type(value, module, name)
+            elif tp_mod == "builtins":
+                if tp is property:
+                    self.put_property(value, name)
+                else:
+                    abbrev = name != "__all__"
+                    self.put_value(value, name, parent, abbrev=abbrev)
+            else:
+                self.put_value(value, name, parent)
+        finally:
+            self.stack.pop()
 
     def import_object(self, module, name, as_name=None):
         """
         Import a type (e.g. typing.Optional) used within the stub,
         ensuring that this does not cause conflicts
         """
-        if module == "builtins":
+        if module == "builtins" and (as_name is None or name == as_name):
             return name
         if self.module and module.startswith(self.module.__name__):
             module = module[len(self.module.__name__) :]

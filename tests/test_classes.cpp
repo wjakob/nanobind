@@ -575,6 +575,8 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<F>(sm, "F");
     m.attr("f2") = sm.attr("f");
     m.attr("F") = sm.attr("F");
+    m.attr("StructAlias") = m.attr("Struct");
+    m.attr("f_alias") = m.attr("f");
 
     nb::dict d;
     nb::list l;

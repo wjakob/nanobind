@@ -244,7 +244,7 @@ template <> struct type_caster<char> {
 };
 
 template <typename T> struct type_caster<pointer_and_handle<T>> {
-    using Caster = detail::make_caster<T>;
+    using Caster = make_caster<T>;
     using T2 = pointer_and_handle<T>;
     NB_TYPE_CASTER(T2, Caster::Name)
 
@@ -258,27 +258,33 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
     }
 };
 
-template <typename T, typename X> struct type_caster<typed<T, X>> {
-    using Caster = detail::make_caster<T>;
-    using T2 = typed<T, X>;
-    NB_TYPE_CASTER(T2, X::Name)
+template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {
+    using Caster = make_caster<T>;
+    using Typed = typed<T, Ts...>;
+
+    NB_TYPE_CASTER(Typed, Caster::Name + const_name("[") +
+                              concat(make_caster<Ts>::Name...) +
+                              const_name("]"))
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        Caster c;
-        if (!c.from_python(src, flags, cleanup))
+        Caster caster;
+        if (!caster.from_python(src, flags, cleanup))
             return false;
-        value = T2{ (T &&) c.value };
+        try {
+            value = caster.operator cast_t<T>();
+        } catch (...) {
+            return false;
+        }
         return true;
     }
 
-    static handle from_cpp(const T2 &src, rv_policy policy,
-                           cleanup_list *cleanup) noexcept {
-        return Caster::from_cpp(src.value, policy, cleanup);
+    static handle from_cpp(const Value &src, rv_policy policy, cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(src, policy, cleanup);
     }
 };
 
 template <typename T>
-struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T>>> {
+struct type_caster<T, enable_if_t<std::is_base_of_v<detail::api_tag, T> && !T::nb_typed>> {
 public:
     NB_TYPE_CASTER(T, T::Name)
 

@@ -373,8 +373,9 @@ include directive:
    :cpp:class:`keep_alive` annotation is needed to tie the lifetime of the
    parent container to that of the iterator.
 
-   The return value is a typed iterator (:cpp:class:`iterator_t`), whose
-   template parameter is given by the type of ``*first``.
+   The return value is a typed iterator (:cpp:class:`iterator` wrapped using
+   :cpp:class:`typed`), whose template parameter is given by the type of
+   ``*first``.
 
    Here is an example of what this might look like for a STL vector:
 
@@ -402,8 +403,9 @@ include directive:
    key-value pairs. `make_key_iterator` returns the first pair element to
    iterate over keys.
 
-   The return value is a typed iterator (:cpp:class:`iterator_t`), whose
-   template parameter is given by the type of ``(*first).first``.
+   The return value is a typed iterator (:cpp:class:`iterator` wrapped using
+   :cpp:class:`typed`), whose template parameter is given by the type of
+   ``(*first).first``.
 
 
 .. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
@@ -412,8 +414,9 @@ include directive:
    key-value pairs. `make_value_iterator` returns the second pair element to
    iterate over values.
 
-   The return value is a typed iterator (:cpp:class:`iterator_t`), whose
-   template parameter is given by the type of ``(*first).second``.
+   The return value is a typed iterator (:cpp:class:`iterator` wrapped using
+   :cpp:class:`typed`), whose template parameter is given by the type of
+   ``(*first).second``.
 
 N-dimensional array type
 ------------------------

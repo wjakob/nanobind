@@ -169,7 +169,6 @@ def test17_iter_tuple():
 
 
 def test18_raw_doc():
-    print(t.test_08.__doc__ )
     assert t.test_08.__doc__ == '''test_08(arg: int, /) -> int
 test_08(x: Annotated[float, 'foo']) -> int
 

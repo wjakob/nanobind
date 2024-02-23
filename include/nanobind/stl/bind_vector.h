@@ -34,12 +34,6 @@ template <> struct iterator_access<typename std::vector<bool>::iterator> {
     result_type operator()(typename std::vector<bool>::iterator &it) const { return *it; }
 };
 
-template <typename Value> struct iterable_type_id {
-    static constexpr auto Name = const_name("Iterable[") +
-                                 make_caster<Value>::Name +
-                                 const_name("]");
-};
-
 NAMESPACE_END(detail)
 
 
@@ -87,10 +81,10 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
         cl.def(init<const Vector &>(),
                "Copy constructor");
 
-        cl.def("__init__", [](Vector *v, typed<iterable, detail::iterable_type_id<Value>> &seq) {
+        cl.def("__init__", [](Vector *v, typed<iterable, Value> seq) {
             new (v) Vector();
-            v->reserve(len_hint(seq.value));
-            for (handle h : seq.value)
+            v->reserve(len_hint(seq));
+            for (handle h : seq)
                 v->push_back(cast<Value>(h));
         }, "Construct from an iterable object");
 

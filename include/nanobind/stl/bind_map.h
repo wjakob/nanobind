@@ -15,12 +15,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <typename Key, typename Value> struct dict_type_id {
-    static constexpr auto Name =
-        const_name(NB_TYPING_DICT "[") + make_caster<Key>::Name +
-        const_name(", ") + make_caster<Value>::Name + const_name("]");
-};
-
 template <typename Map, typename Key, typename Value>
 inline void map_set(Map &m, const Key &k, const Value &v) {
     if constexpr (detail::is_copy_assignable_v<Value>) {
@@ -102,9 +96,9 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     if constexpr (detail::is_copy_constructible_v<Map>) {
         cl.def(init<const Map &>(), "Copy constructor");
 
-        cl.def("__init__", [](Map *m, typed<dict, detail::dict_type_id<Key, Value>> &d) {
+        cl.def("__init__", [](Map *m, typed<dict, Key, Value> d) {
             new (m) Map();
-            for (auto [k, v] : d.value)
+            for (auto [k, v] : borrow<dict>(std::move(d)))
                 m->emplace(cast<Key>(k), cast<Value>(v));
         }, "Construct from a dictionary");
 

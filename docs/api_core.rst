@@ -1064,13 +1064,6 @@ Wrapper classes
 
       Iterator inequality comparison operator.
 
-.. cpp:class:: template <typename T> iterator_t : public iterator
-
-   Type-parameterized form of the iterator class. Note that the use of this
-   class does not enable any kind of type checking within nanobind. It is
-   mainly useful to annotate arguments and return values so that they are
-   rendered as ``collections.abc.Iterator[T]`` in typing :ref:`stubs <stubs>`.
-
 .. cpp:class:: iterable : public object
 
    Wrapper class representing an object that can be iterated upon (in the sense
@@ -2572,14 +2565,11 @@ Miscellaneous
    is not available (e.g., for custom binding-specific constructors that don't
    exist in `Target` type).
 
-.. cpp:struct:: template <typename T, typename D> typed
+.. cpp:class:: template <typename T, typename... Ts> typed
 
-    This helper class provides an an API for overriding the type
-    annotation of a function argument or return value in generated
-    docstrings. It is particularly helpful when the type signature is
-    not obvious and must be computed at compile time.  Otherwise, the
-    :cpp:class:`signature` attribute provides a simpler alternative for
-    taking full control function type annotations.
+    This helper class provides an an interface to parameterize generic types to
+    improve generated Python function signatures (e.g., to turn ``list`` into
+    ``list[MyType]``).
 
     Consider the following binding that iterates over a Python list.
 
@@ -2591,36 +2581,16 @@ Miscellaneous
            }
        });
 
-    Suppose that ``f`` expects a list of ``Foo`` objects, which is not clear
-    from the signature. To improve the function signature, use the
-    ``nb::typed<T, D>`` wrapper class to pass the argument.
-
-    The template argument `T` should be set to the original argument type, and
-    `D` points to a helper class that will be used to compute the type name at
-    compile time. Any access to the list ``l`` must be replaced by ``l.value``:
+    Suppose that ``f`` expects a list of ``MyType`` objects, which is not clear
+    from the signature. To make this explicit, use the ``nb::typed<T, Ts...>``
+    wrapper to pass additional type parameters. This has no effect besides
+    clarifying the signature---in particular, nanobind does *not* insert
+    additional runtime checks!
 
     .. code-block:: cpp
 
-       m.def("f", [](nb::typed<nb::list, FooListName> l) {
-           for (nb::handle h : l.value) {
+       m.def("f", [](nb::typed<nb::list, MyType> l) {
+           for (nb::handle h : l) {
                // ...
            }
        });
-
-    In this simple example, the ``FooListName`` type can be defined as follows:
-
-    .. code-block:: cpp
-
-       struct FooListName {
-           static constexpr auto Name =
-               nb::detail::const_name("list[") +
-               nb::detail::const_name<Foo>() +
-               nb::detail::const_name("]");
-       };
-
-    More generally, `D` can be a templated class with partial overloads,
-    which allows for advanced constructions.
-
-    .. cpp:member:: T value
-
-       Wrapped value of the `typed` parameter.

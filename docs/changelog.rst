@@ -34,12 +34,29 @@ API and ABI level, requiring new major version according to `SemVer
 
 - The ability to override the combined docstring and overload signature listing
   with a raw string (formerly ``nb::raw_doc``) was replaced with a more
-  fine-grained annotation named :cpp:class:`nb::signature`.
+  fine-grained annotation named :cpp:class:`nb::signature <signature>`.
 
   The new interface enables changing the signature of individual overloads
   without touching the docstring part. This change was needed by the new stub
   generator. Existing use of ``nb::raw_doc`` must be reworked into this format,
-  see :ref:`here <fsig_override>` for an example.  
+  see :ref:`here <fsig_override>` and the section on :ref:`customizing function
+  signatures <typing_signatures>` for further details. This is an API-breaking
+  change.
+
+- The behavior of the :cpp:class:`nb::typed\<T, Ts...\> <typed>` wrapper was
+  changed to make this feature equivalent to parameterization of generic types
+  in in Python -- for example
+
+  .. code-block:: cpp
+
+     m.def("f", [](nb::typed<nb::mapping, int, nb::str> list) { ... });
+
+  produces ``collections.abc.Mapping[int, str]`` in generated stubs.
+  Previously, this feature required that the user provide a custom type
+  formatting implementation, which was somewhat awkward to use. This is an
+  API-breaking change. Please see the section on :ref:`parameterizing generics
+  <typing_generics>` for further details.
+
 
 - The release improves many type caster so that they produce more accurate type
   signatures. For example, the STL ``std::vector<T>`` type caster now renders
@@ -71,7 +88,7 @@ Version 1.9.2 (Feb 23, 2024)
 
 * :cpp:func:`nb::try_cast() <try_cast>` no longer crashes the interpreter when
   attempting to cast a Python ``None`` to a C++ type that was bound using
-  :cpp:class:`nb::class_<...> <class_>`. Previously this would raise an
+  :cpp:class:`nb::class_\<...\> <class_>`. Previously this would raise an
   exception from the cast operator, which would result in a call to
   ``std::terminate()`` because :cpp:func:`try_cast() <try_cast>` is declared
   ``noexcept``. (PR `#386 <https://github.com/wjakob/nanobind/pull/386>`__).

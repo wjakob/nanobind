@@ -44,9 +44,9 @@ template <typename Iterator> struct iterator_value_access {
 
 template <typename Access, rv_policy Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
-iterator_t<ValueType> make_iterator_impl(handle scope, const char *name,
-                                         Iterator &&first, Sentinel &&last,
-                                         Extra &&...extra) {
+typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
+                                              Iterator &&first, Sentinel &&last,
+                                              Extra &&...extra) {
     using State = iterator_state<Access, Policy, Iterator, Sentinel, ValueType, Extra...>;
 
     if (!type<State>().is_valid()) {
@@ -70,8 +70,8 @@ iterator_t<ValueType> make_iterator_impl(handle scope, const char *name,
                  Policy);
     }
 
-    return borrow<iterator_t<ValueType>>(cast(State{ std::forward<Iterator>(first),
-                                                     std::forward<Sentinel>(last), true }));
+    return borrow<typed<iterator, ValueType>>(cast(State{
+        std::forward<Iterator>(first), std::forward<Sentinel>(last), true }));
 }
 
 NAMESPACE_END(detail)

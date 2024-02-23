@@ -91,7 +91,9 @@ struct num_item_list; struct num_item_tuple;
 class args_proxy; class kwargs_proxy;
 struct borrow_t { };
 struct steal_t { };
-class api_tag { };
+struct api_tag {
+    constexpr static bool nb_typed = false;
+};
 class dict_iterator;
 struct fast_iterator;
 
@@ -557,18 +559,9 @@ private:
     mutable object m_value;
 };
 
-template <typename T> class iterator_t : public iterator {
-public:
-    using iterator::iterator;
-    static constexpr auto Name =
-        detail::const_name("Iterator[") +
-        detail::make_caster<T>::Name + detail::const_name("]");
-};
-
 class iterable : public object {
 public:
-    NB_OBJECT_DEFAULT(iterable, object, "Iterable",
-                      detail::iterable_check)
+    NB_OBJECT_DEFAULT(iterable, object, "Iterable", detail::iterable_check)
 };
 
 /// Retrieve the Python type object associated with a C++ class
@@ -693,7 +686,12 @@ public:
     }
 };
 
-template <typename T, typename X> struct typed { T value; };
+template <typename T, typename...> class typed : public T {
+public:
+    constexpr static bool nb_typed = true;
+    using T::T;
+    using T::operator=;
+};
 
 template <typename T> struct pointer_and_handle {
     T *p;

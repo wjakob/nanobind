@@ -19,7 +19,7 @@ Version 1.9.0 (Feb 18, 2024)
 ----------------------------
 
 * Nanobind instances can now be :ref:`made weak-referenceable <weak_refs>` by
-  specifying the :cpp:class:`nb::weak_referenceable <weak_referenceable>` tag
+  specifying the :cpp:class:`nb::is_weak_referenceable <is_weak_referenceable>` tag
   in the :cpp:class:`nb::class_\<..\> <class_>` constructor. (PR `#335
   <https://github.com/wjakob/nanobind/pull/335>`__, commit `fc7709
   <https://github.com/wjakob/nanobind/commit/fc770930468313e5a69364cfd1bbdab9bc0ab208>`__).

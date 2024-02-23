@@ -374,14 +374,14 @@ Weak references
 By default, nanobind instances cannot be referenced via Python's ``weakref``
 class, and attempting to do so will raise an exception.
 
-To support this, add the :class:`nb::weak_referenceable
-<weak_referenceable>` tag to the :class:`nb::class_ <class_>` constructor.
+To support this, add the :class:`nb::is_weak_referenceable
+<is_weak_referenceable>` tag to the :class:`nb::class_ <class_>` constructor.
 Note that this will increase the size of every instance by ``sizeof(void*)``
 due to the need to store a weak reference list.
 
 .. code-block:: cpp
 
-   nb::class_<Pet>(m, "Pet", nb::weak_referenceable());
+   nb::class_<Pet>(m, "Pet", nb::is_weak_referenceable());
 
 .. _inheriting_in_python:
 

@@ -156,8 +156,8 @@ NB_INLINE void type_extra_apply(type_init_data &t, dynamic_attr) {
     t.flags |= (uint32_t) type_flags::has_dynamic_attr;
 }
 
-NB_INLINE void type_extra_apply(type_data & t, weak_referenceable) {
-    t.flags |= (uint32_t)type_flags::is_weak_referenceable;
+NB_INLINE void type_extra_apply(type_data & t, is_weak_referenceable) {
+    t.flags |= (uint32_t) type_flags::is_weak_referenceable;
 }
 
 template <typename T>

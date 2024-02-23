@@ -48,7 +48,7 @@ template <typename... Ts> struct call_guard {
 };
 
 struct dynamic_attr {};
-struct weak_referenceable {};
+struct is_weak_referenceable {};
 struct is_method {};
 struct is_implicit {};
 struct is_operator {};

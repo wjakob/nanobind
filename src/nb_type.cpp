@@ -840,6 +840,13 @@ NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *
     return result;
 }
 
+#if PY_VERSION_HEX >= 0x03090000
+static PyMethodDef class_getitem_method[] = {
+    { "__class_getitem__", Py_GenericAlias, METH_O | METH_CLASS, nullptr },
+    { nullptr }
+};
+#endif
+
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool has_doc               = t->flags & (uint32_t) type_init_flags::has_doc,
@@ -849,6 +856,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          has_supplement        = t->flags & (uint32_t) type_init_flags::has_supplement,
          has_dynamic_attr      = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          is_weak_referenceable = t->flags & (uint32_t) type_flags::is_weak_referenceable,
+         is_generic            = t->flags & (uint32_t) type_flags::is_generic,
          intrusive_ptr         = t->flags & (uint32_t) type_flags::intrusive_ptr,
          has_shared_from_this  = t->flags & (uint32_t) type_flags::has_shared_from_this,
          has_signature         = t->flags & (uint32_t) type_flags::has_signature;
@@ -1029,7 +1037,14 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     if (num_members > 0)
-        *s++ = { Py_tp_members, (void*)members };
+        *s++ = { Py_tp_members, (void*) members };
+
+#if PY_VERSION_HEX < 0x03090000
+    (void) is_generic; // unsupported on Python 3.8
+#else
+    if (is_generic)
+        *s++ = { Py_tp_methods, (void*) class_getitem_method };
+#endif
 
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;

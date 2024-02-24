@@ -1,0 +1,29 @@
+from . import submodule
+from .submodule import F as F, f as f2
+from collections.abc import Iterable
+import typing
+
+@my_decorator
+class CustomSignature(Iterable[int]):
+    @my_decorator
+    def method(self: typing.Self): ...
+
+class Foo:
+    pass
+
+FooAlias = Foo
+
+T = typing.TypeVar("T", contravariant=True)
+
+class Wrapper(typing.Generic[T]):
+    def __init__(self, arg: T, /) -> None: ...
+
+    def get(self, /) -> T: ...
+
+    def __eq__(self, arg: object, /) -> bool: ...
+
+def f() -> None: ...
+
+f_alias = f
+
+pytree: dict = {'a' : ('b', [123])}

@@ -18,59 +18,122 @@ below inherit that of the preceding release.
 Version 2.0.0 (TBA)
 -------------------
 
-This version adds a major new feature: automatic generation of `stubs
-<https://typing.readthedocs.io/en/latest/source/stubs.html>`__, which make
-compiled extension code compatible with visual autocomplete in editors like
-`Visual Studio Code <https://code.visualstudio.com>`__ and static type checkers
-like `MyPy <https://github.com/python/mypy>`__, `PyRight
-<https://github.com/microsoft/pyright>`__ and `PyType
-<https://github.com/google/pytype>`__. The process is fully integrated into
-nanobind's CMake-based build system and explained in a :ref:`new documentation
-section <stubs>`.
+The 2.0.0 release of nanobind is entirely dedicated to *types* [#f1]_! The
+project has always advertised seamless Python ↔ C++ interoperability, and this
+release tries to bring a similar level of interoperability to static type
+checkers like `MyPy <https://github.com/python/mypy>`__, `PyRight
+<https://github.com/microsoft/pyright>`__, `PyType
+<https://github.com/google/pytype>`__, and editors with interactive
+autocompletion like `Visual Studio Code <https://code.visualstudio.com>`__,
+`PyCharm <https://www.jetbrains.com/pycharm/>`__, and many other `LSP
+<https://en.wikipedia.org/wiki/Language_Server_Protocol>`__-compatible IDEs.
 
-Additionally, the release bundles two changes that break compatibility at both
-API and ABI levels, requiring new major version according to `SemVer
-<http://semver.org>`__.
+This required work on three fronts:
 
-- The ability to override the combined docstring and overload signature listing
-  with a raw string (formerly ``nb::raw_doc``) was replaced with a more
-  fine-grained annotation named :cpp:class:`nb::signature <signature>`.
+1. **Stub generation**: the above tools all analyze Python code statically
+   without running it. Because the import mechanism of compiled extensions
+   depends the Python interpreter, these tools weren't able to inspect the
+   contents of nanobind-based extensions.
 
-  The new interface enables changing the signature of individual overloads
-  without touching the docstring part. This change was needed by the new stub
-  generator. Existing use of ``nb::raw_doc`` must be reworked into this format,
-  see :ref:`here <fsig_override>` and the section on :ref:`customizing function
-  signatures <typing_signatures>` for further details.
+   The usual solution involves writing `stubs
+   <https://typing.readthedocs.io/en/latest/source/stubs.html>`__ that expose
+   the module contents to static analysis tools. However, writing stubs by hand
+   is tedious and error-prone.
 
-  Furthermore, , :cpp:class:`nb::signature <signature>` can now also be used to
-  override *class signatures* in generated stubs. See the section on
-  :ref:`customizing class signatures <typing_class_signatures>` for details.
+   This release adds tooling to automatically extract stubs from existing
+   extensions. The process is fully integrated into the CMake-based build
+   system and explained in a :ref:`new documentation section <stubs>`.
 
-  This is an API-breaking change.
+2. **Better default annotations**: once stubs were available, this revealed the
+   next problem: the default nanobind-provided function and class signatures
+   were too rudimentary, and this led to a user poor experience.
 
-- The behavior of the :cpp:class:`nb::typed\<T, Ts...\> <typed>` wrapper was
-  changed to make this feature equivalent to parameterization of generic types
-  in in Python -- for example
+   The release therefore improves many builtin type caster so that they produce
+   more accurate type signatures. For example, the STL ``std::vector<T>``
+   caster now renders as ``collections.abc.Sequence[T]`` in stubs when it is
+   used as an *input*, and ``list[T]`` when it is used as part of a return
+   value. The :cpp:func:`nb::make_*_iterator() <make_iterator>` family of
+   functions return typed iterators, etc.
 
-  .. code-block:: cpp
+3. **Advanced customization**: a subset of the type signatures in larger
+   binding projects will generally require further customization. The features
+   listed below aim to enable precisely this:
 
-     m.def("f", [](nb::typed<nb::mapping, int, nb::str> list) { ... });
+   * In Python, many built-in types are *generic* and can be *parameterized* (e.g.,
+     ``list[int]``). The :cpp:class:`nb::typed\<T, Ts...\> <typed>` wrapper
+     enables such parameterization within C++ (for example, the
+     ``int``-specialized list would be written as ``nb::typed<nb::list,
+     int>``). :ref:`Read more <typing_generics_parameterizing>`.
 
-  produces ``collections.abc.Mapping[int, str]`` in generated stubs.
-  Previously, this feature required that the user provide a custom type
-  formatting implementation, which was somewhat awkward to use. This is an
-  API-breaking change. Please see the section on :ref:`parameterizing generics
-  <typing_generics>` for further details.
+   * The opposite is also possible: passing :cpp:class:`nb::is_generic()
+     <is_generic>` to the class binding constructor
 
+     .. code-block:: cpp
 
-- The release improves many type caster so that they produce more accurate type
-  signatures. For example, the STL ``std::vector<T>`` type caster now renders
-  as ``collections.abc.Sequence[T]`` in stubs when it is used as an *input*,
-  and ``list[T]`` when it is used as part of a return value. The
-  :cpp:func:`nb::make_iterator() <make_iterator>` API now returns typed
-  iterators.
+        nb::class_<MyType>(m, "MyType", nb::is_generic())
+
+     produces a *generic* type that can be parameterized in Python (e.g.
+     ``MyType[int]``). :ref:`Read more <typing_generics_creating>`.
+
+   * The :cpp:class:`nb::signature <signature>` annotation overrides the
+     signature of a function or method, e.g.:
+
+     .. code-block:: cpp
+
+        m.def("f", &f, nb::signature("def f(x: Foo = Foo(0)) -> None"), "docstring");
+
+     Each binding of an overloaded function can be customized separately. This
+     feature can be used to add decorators or control how default arguments are
+     rendered. :ref:`Read more <typing_signature_functions>`.
+
+   * The :cpp:class:`nb::signature <signature>` annotation can also override
+     *class signatures* in generated stubs. Stubs often take certain liberties in
+     deviating somewhat from the precise type signature of the underlying
+     implementation, which is fine as long as this improves the capabilities of
+     the type checker (the stubs are only used by the static type checking phase,
+     which never imports the actual extension).
+
+     For example, the signature annotation in the example below adds an
+     abstract base class advertising that the class implements a typed
+     iterator.
+
+     .. code-block:: cpp
+
+        using IntVec = std::vector<int>;
+
+        nb::class_<IntVec>(m, "IntVec",
+                           nb::signature("class IntVec(Iterable[int])"));
+
+     Nanobind class bindings can't actually extend Python types, so this is a
+     convenient lie. Such shenanigans are worthwhile because they can greatly
+     improve the development experience (e.g. `VS Code
+     <https://code.visualstudio.com>`__ autocomplete) involving compiled
+     extensions. :ref:`Read more <typing_signature_classes>`.
+
+Perhaps most importantly, it was possible to support these improvements with
+minimal changes to the core parts of nanobind, which remains a "nano" library.
+
+These release breaks API and ABI compatibility, requiring a new major version
+according to `SemVer <http://semver.org>`__. The following changes are
+noteworthy:
+
+* The ``nb::raw_doc`` annotation was found to be too inflexible and was
+  therefore removed in this version.
+
+* The ``nb::typed`` wrapper listed above actually already existed in previous
+  nanobind versions but was awkward to use, as it required the user to provide
+  a custom type formatter. This release makes the interface more convenient.
 
 * ABI version 14.
+
+.. rubric:: Footnote
+
+.. [#f1] The author of this library had somewhat of a revelation after
+   switching to a `new editor <https://neovim.io>`__ and experiencing the
+   benefits of interactive Python code completion and type checking for the
+   first time. This experience also showed how nanobind-based extension were
+   previously a second-class citizen in this typed world, prompting the changes
+   in this release.
 
 Version 1.9.2 (Feb 23, 2024)
 ----------------------------
@@ -98,7 +161,7 @@ Version 1.9.2 (Feb 23, 2024)
   ``std::terminate()`` because :cpp:func:`try_cast() <try_cast>` is declared
   ``noexcept``. (PR `#386 <https://github.com/wjakob/nanobind/pull/386>`__).
 
-* Fixed memory corruption in a PyPy-specific codepath in
+* Fixed memory corruption in a PyPy-specific code path in
   :cpp:func:`nb::module_::def_submodule() <module_::def_submodule>` (commit
   `21eaff
   <https://github.com/wjakob/nanobind/commit/21eaffc263c13a5373546d8957e4152e65b1e8ac>`__).
@@ -748,7 +811,7 @@ Version 0.2.0 (March 3, 2023)
 * Added an :cpp:func:`nb::implicit_convertible\<A, B\>() <implicitly_convertible>` function analogous to the one in
   pybind11. (commit `aba4af
   <https://github.com/wjakob/nanobind/commit/aba4af06992f14e21e5b7b379e7986e939316da4>`__).
-* Updated :cpp:func:`nb::make*_iterator\<..\>() <make_iterator>` so that it returns references of elements, not
+* Updated :cpp:func:`nb::make_*_iterator\<..\>() <make_iterator>` so that it returns references of elements, not
   copies. (commit `8916f5
   <https://github.com/wjakob/nanobind/commit/8916f51ad1a25318b5c9fcb07c153f6b72a43bd2>`__).
 * Changed the CMake build system so that the library component

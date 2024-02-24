@@ -59,7 +59,10 @@ enum class type_flags : uint32_t {
     /// A custom signature override was specified
     has_signature            = (1 << 15),
 
-    // Three more flag bits available (16 through 18) without needing
+    /// The class implements __class_getitem__ similar to typing.Generic
+    is_generic               = (1 << 16),
+
+    // Two more flag bits available (17 through 18) without needing
     // a larger reorganization
 };
 
@@ -165,6 +168,10 @@ NB_INLINE void type_extra_apply(type_init_data &t, dynamic_attr) {
 
 NB_INLINE void type_extra_apply(type_init_data & t, is_weak_referenceable) {
     t.flags |= (uint32_t) type_flags::is_weak_referenceable;
+}
+
+NB_INLINE void type_extra_apply(type_init_data & t, is_generic) {
+    t.flags |= (uint32_t) type_flags::is_generic;
 }
 
 NB_INLINE void type_extra_apply(type_init_data & t, const signature &s) {
@@ -664,6 +671,11 @@ template <typename Source, typename Target> void implicitly_convertible() {
             },
             &typeid(Target));
     }
+}
+
+template <typename... Args>
+object type_var(Args&&... args) {
+    return module_::import_("typing").attr("TypeVar")((detail::forward_t<Args>) args...);
 }
 
 NAMESPACE_END(NB_NAMESPACE)

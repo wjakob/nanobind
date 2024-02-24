@@ -45,6 +45,7 @@ import inspect
 import textwrap
 import importlib
 import types
+import typing
 import re
 import sys
 
@@ -389,7 +390,11 @@ class StubGen:
             value_str = self.expr_str(value, abbrev)
             if value_str is None:
                 value_str = "..."
-            self.write_ln(f"{name}: {self.type_str(tp)} = {value_str}\n")
+
+            if issubclass(tp, typing.TypeVar):
+                self.write_ln(f"{name} = {value_str}\n")
+            else:
+                self.write_ln(f"{name}: {self.type_str(tp)} = {value_str}\n")
 
     def replace_standard_types(self, s):
         """Detect standard types (e.g. typing.Optional) within a type signature"""
@@ -466,6 +471,7 @@ class StubGen:
                 "__getattribute__",
                 "__setattribute__",
                 "__nb_signature__",
+                "__class_getitem__",
                 "__file__",
                 "__dict__",
                 "__weakref__",
@@ -566,6 +572,16 @@ class StubGen:
             return self.type_str(type(e)) + '.' + e.__name__
         elif issubclass(tp, type):
             return self.type_str(e)
+        elif issubclass(tp, typing.TypeVar):
+            s = f"typing.TypeVar(\"{e.__name__}\""
+            for v in getattr(e, '__constraints__', ()):
+                s += ", " + self.expr_str(v)
+            for k in ['contravariant', 'covariant', 'bound', 'infer_variance']:
+                v = getattr(e, f'__{k}__', None)
+                if v:
+                    s += f", {k}=" + self.expr_str(v)
+            s += ")"
+            return s
         elif issubclass(tp, str):
             s = repr(e)
             if len(s) < self.max_expr_length or not abbrev:

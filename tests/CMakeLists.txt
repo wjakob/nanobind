@@ -40,9 +40,10 @@ nanobind_add_module(test_ndarray_ext test_ndarray.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_intrusive_ext test_intrusive.cpp test_intrusive_impl.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_typing_ext test_typing.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
 
-foreach (NAME functions classes ndarray stl enum make_iterator)
+foreach (NAME functions classes ndarray stl enum typing make_iterator)
   if (NAME STREQUAL stl)
     set(EXTRA MARKER_FILE py.typed)
   else()
@@ -103,6 +104,7 @@ set(TEST_FILES
   test_chrono.py
   test_ndarray.py
   test_stubs.py
+  test_typing.py
 
   # Stub reference files
   test_classes_ext.pyi.ref
@@ -111,6 +113,7 @@ set(TEST_FILES
   test_ndarray_ext.pyi.ref
   test_stl_ext.pyi.ref
   test_enum_ext.pyi.ref
+  test_typing_ext.pyi.ref
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

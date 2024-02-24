@@ -323,7 +323,6 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<int>())
         .def(nb::self + nb::self)
         .def(nb::self += nb::self)
-        .def(nb::self == nb::self, nb::signature("def __eq__(self, arg: object, /) -> bool"))
         .def(nb::self - float())
         .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
 
@@ -567,25 +566,4 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<StructWithWeakrefsAndDynamicAttrs, Struct>(m, "StructWithWeakrefsAndDynamicAttrs",
                nb::is_weak_referenceable(), nb::dynamic_attr())
         .def(nb::init<int>());
-
-    // The following declarations are here to test the stub generator
-    nb::module_ sm = m.def_submodule("submodule");
-    struct F { };
-    sm.def("f", [] { });
-    nb::class_<F>(sm, "F");
-    m.attr("f2") = sm.attr("f");
-    m.attr("F") = sm.attr("F");
-    m.attr("StructAlias") = m.attr("Struct");
-    m.attr("f_alias") = m.attr("f");
-
-    struct CustomSignature { };
-    nb::class_<CustomSignature>(
-        m, "CustomSignature", nb::signature("@my_decorator\nclass CustomSignature(Iterable[int])"))
-        .def("method", []{}, nb::signature("@my_decorator\ndef method(self: typing.Self)"));
-
-    nb::dict d;
-    nb::list l;
-    l.append(123);
-    d["a"] = nb::make_tuple("b", l);
-    m.attr("pytree") = d;
 }

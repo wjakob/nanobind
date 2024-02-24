@@ -54,6 +54,7 @@ struct is_implicit {};
 struct is_operator {};
 struct is_arithmetic {};
 struct is_final {};
+struct is_generic {};
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};

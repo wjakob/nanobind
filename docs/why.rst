@@ -193,14 +193,12 @@ The following lists minor-but-useful additions relative to pybind11.
   overload when the underlying Python type object is a subtype of the C++ type
   ``T``.
 
-  Finally, the :cpp:class:`nb::typed\<T, Ts...\> <typed>` annotation can be
-  used to parameterize any other type. The feature exists to improve the
+  Finally, the :cpp:class:`nb::typed\<T, Ts...\> <typed>` annotation can 
+  parameterize any other type. The feature exists to improve the
   expressiveness of type signatures (e.g., to turn ``list`` into
   ``list[int]``). Note, however, that nanobind does not perform additional
   runtime checks in this case. Please see the section on :ref:`parameterizing
-  generics <typing_generics>` for further details.
-
-.. _fsig_override:
+  generics <typing_generics_parameterizing>` for further details.
 
 - **Signature overrides**: it may sometimes be necessary to tweak the
   type signature of a class or function to provide richer type information to
@@ -212,7 +210,7 @@ The following lists minor-but-useful additions relative to pybind11.
   For example, the following function signature annotation creates an overload
   that should only be called with an ``1``-valued integer literal. While the
   function also includes a runtime check, a static type checker can now ensure
-  that this error condition is not triggered before the code has ever run.
+  that this error condition cannot possibly be triggered by a given piece of code.
 
   .. code-block:: cpp
 
@@ -225,4 +223,5 @@ The following lists minor-but-useful additions relative to pybind11.
            nb::signature("def f(arg: typing.Literal[1], /) -> int"));
 
   Please see the section on :ref:`customizing function signatures
-  <typing_signatures>` for further details.
+  <typing_signature_functions>` and :ref:`class signatures
+  <typing_signature_classes>` for further details.

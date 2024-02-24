@@ -1749,8 +1749,26 @@ declarations in generated :ref:`stubs <stubs>`,
 
 .. cpp:struct:: is_weak_referenceable
 
-   Indicate that instances of a type require weak reference list so that they
-   can be referenced by the Python ``weakref`` type.
+   Indicate that instances of a type require a weak reference list so that they
+   can be referenced by the Python ``weakref.*`` types.
+
+.. cpp:struct:: is_generic
+
+   If present, nanobind will add a ``__class_getitem__`` function to the newly
+   created type that permits constructing *parameterized* versions (e.g.,
+   ``MyType[int]``). The implementation of this function is equivalent to
+
+   .. code-block:: python
+
+      def __class_getitem__(cls, value):
+          import types
+          return types.GenericAlias(cls, value)
+
+   See the section on :ref:`creating generic types <typing_generics_creating>`
+   for an example.
+
+   This feature is only supported on Python 3.9+. Nanobind will ignore
+   the attribute in Python 3.8 builds.
 
 .. cpp:struct:: template <typename T> supplement
 
@@ -1771,7 +1789,7 @@ declarations in generated :ref:`stubs <stubs>`,
 
 .. cpp:struct:: type_slots_callback
 
-   .. cpp:function:: type_slots_callback(void (*callback)(detail::type_init_data *, PyType_Slot *&slots, size_t max_slots) noexcept)
+   .. cpp:function:: type_slots_callback(void (* callback)(detail::type_init_data * , PyType_Slot * &slots, size_t max_slots) noexcept)
 
    This is an alternative to `type_slots` that provides a callback
    which will be invoked during type creation to populate the type's
@@ -2641,3 +2659,18 @@ Miscellaneous
                // ...
            }
        });
+
+.. cpp:function:: template <typename... Args> object type_var(Args&&... args)
+
+   Intantiate a  `type variable
+   <https://docs.python.org/3/library/typing.html#typing.TypeVar>`__ (i.e., an
+   instance of ``typing.TypeVar``). All arguments of the original Python
+   construction are supported, e.g.:
+
+   .. code-block:: cpp
+
+        m.attr("T") = nb::type_var("T",
+                                   "contravariant"_a = true,
+                                   "covariant"_a = false,
+                                   "bound"_a = nb::type<MyClass>());
+

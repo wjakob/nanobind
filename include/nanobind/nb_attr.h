@@ -206,9 +206,9 @@ NB_INLINE void func_extra_apply(F &f, const scope &scope, size_t &) {
 }
 
 template <typename F>
-NB_INLINE void func_extra_apply(F &f, const signature &d, size_t &) {
+NB_INLINE void func_extra_apply(F &f, const signature &s, size_t &) {
     f.flags |= (uint32_t) func_flags::has_signature;
-    f.name = d.value;
+    f.name = s.value;
 }
 
 template <typename F>

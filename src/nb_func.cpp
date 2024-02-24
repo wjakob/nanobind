@@ -210,14 +210,12 @@ PyObject *nb_func_new(const void *in_) noexcept {
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
 
-    const char *name_cstr = strdup_check(has_name ? f->name : "");
+    char *name_cstr;
     if (has_signature) {
-        char *brace = (char *) strchr(name_cstr, '(');
-        check(brace != nullptr,
-              "nb::detail::nb_func_new(\"%s\"): custom signature must contain "
-              "an opening brace '('.", name_cstr);
-        has_name = brace != name_cstr;
-        *brace = '\0';
+        name_cstr = extract_name("nanobind::detail::nb_func_new", "def ", f->name);
+        has_name = *name_cstr != '\0';
+    } else {
+        name_cstr = strdup_check(has_name ? f->name : "");
     }
 
     // Check for previous overloads
@@ -881,9 +879,22 @@ static uint32_t nb_func_render_signature(const func_data *f,
                has_signature  = f->flags & (uint32_t) func_flags::has_signature;
 
     if (has_signature) {
-        buf.put_dstr(f->signature);
+        const char *s = f->signature;
+
+        if (!nb_signature_mode) {
+            // go to last line of manually provided signature, strip away 'def ' prefix
+            const char *p = strrchr(s, '\n');
+            s = p ? (p + 1) : s;
+            if (strncmp(s, "def ", 4) == 0)
+                s += 4;
+        }
+
+        buf.put_dstr(s);
         return 0;
     }
+
+    if (nb_signature_mode)
+        buf.put("def ");
 
     const std::type_info **descr_type = f->descr_types;
     bool rv = false;

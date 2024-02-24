@@ -29,7 +29,7 @@ nanobind's CMake-based build system and explained in a :ref:`new documentation
 section <stubs>`.
 
 Additionally, the release bundles two changes that break compatibility at both
-API and ABI level, requiring new major version according to `SemVer
+API and ABI levels, requiring new major version according to `SemVer
 <http://semver.org>`__.
 
 - The ability to override the combined docstring and overload signature listing
@@ -40,8 +40,13 @@ API and ABI level, requiring new major version according to `SemVer
   without touching the docstring part. This change was needed by the new stub
   generator. Existing use of ``nb::raw_doc`` must be reworked into this format,
   see :ref:`here <fsig_override>` and the section on :ref:`customizing function
-  signatures <typing_signatures>` for further details. This is an API-breaking
-  change.
+  signatures <typing_signatures>` for further details.
+
+  Furthermore, , :cpp:class:`nb::signature <signature>` can now also be used to
+  override *class signatures* in generated stubs. See the section on
+  :ref:`customizing class signatures <typing_class_signatures>` for details.
+
+  This is an API-breaking change.
 
 - The behavior of the :cpp:class:`nb::typed\<T, Ts...\> <typed>` wrapper was
   changed to make this feature equivalent to parameterization of generic types

@@ -1596,18 +1596,61 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    .. cpp:function:: signature(const char * value)
 
-      This annotation enables taking complete control over a function's type
-      signature by replacing the automatically generated version with
-      ``value``.
+      This is *both* a class and a function binding annotation.
 
-      The provided string should have the form ``function_name(arg_1: type_1 =
-      default_value_1, arg_2: type_2 = default_value_2, ...) ->
-      return_value_type`` (in particular, nanobind expects to find a function
-      name followed by an opening parenthesis).
+      1. When used in functions bindings, it provides complete control over
+         the function's type signature by replacing the automatically generated
+         version with ``value``. You can use it to add or change arguments and
+         return values, tweak how default values are rendered, and add custom
+         decorators.
 
-      nanobind will internally copy the string when creating a function
-      binding, hence dynamically generated arguments with a limited lifetime
-      are legal.
+         Here is an example:
+
+         .. code-block:: cpp
+
+            nb::def("function_name", &function_name,
+                    nb::signature(
+                        "@decorator(decorator_args..)\n
+                        "def function_name(arg_1: type_1 = def_1, ...) -> ret"
+                    ));
+
+
+      2. When used in class bindings, the annotation enables complete control
+         over how the class is rendered by nanobind's ``stubgen`` program. You
+         can use it add decorators, specify ``typing.TypeVar``-parameterized
+         base classes, metaclasses, etc.
+
+         Here is an example:
+
+         .. code-block:: cpp
+
+            nb::class_<Class>(m, "Class",
+                              nb::signature(
+                                  "@decorator(decorator_args..)\n"
+                                  "class Class(Base1[T], Base2, meta=Meta)"
+                              ));
+
+      Deviating significantly from the nanobind-generated signature likely
+      means that the class or function declaration is a *lie*, but such lies
+      can be useful to type-check complex binding projects.
+
+      Specifying decorators isn't required---the above are just examples to
+      show that this is possible.
+
+      nanobind will internally copy the signature during function/type
+      creation, hence dynamically generated strings with a limited lifetime are
+      legal.
+
+      The provided string should be valid Python signature, but *without* a
+      trailing colon (``":"``) or trailing newline. Furthermore, nanobind
+      analyzes the string and expects to find the name of the function or class
+      on the *last line* between the ``"def"`` / ``"class"`` prefix and the
+      opening parenthesis.
+
+      For function bindings, this name must match the specified function name
+      in ``.def("name", ..)``-style binding declarations, and for class
+      bindings, the specified name must match the ``name`` argument of
+      :cpp:class:`nb::class_ <class_>`.
 
 .. cpp:enum-class:: rv_policy
 
@@ -1691,6 +1734,10 @@ Class binding annotations
 
 The following annotations can be specified using the variable-length ``Extra``
 parameter of the constructor :cpp:func:`class_::class_`.
+
+Besides the below options, also refer to the :cpp:class:`signature` which is
+usable in both function and class bindings. It can be used to override class
+declarations in generated :ref:`stubs <stubs>`,
 
 .. cpp:struct:: is_final
 

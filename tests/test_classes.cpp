@@ -323,7 +323,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<int>())
         .def(nb::self + nb::self)
         .def(nb::self += nb::self)
-        .def(nb::self == nb::self, nb::signature("__eq__(self, arg: object, /) -> bool"))
+        .def(nb::self == nb::self, nb::signature("def __eq__(self, arg: object, /) -> bool"))
         .def(nb::self - float())
         .def("__repr__", [](const Int &i) { return std::to_string(i.i); });
 
@@ -577,6 +577,11 @@ NB_MODULE(test_classes_ext, m) {
     m.attr("F") = sm.attr("F");
     m.attr("StructAlias") = m.attr("Struct");
     m.attr("f_alias") = m.attr("f");
+
+    struct CustomSignature { };
+    nb::class_<CustomSignature>(
+        m, "CustomSignature", nb::signature("@my_decorator\nclass CustomSignature(Iterable[int])"))
+        .def("method", []{}, nb::signature("@my_decorator\ndef method(self: typing.Self)"));
 
     nb::dict d;
     nb::list l;

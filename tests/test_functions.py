@@ -364,11 +364,11 @@ def test39_del():
 
 
 def test40_nb_signature():
-    assert t.test_01.__nb_signature__ == ((r"test_01() -> None", None),)
-    assert t.test_02.__nb_signature__ == ((r"test_02(j: int = \0, k: int = \1) -> int", None, 8, 1),)
-    assert t.test_05.__nb_signature__ == ((r"test_05(arg: int, /) -> int", "doc_1"), (r"test_05(arg: float, /) -> int", "doc_2"))
+    assert t.test_01.__nb_signature__ == ((r"def test_01() -> None", None),)
+    assert t.test_02.__nb_signature__ == ((r"def test_02(j: int = \0, k: int = \1) -> int", None, 8, 1),)
+    assert t.test_05.__nb_signature__ == ((r"def test_05(arg: int, /) -> int", "doc_1"), (r"def test_05(arg: float, /) -> int", "doc_2"))
     if sys.version_info >= (3, 9):
         assert t.test_07.__nb_signature__ == (
-            (r"test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]", None),
-            (r"test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]", None)
+            (r"def test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]", None),
+            (r"def test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]", None)
         )

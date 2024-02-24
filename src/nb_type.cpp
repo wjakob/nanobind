@@ -802,6 +802,44 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
     return tp;
 }
 
+// This helper function extracts the function/class name from a custom signature attribute
+NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *s) {
+    (void) cmd;
+
+    // Move to the last line
+    const char *p = strrchr(s, '\n');
+    p = p ? (p + 1) : s;
+
+    // Check that the last line starts with the right prefix
+    size_t prefix_len = strlen(prefix);
+    check(strncmp(p, prefix, prefix_len) == 0,
+          "%s(): last line of custom signature \"%s\" must start with \"%s\"!",
+          cmd, s, prefix);
+    p += prefix_len;
+
+    // Find the opening parenthesis
+    const char *p2 = strchr(p, '(');
+    check(p2 != nullptr,
+          "%s(): last line of custom signature \"%s\" must contain an opening "
+          "parenthesis (\"(\")!", cmd, s);
+
+    // A few sanity checks
+    size_t len = strlen(p);
+    char last = p[len ? (len - 1) : 0];
+
+    check(last != ':' && last != ' ',
+          "%s(): custom signature \"%s\" should not end with \":\" or \" \"!", cmd, s);
+    check((p2 == p || (p[0] != ' ' && p2[-1] != ' ')),
+          "%s(): custom signature \"%s\" contains leading/trailing space around name!", cmd, s);
+
+    size_t size = p2 - p;
+    char *result = (char *) malloc_check(size + 1);
+    memcpy(result, p, size);
+    result[size] = '\0';
+
+    return result;
+}
+
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool has_doc               = t->flags & (uint32_t) type_init_flags::has_doc,
@@ -812,18 +850,26 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          has_dynamic_attr      = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          is_weak_referenceable = t->flags & (uint32_t) type_flags::is_weak_referenceable,
          intrusive_ptr         = t->flags & (uint32_t) type_flags::intrusive_ptr,
-         has_shared_from_this  = t->flags & (uint32_t) type_flags::has_shared_from_this;
+         has_shared_from_this  = t->flags & (uint32_t) type_flags::has_shared_from_this,
+         has_signature         = t->flags & (uint32_t) type_flags::has_signature;
 
-    str name(t->name), qualname = name;
+    const char *t_name = t->name;
+    if (has_signature)
+        t_name =
+            extract_name("nanobind::detail::nb_type_new", "class ", t->name);
+
+    str name(t_name), qualname = name;
     object modname;
     PyObject *mod = nullptr;
 
     // Update hash table that maps from std::type_info to Python type
     auto [it, success] = internals->type_c2p_slow.try_emplace(t->type, nullptr);
     if (!success) {
-        PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: type '%s' was already registered!\n", t->name);
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: type '%s' was already registered!\n", t_name);
         PyObject *tp = (PyObject *) it->second->type_py;
         Py_INCREF(tp);
+        if (has_signature)
+            free((char *) t_name);
         return tp;
     }
 
@@ -854,16 +900,16 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (has_base_py) {
         check(!has_base,
               "nanobind::detail::nb_type_new(\"%s\"): multiple base types "
-              "specified!", t->name);
+              "specified!", t_name);
         base = (PyObject *) t->base_py;
         check(nb_type_check(base),
               "nanobind::detail::nb_type_new(\"%s\"): base type is not a "
-              "nanobind type!", t->name);
+              "nanobind type!", t_name);
     } else if (has_base) {
         nb_type_map_slow::iterator it2 = internals->type_c2p_slow.find(t->base);
         check(it2 != internals->type_c2p_slow.end(),
                   "nanobind::detail::nb_type_new(\"%s\"): base type \"%s\" not "
-                  "known to nanobind!", t->name, type_name(t->base));
+                  "known to nanobind!", t_name, type_name(t->base));
         base = (PyObject *) it2->second->type_py;
     }
 
@@ -923,7 +969,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             t->type_slots_callback(t, s, num_avail);
             check(first_new + num_avail >= s,
                   "nanobind::detail::nb_type_new(\"%s\"): type_slots_callback "
-                  "overflowed the slots array!", t->name);
+                  "overflowed the slots array!", t_name);
             num_avail -= (s - first_new);
         }
         if (t->type_slots) {
@@ -931,7 +977,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             while (t->type_slots[i].slot) {
                 check(i != num_avail,
                       "nanobind::detail::nb_type_new(\"%s\"): ran out of "
-                      "type slots!", t->name);
+                      "type slots!", t_name);
                 *s++ = t->type_slots[i++];
             }
         }
@@ -997,7 +1043,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         python_error err;
         check(false,
               "nanobind::detail::nb_type_new(\"%s\"): type construction "
-              "failed: %s!", t->name, err.what());
+              "failed: %s!", t_name, err.what());
     }
 
     type_data *to = nb_type_data((PyTypeObject *) result);
@@ -1034,7 +1080,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     if (t->scope != nullptr)
-        setattr(t->scope, t->name, result);
+        setattr(t->scope, t_name, result);
 
     setattr(result, "__qualname__", qualname.ptr());
 
@@ -1043,6 +1089,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     internals->type_c2p_fast[t->type] = to;
     internals->type_c2p_slow[t->type] = to;
+
+    if (has_signature) {
+        setattr(result, "__nb_signature__", str(t->name));
+        free((char *) t_name);
+    }
 
     return result;
 }

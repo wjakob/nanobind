@@ -1,5 +1,7 @@
 from . import submodule
 from .submodule import F as F, f as f2
+from collections.abc import Iterable
+import typing
 from typing import overload
 
 class A:
@@ -49,6 +51,11 @@ class ClassWithLen:
 
 class ClassWithSupplement:
     def __init__(self) -> None: ...
+
+@my_decorator
+class CustomSignature(Iterable[int]):
+    @my_decorator
+    def method(self: typing.Self): ...
 
 class D:
     @overload

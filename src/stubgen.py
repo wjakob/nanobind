@@ -184,8 +184,8 @@ class StubGen:
     def put_nb_overload(self, fn, sig, name=None):
         """Append an 'nb_func' function overload"""
         sig_str, docstr, start = sig[0], sig[1], 0
-        if sig_str[0] == "(" and name is not None:
-            sig_str = name + sig_str
+        if sig_str.startswith("def (") and name is not None:
+            sig_str = 'def ' + name + sig_str[4:]
 
         sig_str = self.replace_standard_types(sig_str)
 
@@ -205,10 +205,14 @@ class StubGen:
             self.write_ln("@staticmethod")
 
         if not docstr or not self.include_docstrings:
-            self.write_ln("def " + sig_str + ": ...")
+            for s in sig_str.split('\n'):
+                self.write_ln(s)
+            self.output = self.output[:-1] + ': ...\n'
         else:
             docstr = textwrap.dedent(docstr)
-            self.write_ln("def " + sig_str + ":")
+            for s in sig_str.split('\n'):
+                self.write_ln(s)
+            self.output = self.output[:-1] + ':\n'
             self.depth += 1
             self.put_docstr(docstr)
             self.depth -= 1
@@ -282,7 +286,7 @@ class StubGen:
             self.put(prop.fset, name=name)
             self.include_docstrings = docstrings_backup
 
-    def put_nb_static_property(self, parent, name, prop):
+    def put_nb_static_property(self, name, prop):
         """Append an 'nb_static_property' object"""
         getter_sig = prop.fget.__nb_signature__[0][0]
         getter_sig = getter_sig[getter_sig.find("/) -> ") + 6 :]
@@ -291,24 +295,26 @@ class StubGen:
             self.put_docstr(prop.__doc__)
         self.write("\n")
 
-    def put_nb_enum(self, tp):
-        """Append a 'nb_type' type object representing an enum"""
-
-    def put_nb_type(self, tp, module, name):
+    def put_type(self, tp, module, name):
         """Append a 'nb_type' type object"""
         if name and (name != tp.__name__ or module.__name__ != tp.__module__):
-            # This is an alias of a type in the same module or a different one
             if module.__name__ == tp.__module__:
+                # This is an alias of a type in the same module
                 self.write_ln(f"{name} = {tp.__name__}\n")
             else:
+                # Import from a different module
                 self.put_value(tp, name, None)
         else:
             is_enum = self.is_enum(tp)
             docstr = tp.__doc__
             tp_dict = dict(tp.__dict__)
-            tp_bases = [self.type_str(base) for base in tp.__bases__]
+            tp_bases = None
 
             if is_enum:
+                # Rewrite enumerations so that they derive from a helper
+                # type to avoid bloat from a large number of repeated
+                # function declaarations
+
                 docstr = docstr.__doc__
                 is_arith = "__add__" in tp_dict
                 self.abstract_enum = True
@@ -322,17 +328,26 @@ class StubGen:
                     if rname in tp_dict:
                         del tp_dict[rname]
 
-            self.write_ln(f"class {tp.__name__}:")
-            if tp_bases != ["object"]:
-                self.output = self.output[:-2] + "("
-                for i, base in enumerate(tp_bases):
-                    if i:
-                        self.write(", ")
-                    self.write(base)
-                self.write("):\n")
-            output_len = len(self.output)
+            if hasattr(tp, '__nb_signature__'):
+                # Types with a custom signature override
+                for s in tp.__nb_signature__.split('\n'):
+                    self.write_ln(self.replace_standard_types(s))
+                self.output = self.output[:-1] + ':\n'
+            else:
+                self.write_ln(f"class {tp.__name__}:")
+                if tp_bases is None:
+                    tp_bases = [self.type_str(base) for base in tp.__bases__]
+
+                if tp_bases != ["object"]:
+                    self.output = self.output[:-2] + "("
+                    for i, base in enumerate(tp_bases):
+                        if i:
+                            self.write(", ")
+                        self.write(base)
+                    self.write("):\n")
 
             self.depth += 1
+            output_len = len(self.output)
             if docstr and self.include_docstrings:
                 self.put_docstr(docstr)
                 if len(tp_dict):
@@ -342,10 +357,6 @@ class StubGen:
             if output_len == len(self.output):
                 self.write_ln("pass\n")
             self.depth -= 1
-
-    def put_type(self, tp, module, name):
-        """Append a Python type object (uses the nb_type code path for now)"""
-        self.put_nb_type(tp, module, name)
 
     def is_enum(self, tp):
         """Check if the given type is an enumeration"""
@@ -454,6 +465,7 @@ class StubGen:
                 "__package__",
                 "__getattribute__",
                 "__setattribute__",
+                "__nb_signature__",
                 "__file__",
                 "__dict__",
                 "__weakref__",
@@ -485,15 +497,13 @@ class StubGen:
                     self.put(child, module=value, name=name, parent=value)
             elif self.is_function(tp):
                 self.put_function(value, name, parent)
+            elif issubclass(tp, type):
+                self.put_type(value, module, name)
             elif tp_mod == "nanobind":
                 if tp_name == "nb_method":
                     self.put_nb_func(value, name)
                 elif tp_name == "nb_static_property":
-                    self.put_nb_static_property(parent, name, value)
-                elif tp_name.startswith("nb_type"):
-                    self.put_nb_type(value, module, name)
-            elif issubclass(tp, type):
-                self.put_type(value, module, name)
+                    self.put_nb_static_property(name, value)
             elif tp_mod == "builtins":
                 if tp is property:
                     self.put_property(value, name)

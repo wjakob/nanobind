@@ -955,3 +955,41 @@ custom ``__init__``-style constructors.
           });
     }
 
+
+.. _typing_class_signatures:
+
+Signature customization
+-----------------------
+
+In larger binding projects, some customization of class signatures is often
+needed so that static type checkers accept the generated stubs. For example,
+the following class binding
+
+.. code-block:: cpp
+
+   using IntVec = std::vector<int>;
+
+   nb::class_<IntVec>(m, "IntVec")
+      .def("__iter__",
+           [](const IntVec &v) {
+               return nb::make_iterator(nb::type<IntVec>(), "iterator",
+                                        v.begin(), v.end());
+           }, nb::keep_alive<0, 1>());
+
+defines an iterable vector type storing integers. It may be useful to inherit
+from ``collections.abc.Iterable[int]`` to communicate this fact to static type
+checkers, but such a Python→C++ inheritance chain is not permitted by nanobind.
+
+The :cpp:class:`nb::signature <signature>` annotation provides a way of
+manipulating the class declaration signature in generated :ref:`stubs <stubs>`,
+to achieve this goal (which is technically a *lie*, but a convenient one).
+
+.. code-block:: cpp
+
+   nb::class_<IntVec>(m, "IntVec",
+                      nb::signature("class IntVec(Iterable[int])"));
+
+Note that this must be a valid Python class signature of the form ``class
+ClassName(...)`` excluding trailing colon (``":"``) and newline, where
+``ClassName`` must furthermore match the name provided in the main class
+binding declaration.

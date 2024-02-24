@@ -566,9 +566,10 @@ with a custom string.
 
    nb::class_<Int>(m, "Int")
        .def(nb::self == nb::self,
-            nb::signature("__eq__(self, arg: object, /) -> bool"));
+            nb::signature("def __eq__(self, arg: object, /) -> bool"));
 
-Note that this *must* be a valid Python function signature of the form
-``name(...) -> ...``, where ``name`` must furthermore match the name given to
-the binding declaration (this comment applies to ``.def("name", ...)``-style
-bindings with explicit name).
+Note that this must be a valid Python function signature of the form ``def
+name(...) -> ...`` without trailing colon (``":"``) and newline, where ``name``
+must furthermore match the name given to the binding declaration. In this case,
+the name is implicitly given by the operator, and it must match ``"name"`` in
+``.def("name", ...)``-style bindings with explicit name.

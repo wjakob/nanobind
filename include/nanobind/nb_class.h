@@ -56,7 +56,10 @@ enum class type_flags : uint32_t {
     /// Indicate that a type refers to an enumeration
     is_enum                  = (1 << 14),
 
-    // Four more flag bits available (15 through 18) without needing
+    /// A custom signature override was specified
+    has_signature            = (1 << 15),
+
+    // Three more flag bits available (16 through 18) without needing
     // a larger reorganization
 };
 
@@ -160,8 +163,13 @@ NB_INLINE void type_extra_apply(type_init_data &t, dynamic_attr) {
     t.flags |= (uint32_t) type_flags::has_dynamic_attr;
 }
 
-NB_INLINE void type_extra_apply(type_data & t, is_weak_referenceable) {
+NB_INLINE void type_extra_apply(type_init_data & t, is_weak_referenceable) {
     t.flags |= (uint32_t) type_flags::is_weak_referenceable;
+}
+
+NB_INLINE void type_extra_apply(type_init_data & t, const signature &s) {
+    t.flags |= (uint32_t) type_flags::has_signature;
+    t.name = s.value;
 }
 
 template <typename T>

@@ -258,11 +258,28 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
     }
 };
 
+template <typename T> struct typed_name {
+      static constexpr auto Name = type_caster<T>::Name;
+};
+
+#if PY_VERSION_HEX < 0x03090000
+#define NB_TYPED_NAME_PYTHON38(type, name)                     \
+    template <> struct typed_name<type> {                      \
+        static constexpr auto Name = detail::const_name(name); \
+    };
+
+NB_TYPED_NAME_PYTHON38(nanobind::tuple, "Tuple")
+NB_TYPED_NAME_PYTHON38(list, "List")
+NB_TYPED_NAME_PYTHON38(set, "Set")
+NB_TYPED_NAME_PYTHON38(dict, "Dict")
+NB_TYPED_NAME_PYTHON38(type_object, "Type")
+#endif
+
 template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {
     using Caster = make_caster<T>;
     using Typed = typed<T, Ts...>;
 
-    NB_TYPE_CASTER(Typed, Caster::Name + const_name("[") +
+    NB_TYPE_CASTER(Typed, typed_name<intrinsic_t<T>>::Name + const_name("[") +
                               concat(make_caster<Ts>::Name...) +
                               const_name("]"))
 

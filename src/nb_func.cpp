@@ -96,8 +96,10 @@ void nb_func_dealloc(PyObject *self) {
 
             if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {
-                    Py_XDECREF(f->args[j].value);
-                    Py_XDECREF(f->args[j].name_py);
+                    const arg_data &arg = f->args[j];
+                    Py_XDECREF(arg.value);
+                    Py_XDECREF(arg.name_py);
+                    free((char *) arg.signature);
                 }
             }
 
@@ -139,8 +141,8 @@ void nb_bound_method_dealloc(PyObject *self) {
 }
 
 static arg_data method_args[2] = {
-    { "self", nullptr, nullptr, false, false },
-    { nullptr, nullptr, nullptr, false, false }
+    { "self", nullptr, nullptr, nullptr, false, false },
+    { nullptr, nullptr, nullptr, nullptr, false, false }
 };
 
 static bool set_builtin_exception_status(builtin_exception &e) {
@@ -366,11 +368,14 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         for (size_t i = 0; i < fc->nargs; ++i) {
             arg_data &a = fc->args[i];
-            if (a.name)
+            if (a.name) {
                 a.name_py = PyUnicode_InternFromString(a.name);
-            else
+                a.name = PyUnicode_AsUTF8AndSize(a.name_py, nullptr);
+            } else {
                 a.name_py = nullptr;
+            }
             a.none |= a.value == Py_None;
+            a.signature = a.signature ? strdup_check(a.signature) : nullptr;
             Py_XINCREF(a.value);
         }
     }
@@ -988,11 +993,17 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     }
 
                     if (f->args[arg_index].value) {
-                        PyObject *o = f->args[arg_index].value;
+                        const arg_data &arg= f->args[arg_index];
                         if (nb_signature_mode) {
                             buf.put(" = \\");
+                            if (arg.signature)
+                                buf.put('=');
                             buf.put_uint32(n_default_args++);
+                        } else if (arg.signature) {
+                            buf.put(" = ");
+                            buf.put_dstr(arg.signature);
                         } else {
+                            PyObject *o = arg.value;
                             PyObject *str = PyObject_Str(o);
                             bool is_str = PyUnicode_Check(o);
 
@@ -1110,6 +1121,8 @@ static PyObject *nb_func_get_module(PyObject *self) {
 }
 
 PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
+    PyObject *docstr = nullptr, *item = nullptr, *sigstr = nullptr;
+
     func_data *f = nb_func_data(self);
     uint32_t count = (uint32_t) Py_SIZE(self);
     PyObject *result = PyTuple_New(count);
@@ -1117,9 +1130,9 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         return nullptr;
 
     for (uint32_t i = 0; i < count; ++i) {
-        const func_data *fi = f + i;
-        PyObject *docstr;
+        docstr = item = sigstr = nullptr;
 
+        const func_data *fi = f + i;
         if (fi->flags & (uint32_t) func_flags::has_doc && fi->doc[0] != '\0') {
             docstr = PyUnicode_FromString(fi->doc);
         } else {
@@ -1131,25 +1144,27 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         uint32_t n_default_args = nb_func_render_signature(fi, true),
                  pos = 2;
 
-        PyObject *item = PyTuple_New(2 + n_default_args),
-                 *sigstr = PyUnicode_FromString(buf.get());
-        if (!docstr || !sigstr || !item) {
-            Py_XDECREF(docstr);
-            Py_XDECREF(sigstr);
-            Py_XDECREF(item);
-            Py_DECREF(result);
-            return nullptr;
-        }
+        item = PyTuple_New(2 + n_default_args);
+        sigstr = PyUnicode_FromString(buf.get());
+        if (!docstr || !sigstr || !item)
+            goto fail;
 
         NB_TUPLE_SET_ITEM(item, 0, sigstr);
         NB_TUPLE_SET_ITEM(item, 1, docstr);
 
         if (n_default_args) {
             for (uint32_t j = 0; j < fi->nargs; ++j) {
-                PyObject *value = fi->args[j].value;
+                const arg_data &arg = fi->args[j];
+                PyObject *value = arg.value;
                 if (!value)
                     continue;
-                Py_INCREF(value);
+                if (arg.signature) {
+                    value = PyUnicode_FromString(arg.signature);
+                    if (!value)
+                        goto fail;
+                } else {
+                    Py_INCREF(value);
+                }
                 NB_TUPLE_SET_ITEM(item, pos, value);
                 pos++;
             }
@@ -1162,6 +1177,13 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
     }
 
     return result;
+
+fail:
+    Py_XDECREF(docstr);
+    Py_XDECREF(sigstr);
+    Py_XDECREF(item);
+    Py_DECREF(result);
+    return nullptr;
 }
 
 PyObject *nb_func_get_doc(PyObject *self, void *) {

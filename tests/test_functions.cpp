@@ -126,7 +126,7 @@ NB_MODULE(test_functions_ext, m) {
     // Overload chain with a raw docstring that has precedence
     m.def("test_08", [](int) -> int { return 1; }, "first docstring");
     m.def("test_08", [](float) -> int { return 2; },
-          nb::signature("def test_08(x: Annotated[float, 'foo']) -> int"),
+          nb::sig("def test_08(x: Annotated[float, 'foo']) -> int"),
           "another docstring");
 
     // Manual type check

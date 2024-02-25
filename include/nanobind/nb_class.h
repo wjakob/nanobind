@@ -174,7 +174,7 @@ NB_INLINE void type_extra_apply(type_init_data & t, is_generic) {
     t.flags |= (uint32_t) type_flags::is_generic;
 }
 
-NB_INLINE void type_extra_apply(type_init_data & t, const signature &s) {
+NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
     t.flags |= (uint32_t) type_flags::has_signature;
     t.name = s.value;
 }

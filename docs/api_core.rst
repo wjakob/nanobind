@@ -1530,6 +1530,13 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       Set a flag noting that implicit conversion should never be performed for
       this function argument.
 
+   .. cpp:function:: arg &sig(const char * sig)
+
+      Override the signature of the default argument value. This is useful when
+      the argument value is unusually complex so that the default method to
+      explain it in docstrings and stubs (``str(value)``) does not produce
+      acceptable output.
+
 .. cpp:struct:: is_method
 
    Indicate that the bound function is a method.
@@ -1592,9 +1599,9 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
      The ``Nurse`` and ``Patient`` annotation always refer to the *final* object
      following implicit conversion.
 
-.. cpp:struct:: signature
+.. cpp:struct:: sig
 
-   .. cpp:function:: signature(const char * value)
+   .. cpp:function:: sig(const char * value)
 
       This is *both* a class and a function binding annotation.
 
@@ -1609,7 +1616,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
          .. code-block:: cpp
 
             nb::def("function_name", &function_name,
-                    nb::signature(
+                    nb::sig(
                         "@decorator(decorator_args..)\n
                         "def function_name(arg_1: type_1 = def_1, ...) -> ret"
                     ));
@@ -1625,7 +1632,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
          .. code-block:: cpp
 
             nb::class_<Class>(m, "Class",
-                              nb::signature(
+                              nb::sig(
                                   "@decorator(decorator_args..)\n"
                                   "class Class(Base1[T], Base2, meta=Meta)"
                               ));
@@ -1736,8 +1743,8 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
       nb::class_<MyClass>(m, "MyClass")
         .def_rw("value", &MyClass::value,
-                nb::for_getter(nb::signature("def value(self, /) -> int")),
-                nb::for_setter(nb::signature("def value(self, value: int, /) -> None")),
+                nb::for_getter(nb::sig("def value(self, /) -> int")),
+                nb::for_setter(nb::sig("def value(self, value: int, /) -> None")),
                 nb::for_getter("docstring for getter"),
                 nb::for_setter("docstring for setter"));
 
@@ -1755,7 +1762,7 @@ Class binding annotations
 The following annotations can be specified using the variable-length ``Extra``
 parameter of the constructor :cpp:func:`class_::class_`.
 
-Besides the below options, also refer to the :cpp:class:`signature` which is
+Besides the below options, also refer to the :cpp:class:`sig` which is
 usable in both function and class bindings. It can be used to override class
 declarations in generated :ref:`stubs <stubs>`,
 

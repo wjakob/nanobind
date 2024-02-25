@@ -31,11 +31,12 @@ NB_MODULE(test_typing_ext, m) {
     // Custom signature generation for classes and methods
     struct CustomSignature { int value; };
     nb::class_<CustomSignature>(
-        m, "CustomSignature", nb::signature("@my_decorator\nclass CustomSignature(Iterable[int])"))
-        .def("method", []{}, nb::signature("@my_decorator\ndef method(self: typing.Self)"))
+        m, "CustomSignature", nb::sig("@my_decorator\nclass CustomSignature(Iterable[int])"))
+        .def("method", []{}, nb::sig("@my_decorator\ndef method(self: typing.Self)"))
+        .def("method_with_default", [](CustomSignature&,bool){}, "value"_a.sig("bool(True)") = true)
         .def_rw("value", &CustomSignature::value,
-                nb::for_getter(nb::signature("def value(self, /) -> Optional[int]")),
-                nb::for_setter(nb::signature("def value(self, value: Optional[int], /) -> None")),
+                nb::for_getter(nb::sig("def value(self, /) -> Optional[int]")),
+                nb::for_setter(nb::sig("def value(self, value: Optional[int], /) -> None")),
                 nb::for_getter("docstring for getter"),
                 nb::for_setter("docstring for setter"));
 
@@ -58,10 +59,10 @@ NB_MODULE(test_typing_ext, m) {
     // 2. Create a generic type, and indicate in generated stubs
     //    that it derives from Generic[T]
     nb::class_<Wrapper>(m, "Wrapper", nb::is_generic(),
-                        nb::signature("class Wrapper(typing.Generic[T])"))
+                        nb::sig("class Wrapper(typing.Generic[T])"))
        .def(nb::init<nb::object>(),
-            nb::signature("def __init__(self, arg: T, /) -> None"))
+            nb::sig("def __init__(self, arg: T, /) -> None"))
        .def("get", [](Wrapper &w) { return w.value; },
-            nb::signature("def get(self, /) -> T"))
-       .def(nb::self == nb::self, nb::signature("def __eq__(self, arg: object, /) -> bool"));
+            nb::sig("def get(self, /) -> T"))
+       .def(nb::self == nb::self, nb::sig("def __eq__(self, arg: object, /) -> bool"));
 }

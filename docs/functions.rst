@@ -30,7 +30,7 @@ prior instantiation of ``nb::class_<SomeType>``), or an exception will be
 thrown.
 
 The "preview" of the default argument in the function signature is generated
-using the object's ``__repr__`` method. If not available, the signature may not
+using the object's ``__str__`` method. If not available, the signature may not
 be very helpful, e.g.:
 
 .. code-block:: pycon
@@ -42,6 +42,16 @@ be very helpful, e.g.:
     ....
     |  f(...)
     |      f(self, value: my_ext.SomeType = <my_ext.SomeType object at 0x1004d7230>) -> None
+
+
+In such cases, you can either refine the implementation of the type in question
+or manually override how nanobind renders the default value using the
+:cpp:func:`.sig("string") method <arg::sig>`:
+
+.. code-block:: cpp
+
+   nb::class_<MyClass>(m, "MyClass")
+       .def("f", &MyClass::f, "value"_a.sig("SomeType(123)") = SomeType(123));
 
 
 .. _noconvert:

@@ -2,12 +2,14 @@ from . import submodule
 from .submodule import F as F, f as f2
 from collections.abc import Iterable
 import typing
-from typing import Optional
+from typing import Optional, TypeAlias
 
 @my_decorator
 class CustomSignature(Iterable[int]):
     @my_decorator
     def method(self: typing.Self): ...
+
+    def method_with_default(self, value: bool = bool(True)) -> None: ...
 
     @property
     def value(self, /) -> Optional[int]:
@@ -20,7 +22,7 @@ class CustomSignature(Iterable[int]):
 class Foo:
     pass
 
-type FooAlias = Foo
+FooAlias: TypeAlias = Foo
 
 T = typing.TypeVar("T", contravariant=True)
 

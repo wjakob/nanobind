@@ -204,7 +204,7 @@ The following lists minor-but-useful additions relative to pybind11.
   type signature of a class or function to provide richer type information to
   static type checkers like `MyPy <https://github.com/python/mypy>`__ or
   `PyRight <https://github.com/microsoft/pyright>`__. In such cases, specify
-  the :cpp:class:`nb::signature <signature>` attribute to override the default
+  the :cpp:class:`nb::sig <signature>` attribute to override the default
   nanobind-provided signature.
 
   For example, the following function signature annotation creates an overload
@@ -220,7 +220,7 @@ The following lists minor-but-useful additions relative to pybind11.
                   nb::raise("invalid input");
                return arg;
            },
-           nb::signature("def f(arg: typing.Literal[1], /) -> int"));
+           nb::sig("def f(arg: typing.Literal[1], /) -> int"));
 
   Please see the section on :ref:`customizing function signatures
   <typing_signature_functions>` and :ref:`class signatures

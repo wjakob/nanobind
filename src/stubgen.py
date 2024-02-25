@@ -192,14 +192,36 @@ class StubGen:
 
         # Render function default arguments
         for index, arg in enumerate(sig[2:]):
-            pos = sig_str.find(f"\\{index}", start)
-            arg_str = self.expr_str(arg)
-            if arg_str is None:
-                arg_str = "..."
+            pos = -1
+            custom_signature = False
+
+            # First, handle the case where the user overrode the default value signature
+            if isinstance(arg, str):
+                pattern = f"\\={index}"
+                pos = sig_str.find(pattern, start)
+                if pos >= 0:
+                    custom_signature = True
+
+            # General case
+            if pos < 0:
+                pattern = f"\\{index}"
+                pos = sig_str.find(pattern, start)
+
+            if pos < 0:
+                raise Exception('Could not locate default argument in function signature')
+
+            if custom_signature:
+                arg_str = arg
+            else:
+                arg_str = self.expr_str(arg)
+                if arg_str is None:
+                    arg_str = "..."
+
             assert (
                 "\n" not in arg_str
             ), "Default argument string may not contain newlines."
-            sig_str = sig_str[:pos] + arg_str + sig_str[pos + 2 :]
+
+            sig_str = sig_str[:pos] + arg_str + sig_str[pos + len(pattern) :]
             start = pos + len(arg_str)
 
         if type(fn).__name__ == "nb_func" and self.depth > 0:
@@ -305,11 +327,8 @@ class StubGen:
         if name and (name != tp.__name__ or module.__name__ != tp.__module__):
             if module.__name__ == tp.__module__:
                 # This is an alias of a type in the same module
-                if sys.version_info >= (3, 12, 0):
-                    self.write_ln(f"type {name} = {tp.__name__}\n")
-                else:
-                    alias_tp = self.import_object('typing', 'TypeAlias')
-                    self.write_ln(f"{name}: {alias_tp} = \"{tp.__name__}\"\n")
+                alias_tp = self.import_object('typing', 'TypeAlias')
+                self.write_ln(f"{name}: {alias_tp} = {tp.__name__}\n")
             else:
                 # Import from a different module
                 self.put_value(tp, name, None)

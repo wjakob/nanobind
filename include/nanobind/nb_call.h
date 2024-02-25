@@ -58,7 +58,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
     if constexpr (std::is_same_v<D, arg_v>) {
         args[kwargs_offset + nkwargs] = value.value.release().ptr();
         NB_TUPLE_SET_ITEM(kwnames, nkwargs++,
-                         PyUnicode_InternFromString(value.name));
+                         PyUnicode_InternFromString(value.name_));
     } else if constexpr (std::is_same_v<D, args_proxy>) {
         for (size_t i = 0, l = len(value); i < l; ++i)
             args[nargs++] = borrow(value[i]).release().ptr();

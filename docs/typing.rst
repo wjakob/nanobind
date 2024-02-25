@@ -52,14 +52,14 @@ In this case, a static type checker like `MyPy
 
     error: Argument 1 of "__eq__" is incompatible with supertype "object"; supertype defines the argument type as "object"  [override]
 
-To handle such cases, you can use the :cpp:class:`nb::signature <signature>`
+To handle such cases, you can use the :cpp:class:`nb::sig <sig>`
 attribute to overrides the function signature with a custom string.
 
 .. code-block:: cpp
 
    nb::class_<Int>(m, "Int")
        .def(nb::self == nb::self,
-            nb::signature("def __eq__(self, arg: object, /) -> bool"));
+            nb::sig("def __eq__(self, arg: object, /) -> bool"));
 
 The argument must be a valid Python function signature of the form ``def
 name(...) -> ...`` without trailing colon (``":"``) and newlines, where
@@ -108,7 +108,7 @@ Here, we could specify
 .. code-block:: cpp
 
    nb::class_<IntVec>(m, "IntVec",
-                      nb::signature("class IntVec(collections.abc.Iterable[int])"));
+                      nb::sig("class IntVec(collections.abc.Iterable[int])"));
 
 This is technically a lie. Such shenanigans are worthwhile because they can
 greatly improve the development experience (e.g. `VS Code
@@ -225,11 +225,11 @@ This looks as follows:
    // 2. Create a generic type, and indicate in generated stubs
    //    that it derives from Generic[T]
    nb::class_<Wrapper>(m, "Wrapper", nb::is_generic(),
-                       nb::signature("class Wrapper(typing.Generic[T])"))
+                       nb::sig("class Wrapper(typing.Generic[T])"))
        .def(nb::init<nb::object>(),
-            nb::signature("def __init__(self, arg: T, /) -> None"))
+            nb::sig("def __init__(self, arg: T, /) -> None"))
        .def("get", [](Wrapper &w) { return w.value; },
-            nb::signature("def get(self, /) -> T"));
+            nb::sig("def get(self, /) -> T"));
 
 This involves the following steps:
 

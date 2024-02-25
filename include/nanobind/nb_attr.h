@@ -21,7 +21,7 @@ struct name {
 
 struct arg_v;
 struct arg {
-    NB_INLINE constexpr explicit arg(const char *name = nullptr) : name(name) {}
+    NB_INLINE constexpr explicit arg(const char *name = nullptr) : name_(name), signature_(nullptr) { }
     template <typename T> NB_INLINE arg_v operator=(T &&value) const;
     NB_INLINE arg &noconvert(bool value = true) {
         convert_ = !value;
@@ -32,7 +32,12 @@ struct arg {
         return *this;
     }
 
-    const char *name;
+    NB_INLINE arg &sig(const char *value) {
+        signature_ = value;
+        return *this;
+    }
+
+    const char *name_, *signature_;
     uint8_t convert_{ true };
     bool none_{ false };
 };
@@ -76,9 +81,9 @@ struct type_slots_callback {
     cb_t callback;
 };
 
-struct signature {
+struct sig {
     const char *value;
-    signature(const char *doc) : value(doc) { }
+    sig(const char *value) : value(value) { }
 };
 
 struct is_getter { };
@@ -124,6 +129,7 @@ enum class func_flags : uint32_t {
 
 struct arg_data {
     const char *name;
+    const char *signature;
     PyObject *name_py;
     PyObject *value;
     bool convert;
@@ -207,7 +213,7 @@ NB_INLINE void func_extra_apply(F &f, const scope &scope, size_t &) {
 }
 
 template <typename F>
-NB_INLINE void func_extra_apply(F &f, const signature &s, size_t &) {
+NB_INLINE void func_extra_apply(F &f, const sig &s, size_t &) {
     f.flags |= (uint32_t) func_flags::has_signature;
     f.name = s.value;
 }
@@ -247,7 +253,8 @@ NB_INLINE void func_extra_apply(F &, nullptr_t, size_t &) { }
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
     arg_data &arg = f.args[index++];
-    arg.name = a.name;
+    arg.name = a.name_;
+    arg.signature = a.signature_;
     arg.value = nullptr;
     arg.convert = a.convert_;
     arg.none = a.none_;
@@ -256,7 +263,8 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
     arg_data &arg = f.args[index++];
-    arg.name = a.name;
+    arg.name = a.name_;
+    arg.signature = a.signature_;
     arg.value = a.value.ptr();
     arg.convert = a.convert_;
     arg.none = a.none_;

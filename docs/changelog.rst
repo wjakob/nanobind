@@ -75,18 +75,18 @@ This required work on three fronts:
      produces a *generic* type that can be parameterized in Python (e.g.
      ``MyType[int]``). :ref:`Read more <typing_generics_creating>`.
 
-   * The :cpp:class:`nb::signature <signature>` annotation overrides the
+   * The :cpp:class:`nb::sig <sig>` annotation overrides the
      signature of a function or method, e.g.:
 
      .. code-block:: cpp
 
-        m.def("f", &f, nb::signature("def f(x: Foo = Foo(0)) -> None"), "docstring");
+        m.def("f", &f, nb::sig("def f(x: Foo = Foo(0)) -> None"), "docstring");
 
      Each binding of an overloaded function can be customized separately. This
      feature can be used to add decorators or control how default arguments are
      rendered. :ref:`Read more <typing_signature_functions>`.
 
-   * The :cpp:class:`nb::signature <signature>` annotation can also override
+   * The :cpp:class:`nb::sig <sig>` annotation can also override
      *class signatures* in generated stubs. Stubs often take certain liberties in
      deviating somewhat from the precise type signature of the underlying
      implementation, which is fine as long as this improves the capabilities of
@@ -102,7 +102,7 @@ This required work on three fronts:
         using IntVec = std::vector<int>;
 
         nb::class_<IntVec>(m, "IntVec",
-                           nb::signature("class IntVec(Iterable[int])"));
+                           nb::sig("class IntVec(Iterable[int])"));
 
      Nanobind class bindings can't actually extend Python types, so this is a
      convenient lie. Such shenanigans are worthwhile because they can greatly
@@ -114,6 +114,12 @@ This required work on three fronts:
      :cpp:struct:`nb::for_getter <for_getter>` annotations enable passing
      function binding annotations (e.g., signature overrides) specifically to
      the setter or the getter part of a property.
+
+   * The :cpp:class:`nb::arg("name") <arg>` argument annotation (and
+     ``"name"_a`` shorthand) now have a :cpp:func:`.sig("signature")
+     <arg::sig>` member to control how a default value is rendered in the stubs
+     and docstrings. This provides more targeted control compared to overriding
+     the entire function signature.
 
 Most importantly, it was possible to support these improvements with minimal
 changes to the core parts of nanobind.

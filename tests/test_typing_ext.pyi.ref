@@ -33,6 +33,9 @@ class Wrapper(typing.Generic[T]):
 
     def __eq__(self, arg: object, /) -> bool: ...
 
+class WrapperFoo(Wrapper[Foo]):
+    pass
+
 def f() -> None: ...
 
 f_alias = f

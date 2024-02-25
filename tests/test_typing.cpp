@@ -58,11 +58,16 @@ NB_MODULE(test_typing_ext, m) {
 
     // 2. Create a generic type, and indicate in generated stubs
     //    that it derives from Generic[T]
-    nb::class_<Wrapper>(m, "Wrapper", nb::is_generic(),
+    auto wrapper = nb::class_<Wrapper>(m, "Wrapper", nb::is_generic(),
                         nb::sig("class Wrapper(typing.Generic[T])"))
        .def(nb::init<nb::object>(),
             nb::sig("def __init__(self, arg: T, /) -> None"))
        .def("get", [](Wrapper &w) { return w.value; },
             nb::sig("def get(self, /) -> T"))
        .def(nb::self == nb::self, nb::sig("def __eq__(self, arg: object, /) -> bool"));
+
+#if PY_VERSION_HEX >= 0x03090000 && !defined(PYPY_VERSION) // https://github.com/pypy/pypy/issues/4914
+    struct WrapperFoo : Wrapper { };
+    nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
+#endif
 }

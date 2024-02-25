@@ -72,6 +72,10 @@ decorators.
 The modified signature is shown in generated stubs, docstrings, and error
 messages (e.g., when a function receives incompatible arguments).
 
+Besides :cpp:class:`nb::sig <sig>`, nanobind also provides a lighter-weight
+alternative to only modify the signature of  a specific function default
+argument via :cpp:func:`nb::arg("name").sig("signature") <arg::sig>`.
+
 .. _typing_signature_classes:
 
 Classes
@@ -224,8 +228,8 @@ This looks as follows:
 
    // 2. Create a generic type, and indicate in generated stubs
    //    that it derives from Generic[T]
-   nb::class_<Wrapper>(m, "Wrapper", nb::is_generic(),
-                       nb::sig("class Wrapper(typing.Generic[T])"))
+   nb::class_<Wrapper> wrapper(m, "Wrapper", nb::is_generic(),
+                               nb::sig("class Wrapper(typing.Generic[T])"))
        .def(nb::init<nb::object>(),
             nb::sig("def __init__(self, arg: T, /) -> None"))
        .def("get", [](Wrapper &w) { return w.value; },
@@ -248,19 +252,28 @@ This involves the following steps:
   - It passes the :cpp:class:`nb::is_generic <is_generic>` annotation to the
     :cpp:class:`nb::class_\<...\> <class_>` constructor, causing the addition
     of a ``__class_getattr__`` member that enables type parameterization.
-    Following this step, an expression like ``Wrapper[int]`` is valid and
+    Following this step, an expression like ``Wrapper[int]`` becomes valid and
     returns a ``typing.TypeAlias`` (in other words, the behavior is *as if* we
     had derived from ``typing.Generic[T]``).
 
     However, `MyPy <https://github.com/python/mypy>`__ and similar tools don't
-    quite know what to do with types overriding ``__class_getattr__``
+    quite know what to do with custom types overriding ``__class_getattr__``
     themselves, since the official parameterization mechanism is to subclass
     ``typing.Generic``.
 
   - Therefore, we *lie* about this in the stub and declare
-    ``typing.Generic[T]`` as a base class.
+    ``typing.Generic[T]`` as a base class. Only static type checkers will
+    see this information, and it helps them to interpret how the type works.
 
-  - That's it.
+  - That's it!
+
+You may also extend parameterized forms of such generic types:
+
+.. code-block:: cpp
+
+   nb::class_<Subclass>(m, "Subclass", wrapper[nb::type<Foo>()]);
+
+nanobind's stub generator will render this as ``class Subclass(Wrapper[Foo]):``.
 
 .. _stubs:
 

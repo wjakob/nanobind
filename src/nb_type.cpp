@@ -905,11 +905,27 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         basicsize += t->align - ptr_size;
 
     PyObject *base = nullptr;
+
+#if PY_VERSION_HEX >= 0x03090000
+    bool generic_base = false;
+#endif
+
     if (has_base_py) {
         check(!has_base,
               "nanobind::detail::nb_type_new(\"%s\"): multiple base types "
               "specified!", t_name);
         base = (PyObject *) t->base_py;
+
+        #if PY_VERSION_HEX >= 0x03090000 && !defined(PYPY_VERSION) // see https://github.com/pypy/pypy/issues/4914
+        if (Py_TYPE(base) == &Py_GenericAliasType) {
+            base = PyObject_GetAttrString(base, "__origin__");
+            check(base != nullptr,
+                  "nanobind::detail::nb_type_new(\"%s\"): could not access base of type alias!", t_name);
+            Py_DECREF(base);
+            generic_base = true;
+        }
+        #endif
+
         check(nb_type_check(base),
               "nanobind::detail::nb_type_new(\"%s\"): base type is not a "
               "nanobind type!", t_name);
@@ -1109,6 +1125,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         setattr(result, "__nb_signature__", str(t->name));
         free((char *) t_name);
     }
+
+#if PY_VERSION_HEX >= 0x03090000
+    if (generic_base)
+        setattr(result, "__orig_bases__", make_tuple(handle(t->base_py)));
+#endif
 
     return result;
 }

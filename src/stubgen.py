@@ -364,7 +364,10 @@ class StubGen:
             else:
                 self.write_ln(f"class {tp.__name__}:")
                 if tp_bases is None:
-                    tp_bases = [self.type_str(base) for base in tp.__bases__]
+                    tp_bases = getattr(tp, '__orig_bases__', None)
+                    if tp_bases is None:
+                        tp_bases = tp.__bases__
+                    tp_bases = [self.type_str(base) for base in tp_bases]
 
                 if tp_bases != ["object"]:
                     self.output = self.output[:-2] + "("
@@ -499,6 +502,7 @@ class StubGen:
                 "__setattribute__",
                 "__nb_signature__",
                 "__class_getitem__",
+                "__orig_bases__",
                 "__file__",
                 "__dict__",
                 "__weakref__",
@@ -643,7 +647,11 @@ class StubGen:
 
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
-        return self.replace_standard_types(tp.__module__ + "." + tp.__qualname__)
+        if hasattr(types, "GenericAlias") and isinstance(tp, types.GenericAlias):
+            tp_name = str(tp)
+        else:
+            tp_name = tp.__module__ + "." + tp.__qualname__
+        return self.replace_standard_types(tp_name)
 
     def get(self):
         """Generate the final stub output"""

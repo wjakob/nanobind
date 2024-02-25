@@ -337,7 +337,7 @@ class StubGen:
                     if rname in tp_dict:
                         del tp_dict[rname]
 
-            if hasattr(tp, '__nb_signature__'):
+            if '__nb_signature__' in tp.__dict__:
                 # Types with a custom signature override
                 for s in tp.__nb_signature__.split('\n'):
                     self.write_ln(self.replace_standard_types(s))

@@ -276,14 +276,18 @@ class StubGen:
 
     def put_property(self, prop, name):
         """Append a Python 'property' object"""
+        fget, fset = prop.fget, prop.fset
         self.write_ln("@property")
-        self.put(prop.fget, name=name)
-        if prop.fset:
+        self.put(fget, name=name)
+        if fset:
             self.write_ln(f"@{name}.setter")
             docstrings_backup = self.include_docstrings
-            self.include_docstrings = (
-                self.include_docstrings and prop.fget.__doc__ == prop.fset.__doc__
-            )
+            if type(fget).__module__ == 'nanobind' and \
+               type(fset).__module__ == 'nanobind':
+                doc1 = fget.__nb_signature__[0][1]
+                doc2 = fset.__nb_signature__[0][1]
+                if doc1 and doc2 and doc1 == doc2:
+                    self.include_docstrings = False
             self.put(prop.fset, name=name)
             self.include_docstrings = docstrings_backup
 

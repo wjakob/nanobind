@@ -242,6 +242,9 @@ NB_INLINE void func_extra_apply(F &f, rv_policy pol, size_t &) {
 }
 
 template <typename F>
+NB_INLINE void func_extra_apply(F &, nullptr_t, size_t &) { }
+
+template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
     arg_data &arg = f.args[index++];
     arg.name = a.name;

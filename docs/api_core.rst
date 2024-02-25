@@ -1726,6 +1726,26 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       This policy matches `automatic` but falls back to `reference` when the
       return value is a pointer.
 
+.. cpp:struct:: template <typename T> for_getter
+
+   When defining a property with a getter and a setter, you can use this to
+   only pass a function binding attribute to the getter part. An example is
+   shown below.
+
+   .. code-block:: cpp
+
+      nb::class_<MyClass>(m, "MyClass")
+        .def_rw("value", &MyClass::value,
+                nb::for_getter(nb::signature("def value(self, /) -> int")),
+                nb::for_setter(nb::signature("def value(self, value: int, /) -> None")),
+                nb::for_getter("docstring for getter"),
+                nb::for_setter("docstring for setter"));
+
+.. cpp:struct:: template <typename T> for_setter
+
+
+   Analogous to :cpp:struct:`for_getter`, but for setters.
+
 
 .. _class_binding_annotations:
 
@@ -1939,7 +1959,10 @@ Class binding
       The variable length `extra` parameter can be used to pass a docstring and
       other :ref:`function binding annotations <function_binding_annotations>`
       that are forwarded to the anonymous functions used to construct the
-      property
+      property.
+      Use the :cpp:struct:`nb::for_getter <for_getter>` and
+      :cpp:struct:`nb::for_setter <for_setter>` to pass annotations
+      specifically to the setter or getter part.
 
       **Example**:
 
@@ -1984,6 +2007,9 @@ Class binding
 
       The variable length `extra` parameter can be used to pass a docstring and
       other :ref:`function binding annotations <function_binding_annotations>`.
+      Use the :cpp:struct:`nb::for_getter <for_getter>` and
+      :cpp:struct:`nb::for_setter <for_setter>` to pass annotations
+      specifically to the setter or getter part.
 
       Note that this function implicitly assigns the
       :cpp:enumerator:`rv_policy::reference_internal` return value policy to
@@ -2076,6 +2102,9 @@ Class binding
       other :ref:`function binding annotations <function_binding_annotations>`
       that are forwarded to the anonymous functions used to construct the
       property
+      Use the :cpp:struct:`nb::for_getter <for_getter>` and
+      :cpp:struct:`nb::for_setter <for_setter>` to pass annotations
+      specifically to the setter or getter part.
 
       **Example**:
 
@@ -2122,6 +2151,9 @@ Class binding
 
       The variable length `extra` parameter can be used to pass a docstring and
       other :ref:`function binding annotations <function_binding_annotations>`.
+      Use the :cpp:struct:`nb::for_getter <for_getter>` and
+      :cpp:struct:`nb::for_setter <for_setter>` to pass annotations
+      specifically to the setter or getter part.
 
       Note that this function implicitly assigns the
       :cpp:enumerator:`rv_policy::reference` return value policy to

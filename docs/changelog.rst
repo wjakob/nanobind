@@ -110,8 +110,13 @@ This required work on three fronts:
      <https://code.visualstudio.com>`__ autocomplete) involving compiled
      extensions. :ref:`Read more <typing_signature_classes>`.
 
-Perhaps most importantly, it was possible to support these improvements with
-minimal changes to the core parts of nanobind, which remains a "nano" library.
+   * The :cpp:struct:`nb::for_setter <for_setter>` and
+     :cpp:struct:`nb::for_getter <for_getter>` annotations enable passing
+     function binding annotations (e.g., signature overrides) specifically to
+     the setter or the getter part of a property.
+
+Most importantly, it was possible to support these improvements with minimal
+changes to the core parts of nanobind.
 
 These release breaks API and ABI compatibility, requiring a new major version
 according to `SemVer <http://semver.org>`__. The following changes are
@@ -183,7 +188,7 @@ Version 1.9.2 (Feb 23, 2024)
   This gets NVCC to work out of the box (that said, this change does not
   elevate NVCC to being an *officially* supported compiler). (issue `#383
   <https://github.com/wjakob/nanobind/pull/383>`__, commit `a307ea
-  <https://github.com/wjakob/nanobind/commit/a307eacaa9902daa190adc428168cf64007dff9e>`__
+  <https://github.com/wjakob/nanobind/commit/a307eacaa9902daa190adc428168cf64007dff9e>`__).
 
 * Added a CMake install target to the nanobind build system. (PR `#356
   <https://github.com/wjakob/nanobind/pull/356>`__, commit `6bde65

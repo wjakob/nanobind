@@ -29,10 +29,15 @@ NB_MODULE(test_typing_ext, m) {
     m.attr("f_alias") = m.attr("f");
 
     // Custom signature generation for classes and methods
-    struct CustomSignature { };
+    struct CustomSignature { int value; };
     nb::class_<CustomSignature>(
         m, "CustomSignature", nb::signature("@my_decorator\nclass CustomSignature(Iterable[int])"))
-        .def("method", []{}, nb::signature("@my_decorator\ndef method(self: typing.Self)"));
+        .def("method", []{}, nb::signature("@my_decorator\ndef method(self: typing.Self)"))
+        .def_rw("value", &CustomSignature::value,
+                nb::for_getter(nb::signature("def value(self, /) -> Optional[int]")),
+                nb::for_setter(nb::signature("def value(self, value: Optional[int], /) -> None")),
+                nb::for_getter("docstring for getter"),
+                nb::for_setter("docstring for setter"));
 
     // Stubification of simple constants
     nb::dict d;

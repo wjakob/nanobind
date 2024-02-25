@@ -377,6 +377,29 @@ private:
     }
 };
 
+template <typename T> struct for_setter {
+    T value;
+    for_setter(const T &value) : value(value) { }
+};
+
+template <typename T> struct for_getter {
+    T value;
+    for_getter(const T &value) : value(value) { }
+};
+
+template <typename T> for_getter(T) -> for_getter<std::decay_t<T>>;
+template <typename T> for_setter(T) -> for_setter<std::decay_t<T>>;
+
+namespace detail {
+    template <typename T> auto filter_getter(const T &v) { return v; }
+    template <typename T> auto filter_getter(const for_getter<T> &v) { return v.value; }
+    template <typename T> nullptr_t filter_getter(const for_setter<T> &) { return nullptr; }
+
+    template <typename T> auto filter_setter(const T &v) { return v; }
+    template <typename T> auto filter_setter(const for_setter<T> &v) { return v.value; }
+    template <typename T> nullptr_t filter_setter(const for_getter<T> &) { return nullptr; }
+}
+
 template <typename T, typename... Ts>
 class class_ : public object {
 public:
@@ -504,12 +527,12 @@ public:
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
             get_p = cpp_function((detail::forward_t<Getter>) getter,
-                                 scope(*this), is_method(), is_getter(),
-                                 rv_policy::reference_internal, extra...);
+                                 is_method(), is_getter(),
+                                 rv_policy::reference_internal, detail::filter_getter(extra)...);
 
         if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
             set_p = cpp_function((detail::forward_t<Setter>) setter,
-                                 scope(*this), is_method(), extra...);
+                                 is_method(), detail::filter_setter(extra)...);
 
         detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr());
         return *this;
@@ -523,11 +546,12 @@ public:
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
             get_p = cpp_function((detail::forward_t<Getter>) getter, is_getter(),
-                                 scope(*this), rv_policy::reference, extra...);
+                                 rv_policy::reference,
+                                 detail::filter_getter(extra)...);
 
         if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
             set_p = cpp_function((detail::forward_t<Setter>) setter,
-                                 scope(*this), extra...);
+                                 detail::filter_setter(extra)...);
 
         detail::property_install_static(m_ptr, name_, get_p.ptr(), set_p.ptr());
         return *this;

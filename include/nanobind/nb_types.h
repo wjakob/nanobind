@@ -644,7 +644,7 @@ public:
 
 class callable : public object {
 public:
-    NB_OBJECT(callable, object, "Callable[..., object]", PyCallable_Check)
+    NB_OBJECT(callable, object, "Callable", PyCallable_Check)
     using object::object;
 };
 

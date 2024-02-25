@@ -20,7 +20,7 @@ class CustomSignature(Iterable[int]):
 class Foo:
     pass
 
-FooAlias = Foo
+type FooAlias = Foo
 
 T = typing.TypeVar("T", contravariant=True)
 

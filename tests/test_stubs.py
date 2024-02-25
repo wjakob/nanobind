@@ -16,7 +16,8 @@ def remove_platform_dependent(s):
     while i < len(s):
         v = s[i]
         if v.startswith('def ret_numpy_half()') or \
-           v.startswith('def test_slots()'):
+           v.startswith('def test_slots()') or \
+           v.startswith('TypeAlias'):
             i += 2
         else:
             s2.append(v)

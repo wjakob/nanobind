@@ -305,7 +305,11 @@ class StubGen:
         if name and (name != tp.__name__ or module.__name__ != tp.__module__):
             if module.__name__ == tp.__module__:
                 # This is an alias of a type in the same module
-                self.write_ln(f"{name} = {tp.__name__}\n")
+                if sys.version_info >= (3, 12, 0):
+                    self.write_ln(f"type {name} = {tp.__name__}\n")
+                else:
+                    alias_tp = self.import_object('typing', 'TypeAlias')
+                    self.write_ln(f"{name}: {alias_tp} = \"{tp.__name__}\"\n")
             else:
                 # Import from a different module
                 self.put_value(tp, name, None)

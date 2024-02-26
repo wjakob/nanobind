@@ -1,8 +1,8 @@
-from . import submodule
+from . import submodule as submodule
 from .submodule import F as F, f as f2
 from collections.abc import Iterable
 import typing
-from typing import Optional, TypeAlias
+from typing import Optional, TypeAlias, TypeVar
 
 @my_decorator
 class CustomSignature(Iterable[int]):
@@ -20,11 +20,17 @@ class CustomSignature(Iterable[int]):
         """docstring for setter"""
 
 class Foo:
-    pass
+    def __lt__(self, arg: int, /) -> bool: ...
+
+    def __gt__(self, arg: int, /) -> bool: ...
+
+    def __le__(self, arg: Foo, /) -> bool: ...
+
+    def __ge__(self, arg: Foo, /) -> bool: ...
 
 FooAlias: TypeAlias = Foo
 
-T = typing.TypeVar("T", contravariant=True)
+T = TypeVar("T", contravariant=True)
 
 class Wrapper(typing.Generic[T]):
     def __init__(self, arg: T, /) -> None: ...
@@ -41,3 +47,9 @@ def f() -> None: ...
 f_alias = f
 
 pytree: dict = {'a' : ('b', [123])}
+
+def tweak_me(arg: int):
+    """
+    prior docstring
+    remains preserved
+    """

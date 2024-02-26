@@ -44,6 +44,7 @@ specifically to simplify stub generation.
 import inspect
 import textwrap
 import importlib
+import importlib.machinery
 import types
 import typing
 import re
@@ -65,6 +66,7 @@ class StubGen:
         include_private=False,
         module=None,
         max_expr_length=50,
+        patterns={},
     ):
         # Store the module (if available) so that we can check for naming
         # conflicts when introducing temporary variables needed within the stub
@@ -80,6 +82,9 @@ class StubGen:
         # Maximal length (in characters) before an expression gets abbreviated as '...'
         self.max_expr_length = max_expr_length
 
+        # Replacement patterns
+        self.patterns = patterns
+
         # ---------- Internal fields ----------
 
         # Current depth / indentation level
@@ -90,6 +95,9 @@ class StubGen:
 
         # A stack to avoid infinite recursion
         self.stack = []
+
+        # An associated sequence of identifier
+        self.prefix = module.__name__ if module else ""
 
         # Dictionary to keep track of import directives added by the stub generator
         self.imports = {}
@@ -145,7 +153,7 @@ class StubGen:
         self.identifier_seq_re = re.compile(identifier_seq)
 
         # Regular expression to strip away the module for locals
-        if module:
+        if self.module:
             module_name_re = self.module.__name__.replace(".", r"\.")
             self.module_member_re = re.compile(
                 sep_before + module_name_re + r"\.(" + identifier + ")" + sep_after
@@ -163,7 +171,9 @@ class StubGen:
 
     def write_ln(self, line):
         """Append an indented line"""
-        self.output += "    " * self.depth + line + "\n"
+        if len(line) != 0 and not line.isspace():
+            self.output += "    " * self.depth + line
+        self.output += "\n"
 
     def write_par(self, line):
         """Append an indented paragraph"""
@@ -186,7 +196,7 @@ class StubGen:
         """Append an 'nb_func' function overload"""
         sig_str, docstr, start = sig[0], sig[1], 0
         if sig_str.startswith("def (") and name is not None:
-            sig_str = 'def ' + name + sig_str[4:]
+            sig_str = "def " + name + sig_str[4:]
 
         sig_str = self.replace_standard_types(sig_str)
 
@@ -194,6 +204,7 @@ class StubGen:
         for index, arg in enumerate(sig[2:]):
             pos = -1
             custom_signature = False
+            pattern = None
 
             # First, handle the case where the user overrode the default value signature
             if isinstance(arg, str):
@@ -208,7 +219,9 @@ class StubGen:
                 pos = sig_str.find(pattern, start)
 
             if pos < 0:
-                raise Exception('Could not locate default argument in function signature')
+                raise Exception(
+                    "Could not locate default argument in function signature"
+                )
 
             if custom_signature:
                 arg_str = arg
@@ -221,6 +234,7 @@ class StubGen:
                 "\n" not in arg_str
             ), "Default argument string may not contain newlines."
 
+            assert pattern is not None
             sig_str = sig_str[:pos] + arg_str + sig_str[pos + len(pattern) :]
             start = pos + len(arg_str)
 
@@ -228,14 +242,14 @@ class StubGen:
             self.write_ln("@staticmethod")
 
         if not docstr or not self.include_docstrings:
-            for s in sig_str.split('\n'):
+            for s in sig_str.split("\n"):
                 self.write_ln(s)
-            self.output = self.output[:-1] + ': ...\n'
+            self.output = self.output[:-1] + ": ...\n"
         else:
             docstr = textwrap.dedent(docstr)
-            for s in sig_str.split('\n'):
+            for s in sig_str.split("\n"):
                 self.write_ln(s)
-            self.output = self.output[:-1] + ':\n'
+            self.output = self.output[:-1] + ":\n"
             self.depth += 1
             self.put_docstr(docstr)
             self.depth -= 1
@@ -254,7 +268,7 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
-    def put_function(self, fn, name=None, parent = None):
+    def put_function(self, fn, name=None, parent=None):
         """Append a function of an arbitrary type"""
         # Don't generate a constructor for nanobind classes that aren't constructible
         if name == "__init__" and type(parent).__name__.startswith("nb_type"):
@@ -275,7 +289,7 @@ class StubGen:
                 return
 
         # Special handling for nanobind functions with overloads
-        if type(fn).__module__ == 'nanobind':
+        if type(fn).__module__ == "nanobind":
             self.put_nb_func(fn, name)
             return
 
@@ -304,8 +318,10 @@ class StubGen:
         if fset:
             self.write_ln(f"@{name}.setter")
             docstrings_backup = self.include_docstrings
-            if type(fget).__module__ == 'nanobind' and \
-               type(fset).__module__ == 'nanobind':
+            if (
+                type(fget).__module__ == "nanobind"
+                and type(fset).__module__ == "nanobind"
+            ):
                 doc1 = fget.__nb_signature__[0][1]
                 doc2 = fset.__nb_signature__[0][1]
                 if doc1 and doc2 and doc1 == doc2:
@@ -327,7 +343,7 @@ class StubGen:
         if name and (name != tp.__name__ or module.__name__ != tp.__module__):
             if module.__name__ == tp.__module__:
                 # This is an alias of a type in the same module
-                alias_tp = self.import_object('typing', 'TypeAlias')
+                alias_tp = self.import_object("typing", "TypeAlias")
                 self.write_ln(f"{name}: {alias_tp} = {tp.__name__}\n")
             else:
                 # Import from a different module
@@ -356,15 +372,15 @@ class StubGen:
                     if rname in tp_dict:
                         del tp_dict[rname]
 
-            if '__nb_signature__' in tp.__dict__:
+            if "__nb_signature__" in tp.__dict__:
                 # Types with a custom signature override
-                for s in tp.__nb_signature__.split('\n'):
+                for s in tp.__nb_signature__.split("\n"):
                     self.write_ln(self.replace_standard_types(s))
-                self.output = self.output[:-1] + ':\n'
+                self.output = self.output[:-1] + ":\n"
             else:
                 self.write_ln(f"class {tp.__name__}:")
                 if tp_bases is None:
-                    tp_bases = getattr(tp, '__orig_bases__', None)
+                    tp_bases = getattr(tp, "__orig_bases__", None)
                     if tp_bases is None:
                         tp_bases = tp.__bases__
                     tp_bases = [self.type_str(base) for base in tp_bases]
@@ -455,12 +471,12 @@ class StubGen:
         def replace_ndarray(m):
             s = m.group(2)
 
-            annotated = self.import_object("typing", "Annotated")
             ndarray = self.import_object("numpy.typing", "ArrayLike")
             s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
             s = s.replace("*", "None")
 
             if s:
+                annotated = self.import_object("typing", "Annotated")
                 return f"{annotated}[{ndarray}, dict({s})]"
             else:
                 return ndarray
@@ -479,10 +495,62 @@ class StubGen:
 
     def put(self, value, module=None, name=None, parent=None):
         # Avoid infinite recursion due to cycles
+        old_prefix = self.prefix
+
         if value in self.stack:
             return
         try:
             self.stack.append(value)
+
+            if self.prefix and name:
+                self.prefix = self.prefix + "." + name
+            else:
+                self.prefix = name if name else self.prefix
+
+            # Check if an entry in a provided pattern file matches
+            if self.prefix:
+                for query, query_v in self.patterns.items():
+                    match = query.search(self.prefix)
+                    if not match:
+                        continue
+
+                    query_v[1] += 1
+                    for l in query_v[0]:
+                        ls = l.strip()
+                        if ls == '\\doc':
+                            # Docstring reference
+                            tp = type(value)
+                            if tp.__module__ == 'nanobind' and \
+                               tp.__name__ in ('nb_func', 'nb_method'):
+                                doc = value.__nb_signature__[0][1]
+                            else:
+                                doc = getattr(value, '__doc__', None)
+                            self.depth += 1
+                            if doc and self.include_docstrings:
+                                self.put_docstr(doc)
+                            else:
+                                self.write_ln('pass')
+                            self.depth -= 1
+                            continue
+                        elif ls.startswith('\\from '):
+                            items = ls[5:].split(' import ')
+                            if len(items) != 2:
+                                raise RuntimeError(f"Could not parse import declaration {ls}")
+                            for item in items[1].strip('()').split(','):
+                                item = item.split(' as ')
+                                import_module, import_name = items[0].strip(), item[0].strip()
+                                import_as = item[1].strip() if len(item) > 1 else None
+                                self.import_object(import_module, import_name, import_as)
+                            continue
+
+
+                        groups = match.groups()
+                        for i in reversed(range(len(groups))):
+                            l = l.replace(f"\\{i+1}", groups[i])
+                        for k, v in match.groupdict():
+                            l = l.replace(f"\\{k}", v)
+                        self.write_ln(l)
+                    return
 
             # Don't explicitly include various standard elements found
             # in modules, classes, etc.
@@ -498,8 +566,6 @@ class StubGen:
                 "__spec__",
                 "__loader__",
                 "__package__",
-                "__getattribute__",
-                "__setattribute__",
                 "__nb_signature__",
                 "__class_getitem__",
                 "__orig_bases__",
@@ -528,7 +594,7 @@ class StubGen:
             if inspect.ismodule(value):
                 if len(self.stack) != 1:
                     # Do not recurse into submodules, but include a directive to import them
-                    self.import_object(".", name)
+                    self.import_object(value.__name__, name=None, as_name=name)
                     return
                 for name, child in inspect.getmembers(value):
                     self.put(child, module=value, name=name, parent=value)
@@ -551,41 +617,66 @@ class StubGen:
                 self.put_value(value, name, parent)
         finally:
             self.stack.pop()
+            self.prefix = old_prefix
 
     def import_object(self, module, name, as_name=None):
         """
-        Import a type (e.g. typing.Optional) used within the stub,
-        ensuring that this does not cause conflicts
+        Import a type (e.g. typing.Optional) used within the stub, ensuring
+        that this does not cause conflicts. Specify ``as_name`` to ensure that
+        the import is bound to a specified name.
         """
-        if module == "builtins" and (as_name is None or name == as_name):
+        if module == "builtins" and (not as_name or name == as_name):
             return name
+
+        # Rewrite module name if this is relative import from a submodule
         if self.module and module.startswith(self.module.__name__):
-            module = module[len(self.module.__name__) :]
+            module_short = module[len(self.module.__name__) :]
+            if not name and as_name and module_short[0] == '.':
+                name = as_name = module_short[1:]
+                module_short = '.'
+        else:
+            module_short = module
 
-        if module not in self.imports:
-            self.imports[module] = {}
-        if name not in self.imports[module]:
-            if as_name is None and name and self.module:
-                # Perform conflict resolution if possible
-                as_name = name
+        # Query a cache of previously imported objects
+        imports_module = self.imports.get(module_short, None)
+        if not imports_module:
+            imports_module = {}
+            self.imports[module_short] = imports_module
+
+        key = (name, as_name)
+        final_name = imports_module.get(key, None)
+
+        if not final_name:
+            # Cache miss, import the object
+            final_name = as_name if as_name else name
+
+            # If no as_name constraint was set, potentially adjust the
+            # name to avoid conflicts with an existing object of the same name
+            if not as_name and name and self.module:
+                final_name = name
                 while True:
-                    if not hasattr(self.module, as_name):
+                    # Accept the name if there are no conflicts
+                    if not hasattr(self.module, final_name):
                         break
+                    value = getattr(self.module, final_name)
                     try:
-                        value = getattr(
-                            importlib.import_module(self.module.__name__), as_name
-                        )
-                    except ImportError as e:
-                        value = None
-                    if getattr(self.module, as_name) is value:
-                        break
-                    as_name = "_" + as_name
-                if as_name == name:
-                    as_name = None
-            self.imports[module][name] = as_name
+                        if module == '.':
+                            mod_o = self.module
+                        else:
+                            mod_o = importlib.import_module(module)
 
-        as_name = self.imports[module][name]
-        return name if as_name is None else as_name
+                        # If there is a conflict, accept it if it refers to the same object
+                        if getattr(mod_o, name) is value:
+                            break
+                    except ImportError:
+                        pass
+
+                    # Prefix with an underscore
+                    final_name = "_" + final_name
+
+            imports_module[key] = final_name
+
+        return final_name
 
     def expr_str(self, e, abbrev=True):
         """Attempt to convert a value into a Python expression to generate that value"""
@@ -595,22 +686,28 @@ class StubGen:
                 return repr(e)
         if issubclass(tp, float):
             s = repr(e)
-            if 'inf' in s or 'nan' in s:
+            if "inf" in s or "nan" in s:
                 return f"float('{s}')"
             else:
                 return s
         elif self.is_enum(tp):
-            return self.type_str(type(e)) + '.' + e.__name__
+            return self.type_str(type(e)) + "." + e.__name__
         elif issubclass(tp, type):
             return self.type_str(e)
+        elif issubclass(tp, typing.ForwardRef):
+            return f'"{e.__forward_arg__}"'
         elif issubclass(tp, typing.TypeVar):
-            s = f"typing.TypeVar(\"{e.__name__}\""
-            for v in getattr(e, '__constraints__', ()):
+            tv = self.import_object("typing", "TypeVar")
+            s = f'{tv}("{e.__name__}"'
+            for v in getattr(e, "__constraints__", ()):
                 s += ", " + self.expr_str(v)
-            for k in ['contravariant', 'covariant', 'bound', 'infer_variance']:
-                v = getattr(e, f'__{k}__', None)
+            for k in ["contravariant", "covariant", "bound", "infer_variance"]:
+                v = getattr(e, f"__{k}__", None)
                 if v:
-                    s += f", {k}=" + self.expr_str(v)
+                    v = self.expr_str(v)
+                    if v is None:
+                        return
+                    s += f", {k}=" + v
             s += ")"
             return s
         elif issubclass(tp, str):
@@ -658,25 +755,27 @@ class StubGen:
         s = ""
 
         for module in sorted(self.imports):
-            si = ""
             imports = self.imports[module]
-            for i, (k, v) in enumerate(imports.items()):
+            items = []
+
+            for ((k, v1), v2) in imports.items():
                 if k == None:
-                    continue
-                si += k if v is None else f"{k} as {v}"
-                if i + 1 < len(imports):
-                    si += ","
-                    if len(si) > 50:
-                        si += "\n    "
+                    if v1 and v1 != module:
+                        s += f"import {module} as {v1}\n"
                     else:
-                        si += " "
-            if None in imports:
-                s += f"import {module}\n"
-            if si:
-                if "\n" in si:
-                    s += f"from {module} import (\n    {si}\n)\n"
+                        s += f"import {module}\n"
                 else:
-                    s += f"from {module} import {si}\n"
+                    if k != v2 or v1:
+                        items.append(f"{k} as {v2}")
+                    else:
+                        items.append(k)
+
+            if items:
+                items_v0 = ", ".join(items)
+                items_v0 = f"from {module} import {items_v0}\n"
+                items_v1 = "(\n    " + ",\n    ".join(items) + "\n)"
+                items_v1 = f"from {module} import {items_v1}\n"
+                s += items_v0 if len(items_v0) <= 70 else items_v1
         if s:
             s += "\n"
         s += self.put_abstract_enum_class()
@@ -700,16 +799,25 @@ class StubGen:
 
         for op in ["gt", "ge", "lt", "le"]:
             s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
-        s += '\n'
+        s += "\n"
 
         if not self.abstract_enum_arith:
             return s
 
-        self_t = '_EnumArithT'
         s += f"class _EnumArith(_Enum):\n"
         for op in ["abs", "neg", "invert"]:
             s += f"    def __{op}__(self) -> int: ...\n"
-        for op in ["add", "sub", "mul", "floordiv", "lshift", "rshift", "and", "or", "xor"]:
+        for op in [
+            "add",
+            "sub",
+            "mul",
+            "floordiv",
+            "lshift",
+            "rshift",
+            "and",
+            "or",
+            "xor",
+        ]:
             s += f"    def __{op}__(self, arg: object, /) -> int: ...\n"
             s += f"    def __r{op}__(self, arg: object, /) -> int: ...\n"
 
@@ -765,11 +873,20 @@ def parse_options(args):
 
     parser.add_argument(
         "-M",
-        "--marker",
+        "--marker-file",
         metavar="FILE",
-        dest="marker",
+        dest="marker_file",
         default=None,
         help="generate a marker file (usually named 'py.typed')",
+    )
+
+    parser.add_argument(
+        "-p",
+        "--pattern-file",
+        metavar="FILE",
+        dest="pattern_file",
+        default=None,
+        help="apply the given patterns to the generated stub (see the docs for syntax)",
     )
 
     parser.add_argument(
@@ -808,6 +925,57 @@ def parse_options(args):
     return opt
 
 
+def load_pattern_file(fname):
+    with open(fname, "r") as f:
+        lines = f.readlines()
+
+    patterns = {}
+
+    def add_pattern(query, pattern):
+        # Exactly 1 empty line at the end
+        while pattern and pattern[-1].isspace():
+            pattern.pop()
+        pattern.append('')
+
+        # Identify deletions (replacement by only whitespace)
+        if all((p.isspace() or len(p) == 0 for p in pattern)):
+            pattern = []
+        key = re.compile(query[:-1])
+        if key in patterns:
+            raise Exception(f'Duplicate query pattern "{query}"')
+        patterns[key] = [pattern, 0]
+
+    pattern, query, dedent = [], None, 0
+    for i, l in enumerate(lines):
+        l = l.rstrip()
+
+        if l.startswith("#"):
+            continue
+
+        if len(l) == 0 or l[0].isspace():
+            if not pattern:
+                s = l.lstrip()
+                dedent = len(l) - len(s)
+                pattern.append(s)
+            else:
+                s1, s2 = l.lstrip(), l[dedent:]
+                pattern.append(s2 if len(s2) > len(s1) else s1)
+
+        else:
+            if not l.endswith(":"):
+                raise Exception(f'Cannot parse line {i+1} of pattern file "{fname}"')
+
+            if query:
+                add_pattern(query, pattern)
+            query = l
+            pattern = []
+
+    if query:
+        add_pattern(query, pattern)
+
+    return patterns
+
+
 def main(args=None):
     from pathlib import Path
     import sys
@@ -818,6 +986,15 @@ def main(args=None):
         sys.path.insert(0, "")
 
     opt = parse_options(sys.argv[1:] if args is None else args)
+
+    if opt.pattern_file:
+        if not opt.quiet:
+            print('Using pattern file "%s" ..' % opt.pattern_file)
+        patterns = load_pattern_file(opt.pattern_file)
+        if not opt.quiet:
+            print("  - loaded %i patterns.\n" % len(patterns))
+    else:
+        patterns = {}
 
     for i in opt.imports:
         sys.path.insert(0, i)
@@ -837,6 +1014,7 @@ def main(args=None):
             include_docstrings=opt.include_docstrings,
             include_private=opt.include_private,
             module=mod_imported,
+            patterns=patterns,
         )
 
         if not opt.quiet:
@@ -865,16 +1043,31 @@ def main(args=None):
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)
 
+        if patterns:
+            matches = 0
+            for k, v in patterns.items():
+                if v[1] == 0:
+                    rule_str = str(k)
+                    if "re.compile" in rule_str:
+                        rule_str = rule_str.replace("re.compile(", "")[:-1]
+                    if not opt.quiet:
+                        print(
+                            f"  - warning: rule {rule_str} did not match any elements."
+                        )
+                matches += v[1]
+            if not opt.quiet:
+                print("  - applied %i patterns." % matches)
+
         if not opt.quiet:
             print('  - writing stub "%s" ..' % str(file))
 
         with open(file, "w") as f:
             f.write(sg.get())
 
-    if opt.marker:
+    if opt.marker_file:
         if not opt.quiet:
-            print('  - writing marker file "%s" ..' % opt.marker)
-        Path(opt.marker).touch()
+            print('  - writing marker file "%s" ..' % opt.marker_file)
+        Path(opt.marker_file).touch()
 
 
 if __name__ == "__main__":

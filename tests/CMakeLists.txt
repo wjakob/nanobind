@@ -44,8 +44,11 @@ nanobind_add_module(test_typing_ext test_typing.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
 
 foreach (NAME functions classes ndarray stl enum typing make_iterator)
-  if (NAME STREQUAL stl)
-    set(EXTRA MARKER_FILE py.typed)
+  if (NAME STREQUAL typing)
+    set(EXTRA
+      MARKER_FILE py.typed
+      PATTERN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pattern_file.nb"
+    )
   else()
     set(EXTRA "")
   endif()

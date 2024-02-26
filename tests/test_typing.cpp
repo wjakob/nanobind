@@ -20,8 +20,18 @@ NB_MODULE(test_typing_ext, m) {
     m.attr("F") = sm.attr("F");
 
     // A top-level type and a function
-    class Foo { };
-    nb::class_<Foo>(m, "Foo");
+    struct Foo {
+        bool operator<(Foo) const { return false; }
+        bool operator>(Foo) const { return false; }
+        bool operator<=(Foo) const { return false; }
+        bool operator>=(Foo) const { return false; }
+    };
+    nb::class_<Foo>(m, "Foo")
+        .def(nb::self < nb::self)
+        .def(nb::self > nb::self)
+        .def(nb::self <= nb::self)
+        .def(nb::self >= nb::self);
+
     m.def("f", []{});
 
     // Aliases to local functoins and types
@@ -70,4 +80,8 @@ NB_MODULE(test_typing_ext, m) {
     struct WrapperFoo : Wrapper { };
     nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
 #endif
+
+    // Some statements that will be modified by the pattern file
+    m.def("remove_me", []{});
+    m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");
 }

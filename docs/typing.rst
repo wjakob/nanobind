@@ -5,13 +5,16 @@
 Typing
 ======
 
-This section covers two broad typing-related topics:
+This section covers three broad typing-related topics:
 
 1. How to create rich type annotation in C++ bindings so that projects
    using them can be effectively type-checked.
 
 2. How to :ref:`automatically generate stub files <stubs>` that are needed to
    enable static type checking and autocompletion in Python IDEs.
+
+3. How to write :ref:`pattern files <pattern_files>` to handle advanced use
+   cases requiring significant stub customization.
 
 Signature customization
 -----------------------
@@ -72,9 +75,10 @@ decorators.
 The modified signature is shown in generated stubs, docstrings, and error
 messages (e.g., when a function receives incompatible arguments).
 
-Besides :cpp:class:`nb::sig <sig>`, nanobind also provides a lighter-weight
-alternative to only modify the signature of  a specific function default
-argument via :cpp:func:`nb::arg("name").sig("signature") <arg::sig>`.
+In cases where a custom signature is only needed to tweak how nanobind renders
+the signature of a default argument, the more targeted
+:cpp:func:`nb::arg("name").sig("signature") <arg::sig>` annotation is
+preferable to :cpp:class:`nb::sig <sig>`.
 
 .. _typing_signature_classes:
 
@@ -184,8 +188,8 @@ Creating generic types
 Python types inheriting from `types.Generic
 <https://docs.python.org/3/library/typing.html#typing.Generic>`__ can be
 *parameterized* by other types including generic `type variables
-<https://docs.python.org/3/library/typing.html#typing.TypeVar>`__ that act as a
-placeholder. Such constructions enable more effective static type checking. In
+<https://docs.python.org/3/library/typing.html#typing.TypeVar>`__ that act as
+placeholders. Such constructions enable more effective static type checking. In
 the snippet below, tools like `MyPy <https://github.com/python/mypy>`__ or
 `PyRight <https://github.com/microsoft/pyright>`__ can infer that ``x`` and
 ``y`` have types ``Wrapper[int]`` and ``int``, respectively.
@@ -207,12 +211,16 @@ the snippet below, tools like `MyPy <https://github.com/python/mypy>`__ or
        def get(self) -> T:
            return self.value
 
-    x = Wrapper(3)
-    y = x.get()
+   # Based on the typed constructor, MyPy knows that 'x' has type 'Wrapper[int]'
+   x = Wrapper(3)
 
-Note that generic type parameterization doesn't change the underlying type and is not to
-be confused with C++ template instantiation. The feature mainly enables
-propagating more fine-grained type information through extension code.
+   # Based on the typed 'Wrapped.get' method, 'y' is inferred to have type 'int'
+   y = x.get()
+
+Note that parameterization of a generic type doesn't generate new code or
+modify its functionality. It is not to be confused with C++ template
+instantiation. The feature only exists to propagate fine-grained type
+information and thereby aid static type checking.
 
 Similar functionality can also be supported in nanobind-based binding projects.
 This looks as follows:
@@ -456,18 +464,20 @@ The program has the following command line options:
    Generate stubs for nanobind-based extensions.
 
    options:
-     -h, --help                   show this help message and exit
-     -o FILE, --output-file FILE  write generated stubs to the specified file
-     -O PATH, --output-dir PATH   write generated stubs to the specified directory
-     -i PATH, --import PATH       add the directory to the Python import path (can
-                                  specify multiple times)
-     -m MODULE, --module MODULE   generate a stub for the specified module (can
-                                  specify multiple times)
-     -M FILE, --marker FILE       generate a marker file (usually named 'py.typed')
-     -P, --include-private        include private members (with single leading or
-                                  trailing underscore)
-     -D, --exclude-docstrings     exclude docstrings from the generated stub
-     -q, --quiet                  do not generate any output in the absence of failures
+     -h, --help                    show this help message and exit
+     -o FILE, --output-file FILE   write generated stubs to the specified file
+     -O PATH, --output-dir PATH    write generated stubs to the specified directory
+     -i PATH, --import PATH        add the directory to the Python import path (can
+                                   specify multiple times)
+     -m MODULE, --module MODULE    generate a stub for the specified module (can
+                                   specify multiple times)
+     -M FILE, --marker-file FILE   generate a marker file (usually named 'py.typed')
+     -p FILE, --pattern-file FILE  apply the given patterns to the generated stub
+                                   (see the docs for syntax)
+     -P, --include-private         include private members (with single leading or
+                                   trailing underscore)
+     -D, --exclude-docstrings      exclude docstrings from the generated stub
+     -q, --quiet                   do not generate any output in the absence of failures
 
 
 Python interface
@@ -494,3 +504,128 @@ containing the stub declarations.
 Note that for now, the ``nanobind.stubgen.StubGen`` API is considered
 experimental and not subject to the semantic versioning policy used by the
 nanobind project.
+
+.. _pattern_files:
+
+Pattern files
+-------------
+
+In complex binding projects requiring static type checking, the previously
+discussed mechanisms for controlling typed signatures (:cpp:class:`nb::sig
+<sig>`, :cpp:class:`nb::typed <typed>`) may be insufficient. Two common reasons
+are as follows:
+
+- the ``@typing.overload`` chain associated with a function may sometimes
+  require significant deviations from the actual overloads present on the C++
+  side.
+
+- Some members of a module could be inherited from existing Python packages or
+  extension libraries, in which case patching their signature via
+  :cpp:class:`nb::sig <sig>` is not even an option.
+
+``stubgen`` supports *pattern files* as a last-resort solution to handle such
+advanced needs. These are files written in a *domain-specific language* (DSL)
+that specifies replacement patterns to dynamically rewrite stubs during
+generation. To use one, simply add it to the :cmake:command:`nanobind_add_stub`
+command.
+
+.. code-block:: cmake
+
+   nanobind_add_stub(
+     ...
+     PATTERN_FILE  <PATH>
+     ...
+   )
+
+A pattern file contains sequence of patterns. Each pattern consists of a query
+and an (arbitrarily) indented replacement block to be applied when the query
+matches.
+
+.. code-block:: text
+
+   # This is the first pattern
+   query 1:
+       replacement 1
+
+   # And this is the second one
+   query 2:
+       replacement 2
+
+Empty lines and lines beginning with ``#`` are ignored.
+
+When the stub generator traverses the module, it computes the *fully qualified
+name* of every type, function, property, etc. (for example:
+``"my_ext.MyClass.my_function"``). The queries in a pattern file are checked
+against these qualified names one by one until the first one matches.
+
+For example, suppose that we had the following lackluster stub entry:
+
+.. code-block:: python
+
+   class MyClass:
+       def my_function(arg: object) -> object: ...
+
+The pattern below matches this function stub and inserts an alternative with
+two typed overloads.
+
+.. code-block:: text
+
+   my_ext.MyClass.my_function:
+       @overload
+       def my_function(arg: int) -> int:
+           """A helpful docstring"""
+
+       @overload
+       def my_function(arg: str) -> str: ...
+
+Patterns can also *remove* entries, by simply not specifying a replacement
+block. Also, queries don't have to match the entire qualified name. For
+example, the following pattern deletes all occurrences of anything containing
+the string ``secret`` somewhere in its name
+
+.. code-block:: text
+
+   secret:
+
+In fact (you may have guessed it), the queries are *regular expressions*! The
+query supports all features of Python's builtin `re
+<https://docs.python.org/3/library/re.html>`__ library.
+
+When the query uses *groups*, the replacement block may access the contents of
+each numbered group using using the syntax ``\1``, ``\2``, etc. This permits
+writing generic patterns that can be applied to a number of stub entries at
+once:
+
+.. code-block:: text
+
+   __(eq|ne)__:
+       def __\1__(self, arg, /) -> bool: ...
+
+Named groups are also supported:
+
+.. code-block:: text
+
+   __(?P<op>eq|ne)__:
+       def __\op__(self, arg, /) -> bool : ...
+
+Finally, sometimes, it is desirable to rewrite only the signature of a function
+in a stub but to keep its docstring so that it doesn't have to be copied into
+the pattern file. The special escape code ``\doc`` references the previously
+existing docstring.
+
+.. code-block:: text
+
+   my_ext.lookup:
+       def lookup(array: Array[T], index: int) -> T:
+           \doc
+
+If your replacement rule requires additional types to work (e.g., from ``typing.*``),
+you may use the special ``\from`` escape code to import them:
+
+.. code-block:: text
+
+   @overload
+   my_ext.lookup:
+       \from typing.import Optional as _Opt, Literal
+       def lookup(array: Array[T], index: Literal[0] = 0) -> _Opt[T]:
+           \doc

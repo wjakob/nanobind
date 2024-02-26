@@ -121,6 +121,11 @@ This required work on three fronts:
      and docstrings. This provides more targeted control compared to overriding
      the entire function signature.
 
+   * Finally, nanobind's stub generator supports :ref:`pattern files
+     <pattern_files>` containing custom stub replacement rules.This catch-all
+     solution addresses the needs of advanced binding projects, for which the
+     above list of features may still not be sufficient.
+
 Most importantly, it was possible to support these improvements with minimal
 changes to the core parts of nanobind.
 

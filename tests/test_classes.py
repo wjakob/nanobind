@@ -785,3 +785,28 @@ def test42_weak_references():
     gc.collect()
     gc.collect()
     assert w() is None
+
+def test43_multiple_inheritance():
+    class Dummy:
+        def __init__(self, value):
+            self.value2 = value
+
+    order = [(t.Struct, Dummy), (Dummy, t.Struct)]
+
+    for o in order:
+        class A(*o):
+            def __init__(self):
+                t.Struct.__init__(self, 123)
+                Dummy.__init__(self, 456)
+
+        a = A()
+        assert a.value() == 123
+        assert a.value2 == 456
+        assert isinstance(a, t.Struct)
+        assert isinstance(a, Dummy)
+
+
+def test44_multiple_inheritance_checks():
+    with pytest.raises(TypeError):
+        class A(t.Struct, t.Foo):
+            pass

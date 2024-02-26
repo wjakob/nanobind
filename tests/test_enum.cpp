@@ -18,6 +18,7 @@ enum class Color : uint8_t {
     Cyan = 6,
     White = 7
 };
+
 static PyObject *color_or(PyObject *a, PyObject *b) {
     PyObject *ia = PyNumber_Long(a);
     PyObject *ib = PyNumber_Long(b);

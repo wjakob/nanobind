@@ -733,7 +733,7 @@ def test39_try_cast(clean):
     rv, s2 = t.try_cast_4(s)
     assert rv is False and s2 == 0
     rv, s2 = t.try_cast_4(123)
-    assert rv is True and s2 is 123
+    assert rv is True and s2 == 123
     del s, s2
 
     assert_stats(destructed=1)

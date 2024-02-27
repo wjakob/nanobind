@@ -538,8 +538,7 @@ command.
    )
 
 A pattern file contains sequence of patterns. Each pattern consists of a query
-and an (arbitrarily) indented replacement block to be applied when the query
-matches.
+and an indented replacement block to be applied when the query matches.
 
 .. code-block:: text
 
@@ -551,7 +550,9 @@ matches.
    query 2:
        replacement 2
 
-Empty lines and lines beginning with ``#`` are ignored.
+Empty lines and lines beginning with ``#`` are ignored. The amount of
+indentation is arbitrary: ``stubgen`` will re-indent the replacement as needed
+based on where the query matched.
 
 When the stub generator traverses the module, it computes the *fully qualified
 name* of every type, function, property, etc. (for example:
@@ -580,8 +581,8 @@ two typed overloads.
 
 Patterns can also *remove* entries, by simply not specifying a replacement
 block. Also, queries don't have to match the entire qualified name. For
-example, the following pattern deletes all occurrences of anything containing
-the string ``secret`` somewhere in its name
+example, the following pattern deletes all occurrences of anything
+containing the string ``secret`` somewhere in its name
 
 .. code-block:: text
 
@@ -626,6 +627,6 @@ you may use the special ``\from`` escape code to import them:
 
    @overload
    my_ext.lookup:
-       \from typing.import Optional as _Opt, Literal
+       \from typing import Optional as _Opt, Literal
        def lookup(array: Array[T], index: Literal[0] = 0) -> _Opt[T]:
            \doc

@@ -579,10 +579,14 @@ class StubGen:
             ):
                 return
 
+            tp = type(value)
+
             # Potentially exclude private members
             if (
                 not self.include_private
                 and name
+                # Need these even if their name indicates otherwise
+                and not issubclass(tp, typing.TypeVar)
                 and len(name) > 2
                 and (
                     (name[0] == "_" and name[1] != "_")

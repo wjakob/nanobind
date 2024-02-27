@@ -301,6 +301,12 @@ static void internals_cleanup() {
     }
 
     if (!leak) {
+        nb_translator_seq* t = internals->translators.next;
+        while (t) {
+          nb_translator_seq* next = t->next;
+          delete t;
+          t = next;
+        }
         delete internals;
         internals = nullptr;
         nb_meta_cache = nullptr;

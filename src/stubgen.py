@@ -522,7 +522,10 @@ class StubGen:
                             tp = type(value)
                             if tp.__module__ == 'nanobind' and \
                                tp.__name__ in ('nb_func', 'nb_method'):
-                                doc = value.__nb_signature__[0][1]
+                                for tp_i in value.__nb_signature__:
+                                    doc = tp_i[1]
+                                    if doc:
+                                        break
                             else:
                                 doc = getattr(value, '__doc__', None)
                             self.depth += 1

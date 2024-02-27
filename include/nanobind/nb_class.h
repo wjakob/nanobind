@@ -393,11 +393,11 @@ template <typename T> for_setter(T) -> for_setter<std::decay_t<T>>;
 namespace detail {
     template <typename T> auto filter_getter(const T &v) { return v; }
     template <typename T> auto filter_getter(const for_getter<T> &v) { return v.value; }
-    template <typename T> nullptr_t filter_getter(const for_setter<T> &) { return nullptr; }
+    template <typename T> std::nullptr_t filter_getter(const for_setter<T> &) { return nullptr; }
 
     template <typename T> auto filter_setter(const T &v) { return v; }
     template <typename T> auto filter_setter(const for_setter<T> &v) { return v.value; }
-    template <typename T> nullptr_t filter_setter(const for_getter<T> &) { return nullptr; }
+    template <typename T> std::nullptr_t filter_setter(const for_getter<T> &) { return nullptr; }
 }
 
 template <typename T, typename... Ts>

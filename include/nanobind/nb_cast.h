@@ -319,8 +319,14 @@ public:
         return true;
     }
 
-    static handle from_cpp(const handle &src, rv_policy,
-                           cleanup_list *) noexcept {
+    static handle from_cpp(T&& src, rv_policy, cleanup_list *) noexcept {
+        if constexpr (std::is_base_of_v<object, T>)
+            return src.release();
+        else
+            return src.inc_ref();
+    }
+
+    static handle from_cpp(const T &src, rv_policy, cleanup_list *) noexcept {
         return src.inc_ref();
     }
 };

@@ -297,10 +297,20 @@ class StubGen:
             name = fn.__name__
 
         sig = inspect.signature(fn)
-        sig_str = f"{name}{str(sig):}"
+
+        # TODO: it would be good if the following two steps could be targeted a
+        # bit more so that they only apply to types and not the entire function
+        # signature (for example, this will also rewrite type names that occur
+        # in default argument values, which is obviously very bad.)
+
+        # Remove '~' (which indicates how type variables are
+        # bound, but is actually invalid Python syntax)
+        sig = str(sig).replace('~', '')
+        sig = self.replace_standard_types(sig)
+
+        sig_str = f"{name}{sig:}"
         docstr = fn.__doc__
 
-        sig_str = self.replace_standard_types(sig_str)
         if not docstr or not self.include_docstrings:
             self.write_ln("def " + sig_str + ": ...")
         else:
@@ -437,7 +447,9 @@ class StubGen:
             if value_str is None:
                 value_str = "..."
 
-            if issubclass(tp, typing.TypeVar):
+            if issubclass(tp, typing.TypeVar) or \
+               (hasattr(typing, 'TypeVarTuple') and
+                issubclass(tp, typing.TypeVarTuple)):
                 self.write_ln(f"{name} = {value_str}\n")
             else:
                 self.write_ln(f"{name}: {self.type_str(tp)} = {value_str}\n")
@@ -595,6 +607,10 @@ class StubGen:
                 and name
                 # Need these even if their name indicates otherwise
                 and not issubclass(tp, typing.TypeVar)
+                and not (
+                    hasattr(typing, "TypeVarTuple")
+                    and issubclass(tp, typing.TypeVarTuple)
+                )
                 and len(name) > 2
                 and (
                     (name[0] == "_" and name[1] != "_")
@@ -710,6 +726,10 @@ class StubGen:
             return self.type_str(e)
         elif issubclass(tp, typing.ForwardRef):
             return f'"{e.__forward_arg__}"'
+        elif hasattr(typing, "TypeVarTuple") and \
+             issubclass(tp, typing.TypeVarTuple):
+            tv = self.import_object("typing", "TypeVarTuple")
+            return f'{tv}("{e.__name__}")'
         elif issubclass(tp, typing.TypeVar):
             tv = self.import_object("typing", "TypeVar")
             s = f'{tv}("{e.__name__}"'

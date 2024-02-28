@@ -1202,3 +1202,34 @@ functions:
    .. cpp:function:: const T* get() const
 
       Return a C++ pointer to the referenced object (const version)
+
+Typing
+------
+
+The following functions for typing-related functionality require an additional
+include directive:
+
+.. code-block:: cpp
+
+   #include <nanobind/typing.h>
+
+.. cpp:function:: template <typename... Args> object type_var(Args&&... args)
+
+   Create a `type variable
+   <https://docs.python.org/3/library/typing.html#typing.TypeVar>`__ (i.e., an
+   instance of ``typing.TypeVar``). All arguments of the original Python
+   construction are supported, e.g.:
+
+   .. code-block:: cpp
+
+        m.attr("T") = nb::type_var("T",
+                                   "contravariant"_a = true,
+                                   "covariant"_a = false,
+                                   "bound"_a = nb::type<MyClass>());
+
+
+.. cpp:function:: template <typename... Args> object type_var_tuple(Args&&... args)
+
+   Analogousto :cpp:func:`type_var`, create a `type variable tuple
+   <https://docs.python.org/3/library/typing.html#typing.TypeVarTuple>`__
+   (i.e., an instance of ``typing.TypeVarTuple``). 

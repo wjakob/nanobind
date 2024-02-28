@@ -122,6 +122,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/nb_types.h
     ${NB_DIR}/include/nanobind/ndarray.h
     ${NB_DIR}/include/nanobind/trampoline.h
+    ${NB_DIR}/include/nanobind/typing.h
     ${NB_DIR}/include/nanobind/operators.h
     ${NB_DIR}/include/nanobind/stl/array.h
     ${NB_DIR}/include/nanobind/stl/bind_map.h

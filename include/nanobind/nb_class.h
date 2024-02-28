@@ -697,9 +697,4 @@ template <typename Source, typename Target> void implicitly_convertible() {
     }
 }
 
-template <typename... Args>
-object type_var(Args&&... args) {
-    return module_::import_("typing").attr("TypeVar")((detail::forward_t<Args>) args...);
-}
-
 NAMESPACE_END(NB_NAMESPACE)

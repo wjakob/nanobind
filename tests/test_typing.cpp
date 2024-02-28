@@ -1,4 +1,4 @@
-#include <nanobind/nanobind.h>
+#include <nanobind/typing.h>
 #include <nanobind/operators.h>
 
 namespace nb = nanobind;

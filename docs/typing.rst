@@ -227,21 +227,25 @@ This looks as follows:
 
 .. code-block:: cpp
 
+   #include <nanobind/typing.h> // needed by nb::type_var below
+
    struct Wrapper {
        nb::object value;
    };
 
-   // 1. Instantiate a placeholder type ("type variable") used below
-   m.attr("T") = nb::type_var("T");
+   NB_MODULE(my_ext, m) {
+       // 1. Instantiate a placeholder type ("type variable") used below
+       m.attr("T") = nb::type_var("T");
 
-   // 2. Create a generic type, and indicate in generated stubs
-   //    that it derives from Generic[T]
-   nb::class_<Wrapper> wrapper(m, "Wrapper", nb::is_generic(),
-                               nb::sig("class Wrapper(typing.Generic[T])"))
-       .def(nb::init<nb::object>(),
-            nb::sig("def __init__(self, arg: T, /) -> None"))
-       .def("get", [](Wrapper &w) { return w.value; },
-            nb::sig("def get(self, /) -> T"));
+       // 2. Create a generic type, and indicate in generated stubs
+       //    that it derives from Generic[T]
+       nb::class_<Wrapper> wrapper(m, "Wrapper", nb::is_generic(),
+                                   nb::sig("class Wrapper(typing.Generic[T])"))
+           .def(nb::init<nb::object>(),
+                nb::sig("def __init__(self, arg: T, /) -> None"))
+           .def("get", [](Wrapper &w) { return w.value; },
+                nb::sig("def get(self, /) -> T"));
+   }
 
 This involves the following steps:
 

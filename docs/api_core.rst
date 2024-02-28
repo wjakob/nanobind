@@ -2698,18 +2698,3 @@ Miscellaneous
                // ...
            }
        });
-
-.. cpp:function:: template <typename... Args> object type_var(Args&&... args)
-
-   Intantiate a  `type variable
-   <https://docs.python.org/3/library/typing.html#typing.TypeVar>`__ (i.e., an
-   instance of ``typing.TypeVar``). All arguments of the original Python
-   construction are supported, e.g.:
-
-   .. code-block:: cpp
-
-        m.attr("T") = nb::type_var("T",
-                                   "contravariant"_a = true,
-                                   "covariant"_a = false,
-                                   "bound"_a = nb::type<MyClass>());
-

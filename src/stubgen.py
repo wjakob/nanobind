@@ -41,7 +41,7 @@ specifically to simplify stub generation.
  to the semantic versioning policy used by the nanobind project.)
 """
 
-import inspect
+from inspect import Signature, Parameter, signature, ismodule, getmembers
 import textwrap
 import importlib
 import importlib.machinery
@@ -288,6 +288,13 @@ class StubGen:
                 self.write_ln(f"{name} = {fn_name}\n")
                 return
 
+        if isinstance(fn, staticmethod):
+            self.write_ln('@staticmethod')
+            fn = fn.__func__
+        elif isinstance(fn, classmethod):
+            self.write_ln('@staticmethod')
+            fn = fn.__func__
+
         # Special handling for nanobind functions with overloads
         if type(fn).__module__ == "nanobind":
             self.put_nb_func(fn, name)
@@ -296,29 +303,39 @@ class StubGen:
         if name is None:
             name = fn.__name__
 
-        sig = inspect.signature(fn)
+        overloads = []
+        if hasattr(fn, '__module__'):
+            if sys.version_info >= (3, 11, 0):
+                overloads = typing.get_overloads(fn)
+            else:
+                try:
+                    import typing_extensions
+                    overloads = typing_extensions.get_overloads(fn)
+                except ModuleNotFoundError:
+                    raise RuntimeError("stubgen.py requires the 'typing_extension' package on Python <3.11")
+        if not overloads:
+            overloads = [fn]
 
-        # TODO: it would be good if the following two steps could be targeted a
-        # bit more so that they only apply to types and not the entire function
-        # signature (for example, this will also rewrite type names that occur
-        # in default argument values, which is obviously very bad.)
+        for i, fno in enumerate(overloads):
+            if len(overloads) > 1:
+                overload = self.import_object("typing", "overload")
+                self.write_ln(f'@{overload}')
 
-        # Remove '~' (which indicates how type variables are
-        # bound, but is actually invalid Python syntax)
-        sig = str(sig).replace('~', '')
-        sig = self.replace_standard_types(sig)
+            sig_str = f"{name}{self.signature_str(signature(fno))}"
 
-        sig_str = f"{name}{sig:}"
-        docstr = fn.__doc__
+            # Potentially copy docstring from the implementation function
+            docstr = fno.__doc__
+            if i == 0 and not docstr and fn.__doc__:
+                docstr = fn.__doc__
 
-        if not docstr or not self.include_docstrings:
-            self.write_ln("def " + sig_str + ": ...")
-        else:
-            self.write_ln("def " + sig_str + ":")
-            self.depth += 1
-            self.put_docstr(docstr)
-            self.depth -= 1
-        self.write("\n")
+            if not docstr or not self.include_docstrings:
+                self.write_ln("def " + sig_str + ": ...")
+            else:
+                self.write_ln("def " + sig_str + ":")
+                self.depth += 1
+                self.put_docstr(docstr)
+                self.depth -= 1
+            self.write("\n")
 
     def put_property(self, prop, name):
         """Append a Python 'property' object"""
@@ -425,6 +442,8 @@ class StubGen:
             or issubclass(tp, types.BuiltinFunctionType)
             or issubclass(tp, types.BuiltinMethodType)
             or issubclass(tp, types.WrapperDescriptorType)
+            or issubclass(tp, staticmethod)
+            or issubclass(tp, classmethod)
             or (tp.__module__ == "nanobind" and tp.__name__ == "nb_func")
         )
 
@@ -621,12 +640,12 @@ class StubGen:
 
             tp_mod, tp_name = tp.__module__, tp.__name__
 
-            if inspect.ismodule(value):
+            if ismodule(value):
                 if len(self.stack) != 1:
                     # Do not recurse into submodules, but include a directive to import them
                     self.import_object(value.__name__, name=None, as_name=name)
                     return
-                for name, child in inspect.getmembers(value):
+                for name, child in getmembers(value):
                     self.put(child, module=value, name=name, parent=value)
             elif self.is_function(tp):
                 self.put_function(value, name, parent)
@@ -776,12 +795,65 @@ class StubGen:
             pass
         return None
 
+    def signature_str(self, s: Signature):
+        """Convert an inspect.Signature to into valid Python syntax"""
+        posonly_sep, kwonly_sep = False, True
+        params = []
+
+        # Logic for placing '*' and '/' based on the
+        # signature.Signature implementation
+        for param in s.parameters.values():
+            kind = param.kind
+
+            if kind == Parameter.POSITIONAL_ONLY:
+                posonly_sep = True
+            elif posonly_sep:
+                params.append('/')
+                posonly_sep = False
+
+            if kind == Parameter.VAR_POSITIONAL:
+                kwonly_sep = False
+            elif kind == Parameter.KEYWORD_ONLY and kwonly_sep:
+                params.append('*')
+                kwonly_sep = False
+            params.append(self.param_str(param))
+
+        if posonly_sep:
+            params.append('/')
+
+        result = f"({', '.join(params)})"
+        if s.return_annotation != Signature.empty:
+            result += " -> " + self.type_str(s.return_annotation)
+        return result
+
+    def param_str(self, p: Parameter):
+        result = ''
+        if p.kind == Parameter.VAR_POSITIONAL:
+            result += '*'
+        elif p.kind == Parameter.VAR_KEYWORD:
+            result += '**'
+        result += p.name
+        has_type = p.annotation != Parameter.empty
+        has_def  = p.default != Parameter.empty
+
+        if has_type:
+            result += ': ' + self.type_str(p.annotation)
+        if has_def:
+            result += ' = ' if has_type else '='
+            result += self.expr_str(p.default)
+        return result
+
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
         if hasattr(types, "GenericAlias") and isinstance(tp, types.GenericAlias):
-            tp_name = str(tp)
-        else:
+            # Strip ~ and - from TypeVar names, which produces invalid Python code
+            tp_name = re.sub(r'(?<=( |\[))[~-]', '', str(tp))
+        elif isinstance(tp, typing.TypeVar):
+            tp_name = tp.__name__
+        elif isinstance(tp, type):
             tp_name = tp.__module__ + "." + tp.__qualname__
+        else:
+            tp_name = str(tp)
         return self.replace_standard_types(tp_name)
 
     def get(self):

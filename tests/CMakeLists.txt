@@ -67,6 +67,14 @@ foreach (NAME functions classes ndarray stl enum typing make_iterator)
     ${EXTRA})
 endforeach()
 
+nanobind_add_stub(
+  py_stub
+  MODULE py_stub_test
+  OUTPUT ${PYI_PREFIX}py_stub_test.pyi
+  PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
+  DEPENDS py_stub_test.py
+)
+
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)
   nanobind_add_module(test_eigen_ext test_eigen.cpp ${NB_EXTRA_ARGS})
@@ -117,6 +125,8 @@ set(TEST_FILES
   test_stl_ext.pyi.ref
   test_enum_ext.pyi.ref
   test_typing_ext.pyi.ref
+  py_stub_test.py
+  py_stub_test.pyi.ref
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)

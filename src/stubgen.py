@@ -845,14 +845,16 @@ class StubGen:
 
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
+        tp_tp = type(tp)
+        generic_alias = 'GenericAlias' in tp_tp.__name__
+
         if isinstance(tp, typing.TypeVar):
             tp_name = tp.__name__
-        elif isinstance(tp, type):
+        elif isinstance(tp, type) and not generic_alias:
             tp_name = tp.__module__ + "." + tp.__qualname__
         else:
             tp_name = str(tp)
-            tp2 = type(tp)
-            if tp2.__module__ == 'typing' or 'GenericAlias' in tp2.__name__:
+            if generic_alias or tp_tp.__module__ == 'typing':
                 # Strip ~ and - from TypeVar names, which produces invalid Python code
                 tp_name = re.sub(r'(?<=( |\[))[~-]', '', tp_name)
         return self.replace_standard_types(tp_name)

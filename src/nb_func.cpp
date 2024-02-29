@@ -1004,8 +1004,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                             buf.put_dstr(arg.signature);
                         } else {
                             PyObject *o = arg.value;
-                            PyObject *str = PyObject_Str(o);
-                            bool is_str = PyUnicode_Check(o);
+                            PyObject *str = PyObject_Repr(o);
 
                             if (str) {
                                 Py_ssize_t size = 0;
@@ -1015,11 +1014,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                                     PyErr_Clear();
                                 } else {
                                     buf.put(" = ");
-                                    if (is_str)
-                                        buf.put('\'');
                                     buf.put(cstr, (size_t) size);
-                                    if (is_str)
-                                        buf.put('\'');
                                 }
                                 Py_DECREF(str);
                             } else {

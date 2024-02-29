@@ -36,6 +36,10 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Key = typename Map::key_type;
     using Value = typename Map::mapped_type;
 
+    static_assert(!detail::is_base_caster_v<detail::make_caster<Value>> ||
+                      detail::is_copy_constructible_v<Value>,
+                  "bind_map(): the value type must be copy-constructible.");
+
     handle cl_cur = type<Map>();
     if (cl_cur.is_valid()) {
         // Binding already exists, don't re-create
@@ -76,8 +80,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                  if (it == m.end())
                      throw key_error();
                  return it->second;
-             },
-             rv_policy::reference_internal
+             }
         )
 
         .def("__delitem__",

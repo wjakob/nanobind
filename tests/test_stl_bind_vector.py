@@ -110,15 +110,7 @@ def test03_vector_custom():
     assert len(v_b) == 2 and v_b[0].a == 1 and v_b[1].a == 2
 
 
-def test04_vector_noncopyable():
-    vnc = t.get_vnc(5)
-    for i in range(0, 5):
-        assert vnc[i].value == i + 1
-
-    for i, j in enumerate(vnc, start=1):
-        assert j.value == i
-
-def test05_vector_slicing():
+def test04_vector_slicing():
     l1 = list(range(100))
     l2 = t.VectorInt(l1)
 
@@ -145,3 +137,26 @@ def test05_vector_slicing():
     check_del(slice(200, 10, 1))
     check_del(slice(200, 10, -1))
     check_del(slice(200, 10, -3))
+
+
+def test05_vector_non_shared():
+    v = t.VectorEl()
+    v.append(t.El(1))
+    v.append(t.El(2))
+
+    v0, v1 = v[0], v[1]
+    v0.a, v1.a = 100, 200
+
+    assert v[0].a == 1
+    assert v[1].a == 2
+
+def test06_vector_shared():
+    v = t.VectorElShared()
+    v.append(t.El(1))
+    v.append(t.El(2))
+
+    v0, v1 = v[0], v[1]
+    v0.a, v1.a = 100, 200
+
+    assert v[0].a == 100
+    assert v[1].a == 200

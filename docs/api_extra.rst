@@ -169,7 +169,7 @@ STL vector bindings
 -------------------
 
 The following function can be used to expose ``std::vector<...>`` variants
-in Python. It is not part of the core nanobind API and require an additional
+in Python. It is not part of the core nanobind API and requires an additional
 include directive:
 
 .. code-block:: cpp
@@ -253,7 +253,7 @@ STL map bindings
 
 The following function can be used to expose ``std::map<...>`` or
 ``std::unordered_map<...>`` variants in Python. It is not part of the core
-nanobind API and require an additional include directive:
+nanobind API and requires an additional include directive:
 
 .. code-block:: cpp
 
@@ -313,6 +313,17 @@ nanobind API and require an additional include directive:
 
    The binding operation is a no-op if the map type has already been
    registered with nanobind.
+
+   The binding routine ideally expects the involved types to be:
+
+   - copy-constructible
+   - copy-assignable
+   - equality-comparable
+
+   If not all of these properties are available, then a subset of the above
+   methods will be omitted. Please refer to ``bind_map.h`` for details on the
+   logic.
+
 
 Unique pointer deleter
 ----------------------

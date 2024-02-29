@@ -393,7 +393,7 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_ARGS -p "${ARG_PATTERN_FILE}")
   endif()
 
-  if (ARG_MARKER)
+  if (ARG_MARKER_FILE)
     list(APPEND NB_STUBGEN_ARGS -M "${ARG_MARKER_FILE}")
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_MARKER_FILE}")
   endif()

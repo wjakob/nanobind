@@ -430,6 +430,9 @@ function (nanobind_add_stub name)
     if (ARG_EXCLUDE_FROM_ALL)
       list(APPEND NB_STUBGEN_EXTRA EXCLUDE_FROM_ALL)
     endif()
-    install(CODE "set(CMD \"${NB_STUBGEN_CMD}\")\nexecute_process(\n COMMAND \$\{CMD\}\n WORKING_DIRECTORY \"$<INSTALL_PREFIX>\"\n)" ${NB_STUBGEN_EXTRA})
+    # \${CMAKE_INSTALL_PREFIX} has same effect as $<INSTALL_PREFIX>
+    # This is for compatibility with CMake < 3.27.
+    # For more info: https://github.com/wjakob/nanobind/issues/420#issuecomment-1971353531
+    install(CODE "set(CMD \"${NB_STUBGEN_CMD}\")\nexecute_process(\n COMMAND \$\{CMD\}\n WORKING_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}\"\n)" ${NB_STUBGEN_EXTRA})
   endif()
 endfunction()

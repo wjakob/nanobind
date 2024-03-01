@@ -22,22 +22,29 @@
 #  define NAMESPACE_END(name) }
 #endif
 
-#if defined(_WIN32)
-#  define NB_EXPORT        __declspec(dllexport)
-#  define NB_IMPORT        __declspec(dllimport)
-#  define NB_INLINE        __forceinline
+#if defined _WIN32 || defined __CYGWIN__
+#  ifdef __GNUC__
+#    define NB_EXPORT        __attribute__ ((visibility("default")))
+#    define NB_IMPORT        NB_EXPORT
+#    define NB_INLINE        inline __attribute__((always_inline))
+#    define NB_NOINLINE      __attribute__((noinline))
+#  else
+#    define NB_EXPORT        __declspec(dllexport)
+#    define NB_IMPORT        __declspec(dllimport)
+#    define NB_INLINE        __forceinline
+#    define NB_NOINLINE      __declspec(noinline)
+#  endif
 #  define NB_INLINE_LAMBDA
-#  define NB_NOINLINE      __declspec(noinline)
 #else
-#  define NB_EXPORT        __attribute__ ((visibility("default")))
-#  define NB_IMPORT        NB_EXPORT
-#  define NB_INLINE        inline __attribute__((always_inline))
-#  define NB_NOINLINE      __attribute__((noinline))
-#if defined(__clang__)
+#  define NB_EXPORT          __attribute__ ((visibility("default")))
+#  define NB_IMPORT          NB_EXPORT
+#  define NB_INLINE          inline __attribute__((always_inline))
+#  define NB_NOINLINE        __attribute__((noinline))
+#  if defined(__clang__)
 #    define NB_INLINE_LAMBDA __attribute__((always_inline))
-#else
+#  else
 #    define NB_INLINE_LAMBDA
-#endif
+#  endif
 #endif
 
 #if defined(__GNUC__)

@@ -73,6 +73,13 @@ static PyObject *nb_enum_get_doc(PyObject *self, void *) {
     return result;
 }
 
+static PyObject *nb_enum_get_value(PyObject *self, void *) {
+    enum_supplement &supp = nb_enum_supplement(Py_TYPE(self));
+    return supp.is_signed ? nb_enum_int_signed(self)
+                          : nb_enum_int_unsigned(self);
+}
+
+
 NB_NOINLINE static PyObject *nb_enum_int_signed(PyObject *o) {
     type_data *t = nb_type_data(Py_TYPE(o));
     const void *p = inst_ptr((nb_inst *) o);
@@ -141,6 +148,8 @@ error:
 static PyGetSetDef nb_enum_getset[] = {
     { "__doc__", nb_enum_get_doc, nullptr, nullptr, nullptr },
     { "__name__", nb_enum_get_name, nullptr, nullptr, nullptr },
+    { "name", nb_enum_get_name, nullptr, nullptr, nullptr },
+    { "value", nb_enum_get_value, nullptr, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 

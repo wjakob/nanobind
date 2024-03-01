@@ -195,7 +195,7 @@ static void inst_dealloc(PyObject *self) {
     if (NB_UNLIKELY(gc)) {
         PyObject_GC_UnTrack(self);
 
-        if (t->flags & (uint32_t)type_flags::has_dynamic_attr) {
+        if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
             PyObject **dict = nb_dict_ptr(self);
             if (dict)
                 Py_CLEAR(*dict);
@@ -296,7 +296,7 @@ static void inst_dealloc(PyObject *self) {
           "unknown instance (%p)!", t->name, p);
 
     if (NB_UNLIKELY(gc))
-        NB_SLOT(PyType_Type, tp_free)(self);
+        PyObject_GC_Del(self);
     else
         PyObject_Free(self);
 

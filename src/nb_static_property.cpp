@@ -56,5 +56,5 @@ PyTypeObject *nb_static_property_tp() noexcept {
     return tp;
 }
 
-NAMESPACE_END(NB_NAMESPACE)
 NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)

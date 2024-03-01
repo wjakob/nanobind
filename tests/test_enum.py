@@ -9,6 +9,9 @@ def test01_unsigned_enum():
     assert t.Enum.A.__name__ == 'A'
     assert t.Enum.B.__name__ == 'B'
     assert t.Enum.C.__name__ == 'C'
+    assert t.Enum.A.name == 'A'
+    assert t.Enum.B.name == 'B'
+    assert t.Enum.C.name == 'C'
 
     # The following fails on PyPy: https://github.com/pypy/pypy/issues/4898
     if platform.python_implementation() != 'PyPy':
@@ -20,6 +23,9 @@ def test01_unsigned_enum():
     assert int(t.Enum.A) == 0
     assert int(t.Enum.B) == 1
     assert int(t.Enum.C) == 0xffffffff
+    assert t.Enum.A.value == 0
+    assert t.Enum.B.value == 1
+    assert t.Enum.C.value == 0xffffffff
     assert t.Enum(0) is t.Enum.A
     assert t.Enum(1) is t.Enum.B
     assert t.Enum(0xffffffff) is t.Enum.C
@@ -54,6 +60,9 @@ def test02_signed_enum():
     assert int(t.SEnum.A) == 0
     assert int(t.SEnum.B) == 1
     assert int(t.SEnum.C) == -1
+    assert t.SEnum.A.value == 0
+    assert t.SEnum.B.value == 1
+    assert t.SEnum.C.value == -1
     assert t.SEnum(0) is t.SEnum.A
     assert t.SEnum(1) is t.SEnum.B
     assert t.SEnum(-1) is t.SEnum.C

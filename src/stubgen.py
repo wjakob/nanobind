@@ -392,6 +392,8 @@ class StubGen:
                 self.abstract_enum_arith |= is_arith
 
                 tp_bases = ["_Enum" + ("Arith" if is_arith else "")]
+                del tp_dict["name"]
+                del tp_dict["value"]
                 for op in ENUM_OPS:
                     name, rname = f"__{op}__", f"__r{op}__"
                     if name in tp_dict:
@@ -908,6 +910,8 @@ class StubGen:
 
         for op in ["gt", "ge", "lt", "le"]:
             s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
+        s += f"    def name(self, /) -> str: ...\n"
+        s += f"    def value(self, /) -> int: ...\n"
         s += "\n"
 
         if not self.abstract_enum_arith:

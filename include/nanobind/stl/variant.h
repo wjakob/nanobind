@@ -22,7 +22,7 @@ struct concat_variant<std::variant<Ts1...>, std::variant<Ts2...>, Ts3...>
     : concat_variant<std::variant<Ts1..., Ts2...>, Ts3...> {};
 
 template <typename... Ts> struct remove_opt_mono<std::variant<Ts...>>
-    : concat_variant<std::conditional_t<std::is_same_v<std::monostate, Ts>, std::variant<>, std::variant<Ts>>...> {};
+    : concat_variant<std::conditional_t<std::is_same_v<std::monostate, Ts>, std::variant<>, std::variant<remove_opt_mono_t<Ts>>>...> {};
 
 template <> struct type_caster<std::monostate> {
     NB_TYPE_CASTER(std::monostate, const_name("None"))

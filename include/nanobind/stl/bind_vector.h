@@ -76,7 +76,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
         .def("__getitem__",
              [](Vector &v, Py_ssize_t i) -> ValueRef {
                  return v[detail::wrap(i, v.size())];
-             })
+             }, std::is_pointer_v<Value> ? rv_policy::take_ownership : rv_policy::copy)
 
         .def("clear", [](Vector &v) { v.clear(); },
              "Remove all items from list.");

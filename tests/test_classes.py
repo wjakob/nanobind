@@ -493,7 +493,7 @@ def test22_low_level(clean):
 def test23_handle_t(clean):
     assert (
         t.test_handle_t.__doc__
-        == "test_handle_t(arg: test_classes_ext.Struct, /) -> object"
+        == "test_handle_t(arg: test_classes_ext.Struct, /) -> typing.Any"
     )
     s = t.test_handle_t(t.Struct(5))
     assert s.value() == 5
@@ -508,7 +508,7 @@ def test23_handle_t(clean):
 def test24_type_object_t(clean):
     assert (
         t.test_type_object_t.__doc__
-        == f"test_type_object_t(arg: {TYPING_TYPE}[test_classes_ext.Struct], /) -> object"
+        == f"test_type_object_t(arg: {TYPING_TYPE}[test_classes_ext.Struct], /) -> typing.Any"
     )
 
     assert t.test_type_object_t(t.Struct) is t.Struct

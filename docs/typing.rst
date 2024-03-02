@@ -568,7 +568,7 @@ For example, suppose that we had the following lackluster stub entry:
 .. code-block:: python
 
    class MyClass:
-       def my_function(arg: object) -> object: ...
+       def my_function(arg: object) -> Any: ...
 
 The pattern below matches this function stub and inserts an alternative with
 two typed overloads.

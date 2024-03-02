@@ -249,7 +249,7 @@ def test25_int():
     assert t.test_19(5) == 128
     assert t.test_20("5") == 128
     assert t.test_21(5) == 5
-    assert t.test_19.__doc__ == "test_19(arg: int, /) -> object"
+    assert t.test_19.__doc__ == "test_19(arg: int, /) -> typing.Any"
 
 
 def test26_capsule():

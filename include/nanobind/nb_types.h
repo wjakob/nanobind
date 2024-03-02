@@ -170,7 +170,7 @@ class handle : public detail::api<handle> {
     friend struct detail::obj_item;
     friend struct detail::num_item;
 public:
-    static constexpr auto Name = detail::const_name("object");
+    static constexpr auto Name = detail::io_name("object", "typing.Any");
 
     handle() = default;
     handle(const handle &) = default;
@@ -210,7 +210,7 @@ protected:
 
 class object : public handle {
 public:
-    static constexpr auto Name = detail::const_name("object");
+    static constexpr auto Name = detail::io_name("object", "typing.Any");
 
     object() = default;
     object(const object &o) : handle(o) { inc_ref(); }

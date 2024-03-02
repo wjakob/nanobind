@@ -86,10 +86,10 @@ constexpr auto io_name(char const (&text1)[N1], char const (&text2)[N2]) {
 
 #if PY_VERSION_HEX < 0x030A0000
 template <typename T> constexpr auto optional_name(const T &v) {
-    return const_name("Optional[") + v + const_name("]");
+    return const_name("typing.Optional[") + v + const_name("]");
 }
 template <typename... Ts> constexpr auto union_name(const Ts&... vs) {
-    return const_name("Union[") + concat(vs...) + const_name("]");
+    return const_name("typing.Union[") + concat(vs...) + const_name("]");
 }
 #else
 template <typename T> constexpr auto optional_name(const T &v) {

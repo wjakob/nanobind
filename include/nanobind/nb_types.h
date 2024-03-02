@@ -314,7 +314,7 @@ inline void delattr(handle h, handle key) {
 
 class module_ : public object {
 public:
-    NB_OBJECT(module_, object, "ModuleType", PyModule_CheckExact);
+    NB_OBJECT(module_, object, "types.ModuleType", PyModule_CheckExact);
 
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
@@ -332,7 +332,7 @@ public:
 };
 
 class capsule : public object {
-    NB_OBJECT_DEFAULT(capsule, object, "CapsuleType", PyCapsule_CheckExact)
+    NB_OBJECT_DEFAULT(capsule, object, "types.CapsuleType", PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
         m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
@@ -466,6 +466,7 @@ class list : public object {
     size_t size() const { return (size_t) NB_LIST_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);
+    template <typename T> void insert(Py_ssize_t index, T &&value);
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
@@ -503,11 +504,11 @@ class set : public object {
 };
 
 class sequence : public object {
-    NB_OBJECT_DEFAULT(sequence, object, "Sequence", PySequence_Check)
+    NB_OBJECT_DEFAULT(sequence, object, NB_TYPING_SEQUENCE, PySequence_Check)
 };
 
 class mapping : public object {
-    NB_OBJECT_DEFAULT(mapping, object, "Mapping", PyMapping_Check)
+    NB_OBJECT_DEFAULT(mapping, object, NB_TYPING_MAPPING, PyMapping_Check)
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Keys)); }
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
@@ -529,7 +530,7 @@ public:
     using reference = const handle;
     using pointer = const handle *;
 
-    NB_OBJECT_DEFAULT(iterator, object, "Iterator", PyIter_Check)
+    NB_OBJECT_DEFAULT(iterator, object, NB_TYPING_ITERATOR, PyIter_Check)
 
     iterator& operator++() {
         m_value = steal(detail::obj_iter_next(m_ptr));
@@ -561,7 +562,7 @@ private:
 
 class iterable : public object {
 public:
-    NB_OBJECT_DEFAULT(iterable, object, "Iterable", detail::iterable_check)
+    NB_OBJECT_DEFAULT(iterable, object, NB_TYPING_ITERABLE, detail::iterable_check)
 };
 
 /// Retrieve the Python type object associated with a C++ class
@@ -630,7 +631,7 @@ class ellipsis : public object {
     static bool is_ellipsis(PyObject *obj) { return obj == Py_Ellipsis; }
 
 public:
-    NB_OBJECT(ellipsis, object, "EllipsisType", is_ellipsis)
+    NB_OBJECT(ellipsis, object, "types.EllipsisType", is_ellipsis)
     ellipsis() : object(Py_Ellipsis, detail::borrow_t()) {}
 };
 
@@ -638,13 +639,13 @@ class not_implemented : public object {
     static bool is_not_implemented(PyObject *obj) { return obj == Py_NotImplemented; }
 
 public:
-    NB_OBJECT(not_implemented, object, "NotImplementedType", is_not_implemented)
+    NB_OBJECT(not_implemented, object, "types.NotImplementedType", is_not_implemented)
     not_implemented() : object(Py_NotImplemented, detail::borrow_t()) {}
 };
 
 class callable : public object {
 public:
-    NB_OBJECT(callable, object, "Callable", PyCallable_Check)
+    NB_OBJECT(callable, object, NB_TYPING_CALLABLE, PyCallable_Check)
     using object::object;
 };
 

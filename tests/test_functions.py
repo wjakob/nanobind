@@ -262,7 +262,7 @@ def test27_slice():
 
 def test28_ellipsis():
     assert t.test_29(...) is ...
-    assert t.test_29.__doc__ == "test_29(arg: EllipsisType, /) -> EllipsisType"
+    assert t.test_29.__doc__ == "test_29(arg: types.EllipsisType, /) -> types.EllipsisType"
 
 
 def test29_traceback():

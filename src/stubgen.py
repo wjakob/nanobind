@@ -30,11 +30,21 @@ sg.put(my_module)
 print(sg.get())
 ```
 
+Internals:
+----------
+
+The implementation of stubgen performs a DFS traversal of the loaded module and
+directly generates the stub in lockstep. There are no ASTs or other
+intermediate data structures to keep things as simple as possible. Every kind
+of object that could be encountered (functions, properties, values, types) has
+a corresponding ``put_..`` method, along with the main ``put()`` entry point
+that dispatches to the others as appropriate.
+
 Internally, stub generation involves two potentially complex steps: converting
 nanobind overload chains into '@overload' declarations that can be understood
 by the 'typing' module, and turning default values back into Python
-expressions. To make this process more well-defined, the implementation relies
-on an internal ``__nb_signature__`` property that nanobind functions expose
+expressions. To make both steps well-defined, the implementation relies on an
+internal ``__nb_signature__`` property that nanobind functions expose
 specifically to simplify stub generation.
 
 (Note that for now, the StubGen API is considered experimental and not subject
@@ -56,33 +66,41 @@ ENUM_OPS = [
     "add", "sub", "mul", "floordiv", "eq", "ne", "gt", "ge", "lt", "le",
     "index", "repr", "hash", "int", "rshift", "lshift", "and", "or", "xor",
     "neg", "abs", "invert",
-]  # fmt: on
+] 
+
+
+# Exclude various standard elements found in modules, classes, etc.
+SKIP_LIST = [
+    "__doc__", "__module__", "__name__", "__new__", "__builtins__",
+    "__cached__", "__path__", "__version__", "__spec__", "__loader__",
+    "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
+    "__file__", "__dict__", "__weakref__", "@entries"
+]
+# fmt: on
 
 
 class StubGen:
     def __init__(
         self,
+        module,
         include_docstrings=True,
         include_private=False,
-        module=None,
         max_expr_length=50,
         patterns={},
     ):
-        # Store the module (if available) so that we can check for naming
-        # conflicts when introducing temporary variables needed within the stub
+        # Module to check for name conflicts when adding helper imports
         self.module = module
 
-        # Should docstrings be included in the generated stub?
+        # Include docstrings in the generated stub?
         self.include_docstrings = include_docstrings
 
-        # Should private members (that start or end with
-        # a single underscore) be included?
+        # Include private members that start or end with a single underscore?
         self.include_private = include_private
 
         # Maximal length (in characters) before an expression gets abbreviated as '...'
         self.max_expr_length = max_expr_length
 
-        # Replacement patterns
+        # Replacement patterns as produced by ``load_pattern_file()`` below
         self.patterns = patterns
 
         # ---------- Internal fields ----------
@@ -96,11 +114,13 @@ class StubGen:
         # A stack to avoid infinite recursion
         self.stack = []
 
-        # An associated sequence of identifier
-        self.prefix = module.__name__ if module else ""
+        # An identifier associated with the top element of the stack
+        self.prefix = module.__name__
 
         # Dictionary to keep track of import directives added by the stub generator
         self.imports = {}
+
+        # ---------- Regular expressions ----------
 
         # Negative lookbehind matching word boundaries except '.'
         sep_before = r"(?<![\\B\.])"
@@ -108,14 +128,11 @@ class StubGen:
         # Negative lookforward matching word boundaries except '.'
         sep_after = r"(?![\\B\.])"
 
-        # Positive lookforward matching an opening bracket
-        bracket = r"(?=\[)"
-
         # Regexp matching a Python identifier
         identifier = r"[^\d\W]\w*"
 
-        # Regexp matching a sequence of identifiers separated by periods
-        identifier_seq = (
+        # Precompile RE a sequence of identifiers separated by periods
+        self.id_seq = re.compile(
             sep_before
             + "((?:"
             + identifier
@@ -125,41 +142,10 @@ class StubGen:
             + sep_after
         )
 
-        # Precompile a regular expression used to extract types from 'typing.*'
-        self.typing_re = re.compile(
-            sep_before + r"(Union|Optional|Tuple|Dict|List|Annotated)" + bracket
-        )
-
-        # ditto, for 'typing.*' or 'collections.abc.*' depending on the Python version
-        self.abc_re = re.compile(
-            sep_before + r"(Callable|Tuple|Sequence|Mapping|Set|Iterator|Iterable)\b"
-        )
-
-        # Precompile a regular expression used to extract types from 'types.*'
-        self.types_re = re.compile(
-            sep_before + r"(ModuleType|CapsuleType|EllipsisType)\b"
-        )
-
-        # Precompile a regular expression used to extract nanobind nd-arrays
+        # Precompile RE to extract nanobind nd-arrays
         self.ndarray_re = re.compile(
             sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor)\[([^\]]*)\]"
         )
-
-        # Regular expression matching `builtins.*` types
-        self.none_re = re.compile(sep_before + r"builtins\.(None)Type\b")
-        self.builtins_re = re.compile(sep_before + r"builtins\.(" + identifier + ")")
-
-        # Precompile a regular expression used to extract a few other types
-        self.identifier_seq_re = re.compile(identifier_seq)
-
-        # Regular expression to strip away the module for locals
-        if self.module:
-            module_name_re = self.module.__name__.replace(".", r"\.")
-            self.module_member_re = re.compile(
-                sep_before + module_name_re + r"\.(" + identifier + ")" + sep_after
-            )
-        else:
-            self.module_member_re = None
 
         # Should we insert a dummy base class to handle enumerations?
         self.abstract_enum = False
@@ -193,14 +179,21 @@ class StubGen:
         self.write_par(docstr)
 
     def put_nb_overload(self, fn, sig, name=None):
-        """Append an 'nb_func' function overload"""
+        """
+        The ``put_nb_func()`` repeatedly calls this method to render the
+        individual method overloads.
+        """
         sig_str, docstr, start = sig[0], sig[1], 0
+
+        # Label anonymous functoins
         if sig_str.startswith("def (") and name is not None:
             sig_str = "def " + name + sig_str[4:]
 
-        sig_str = self.replace_standard_types(sig_str)
+        # Simplify type names present in the signature
+        paren = sig_str.find("(")
+        sig_str = sig_str[:paren] + self.simplify_types(sig_str[paren:])
 
-        # Render function default arguments
+        # Substitute in string versions of the default arguments
         for index, arg in enumerate(sig[2:]):
             pos = -1
             custom_signature = False
@@ -226,7 +219,9 @@ class StubGen:
             if custom_signature:
                 arg_str = arg
             else:
-                arg_str = self.expr_str(arg)
+                # Call expr_str to convert the default value to a string.
+                # Abbreviate with '...' if it is too long.
+                arg_str = self.expr_str(arg, abbrev=True)
                 if arg_str is None:
                     arg_str = "..."
 
@@ -256,43 +251,44 @@ class StubGen:
         self.write("\n")
 
     def put_nb_func(self, fn, name=None):
-        """Append an 'nb_func' function object"""
+        """Append a nanobind function binding to the stub"""
         sigs = fn.__nb_signature__
         count = len(sigs)
         assert count > 0
         if count == 1:
+            # No overloads write directly
             self.put_nb_overload(fn, sigs[0], name)
         else:
+            # Render an @overload-decorated chain
             overload = self.import_object("typing", "overload")
             for s in sigs:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
     def put_function(self, fn, name=None, parent=None):
-        """Append a function of an arbitrary type"""
+        """Append a function of an arbitrary type to the stub"""
         # Don't generate a constructor for nanobind classes that aren't constructible
         if name == "__init__" and type(parent).__name__.startswith("nb_type"):
             return
 
-        if self.module:
-            fn_module = getattr(fn, "__module__", None)
-            fn_name = getattr(fn, "__name__", None)
+        fn_module = getattr(fn, "__module__", None)
+        fn_name = getattr(fn, "__name__", None)
 
-            # Check if this function is an alias from another module
-            if fn_module and fn_module != self.module.__name__:
-                self.put_value(fn, name, None)
-                return
+        # Check if this function is an alias from *another* module
+        if fn_module and fn_module != self.module.__name__:
+            self.put_value(fn, name)
+            return
 
-            # Check if this function is an alias from the same module
-            if name and fn_name and name != fn_name:
-                self.write_ln(f"{name} = {fn_name}\n")
-                return
+        # Check if this function is an alias from the *same* module
+        if name and fn_name and name != fn_name:
+            self.write_ln(f"{name} = {fn_name}\n")
+            return
 
         if isinstance(fn, staticmethod):
-            self.write_ln('@staticmethod')
+            self.write_ln("@staticmethod")
             fn = fn.__func__
         elif isinstance(fn, classmethod):
-            self.write_ln('@staticmethod')
+            self.write_ln("@staticmethod")
             fn = fn.__func__
 
         # Special handling for nanobind functions with overloads
@@ -304,22 +300,25 @@ class StubGen:
             name = fn.__name__
 
         overloads = []
-        if hasattr(fn, '__module__'):
+        if hasattr(fn, "__module__"):
             if sys.version_info >= (3, 11, 0):
                 overloads = typing.get_overloads(fn)
             else:
                 try:
                     import typing_extensions
+
                     overloads = typing_extensions.get_overloads(fn)
                 except ModuleNotFoundError:
-                    raise RuntimeError("stubgen.py requires the 'typing_extension' package on Python <3.11")
+                    raise RuntimeError(
+                        "stubgen.py requires the 'typing_extension' package on Python <3.11"
+                    )
         if not overloads:
             overloads = [fn]
 
         for i, fno in enumerate(overloads):
             if len(overloads) > 1:
                 overload = self.import_object("typing", "overload")
-                self.write_ln(f'@{overload}')
+                self.write_ln(f"@{overload}")
 
             sig_str = f"{name}{self.signature_str(signature(fno))}"
 
@@ -357,7 +356,7 @@ class StubGen:
             self.include_docstrings = docstrings_backup
 
     def put_nb_static_property(self, name, prop):
-        """Append an 'nb_static_property' object"""
+        """Append a 'nb_static_property' object"""
         getter_sig = prop.fget.__nb_signature__[0][0]
         getter_sig = getter_sig[getter_sig.find("/) -> ") + 6 :]
         self.write_ln(f"{name}: {getter_sig} = ...")
@@ -374,7 +373,7 @@ class StubGen:
                 self.write_ln(f"{name}: {alias_tp} = {tp.__name__}\n")
             else:
                 # Import from a different module
-                self.put_value(tp, name, None)
+                self.put_value(tp, name)
         else:
             is_enum = self.is_enum(tp)
             docstr = tp.__doc__
@@ -382,9 +381,9 @@ class StubGen:
             tp_bases = None
 
             if is_enum:
-                # Rewrite enumerations so that they derive from a helper
-                # type to avoid bloat from a large number of repeated
-                # function declaarations
+                # Rewrite enumerations so that they derive from a helper type
+                # to avoid bloat from a large number of repeated function
+                # declarations
 
                 docstr = docstr.__doc__
                 is_arith = "__add__" in tp_dict
@@ -404,7 +403,7 @@ class StubGen:
             if "__nb_signature__" in tp.__dict__:
                 # Types with a custom signature override
                 for s in tp.__nb_signature__.split("\n"):
-                    self.write_ln(self.replace_standard_types(s))
+                    self.write_ln(self.simplify_types(s))
                 self.output = self.output[:-1] + ":\n"
             else:
                 self.write_ln(f"class {tp.__name__}:")
@@ -439,6 +438,10 @@ class StubGen:
         return hasattr(tp, "@entries")
 
     def is_function(self, tp):
+        """
+        Test if this is one of the many types of built-in functions supported
+        by Python, or if it is a nanobind ``nb_func``.
+        """
         return (
             issubclass(tp, types.FunctionType)
             or issubclass(tp, types.BuiltinFunctionType)
@@ -449,59 +452,89 @@ class StubGen:
             or (tp.__module__ == "nanobind" and tp.__name__ == "nb_func")
         )
 
-    def put_value(self, value, name, parent, abbrev=True):
-        tp = type(value)
-        is_function = self.is_function(tp)
-        is_enum_entry = (
-            isinstance(parent, type) and issubclass(tp, parent) and self.is_enum(parent)
-        )
+    def put_value(self, value, name, parent=None, abbrev=True):
+        """
+        Render a ``name: type = value`` assignment at the module, class, or
+        enum scope.
 
-        if is_enum_entry:
+        The parameter ``abbrev`` indicates if it is acceptable to reduce very
+        long expressions to ``...``.
+        """
+        tp = type(value)
+
+        if isinstance(parent, type) and issubclass(tp, parent) and self.is_enum(parent):
+            # This is an entry of an enumeration
             self.write_ln(f"{name}: {self.type_str(tp)}")
             if value.__doc__ and self.include_docstrings:
                 self.put_docstr(value.__doc__)
             self.write("\n")
-        elif is_function or isinstance(value, type):
+        elif self.is_function(tp) or isinstance(value, type):
+            # This is a function or a type, import it from its
+            # actual source
             self.import_object(value.__module__, value.__name__, name)
         else:
             value_str = self.expr_str(value, abbrev)
+
             if value_str is None:
                 value_str = "..."
 
-            if issubclass(tp, typing.TypeVar) or \
-               (hasattr(typing, 'TypeVarTuple') and
-                issubclass(tp, typing.TypeVarTuple)):
-                self.write_ln(f"{name} = {value_str}\n")
+            # Catch a few different typing.* constructs
+            if issubclass(tp, typing.TypeVar) or (
+                hasattr(typing, "TypeVarTuple") and issubclass(tp, typing.TypeVarTuple)
+            ):
+                types = ""
+            elif typing.get_origin(value):
+                types = ": " + self.import_object("typing", "TypeAlias")
             else:
-                self.write_ln(f"{name}: {self.type_str(tp)} = {value_str}\n")
+                types = f": {self.type_str(tp)}"
 
-    def replace_standard_types(self, s):
-        """Detect standard types (e.g. typing.Optional) within a type signature"""
+            self.write_ln(f"{name}{types} = {value_str}\n")
 
-        # Strip module from types declared in the same module
-        is_local = False
-        if self.module_member_re:
-            s_old = s
-            s = self.module_member_re.sub(lambda m: m.group(1), s)
-            is_local = s != s_old
+    def simplify_types(self, s):
+        """
+        Process types that occur within a signature string ``s`` and simplify
+        them. This function applies the following rules:
 
-        # Remove 'builtins.*'
-        s = self.none_re.sub(lambda m: m.group(1), s)
-        s = self.builtins_re.sub(lambda m: m.group(1), s)
+        - "local_module.X" -> "X"
 
-        # tuple[] is not a valid type annotation
-        s = s.replace("tuple[]", "tuple[()]").replace("Tuple[]", "Tuple[()]")
+        - "other_module.X" -> "other_module.XX"
+          (with "import other_module" added at top)
 
-        # Rewrite typings/collection.abc types
-        s = self.typing_re.sub(lambda m: self.import_object("typing", m.group(1)), s)
-        source_pkg = "typing" if sys.version_info < (3, 9, 0) else "collections.abc"
-        s = self.abc_re.sub(lambda m: self.import_object(source_pkg, m.group(1)), s)
+        - "builtins.X" -> "X"
 
-        # Import a few types from 'types.*' as needed
-        s = self.types_re.sub(lambda m: self.import_object("types", m.group(1)), s)
+        - "NoneType" -> "None"
+
+        - "ndarray[...]" -> "Annotated[ArrayLike, dict(...)]"
+
+        - "collections.abc.X" -> "X"
+          (with "from collections.abc import X" added at top)
+
+        - "typing.X" -> "X"
+          (with "from typing import X" added at top)
+        """
+
+        # Process other type names and add suitable import statements
+        def process_general(m):
+            full_name, mod_name, cls_name = m.group(0), m.group(1)[:-1], m.group(2)
+
+            if mod_name == "builtins":
+                # Simplify builtins
+                return cls_name if cls_name != "NoneType" else "None"
+            if full_name.startswith(self.module.__name__):
+                # Strip away the module prefix for local classes
+                return full_name[len(self.module.__name__) + 1 :]
+            elif mod_name == "typing" or mod_name == "collections.abc":
+                # Import frequently-occuring typing classes and ABCs directly
+                return self.import_object(mod_name, cls_name)
+            else:
+                # Import the module and reference the contained class by name
+                self.import_object(mod_name, None)
+                return full_name
+
+        s = self.id_seq.sub(process_general, s)
 
         # Process nd-array type annotations so that MyPy accepts them
-        def replace_ndarray(m):
+        def process_ndarray(m):
             s = m.group(2)
 
             ndarray = self.import_object("numpy.typing", "ArrayLike")
@@ -514,124 +547,91 @@ class StubGen:
             else:
                 return ndarray
 
-        s = self.ndarray_re.sub(replace_ndarray, s)
-
-        # For types from other modules, add suitable import statements
-        def ensure_module_imported(m):
-            self.import_object(m.group(1)[:-1], None)
-            return m.group(0)
-
-        if not is_local:
-            s = self.identifier_seq_re.sub(ensure_module_imported, s)
+        s = self.ndarray_re.sub(process_ndarray, s)
 
         return s
 
+    def apply_pattern(self, value, match, lines):
+        """
+        Called when ``value`` matched an entry of a pattern file
+        """
+        for line in lines:
+            ls = line.strip()
+            if ls == "\\doc":
+                # Docstring reference
+                tp = type(value)
+                if tp.__module__ == "nanobind" and tp.__name__ in (
+                    "nb_func",
+                    "nb_method",
+                ):
+                    for tp_i in value.__nb_signature__:
+                        doc = tp_i[1]
+                        if doc:
+                            break
+                else:
+                    doc = getattr(value, "__doc__", None)
+                self.depth += 1
+                if doc and self.include_docstrings:
+                    self.put_docstr(doc)
+                else:
+                    self.write_ln("pass")
+                self.depth -= 1
+                continue
+            elif ls.startswith("\\from "):
+                items = ls[5:].split(" import ")
+                if len(items) != 2:
+                    raise RuntimeError(f"Could not parse import declaration {ls}")
+                for item in items[1].strip("()").split(","):
+                    item = item.split(" as ")
+                    import_module, import_name = (
+                        items[0].strip(),
+                        item[0].strip(),
+                    )
+                    import_as = item[1].strip() if len(item) > 1 else None
+                    self.import_object(import_module, import_name, import_as)
+                continue
+
+            groups = match.groups()
+            for i in reversed(range(len(groups))):
+                line = line.replace(f"\\{i+1}", groups[i])
+            for k, v in match.groupdict():
+                line = line.replace(f"\\{k}", v)
+            self.write_ln(line)
+
     def put(self, value, module=None, name=None, parent=None):
-        # Avoid infinite recursion due to cycles
         old_prefix = self.prefix
 
         if value in self.stack:
+            # Avoid infinite recursion due to cycles
             return
+
         try:
             self.stack.append(value)
-
-            if self.prefix and name:
-                self.prefix = self.prefix + "." + name
-            else:
-                self.prefix = name if name else self.prefix
+            self.prefix = self.prefix + (("." + name) if name else "")
 
             # Check if an entry in a provided pattern file matches
             if self.prefix:
                 for query, query_v in self.patterns.items():
                     match = query.search(self.prefix)
-                    if not match:
-                        continue
+                    if match:
+                        query_v[1] += 1
+                        self.apply_pattern(value, match, query_v[0])
+                        return
 
-                    query_v[1] += 1
-                    for l in query_v[0]:
-                        ls = l.strip()
-                        if ls == "\\doc":
-                            # Docstring reference
-                            tp = type(value)
-                            if tp.__module__ == "nanobind" and tp.__name__ in (
-                                "nb_func",
-                                "nb_method",
-                            ):
-                                for tp_i in value.__nb_signature__:
-                                    doc = tp_i[1]
-                                    if doc:
-                                        break
-                            else:
-                                doc = getattr(value, "__doc__", None)
-                            self.depth += 1
-                            if doc and self.include_docstrings:
-                                self.put_docstr(doc)
-                            else:
-                                self.write_ln("pass")
-                            self.depth -= 1
-                            continue
-                        elif ls.startswith("\\from "):
-                            items = ls[5:].split(" import ")
-                            if len(items) != 2:
-                                raise RuntimeError(
-                                    f"Could not parse import declaration {ls}"
-                                )
-                            for item in items[1].strip("()").split(","):
-                                item = item.split(" as ")
-                                import_module, import_name = (
-                                    items[0].strip(),
-                                    item[0].strip(),
-                                )
-                                import_as = item[1].strip() if len(item) > 1 else None
-                                self.import_object(
-                                    import_module, import_name, import_as
-                                )
-                            continue
-
-                        groups = match.groups()
-                        for i in reversed(range(len(groups))):
-                            l = l.replace(f"\\{i+1}", groups[i])
-                        for k, v in match.groupdict():
-                            l = l.replace(f"\\{k}", v)
-                        self.write_ln(l)
-                    return
-
-            # Don't explicitly include various standard elements found
-            # in modules, classes, etc.
-            if name in (
-                "__doc__",
-                "__module__",
-                "__name__",
-                "__new__",
-                "__builtins__",
-                "__cached__",
-                "__path__",
-                "__version__",
-                "__spec__",
-                "__loader__",
-                "__package__",
-                "__nb_signature__",
-                "__class_getitem__",
-                "__orig_bases__",
-                "__file__",
-                "__dict__",
-                "__weakref__",
-                "@entries",
-            ):
+            # Exclude various standard elements found in modules, classes, etc.
+            if name in SKIP_LIST:
                 return
 
-            tp = type(value)
+            is_type_alias = typing.get_origin(value) or (
+                isinstance(value, type)
+                and (value.__name__ != name or value.__module__ != self.module.__name__)
+            )
 
-            # Potentially exclude private members
+            # Ignore private members unless the user requests their inclusion
             if (
                 not self.include_private
                 and name
-                # Need these even if their name indicates otherwise
-                and not issubclass(tp, typing.TypeVar)
-                and not (
-                    hasattr(typing, "TypeVarTuple")
-                    and issubclass(tp, typing.TypeVarTuple)
-                )
+                and not is_type_alias
                 and len(name) > 2
                 and (
                     (name[0] == "_" and name[1] != "_")
@@ -640,6 +640,7 @@ class StubGen:
             ):
                 return
 
+            tp = type(value)
             tp_mod, tp_name = tp.__module__, tp.__name__
 
             if ismodule(value):
@@ -680,7 +681,7 @@ class StubGen:
             return name
 
         # Rewrite module name if this is relative import from a submodule
-        if self.module and module.startswith(self.module.__name__):
+        if module.startswith(self.module.__name__):
             module_short = module[len(self.module.__name__) :]
             if not name and as_name and module_short[0] == ".":
                 name = as_name = module_short[1:]
@@ -703,7 +704,7 @@ class StubGen:
 
             # If no as_name constraint was set, potentially adjust the
             # name to avoid conflicts with an existing object of the same name
-            if not as_name and name and self.module:
+            if not as_name and name:
                 final_name = name
                 while True:
                     # Accept the name if there are no conflicts
@@ -730,7 +731,11 @@ class StubGen:
         return final_name
 
     def expr_str(self, e, abbrev=True):
-        """Attempt to convert a value into a Python expression to generate that value"""
+        """
+        Attempt to convert a value into valid Python syntax that regenerates
+        that value. When ``abbrev`` is True, give up and replace with '...' if
+        the expression is too complicated to be included in the stubs
+        """
         tp = type(e)
         for t in [bool, int, type(None), type(...)]:
             if issubclass(tp, t):
@@ -743,12 +748,11 @@ class StubGen:
                 return s
         elif self.is_enum(tp):
             return self.type_str(type(e)) + "." + e.__name__
-        elif issubclass(tp, type):
+        elif issubclass(tp, type) or typing.get_origin(e):
             return self.type_str(e)
         elif issubclass(tp, typing.ForwardRef):
             return f'"{e.__forward_arg__}"'
-        elif hasattr(typing, "TypeVarTuple") and \
-             issubclass(tp, typing.TypeVarTuple):
+        elif hasattr(typing, "TypeVarTuple") and issubclass(tp, typing.TypeVarTuple):
             tv = self.import_object("typing", "TypeVarTuple")
             return f'{tv}("{e.__name__}")'
         elif issubclass(tp, typing.TypeVar):
@@ -786,7 +790,7 @@ class StubGen:
             ]
             s = "{"
             for i, (k, v) in enumerate(e):
-                if k == None or v == None:
+                if k is None or v is None:
                     return None
                 s += k + " : " + v
                 if i + 1 < len(e):
@@ -810,18 +814,18 @@ class StubGen:
             if kind == Parameter.POSITIONAL_ONLY:
                 posonly_sep = True
             elif posonly_sep:
-                params.append('/')
+                params.append("/")
                 posonly_sep = False
 
             if kind == Parameter.VAR_POSITIONAL:
                 kwonly_sep = False
             elif kind == Parameter.KEYWORD_ONLY and kwonly_sep:
-                params.append('*')
+                params.append("*")
                 kwonly_sep = False
             params.append(self.param_str(param))
 
         if posonly_sep:
-            params.append('/')
+            params.append("/")
 
         result = f"({', '.join(params)})"
         if s.return_annotation != Signature.empty:
@@ -829,37 +833,42 @@ class StubGen:
         return result
 
     def param_str(self, p: Parameter):
-        result = ''
+        result = ""
         if p.kind == Parameter.VAR_POSITIONAL:
-            result += '*'
+            result += "*"
         elif p.kind == Parameter.VAR_KEYWORD:
-            result += '**'
+            result += "**"
         result += p.name
         has_type = p.annotation != Parameter.empty
-        has_def  = p.default != Parameter.empty
+        has_def = p.default != Parameter.empty
 
         if has_type:
-            result += ': ' + self.type_str(p.annotation)
+            result += ": " + self.type_str(p.annotation)
         if has_def:
-            result += ' = ' if has_type else '='
+            result += " = " if has_type else "="
             result += self.expr_str(p.default)
         return result
 
     def type_str(self, tp):
         """Attempt to convert a type into a Python expression which reproduces it"""
-        tp_tp = type(tp)
-        generic_alias = 'GenericAlias' in tp_tp.__name__
+        origin, args = typing.get_origin(tp), typing.get_args(tp)
 
         if isinstance(tp, typing.TypeVar):
-            tp_name = tp.__name__
-        elif isinstance(tp, type) and not generic_alias:
-            tp_name = tp.__module__ + "." + tp.__qualname__
+            return tp.__name__
+        elif isinstance(tp, typing.ForwardRef):
+            return repr(tp.__forward_arg__)
+        elif origin and args:
+            result = (
+                self.type_str(origin)
+                + "["
+                + ", ".join(self.type_str(a) for a in args)
+                + "]"
+            )
+        elif isinstance(tp, type):
+            result = tp.__module__ + "." + tp.__qualname__
         else:
-            tp_name = str(tp)
-            if generic_alias or tp_tp.__module__ == 'typing':
-                # Strip ~ and - from TypeVar names, which produces invalid Python code
-                tp_name = re.sub(r'(?<=( |\[))[~-]', '', tp_name)
-        return self.replace_standard_types(tp_name)
+            result = repr(tp)
+        return self.simplify_types(result)
 
     def get(self):
         """Generate the final stub output"""
@@ -870,7 +879,7 @@ class StubGen:
             items = []
 
             for (k, v1), v2 in imports.items():
-                if k == None:
+                if k is None:
                     if v1 and v1 != module:
                         s += f"import {module} as {v1}\n"
                     else:
@@ -898,26 +907,26 @@ class StubGen:
         if not self.abstract_enum:
             return s
 
-        s += f"class _Enum:\n"
-        s += f"    def __init__(self, arg: object, /) -> None: ...\n"
-        s += f"    def __repr__(self, /) -> str: ...\n"
-        s += f"    def __hash__(self, /) -> int: ...\n"
-        s += f"    def __int__(self, /) -> int: ...\n"
-        s += f"    def __index__(self, /) -> int: ...\n"
+        s += "class _Enum:\n"
+        s += "    def __init__(self, arg: object, /) -> None: ...\n"
+        s += "    def __repr__(self, /) -> str: ...\n"
+        s += "    def __hash__(self, /) -> int: ...\n"
+        s += "    def __int__(self, /) -> int: ...\n"
+        s += "    def __index__(self, /) -> int: ...\n"
 
         for op in ["eq", "ne"]:
             s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
 
         for op in ["gt", "ge", "lt", "le"]:
             s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
-        s += f"    def name(self, /) -> str: ...\n"
-        s += f"    def value(self, /) -> int: ...\n"
+        s += "    def name(self, /) -> str: ...\n"
+        s += "    def value(self, /) -> int: ...\n"
         s += "\n"
 
         if not self.abstract_enum_arith:
             return s
 
-        s += f"class _EnumArith(_Enum):\n"
+        s += "class _EnumArith(_Enum):\n"
         for op in ["abs", "neg", "invert"]:
             s += f"    def __{op}__(self) -> int: ...\n"
         for op in [
@@ -1059,28 +1068,28 @@ def load_pattern_file(fname):
         patterns[key] = [pattern, 0]
 
     pattern, query, dedent = [], None, 0
-    for i, l in enumerate(lines):
-        l = l.rstrip()
+    for i, line in enumerate(lines):
+        line = line.rstrip()
 
-        if l.startswith("#"):
+        if line.startswith("#"):
             continue
 
-        if len(l) == 0 or l[0].isspace():
+        if len(line) == 0 or line[0].isspace():
             if not pattern:
-                s = l.lstrip()
-                dedent = len(l) - len(s)
-                pattern.append(s)
+                stripped = line.lstrip()
+                dedent = len(line) - len(stripped)
+                pattern.append(stripped)
             else:
-                s1, s2 = l.lstrip(), l[dedent:]
+                s1, s2 = line.lstrip(), line[dedent:]
                 pattern.append(s2 if len(s2) > len(s1) else s1)
 
         else:
-            if not l.endswith(":"):
+            if not line.endswith(":"):
                 raise Exception(f'Cannot parse line {i+1} of pattern file "{fname}"')
 
             if query:
                 add_pattern(query, pattern)
-            query = l
+            query = line
             pattern = []
 
     if query:
@@ -1124,9 +1133,9 @@ def main(args=None):
         mod_imported = importlib.import_module(mod)
 
         sg = StubGen(
+            module=mod_imported,
             include_docstrings=opt.include_docstrings,
             include_private=opt.include_private,
-            module=mod_imported,
             patterns=patterns,
         )
 

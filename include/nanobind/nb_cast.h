@@ -143,7 +143,7 @@ template <> struct type_caster<void_type> {
 template <> struct type_caster<void> {
     template <typename T_> using Cast = void *;
     using Value = void*;
-    static constexpr auto Name = const_name("CapsuleType");
+    static constexpr auto Name = const_name("types.CapsuleType");
     explicit operator void *() { return value; }
     Value value;
 
@@ -502,6 +502,12 @@ detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
 template <typename T> void list::append(T &&value) {
     object o = nanobind::cast((detail::forward_t<T>) value);
     if (PyList_Append(m_ptr, o.ptr()))
+        raise_python_error();
+}
+
+template <typename T> void list::insert(Py_ssize_t index, T &&value) {
+    object o = nanobind::cast((detail::forward_t<T>) value);
+    if (PyList_Insert(m_ptr, index, o.ptr()))
         raise_python_error();
 }
 

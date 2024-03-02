@@ -51,12 +51,15 @@ specifically to simplify stub generation.
  to the semantic versioning policy used by the nanobind project.)
 """
 
+import argparse
 from inspect import Signature, Parameter, signature, ismodule, getmembers
 import textwrap
 import importlib
 import importlib.machinery
 import types
 import typing
+from dataclasses import dataclass
+from typing import Dict, Sequence, List, Optional, Callable, Tuple, cast
 import re
 import sys
 
@@ -79,15 +82,23 @@ SKIP_LIST = [
 # fmt: on
 
 
+@dataclass
+class Pattern:
+    # A replacement patterns as produced by ``load_pattern_file()`` below
+    query: re.Pattern
+    lines: List[str]
+    matches: int
+
+
 class StubGen:
     def __init__(
         self,
-        module,
-        include_docstrings=True,
-        include_private=False,
-        max_expr_length=50,
-        patterns={},
-    ):
+        module: types.ModuleType,
+        include_docstrings: bool = True,
+        include_private: bool = False,
+        max_expr_length: int = 50,
+        patterns: List[Pattern] = [],
+    ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
 
@@ -112,13 +123,16 @@ class StubGen:
         self.output = ""
 
         # A stack to avoid infinite recursion
-        self.stack = []
+        self.stack: List[object] = []
 
         # An identifier associated with the top element of the stack
         self.prefix = module.__name__
 
         # Dictionary to keep track of import directives added by the stub generator
-        self.imports = {}
+        # Maps package_name -> ((name, desired_as_name) -> actual_as_name)
+        self.imports: Dict[
+            str, Dict[Tuple[Optional[str], Optional[str]], Optional[str]]
+        ] = {}
 
         # ---------- Regular expressions ----------
 
@@ -151,21 +165,21 @@ class StubGen:
         self.abstract_enum = False
         self.abstract_enum_arith = False
 
-    def write(self, s):
+    def write(self, s: str) -> None:
         """Append raw characters to the output"""
         self.output += s
 
-    def write_ln(self, line):
+    def write_ln(self, line: str) -> None:
         """Append an indented line"""
         if len(line) != 0 and not line.isspace():
             self.output += "    " * self.depth + line
         self.output += "\n"
 
-    def write_par(self, line):
+    def write_par(self, line: str) -> None:
         """Append an indented paragraph"""
         self.output += textwrap.indent(line, "    " * self.depth)
 
-    def put_docstr(self, docstr):
+    def put_docstr(self, docstr: str) -> None:
         """Append an indented single or multi-line docstring"""
         docstr = textwrap.dedent(docstr).strip()
         raw_str = ""
@@ -178,12 +192,12 @@ class StubGen:
         docstr = f'{raw_str}"""{docstr}"""\n'
         self.write_par(docstr)
 
-    def put_nb_overload(self, fn, sig, name=None):
+    def put_nb_overload(self, fn, sig: List, name: Optional[str] = None) -> None:
         """
         The ``put_nb_func()`` repeatedly calls this method to render the
         individual method overloads.
         """
-        sig_str, docstr, start = sig[0], sig[1], 0
+        sig_str, docstr, start = cast(str, sig[0]), cast(str, sig[1]), 0
 
         # Label anonymous functoins
         if sig_str.startswith("def (") and name is not None:
@@ -250,7 +264,7 @@ class StubGen:
             self.depth -= 1
         self.write("\n")
 
-    def put_nb_func(self, fn, name=None):
+    def put_nb_func(self, fn, name: Optional[str] = None) -> None:
         """Append a nanobind function binding to the stub"""
         sigs = fn.__nb_signature__
         count = len(sigs)
@@ -265,7 +279,7 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
-    def put_function(self, fn, name=None, parent=None):
+    def put_function(self, fn, name: Optional[str] = None, parent=None):
         """Append a function of an arbitrary type to the stub"""
         # Don't generate a constructor for nanobind classes that aren't constructible
         if name == "__init__" and type(parent).__name__.startswith("nb_type"):
@@ -275,7 +289,7 @@ class StubGen:
         fn_name = getattr(fn, "__name__", None)
 
         # Check if this function is an alias from *another* module
-        if fn_module and fn_module != self.module.__name__:
+        if name and fn_module and fn_module != self.module.__name__:
             self.put_value(fn, name)
             return
 
@@ -299,7 +313,7 @@ class StubGen:
         if name is None:
             name = fn.__name__
 
-        overloads = []
+        overloads: Sequence[Callable] = []
         if hasattr(fn, "__module__"):
             if sys.version_info >= (3, 11, 0):
                 overloads = typing.get_overloads(fn)
@@ -364,10 +378,10 @@ class StubGen:
             self.put_docstr(prop.__doc__)
         self.write("\n")
 
-    def put_type(self, tp, module, name):
+    def put_type(self, tp, name):
         """Append a 'nb_type' type object"""
-        if name and (name != tp.__name__ or module.__name__ != tp.__module__):
-            if module.__name__ == tp.__module__:
+        if name and (name != tp.__name__ or self.module.__name__ != tp.__module__):
+            if self.module.__name__ == tp.__module__:
                 # This is an alias of a type in the same module
                 alias_tp = self.import_object("typing", "TypeAlias")
                 self.write_ln(f"{name}: {alias_tp} = {tp.__name__}\n")
@@ -428,16 +442,16 @@ class StubGen:
                 if len(tp_dict):
                     self.write("\n")
             for k, v in tp_dict.items():
-                self.put(v, module, k, tp)
+                self.put(v, k, tp)
             if output_len == len(self.output):
                 self.write_ln("pass\n")
             self.depth -= 1
 
-    def is_enum(self, tp):
+    def is_enum(self, tp: type) -> bool:
         """Check if the given type is an enumeration"""
         return hasattr(tp, "@entries")
 
-    def is_function(self, tp):
+    def is_function(self, tp) -> bool:
         """
         Test if this is one of the many types of built-in functions supported
         by Python, or if it is a nanobind ``nb_func``.
@@ -452,7 +466,7 @@ class StubGen:
             or (tp.__module__ == "nanobind" and tp.__name__ == "nb_func")
         )
 
-    def put_value(self, value, name, parent=None, abbrev=True):
+    def put_value(self, value: object, name: str, parent=None, abbrev=True) -> None:
         """
         Render a ``name: type = value`` assignment at the module, class, or
         enum scope.
@@ -469,9 +483,8 @@ class StubGen:
                 self.put_docstr(value.__doc__)
             self.write("\n")
         elif self.is_function(tp) or isinstance(value, type):
-            # This is a function or a type, import it from its
-            # actual source
-            self.import_object(value.__module__, value.__name__, name)
+            # This is a function or a type, import it from its actual source
+            self.import_object(value.__module__, value.__name__, name)  # type: ignore
         else:
             value_str = self.expr_str(value, abbrev)
 
@@ -490,7 +503,7 @@ class StubGen:
 
             self.write_ln(f"{name}{types} = {value_str}\n")
 
-    def simplify_types(self, s):
+    def simplify_types(self, s: str) -> str:
         """
         Process types that occur within a signature string ``s`` and simplify
         them. This function applies the following rules:
@@ -513,8 +526,24 @@ class StubGen:
           (with "from typing import X" added at top)
         """
 
+        # Process nd-array type annotations so that MyPy accepts them
+        def process_ndarray(m: re.Match) -> str:
+            s = m.group(2)
+
+            ndarray = self.import_object("numpy.typing", "ArrayLike")
+            s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
+            s = s.replace("*", "None")
+
+            if s:
+                annotated = self.import_object("typing", "Annotated")
+                return f"{annotated}[{ndarray}, dict({s})]"
+            else:
+                return ndarray
+
+        s = self.ndarray_re.sub(process_ndarray, s)
+
         # Process other type names and add suitable import statements
-        def process_general(m):
+        def process_general(m: re.Match) -> str:
             full_name, mod_name, cls_name = m.group(0), m.group(1)[:-1], m.group(2)
 
             if mod_name == "builtins":
@@ -533,38 +562,23 @@ class StubGen:
 
         s = self.id_seq.sub(process_general, s)
 
-        # Process nd-array type annotations so that MyPy accepts them
-        def process_ndarray(m):
-            s = m.group(2)
-
-            ndarray = self.import_object("numpy.typing", "ArrayLike")
-            s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
-            s = s.replace("*", "None")
-
-            if s:
-                annotated = self.import_object("typing", "Annotated")
-                return f"{annotated}[{ndarray}, dict({s})]"
-            else:
-                return ndarray
-
-        s = self.ndarray_re.sub(process_ndarray, s)
-
         return s
 
-    def apply_pattern(self, value, match, lines):
+    def apply_pattern(self, value: object, pattern: Pattern, match: re.Match) -> None:
         """
         Called when ``value`` matched an entry of a pattern file
         """
-        for line in lines:
+        for line in pattern.lines:
             ls = line.strip()
             if ls == "\\doc":
                 # Docstring reference
                 tp = type(value)
+                doc: Optional[str] = None
                 if tp.__module__ == "nanobind" and tp.__name__ in (
                     "nb_func",
                     "nb_method",
                 ):
-                    for tp_i in value.__nb_signature__:
+                    for tp_i in value.__nb_signature__:  # type: ignore
                         doc = tp_i[1]
                         if doc:
                             break
@@ -582,23 +596,23 @@ class StubGen:
                 if len(items) != 2:
                     raise RuntimeError(f"Could not parse import declaration {ls}")
                 for item in items[1].strip("()").split(","):
-                    item = item.split(" as ")
+                    item_list = item.split(" as ")
                     import_module, import_name = (
                         items[0].strip(),
-                        item[0].strip(),
+                        item_list[0].strip(),
                     )
-                    import_as = item[1].strip() if len(item) > 1 else None
+                    import_as = item_list[1].strip() if len(item_list) > 1 else None
                     self.import_object(import_module, import_name, import_as)
                 continue
 
             groups = match.groups()
             for i in reversed(range(len(groups))):
                 line = line.replace(f"\\{i+1}", groups[i])
-            for k, v in match.groupdict():
+            for k, v in match.groupdict().items():
                 line = line.replace(f"\\{k}", v)
             self.write_ln(line)
 
-    def put(self, value, module=None, name=None, parent=None):
+    def put(self, value: object, name: Optional[str] = None, parent=None) -> None:
         old_prefix = self.prefix
 
         if value in self.stack:
@@ -611,11 +625,11 @@ class StubGen:
 
             # Check if an entry in a provided pattern file matches
             if self.prefix:
-                for query, query_v in self.patterns.items():
-                    match = query.search(self.prefix)
+                for pattern in self.patterns:
+                    match = pattern.query.search(self.prefix)
                     if match:
-                        query_v[1] += 1
-                        self.apply_pattern(value, match, query_v[0])
+                        # If so, don't recurse
+                        self.apply_pattern(value, pattern, match)
                         return
 
             # Exclude various standard elements found in modules, classes, etc.
@@ -649,11 +663,11 @@ class StubGen:
                     self.import_object(value.__name__, name=None, as_name=name)
                     return
                 for name, child in getmembers(value):
-                    self.put(child, module=value, name=name, parent=value)
+                    self.put(child, name=name, parent=value)
             elif self.is_function(tp):
                 self.put_function(value, name, parent)
             elif issubclass(tp, type):
-                self.put_type(value, module, name)
+                self.put_type(value, name)
             elif tp_mod == "nanobind":
                 if tp_name == "nb_method":
                     self.put_nb_func(value, name)
@@ -663,21 +677,27 @@ class StubGen:
                 if tp is property:
                     self.put_property(value, name)
                 else:
+                    assert name is not None
                     abbrev = name != "__all__"
                     self.put_value(value, name, parent, abbrev=abbrev)
             else:
+                assert name is not None
                 self.put_value(value, name, parent)
         finally:
             self.stack.pop()
             self.prefix = old_prefix
 
-    def import_object(self, module, name, as_name=None):
+    def import_object(
+        self, module: str, name: Optional[str], as_name: Optional[str] = None
+    ) -> str:
         """
         Import a type (e.g. typing.Optional) used within the stub, ensuring
         that this does not cause conflicts. Specify ``as_name`` to ensure that
         the import is bound to a specified name.
+
+        When ``name`` is None, the entire module is imported.
         """
-        if module == "builtins" and (not as_name or name == as_name):
+        if module == "builtins" and name and (not as_name or name == as_name):
             return name
 
         # Rewrite module name if this is relative import from a submodule
@@ -697,38 +717,39 @@ class StubGen:
 
         key = (name, as_name)
         final_name = imports_module.get(key, None)
+        if final_name:
+            return final_name
 
-        if not final_name:
-            # Cache miss, import the object
-            final_name = as_name if as_name else name
+        # Cache miss, import the object
+        final_name = as_name if as_name else name
 
-            # If no as_name constraint was set, potentially adjust the
-            # name to avoid conflicts with an existing object of the same name
-            if not as_name and name:
-                final_name = name
-                while True:
-                    # Accept the name if there are no conflicts
-                    if not hasattr(self.module, final_name):
+        # If no as_name constraint was set, potentially adjust the name to
+        # avoid conflicts with an existing object of the same name
+        if name and not as_name:
+            test_name = name
+            while True:
+                # Accept the name if there are no conflicts
+                if not hasattr(self.module, test_name):
+                    break
+                value = getattr(self.module, test_name)
+                try:
+                    if module == ".":
+                        mod_o = self.module
+                    else:
+                        mod_o = importlib.import_module(module)
+
+                    # If there is a conflict, accept it if it refers to the same object
+                    if getattr(mod_o, name) is value:
                         break
-                    value = getattr(self.module, final_name)
-                    try:
-                        if module == ".":
-                            mod_o = self.module
-                        else:
-                            mod_o = importlib.import_module(module)
+                except ImportError:
+                    pass
 
-                        # If there is a conflict, accept it if it refers to the same object
-                        if getattr(mod_o, name) is value:
-                            break
-                    except ImportError:
-                        pass
+                # Prefix with an underscore
+                test_name = "_" + test_name
+            final_name = test_name
 
-                    # Prefix with an underscore
-                    final_name = "_" + final_name
-
-            imports_module[key] = final_name
-
-        return final_name
+        imports_module[key] = final_name
+        return final_name if final_name else ""
 
     def expr_str(self, e, abbrev=True):
         """
@@ -870,7 +891,7 @@ class StubGen:
             result = repr(tp)
         return self.simplify_types(result)
 
-    def get(self):
+    def get(self) -> str:
         """Generate the final stub output"""
         s = ""
 
@@ -902,7 +923,7 @@ class StubGen:
         s += self.output
         return s.rstrip() + "\n"
 
-    def put_abstract_enum_class(self):
+    def put_abstract_enum_class(self) -> str:
         s = ""
         if not self.abstract_enum:
             return s
@@ -947,9 +968,7 @@ class StubGen:
         return s
 
 
-def parse_options(args):
-    import argparse
-
+def parse_options(args: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m nanobind.stubgen",
         description="Generate stubs for nanobind-based extensions.",
@@ -1047,58 +1066,55 @@ def parse_options(args):
     return opt
 
 
-def load_pattern_file(fname):
+def load_pattern_file(fname: str) -> List[Pattern]:
     with open(fname, "r") as f:
-        lines = f.readlines()
+        f_lines = f.readlines()
 
-    patterns = {}
+    patterns: List[Pattern] = []
 
-    def add_pattern(query, pattern):
+    def add_pattern(query, lines):
         # Exactly 1 empty line at the end
-        while pattern and pattern[-1].isspace():
-            pattern.pop()
-        pattern.append("")
+        while lines and lines[-1].isspace():
+            lines.pop()
+        lines.append("")
 
         # Identify deletions (replacement by only whitespace)
-        if all((p.isspace() or len(p) == 0 for p in pattern)):
-            pattern = []
-        key = re.compile(query[:-1])
-        if key in patterns:
-            raise Exception(f'Duplicate query pattern "{query}"')
-        patterns[key] = [pattern, 0]
+        if all((p.isspace() or len(p) == 0 for p in lines)):
+            lines = []
+        patterns.append(Pattern(re.compile(query[:-1]), lines, 0))
 
-    pattern, query, dedent = [], None, 0
-    for i, line in enumerate(lines):
+    lines: List[str]
+    lines, query, dedent = [], None, 0
+    for i, line in enumerate(f_lines):
         line = line.rstrip()
 
         if line.startswith("#"):
             continue
 
         if len(line) == 0 or line[0].isspace():
-            if not pattern:
+            if not lines:
                 stripped = line.lstrip()
                 dedent = len(line) - len(stripped)
-                pattern.append(stripped)
+                lines.append(stripped)
             else:
                 s1, s2 = line.lstrip(), line[dedent:]
-                pattern.append(s2 if len(s2) > len(s1) else s1)
-
+                lines.append(s2 if len(s2) > len(s1) else s1)
         else:
             if not line.endswith(":"):
                 raise Exception(f'Cannot parse line {i+1} of pattern file "{fname}"')
 
             if query:
-                add_pattern(query, pattern)
+                add_pattern(query, lines)
             query = line
-            pattern = []
+            lines = []
 
     if query:
-        add_pattern(query, pattern)
+        add_pattern(query, lines)
 
     return patterns
 
 
-def main(args=None):
+def main(args: Optional[List[str]] = None) -> None:
     from pathlib import Path
     import sys
     import os
@@ -1109,6 +1125,7 @@ def main(args=None):
 
     opt = parse_options(sys.argv[1:] if args is None else args)
 
+    patterns: List[Pattern]
     if opt.pattern_file:
         if not opt.quiet:
             print('Using pattern file "%s" ..' % opt.pattern_file)
@@ -1116,7 +1133,7 @@ def main(args=None):
         if not opt.quiet:
             print("  - loaded %i patterns.\n" % len(patterns))
     else:
-        patterns = {}
+        patterns = []
 
     for i in opt.imports:
         sys.path.insert(0, i)
@@ -1147,15 +1164,15 @@ def main(args=None):
         if opt.output_file:
             file = Path(opt.output_file)
         else:
-            file = getattr(mod_imported, "__file__", None)
-            if file is None:
+            file_s = getattr(mod_imported, "__file__", None)
+            if file_s is None:
                 raise Exception(
                     'the module lacks a "__file__" attribute, hence '
                     "stubgen cannot infer where to place the generated "
                     "stub. You must specify the -o parameter to provide "
                     "the name of an output file."
                 )
-            file = Path(file)
+            file = Path(str(file_s))
 
             ext_loader = importlib.machinery.ExtensionFileLoader
             if isinstance(mod_imported.__loader__, ext_loader):
@@ -1166,29 +1183,28 @@ def main(args=None):
                 file = Path(opt.output_dir, file.name)
 
         if patterns:
-            matches = 0
-            for k, v in patterns.items():
-                if v[1] == 0:
-                    rule_str = str(k)
-                    if "re.compile" in rule_str:
-                        rule_str = rule_str.replace("re.compile(", "")[:-1]
-                    if not opt.quiet:
-                        print(
-                            f"  - warning: rule {rule_str} did not match any elements."
-                        )
-                matches += v[1]
+            total_matches = 0
+            for p in patterns:
+                if p.matches != 0:
+                    total_matches += p.matches
+                    continue
+                rule_str = str(p.query)
+                if "re.compile" in rule_str:
+                    rule_str = rule_str.replace("re.compile(", "")[:-1]
+                if not opt.quiet:
+                    print(f"  - warning: rule {rule_str} did not match any elements.")
             if not opt.quiet:
-                print("  - applied %i patterns." % matches)
+                print(f"  - applied {total_matches} patterns.")
 
         if not opt.quiet:
-            print('  - writing stub "%s" ..' % str(file))
+            print(f'  - writing stub "{file}" ..')
 
         with open(file, "w") as f:
             f.write(sg.get())
 
     if opt.marker_file:
         if not opt.quiet:
-            print('  - writing marker file "%s" ..' % opt.marker_file)
+            print(f'  - writing marker file "{opt.marker_file}" ..')
         Path(opt.marker_file).touch()
 
 

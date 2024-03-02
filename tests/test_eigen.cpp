@@ -243,12 +243,12 @@ NB_MODULE(test_eigen_ext, m) {
         .def("modRefDataConst", &Base::modRefDataConst);
 
     m.def("modifyRef", [](Base* base) {
-        Eigen::Vector2d input {{1.0}, {2.0}};
+        Eigen::Vector2d input(1.0, 2.0);
         base->modRefData(input);
         return input;
     });
     m.def("modifyRefConst", [](Base* base) {
-        Eigen::Vector2d input {{1.0}, {2.0}};
+        Eigen::Vector2d input(1.0, 2.0);
         base->modRefDataConst(input);
         return input;
     });

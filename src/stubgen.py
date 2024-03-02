@@ -878,6 +878,16 @@ class StubGen:
             return tp.__name__
         elif isinstance(tp, typing.ForwardRef):
             return repr(tp.__forward_arg__)
+        elif isinstance(tp, list):
+            return "[" + ", ".join(self.type_str(a) for a in tp) + "]"
+        elif isinstance(tp, tuple):
+            return "(" + ", ".join(self.type_str(a) for a in tp) + ")"
+        elif isinstance(tp, dict):
+            return (
+                "{"
+                + ", ".join(repr(k) + ": " + self.type_str(v) for k, v in tp.items())
+                + "}"
+            )
         elif origin and args:
             result = (
                 self.type_str(origin)
@@ -885,6 +895,8 @@ class StubGen:
                 + ", ".join(self.type_str(a) for a in args)
                 + "]"
             )
+        elif tp is types.ModuleType:
+            result = "types.ModuleType"
         elif isinstance(tp, type):
             result = tp.__module__ + "." + tp.__qualname__
         else:

@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import overload, TypeVar
 
 class AClass:
@@ -41,3 +42,5 @@ def f2(a=(3, (4, 5)), /, b=(1, 2), *, c=4):
     """docstring 2"""
 
 def f3(*args, **kwargs): ...
+
+def f4() -> Callable[[T], T]: ...

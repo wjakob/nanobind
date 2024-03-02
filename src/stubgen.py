@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# pyright: strict
+
 """
 stubgen.py: nanobind stub generation tool
 
@@ -136,6 +138,11 @@ class NbType(Protocol):
 
 @dataclass
 class ReplacePattern:
+    """
+    A compiled query (regular expression) and replacement pattern. Patterns can
+    be loaded using the ``load_pattern_file()`` function dfined below
+    """
+
     # A replacement patterns as produced by ``load_pattern_file()`` below
     query: Pattern[str]
     lines: List[str]
@@ -614,10 +621,23 @@ class StubGen:
 
         return s
 
-    def apply_pattern(self, value: object, pattern: ReplacePattern, match: Match[str]) -> None:
+    def apply_pattern(self, query: str, value: object) -> bool:
         """
-        Called when ``value`` matched an entry of a pattern file
+        Check if ``value`` matches an entry of a pattern file. Applies the
+        pattern and returns ``True`` in that case, otherwise returns ``False``.
         """
+
+        match: Optional[Match[str]] = None
+        pattern: Optional[ReplacePattern] = None
+
+        for pattern in self.patterns:
+            match = pattern.query.search(query)
+            if match:
+                break
+
+        if not match or not pattern:
+            return False
+
         for line in pattern.lines:
             ls = line.strip()
             if ls == "\\doc":
@@ -663,6 +683,9 @@ class StubGen:
                 line = line.replace(f"\\{k}", v)
             self.write_ln(line)
 
+        # Success, pattern was applied
+        return True
+
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
         old_prefix = self.prefix
 
@@ -675,13 +698,8 @@ class StubGen:
             self.prefix = self.prefix + (("." + name) if name else "")
 
             # Check if an entry in a provided pattern file matches
-            if self.prefix:
-                for pattern in self.patterns:
-                    match = pattern.query.search(self.prefix)
-                    if match:
-                        # If so, don't recurse
-                        self.apply_pattern(value, pattern, match)
-                        return
+            if self.apply_pattern(self.prefix, value):
+                return
 
             # Exclude various standard elements found in modules, classes, etc.
             if name in SKIP_LIST:
@@ -713,8 +731,11 @@ class StubGen:
                     # Do not recurse into submodules, but include a directive to import them
                     self.import_object(value.__name__, name=None, as_name=name)
                     return
-                for name, child in getmembers(value):
-                    self.put(child, name=name, parent=value)
+                else:
+                    self.apply_pattern(self.prefix + ".__prefix__", None)
+                    for name, child in getmembers(value):
+                        self.put(child, name=name, parent=value)
+                    self.apply_pattern(self.prefix + ".__suffix__", None)
             elif self.is_function(tp):
                 value = cast(NbFunction, value)
                 self.put_function(value, name, parent)
@@ -996,7 +1017,10 @@ class StubGen:
         if s:
             s += "\n"
         s += self.put_abstract_enum_class()
+
+        # Append the main generated stub
         s += self.output
+
         return s.rstrip() + "\n"
 
     def put_abstract_enum_class(self) -> str:
@@ -1143,6 +1167,11 @@ def parse_options(args: List[str]) -> argparse.Namespace:
 
 
 def load_pattern_file(fname: str) -> List[ReplacePattern]:
+    """
+    Load a pattern file from disk and return a list of pattern instances that
+    includes precompiled versions of all of the contained regular expressions.
+    """
+
     with open(fname, "r") as f:
         f_lines = f.readlines()
 
@@ -1150,7 +1179,7 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
     def add_pattern(query: str, lines: List[str]):
         # Exactly 1 empty line at the end
-        while lines and lines[-1].isspace():
+        while lines and (lines[-1].isspace() or len(lines[-1]) == 0):
             lines.pop()
         lines.append("")
 

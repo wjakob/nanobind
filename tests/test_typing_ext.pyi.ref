@@ -3,6 +3,8 @@ from .submodule import F as F, f as f2
 from collections.abc import Iterable
 from typing import Self, Optional, TypeAlias, TypeVar, Generic
 
+# a prefix
+
 @my_decorator
 class CustomSignature(Iterable[int]):
     @my_decorator
@@ -52,3 +54,5 @@ def tweak_me(arg: int):
     prior docstring
     remains preserved
     """
+
+# a suffix

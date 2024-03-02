@@ -634,3 +634,7 @@ you may use the special ``\from`` escape code to import them:
        \from typing import Optional as _Opt, Literal
        def lookup(array: Array[T], index: Literal[0] = 0) -> _Opt[T]:
            \doc
+
+You may also add free-form text the beginning or the end of the generated stub.
+To do so, add an entry that matches on ``module_name.__prefix__`` or
+``module_name.__suffix__``.

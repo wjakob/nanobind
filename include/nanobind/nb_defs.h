@@ -94,25 +94,31 @@
 
 #if PY_VERSION_HEX < 0x03090000
 #  define NB_TYPING_ABC   "typing."
-#  define NB_TYPING_DICT  "typing.Dict"
-#  define NB_TYPING_LIST  "typing.List"
-#  define NB_TYPING_SET   "typing.Set"
 #  define NB_TYPING_TUPLE "typing.Tuple"
+#  define NB_TYPING_LIST  "typing.List"
+#  define NB_TYPING_DICT  "typing.Dict"
+#  define NB_TYPING_SET   "typing.Set"
 #  define NB_TYPING_TYPE  "typing.Type"
 #else
 #  define NB_TYPING_ABC   "collections.abc."
-#  define NB_TYPING_DICT  "dict"
-#  define NB_TYPING_LIST  "list"
-#  define NB_TYPING_SET   "set"
 #  define NB_TYPING_TUPLE "tuple"
+#  define NB_TYPING_LIST  "list"
+#  define NB_TYPING_DICT  "dict"
+#  define NB_TYPING_SET   "set"
 #  define NB_TYPING_TYPE  "type"
 #endif
 
-#define NB_TYPING_SEQUENCE NB_TYPING_ABC "Sequence"
-#define NB_TYPING_MAPPING  NB_TYPING_ABC "Mapping"
-#define NB_TYPING_CALLABLE NB_TYPING_ABC "Callable"
-#define NB_TYPING_ITERATOR NB_TYPING_ABC "Iterator"
-#define NB_TYPING_ITERABLE NB_TYPING_ABC "Iterable"
+#define NB_TYPING_SEQUENCE     NB_TYPING_ABC "Sequence"
+#define NB_TYPING_MAPPING      NB_TYPING_ABC "Mapping"
+#define NB_TYPING_CALLABLE     NB_TYPING_ABC "Callable"
+#define NB_TYPING_ITERATOR     NB_TYPING_ABC "Iterator"
+#define NB_TYPING_ITERABLE     NB_TYPING_ABC "Iterable"
+
+#if PY_VERSION_HEX < 0x03090000
+#  define NB_TYPING_ABSTRACT_SET "typing.AbstractSet"
+#else
+#  define NB_TYPING_ABSTRACT_SET "collections.abc.Set"
+#endif
 
 #if defined(Py_LIMITED_API)
 #  if PY_VERSION_HEX < 0x030C0000 || defined(PYPY_VERSION)

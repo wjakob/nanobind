@@ -1,7 +1,35 @@
 import test_stl_ext as t
+import typing
 import pytest
 import sys
 from common import collect, skip_on_pypy
+
+# Some helper declaration to check types across different Python versions
+if sys.version_info < (3, 9):
+    TYPING_DICT = "typing.Dict"
+    TYPING_SET = "typing.Set"
+    TYPING_ABC = "typing"
+    TYPING_ABSTRACT_SET = "typing.AbstractSet"
+else:
+    TYPING_DICT = "dict"
+    TYPING_SET = "set"
+    TYPING_ABC = "collections.abc"
+    TYPING_ABSTRACT_SET = "collections.abc.Set"
+
+
+def optional(arg: str, /) -> str:
+    if sys.version_info < (3, 10):
+        return "typing.Optional[" + arg + "]"
+    else:
+        return arg + " | " + "None"
+
+
+def union(*args: str) -> str:
+    if sys.version_info < (3, 10):
+        return "typing.Union[" + ", ".join(args) + "]"
+    else:
+        return " | ".join(args)
+
 
 @pytest.fixture
 def clean():
@@ -19,7 +47,7 @@ def assert_stats(**kwargs):
         elif v != 0:
             fail = True
         if fail:
-            raise Exception(f'Mismatch for key {k}: {t.stats()}')
+            raise Exception(f"Mismatch for key {k}: {t.stats()}")
 
 
 # ------------------------------------------------------------------
@@ -28,19 +56,15 @@ def assert_stats(**kwargs):
 # are properly triggered, which the STL type casters depend on.
 # ------------------------------------------------------------------
 
+
 def test01_movable_return(clean):
     assert t.return_movable().value == 5
-    assert_stats(
-        default_constructed=1,
-        move_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, move_constructed=1, destructed=2)
 
 
 def test02_movable_return_ptr(clean):
     assert t.return_movable_ptr().value == 5
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test03_movable_in_value(clean):
@@ -48,10 +72,7 @@ def test03_movable_in_value(clean):
     t.movable_in_value(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
 
 
 def test04_movable_in_lvalue_ref(clean):
@@ -59,9 +80,7 @@ def test04_movable_in_lvalue_ref(clean):
     t.movable_in_lvalue_ref(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test05_movable_in_ptr(clean):
@@ -69,9 +88,7 @@ def test05_movable_in_ptr(clean):
     t.movable_in_ptr(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test06_movable_in_rvalue_ref(clean):
@@ -79,25 +96,17 @@ def test06_movable_in_rvalue_ref(clean):
     t.movable_in_rvalue_ref(s)
     assert s.value == 0
     del s
-    assert_stats(
-        default_constructed=1,
-        move_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, move_constructed=1, destructed=2)
 
 
 def test07_copyable_return(clean):
     assert t.return_copyable().value == 5
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
 
 
 def test08_copyable_return_ptr(clean):
     assert t.return_copyable_ptr().value == 5
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test09_copyable_in_value(clean):
@@ -105,10 +114,7 @@ def test09_copyable_in_value(clean):
     t.copyable_in_value(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
 
 
 def test10_copyable_in_lvalue_ref(clean):
@@ -116,9 +122,7 @@ def test10_copyable_in_lvalue_ref(clean):
     t.copyable_in_lvalue_ref(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test11_copyable_in_ptr(clean):
@@ -126,9 +130,7 @@ def test11_copyable_in_ptr(clean):
     t.copyable_in_ptr(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test12_copyable_in_rvalue_ref(clean):
@@ -136,26 +138,20 @@ def test12_copyable_in_rvalue_ref(clean):
     t.copyable_in_rvalue_ref(s)
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
+
 
 # ------------------------------------------------------------------
 
+
 def test13_tuple_movable_return(clean):
     assert t.tuple_return_movable()[0].value == 5
-    assert_stats(
-        default_constructed=1,
-        move_constructed=2,
-        destructed=3)
+    assert_stats(default_constructed=1, move_constructed=2, destructed=3)
 
 
 def test14_tuple_movable_return_ptr(clean):
     assert t.return_movable_ptr().value == 5
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test15_tuple_movable_in_value(clean):
@@ -163,10 +159,7 @@ def test15_tuple_movable_in_value(clean):
     t.tuple_movable_in_value((s,))
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
 
 
 def test16_tuple_movable_in_lvalue_ref(clean):
@@ -174,9 +167,7 @@ def test16_tuple_movable_in_lvalue_ref(clean):
     t.tuple_movable_in_lvalue_ref((s,))
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test17_tuple_movable_in_lvalue_ref_2(clean):
@@ -184,10 +175,7 @@ def test17_tuple_movable_in_lvalue_ref_2(clean):
     t.tuple_movable_in_lvalue_ref_2((s,))
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
 
 
 def test18_tuple_movable_in_ptr(clean):
@@ -195,9 +183,7 @@ def test18_tuple_movable_in_ptr(clean):
     t.tuple_movable_in_ptr((s,))
     assert s.value == 5
     del s
-    assert_stats(
-        default_constructed=1,
-        destructed=1)
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test19_tuple_movable_in_rvalue_ref(clean):
@@ -205,10 +191,7 @@ def test19_tuple_movable_in_rvalue_ref(clean):
     t.tuple_movable_in_rvalue_ref((s,))
     assert s.value == 0
     del s
-    assert_stats(
-        default_constructed=1,
-        move_constructed=1,
-        destructed=2)
+    assert_stats(default_constructed=1, move_constructed=1, destructed=2)
 
 
 def test20_tuple_movable_in_rvalue_ref_2(clean):
@@ -217,84 +200,59 @@ def test20_tuple_movable_in_rvalue_ref_2(clean):
     assert s.value == 5
     del s
     assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        move_constructed=1,
-        destructed=3)
+        default_constructed=1, copy_constructed=1, move_constructed=1, destructed=3
+    )
+
 
 # ------------------------------------------------------------------
+
 
 def test21_tuple_pair_basic():
     assert t.empty_tuple(()) == ()
     assert t.swap_tuple((1, 2.5)) == (2.5, 1)
     assert t.swap_pair((1, 2.5)) == (2.5, 1)
 
+
 # ------------------------------------------------------------------
+
 
 def test22_vec_return_movable(clean):
     for i, x in enumerate(t.vec_return_movable()):
         assert x.value == i
     del x
-    assert_stats(
-        value_constructed=10,
-        move_constructed=10,
-        destructed=20
-    )
+    assert_stats(value_constructed=10, move_constructed=10, destructed=20)
 
 
 def test23_vec_return_copyable(clean):
     for i, x in enumerate(t.vec_return_copyable()):
         assert x.value == i
     del x
-    assert_stats(
-        value_constructed=10,
-        copy_constructed=20,
-        destructed=30
-    )
+    assert_stats(value_constructed=10, copy_constructed=20, destructed=30)
 
 
 def test24_vec_movable_in_value(clean):
     t.vec_movable_in_value([t.Movable(i) for i in range(10)])
-    assert_stats(
-        value_constructed=10,
-        copy_constructed=10,
-        destructed=20
-    )
+    assert_stats(value_constructed=10, copy_constructed=10, destructed=20)
 
 
 def test25_vec_movable_in_value(clean):
     t.vec_copyable_in_value([t.Copyable(i) for i in range(10)])
-    assert_stats(
-        value_constructed=10,
-        copy_constructed=10,
-        destructed=20
-    )
+    assert_stats(value_constructed=10, copy_constructed=10, destructed=20)
 
 
 def test26_vec_movable_in_lvalue_ref(clean):
     t.vec_movable_in_lvalue_ref([t.Movable(i) for i in range(10)])
-    assert_stats(
-        value_constructed=10,
-        copy_constructed=10,
-        destructed=20
-    )
+    assert_stats(value_constructed=10, copy_constructed=10, destructed=20)
 
 
 def test27_vec_movable_in_ptr_2(clean):
     t.vec_movable_in_ptr_2([t.Movable(i) for i in range(10)])
-    assert_stats(
-        value_constructed=10,
-        destructed=10
-    )
+    assert_stats(value_constructed=10, destructed=10)
 
 
 def test28_vec_movable_in_rvalue_ref(clean):
     t.vec_movable_in_rvalue_ref([t.Movable(i) for i in range(10)])
-    assert_stats(
-        value_constructed=10,
-        copy_constructed=10,
-        destructed=20
-    )
+    assert_stats(value_constructed=10, copy_constructed=10, destructed=20)
 
 
 def test29_opaque_vector():
@@ -312,15 +270,17 @@ def test30_std_function():
 
     with pytest.raises(TypeError) as excinfo:
         assert t.call_function(5, 3) == 8
-    assert 'incompatible function arguments' in str(excinfo.value)
+    assert "incompatible function arguments" in str(excinfo.value)
 
     with pytest.raises(TypeError) as excinfo:
-        assert t.call_function(lambda x, y: x+y, 3) == 8
-    assert 'missing 1 required positional argument' in str(excinfo.value)
+        assert t.call_function(lambda x, y: x + y, 3) == 8
+    assert "missing 1 required positional argument" in str(excinfo.value)
 
     l = []
+
     def f():
         l.append(1)
+
     f2 = t.return_void_function(f)
     f2()
     assert l == [1]
@@ -329,6 +289,7 @@ def test30_std_function():
 def test31_std_function_roundtrip():
     def f():
         l.append(1)
+
     f2 = t.return_void_function(f)
     assert f2 is f
 
@@ -338,6 +299,7 @@ def test31_std_function_roundtrip():
 def test32_std_function_gc():
     class A(t.FuncWrapper):
         pass
+
     assert t.FuncWrapper.alive == 0
     a = A()
     assert t.FuncWrapper.alive == 1
@@ -349,10 +311,12 @@ def test32_std_function_gc():
     class B(t.FuncWrapper):
         def __init__(self):
             super().__init__()
+
             def f():
                 print(self.f)
 
             self.f = f
+
     assert t.FuncWrapper.alive == 0
     b = B()
     assert t.FuncWrapper.alive == 1
@@ -372,6 +336,7 @@ def test34_list():
     assert t.identity_list(()) == []
     assert t.identity_list((1, 2, 3)) == [1, 2, 3]
 
+
 def test35_string_and_string_view():
     assert t.identity_string("") == ""
     assert t.identity_string("orange") == "orange"
@@ -390,34 +355,20 @@ def test35_string_and_string_view():
 
 def test36_std_optional_copyable(clean):
     t.optional_copyable(t.Copyable())
-    if sys.version_info < (3, 10):
-        assert t.optional_copyable.__doc__ == (
-            "optional_copyable(x: typing.Optional[test_stl_ext.Copyable]) -> None"
-        )
-    else:
-        assert t.optional_copyable.__doc__ == (
-            "optional_copyable(x: test_stl_ext.Copyable | None) -> None"
-        )
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2
+    opt_copyable = optional("test_stl_ext.Copyable")
+    assert t.optional_copyable.__doc__ == (
+        f"optional_copyable(x: {opt_copyable}) -> None"
     )
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
+
 
 def test37_std_optional_copyable_ptr(clean):
     t.optional_copyable_ptr(t.Copyable())
-    if sys.version_info < (3, 10):
-        assert t.optional_copyable_ptr.__doc__ == (
-            "optional_copyable_ptr(x: typing.Optional[test_stl_ext.Copyable]) -> None"
-        )
-    else:
-        assert t.optional_copyable_ptr.__doc__ == (
-            "optional_copyable_ptr(x: test_stl_ext.Copyable | None) -> None"
-        )
-    assert_stats(
-        default_constructed=1,
-        destructed=1
+    opt_copyable = optional("test_stl_ext.Copyable")
+    assert t.optional_copyable_ptr.__doc__ == (
+        f"optional_copyable_ptr(x: {opt_copyable}) -> None"
     )
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test38_std_optional_none():
@@ -426,26 +377,16 @@ def test38_std_optional_none():
 
 def test39_std_optional_ret_opt_movable(clean):
     assert t.optional_ret_opt_movable().value == 5
-    if sys.version_info < (3, 10):
-        assert t.optional_ret_opt_movable.__doc__ == (
-            "optional_ret_opt_movable() -> typing.Optional[test_stl_ext.Movable]"
-        )
-    else:
-        assert t.optional_ret_opt_movable.__doc__ == (
-            "optional_ret_opt_movable() -> test_stl_ext.Movable | None"
-        )
-    assert_stats(
-        default_constructed=1,
-        move_constructed=2,
-        destructed=3
+    opt_movable = optional("test_stl_ext.Movable")
+    assert t.optional_ret_opt_movable.__doc__ == (
+        f"optional_ret_opt_movable() -> {opt_movable}"
     )
+    assert_stats(default_constructed=1, move_constructed=2, destructed=3)
+
 
 def test40_std_optional_ret_opt_movable_ptr(clean):
     assert t.optional_ret_opt_movable_ptr().value == 5
-    assert_stats(
-        default_constructed=1,
-        destructed=1
-    )
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test41_std_optional_ret_opt_none():
@@ -453,19 +394,16 @@ def test41_std_optional_ret_opt_none():
 
 
 def test42_std_optional_unbound_type():
-    for method_name in ("optional_unbound_type", "optional_unbound_type_with_nullopt_as_default"):
+    for method_name in (
+        "optional_unbound_type",
+        "optional_unbound_type_with_nullopt_as_default",
+    ):
         method = getattr(t, method_name)
         assert method(3) == 3
         assert method(None) is None
         assert method() is None
-        if sys.version_info < (3, 10):
-            assert method.__doc__ == (
-                f"{method_name}(x: typing.Optional[int] = None) -> typing.Optional[int]"
-            )
-        else:
-            assert method.__doc__ == (
-                f"{method_name}(x: int | None = None) -> int | None"
-            )
+        opt_int = optional("int")
+        assert method.__doc__ == (f"{method_name}(x: {opt_int} = None) -> {opt_int}")
 
 
 def test42a_std_optional_non_assignable():
@@ -475,126 +413,80 @@ def test42a_std_optional_non_assignable():
 def test43_std_variant_copyable(clean):
     t.variant_copyable(t.Copyable())
     t.variant_copyable(5)
-    if sys.version_info < (3, 10):
-        assert t.variant_copyable.__doc__ == (
-            "variant_copyable(arg: Union[test_stl_ext.Copyable, int], /) -> None"
-        )
-    else:
-        assert t.variant_copyable.__doc__ == (
-            "variant_copyable(arg: test_stl_ext.Copyable | int, /) -> None"
-        )
-    assert_stats(
-        default_constructed=3,
-        copy_assigned=1,
-        destructed=3
+    arg_t = union('test_stl_ext.Copyable', 'int')
+    assert t.variant_copyable.__doc__ == (
+        f"variant_copyable(arg: {arg_t}, /) -> None"
     )
+    assert_stats(default_constructed=3, copy_assigned=1, destructed=3)
 
 
 def test44_std_variant_copyable_none(clean):
     t.variant_copyable_none(t.Copyable())
     t.variant_copyable_none(5)
     t.variant_copyable_none(None)
-    if sys.version_info < (3, 10):
-        assert t.variant_copyable_none.__doc__ == (
-            "variant_copyable_none(x: typing.Optional[Union[int, test_stl_ext.Copyable]]) -> None"
-        )
-    else:
-        assert t.variant_copyable_none.__doc__ == (
-            "variant_copyable_none(x: int | test_stl_ext.Copyable | None) -> None"
-        )
-    assert_stats(
-        default_constructed=1,
-        copy_constructed=1,
-        destructed=2
+    arg_t = optional(union("int", "test_stl_ext.Copyable"))
+    assert t.variant_copyable_none.__doc__ == (
+        f"variant_copyable_none(x: {arg_t}) -> None"
     )
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
 
 
 def test45_std_variant_copyable_ptr(clean):
     t.variant_copyable_ptr(t.Copyable())
     t.variant_copyable_ptr(5)
-    if sys.version_info < (3, 10):
-        assert t.variant_copyable_ptr.__doc__ == (
-            "variant_copyable_ptr(arg: Union[test_stl_ext.Copyable, int], /) -> None"
-        )
-    else:
-        assert t.variant_copyable_ptr.__doc__ == (
-            "variant_copyable_ptr(arg: test_stl_ext.Copyable | int, /) -> None"
-        )
-    assert_stats(
-        default_constructed=1,
-        destructed=1
+    arg_t = union("test_stl_ext.Copyable", "int")
+    assert t.variant_copyable_ptr.__doc__ == (
+        f"variant_copyable_ptr(arg: {arg_t}, /) -> None"
     )
+    assert_stats(default_constructed=1, destructed=1)
 
 
 def test46_std_variant_copyable_ptr_none(clean):
     t.variant_copyable_ptr_none(t.Copyable())
     t.variant_copyable_ptr_none(5)
     t.variant_copyable_ptr_none(None)
-    if sys.version_info < (3, 10):
-        assert t.variant_copyable_ptr_none.__doc__ == (
-            "variant_copyable_ptr_none(x: typing.Optional[Union[test_stl_ext.Copyable, int]]) -> None"
-        )
-    else:
-        assert t.variant_copyable_ptr_none.__doc__ == (
-            "variant_copyable_ptr_none(x: test_stl_ext.Copyable | int | None) -> None"
-        )
-    assert_stats(
-        default_constructed=1,
-        destructed=1
+    arg_t = optional(union("test_stl_ext.Copyable", "int"))
+    assert t.variant_copyable_ptr_none.__doc__ == (
+        f"variant_copyable_ptr_none(x: {arg_t}) -> None"
     )
+    assert_stats(default_constructed=1, destructed=1)
+
 
 def test47_std_variant_ret_var_copyable():
     assert t.variant_ret_var_copyable().value == 5
-    if sys.version_info < (3, 10):
-        assert t.variant_ret_var_copyable.__doc__ == (
-            "variant_ret_var_copyable() -> Union[test_stl_ext.Copyable, int]"
-        )
-    else:
-        assert t.variant_ret_var_copyable.__doc__ == (
-            "variant_ret_var_copyable() -> test_stl_ext.Copyable | int"
-        )
+    rv_t = union("test_stl_ext.Copyable", "int")
+    assert t.variant_ret_var_copyable.__doc__ == (
+        f"variant_ret_var_copyable() -> {rv_t}"
+    )
 
 
 def test48_std_variant_ret_var_none():
     assert t.variant_ret_var_none() is None
-    if sys.version_info < (3, 10):
-        assert t.variant_ret_var_none.__doc__ == (
-            "variant_ret_var_none() -> Union[None, test_stl_ext.Copyable, int]"
-        )
-    else:
-        assert t.variant_ret_var_none.__doc__ == (
-            "variant_ret_var_none() -> None | test_stl_ext.Copyable | int"
-        )
+
+    rv_t = union("None", "test_stl_ext.Copyable", "int")
+    print(t.variant_ret_var_none.__doc__)
+    assert t.variant_ret_var_none.__doc__ == (f"variant_ret_var_none() -> {rv_t}")
 
 
 def test49_std_variant_unbound_type():
     assert t.variant_unbound_type() is None
     assert t.variant_unbound_type(None) is None
     assert t.variant_unbound_type([5]) == [5]
-    assert t.variant_unbound_type((1,2,3)) == (1,2,3)
+    assert t.variant_unbound_type((1, 2, 3)) == (1, 2, 3)
     assert t.variant_unbound_type(5) == 5
-    if sys.version_info < (3, 10):
-        assert t.variant_unbound_type.__doc__ == (
-            "variant_unbound_type(x: typing.Optional[typing.Union[list, tuple, int]] = None)"
-            " -> tyipng.Union[None, list, tuple, int]"
-        )
-    else:
-        assert t.variant_unbound_type.__doc__ == (
-            "variant_unbound_type(x: list | tuple | int | None = None)"
-            " -> None | list | tuple | int"
-        )
+    arg_t = optional(union("list", "tuple", "int"))
+    rv_t = union("None", "list", "tuple", "int")
+    assert t.variant_unbound_type.__doc__ == (
+        f"variant_unbound_type(x: {arg_t} = None) -> {rv_t}"
+    )
+
 
 def test50_map_return_movable_value():
     for i, (k, v) in enumerate(sorted(t.map_return_movable_value().items())):
         assert k == chr(ord("a") + i)
         assert v.value == i
-    if sys.version_info < (3, 9):
         assert t.map_return_movable_value.__doc__ == (
-            "map_return_movable_value() -> typing.Dict[str, test_stl_ext.Movable]"
-        )
-    else:
-        assert t.map_return_movable_value.__doc__ == (
-            "map_return_movable_value() -> dict[str, test_stl_ext.Movable]"
+            f"map_return_movable_value() -> {TYPING_DICT}[str, test_stl_ext.Movable]"
         )
 
 
@@ -602,47 +494,49 @@ def test51_map_return_copyable_value():
     for i, (k, v) in enumerate(sorted(t.map_return_copyable_value().items())):
         assert k == chr(ord("a") + i)
         assert v.value == i
-    if sys.version_info < (3, 9):
         assert t.map_return_copyable_value.__doc__ == (
-            "map_return_copyable_value() -> typing.Dict[str, test_stl_ext.Copyable]"
+            f"map_return_copyable_value() -> {TYPING_DICT}[str, test_stl_ext.Copyable]"
         )
-    else:
-        assert t.map_return_copyable_value.__doc__ == (
-            "map_return_copyable_value() -> dict[str, test_stl_ext.Copyable]"
-        )
+
 
 def test52_map_movable_in_value():
     t.map_movable_in_value(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
     assert t.map_movable_in_value.__doc__ == (
-        "map_movable_in_value(x: Mapping[str, test_stl_ext.Movable]) -> None"
+        f"map_movable_in_value(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
 def test53_map_copyable_in_value():
-    t.map_copyable_in_value(dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)]))
+    t.map_copyable_in_value(
+        dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)])
+    )
     assert t.map_copyable_in_value.__doc__ == (
-        "map_copyable_in_value(x: Mapping[str, test_stl_ext.Copyable]) -> None"
+        f"map_copyable_in_value(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Copyable]) -> None"
     )
 
 
 def test54_map_movable_in_lvalue_ref():
-    t.map_movable_in_lvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
+    t.map_movable_in_lvalue_ref(
+        dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)])
+    )
     assert t.map_movable_in_lvalue_ref.__doc__ == (
-        "map_movable_in_lvalue_ref(x: Mapping[str, test_stl_ext.Movable]) -> None"
+        f"map_movable_in_lvalue_ref(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
 def test55_map_movable_in_rvalue_ref():
-    t.map_movable_in_rvalue_ref(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
+    t.map_movable_in_rvalue_ref(
+        dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)])
+    )
     assert t.map_movable_in_rvalue_ref.__doc__ == (
-        "map_movable_in_rvalue_ref(x: Mapping[str, test_stl_ext.Movable]) -> None"
+        f"map_movable_in_rvalue_ref(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
 def test56_map_movable_in_ptr():
     t.map_movable_in_ptr(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
     assert t.map_movable_in_ptr.__doc__ == (
-        "map_movable_in_ptr(x: Mapping[str, test_stl_ext.Movable]) -> None"
+        f"map_movable_in_ptr(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
@@ -662,12 +556,13 @@ def test58_array():
     assert t.array_in((1, 2, 3)) == 6
     with pytest.raises(TypeError) as excinfo:
         assert t.array_in((1, 2, 3, 4)) == 6
-    assert 'incompatible function arguments' in str(excinfo.value)
+    assert "incompatible function arguments" in str(excinfo.value)
+
 
 def test59_map_movable_in_failure():
     with pytest.raises(TypeError) as excinfo:
-        t.map_copyable_in_value({1:2})
-    assert 'incompatible function arguments' in str(excinfo.value)
+        t.map_copyable_in_value({1: 2})
+    assert "incompatible function arguments" in str(excinfo.value)
 
 
 def test60_set_return_value():
@@ -675,41 +570,41 @@ def test60_set_return_value():
         assert k == chr(ord("a") + i)
     for i, k in enumerate(sorted(t.unordered_set_return_value())):
         assert k == chr(ord("a") + i)
-    if sys.version_info < (3, 9):
-        assert t.set_return_value.__doc__ == (
-            "set_return_value() -> Set[str]")
-        assert t.unordered_set_return_value.__doc__ == (
-            "unordered_set_return_value() -> Set[str]")
-    else:
-        assert t.set_return_value.__doc__ == (
-            "set_return_value() -> set[str]")
-        assert t.unordered_set_return_value.__doc__ == (
-            "unordered_set_return_value() -> set[str]")
+    assert t.set_return_value.__doc__ == (f"set_return_value() -> {TYPING_SET}[str]")
+    assert t.unordered_set_return_value.__doc__ == (
+        f"unordered_set_return_value() -> {TYPING_SET}[str]"
+    )
+
 
 def test61_set_in_value():
     t.set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     t.unordered_set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_value.__doc__ == (
-        "set_in_value(x: Set[str]) -> None")
+        f"set_in_value(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+    )
     assert t.unordered_set_in_value.__doc__ == (
-        "unordered_set_in_value(x: Set[str]) -> None")
+        f"unordered_set_in_value(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+    )
 
 
 def test62_set_in_lvalue_ref():
     t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_lvalue_ref.__doc__ == (
-        "set_in_lvalue_ref(x: Set[str]) -> None")
+        f"set_in_lvalue_ref(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+    )
+
 
 def test63_set_in_rvalue_ref():
     t.set_in_rvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_rvalue_ref.__doc__ == (
-        "set_in_rvalue_ref(x: Set[str]) -> None")
+        f"set_in_rvalue_ref(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+    )
 
 
 def test64_set_in_failure():
     with pytest.raises(TypeError) as excinfo:
         t.set_in_value(set([i for i in range(10)]))
-    assert 'incompatible function arguments' in str(excinfo.value)
+    assert "incompatible function arguments" in str(excinfo.value)
 
 
 def test65_class_with_movable_field(clean):
@@ -717,40 +612,28 @@ def test65_class_with_movable_field(clean):
     m1 = t.Movable(1)
     m2 = t.Movable(2)
 
-    assert_stats(
-        value_constructed=2
-    )
+    assert_stats(value_constructed=2)
 
-    cwmf.movable = [ m1, m2 ]
+    cwmf.movable = [m1, m2]
 
-    assert_stats(
-        value_constructed=2,
-        copy_constructed=2
-    )
+    assert_stats(value_constructed=2, copy_constructed=2)
 
     del m1, m2
     collect()
 
-    assert_stats(
-        value_constructed=2,
-        copy_constructed=2,
-        destructed=2
-    )
+    assert_stats(value_constructed=2, copy_constructed=2, destructed=2)
 
     del cwmf
     collect()
 
-    assert_stats(
-        value_constructed=2,
-        copy_constructed=2,
-        destructed=4
-    )
+    assert_stats(value_constructed=2, copy_constructed=2, destructed=4)
+
 
 def test66_replace_extension():
     from pathlib import Path
 
-    if not hasattr(t, 'replace_extension'):
-        pytest.skip('filesystem tests not compiled')
+    if not hasattr(t, "replace_extension"):
+        pytest.skip("filesystem tests not compiled")
 
     filename = Path("test.txt")
     assert t.replace_extension(filename, ".obj") == filename.with_suffix(".obj")
@@ -772,6 +655,7 @@ def test66_replace_extension():
     assert t.parent_path(PseudoStrPath()) == Path("foo")
     assert t.parent_path(PseudoBytesPath()) == Path("foo")
 
+
 def test67_vector_bool():
     bool_vector = [True, False, True, False]
     result = t.flip_vector_bool(bool_vector)
@@ -791,8 +675,8 @@ def test68_complex_value():
     assert t.complex_value_float(0.0j) == 0.0j
     assert t.complex_value_float(0) == 0
 
-    val_64 = 2.7-3.2j
-    val_32 = 2.700000047683716-3.200000047683716j
+    val_64 = 2.7 - 3.2j
+    val_32 = 2.700000047683716 - 3.200000047683716j
     assert val_64 != val_32
 
     assert t.complex_value_float(val_32) == val_32
@@ -802,6 +686,7 @@ def test68_complex_value():
 
     try:
         import numpy as np
+
         assert t.complex_value_float(np.complex64(val_32)) == val_32
         assert t.complex_value_float(np.complex64(val_64)) == val_32
         assert t.complex_value_double(np.complex64(val_32)) == val_32
@@ -813,39 +698,66 @@ def test68_complex_value():
     except ImportError:
         pass
 
+
 def test69_complex_array():
-    val1_64 = 2.7-3.2j
-    val1_32 = 2.700000047683716-3.200000047683716j
+    val1_64 = 2.7 - 3.2j
+    val1_32 = 2.700000047683716 - 3.200000047683716j
     val2_64 = 3.1415
-    val2_32 = 3.1414999961853027+0j
+    val2_32 = 3.1414999961853027 + 0j
 
     # test 64 bit casts
-    assert t.complex_array_double([val1_64, -1j, val2_64]) == [val1_64, -0-1j, val2_64]
+    assert t.complex_array_double([val1_64, -1j, val2_64]) == [
+        val1_64,
+        -0 - 1j,
+        val2_64,
+    ]
 
     # test 32 bit casts
-    assert t.complex_array_float([val1_64, -1j, val2_64]) == [val1_32, (-0-1j), val2_32]
+    assert t.complex_array_float([val1_64, -1j, val2_64]) == [
+        val1_32,
+        (-0 - 1j),
+        val2_32,
+    ]
 
     try:
         import numpy as np
 
         # test 64 bit casts
-        assert t.complex_array_double(np.array([val1_64, -1j, val2_64])) == [val1_64, -0-1j, val2_64]
-        assert t.complex_array_double(np.array([val1_64, -1j, val2_64],dtype=np.complex128)) == [val1_64, -0-1j, val2_64]
-        assert t.complex_array_double(np.array([val1_64, -1j, val2_64],dtype=np.complex64)) == [val1_32, -0-1j, val2_32]
+        assert t.complex_array_double(np.array([val1_64, -1j, val2_64])) == [
+            val1_64,
+            -0 - 1j,
+            val2_64,
+        ]
+        assert t.complex_array_double(
+            np.array([val1_64, -1j, val2_64], dtype=np.complex128)
+        ) == [val1_64, -0 - 1j, val2_64]
+        assert t.complex_array_double(
+            np.array([val1_64, -1j, val2_64], dtype=np.complex64)
+        ) == [val1_32, -0 - 1j, val2_32]
 
         # test 32 bit casts
-        assert t.complex_array_float(np.array([val1_64, -1j, val2_64])) == [val1_32, (-0-1j), val2_32]
-        assert t.complex_array_float(np.array([val1_64, -1j, val2_64],dtype=np.complex128)) == [val1_32, (-0-1j), val2_32]
-        assert t.complex_array_float(np.array([val1_64, -1j, val2_64],dtype=np.complex64)) == [val1_32, (-0-1j), val2_32]
+        assert t.complex_array_float(np.array([val1_64, -1j, val2_64])) == [
+            val1_32,
+            (-0 - 1j),
+            val2_32,
+        ]
+        assert t.complex_array_float(
+            np.array([val1_64, -1j, val2_64], dtype=np.complex128)
+        ) == [val1_32, (-0 - 1j), val2_32]
+        assert t.complex_array_float(
+            np.array([val1_64, -1j, val2_64], dtype=np.complex64)
+        ) == [val1_32, (-0 - 1j), val2_32]
     except ImportError:
         pass
+
 
 def test70_vec_char():
     assert isinstance(t.vector_str("123"), str)
     assert isinstance(t.vector_str(["123", "345"]), list)
 
+
 def test71_null_input():
     with pytest.raises(TypeError):
         t.vec_movable_in_value([None])
     with pytest.raises(TypeError):
-        t.map_copyable_in_value({'a': None})
+        t.map_copyable_in_value({"a": None})

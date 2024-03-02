@@ -973,7 +973,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     buf.put(": ");
                     if (has_args && f->args[arg_index].none) {
                         #if PY_VERSION_HEX < 0x030A0000
-                            buf.put("Optional[");
+                            buf.put("typing.Optional[");
                         #else
                             // See below
                         #endif

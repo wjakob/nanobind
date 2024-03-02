@@ -20,6 +20,9 @@ def f2(a=(3,(4,5)), /, b=(1,2), *, c=4):
 def f3(*args, **kwargs):
     pass
 
+def f4() -> typing.Callable[[T], T]:
+    return lambda x: x
+
 class AClass:
     STATIC_VAR: int = 5
 

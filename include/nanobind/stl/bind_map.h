@@ -80,8 +80,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                  if (it == m.end())
                      throw key_error();
                  return it->second;
-             }
-        )
+             }, std::is_pointer_v<Value> ? rv_policy::take_ownership : rv_policy::copy)
 
         .def("__delitem__",
             [](Map &m, const Key &k) {
@@ -89,8 +88,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                 if (it == m.end())
                     throw key_error();
                 m.erase(it);
-            }
-        )
+            })
 
         .def("clear", [](Map &m) { m.clear(); },
              "Remove all items");

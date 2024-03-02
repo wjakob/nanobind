@@ -133,6 +133,21 @@ These release breaks API and ABI compatibility, requiring a new major version
 according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
+* The :cpp:func:`nb::bind_vector\<T\>() <bind_vector>` and
+  :cpp:func:`nb::bind_map\<T\>() <bind_map>` interfaces were found to be
+  severely flawed since element access (``__getitem__``) created views into the
+  internal state of the STL type that was not stable across subsequent
+  modifications.
+
+  This could lead to unexpected changes to array elements and undefined
+  behavior when the underlying storage was reallocated (i.e., use-after-free).
+
+  nanobind 2.0.0 improves these types so that they are safe to use, but this
+  means that element access must now copy by default, potentially making them
+  less convenient. The documentation of :cpp:func:`nb::bind_vector\<T\>()
+  <bind_vector>` discusses the issue at length and presents alternative
+  solutions.
+
 * The ``nb::raw_doc`` annotation was found to be too inflexible and was
   therefore removed in this version.
 

@@ -15,7 +15,9 @@ def test01_vector_int(capfd):
 
     v_int2 = t.VectorInt([0, 0])
     assert v_int == v_int2
-    v_int2[1] = 1
+    v_int2[1] = 2
+    v_int2[1] -= 1
+    assert v_int2[1] == 1
     assert v_int != v_int2
 
     v_int2.append(2)

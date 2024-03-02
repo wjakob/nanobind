@@ -246,6 +246,90 @@ include directive:
    The binding operation is a no-op if the vector type has already been
    registered with nanobind.
 
+   .. warning::
+
+      While this function creates a type resembling a Python ``list``, it has a
+      major caveat: the item accessor ``__getitem__`` copies the accessed
+      element by default (the bottom of this paragraph explains how this copy
+      can be avoided).
+
+      Consequently, writes to elements may not propagate in the expected way.
+      Consider the following C++ bindings:
+
+      .. code-block:: cpp
+
+         struct A {
+             int value;
+         };
+
+         nb::class_<A>(m, "A")
+             .def(nb::init<int>())
+             .def_rw("value", &A::value);
+
+         nb::bind_vector<std::vector<A>>(m, "VecA");
+
+      On the Python end, they yield the following surprising behavior:
+
+      .. code-block:: python
+
+         from my_ext import A, VecA
+
+         va = VecA()
+         va.append(A(123))
+         a[0].value = 456
+         assert a[0].value == 456 # <-- assertion fails!
+
+      To actually modify ``va``, another write is needed.
+
+      .. code-block:: python
+
+         v = a[0]
+         v.value = 456
+         a[0] = v
+
+      This may seem like a strange design, so it is worth explaining why the
+      implementation works in this way.
+
+      The key issue is that any particular value (e.g., ``va[0]``) lies within
+      a memory buffer managed by the ``std::vector``. It is not safe for
+      nanobind to refer to objects within this buffer using their absolute or
+      relative memory address. For example, inserting an element at position 0
+      will rearrange the buffer's contents and shift all subsequent ``A``
+      instances. If nanobind ``A`` objects could be "views" into the
+      ``std::vector``, then an insertion would cause the contents of unrelated
+      ``A`` Python objects to change unexpectedly. Insertion may also require
+      reallocation of the buffer, invalidating all current addresses, and this
+      could lead to undefined behavior (use-after-free) if nanobind did not
+      make a copy.
+
+      There are three situations in which the surprising behavior is avoided:
+
+      1. If the modification of the array is performed using in-place
+         operations like
+
+         .. code-block:: python
+
+            v[i] += 5
+
+         In-place operators automatically perform an array assignment, causing
+         the issue to disappear. This means that if you work with a vector type
+         like ``std::vector<int>`` or ``std::vector<std::string>`` with an
+         immutable element type like ``int`` or ``str`` on the Python end, it
+         will behave completely naturally in Python.
+
+      2. If the array contains STL shared pointers (e.g.,
+         ``std::vector<std::shared_ptr<T>>``), the added
+         indirection and ownership tracking removes the need for extra copies.
+
+      3. If the array contains pointers (e.g., ``std::vector<T*>``) and ``T``
+         uses :ref:`intrusive reference counting <intrusive>`, the added
+         indirection and ownership tracking removes the need for extra copies.
+
+     You should **never** use this class to bind pointer-valued vectors
+     ``std::vector<T*>`` when ``T`` does not use intrusive reference counting.
+     Some kind of ownership tracking (points 2 and 3 of the above list) is
+     needed in this case.
+
 .. _map_bindings:
 
 STL map bindings
@@ -323,6 +407,16 @@ nanobind API and requires an additional include directive:
    If not all of these properties are available, then a subset of the above
    methods will be omitted. Please refer to ``bind_map.h`` for details on the
    logic.
+
+   .. warning::
+
+      While this function creates a type resembling a Python ``dict``, it has a
+      major caveat: the item accessor ``__getitem__`` copies the accessed
+      element by default.
+
+      Please refer to the :ref:`STL vector bindings <vector_bindings>` for a
+      discussion of the problem and possible solutions. Everything applies
+      equally to the map case.
 
 
 Unique pointer deleter
@@ -1243,4 +1337,4 @@ include directive:
 
    Analogousto :cpp:func:`type_var`, create a `type variable tuple
    <https://docs.python.org/3/library/typing.html#typing.TypeVarTuple>`__
-   (i.e., an instance of ``typing.TypeVarTuple``). 
+   (i.e., an instance of ``typing.TypeVarTuple``).

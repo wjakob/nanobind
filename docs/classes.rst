@@ -716,6 +716,17 @@ C++ side, or to perform other types of customization. The
 nanobind that this is an operator, which returns ``NotImplemented`` when
 invoked with incompatible arguments rather than throwing a type error.
 
+When binding *in-place* operators such as ``operator+=``, and when their
+implementation is guaranteed to end with ``return *this``, it is recommended
+that you set a return value policy of :cpp:enumerator:`rv_policy::none`, i.e.,
+
+.. code-block:: cpp
+
+   .def(nb::self += nb::self, nb::rv_policy::none)
+
+Otherwise, the function binding will return a new copy of the object, which is
+usually not desired.
+
 Binding protected member functions
 ----------------------------------
 

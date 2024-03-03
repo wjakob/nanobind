@@ -375,7 +375,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
         if (pass_shape) {
             for (uint32_t i = 0; i < req->ndim; ++i) {
                 if (req->shape[i] != (size_t) t.shape[i] &&
-                    req->shape[i] != nanobind::any) {
+                    req->shape[i] != (size_t) -1) {
                     pass_shape = false;
                     break;
                 }

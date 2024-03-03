@@ -133,6 +133,14 @@ These release breaks API and ABI compatibility, requiring a new major version
 according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
+* The ``nb::any`` placeholder to specify an unconstrained
+  :cpp:class:`nb::ndarray <ndarray>` axis was removed. This name was given to a
+  new wrapper type :cpp:class:`nb::any`` indicating ``typing.Any``-typed
+  values.
+
+  All use of ``nb::any`` in existing code must be replaced with ``-1`` (for
+  example, ``nb::shape<3, nb::any, 4>`` → ``nb::shape<3, -1, 4>``).
+
 * The ``nb::raw_doc`` annotation was found to be too inflexible and was
   therefore removed in this version.
 

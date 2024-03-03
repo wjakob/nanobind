@@ -95,9 +95,9 @@ using array_for_eigen_t = ndarray<
     numpy,
     std::conditional_t<
         ndim_v<T> == 1,
-        shape<(size_t) T::SizeAtCompileTime>,
-        shape<(size_t) T::RowsAtCompileTime,
-              (size_t) T::ColsAtCompileTime>>,
+        shape<T::SizeAtCompileTime>,
+        shape<T::RowsAtCompileTime,
+              T::ColsAtCompileTime>>,
     std::conditional_t<
         is_contiguous_v<T>,
         std::conditional_t<

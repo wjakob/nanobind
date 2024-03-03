@@ -10,6 +10,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+using ssize_t = std::make_signed_t<size_t>;
+
 struct void_type { };
 
 template <bool... Bs> struct index_1;

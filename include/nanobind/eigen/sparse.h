@@ -39,8 +39,8 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
 
     static constexpr bool RowMajor = T::IsRowMajor;
 
-    using ScalarNDArray = ndarray<numpy, Scalar, shape<any>>;
-    using StorageIndexNDArray = ndarray<numpy, StorageIndex, shape<any>>;
+    using ScalarNDArray = ndarray<numpy, Scalar, shape<-1>>;
+    using StorageIndexNDArray = ndarray<numpy, StorageIndex, shape<-1>>;
 
     using ScalarCaster = make_caster<ScalarNDArray>;
     using StorageIndexCaster = make_caster<StorageIndexNDArray>;

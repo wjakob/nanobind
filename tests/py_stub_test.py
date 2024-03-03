@@ -6,6 +6,10 @@ if sys.version_info < (3, 11, 0):
 else:
     import typing
 
+# Ignore a type and a function from elsewhere. These shouldn't be included in
+# the stub by default
+from os import PathLike, getcwd
+
 del sys
 
 C = 123

@@ -1,6 +1,6 @@
 import argparse
 import sys
-import sysconfig
+import sysconfig  # type: ignore
 
 from . import __version__, include_dir, cmake_dir
 

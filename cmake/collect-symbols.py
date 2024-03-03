@@ -8,7 +8,7 @@
 from urllib.request import urlopen
 import re
 
-funcs = set()
+funcs: "set[str]" = set()
 
 for ver in ['3.7', '3.8', '3.9']:
   url = f'https://raw.githubusercontent.com/python/cpython/{ver}/PC/python3.def'

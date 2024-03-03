@@ -466,6 +466,7 @@ class list : public object {
     size_t size() const { return (size_t) NB_LIST_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);
+    template <typename T> void insert(Py_ssize_t index, T &&value);
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;

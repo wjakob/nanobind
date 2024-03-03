@@ -505,6 +505,12 @@ template <typename T> void list::append(T &&value) {
         raise_python_error();
 }
 
+template <typename T> void list::insert(Py_ssize_t index, T &&value) {
+    object o = nanobind::cast((detail::forward_t<T>) value);
+    if (PyList_Insert(m_ptr, index, o.ptr()))
+        raise_python_error();
+}
+
 template <typename T> bool dict::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PyDict_Contains(m_ptr, o.ptr());

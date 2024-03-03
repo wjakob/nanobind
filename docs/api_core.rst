@@ -720,6 +720,12 @@ Wrapper classes
       Append an element to the list. When `T` does not already represent a
       wrapped Python object, the function performs a cast.
 
+   .. cpp:function:: template <typename T> void insert(Py_ssize_t index, T&& value)
+
+      Insert an element to the list (at index ``index``, which may also be
+      negative). When `T` does not already represent a wrapped Python object,
+      the function performs a cast.
+
    .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_list> operator[](T key) const
 
       Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic

@@ -76,11 +76,11 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("pass_uint32", [](const nb::ndarray<uint32_t> &) { }, "array"_a.noconvert());
     m.def("pass_bool", [](const nb::ndarray<bool> &) { }, "array"_a.noconvert());
     m.def("pass_float32_shaped",
-          [](const nb::ndarray<float, nb::shape<3, nb::any, 4>> &) {}, "array"_a.noconvert());
+          [](const nb::ndarray<float, nb::shape<3, -1, 4>> &) {}, "array"_a.noconvert());
 
     m.def("pass_float32_shaped_ordered",
           [](const nb::ndarray<float, nb::c_contig,
-                               nb::shape<nb::any, nb::any, 4>> &) {}, "array"_a.noconvert());
+                               nb::shape<-1, -1, 4>> &) {}, "array"_a.noconvert());
 
     m.def("check_order", [](nb::ndarray<nb::c_contig>) -> char { return 'C'; });
     m.def("check_order", [](nb::ndarray<nb::f_contig>) -> char { return 'F'; });
@@ -98,7 +98,7 @@ NB_MODULE(test_ndarray_ext, m) {
           });
 
     m.def("initialize",
-          [](nb::ndarray<float, nb::shape<10, nb::any>, nb::device::cpu> &t) {
+          [](nb::ndarray<float, nb::shape<10, -1>, nb::device::cpu> &t) {
               int k = 0;
               for (size_t i = 0; i < 10; ++i)
                   for (size_t j = 0; j < t.shape(1); ++j)
@@ -132,7 +132,7 @@ NB_MODULE(test_ndarray_ext, m) {
         );
     });
 
-    m.def("process", [](nb::ndarray<uint8_t, nb::shape<nb::any, nb::any, 3>,
+    m.def("process", [](nb::ndarray<uint8_t, nb::shape<-1, -1, 3>,
                                    nb::c_contig, nb::device::cpu> ndarray) {
         // Double brightness of the MxNx3 RGB image
         for (size_t y = 0; y < ndarray.shape(0); ++y)

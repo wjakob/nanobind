@@ -155,6 +155,14 @@ noteworthy:
   nanobind versions but was awkward to use, as it required the user to provide
   a custom type formatter. This release makes the interface more convenient.
 
+* The ``nb::any`` placeholder to specify an unconstrained
+  :cpp:class:`nb::ndarray <ndarray>` axis was removed. This name was given to a
+  new wrapper type :cpp:class:`nb::any`` indicating ``typing.Any``-typed
+  values.
+
+  All use of ``nb::any`` in existing code must be replaced with ``-1`` (for
+  example, ``nb::shape<3, nb::any, 4>`` → ``nb::shape<3, -1, 4>``).
+
 * :ref:`Keyword-only arguments <kw_only>` are now supported, and can be
   indicated using the new :cpp:struct:`nb::kw_only() <kw_only>` function
   annotation. (PR `#448 <https://github.com/wjakob/nanobind/pull/448>`__).

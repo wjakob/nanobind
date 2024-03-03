@@ -71,9 +71,11 @@ template <typename T> struct is_complex : std::false_type { };
 
 NAMESPACE_END(detail)
 
-constexpr size_t any = (size_t) -1;
-
-template <size_t... Is> struct shape {
+template <ssize_t... Is> struct shape {
+    static_assert(
+        ((Is >= 0 || Is == -1) && ...),
+        "The arguments to nanobind::shape must either be positive or equal to -1"
+    );
     static constexpr size_t size = sizeof...(Is);
 };
 
@@ -103,7 +105,7 @@ constexpr bool is_ndarray_scalar_v =
 
 template <typename> struct ndim_shape;
 template <size_t... S> struct ndim_shape<std::index_sequence<S...>> {
-    using type = shape<((void) S, any)...>;
+    using type = shape<((void) S, -1)...>;
 };
 
 NAMESPACE_END(detail)
@@ -227,16 +229,16 @@ template<> struct ndarray_arg<ro> {
     }
 };
 
-template <size_t... Is> struct ndarray_arg<shape<Is...>> {
+template <ssize_t... Is> struct ndarray_arg<shape<Is...>> {
     static constexpr size_t size = sizeof...(Is);
     static constexpr auto name =
         const_name("shape=(") +
-        concat(const_name<Is == any>(const_name("*"), const_name<Is>())...) +
+        concat(const_name<Is == -1>(const_name("*"), const_name<(size_t) Is>())...) +
         const_name(")");
 
     static void apply(ndarray_req &tr) {
         size_t i = 0;
-        ((tr.shape[i++] = Is), ...);
+        ((tr.shape[i++] = (size_t) Is), ...);
         tr.ndim = (uint32_t) sizeof...(Is);
         tr.req_shape = true;
     }
@@ -281,7 +283,7 @@ template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_i
                            T, typename ndarray_info<Ts...>::scalar_type>;
 };
 
-template <size_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {
+template <ssize_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {
     using shape_type = shape<Is...>;
 };
 
@@ -347,14 +349,14 @@ template <typename Scalar, typename Shape, char Order> struct ndarray_view {
 private:
     template <typename...> friend class ndarray;
 
-    template <size_t... I1, size_t... I2>
+    template <size_t... I1, ssize_t... I2>
     ndarray_view(Scalar *data, const int64_t *shape, const int64_t *strides,
                  std::index_sequence<I1...>, nanobind::shape<I2...>)
         : m_data(data) {
 
         /* Initialize shape/strides with compile-time knowledge if
            available (to permit vectorization, loop unrolling, etc.) */
-        ((m_shape[I1] = (I2 == any) ? shape[I1] : I2), ...);
+        ((m_shape[I1] = (I2 == -1) ? shape[I1] : (int64_t) I2), ...);
         ((m_strides[I1] = strides[I1]), ...);
 
         if constexpr (Order == 'F') {

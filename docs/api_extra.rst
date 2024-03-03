@@ -799,19 +799,19 @@ nanobind does not support non-standard types as documented in the section on
 Shape
 +++++
 
-.. cpp:class:: template <size_t... Is> shape
+.. cpp:class:: template <ssize_t... Is> shape
 
    Require the array to have ``sizeof...(Is)`` dimensions. Each entry of `Is`
    specifies a fixed size constraint for that specific dimension. An entry
-   equal to :cpp:var:`any` indicates that any size should be accepted for this
+   equal to ``-1`` indicates that *any* size should be accepted for this
    dimension.
+
+   (An alias named ``nb::any`` representing ``-1`` was removed in nanobind 2).
 
 .. cpp:class:: template <size_t N> ndim
 
    Alternative to the above that only constrains the array dimension.
-   ``nb::ndim<2>`` is equivalent to ``nb::shape<nb::any, nb::any>``.
-
-.. cpp:var:: constexpr size_t any = (size_t) -1
+   ``nb::ndim<2>`` is equivalent to ``nb::shape<-1, -1>``.
 
 Contiguity
 ++++++++++

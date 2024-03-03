@@ -8,6 +8,8 @@
 */
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
+using ssize_t = std::make_signed_t<size_t>;
+
 NAMESPACE_BEGIN(detail)
 
 struct void_type { };

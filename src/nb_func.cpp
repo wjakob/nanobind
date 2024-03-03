@@ -1116,7 +1116,8 @@ static PyObject *nb_func_get_module(PyObject *self) {
 }
 
 PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
-    PyObject *docstr = nullptr, *item = nullptr, *sigstr = nullptr;
+    PyObject *docstr = nullptr, *item = nullptr, *sigstr = nullptr,
+             *defaults = nullptr;
 
     func_data *f = nb_func_data(self);
     uint32_t count = (uint32_t) Py_SIZE(self);
@@ -1125,7 +1126,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         return nullptr;
 
     for (uint32_t i = 0; i < count; ++i) {
-        docstr = item = sigstr = nullptr;
+        docstr = item = sigstr = defaults = nullptr;
 
         const func_data *fi = f + i;
         if (fi->flags & (uint32_t) func_flags::has_doc && fi->doc[0] != '\0') {
@@ -1136,18 +1137,22 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         }
 
         buf.clear();
-        uint32_t n_default_args = nb_func_render_signature(fi, true),
-                 pos = 2;
+        uint32_t n_default_args = nb_func_render_signature(fi, true);
 
-        item = PyTuple_New(2 + n_default_args);
+        item = PyTuple_New(3);
         sigstr = PyUnicode_FromString(buf.get());
-        if (!docstr || !sigstr || !item)
+        if (n_default_args) {
+            defaults = PyTuple_New(n_default_args);
+        } else {
+            defaults = Py_None;
+            Py_INCREF(defaults);
+        }
+
+        if (!docstr || !sigstr || !item || !defaults)
             goto fail;
 
-        NB_TUPLE_SET_ITEM(item, 0, sigstr);
-        NB_TUPLE_SET_ITEM(item, 1, docstr);
-
         if (n_default_args) {
+            size_t pos = 0;
             for (uint32_t j = 0; j < fi->nargs; ++j) {
                 const arg_data &arg = fi->args[j];
                 PyObject *value = arg.value;
@@ -1160,14 +1165,17 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
                 } else {
                     Py_INCREF(value);
                 }
-                NB_TUPLE_SET_ITEM(item, pos, value);
+                NB_TUPLE_SET_ITEM(defaults, pos, value);
                 pos++;
             }
+
+            check(pos == n_default_args,
+                  "__nb_signature__: default argument counting inconsistency!");
         }
 
-        check(pos == n_default_args + 2,
-              "__nb_signature__: default argument counting inconsistency!");
-
+        NB_TUPLE_SET_ITEM(item, 0, sigstr);
+        NB_TUPLE_SET_ITEM(item, 1, docstr);
+        NB_TUPLE_SET_ITEM(item, 2, defaults);
         NB_TUPLE_SET_ITEM(result, (Py_ssize_t) i, item);
     }
 
@@ -1176,6 +1184,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
 fail:
     Py_XDECREF(docstr);
     Py_XDECREF(sigstr);
+    Py_XDECREF(defaults);
     Py_XDECREF(item);
     Py_DECREF(result);
     return nullptr;

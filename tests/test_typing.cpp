@@ -41,7 +41,7 @@ NB_MODULE(test_typing_ext, m) {
     // Custom signature generation for classes and methods
     struct CustomSignature { int value; };
     nb::class_<CustomSignature>(
-        m, "CustomSignature", nb::sig("@my_decorator\nclass CustomSignature(Iterable[int])"))
+        m, "CustomSignature", nb::sig("@my_decorator\nclass CustomSignature(" NB_TYPING_ITERABLE "[int])"))
         .def("method", []{}, nb::sig("@my_decorator\ndef method(self: typing.Self)"))
         .def("method_with_default", [](CustomSignature&,bool){}, "value"_a.sig("bool(True)") = true)
         .def_rw("value", &CustomSignature::value,

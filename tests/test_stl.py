@@ -392,7 +392,7 @@ def test36_std_optional_copyable(clean):
     t.optional_copyable(t.Copyable())
     if sys.version_info < (3, 10):
         assert t.optional_copyable.__doc__ == (
-            "optional_copyable(x: Optional[test_stl_ext.Copyable]) -> None"
+            "optional_copyable(x: typing.Optional[test_stl_ext.Copyable]) -> None"
         )
     else:
         assert t.optional_copyable.__doc__ == (
@@ -408,7 +408,7 @@ def test37_std_optional_copyable_ptr(clean):
     t.optional_copyable_ptr(t.Copyable())
     if sys.version_info < (3, 10):
         assert t.optional_copyable_ptr.__doc__ == (
-            "optional_copyable_ptr(x: Optional[test_stl_ext.Copyable]) -> None"
+            "optional_copyable_ptr(x: typing.Optional[test_stl_ext.Copyable]) -> None"
         )
     else:
         assert t.optional_copyable_ptr.__doc__ == (
@@ -428,7 +428,7 @@ def test39_std_optional_ret_opt_movable(clean):
     assert t.optional_ret_opt_movable().value == 5
     if sys.version_info < (3, 10):
         assert t.optional_ret_opt_movable.__doc__ == (
-            "optional_ret_opt_movable() -> Optional[test_stl_ext.Movable]"
+            "optional_ret_opt_movable() -> typing.Optional[test_stl_ext.Movable]"
         )
     else:
         assert t.optional_ret_opt_movable.__doc__ == (
@@ -460,7 +460,7 @@ def test42_std_optional_unbound_type():
         assert method() is None
         if sys.version_info < (3, 10):
             assert method.__doc__ == (
-                f"{method_name}(x: Optional[int] = None) -> Optional[int]"
+                f"{method_name}(x: typing.Optional[int] = None) -> typing.Optional[int]"
             )
         else:
             assert method.__doc__ == (
@@ -496,7 +496,7 @@ def test44_std_variant_copyable_none(clean):
     t.variant_copyable_none(None)
     if sys.version_info < (3, 10):
         assert t.variant_copyable_none.__doc__ == (
-            "variant_copyable_none(x: Optional[Union[int, test_stl_ext.Copyable]]) -> None"
+            "variant_copyable_none(x: typing.Optional[Union[int, test_stl_ext.Copyable]]) -> None"
         )
     else:
         assert t.variant_copyable_none.__doc__ == (
@@ -532,7 +532,7 @@ def test46_std_variant_copyable_ptr_none(clean):
     t.variant_copyable_ptr_none(None)
     if sys.version_info < (3, 10):
         assert t.variant_copyable_ptr_none.__doc__ == (
-            "variant_copyable_ptr_none(x: Optional[Union[test_stl_ext.Copyable, int]]) -> None"
+            "variant_copyable_ptr_none(x: typing.Optional[Union[test_stl_ext.Copyable, int]]) -> None"
         )
     else:
         assert t.variant_copyable_ptr_none.__doc__ == (
@@ -575,8 +575,8 @@ def test49_std_variant_unbound_type():
     assert t.variant_unbound_type(5) == 5
     if sys.version_info < (3, 10):
         assert t.variant_unbound_type.__doc__ == (
-            "variant_unbound_type(x: Optional[Union[list, tuple, int]] = None)"
-            " -> Union[None, list, tuple, int]"
+            "variant_unbound_type(x: typing.Optional[typing.Union[list, tuple, int]] = None)"
+            " -> tyipng.Union[None, list, tuple, int]"
         )
     else:
         assert t.variant_unbound_type.__doc__ == (
@@ -590,7 +590,7 @@ def test50_map_return_movable_value():
         assert v.value == i
     if sys.version_info < (3, 9):
         assert t.map_return_movable_value.__doc__ == (
-            "map_return_movable_value() -> Dict[str, test_stl_ext.Movable]"
+            "map_return_movable_value() -> typing.Dict[str, test_stl_ext.Movable]"
         )
     else:
         assert t.map_return_movable_value.__doc__ == (
@@ -604,7 +604,7 @@ def test51_map_return_copyable_value():
         assert v.value == i
     if sys.version_info < (3, 9):
         assert t.map_return_copyable_value.__doc__ == (
-            "map_return_copyable_value() -> Dict[str, test_stl_ext.Copyable]"
+            "map_return_copyable_value() -> typing.Dict[str, test_stl_ext.Copyable]"
         )
     else:
         assert t.map_return_copyable_value.__doc__ == (

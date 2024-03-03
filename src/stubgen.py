@@ -208,44 +208,46 @@ class StubGen:
         sig_str = sig_str[:paren] + self.simplify_types(sig_str[paren:])
 
         # Substitute in string versions of the default arguments
-        for index, arg in enumerate(sig[2:]):
-            pos = -1
-            custom_signature = False
-            pattern = None
+        default_args = sig[2]
+        if default_args:
+            for index, arg in enumerate(default_args):
+                pos = -1
+                custom_signature = False
+                pattern = None
 
-            # First, handle the case where the user overrode the default value signature
-            if isinstance(arg, str):
-                pattern = f"\\={index}"
-                pos = sig_str.find(pattern, start)
-                if pos >= 0:
-                    custom_signature = True
+                # First, handle the case where the user overrode the default value signature
+                if isinstance(arg, str):
+                    pattern = f"\\={index}"
+                    pos = sig_str.find(pattern, start)
+                    if pos >= 0:
+                        custom_signature = True
 
-            # General case
-            if pos < 0:
-                pattern = f"\\{index}"
-                pos = sig_str.find(pattern, start)
+                # General case
+                if pos < 0:
+                    pattern = f"\\{index}"
+                    pos = sig_str.find(pattern, start)
 
-            if pos < 0:
-                raise Exception(
-                    "Could not locate default argument in function signature"
-                )
+                if pos < 0:
+                    raise Exception(
+                        "Could not locate default argument in function signature"
+                    )
 
-            if custom_signature:
-                arg_str = arg
-            else:
-                # Call expr_str to convert the default value to a string.
-                # Abbreviate with '...' if it is too long.
-                arg_str = self.expr_str(arg, abbrev=True)
-                if arg_str is None:
-                    arg_str = "..."
+                if custom_signature:
+                    arg_str = arg
+                else:
+                    # Call expr_str to convert the default value to a string.
+                    # Abbreviate with '...' if it is too long.
+                    arg_str = self.expr_str(arg, abbrev=True)
+                    if arg_str is None:
+                        arg_str = "..."
 
-            assert (
-                "\n" not in arg_str
-            ), "Default argument string may not contain newlines."
+                assert (
+                    "\n" not in arg_str
+                ), "Default argument string may not contain newlines."
 
-            assert pattern is not None
-            sig_str = sig_str[:pos] + arg_str + sig_str[pos + len(pattern) :]
-            start = pos + len(arg_str)
+                assert pattern is not None
+                sig_str = sig_str[:pos] + arg_str + sig_str[pos + len(pattern) :]
+                start = pos + len(arg_str)
 
         if type(fn).__name__ == "nb_func" and self.depth > 0:
             self.write_ln("@staticmethod")

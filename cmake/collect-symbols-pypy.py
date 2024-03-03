@@ -2,7 +2,7 @@ from urllib.request import urlopen
 import tarfile
 import subprocess
 
-funcs = set()
+funcs: "set[str]" = set()
 
 files = [
     ('https://downloads.python.org/pypy/pypy3.9-v7.3.11-macos_arm64.tar.bz2', 'pypy3.9-v7.3.11-macos_arm64/bin/libpypy3.9-c.dylib')

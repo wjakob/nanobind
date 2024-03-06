@@ -52,7 +52,6 @@ enum class type_flags : uint32_t {
     /// Instances of this type can be referenced by 'weakref'
     is_weak_referenceable    = (1 << 13),
 
-    // Five more flag bits available (12 through 18) without needing
     /// Indicate that a type refers to an enumeration
     is_enum                  = (1 << 14),
 

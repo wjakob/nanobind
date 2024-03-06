@@ -238,6 +238,14 @@ class StubGen:
             sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor)\[([^\]]*)\]"
         )
 
+        # Types which moved from typing.* to collections.abc in Python 3.9
+        self.abc_re = re.compile(
+            'typing.(AsyncGenerator|AsyncIterable|AsyncIterator|Awaitable|Callable|'
+            'Collection|Container|Coroutine|Generator|Hashable|ItemsView|'
+            'Iterable|Iterator|KeysView|Mapping|MappingView|MutableMapping|'
+            'MutableSequence|MutableSet|Sequence|ValuesView)'
+        )
+
         # Should we insert a dummy base class to handle enumerations?
         self.abstract_enum = False
         self.abstract_enum_arith = False
@@ -616,7 +624,8 @@ class StubGen:
           (with "from collections.abc import X" added at top)
 
         - "typing.X" -> "X"
-          (with "from typing import X" added at top)
+          (with "from typing import X" added at top, potentially
+           changed to 'collections.abc' on newer Python versions)
         """
 
         # Process nd-array type annotations so that MyPy accepts them
@@ -635,6 +644,9 @@ class StubGen:
                 return ndarray
 
         s = self.ndarray_re.sub(process_ndarray, s)
+
+        if sys.version_info >= (3, 9, 0):
+            s = self.abc_re.sub(r'collections.abc.\1', s)
 
         # Process other type names and add suitable import statements
         def process_general(m: Match[str]) -> str:

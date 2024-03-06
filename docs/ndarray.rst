@@ -172,8 +172,8 @@ Consider the following snippet, which fills a 2D array with data:
 .. code-block:: cpp
 
    void fill(nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu> arg) {
-       for (size_t i = 0; i < array.shape(0); ++i)
-           for (size_t j = 0; j < array.shape(1); ++j)
+       for (size_t i = 0; i < arg.shape(0); ++i)
+           for (size_t j = 0; j < arg.shape(1); ++j)
                arg(i, j) = /* ... */;
    }
 
@@ -194,7 +194,7 @@ An improved version of the example using such a view is shown below:
 .. code-block:: cpp
 
    void fill(nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu> arg) {
-       auto v = array.view(); /// <-- new!
+       auto v = arg.view(); /// <-- new!
 
        for (size_t i = 0; i < v.shape(0); ++i) // Important; use 'v' instead of 'arg' everywhere in loop
            for (size_t j = 0; j < v.shape(1); ++j)
@@ -210,7 +210,7 @@ view into its register file.
 
 .. code-block:: cpp
 
-   auto v = array.view();
+   auto v = arg.view();
    #pragma omp parallel for schedule(static) firstprivate(v)
    for (...) { /* parallel loop */ }
 
@@ -235,7 +235,7 @@ this type.
 
    void fill(nb::ndarray<nb::c_contig, nb::device::cpu> arg) {
        if (arg.dtype() == nb::dtype<float>() && arg.ndim() == 2) {
-           auto v = array.view<float, nb::ndim<2>>(); // <-- new!
+           auto v = arg.view<float, nb::ndim<2>>(); // <-- new!
 
            for (size_t i = 0; i < v.shape(0); ++i) {
                for (size_t j = 0; j < v.shape(1); ++j) {
@@ -436,7 +436,7 @@ annotations to determine whether or not a copy should be made. They are
 interpreted as follows:
 
 - :cpp:enumerator:`rv_policy::automatic` causes the array to be copied when it
-  has no owner and when ti is not already associated with a Python object.
+  has no owner and when it is not already associated with a Python object.
 
 - :cpp:enumerator:`rv_policy::automatic_reference` and
   :cpp:enumerator:`rv_policy::reference`

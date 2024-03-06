@@ -25,6 +25,11 @@ struct iterator_state {
     bool first_or_done;
 };
 
+template <typename T>
+struct remove_rvalue_ref { using type = T; };
+template <typename T>
+struct remove_rvalue_ref<T&&> { using type = T; };
+
 // Note: these helpers take the iterator by non-const reference because some
 // iterators in the wild can't be dereferenced when const.
 template <typename Iterator> struct iterator_access {
@@ -33,12 +38,21 @@ template <typename Iterator> struct iterator_access {
 };
 
 template <typename Iterator> struct iterator_key_access {
-    using result_type = const decltype((*std::declval<Iterator &>()).first) &;
+    // Note double parens in decltype((...)) to capture the value category
+    // as well. This will be lvalue if the iterator's operator* returned an
+    // lvalue reference, and xvalue if the iterator's operator* returned an
+    // object (or rvalue reference but that's unlikely). decltype of an xvalue
+    // produces T&&, but we want to return a value T from operator() in that
+    // case, in order to avoid creating a Python object that references a
+    // C++ temporary. Thus, pass the result through remove_rvalue_ref.
+    using result_type = typename remove_rvalue_ref<
+        decltype(((*std::declval<Iterator &>()).first))>::type;
     result_type operator()(Iterator &it) const { return (*it).first; }
 };
 
 template <typename Iterator> struct iterator_value_access {
-    using result_type = const decltype((*std::declval<Iterator &>()).second) &;
+    using result_type = typename remove_rvalue_ref<
+        decltype(((*std::declval<Iterator &>()).second))>::type;
     result_type operator()(Iterator &it) const { return (*it).second; }
 };
 

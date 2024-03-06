@@ -1,5 +1,14 @@
-from collections.abc import Mapping, Iterator
+from collections.abc import Iterator, Mapping
 from typing import overload
+
+class IdentityMap:
+    def __init__(self) -> None: ...
+
+    def __iter__(self) -> Iterator[int]: ...
+
+    def items(self) -> Iterator[tuple[int, int]]: ...
+
+    def values(self) -> Iterator[int]: ...
 
 class StringMap:
     @overload
@@ -14,6 +23,6 @@ class StringMap:
 
     def values(self) -> Iterator[str]: ...
 
-__all__: list = ['iterator_passthrough', 'StringMap']
+__all__: list = ['iterator_passthrough', 'StringMap', 'IdentityMap']
 
 def iterator_passthrough(arg: Iterator, /) -> Iterator: ...

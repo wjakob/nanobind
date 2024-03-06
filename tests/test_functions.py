@@ -439,3 +439,7 @@ def test40_nb_signature():
                 None,
             ),
         )
+
+
+def test42_ptr_return():
+    assert t.test_ptr_return() == (10, 100)

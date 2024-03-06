@@ -245,4 +245,61 @@ NB_MODULE(test_functions_ext, m) {
     static int imut = 10;
     static const int iconst = 100;
     m.def("test_ptr_return", []() { return std::make_pair(&imut, &iconst); });
+
+    // These are caught at compile time, uncomment and rebuild to verify:
+
+    // No nb::arg annotations:
+    //m.def("bad_args1", [](nb::args, int) {});
+
+    // kw_only in wrong place (1):
+    //m.def("bad_args2", [](nb::args, int) {}, nb::kw_only(), "args"_a, "i"_a);
+
+    // kw_only in wrong place (2):
+    //m.def("bad_args3", [](nb::args, int) {}, "args"_a, "i"_a, nb::kw_only());
+
+    // kw_only in wrong place (3):
+    //m.def("bad_args4", [](int, nb::kwargs) {}, "i"_a, "kwargs"_a, nb::kw_only());
+
+    // kw_only specified twice:
+    //m.def("bad_args5", [](int, int) {}, nb::kw_only(), "i"_a, nb::kw_only(), "j"_a);
+
+    m.def("test_args_kwonly",
+          [](int i, double j, nb::args args, int z) {
+              return nb::make_tuple(i, j, args, z);
+          }, "i"_a, "j"_a, "args"_a, "z"_a);
+    m.def("test_args_kwonly_kwargs",
+          [](int i, double j, nb::args args, int z, nb::kwargs kwargs) {
+              return nb::make_tuple(i, j, args, z, kwargs);
+          }, "i"_a, "j"_a, "args"_a, nb::kw_only(), "z"_a, "kwargs"_a);
+    m.def("test_kwonly_kwargs",
+          [](int i, double j, nb::kwargs kwargs) {
+              return nb::make_tuple(i, j, kwargs);
+          }, "i"_a, nb::kw_only(), "j"_a, "kwargs"_a);
+
+    m.def("test_kw_only_all",
+          [](int i, int j) { return nb::make_tuple(i, j); },
+          nb::kw_only(), "i"_a, "j"_a);
+    m.def("test_kw_only_some",
+          [](int i, int j, int k) { return nb::make_tuple(i, j, k); },
+          nb::arg(), nb::kw_only(), "j"_a, "k"_a);
+    m.def("test_kw_only_with_defaults",
+          [](int i, int j, int k, int z) { return nb::make_tuple(i, j, k, z); },
+          nb::arg() = 3, "j"_a = 4, nb::kw_only(), "k"_a = 5, "z"_a);
+    m.def("test_kw_only_mixed",
+          [](int i, int j) { return nb::make_tuple(i, j); },
+          "i"_a, nb::kw_only(), "j"_a);
+
+    struct kw_only_methods {
+        kw_only_methods(int _v) : v(_v) {}
+        int v;
+    };
+    nb::class_<kw_only_methods>(m, "kw_only_methods")
+        .def(nb::init<int>(), nb::kw_only(), "v"_a)
+        .def_rw("v", &kw_only_methods::v)
+        .def("method_2k",
+             [](kw_only_methods&, int i, int j) { return nb::make_tuple(i, j); },
+             nb::kw_only(), "i"_a = 1, "j"_a = 2)
+        .def("method_1p1k",
+             [](kw_only_methods&, int i, int j) { return nb::make_tuple(i, j); },
+             "i"_a = 1, nb::kw_only(), "j"_a = 2);
 }

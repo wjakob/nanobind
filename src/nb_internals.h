@@ -82,7 +82,7 @@ static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
 struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
-    uint32_t max_nargs_pos;
+    uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     bool complex_call;
 };
 

@@ -26,6 +26,15 @@ bool from_python_keep_alive(Caster &c, PyObject **args, uint8_t *args_flags,
     return true;
 }
 
+// Return the number of nb::arg and nb::arg_v types in the first I types Ts.
+// Invoke with std::make_index_sequence<sizeof...(Ts)>() to provide
+// an index pack 'Is' that parallels the types pack Ts.
+template <size_t I, typename... Ts, size_t... Is>
+constexpr size_t count_args_before_index(std::index_sequence<Is...>) {
+    static_assert(sizeof...(Is) == sizeof...(Ts));
+    return ((Is < I && (std::is_same_v<arg, Ts> || std::is_same_v<arg_v, Ts>)) + ... + 0);
+}
+
 template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
           typename... Args, size_t... Is, typename... Extra>
 NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
@@ -45,7 +54,9 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     (void) is;
 
-    // Detect locations of nb::args / nb::kwargs (if exists)
+    // Detect locations of nb::args / nb::kwargs (if they exist).
+    // Find the first and last occurrence of each; we'll later make sure these
+    // match, in order to guarantee there's only one instance.
     static constexpr size_t
         args_pos_1 = index_1_v<std::is_same_v<intrinsic_t<Args>, args>...>,
         args_pos_n = index_n_v<std::is_same_v<intrinsic_t<Args>, args>...>,
@@ -60,16 +71,59 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
+    constexpr bool has_arg_annotations = nargs_provided > 0 && !is_getter_det;
+
+    // Detect location of nb::kw_only annotation, if supplied. As with args/kwargs
+    // we find the first and last location and later verify they match each other.
+    // Note this is an index in Extra... while args/kwargs_pos_* are indices in
+    // Args... .
+    constexpr size_t
+        kwonly_pos_1 = index_1_v<std::is_same_v<kw_only, Extra>...>,
+        kwonly_pos_n = index_n_v<std::is_same_v<kw_only, Extra>...>;
+    // Arguments after nb::args are implicitly keyword-only even if there is no
+    // nb::kw_only annotation
+    constexpr bool explicit_kw_only = kwonly_pos_1 != sizeof...(Extra);
+    constexpr bool implicit_kw_only = args_pos_1 + 1 < kwargs_pos_1;
 
     // A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
         "Repeated use of nb::kwargs or nb::args in the function signature!");
-    static_assert(nargs_provided == 0 || nargs_provided + is_method_det == nargs || is_getter_det,
+    static_assert(!has_arg_annotations || nargs_provided + is_method_det == nargs,
         "The number of nb::arg annotations must match the argument count!");
     static_assert(kwargs_pos_1 == nargs || kwargs_pos_1 + 1 == nargs,
         "nb::kwargs must be the last element of the function signature!");
-    static_assert(args_pos_1 == nargs || args_pos_1 + 1 == kwargs_pos_1,
-        "nb::args must follow positional arguments and precede nb::kwargs!");
+    static_assert(args_pos_1 == nargs || args_pos_1 < kwargs_pos_1,
+        "nb::args must precede nb::kwargs if both are present!");
+    static_assert(has_arg_annotations || (!implicit_kw_only && !explicit_kw_only),
+        "Keyword-only arguments must have names!");
+
+    // Find the index in Args... of the first keyword-only parameter. Since
+    // the 'self' parameter doesn't get a nb::arg annotation, we must adjust
+    // by 1 for methods. Note that nargs_before_kw_only is only used if
+    // a kw_only annotation exists (i.e., if explicit_kw_only is true);
+    // the conditional is just to save the compiler some effort otherwise.
+    constexpr size_t nargs_before_kw_only =
+        explicit_kw_only
+            ? is_method_det + count_args_before_index<kwonly_pos_1, Extra...>(
+                  std::make_index_sequence<sizeof...(Extra)>())
+            : nargs;
+
+    if constexpr (explicit_kw_only) {
+        static_assert(kwonly_pos_1 == kwonly_pos_n,
+            "Repeated use of nb::kw_only annotation!");
+
+        // If both kw_only and *args are specified, kw_only must be
+        // immediately after the nb::arg for *args.
+        static_assert(args_pos_1 == nargs || nargs_before_kw_only == args_pos_1 + 1,
+            "Arguments after nb::args are implicitly keyword-only; any "
+            "nb::kw_only() annotation must be positioned to reflect that!");
+
+        // If both kw_only and **kwargs are specified, kw_only must be
+        // before the nb::arg for **kwargs.
+        static_assert(nargs_before_kw_only < kwargs_pos_1,
+            "Variadic nb::kwargs are implicitly keyword-only; any "
+            "nb::kw_only() annotation must be positioned to reflect that!");
+    }
 
     // Collect function signature information for the docstring
     using cast_out = make_caster<
@@ -96,8 +150,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
-              (nargs_provided &&
-               !is_getter_det       ? (uint32_t) func_flags::has_args       : 0);
+              (has_arg_annotations  ? (uint32_t) func_flags::has_args       : 0);
 
     /* Store captured function inside 'func_data_prelim' if there is space. Issues
        with aliasing are resolved via separate compilation of libnanobind. */
@@ -165,6 +218,21 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     f.descr = descr.text;
     f.descr_types = descr_types;
     f.nargs = nargs;
+
+    // Set nargs_pos to the number of C++ function parameters (Args...) that
+    // can be filled from Python positional arguments in a one-to-one fashion.
+    // This ends at:
+    // - the location of the variadic *args parameter, if present; otherwise
+    // - the location of the first keyword-only parameter, if any; otherwise
+    // - the location of the variadic **kwargs parameter, if present; otherwise
+    // - the end of the parameter list
+    // It's correct to give *args priority over kw_only because we verified
+    // above that kw_only comes afterward if both are present. It's correct
+    // to give kw_only priority over **kwargs because we verified above that
+    // kw_only comes before if both are present.
+    f.nargs_pos =   args_pos_1 < nargs ? args_pos_1 :
+                      explicit_kw_only ? nargs_before_kw_only :
+                  kwargs_pos_1 < nargs ? kwargs_pos_1 : nargs;
 
     // Fill remaining fields of 'f'
     size_t arg_index = 0;

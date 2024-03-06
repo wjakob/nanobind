@@ -334,8 +334,10 @@ Removed features include:
   executable or run several independent Python interpreters in the same process
   is unsupported. Nanobind caters to bindings only. Multi-interpreter support
   would require TLS lookups for nanobind data structures, which is undesirable.
-- ○ **Function binding annotations**: the ``kw_only`` / ``pos_only`` argument
-  annotations were removed.
+- ○ **Function binding annotations**: The ``pos_only`` argument
+  annotation was removed. However, the same behavior can be achieved by
+  creating unnamed arguments; see the discussion in the section on
+  :ref:`keyword-only arguments <kw_only>`.
 - ○ **Metaclasses**: creating types with custom metaclasses is unsupported.
 - ○ **Module-local bindings**: support was removed (both for types and exceptions).
 - ○ **Custom allocation**: C++ classes with an overloaded or deleted ``operator

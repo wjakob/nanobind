@@ -255,11 +255,10 @@ The class :cpp:class:`nb::args <args>` derives from :cpp:class:`nb::tuple
 <dict>`.
 
 You may also use them individually or even combine them with ordinary
-arguments. Note, however, that :cpp:class:`nb::args <args>` and
-:cpp:class:`nb::kwargs <kwargs>` must always be the last arguments of the
-function, and in that order if both are specified. This is a restriction
-compared to pybind11, which allowed more general arrangements. nanobind also
-lacks the ``kw_only`` and ``pos_only`` annotations available in pybind11.
+parameters. Note that :cpp:class:`nb::kwargs <kwargs>` must be the last
+parameter if it is specified, and any parameters after
+:cpp:class:`nb::args <args>` are implicitly :ref:`keyword-only <kw_only>`,
+just like in regular Python.
 
 .. _args_kwargs_2:
 
@@ -300,6 +299,66 @@ Here is an example use of the above extension in Python:
    >>> my_ext.my_call(x)
    (1, 'positional')
    {'keyword': 'value'}
+
+
+.. _kw_only:
+
+Keyword-only parameters
+-----------------------
+
+Python supports keyword-only parameters; these can't be filled positionally,
+thus requiring the caller to specify their name. They can be used
+to enforce more clarity at call sites if a function has
+multiple paramaters that could be confused with each other, or to accept
+named options alongside variadic ``*args``.
+
+.. code-block:: python
+
+    def example(val: int, *, check: bool) -> None:
+        # val can be passed either way; check must be given as a keyword arg
+        pass
+
+    example(val=42, check=True)   # good
+    example(check=False, val=5)   # good
+    example(100, check=True)      # good
+    example(200, False)           # TypeError:
+        # example() takes 1 positional argument but 2 were given
+
+    def munge(*args: int, invert: bool = False) -> int:
+        return sum(args) * (-1 if invert else 1)
+
+    munge(1, 2, 3)                # 6
+    munge(4, 5, 6, invert=True)   # -15
+
+nanobind provides a :cpp:struct:`nb::kw_only() <kw_only>` annotation
+that allows you to produce bindings that behave like these
+examples. It must be placed before the :cpp:struct:`nb::arg() <arg>`
+annotation for the first keyword-only parameter; you can think of it
+as equivalent to the bare ``*,`` in a Python function signature. For
+example, the above examples could be written in C++ as:
+
+.. code-block:: cpp
+
+    void example(int val, bool check);
+    int munge(nb::args args, bool invert);
+
+    m.def("example", &example,
+          nb::arg("val"), nb::kw_only(), nb::arg("check"));
+
+    // Parameters after *args are implicitly keyword-only:
+    m.def("munge", &munge,
+          nb::arg("args"), nb::arg("invert"));
+
+    // But you can be explicit about it too, as long as you put the
+    // kw_only annotation in the correct position:
+    m.def("munge", &munge,
+          nb::arg("args"), nb::kw_only(), nb::arg("invert"));
+
+.. note:: nanobind does *not* support the ``pos_only()`` argument annotation
+   provided by pybind11, which marks the parameters before it as positional-only.
+   However, a parameter can be made effectively positional-only by giving it
+   no name (using an empty :cpp:struct:`nb::arg() <arg>` specifier).
+
 
 .. _function_templates:
 

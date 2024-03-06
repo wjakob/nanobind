@@ -199,8 +199,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
     bool has_scope      = f->flags & (uint32_t) func_flags::has_scope,
          has_name       = f->flags & (uint32_t) func_flags::has_name,
          has_args       = f->flags & (uint32_t) func_flags::has_args,
-         has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
-         has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
          has_keep_alive = f->flags & (uint32_t) func_flags::has_keep_alive,
          has_doc        = f->flags & (uint32_t) func_flags::has_doc,
          has_signature  = f->flags & (uint32_t) func_flags::has_signature,
@@ -277,13 +275,13 @@ PyObject *nb_func_new(const void *in_) noexcept {
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
 
-    func->max_nargs_pos = f->nargs;
-    func->complex_call = has_args || has_var_args || has_var_kwargs || has_keep_alive;
+    func->max_nargs = f->nargs;
+    func->complex_call = f->nargs_pos < f->nargs || has_args || has_keep_alive;
 
     if (func_prev) {
         func->complex_call |= ((nb_func *) func_prev)->complex_call;
-        func->max_nargs_pos = std::max(func->max_nargs_pos,
-                                       ((nb_func *) func_prev)->max_nargs_pos);
+        func->max_nargs = std::max(func->max_nargs,
+                                   ((nb_func *) func_prev)->max_nargs);
 
         func_data *cur  = nb_func_data(func),
                   *prev = nb_func_data(func_prev);
@@ -299,7 +297,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         internals->funcs.erase(it);
     }
 
-    func->complex_call |= func->max_nargs_pos >= NB_MAXARGS_SIMPLE;
+    func->complex_call |= func->max_nargs >= NB_MAXARGS_SIMPLE;
 
     func->vectorcall = func->complex_call ? nb_func_vectorcall_complex
                                           : nb_func_vectorcall_simple;
@@ -507,7 +505,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     /* The following lines allocate memory on the stack, which is very efficient
        but also potentially dangerous since it can be used to generate stack
        overflows. We refuse unrealistically large number of 'kwargs' (the
-       'max_nargs_pos' value is fine since it is specified by the bindings) */
+       'max_nargs' value is fine since it is specified by the bindings) */
     if (nkwargs_in > 1024) {
         PyErr_SetString(PyExc_TypeError,
                         "nanobind::detail::nb_func_vectorcall(): too many (> "
@@ -523,9 +521,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     cleanup_list cleanup(self_arg);
 
     // Preallocate stack memory for function dispatch
-    size_t max_nargs_pos = ((nb_func *) self)->max_nargs_pos;
-    PyObject **args = (PyObject **) alloca(max_nargs_pos * sizeof(PyObject *));
-    uint8_t *args_flags = (uint8_t *) alloca(max_nargs_pos * sizeof(uint8_t));
+    size_t max_nargs = ((nb_func *) self)->max_nargs;
+    PyObject **args = (PyObject **) alloca(max_nargs * sizeof(PyObject *));
+    uint8_t *args_flags = (uint8_t *) alloca(max_nargs * sizeof(uint8_t));
     bool *kwarg_used = (bool *) alloca(nkwargs_in * sizeof(bool));
 
     /*  The logic below tries to find a suitable overload using two passes
@@ -535,7 +533,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
         The following is done per overload during a pass
 
-        1. Copy positional arguments while checking that named positional
+        1. Copy individual arguments while checking that named positional
            arguments weren't *also* specified as kwarg. Substitute missing
            entries using keyword arguments or default argument values provided
            in the bindings, if available.
@@ -563,8 +561,17 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                        has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
                        has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 
-            /// Number of positional arguments
-            size_t nargs_pos = f->nargs - has_var_args - has_var_kwargs;
+            // Number of C++ parameters eligible to be filled from individual
+            // Python positional arguments
+            size_t nargs_pos = f->nargs_pos;
+
+            // Number of C++ parameters in total, except for a possible trailing
+            // nb::kwargs. All of these are eligible to be filled from individual
+            // Python arguments (keyword always, positional until index nargs_pos)
+            // except for a potential nb::args, which exists at index nargs_pos
+            // if has_var_args is true. We'll skip that one in the individual-args
+            // loop, and go back and fill it later with the unused positionals.
+            size_t nargs_step1 = f->nargs - has_var_kwargs;
 
             if (nargs_in > nargs_pos && !has_var_args)
                 continue; // Too many positional arguments given for this overload
@@ -575,14 +582,24 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             memset(kwarg_used, 0, nkwargs_in * sizeof(bool));
 
-            // 1. Copy positional arguments, potentially substitute kwargs/defaults
+            // 1. Copy individual arguments, potentially substitute kwargs/defaults
             size_t i = 0;
-            for (; i < nargs_pos; ++i) {
+            for (; i < nargs_step1; ++i) {
+                if (has_var_args && i == nargs_pos)
+                    continue; // skip nb::args parameter, will be handled below
+
                 PyObject *arg = nullptr;
                 bool arg_convert  = pass == 1,
                      arg_none     = false;
 
-                if (i < nargs_in)
+                // If i >= nargs_pos, then this is a keyword-only parameter.
+                // (We skipped any *args parameter using the test above,
+                // and we set the bounds of nargs_step1 to not include any
+                // **kwargs parameter.) In that case we don't want to take
+                // a positional arg (which might validly exist and be
+                // destined for the *args) but we do still want to look for
+                // a matching keyword arg.
+                if (i < nargs_in && i < nargs_pos)
                     arg = args_in[i];
 
                 if (has_args) {
@@ -625,8 +642,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 args_flags[i] = arg_convert ? (uint8_t) cast_flags::convert : (uint8_t) 0;
             }
 
-            // Skip this overload if positional arguments were unavailable
-            if (i != nargs_pos)
+            // Skip this overload if any arguments were unavailable
+            if (i != nargs_step1)
                 continue;
 
             // Deal with remaining positional arguments
@@ -654,8 +671,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                         PyDict_SetItem(dict, key, args_in[nargs_in + j]);
                 }
 
-                args[nargs_pos + has_var_args] = dict;
-                args_flags[nargs_pos + has_var_args] = 0;
+                args[nargs_step1] = dict;
+                args_flags[nargs_step1] = 0;
                 cleanup.append(dict);
             } else if (kwargs_in) {
                 bool success = true;
@@ -944,11 +961,16 @@ static uint32_t nb_func_render_signature(const func_data *f,
                         break;
                     }
 
-                    if (has_var_args && arg_index + 1 + has_var_kwargs == f->nargs) {
+                    if (arg_index == f->nargs_pos) {
                         buf.put("*");
-                        buf.put_dstr(arg_name ? arg_name : "args");
-                        pc += 5; // strlen("tuple")
-                        break;
+                        if (has_var_args) {
+                            buf.put_dstr(arg_name ? arg_name : "args");
+                            pc += 5; // strlen("tuple")
+                            break;
+                        } else {
+                            buf.put(", ");
+                            // fall through to render the first keyword-only arg
+                        }
                     }
 
                     if (is_method && arg_index == 0) {
@@ -1026,7 +1048,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
                 arg_index++;
 
-                if (arg_index == f->nargs - has_var_args - has_var_kwargs && !has_args)
+                if (arg_index == f->nargs_pos && !has_args)
                     buf.put(", /");
 
                 break;

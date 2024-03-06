@@ -441,5 +441,128 @@ def test40_nb_signature():
         )
 
 
+def test41_kw_only():
+    # (i, j, *args, z)
+    assert t.test_args_kwonly(2, 2.5, z=22) == (2, 2.5, (), 22)
+    assert t.test_args_kwonly(2, 2.5, "a", "b", z=22) == (2, 2.5, ("a", "b"), 22)
+    assert t.test_args_kwonly(z=22, i=4, j=16) == (4, 16.0, (), 22)
+    assert (
+        t.test_args_kwonly.__doc__
+        == "test_args_kwonly(i: int, j: float, *args, z: int) -> tuple"
+    )
+    with pytest.raises(TypeError):
+        t.test_args_kwonly(2, 2.5, 22)  # missing z= keyword
+
+    # (i, j, *args, z, **kwargs)
+    assert t.test_args_kwonly_kwargs(i=1, k=4, j=10, z=-1, y=9) == (
+        1, 10, (), -1, {"k": 4, "y": 9}
+    )
+    assert t.test_args_kwonly_kwargs(1, 2, 3, 4, z=11, y=12) == (
+        1, 2, (3, 4), 11, {"y": 12}
+    )
+    with pytest.raises(TypeError):
+        t.test_args_kwonly_kwargs(1, 2, 3, 4, 5)
+    assert (
+        t.test_args_kwonly_kwargs.__doc__
+        == "test_args_kwonly_kwargs(i: int, j: float, *args, z: int, **kwargs) -> tuple"
+    )
+
+    # (i, *, j, **kwargs)
+    assert t.test_kwonly_kwargs(j=2, i=1) == (1, 2, {})
+    assert t.test_kwonly_kwargs(j=2, i=1, z=10) == (1, 2, {"z": 10})
+    assert t.test_kwonly_kwargs(1, j=2) == (1, 2, {})
+    assert t.test_kwonly_kwargs(1, j=2, z=10) == (1, 2, {"z": 10})
+    with pytest.raises(TypeError):
+        t.test_kwonly_kwargs(1, 2)
+    with pytest.raises(TypeError):
+        t.test_kwonly_kwargs(1, 2, j=3)
+    with pytest.raises(TypeError):
+        t.test_kwonly_kwargs(1, 2, z=10)
+    assert (
+        t.test_kwonly_kwargs.__doc__
+        == "test_kwonly_kwargs(i: int, *, j: float, **kwargs) -> tuple"
+    )
+
+    # (*, i, j)
+    assert t.test_kw_only_all(i=1, j=2) == (1, 2)
+    assert t.test_kw_only_all(j=1, i=2) == (2, 1)
+    with pytest.raises(TypeError):
+        t.test_kw_only_all(i=1)
+    with pytest.raises(TypeError):
+        t.test_kw_only_all(1, 2)
+    assert (
+        t.test_kw_only_all.__doc__
+        == "test_kw_only_all(*, i: int, j: int) -> tuple"
+    )
+
+    # (__arg0, *, j, k)
+    assert t.test_kw_only_some(1, k=3, j=2) == (1, 2, 3)
+    assert (
+        t.test_kw_only_some.__doc__
+        == "test_kw_only_some(arg0: int, *, j: int, k: int) -> tuple"
+    )
+
+    # (__arg0=3, j=4, *, k=5, z)
+    assert t.test_kw_only_with_defaults(z=8) == (3, 4, 5, 8)
+    assert t.test_kw_only_with_defaults(2, z=8) == (2, 4, 5, 8)
+    assert t.test_kw_only_with_defaults(2, j=7, k=8, z=9) == (2, 7, 8, 9)
+    assert t.test_kw_only_with_defaults(2, 7, z=9, k=8) == (2, 7, 8, 9)
+    with pytest.raises(TypeError):
+        t.test_kw_only_with_defaults(2, 7, 8, z=9)
+    assert (
+        t.test_kw_only_with_defaults.__doc__
+        == "test_kw_only_with_defaults(arg0: int = 3, j: int = 4, *, k: int = 5, z: int) -> tuple"
+    )
+
+    # (i, *, j)
+    assert t.test_kw_only_mixed(1, j=2) == (1, 2)
+    assert t.test_kw_only_mixed(j=2, i=3) == (3, 2)
+    assert t.test_kw_only_mixed(i=2, j=3) == (2, 3)
+    with pytest.raises(TypeError):
+        t.test_kw_only_mixed(i=1)
+    with pytest.raises(TypeError):
+        t.test_kw_only_mixed(1, i=2)
+    assert (
+        t.test_kw_only_mixed.__doc__
+        == "test_kw_only_mixed(i: int, *, j: int) -> tuple"
+    )
+
+    with pytest.raises(TypeError):
+        t.kw_only_methods(42)
+
+    val = t.kw_only_methods(v=42)
+    assert val.v == 42
+
+    # (self, *, i, j)
+    assert val.method_2k() == (1, 2)
+    assert val.method_2k(i=3) == (3, 2)
+    assert val.method_2k(j=4) == (1, 4)
+    assert val.method_2k(i=3, j=4) == (3, 4)
+    assert val.method_2k(j=3, i=4) == (4, 3)
+    with pytest.raises(TypeError):
+        val.method_2k(1)
+    with pytest.raises(TypeError):
+        val.method_2k(1, j=2)
+    assert (
+        t.kw_only_methods.method_2k.__doc__
+        == "method_2k(self, *, i: int = 1, j: int = 2) -> tuple"
+    )
+
+    # (self, i, *, j)
+    assert val.method_1p1k() == (1, 2)
+    assert val.method_1p1k(i=3) == (3, 2)
+    assert val.method_1p1k(j=4) == (1, 4)
+    assert val.method_1p1k(i=3, j=4) == (3, 4)
+    assert val.method_1p1k(j=3, i=4) == (4, 3)
+    assert val.method_1p1k(3) == (3, 2)
+    assert val.method_1p1k(3, j=4) == (3, 4)
+    with pytest.raises(TypeError):
+        val.method_2k(1, 2)
+    assert (
+        t.kw_only_methods.method_1p1k.__doc__
+        == "method_1p1k(self, i: int = 1, *, j: int = 2) -> tuple"
+    )
+
+
 def test42_ptr_return():
     assert t.test_ptr_return() == (10, 100)

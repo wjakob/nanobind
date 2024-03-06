@@ -155,6 +155,10 @@ noteworthy:
   nanobind versions but was awkward to use, as it required the user to provide
   a custom type formatter. This release makes the interface more convenient.
 
+* :ref:`Keyword-only arguments <kw_only>` are now supported, and can be
+  indicated using the new :cpp:struct:`nb::kw_only() <kw_only>` function
+  annotation. (PR `#448 <https://github.com/wjakob/nanobind/pull/448>`__).
+
 * ABI version 14.
 
 .. rubric:: Footnote

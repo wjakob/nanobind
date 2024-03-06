@@ -1739,6 +1739,30 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       This policy matches `automatic` but falls back to `reference` when the
       return value is a pointer.
 
+.. cpp:struct:: kw_only
+
+   Indicate that all following function parameters are keyword-only. This
+   may only be used if you supply an :cpp:struct:`arg` annotation for each
+   parameters, because keyword-only parameters are useless if they don't have
+   names. For example, if you write
+
+   .. code-block:: cpp
+
+      int some_func(int one, const char* two);
+
+      m.def("some_func", &some_func,
+            nb::arg("one"), nb::kw_only(), nb::arg("two"));
+
+   then in Python you can write ``some_func(42, two="hi")``, or
+   ``some_func(one=42, two="hi")``, but not ``some_func(42, "hi")``.
+
+   Just like in Python, any parameters appearing after variadic
+   :cpp:class:`*args <args>` are implicitly keyword-only. You don't
+   need to include the :cpp:struct:`kw_only` annotation in this case,
+   but if you do include it, it must be in the correct position:
+   immediately after the :cpp:struct:`arg` annotation for the variadic
+   :cpp:class:`*args <args>` parameter.
+
 .. cpp:struct:: template <typename T> for_getter
 
    When defining a property with a getter and a setter, you can use this to

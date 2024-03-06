@@ -60,6 +60,7 @@ struct is_operator {};
 struct is_arithmetic {};
 struct is_final {};
 struct is_generic {};
+struct kw_only {};
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
@@ -156,8 +157,20 @@ template <size_t Size> struct func_data_prelim {
     /// Supplementary flags
     uint32_t flags;
 
-    /// Total number of function call arguments
-    uint32_t nargs;
+    /// Total number of parameters accepted by the C++ function; nb::args
+    /// and nb::kwargs parameters are counted as one each. If the
+    /// 'has_args' flag is set, then there is one arg_data structure
+    /// for each of these.
+    uint16_t nargs;
+
+    /// Number of paramters to the C++ function that may be filled from
+    /// Python positional arguments without additional ceremony. nb::args and
+    /// nb::kwargs parameters are not counted in this total, nor are any
+    /// parameters after nb::args or after a nb::kw_only annotation.
+    /// The parameters counted here may be either named (nb::arg("name"))
+    /// or unnamed (nb::arg()). If unnamed, they are effectively positional-only.
+    /// nargs_pos is always <= nargs.
+    uint16_t nargs_pos;
 
     // ------- Extra fields -------
 
@@ -269,6 +282,9 @@ NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
     arg.convert = a.convert_;
     arg.none = a.none_;
 }
+
+template <typename F>
+NB_INLINE void func_extra_apply(F &, kw_only, size_t &) {}
 
 template <typename F, typename... Ts>
 NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t &) {}

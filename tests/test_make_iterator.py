@@ -33,3 +33,10 @@ def test04_passthrough_iterator():
     for d in data:
         m = t.StringMap(d)
         assert list(t.iterator_passthrough(m.values())) == list(m.values())
+
+
+def test05_iterator_returning_temporary():
+    im = t.IdentityMap()
+    assert list(im) == list(range(10))
+    assert list(im.values()) == list(range(10))
+    assert list(im.items()) == list(zip(range(10), range(10)))

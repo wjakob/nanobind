@@ -353,7 +353,26 @@ include directive:
 
       .. code-block:: cpp
 
-         nb::bind_vector<std::vector<MyType>, nb::rv_policy::reference_internal>();
+         nb::bind_vector<std::vector<MyType>,
+                         nb::rv_policy::reference_internal>(m, "ExampleVec");
+
+      Again, please avoid this if at all possible.
+      It is *very* easy to cause problems if you're not careful, as the
+      following example demonstrates.
+
+      .. code-block:: python
+
+         def looks_fine_but_crashes(vec: ext.ExampleVec) -> None:
+             # Trying to remove all the elements too much older than the last:
+             last = vec[-1]
+             # Even being careful to iterate backwards so we visit each
+             # index only once...
+             for idx in range(len(vec) - 2, -1, -1):
+                 if last.timestamp - vec[idx].timestamp > 5:
+                     del vec[idx]
+                     # Oops! After the first deletion, 'last' now refers to
+                     # uninitialized memory.
+
 
 .. _map_bindings:
 
@@ -459,13 +478,25 @@ nanobind API and requires an additional include directive:
 
       .. code-block:: cpp
 
-         nb::bind_map<std::map<MyKey, MyValue>, nb::rv_policy::reference_internal>();
+         nb::bind_map<std::map<std::string, SomeValue>,
+                      nb::rv_policy::reference_internal>(m, "ExampleMap");
 
       With a node-based container, the only situation where a reference
       returned from ``__getitem__`` would be invalidated is if the individual
       element that it refers to were removed from the map. Unlike with
       ``std::vector``, additions and removals of *other* elements would
       not present a danger.
+
+      It is still easy to cause problems if you're not careful, though:
+
+      .. code-block:: python
+
+         def unsafe_pop(map: ext.ExampleMap, key: str) -> ext.SomeValue:
+             value = map[key]
+             del map[key]
+             # Oops! `value` now points to a dangling element. Anything you
+             # do with it now is liable to crash the interpreter.
+             return value  # uh-oh...
 
 
 Unique pointer deleter

@@ -842,7 +842,7 @@ but once again each instantiation must be explicitly specified:
         template <typename V> T fn(V v);
     };
 
-    nb::class<MyClass<int>>(m, "MyClassT")
+    nb::class_<MyClass<int>>(m, "MyClassT")
         .def("fn", &MyClass<int>::fn<std::string>);
 
 .. _tag_based_polymorphism:
@@ -932,6 +932,52 @@ expected:
 
     >>> my_ext.make_pet(my_ext.PetKind.Dog)
     <my_ext.Dog object at 0x104da6ef0>
+
+Binding unions
+--------------
+
+:cpp:class:`nb::class_\<..\> <class_>` can also be used to provide bindings
+for `unions <https://en.cppreference.com/w/cpp/language/union>`__.
+A basic and useless example:
+
+.. code-block:: cpp
+
+   union Example {
+       int ival;
+       double dval;
+
+       std::string to_string(size_t active_idx) const {
+           return active_idx == 1 ? std::to_string(dval) : std::to_string(ival);
+       }
+   };
+   static_assert(sizeof(Example) == sizeof(double));
+
+   nb::class_<Example>(m, "Example")
+       .def_rw("ival", &Example::ival)
+       .def_rw("dval", &Example::dval)
+       .def("to_string", &Example::to_string);
+
+.. code-block:: pycon
+
+   >>> u = my_ext.Example()
+   >>> u.ival = 42
+   >>> u.to_string(0)
+   '42'
+   >>> u.dval = 1.25
+   >>> u.to_string(1)
+   '1.250000'
+
+Direct binding of union variant members is only safe if all members of the
+union are trivially copyable types (as in this example), but more complex
+unions can also be supported by binding lambdas or member functions that
+enforce the necessary invariants.
+
+This is a low-level feature and should be used with care; even when all
+members are trivially copyable, reading from a union member
+other than the most recently written one produces undefined behavior
+in C++. Unless you need to bind an existing API that uses union types,
+you're probably better off using ``std::variant<..>``, which knows what
+member is active and can thus enforce all the ncessary invariants for you.
 
 Pickling
 --------

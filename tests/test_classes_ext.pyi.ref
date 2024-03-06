@@ -186,6 +186,21 @@ class StructWithWeakrefsAndDynamicAttrs(Struct):
 class Subclass:
     pass
 
+class Union:
+    def __init__(self) -> None: ...
+
+    @property
+    def i(self) -> int: ...
+
+    @i.setter
+    def i(self, arg: int, /) -> None: ...
+
+    @property
+    def f(self) -> float: ...
+
+    @f.setter
+    def f(self, arg: float, /) -> None: ...
+
 class Wrapper:
     def __init__(self) -> None: ...
 

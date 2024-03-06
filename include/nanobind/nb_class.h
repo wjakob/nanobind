@@ -572,7 +572,8 @@ public:
     template <typename C, typename D, typename... Extra>
     NB_INLINE class_ &def_rw(const char *name, D C::*p,
                              const Extra &...extra) {
-        static_assert(std::is_base_of_v<C, T>,
+        // Unions never satisfy is_base_of, thus the is_same alternative
+        static_assert(std::is_base_of_v<C, T> || std::is_same_v<C, T>,
                       "def_rw() requires a (base) class member!");
 
         using Q =
@@ -604,7 +605,8 @@ public:
     template <typename C, typename D, typename... Extra>
     NB_INLINE class_ &def_ro(const char *name, D C::*p,
                              const Extra &...extra) {
-        static_assert(std::is_base_of_v<C, T>,
+        // Unions never satisfy is_base_of, thus the is_same alternative
+        static_assert(std::is_base_of_v<C, T> || std::is_same_v<C, T>,
                       "def_ro() requires a (base) class member!");
 
         def_prop_ro(name,

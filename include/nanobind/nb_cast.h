@@ -11,7 +11,9 @@
     using Value = Value_;                                                      \
     static constexpr auto Name = descr;                                        \
     template <typename T_> using Cast = movable_cast_t<T_>;                    \
-    static handle from_cpp(Value *p, rv_policy policy, cleanup_list *list) {   \
+    template <typename T_,                                                     \
+              enable_if_t<std::is_same_v<std::remove_cv_t<T_>, Value>> = 0>    \
+    static handle from_cpp(T_ *p, rv_policy policy, cleanup_list *list) {      \
         if (!p)                                                                \
             return none().release();                                           \
         return from_cpp(*p, policy, list);                                     \

@@ -241,4 +241,8 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_del_list", [](nb::list l) { nb::del(l[2]); });
     m.def("test_del_dict", [](nb::dict l) { nb::del(l["a"]); });
+
+    static int imut = 10;
+    static const int iconst = 100;
+    m.def("test_ptr_return", []() { return std::make_pair(&imut, &iconst); });
 }

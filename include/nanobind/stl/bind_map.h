@@ -31,14 +31,22 @@ inline void map_set(Map &m, const Key &k, const Value &v) {
 
 NAMESPACE_END(detail)
 
-template <typename Map, typename... Args>
+template <typename Map,
+          rv_policy getitem_policy = rv_policy::automatic_reference,
+          typename... Args>
 class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Key = typename Map::key_type;
     using Value = typename Map::mapped_type;
 
-    static_assert(!detail::is_base_caster_v<detail::make_caster<Value>> ||
-                      detail::is_copy_constructible_v<Value>,
-                  "bind_map(): the value type must be copy-constructible.");
+    using ValueRef = typename detail::iterator_value_access<typename Map::iterator>::result_type;
+
+    static_assert(
+        !detail::is_base_caster_v<detail::make_caster<Value>> ||
+        detail::is_copy_constructible_v<Value> ||
+        (getitem_policy != rv_policy::automatic_reference &&
+         getitem_policy != rv_policy::copy),
+        "bind_map(): the generated __getitem__ would copy elements, so the "
+        "value type must be copy-constructible");
 
     handle cl_cur = type<Map>();
     if (cl_cur.is_valid()) {
@@ -75,12 +83,12 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
              keep_alive<0, 1>())
 
         .def("__getitem__",
-             [](Map &m, const Key &k) -> Value & {
+             [](Map &m, const Key &k) -> ValueRef {
                  auto it = m.find(k);
                  if (it == m.end())
                      throw key_error();
-                 return it->second;
-             }, std::is_pointer_v<Value> ? rv_policy::take_ownership : rv_policy::copy)
+                 return (*it).second;
+             }, getitem_policy)
 
         .def("__delitem__",
             [](Map &m, const Key &k) {

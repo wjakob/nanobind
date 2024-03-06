@@ -176,7 +176,7 @@ include directive:
 
    #include <nanobind/stl/bind_vector.h>
 
-.. cpp:function:: template <typename Vector, typename... Args> class_<Vector> bind_vector(handle scope, const char * name, Args &&...args)
+.. cpp:function:: template <typename Vector, rv_policy getitem_policy = rv_policy::automatic_reference, typename... Args> class_<Vector> bind_vector(handle scope, const char * name, Args &&...args)
 
    Bind the STL vector-derived type `Vector` to the identifier `name` and
    place it in `scope` (e.g., a :cpp:class:`module_`). The variable argument
@@ -217,7 +217,7 @@ include directive:
         - Assign an element in the list (supports negative indexing)
       * - ``__delitem__(self, arg: int)``
         - Delete an item from the list (supports negative indexing)
-      * - ``__setitem__(self, arg: slice) -> Vector``
+      * - ``__getitem__(self, arg: slice) -> Vector``
         - Slice-based getter
       * - ``__setitem__(self, arg0: slice, arg1: Value)``
         - Slice-based assignment
@@ -327,10 +327,35 @@ include directive:
          <intrusive>`, the added indirection and ownership tracking removes the
          need for extra copies.
 
-     You should **never** use this class to bind pointer-valued vectors
-     ``std::vector<T*>`` when ``T`` does not use intrusive reference counting.
-     Some kind of ownership tracking (points 2 and 3 of the above list) is
-     needed in this case.
+         (It is usually unsafe to use this class to bind pointer-valued
+         vectors ``std::vector<T*>`` when ``T`` does not use intrusive
+         reference counting, because then there is nothing to prevent the Python
+         objects returned by ``__getitem__`` from outliving the C++ ``T``
+         objects that they point to. But if you are able to guarantee through
+         other means that the ``T`` objects will live long enough, the intrusive
+         reference counting is not strictly required.)
+
+   .. note::
+
+      Previous versions of nanobind (before 2.0) and pybind11 would instead
+      return Python objects from ``__getitem__`` that wrapped *references*,
+      meaning that they were only safe to use until the next insertion or
+      deletion in the vector they were drawn from. As discussed above, any
+      use after that point could **corrupt memory or crash your program**,
+      which is why reference semantics are no longer the default.
+
+      If you truly need the unsafe reference semantics, and you
+      promise that everyone who uses your bindings will be mindful
+      of the memory layout and reference-invalidation rules of the
+      underlying C++ container type, you can request the old behavior
+      by passing a second template argument of
+      :cpp:enumerator:`rv_policy::reference_internal` to
+      :cpp:func:`bind_vector`. This will override nanobind's usual
+      choice of :cpp:enumerator:`rv_policy::copy` for ``__getitem__``.
+
+      .. code-block:: cpp
+
+         nb::bind_vector<std::vector<MyType>, nb::rv_policy::reference_internal>();
 
 .. _map_bindings:
 
@@ -345,7 +370,7 @@ nanobind API and requires an additional include directive:
 
    #include <nanobind/stl/bind_map.h>
 
-.. cpp:function:: template <typename Map, typename... Args> class_<Map> bind_map(handle scope, const char * name, Args &&...args)
+.. cpp:function:: template <typename Map, rv_policy getitem_policy = rv_policy::automatic_reference, typename... Args> class_<Map> bind_map(handle scope, const char * name, Args &&...args)
 
    Bind the STL map-derived type `Map` (ordered or unordered) to the identifier
    `name` and place it in `scope` (e.g., a :cpp:class:`module_`). The variable
@@ -419,6 +444,30 @@ nanobind API and requires an additional include directive:
       Please refer to the :ref:`STL vector bindings <vector_bindings>` for a
       discussion of the problem and possible solutions. Everything applies
       equally to the map case.
+
+   .. note::
+
+      Unlike ``std::vector``, the ``std::map`` and ``std::unordered_map``
+      containers are *node-based*, meaning their elements do have a
+      consistent address for as long as they're stored in the map.
+      (Note that this is generally *not* true of third-party containers
+      with similar interfaces, such as ``absl::flat_hash_map``.)
+
+      If you are binding a node-based container type, and you want
+      ``__getitem__`` to return a reference to the accessed element
+      rather than copying it, it is *somewhat* safer than it would
+      be with :cpp:func:`bind_vector` to use the unsafe workaround
+      discussed there:
+
+      .. code-block:: cpp
+
+         nb::bind_map<std::map<MyKey, MyValue>, nb::rv_policy::reference_internal>();
+
+      With a node-based container, the only situation where a reference
+      returned from ``__getitem__`` would be invalidated is if the individual
+      element that it refers to were removed from the map. Unlike with
+      ``std::vector``, additions and removals of *other* elements would
+      not present a danger.
 
 
 Unique pointer deleter

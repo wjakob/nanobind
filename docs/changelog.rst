@@ -136,7 +136,7 @@ noteworthy:
 * The :cpp:func:`nb::bind_vector\<T\>() <bind_vector>` and
   :cpp:func:`nb::bind_map\<T\>() <bind_map>` interfaces were found to be
   severely flawed since element access (``__getitem__``) created views into the
-  internal state of the STL type that was not stable across subsequent
+  internal state of the STL type that were not stable across subsequent
   modifications.
 
   This could lead to unexpected changes to array elements and undefined

@@ -566,4 +566,13 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<StructWithWeakrefsAndDynamicAttrs, Struct>(m, "StructWithWeakrefsAndDynamicAttrs",
                nb::is_weak_referenceable(), nb::dynamic_attr())
         .def(nb::init<int>());
+
+    union Union {
+        int i;
+        float f;
+    };
+    nb::class_<Union>(m, "Union")
+        .def(nb::init<>())
+        .def_rw("i", &Union::i)
+        .def_rw("f", &Union::f);
 }

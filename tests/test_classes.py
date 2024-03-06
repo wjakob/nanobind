@@ -798,3 +798,14 @@ def test42_weak_references():
     gc.collect()
     gc.collect()
     assert w() is None
+
+
+def test43_union():
+    import struct
+
+    u = t.Union()
+    u.i = 42
+    assert u.i == 42
+
+    u.f = 2.125
+    assert u.f == 2.125

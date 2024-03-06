@@ -321,9 +321,11 @@ include directive:
          ``std::vector<std::shared_ptr<T>>``), the added
          indirection and ownership tracking removes the need for extra copies.
 
-      3. If the array contains pointers (e.g., ``std::vector<T*>``) and ``T``
-         uses :ref:`intrusive reference counting <intrusive>`, the added
-         indirection and ownership tracking removes the need for extra copies.
+      3. If the array contains pointers to reference-counted objects (e.g.,
+         ``std::vector<ref<T>>`` via the :cpp:class:`ref` wrapper) and ``T``
+         uses the intrusive reference counting approach explained :ref:`here
+         <intrusive>`, the added indirection and ownership tracking removes the
+         need for extra copies.
 
      You should **never** use this class to bind pointer-valued vectors
      ``std::vector<T*>`` when ``T`` does not use intrusive reference counting.

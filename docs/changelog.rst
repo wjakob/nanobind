@@ -122,7 +122,7 @@ This required work on three fronts:
      the entire function signature.
 
    * Finally, nanobind's stub generator supports :ref:`pattern files
-     <pattern_files>` containing custom stub replacement rules.This catch-all
+     <pattern_files>` containing custom stub replacement rules. This catch-all
      solution addresses the needs of advanced binding projects, for which the
      above list of features may still not be sufficient.
 

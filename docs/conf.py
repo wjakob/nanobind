@@ -39,7 +39,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "nanobind"
-copyright = "2023, Wenzel Jakob"
+copyright = "2023\u2009\u2013\u20092024, Wenzel Jakob"
 author = "Wenzel Jakob"
 
 # The version info for the project you're documenting, acts as replacement for

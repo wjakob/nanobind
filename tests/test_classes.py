@@ -809,3 +809,9 @@ def test43_union():
 
     u.f = 2.125
     assert u.f == 2.125
+
+def test44_dynamic_attr_has_dict():
+    s = t.StructWithAttr(5)
+    assert s.__dict__ == {}
+    s.a_dynamic_attr = 101
+    assert s.__dict__ == {"a_dynamic_attr": 101}

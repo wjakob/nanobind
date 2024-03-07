@@ -36,6 +36,11 @@ static PyObject **nb_weaklist_ptr(PyObject *self) {
     return weaklistoffset ? (PyObject **) ((uint8_t *) self + weaklistoffset) : nullptr;
 }
 
+static PyGetSetDef inst_getset[] = {
+    { "__dict__", PyObject_GenericGetDict, PyObject_GenericSetDict, nullptr, nullptr },
+    { nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
 static int inst_clear(PyObject *self) {
     PyObject **dict = nb_dict_ptr(self);
     if (dict)
@@ -1008,8 +1013,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     bool has_traverse = false;
-    for (PyType_Slot *ts = slots; ts != s; ++ts)
+    bool has_getset = false;
+    for (PyType_Slot *ts = slots; ts != s; ++ts) {
         has_traverse |= ts->slot == Py_tp_traverse;
+        has_getset |= ts->slot == Py_tp_getset;
+    }
 
     Py_ssize_t dictoffset = 0, weaklistoffset = 0;
     int num_members = 0;
@@ -1033,6 +1041,10 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             has_traverse = true;
         }
         spec.basicsize = (int) basicsize;
+
+        if (!has_getset) {
+            *s++ = { Py_tp_getset, (void *) inst_getset };
+        }
     }
 
     if (is_weak_referenceable) {

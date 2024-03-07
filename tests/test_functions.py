@@ -437,3 +437,9 @@ def test40_nb_signature():
                 None,
             ),
         )
+
+
+def test41_any():
+    s = "hello"
+    assert t.test_any(s) is s
+    assert t.test_any.__doc__ == "test_any(arg: typing.Any, /) -> typing.Any"

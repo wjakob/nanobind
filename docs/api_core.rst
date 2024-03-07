@@ -1134,6 +1134,10 @@ Wrapper classes
 
    Variable keyword argument keyword list for use in function argument declarations.
 
+.. cpp:class:: any : public object
+
+   This wrapper class represents Python ``typing.Any``-typed values.
+
 Parameterized wrapper classes
 -----------------------------
 

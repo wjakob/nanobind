@@ -241,4 +241,6 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_del_list", [](nb::list l) { nb::del(l[2]); });
     m.def("test_del_dict", [](nb::dict l) { nb::del(l["a"]); });
+
+    m.def("test_any", [](nb::any a) { return a; } );
 }

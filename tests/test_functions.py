@@ -566,3 +566,8 @@ def test41_kw_only():
 
 def test42_ptr_return():
     assert t.test_ptr_return() == (10, 100)
+
+def test41_any():
+    s = "hello"
+    assert t.test_any(s) is s
+    assert t.test_any.__doc__ == "test_any(arg: typing.Any, /) -> typing.Any"

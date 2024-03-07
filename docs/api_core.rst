@@ -34,7 +34,7 @@ Macros
 .. c:macro:: NB_MAKE_OPAQUE(T)
 
    The macro registers a partial template specialization pattern for the type
-   `T` that marks it as *opaque*, mening that nanobind won't try to run its
+   `T` that marks it as *opaque*, meaning that nanobind won't try to run its
    type casting template machinery on it.
 
    This is useful when trying to register a binding for `T` that is simultaneously
@@ -1139,6 +1139,13 @@ Wrapper classes
 .. cpp:class:: kwargs : public dict
 
    Variable keyword argument keyword list for use in function argument declarations.
+
+.. cpp:class:: any : public object
+
+   This wrapper class represents Python ``typing.Any``-typed values. On the C++
+   end, this type is interchangeable with :py:class:`object`. The only
+   difference is the type signature when used in function arguments and return
+   values.
 
 Parameterized wrapper classes
 -----------------------------

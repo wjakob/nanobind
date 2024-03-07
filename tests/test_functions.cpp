@@ -293,6 +293,7 @@ NB_MODULE(test_functions_ext, m) {
         kw_only_methods(int _v) : v(_v) {}
         int v;
     };
+
     nb::class_<kw_only_methods>(m, "kw_only_methods")
         .def(nb::init<int>(), nb::kw_only(), "v"_a)
         .def_rw("v", &kw_only_methods::v)
@@ -302,4 +303,6 @@ NB_MODULE(test_functions_ext, m) {
         .def("method_1p1k",
              [](kw_only_methods&, int i, int j) { return nb::make_tuple(i, j); },
              "i"_a = 1, nb::kw_only(), "j"_a = 2);
+
+    m.def("test_any", [](nb::any a) { return a; } );
 }

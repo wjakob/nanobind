@@ -287,6 +287,16 @@ You may also extend parameterized forms of such generic types:
 
 nanobind's stub generator will render this as ``class Subclass(Wrapper[Foo]):``.
 
+Any-typed return values
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The return value of a function can sometimes be unclear (dynamic), in which
+case it can be helpful to declare ``typing.Any`` as a pragmatic return type
+(this effectively disables analysis of the return value in static type
+checkers). nanobind provides a :py:class:`nb::any <any>` wrapper type that is
+equivalent to :py:class:`nb::object <object>` except that its type signature
+renders as ``typing.Any`` to facilitate this.
+
 .. _stubs:
 
 Stub generation

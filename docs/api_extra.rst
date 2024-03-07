@@ -1340,3 +1340,7 @@ include directive:
    Analogousto :cpp:func:`type_var`, create a `type variable tuple
    <https://docs.python.org/3/library/typing.html#typing.TypeVarTuple>`__
    (i.e., an instance of ``typing.TypeVarTuple``).
+
+.. cpp:function:: object any_type()
+
+   Convenience wrapper, which returns ``typing.Any``.

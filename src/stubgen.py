@@ -233,10 +233,27 @@ class StubGen:
             + sep_after
         )
 
-        # Precompile RE to extract nanobind nd-arrays
-        self.ndarray_re = re.compile(
-            sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor)\[([^\]]*)\]"
+        # Precompile RE to extract known nd-arrays
+        self.known_ndarray_re = re.compile(
+            sep_before
+            + "("
+            + "|".join(
+                [
+                    r"numpy\.ndarray",
+                    r"torch\.Tensor",
+                    r"tensorflow\.python\.framework\.ops\.EagerTensor",
+                    r"jaxlib\.xla_extension\.DeviceArray",
+                ]
+            )
+            + ")"
+            + r"\[([^\]]*)\]"
         )
+
+        # Precompile RE to extract nanobind nd-arrays
+        self.nb_ndarray_re = re.compile(sep_before + "(ndarray)" + r"\[([^\]]*)\]")
+
+        # Insert ndarray class
+        self.ndarray_class = False
 
         # Types which moved from typing.* to collections.abc in Python 3.9
         self.abc_re = re.compile(
@@ -618,7 +635,10 @@ class StubGen:
 
         - "NoneType" -> "None"
 
-        - "ndarray[...]" -> "Annotated[ArrayLike, dict(...)]"
+        - "<numpy|torch|tensorflow|jax array>[...]" -> "Annotated[<array>, dict(...)]"
+
+        - "ndarray[...]" -> "Annotated[NDArray, dict(...)]"
+          (with array protocol class added at top)
 
         - "collections.abc.X" -> "X"
           (with "from collections.abc import X" added at top)
@@ -628,22 +648,62 @@ class StubGen:
            changed to 'collections.abc' on newer Python versions)
         """
 
-        # Process nd-array type annotations so that MyPy accepts them
-        def process_ndarray(m: Match[str]) -> str:
-            s = m.group(2)
+        # Process nd-array type annotations with metadata
+        def process_known_ndarray(m: re.Match) -> str:
+            ndarray_type = m.group(1)
+            meta = m.group(2)
 
-            ndarray = self.import_object("numpy.typing", "ArrayLike")
-            assert ndarray
-            s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
-            s = s.replace("*", "None")
+            if not meta:
+                return ndarray_type
 
-            if s:
+            if ndarray_type == "numpy.ndarray":
+                dm = re.search(r"dtype=([\w]*)\b", meta)
+                if dm and dm.group(1):
+                    dtype = dm.group(1).replace("bool", "bool_")
+                    ndarray_type = f"numpy.typing.NDArray[numpy.{dtype}]"
+
+            meta = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", meta)
+            meta = meta.replace("*", "None")
+
+            if sys.version_info >= (3, 9, 0):
                 annotated = self.import_object("typing", "Annotated")
-                return f"{annotated}[{ndarray}, dict({s})]"
             else:
-                return ndarray
+                annotated = self.import_object("typing_extensions", "Annotated")
+            return f"{annotated}[{ndarray_type}, dict({meta})]"
 
-        s = self.ndarray_re.sub(process_ndarray, s)
+        s = self.known_ndarray_re.sub(process_known_ndarray, s)
+
+        # Process nb-ndarray type annotations with metadata
+        def process_nb_ndarray(m: re.Match) -> str:
+            ndarray_type = "NDArray"
+            meta = m.group(2)
+
+            self.ndarray_class = True
+
+            self.import_object("typing", "Protocol")
+            if sys.version_info >= (3, 12, 0):
+                self.import_object("collections.abc", "Buffer")
+            else:
+                self.import_object("typing_extensions", "Buffer")
+                if sys.version_info >= (3, 10, 0):
+                    self.import_object("typing", "TypeAlias")
+                else:
+                    self.import_object("typing", "Union")
+                    self.import_object("typing_extensions", "TypeAlias")
+
+            if not meta:
+                return ndarray_type
+
+            meta = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", meta)
+            meta = meta.replace("*", "None")
+
+            if sys.version_info >= (3, 9, 0):
+                annotated = self.import_object("typing", "Annotated")
+            else:
+                annotated = self.import_object("typing_extensions", "Annotated")
+            return f"{annotated}[{ndarray_type}, dict({meta})]"
+
+        s = self.nb_ndarray_re.sub(process_nb_ndarray, s)
 
         if sys.version_info >= (3, 9, 0):
             s = self.abc_re.sub(r'collections.abc.\1', s)
@@ -1070,12 +1130,31 @@ class StubGen:
                 s += items_v0 if len(items_v0) <= 70 else items_v1
         if s:
             s += "\n"
+        s += self.put_ndarray_class()
         s += self.put_abstract_enum_class()
 
         # Append the main generated stub
         s += self.output
 
         return s.rstrip() + "\n"
+
+    def put_ndarray_class(self) -> str:
+        s = ""
+        if not self.ndarray_class:
+            return s
+
+        s += "class DLPackBuffer(Protocol):\n"
+        s += "    def __dlpack__(self) -> object: ...\n"
+        s += "\n"
+        if sys.version_info >= (3, 12, 0):
+            s += "type NDArray = Buffer | DLPackBuffer\n"
+        elif sys.version_info >= (3, 10, 0):
+            s += "NDArray: TypeAlias = Buffer | DLPackBuffer\n"
+        else:
+            s += "NDArray: TypeAlias = Union[Buffer, DLPackBuffer]\n"
+        s += "\n"
+
+        return s
 
     def put_abstract_enum_class(self) -> str:
         s = ""

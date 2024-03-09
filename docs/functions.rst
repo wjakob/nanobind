@@ -104,7 +104,7 @@ The same experiment now fails with a ``TypeError``:
    Invoked with types: int
 
 You may, of course, combine this with the ``_a`` shorthand notation (see the
-section on :ref:`keyword arguments <keyword_and_default_args>`) or use specify
+section on :ref:`keyword arguments <keyword_and_default_args>`) or specify
 *unnamed* non-converting arguments using :cpp:func:`nb::arg().noconvert()
 <arg::noconvert>`.
 

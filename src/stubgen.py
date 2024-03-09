@@ -63,6 +63,7 @@ import types
 import typing
 from dataclasses import dataclass
 from typing import Dict, Sequence, List, Optional, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal
+from pathlib import Path
 import re
 import sys
 
@@ -112,7 +113,7 @@ NbGetterSetterSignature = Tuple[str, str]
 
 class NamedObject(Protocol):
     """
-    Typing protocol representing a an object with __name__ and __module__ members
+    Typing protocol representing an object with __name__ and __module__ members
     """
     __module__: str
     __name__: str
@@ -152,7 +153,7 @@ class NbType(Protocol):
 class ReplacePattern:
     """
     A compiled query (regular expression) and replacement pattern. Patterns can
-    be loaded using the ``load_pattern_file()`` function dfined below
+    be loaded using the ``load_pattern_file()`` function defined below
     """
 
     # A replacement patterns as produced by ``load_pattern_file()`` below
@@ -165,18 +166,24 @@ class StubGen:
     def __init__(
         self,
         module: types.ModuleType,
+        recursive: bool = False,
         include_docstrings: bool = True,
         include_private: bool = False,
         include_internal_imports: bool = True,
         include_external_imports: bool = False,
         max_expr_length: int = 50,
         patterns: List[ReplacePattern] = [],
+        quiet: bool = True,
+        output_file: Optional[Path] = None
     ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
 
         # Include docstrings in the generated stub?
         self.include_docstrings = include_docstrings
+
+        # Recurse into submodules?
+        self.recursive = recursive
 
         # Include private members that start or end with a single underscore?
         self.include_private = include_private
@@ -192,6 +199,12 @@ class StubGen:
 
         # Replacement patterns as produced by ``load_pattern_file()`` below
         self.patterns = patterns
+
+        # Set this to ``True`` if output to stdout is unacceptable
+        self.quiet = quiet
+
+        # Target filename, only needed for recursive stub generation
+        self.output_file = output_file
 
         # ---------- Internal fields ----------
 
@@ -284,7 +297,7 @@ class StubGen:
         """
         sig_str, docstr, start = cast(str, sig[0]), cast(str, sig[1]), 0
 
-        # Label anonymous functoins
+        # Label anonymous functions
         if sig_str.startswith("def (") and name is not None:
             sig_str = "def " + name + sig_str[4:]
 
@@ -659,7 +672,7 @@ class StubGen:
                 # Strip away the module prefix for local classes
                 return full_name[len(self.module.__name__) + 1 :]
             elif mod_name == "typing" or mod_name == "collections.abc":
-                # Import frequently-occuring typing classes and ABCs directly
+                # Import frequently-occurring typing classes and ABCs directly
                 return self.import_object(mod_name, cls_name)
             else:
                 # Import the module and reference the contained class by name
@@ -777,12 +790,46 @@ class StubGen:
 
             if ismodule(value):
                 if len(self.stack) != 1:
-                    is_external = value.__name__.split(".")[0] != self.module.__name__.split(".")[0]
+                    value_name_s = value.__name__.split(".")
+                    module_name_s = self.module.__name__.split(".")
+                    is_external = value_name_s[0] != module_name_s[0]
                     if not self.include_external_imports and is_external:
                         return
 
-                    # Do not recurse into submodules, but include a directive to import them
+                    # Do not include submodules in the same stub, but include a directive to import them
                     self.import_object(value.__name__, name=None, as_name=name)
+
+                    # If the user requested this, generate a separate stub recursively
+                    if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
+                        module_file = getattr(value, '__file__', None)
+
+                        if not module_file or module_file.endswith('__init__.py'):
+                            dir_name = self.output_file.parents[0] / value_name_s[-1]
+                            dir_name.mkdir(parents=False, exist_ok=True)
+                            output_file = dir_name / '__init__.pyi'
+                        else:
+                            output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
+
+                        sg = StubGen(
+                            module=value,
+                            recursive=self.recursive,
+                            include_docstrings=self.include_docstrings,
+                            include_private=self.include_private,
+                            include_external_imports=self.include_external_imports,
+                            include_internal_imports=self.include_internal_imports,
+                            max_expr_length=self.max_expr_length,
+                            patterns=self.patterns,
+                            output_file=output_file,
+                            quiet=self.quiet
+                        )
+
+                        sg.put(value)
+
+                        if not self.quiet:
+                            print(f'  - writing stub "{output_file}" ..')
+
+                        with open(output_file, "w") as f:
+                            f.write(sg.get())
                     return
                 else:
                     self.apply_pattern(self.prefix + ".__prefix__", None)
@@ -1167,6 +1214,15 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-r",
+        "--recursive",
+        default=False,
+        action="store_true",
+        dest="recursive",
+        help="recursively process submodules",
+    )
+
+    parser.add_argument(
         "-M",
         "--marker-file",
         metavar="FILE",
@@ -1216,6 +1272,10 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     if len(opt.modules) > 1 and opt.output_file:
         parser.error(
             "The -o option can only be specified when a single module is being processed."
+        )
+    if opt.recursive and opt.output_file:
+        parser.error(
+            "The -o option is not compatible with recursive stub generation (-r)."
         )
     return opt
 
@@ -1274,7 +1334,6 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
 
 def main(args: Optional[List[str]] = None) -> None:
-    from pathlib import Path
     import sys
     import os
 
@@ -1297,9 +1356,6 @@ def main(args: Optional[List[str]] = None) -> None:
     for i in opt.imports:
         sys.path.insert(0, i)
 
-    if opt.output_dir:
-        os.makedirs(opt.output_dir, exist_ok=True)
-
     for i, mod in enumerate(opt.modules):
         if not opt.quiet:
             if i > 0:
@@ -1307,18 +1363,6 @@ def main(args: Optional[List[str]] = None) -> None:
             print('Module "%s" ..' % mod)
             print("  - importing ..")
         mod_imported = importlib.import_module(mod)
-
-        sg = StubGen(
-            module=mod_imported,
-            include_docstrings=opt.include_docstrings,
-            include_private=opt.include_private,
-            patterns=patterns,
-        )
-
-        if not opt.quiet:
-            print("  - analyzing ..")
-
-        sg.put(mod_imported)
 
         if opt.output_file:
             file = Path(opt.output_file)
@@ -1340,6 +1384,23 @@ def main(args: Optional[List[str]] = None) -> None:
 
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)
+
+        file.parents[0].mkdir(parents=True, exist_ok=True)
+
+        sg = StubGen(
+            module=mod_imported,
+            quiet=opt.quiet,
+            recursive=opt.recursive,
+            include_docstrings=opt.include_docstrings,
+            include_private=opt.include_private,
+            patterns=patterns,
+            output_file=file
+        )
+
+        if not opt.quiet:
+            print("  - analyzing ..")
+
+        sg.put(mod_imported)
 
         if patterns:
             total_matches = 0

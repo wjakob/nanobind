@@ -59,6 +59,7 @@ from inspect import Signature, Parameter, signature, ismodule, getmembers
 import textwrap
 import importlib
 import importlib.machinery
+import importlib.util
 import types
 import typing
 from dataclasses import dataclass
@@ -97,12 +98,8 @@ ImportDict = Dict[Tuple[Optional[str], Optional[str]], Optional[str]]
 
 # This type maps a module name to an `ImportDict` tuple that tracks the
 # import declarations from that module.
-# Party: Source of the package
-# 0 = From stdlib
-# 1 = From the package being built
-# 2 = From 3rd party package
-# package_name -> (((name, desired_as_name) -> actual_as_name), party)
-PackagesDict = Dict[str, Tuple[ImportDict, Literal[0, 1, 2]]]
+# package_name -> ((name, desired_as_name) -> actual_as_name)
+PackagesDict = Dict[str, ImportDict]
 
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
 # It stores a function signature string, docstring, and a tuple of default function values.
@@ -602,7 +599,7 @@ class StubGen:
 
             if self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # This is a function or a type, import it from its actual source
-                self.import_object(named_value.__module__, named_value.__name__, name, party=1)
+                self.import_object(named_value.__module__, named_value.__name__, name)
         else:
             value_str = self.expr_str(value, abbrev)
 
@@ -649,7 +646,7 @@ class StubGen:
         def process_ndarray(m: Match[str]) -> str:
             s = m.group(2)
 
-            ndarray = self.import_object("numpy.typing", "ArrayLike", party=2)
+            ndarray = self.import_object("numpy.typing", "ArrayLike")
             assert ndarray
             s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
             s = s.replace("*", "None")
@@ -801,7 +798,7 @@ class StubGen:
                         return
 
                     # Do not include submodules in the same stub, but include a directive to import them
-                    self.import_object(value.__name__, name=None, as_name=name, party=1)
+                    self.import_object(value.__name__, name=None, as_name=name)
 
                     # If the user requested this, generate a separate stub recursively
                     if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
@@ -869,7 +866,7 @@ class StubGen:
             self.prefix = old_prefix
 
     def import_object(
-        self, module: str, name: Optional[str], as_name: Optional[str] = None, party: Literal[0, 1, 2] = 0
+        self, module: str, name: Optional[str], as_name: Optional[str] = None
     ) -> str:
         """
         Import a type (e.g. typing.Optional) used within the stub, ensuring
@@ -891,10 +888,10 @@ class StubGen:
             module_short = module
 
         # Query a cache of previously imported objects
-        imports_module: Optional[ImportDict] = self.imports.get(module_short, (None, None))[0]
+        imports_module: Optional[ImportDict] = self.imports.get(module_short, None)
         if not imports_module:
             imports_module = {}
-            self.imports[module_short] = (imports_module, party)
+            self.imports[module_short] = imports_module
 
         key = (name, as_name)
         final_name = imports_module.get(key, None)
@@ -1093,6 +1090,29 @@ class StubGen:
             result = repr(tp)
         return self.simplify_types(result)
 
+    def check_party(self, module: str) -> Literal[0, 1, 2]:
+        """
+        Check source of module
+        0 = From stdlib
+        1 = From the package being built
+        2 = From 3rd party package
+        """
+        if module.startswith(".") or module == self.module.__name__.split('.')[0]:
+            return 1
+        
+        try:
+            spec = importlib.util.find_spec(module)
+        except ModuleNotFoundError:
+            return 2
+        
+        if spec:
+            if spec.origin and "site-packages" in spec.origin:
+                return 2
+            else:
+                return 0
+        else:
+            return 2
+
     def get(self) -> str:
         """Generate the final stub output"""
         s = ""
@@ -1101,9 +1121,9 @@ class StubGen:
         for module in sorted(self.imports):
             imports = self.imports[module]
             items: List[str] = []
-            party = imports[1]
+            party = self.check_party(module)
 
-            for (k, v1), v2 in imports[0].items():
+            for (k, v1), v2 in imports.items():
                 if k is None:
                     if v1 and v1 != module:
                         import_strs[party].append(f"import {module} as {v1}")

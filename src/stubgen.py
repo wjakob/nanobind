@@ -97,8 +97,12 @@ ImportDict = Dict[Tuple[Optional[str], Optional[str]], Optional[str]]
 
 # This type maps a module name to an `ImportDict` tuple that tracks the
 # import declarations from that module.
-# package_name -> ((name, desired_as_name) -> actual_as_name)
-PackagesDict = Dict[str, ImportDict]
+# Party: Source of the package
+# 0 = From stdlib
+# 1 = From the package being built
+# 2 = From 3rd party package
+# package_name -> (((name, desired_as_name) -> actual_as_name), party)
+PackagesDict = Dict[str, Tuple[ImportDict, Literal[0, 1, 2]]]
 
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
 # It stores a function signature string, docstring, and a tuple of default function values.
@@ -598,7 +602,7 @@ class StubGen:
 
             if self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # This is a function or a type, import it from its actual source
-                self.import_object(named_value.__module__, named_value.__name__, name)
+                self.import_object(named_value.__module__, named_value.__name__, name, party=1)
         else:
             value_str = self.expr_str(value, abbrev)
 
@@ -645,7 +649,7 @@ class StubGen:
         def process_ndarray(m: Match[str]) -> str:
             s = m.group(2)
 
-            ndarray = self.import_object("numpy.typing", "ArrayLike")
+            ndarray = self.import_object("numpy.typing", "ArrayLike", party=2)
             assert ndarray
             s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
             s = s.replace("*", "None")
@@ -797,7 +801,7 @@ class StubGen:
                         return
 
                     # Do not include submodules in the same stub, but include a directive to import them
-                    self.import_object(value.__name__, name=None, as_name=name)
+                    self.import_object(value.__name__, name=None, as_name=name, party=1)
 
                     # If the user requested this, generate a separate stub recursively
                     if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
@@ -865,7 +869,7 @@ class StubGen:
             self.prefix = old_prefix
 
     def import_object(
-        self, module: str, name: Optional[str], as_name: Optional[str] = None
+        self, module: str, name: Optional[str], as_name: Optional[str] = None, party: Literal[0, 1, 2] = 0
     ) -> str:
         """
         Import a type (e.g. typing.Optional) used within the stub, ensuring
@@ -887,10 +891,10 @@ class StubGen:
             module_short = module
 
         # Query a cache of previously imported objects
-        imports_module: Optional[ImportDict] = self.imports.get(module_short, None)
+        imports_module: Optional[ImportDict] = self.imports.get(module_short, (None, None))[0]
         if not imports_module:
             imports_module = {}
-            self.imports[module_short] = imports_module
+            self.imports[module_short] = (imports_module, party)
 
         key = (name, as_name)
         final_name = imports_module.get(key, None)
@@ -1092,31 +1096,38 @@ class StubGen:
     def get(self) -> str:
         """Generate the final stub output"""
         s = ""
+        import_strs: Dict[Literal[0, 1, 2], List[str]] = {0: [], 1: [], 2: []}
 
         for module in sorted(self.imports):
             imports = self.imports[module]
             items: List[str] = []
+            party = imports[1]
 
-            for (k, v1), v2 in imports.items():
+            for (k, v1), v2 in imports[0].items():
                 if k is None:
                     if v1 and v1 != module:
-                        s += f"import {module} as {v1}\n"
+                        import_strs[party].append(f"import {module} as {v1}")
                     else:
-                        s += f"import {module}\n"
+                        import_strs[party].append(f"import {module}")
                 else:
                     if k != v2 or v1:
                         items.append(f"{k} as {v2}")
                     else:
                         items.append(k)
-
+            
+            items = sorted(items)
             if items:
                 items_v0 = ", ".join(items)
-                items_v0 = f"from {module} import {items_v0}\n"
+                items_v0 = f"from {module} import {items_v0}"
                 items_v1 = "(\n    " + ",\n    ".join(items) + "\n)"
-                items_v1 = f"from {module} import {items_v1}\n"
-                s += items_v0 if len(items_v0) <= 70 else items_v1
-        if s:
-            s += "\n"
+                items_v1 = f"from {module} import {items_v1}"
+                import_strs[party].append(items_v0 if len(items_v0) <= 70 else items_v1)
+
+        # Import format: stdlib -> 3rd party -> Own library
+        for party in (0, 2, 1):
+            s += "\n".join(import_strs[party])
+            s += "\n\n" if import_strs[party] else ""
+        s += "\n"
         s += self.put_abstract_enum_class()
 
         # Append the main generated stub

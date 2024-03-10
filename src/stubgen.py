@@ -1277,6 +1277,10 @@ def parse_options(args: List[str]) -> argparse.Namespace:
         parser.error(
             "The -o option is not compatible with recursive stub generation (-r)."
         )
+    if opt.output_dir and opt.output_file:
+        parser.error(
+            "The output file option (-o) is not compatible with output directory option (-O)."
+        )
     return opt
 
 

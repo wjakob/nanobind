@@ -1779,7 +1779,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
    .. code-block:: cpp
 
       nb::class_<MyClass>(m, "MyClass")
-        .def_rw("value", &MyClass::value,
+        .def_prop_rw("value", &MyClass::value,
                 nb::for_getter(nb::sig("def value(self, /) -> int")),
                 nb::for_setter(nb::sig("def value(self, value: int, /) -> None")),
                 nb::for_getter("docstring for getter"),
@@ -2257,7 +2257,7 @@ Class binding
    .. cpp:function:: template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra> class_ &def(const detail::op_<id, ot, L, R> &op, const Extra&... extra)
 
       This interface provides convenient syntax sugar to replace relatively
-      length method bindings with shorter operator bindings. To use it, you
+      lengthy method bindings with shorter operator bindings. To use it, you
       will need an extra include directive:
 
       .. code-block:: cpp
@@ -2374,7 +2374,7 @@ Class binding
    .. code-block:: cpp
 
       nb::class_<MyType>(m, "MyType")
-          .def(nb::init_implicit<const char*, int>());
+          .def(nb::init_implicit<const char*>());
 
    can be replaced by the lower-level code
 
@@ -2430,7 +2430,7 @@ Low-level type and instance access
 
 nanobind exposes a low-level interface to provide fine-grained control over
 the sequence of steps that instantiates a Python object wrapping a C++
-instance. An thorough explanation of these features is provided in a
+instance. A thorough explanation of these features is provided in a
 :ref:`separate section <lowlevel>`.
 
 Type objects

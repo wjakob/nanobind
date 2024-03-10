@@ -414,7 +414,15 @@ Nanobind's CMake tooling includes a convenience command to interface with the
         - Specifies the name of the stub file that should be written. The path
           is relative to ``CMAKE_CURRENT_BINARY_DIR`` for build-time stub
           generation and relative to ``CMAKE_INSTALL_PREFIX`` for install-time
-          stub generation. Mandatory.
+          stub generation. Either ``OUTPUT`` or ``OUTPUT_DIR`` should be specified.
+      * - ``OUTPUT_DIR``
+        - Specifies the directory of the stub files that should be written. The path
+          is relative to ``CMAKE_CURRENT_BINARY_DIR`` for build-time stub
+          generation and relative to ``CMAKE_INSTALL_PREFIX`` for install-time
+          stub generation. Either ``OUTPUT`` or ``OUTPUT_DIR`` should be specified.
+      * - ``RECURSIVE``
+        - Recursively process submodules. Could be used only if ``OUTPUT_DIR`` and
+          ``INSTALL_TIME`` are used.
       * - ``PYTHON_PATH``
         - List of search paths that should be considered when importing the
           module. The paths are relative to ``CMAKE_CURRENT_BINARY_DIR`` for

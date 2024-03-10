@@ -473,7 +473,7 @@ The program has the following command line options:
 .. code-block:: text
 
    usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH] [-m MODULE]
-                                     [-M FILE] [-P] [-D] [-q]
+                                     [-r] [-M FILE] [-P] [-D] [-q]
 
    Generate stubs for nanobind-based extensions.
 
@@ -485,6 +485,7 @@ The program has the following command line options:
                                    specify multiple times)
      -m MODULE, --module MODULE    generate a stub for the specified module (can
                                    specify multiple times)
+     -r, --recursive               recursively process submodules
      -M FILE, --marker-file FILE   generate a marker file (usually named 'py.typed')
      -p FILE, --pattern-file FILE  apply the given patterns to the generated stub
                                    (see the docs for syntax)

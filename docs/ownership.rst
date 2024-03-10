@@ -182,7 +182,7 @@ options below. In particular, the following policies are available:
      m.def("get_data", []{ return &data; }, nb::rv_policy::reference)
 
 - :cpp:enumerator:`rv_policy::reference_internal`: A policy for *methods* that
-  expose an internal field. The lifetime of the field must matches that of the
+  expose an internal field. The lifetime of the field must match that of the
   parent object.
 
   The policy resembles :cpp:enumerator:`reference <rv_policy::reference>` in

@@ -186,8 +186,8 @@ expected:
 
 *How could this happen?*
 The reason is that type casters convert function arguments and return values once, but further
-changes will not automatically propagate to across the language barrier because
-the representations are not intrinsically linked to each other. This problem
+changes will not automatically propagate across the language barrier because
+the representations are not intrinsically linked to each other. This problem is
 not specific to STL types---for example, the following function will similarly
 not update its argument once exposed in Python.
 

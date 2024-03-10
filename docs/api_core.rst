@@ -1931,7 +1931,7 @@ Class binding
    classes <trampolines>`.
 
    When the type ``T`` was previously already registered (either within the
-   same extension or another extension), the the ``class_<..>`` declaration is
+   same extension or another extension), the ``class_<..>`` declaration is
    redundant. nanobind will print a warning message in this case:
 
    .. code-block:: text

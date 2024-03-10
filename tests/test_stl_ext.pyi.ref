@@ -1,7 +1,8 @@
-from collections.abc import Sequence, Callable, Mapping, Set
+from collections.abc import Callable, Mapping, Sequence, Set
 import os
 import pathlib
 from typing import overload
+
 
 class ClassWithMovableField:
     def __init__(self) -> None: ...

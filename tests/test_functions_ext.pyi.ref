@@ -1,6 +1,7 @@
 from collections.abc import Callable
 import types
-from typing import overload, Annotated, Any
+from typing import Annotated, Any, overload
+
 
 def call_guard_value() -> int: ...
 

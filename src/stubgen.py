@@ -1335,7 +1335,6 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
 def main(args: Optional[List[str]] = None) -> None:
     import sys
-    import os
 
     # Ensure that the current directory is on the path
     if "" not in sys.path and "." not in sys.path:

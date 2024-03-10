@@ -5,9 +5,9 @@ import pytest
 is_pypy = platform.python_implementation() == 'PyPy'
 is_darwin = platform.system() == 'Darwin'
 
-def collect():
+def collect() -> None:
     if is_pypy:
-        for i in range(3):
+        for _ in range(3):
             gc.collect()
     else:
         gc.collect()

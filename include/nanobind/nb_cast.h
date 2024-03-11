@@ -270,11 +270,11 @@ template <typename T> struct typed_name {
         static constexpr auto Name = detail::const_name(name); \
     };
 
-NB_TYPED_NAME_PYTHON38(nanobind::tuple, "Tuple")
-NB_TYPED_NAME_PYTHON38(list, "List")
-NB_TYPED_NAME_PYTHON38(set, "Set")
-NB_TYPED_NAME_PYTHON38(dict, "Dict")
-NB_TYPED_NAME_PYTHON38(type_object, "Type")
+NB_TYPED_NAME_PYTHON38(nanobind::tuple, NB_TYPING_TUPLE)
+NB_TYPED_NAME_PYTHON38(list, NB_TYPING_LIST)
+NB_TYPED_NAME_PYTHON38(set, NB_TYPING_SET)
+NB_TYPED_NAME_PYTHON38(dict, NB_TYPING_DICT)
+NB_TYPED_NAME_PYTHON38(type_object, NB_TYPING_TYPE)
 #endif
 
 template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {

@@ -86,29 +86,24 @@ This required work on three fronts:
      feature can be used to add decorators or control how default arguments are
      rendered. :ref:`Read more <typing_signature_functions>`.
 
-   * The :cpp:class:`nb::sig <sig>` annotation can also override
-     *class signatures* in generated stubs. Stubs often take certain liberties in
+   * The :cpp:class:`nb::sig <sig>` annotation can also override *class
+     signatures* in generated stubs. Stubs often take certain liberties in
      deviating somewhat from the precise type signature of the underlying
-     implementation, which is fine as long as this improves the capabilities of
-     the type checker (the stubs are only used by the static type checking phase,
-     which never imports the actual extension).
-
-     For example, the signature annotation in the example below adds an
-     abstract base class advertising that the class implements a typed
-     iterator.
+     implementation. For example, the following annotation adds an abstract
+     base class advertising that the class implements a typed iterator.
 
      .. code-block:: cpp
 
         using IntVec = std::vector<int>;
 
         nb::class_<IntVec>(m, "IntVec",
-                           nb::sig("class IntVec(Iterable[int])"));
+                           nb::sig("class IntVec(collections.abc.Iterable[int])"));
 
-     Nanobind class bindings can't actually extend Python types, so this is a
-     convenient lie. Such shenanigans are worthwhile because they can greatly
-     improve the development experience (e.g. `VS Code
-     <https://code.visualstudio.com>`__ autocomplete) involving compiled
-     extensions. :ref:`Read more <typing_signature_classes>`.
+     Nanobind can't subclass Python types, hence this declaration is
+     technically untrue. On the flipside, such a declaration can assist static
+     checkers and improve auto-completion in visual IDEs. This is fine since
+     these tools only perform a static analysis and never import the actual
+     extension. :ref:`Read more <typing_signature_classes>`.
 
    * The :cpp:struct:`nb::for_setter <for_setter>` and
      :cpp:struct:`nb::for_getter <for_getter>` annotations enable passing
@@ -157,7 +152,7 @@ noteworthy:
 
 * The ``nb::any`` placeholder to specify an unconstrained
   :cpp:class:`nb::ndarray <ndarray>` axis was removed. This name was given to a
-  new wrapper type :cpp:class:`nb::any`` indicating ``typing.Any``-typed
+  new wrapper type :cpp:class:`nb::any` indicating ``typing.Any``-typed
   values.
 
   All use of ``nb::any`` in existing code must be replaced with ``-1`` (for

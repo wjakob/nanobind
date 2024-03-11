@@ -541,8 +541,11 @@ section <ndarrays>`.
 
 .. cpp:function:: bool ndarray_check(handle h) noexcept
 
-   Test whether the Python object represents an ndarray. Currently, the
-   function considers NumPy, PyTorch, TensorFlow, and XLA arrays.
+   Test whether the Python object represents an ndarray.
+
+   Objects with a ``__dlpack__`` attribute or objects that implement the buffer
+   protocol are considered as ndarray objects. In addition, arrays from NumPy,
+   PyTorch, TensorFlow and XLA are also regarded as ndarrays.
 
 .. cpp:class:: template <typename... Args> ndarray
 

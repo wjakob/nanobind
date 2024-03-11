@@ -285,6 +285,9 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
 }
 
 bool ndarray_check(PyObject *o) noexcept {
+    if (PyObject_HasAttrString(o, "__dlpack__") || PyObject_CheckBuffer(o))
+        return true;
+
     PyTypeObject *tp = Py_TYPE(o);
 
     PyObject *name = nb_type_name((PyObject *) tp);
@@ -294,8 +297,6 @@ bool ndarray_check(PyObject *o) noexcept {
     check(tp_name, "Could not obtain type name! (2)");
 
     bool result =
-        // NumPy
-        strcmp(tp_name, "ndarray") == 0 ||
         // PyTorch
         strcmp(tp_name, "torch.Tensor") == 0 ||
         // XLA

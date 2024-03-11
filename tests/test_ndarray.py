@@ -644,3 +644,14 @@ def test_uint32_complex_do_not_convert(variant):
     t.set_item(data, arg)
     data2 = np.array([123, 3.0 + 4.0j])
     assert np.all(data == data2)
+
+@needs_numpy
+def test26_check_generic():
+    class DLPackWrapper:
+        def __init__(self, o):
+            self.o = o
+        def __dlpack__(self):
+            return self.o.__dlpack__()
+
+    arr = DLPackWrapper(np.zeros((1)))
+    assert t.check(arr)

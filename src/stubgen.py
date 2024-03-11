@@ -828,7 +828,7 @@ class StubGen:
                         if not self.quiet:
                             print(f'  - writing stub "{output_file}" ..')
 
-                        with open(output_file, "w") as f:
+                        with open(output_file, "w", encoding='utf-8') as f:
                             f.write(sg.get())
                     return
                 else:
@@ -1286,7 +1286,7 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
     includes precompiled versions of all of the contained regular expressions.
     """
 
-    with open(fname, "r") as f:
+    with open(fname, "r", encoding='utf-8') as f:
         f_lines = f.readlines()
 
     patterns: List[ReplacePattern] = []
@@ -1419,7 +1419,7 @@ def main(args: Optional[List[str]] = None) -> None:
         if not opt.quiet:
             print(f'  - writing stub "{file}" ..')
 
-        with open(file, "w") as f:
+        with open(file, "w", encoding='utf-8') as f:
             f.write(sg.get())
 
     if opt.marker_file:

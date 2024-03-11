@@ -198,7 +198,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
             owner = capsule(temp, [](void *p) noexcept { delete (T *) p; });
             ptr = temp->data();
             policy = rv_policy::reference;
-        } else if (policy == rv_policy::reference_internal) {
+        } else if (policy == rv_policy::reference_internal && cleanup->self()) {
             owner = borrow(cleanup->self());
             policy = rv_policy::reference;
         }
@@ -417,15 +417,17 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         if constexpr (MaybeConvert) {
             /* Generating an implicit copy requires some object to assume
                ownership. During a function call, ``dcaster`` can serve that
-               role (this case is detected by checking whether ``cleanup`` is
-               defined). When used in other situatons (e.g. ``nb::cast()``),
-               the created ``Eigen::Ref<..>`` must take ownership of the copy.
-               This is only guranteed to work if DMapConstructorOwnsData.
+               role (this case is detected by checking whether ``flags`` has
+               the ``manual`` flag set). When used in other situations (e.g.
+               ``nb::cast()``), the created ``Eigen::Ref<..>`` must take
+               ownership of the copy. This is only guranteed to work if
+               DMapConstructorOwnsData.
 
                If neither of these is possible, we disable implicit
                conversions. */
 
-            if (!cleanup && !DMapConstructorOwnsData)
+            if ((flags & (uint8_t) cast_flags::manual) &&
+                !DMapConstructorOwnsData)
                 flags &= ~(uint8_t) cast_flags::convert;
 
             if (dcaster.from_python_(src, flags, cleanup))

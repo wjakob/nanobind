@@ -40,6 +40,9 @@ enum cast_flags : uint8_t {
 
     // Don't accept 'None' Python objects in the base class caster
     none_disallowed = (1 << 2),
+
+    // Indicates that this cast is performed by nb::cast or nb::try_cast
+    manual = (1 << 3)
 };
 
 /**
@@ -411,51 +414,84 @@ private:
 template <typename Type, typename SFINAE>
 struct type_caster : type_caster_base<Type> { };
 
-NAMESPACE_END(detail)
+template <bool Convert, typename T>
+T cast_impl(handle h) {
+    using Caster = detail::make_caster<T>;
 
-template <typename T, typename Derived>
-bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept {
+    static_assert(
+        !(std::is_reference_v<T> || std::is_pointer_v<T>) ||
+            detail::is_base_caster_v<Caster> ||
+            std::is_same_v<const char *, T>,
+        "nanobind::cast(): cannot return a reference to a temporary.");
+
+    Caster caster;
+    bool rv;
+    if constexpr (Convert) {
+        cleanup_list cleanup(nullptr);
+        rv = caster.from_python(h.ptr(),
+                                ((uint8_t) cast_flags::convert) |
+                                ((uint8_t) cast_flags::manual),
+                                &cleanup);
+        cleanup.release(); // 'from_python' is 'noexcept', so this always runs
+    } else {
+        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr);
+    }
+
+    if (!rv)
+        detail::raise_cast_error();
+    return caster.operator detail::cast_t<T>();
+}
+
+template <bool Convert, typename T>
+bool try_cast_impl(handle h, T &out) noexcept {
     using Caster = detail::make_caster<T>;
 
     static_assert(!std::is_same_v<const char *, T>,
                   "nanobind::try_cast(): cannot return a reference to a temporary.");
 
     Caster caster;
-    if (caster.from_python(value.derived().ptr(),
-                           convert ? (uint8_t) detail::cast_flags::convert
-                                   : (uint8_t) 0, nullptr)) {
+    bool rv;
+    if constexpr (Convert) {
+        cleanup_list cleanup(nullptr);
+        rv = caster.from_python(h.ptr(),
+                                ((uint8_t) cast_flags::convert) |
+                                ((uint8_t) cast_flags::manual),
+                                &cleanup);
+        cleanup.release(); // 'from_python' is 'noexcept', so this always runs
+    } else {
+        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr);
+    }
+
+    if (rv) {
         try {
             out = caster.operator detail::cast_t<T>();
             return true;
-        } catch (const builtin_exception&) {
-            return false;
-        }
+        } catch (const builtin_exception&) { }
     }
 
     return false;
 }
 
+NAMESPACE_END(detail)
+
 template <typename T, typename Derived>
-T cast(const detail::api<Derived> &value, bool convert = true) {
+NB_INLINE T cast(const detail::api<Derived> &value, bool convert = true) {
     if constexpr (std::is_same_v<T, void>) {
         return;
     } else {
-        using Caster = detail::make_caster<T>;
-
-        static_assert(
-            !(std::is_reference_v<T> || std::is_pointer_v<T>) ||
-                detail::is_base_caster_v<Caster> ||
-                std::is_same_v<const char *, T>,
-            "nanobind::cast(): cannot return a reference to a temporary.");
-
-        Caster caster;
-        if (!caster.from_python(value.derived().ptr(),
-                                convert ? (uint8_t) detail::cast_flags::convert
-                                        : (uint8_t) 0, nullptr))
-            detail::raise_cast_error();
-
-        return caster.operator detail::cast_t<T>();
+        if (convert)
+            return detail::cast_impl<true, T>(value);
+        else
+            return detail::cast_impl<false, T>(value);
     }
+}
+
+template <typename T, typename Derived>
+NB_INLINE bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept {
+    if (convert)
+        return detail::try_cast_impl<true, T>(value, out);
+    else
+        return detail::try_cast_impl<false, T>(value, out);
 }
 
 template <typename T>

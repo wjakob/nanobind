@@ -1,6 +1,7 @@
 from collections.abc import Iterator, Mapping
 from typing import overload
 
+
 class IdentityMap:
     def __init__(self) -> None: ...
 

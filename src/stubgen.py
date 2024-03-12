@@ -59,6 +59,7 @@ from inspect import Signature, Parameter, signature, ismodule, getmembers
 import textwrap
 import importlib
 import importlib.machinery
+import importlib.util
 import types
 import typing
 from dataclasses import dataclass
@@ -1089,13 +1090,43 @@ class StubGen:
             result = repr(tp)
         return self.simplify_types(result)
 
+    def check_party(self, module: str) -> Literal[0, 1, 2]:
+        """
+        Check source of module
+        0 = From stdlib
+        1 = From 3rd party package
+        2 = From the package being built
+        """
+        if module.startswith(".") or module == self.module.__name__.split('.')[0]:
+            return 2
+        
+        try:
+            spec = importlib.util.find_spec(module)
+        except ModuleNotFoundError:
+            return 1
+        
+        if spec:
+            if spec.origin and "site-packages" in spec.origin:
+                return 1
+            else:
+                return 0
+        else:
+            return 1
+
     def get(self) -> str:
         """Generate the final stub output"""
         s = ""
+        last_party = None
 
-        for module in sorted(self.imports):
+        for module in sorted(self.imports, key=lambda i: str(self.check_party(i)) + i):
             imports = self.imports[module]
             items: List[str] = []
+            party = self.check_party(module)
+            
+            if party != last_party:
+                if last_party is not None:
+                    s += "\n"
+                last_party = party
 
             for (k, v1), v2 in imports.items():
                 if k is None:
@@ -1108,15 +1139,16 @@ class StubGen:
                         items.append(f"{k} as {v2}")
                     else:
                         items.append(k)
-
+            
+            items = sorted(items)
             if items:
                 items_v0 = ", ".join(items)
                 items_v0 = f"from {module} import {items_v0}\n"
                 items_v1 = "(\n    " + ",\n    ".join(items) + "\n)"
                 items_v1 = f"from {module} import {items_v1}\n"
                 s += items_v0 if len(items_v0) <= 70 else items_v1
-        if s:
-            s += "\n"
+
+        s += "\n\n"
         s += self.put_abstract_enum_class()
 
         # Append the main generated stub
@@ -1335,7 +1367,6 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
 def main(args: Optional[List[str]] = None) -> None:
     import sys
-    import os
 
     # Ensure that the current directory is on the path
     if "" not in sys.path and "." not in sys.path:

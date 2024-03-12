@@ -1,5 +1,7 @@
-from numpy.typing import ArrayLike
 from typing import Annotated, overload
+
+from numpy.typing import ArrayLike
+
 
 class Cls:
     def __init__(self) -> None: ...

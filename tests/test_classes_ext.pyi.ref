@@ -1,5 +1,6 @@
 from typing import overload
 
+
 class A:
     def __init__(self, arg: int, /) -> None: ...
 

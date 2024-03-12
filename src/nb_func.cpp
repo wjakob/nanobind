@@ -295,6 +295,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
         check(it != internals->funcs.end(),
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
         internals->funcs.erase(it);
+
+        Py_CLEAR(func_prev);
     }
 
     func->complex_call |= func->max_nargs >= NB_MAXARGS_SIMPLE;

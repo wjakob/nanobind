@@ -1968,13 +1968,13 @@ Class binding
              .def(nb::init<>()) // Bind the default constructor
              .def("f", &A::f);  // Bind the method A::f
 
-   .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> init, const Extra &... extra)
+   .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> arg, const Extra &... extra)
 
       Bind a constructor. The variable length `extra` parameter can be used to
       pass a docstring and other :ref:`function binding annotations
       <function_binding_annotations>`.
 
-   .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> init, const Extra &... extra)
+   .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> arg, const Extra &... extra)
 
       Bind a constructor that may be used for implicit type conversions. The
       constructor must take a single argument of an unspecified type `Arg`.
@@ -1988,6 +1988,13 @@ Class binding
 
       This constructor generates more compact code than a separate call to
       :cpp:func:`implicitly_convertible`, but is otherwise equivalent.
+
+   .. cpp:function:: template <typename Func, typename... Extra> class_ &def(new_<Func> arg, const Extra &... extra)
+
+      Bind a C++ factory fuction as a Python object constructor (``__new__``).
+      This is an advanced feature; prefer :cpp:struct:`nb::init\<..\> <init>`
+      where possible. See the discussion of :ref:`customizing object creation
+      <custom_new>` for more details.
 
    .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_rw(const char * name, D C::* p, const Extra &...extra)
 
@@ -2387,6 +2394,44 @@ Class binding
                 });
 
        nb::implicitly_convertible<const char*, MyType>();
+
+.. cpp:struct:: template <typename Func> new_
+
+   This is a small helper class that indicates to :cpp:func:`class_::def()`
+   that a particular lambda or static method provides a Python object
+   constructor (``__new__``) for the class being bound. Normally, you would
+   use :cpp:class:`init` instead if possible, in order to cooperate with
+   nanobind's usual object creation process. Using :cpp:class:`new_`
+   replaces that process entirely. This is principally useful when some
+   C++ type of interest can only provide pointers to its instances,
+   rather than allowing them to be constructed directly.
+
+   Like :cpp:class:`init`, the only use of a :cpp:class:`new_` object is
+   as an argument to :cpp:func:`class_::def()`.
+
+   Example use:
+
+   .. code-block:: cpp
+
+      class MyType {
+        private:
+          MyType();
+        public:
+          static std::shared_ptr<MyType> create();
+          int value = 0;
+      };
+
+      nb::class_<MyType>(m, "MyType")
+          .def(nb::new_(&MyType::create));
+
+   Given this example code, writing ``MyType()`` in Python would
+   produce a Python object wrapping the result of ``MyType::create()``
+   in C++. If multiple calls to ``create()`` return pointers to the
+   same C++ object, these will turn into references to the same Python
+   object as well.
+
+   See the discussion of :ref:`customizing Python object creation <custom_new>`
+   for more information.
 
 
 GIL Management

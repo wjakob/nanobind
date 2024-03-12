@@ -162,6 +162,12 @@ noteworthy:
   indicated using the new :cpp:struct:`nb::kw_only() <kw_only>` function
   annotation. (PR `#448 <https://github.com/wjakob/nanobind/pull/448>`__).
 
+* nanobind classes now permit overriding ``__new__``, in order to
+  support C++ singletons, caches, and other types that expose factory
+  functions rather than ordinary constructors. Read the section on
+  :ref:`customizing Python object creation <custom_new>` for more details.
+  (PR `#473 <https://github.com/wjakob/nanobind/pull/473>`__).
+
 * When binding methods on a class ``T``, nanobind will now produce a Python
   function that expects a self argument of type ``T``. Previously, it would
   use the type of the member pointer to determine the Python function

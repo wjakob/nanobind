@@ -376,6 +376,60 @@ private:
     }
 };
 
+namespace detail {
+    // This is 'inline' so we can define it in a header and not pay
+    // for it if unused, and also 'noinline' so we don't generate
+    // multiple copies and produce code bloat.
+    NB_NOINLINE inline void wrap_base_new(handle cls, bool do_wrap) {
+        if (PyCFunction_Check(cls.attr("__new__").ptr())) {
+            if (do_wrap) {
+                cpp_function_def(
+                    [](handle type) {
+                        if (!type_check(type))
+                            detail::raise_cast_error();
+                        return inst_alloc(type);
+                    },
+                    scope(cls), name("__new__"));
+            }
+        } else {
+            if (!do_wrap) {
+                // We already defined the wrapper, so this zero-arg overload
+                // would be unreachable. Raise an error rather than hiding it.
+                raise("nanobind: %s must define its zero-argument __new__ "
+                      "before any other overloads", type_name(cls).c_str());
+            }
+        }
+    }
+}
+
+template <typename Func, typename Sig = detail::function_signature_t<Func>>
+struct new_;
+
+template <typename Func, typename Return, typename... Args>
+struct new_<Func, Return(Args...)> {
+    std::remove_reference_t<Func> func;
+
+    new_(Func &&f) : func((detail::forward_t<Func>) f) {}
+
+    template <typename Class, typename... Extra>
+    NB_INLINE void execute(Class &cl, const Extra&... extra) {
+        // If this is the first __new__ overload we're defining, then wrap
+        // nanobind's built-in __new__ so we overload with it instead of
+        // replacing it; this is important for pickle support.
+        // We can't do this if the user-provided __new__ takes no
+        // arguments, because it would make an ambiguous overload set.
+        detail::wrap_base_new(cl, sizeof...(Args) != 0);
+        cl.def_static(
+            "__new__",
+            [func = (detail::forward_t<Func>) func](handle, Args... args) {
+                return func((detail::forward_t<Args>) args...);
+            },
+            extra...);
+        cl.def("__init__", [](handle, Args...) {}, extra...);
+    }
+};
+template <typename Func> new_(Func&& f) -> new_<Func>;
+
 template <typename T> struct for_setter {
     T value;
     for_setter(const T &value) : value(value) { }
@@ -497,14 +551,20 @@ public:
     }
 
     template <typename... Args, typename... Extra>
-    NB_INLINE class_ &def(init<Args...> &&init, const Extra &... extra) {
-        init.execute(*this, extra...);
+    NB_INLINE class_ &def(init<Args...> &&arg, const Extra &... extra) {
+        arg.execute(*this, extra...);
         return *this;
     }
 
     template <typename Arg, typename... Extra>
-    NB_INLINE class_ &def(init_implicit<Arg> &&init, const Extra &... extra) {
-        init.execute(*this, extra...);
+    NB_INLINE class_ &def(init_implicit<Arg> &&arg, const Extra &... extra) {
+        arg.execute(*this, extra...);
+        return *this;
+    }
+
+    template <typename Func, typename... Extra>
+    NB_INLINE class_ &def(new_<Func> &&arg, const Extra &... extra) {
+        arg.execute(*this, extra...);
         return *this;
     }
 

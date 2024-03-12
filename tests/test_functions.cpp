@@ -34,7 +34,16 @@ NB_MODULE(test_functions_ext, m) {
 
     // Overload chain with two docstrings
     m.def("test_05", [](int) -> int { return 1; }, "doc_1");
+    nb::object first_overload = m.attr("test_05");
     m.def("test_05", [](float) -> int { return 2; }, "doc_2");
+#if !defined(PYPY_VERSION)
+    // Make sure we don't leak the previous member of the overload chain
+    // (pypy's refcounts are bogus and will not help us with this check)
+    if (first_overload.ptr()->ob_refcnt != 1) {
+        throw std::runtime_error("Overload was leaked!");
+    }
+#endif
+    first_overload.reset();
 
     /// Function raising an exception
     m.def("test_06", []() { throw std::runtime_error("oops!"); });

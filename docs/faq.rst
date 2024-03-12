@@ -409,5 +409,5 @@ discourse:
        author = {Wenzel Jakob},
        year = {2022},
        note = {https://github.com/wjakob/nanobind},
-       title = {nanobind---Seamless operability between C++17 and Python}
+       title = {nanobind: tiny and efficient C++/Python bindings}
     }

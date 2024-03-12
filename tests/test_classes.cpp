@@ -575,4 +575,20 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>())
         .def_rw("i", &Union::i)
         .def_rw("f", &Union::f);
+
+    struct HiddenBase {
+        int value = 10;
+        int vget() const { return value; }
+        void vset(int v) { value = v; }
+        int get_answer() const { return value * 10; }
+    };
+    struct BoundDerived : HiddenBase {
+        virtual int polymorphic() { return value; }
+    };
+    nb::class_<BoundDerived>(m, "BoundDerived")
+        .def(nb::init<>())
+        .def_rw("value", &BoundDerived::value)
+        .def_prop_rw("prop", &BoundDerived::vget, &BoundDerived::vset)
+        .def("get_answer", &BoundDerived::get_answer)
+        .def("polymorphic", &BoundDerived::polymorphic);
 }

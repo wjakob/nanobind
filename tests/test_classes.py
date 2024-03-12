@@ -801,8 +801,6 @@ def test42_weak_references():
 
 
 def test43_union():
-    import struct
-
     u = t.Union()
     u.i = 42
     assert u.i == 42
@@ -810,8 +808,20 @@ def test43_union():
     u.f = 2.125
     assert u.f == 2.125
 
+
 def test44_dynamic_attr_has_dict():
     s = t.StructWithAttr(5)
     assert s.__dict__ == {}
     s.a_dynamic_attr = 101
     assert s.__dict__ == {"a_dynamic_attr": 101}
+
+
+def test45_hidden_base():
+    s = t.BoundDerived()
+    assert s.value == 10
+    s.value = 5
+    assert s.prop == 5
+    s.prop = 20
+    assert s.value == 20
+    assert s.get_answer() == 200
+    assert s.polymorphic() == 20

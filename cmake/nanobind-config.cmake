@@ -411,31 +411,25 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
   elseif (ARG_OUTPUT_DIR)
     list(APPEND NB_STUBGEN_ARGS -O "${ARG_OUTPUT_DIR}")
-  else()
-    message(FATAL_ERROR "nanobind_add_stub(): an 'OUTPUT' or 'OUTPUT_DIR' argument must be specified!")
   endif()
 
   if (ARG_RECURSIVE)
-    if (NOT ARG_INSTALL_TIME)
-      message(FATAL_ERROR "nanobind_add_stub(): 'RECURSIVE' can only be used if 'INSTALL_TIME' is also set!")
-    endif()
-    if (ARG_OUTPUT)
-      message(FATAL_ERROR "nanobind_add_stub(): 'RECURSIVE' cannot be used with 'OUTPUT'!")
-    endif()
     list(APPEND NB_STUBGEN_ARGS -r)
   endif()
 
   set(NB_STUBGEN_CMD "${Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
 
   if (NOT ARG_INSTALL_TIME)
+    set(STUB_FAKE_FILE ${CMAKE_BINARY_DIR}/${name}_stub.tmp)
+    set(NB_STUBGEN_CMD ${NB_STUBGEN_CMD} "-M" ${STUB_FAKE_FILE})
     add_custom_command(
-      OUTPUT ${NB_STUBGEN_OUTPUTS}
+      OUTPUT ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE}
       COMMAND ${NB_STUBGEN_CMD}
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
       DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" "${ARG_PATTERN_FILE}"
       ${NB_STUBGEN_EXTRA}
     )
-    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})
+    add_custom_target(${name} ALL DEPENDS ${STUB_FAKE_FILE})
   else()
     set(NB_STUBGEN_EXTRA "")
     if (ARG_COMPONENT)

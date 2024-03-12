@@ -429,7 +429,7 @@ function (nanobind_add_stub name)
       DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" "${ARG_PATTERN_FILE}"
       ${NB_STUBGEN_EXTRA}
     )
-    add_custom_target(${name} ALL DEPENDS ${STUB_FAKE_FILE})
+    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE})
   else()
     set(NB_STUBGEN_EXTRA "")
     if (ARG_COMPONENT)

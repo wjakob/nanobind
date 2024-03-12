@@ -31,8 +31,18 @@ def test02_default_args():
 def test03_kwargs():
     # Basic use of keyword arguments
     assert t.test_02(3, 5) == -2
-    assert t.test_02(3, k=5) == -2
-    assert t.test_02(k=5, j=3) == -2
+    assert t.test_02(3, down=5) == -2
+    assert t.test_02(down=5, up=3) == -2
+
+    # Make sure non-interned keyword names work also
+    i_cant_believe_its_not_down = "".join("down")
+    assert i_cant_believe_its_not_down is not "down"
+    assert t.test_02(**{i_cant_believe_its_not_down: 5, "up": 3}) == -2
+    assert t.test_02(**{i_cant_believe_its_not_down: 5}) == 3
+    with pytest.raises(TypeError):
+        t.test_02(unexpected=27)
+    with pytest.raises(TypeError):
+        t.test_02(**{i_cant_believe_its_not_down: None})
 
 
 def test04_overloads():
@@ -42,7 +52,7 @@ def test04_overloads():
 
 def test05_signature():
     assert t.test_01.__doc__ == "test_01() -> None"
-    assert t.test_02.__doc__ == "test_02(j: int = 8, k: int = 1) -> int"
+    assert t.test_02.__doc__ == "test_02(up: int = 8, down: int = 1) -> int"
     assert t.test_05.__doc__ == (
         "test_05(arg: int, /) -> int\n"
         "test_05(arg: float, /) -> int\n"
@@ -420,7 +430,7 @@ def test39_del():
 def test40_nb_signature():
     assert t.test_01.__nb_signature__ == ((r"def test_01() -> None", None, None),)
     assert t.test_02.__nb_signature__ == (
-        (r"def test_02(j: int = \0, k: int = \1) -> int", None, (8, 1)),
+        (r"def test_02(up: int = \0, down: int = \1) -> int", None, (8, 1)),
     )
     assert t.test_05.__nb_signature__ == (
         (r"def test_05(arg: int, /) -> int", "doc_1", None),

@@ -1944,7 +1944,7 @@ void nb_inst_reset(PyObject *obj, void *ptr, bool cpp_delete) noexcept {
           "inst_alloc_indirect()!");
 
     if (oldptr != nullptr) {
-        clear_instance(nb_type_data(Py_TYPE(inst)), inst, ptr);
+        clear_instance(nb_type_data(Py_TYPE(obj)), inst, ptr);
         inst->ready = 0;
         inst->destruct = 0;
         inst->cpp_delete = 0;

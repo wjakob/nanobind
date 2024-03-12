@@ -63,7 +63,7 @@ foreach (NAME functions classes ndarray stl enum typing make_iterator)
     MODULE test_${NAME}_ext
     OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
     PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PYI_PREFIX}test_${NAME}_ext
+    DEPENDS test_${NAME}_ext
     ${EXTRA})
 endforeach()
 

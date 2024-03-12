@@ -430,6 +430,8 @@ function (nanobind_add_stub name)
       ${NB_STUBGEN_EXTRA}
     )
     add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE})
+    file(GLOB STUB_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/*.pyi" )
+    set_target_properties(${name} PROPERTIES ADDITIONAL_CLEAN_FILES "${STUB_FILES}")
   else()
     set(NB_STUBGEN_EXTRA "")
     if (ARG_COMPONENT)

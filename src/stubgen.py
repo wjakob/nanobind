@@ -1094,41 +1094,46 @@ class StubGen:
         """
         Check source of module
         0 = From stdlib
-        1 = From the package being built
-        2 = From 3rd party package
+        1 = From 3rd party package
+        2 = From the package being built
         """
         if module.startswith(".") or module == self.module.__name__.split('.')[0]:
-            return 1
+            return 2
         
         try:
             spec = importlib.util.find_spec(module)
         except ModuleNotFoundError:
-            return 2
+            return 1
         
         if spec:
             if spec.origin and "site-packages" in spec.origin:
-                return 2
+                return 1
             else:
                 return 0
         else:
-            return 2
+            return 1
 
     def get(self) -> str:
         """Generate the final stub output"""
         s = ""
-        import_strs: Dict[Literal[0, 1, 2], List[str]] = {0: [], 1: [], 2: []}
+        last_party = None
 
-        for module in sorted(self.imports):
+        for module in sorted(self.imports, key=lambda i: str(self.check_party(i)) + i):
             imports = self.imports[module]
             items: List[str] = []
             party = self.check_party(module)
+            
+            if party != last_party:
+                if last_party is not None:
+                    s += "\n"
+                last_party = party
 
             for (k, v1), v2 in imports.items():
                 if k is None:
                     if v1 and v1 != module:
-                        import_strs[party].append(f"import {module} as {v1}")
+                        s += f"import {module} as {v1}\n"
                     else:
-                        import_strs[party].append(f"import {module}")
+                        s += f"import {module}\n"
                 else:
                     if k != v2 or v1:
                         items.append(f"{k} as {v2}")
@@ -1138,16 +1143,12 @@ class StubGen:
             items = sorted(items)
             if items:
                 items_v0 = ", ".join(items)
-                items_v0 = f"from {module} import {items_v0}"
+                items_v0 = f"from {module} import {items_v0}\n"
                 items_v1 = "(\n    " + ",\n    ".join(items) + "\n)"
-                items_v1 = f"from {module} import {items_v1}"
-                import_strs[party].append(items_v0 if len(items_v0) <= 70 else items_v1)
+                items_v1 = f"from {module} import {items_v1}\n"
+                s += items_v0 if len(items_v0) <= 70 else items_v1
 
-        # Import format: stdlib -> 3rd party -> Own library
-        for party in (0, 2, 1):
-            s += "\n".join(import_strs[party])
-            s += "\n\n" if import_strs[party] else ""
-        s += "\n"
+        s += "\n\n"
         s += self.put_abstract_enum_class()
 
         # Append the main generated stub

@@ -103,6 +103,42 @@ PyObject *inst_new_int(PyTypeObject *tp) {
 
 }
 
+static void register_instance(nb_inst *inst, void *ptr) {
+    // Update hash table that maps from C++ to Python instance
+    auto [it, success] = internals->inst_c2p.try_emplace(ptr, inst);
+
+    if (NB_UNLIKELY(!success)) {
+        void *entry = it->second;
+
+        // Potentially convert the map value into linked list format
+        if (!nb_is_seq(entry)) {
+            nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
+            check(first, "nanobind::detail::inst_new_ext(): list element "
+                         "allocation failed!");
+            first->inst = (PyObject *) entry;
+            first->next = nullptr;
+            entry = it.value() = nb_mark_seq(first);
+        }
+
+        nb_inst_seq *seq = nb_get_seq(entry);
+        while (true) {
+            check((nb_inst *) seq->inst != inst,
+                  "nanobind::detail::inst_new_ext(): duplicate instance!");
+            if (!seq->next)
+                break;
+            seq = seq->next;
+        }
+
+        nb_inst_seq *next = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
+        check(next,
+              "nanobind::detail::inst_new_ext(): list element allocation failed!");
+
+        next->inst = (PyObject *) inst;
+        next->next = nullptr;
+        seq->next = next;
+    }
+}
+
 /// Allocate memory for a nb_type instance with external storage
 PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
@@ -155,90 +191,30 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     self->intrusive = intrusive;
     self->unused = 0;
 
-    // Update hash table that maps from C++ to Python instance
-    auto [it, success] = internals->inst_c2p.try_emplace(value, self);
-
-    if (NB_UNLIKELY(!success)) {
-        void *entry = it->second;
-
-        // Potentially convert the map value into linked list format
-        if (!nb_is_seq(entry)) {
-            nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-            check(first, "nanobind::detail::inst_new_ext(): list element "
-                         "allocation failed!");
-            first->inst = (PyObject *) entry;
-            first->next = nullptr;
-            entry = it.value() = nb_mark_seq(first);
-        }
-
-        nb_inst_seq *seq = nb_get_seq(entry);
-        while (true) {
-            check((nb_inst *) seq->inst != self,
-                  "nanobind::detail::inst_new_ext(): duplicate instance!");
-            if (!seq->next)
-                break;
-            seq = seq->next;
-        }
-
-        nb_inst_seq *next = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-        check(next,
-              "nanobind::detail::inst_new_ext(): list element allocation failed!");
-
-        next->inst = (PyObject *) self;
-        next->next = nullptr;
-        seq->next = next;
-    }
+    register_instance(self, value);
 
     return (PyObject *) self;
 }
 
-static void inst_dealloc(PyObject *self) {
-    PyTypeObject *tp = Py_TYPE(self);
-    const type_data *t = nb_type_data(tp);
-
-    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
-    if (NB_UNLIKELY(gc)) {
-        PyObject_GC_UnTrack(self);
-
-        if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
-            PyObject **dict = nb_dict_ptr(self);
-            if (dict)
-                Py_CLEAR(*dict);
-        }
-    }
-
-    if (t->flags & (uint32_t) type_flags::is_weak_referenceable &&
-        nb_weaklist_ptr(self) != nullptr) {
-#if defined(PYPY_VERSION)
-        PyObject **weaklist = nb_weaklist_ptr(self);
-        if (weaklist)
-            Py_CLEAR(*weaklist);
-#else
-        PyObject_ClearWeakRefs(self);
-#endif
-    }
-
-    nb_inst *inst = (nb_inst *) self;
-    void *p = inst_ptr(inst);
-
+static void clear_instance(const type_data *t, nb_inst *inst, void *ptr) {
     if (inst->destruct) {
         check(t->flags & (uint32_t) type_flags::is_destructible,
               "nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
               "the destructor of a non-destructible type!", t->name);
         if (t->flags & (uint32_t) type_flags::has_destruct)
-            t->destruct(p);
+            t->destruct(ptr);
     }
 
     if (inst->cpp_delete) {
         if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
-            operator delete(p);
+            operator delete(ptr);
         else
-            operator delete(p, std::align_val_t(t->align));
+            operator delete(ptr, std::align_val_t(t->align));
     }
 
     if (NB_UNLIKELY(inst->clear_keep_alive)) {
         nb_ptr_map &keep_alive = internals->keep_alive;
-        nb_ptr_map::iterator it = keep_alive.find(self);
+        nb_ptr_map::iterator it = keep_alive.find(inst);
         check(it != keep_alive.end(),
               "nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
               "keep_alive information", t->name);
@@ -260,7 +236,7 @@ static void inst_dealloc(PyObject *self) {
 
     // Update hash table that maps from C++ to Python instance
     nb_ptr_map &inst_c2p = internals->inst_c2p;
-    nb_ptr_map::iterator it = inst_c2p.find(p);
+    nb_ptr_map::iterator it = inst_c2p.find(ptr);
     bool found = false;
 
     if (NB_LIKELY(it != inst_c2p.end())) {
@@ -296,9 +272,41 @@ static void inst_dealloc(PyObject *self) {
         }
     }
 
-    check(found,
+    check(found || !ptr,
           "nanobind::detail::inst_dealloc(\"%s\"): attempted to delete an "
-          "unknown instance (%p)!", t->name, p);
+          "unknown instance (%p)!", t->name, ptr);
+}
+
+static void inst_dealloc(PyObject *self) {
+    PyTypeObject *tp = Py_TYPE(self);
+    const type_data *t = nb_type_data(tp);
+
+    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+    if (NB_UNLIKELY(gc)) {
+        PyObject_GC_UnTrack(self);
+
+        if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
+            PyObject **dict = nb_dict_ptr(self);
+            if (dict)
+                Py_CLEAR(*dict);
+        }
+    }
+
+    if (t->flags & (uint32_t) type_flags::is_weak_referenceable &&
+        nb_weaklist_ptr(self) != nullptr) {
+#if defined(PYPY_VERSION)
+        PyObject **weaklist = nb_weaklist_ptr(self);
+        if (weaklist)
+            Py_CLEAR(*weaklist);
+#else
+        PyObject_ClearWeakRefs(self);
+#endif
+    }
+
+    nb_inst *inst = (nb_inst *) self;
+    void *p = inst_ptr(inst);
+
+    clear_instance(t, inst, p);
 
     if (NB_UNLIKELY(gc))
         PyObject_GC_Del(self);
@@ -1807,6 +1815,36 @@ PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
     return result;
 }
 
+PyObject *nb_inst_alloc_indirect(PyTypeObject *tp) {
+    const type_data *t = nb_type_data(tp);
+    check(!(t->flags & (uint32_t) type_flags::intrusive_ptr),
+          "nb_inst_alloc_indirect(): intrusive-refcounted type '%s' is not "
+          "supported here", t->name);
+
+    // Always allocate an instance using the indirect layout, so that it
+    // can store any pointer we might want later.
+    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+    nb_inst *self;
+    if (NB_LIKELY(!gc)) {
+        constexpr size_t size = sizeof(nb_inst) + sizeof(void*);
+        self = (nb_inst *) PyObject_Malloc(size);
+        if (!self)
+            return PyErr_NoMemory();
+        PyObject_Init((PyObject *) self, tp);
+        memset((char *) self + sizeof(PyObject), 0, size - sizeof(PyObject));
+    } else {
+        self = (nb_inst *) PyType_GenericAlloc(tp, 0);
+        if (!self)
+            return nullptr;
+    }
+
+    self->offset = sizeof(nb_inst);
+
+    // Don't register_instance yet; nb_inst_reset will do it.
+
+    return (PyObject *) self;
+}
+
 void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept {
     nb_inst *nbi = (nb_inst *) o;
     nbi->ready = ready;
@@ -1894,6 +1932,37 @@ void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
     nb_inst_destruct(dst);
     nb_inst_copy(dst, src);
     nbi->destruct = destruct;
+}
+
+void nb_inst_reset(PyObject *obj, void *ptr, bool cpp_delete) noexcept {
+    nb_inst *inst = (nb_inst *) obj;
+
+    void *oldptr;
+    memcpy(&oldptr, inst + 1, sizeof(oldptr));
+    check(oldptr == inst_ptr(inst),
+          "nanobind::detail::nb_inst_reset(): instance was not allocated with "
+          "inst_alloc_indirect()!");
+
+    if (oldptr != nullptr) {
+        clear_instance(nb_type_data(Py_TYPE(inst)), inst, ptr);
+        inst->ready = 0;
+        inst->destruct = 0;
+        inst->cpp_delete = 0;
+        inst->clear_keep_alive = 0;
+    }
+
+    memcpy(inst + 1, &ptr, sizeof(ptr));
+
+    int32_t offset = (int32_t) ((intptr_t) ptr - (intptr_t) inst);
+    bool direct = (intptr_t) inst + offset == (intptr_t) ptr;
+    inst->direct = direct;
+    inst->offset = direct ? offset : sizeof(nb_inst);
+    if (ptr != nullptr) {
+        inst->ready = 1;
+        inst->destruct = cpp_delete;
+        inst->cpp_delete = cpp_delete;
+        register_instance(inst, ptr);
+    }
 }
 
 #if defined(Py_LIMITED_API)

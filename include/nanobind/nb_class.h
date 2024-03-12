@@ -284,6 +284,9 @@ inline object inst_alloc(handle h) {
 inline object inst_alloc_zero(handle h) {
     return steal(detail::nb_inst_alloc_zero((PyTypeObject *) h.ptr()));
 }
+inline object inst_alloc_indirect(handle h) {
+    return steal(detail::nb_inst_alloc_indirect((PyTypeObject *) h.ptr()));
+}
 inline object inst_take_ownership(handle h, void *p) {
     return steal(detail::nb_inst_take_ownership((PyTypeObject *) h.ptr(), p));
 }
@@ -304,6 +307,9 @@ inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), 
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
 inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_replace_copy(dst.ptr(), src.ptr()); }
 inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_replace_move(dst.ptr(), src.ptr()); }
+inline void inst_reset(handle h, void *p, bool cpp_delete) {
+    detail::nb_inst_reset(h.ptr(), p, cpp_delete);
+}
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 inline void *type_get_slot(handle h, int slot_id) {
 #if NB_TYPE_GET_SLOT_IMPL

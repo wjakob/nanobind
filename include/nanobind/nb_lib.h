@@ -333,6 +333,11 @@ NB_CORE PyObject *nb_inst_alloc(PyTypeObject *t);
 /// Allocate an zero-initialized instance of type 't'
 NB_CORE PyObject *nb_inst_alloc_zero(PyTypeObject *t);
 
+/// Allocate an instance of type 't' with space for 'nb_inst_reset'
+/// to later associate it with a heap-allocated C++ object.
+/// Until 'nb_inst_reset' is called, 'nb_inst_ptr' will return null.
+NB_CORE PyObject *nb_inst_alloc_indirect(PyTypeObject *t);
+
 /// Allocate an instance of type 't' referencing the existing 'ptr'
 NB_CORE PyObject *nb_inst_reference(PyTypeObject *t, void *ptr,
                                     PyObject *parent);
@@ -357,6 +362,14 @@ NB_CORE void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept;
 
 /// Destruct 'dst', move-construct 'dst' from 'src', mark ready and retain 'destruct' status (must have the same nb_type)
 NB_CORE void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept;
+
+/// Reset the instance 'obj' so it now refers to the C++ object 'ptr', which
+/// may be null. 'obj' must have originally been created using
+/// 'nb_inst_alloc_indirect()'. The C++ object previously associated with
+/// 'obj', if any, will be treated as it would have been if 'obj' were
+/// deallocated. 'obj' takes ownership of 'ptr' if cpp_delete is true,
+/// and stores a reference otherwise.
+NB_CORE void nb_inst_reset(PyObject *obj, void *ptr, bool cpp_delete) noexcept;
 
 /// Check if a particular instance uses a Python-derived type
 NB_CORE bool nb_inst_python_derived(PyObject *o) noexcept;

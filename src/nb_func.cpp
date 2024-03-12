@@ -528,6 +528,43 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     uint8_t *args_flags = (uint8_t *) alloca(max_nargs * sizeof(uint8_t));
     bool *kwarg_used = (bool *) alloca(nkwargs_in * sizeof(bool));
 
+    // Ensure that keyword argument names are interned. That makes it faster
+    // to compare them against pre-interned argument names in the overload chain.
+    // Normal function calls will have their keyword arguments already interned,
+    // but we can't rely on that; it fails for things like fn(**json.loads(...)).
+    PyObject **kwnames = nullptr;
+
+#if !defined(PYPY_VERSION) && !defined(Py_LIMITED_API)
+    bool kwnames_interned = true;
+    for (size_t i = 0; i < nkwargs_in; ++i) {
+        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
+        kwnames_interned &= ((PyASCIIObject *) key)->state.interned != 0;
+    }
+    if (NB_LIKELY(kwnames_interned)) {
+        kwnames = ((PyTupleObject *) kwargs_in)->ob_item;
+        goto traverse_overloads;
+    }
+#endif
+
+    kwnames = (PyObject **) alloca(nkwargs_in * sizeof(PyObject *));
+    for (size_t i = 0; i < nkwargs_in; ++i) {
+        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i),
+                 *key_interned = key;
+        Py_INCREF(key_interned);
+
+        PyUnicode_InternInPlace(&key_interned);
+
+        if (NB_LIKELY(key == key_interned)) // string was already interned
+            Py_DECREF(key_interned);
+        else
+            cleanup.append(key_interned);
+        kwnames[i] = key_interned;
+    }
+
+#if !defined(PYPY_VERSION) && !defined(Py_LIMITED_API)
+  traverse_overloads:
+#endif
+
     /*  The logic below tries to find a suitable overload using two passes
         of the overload chain (or 1, if there are no overloads). The first pass
         is strict and permits no implicit conversions, while the second pass
@@ -610,12 +647,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     if (kwargs_in && ad.name_py) {
                         PyObject *hit = nullptr;
                         for (size_t j = 0; j < nkwargs_in; ++j) {
-                            PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, j);
-                            #if defined(PYPY_VERSION)
-                                bool match = PyUnicode_Compare(key, ad.name_py) == 0;
-                            #else
-                                bool match = (key == ad.name_py);
-                            #endif
+                            PyObject *key = kwnames[j];
+                            bool match = (key == ad.name_py);
                             if (match) {
                                 hit = args_in[nargs_in + j];
                                 kwarg_used[j] = true;
@@ -668,7 +701,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             if (has_var_kwargs) {
                 PyObject *dict = PyDict_New();
                 for (size_t j = 0; j < nkwargs_in; ++j) {
-                    PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, j);
+                    PyObject *key = kwnames[j];
                     if (!kwarg_used[j])
                         PyDict_SetItem(dict, key, args_in[nargs_in + j]);
                 }

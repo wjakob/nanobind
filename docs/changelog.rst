@@ -169,6 +169,12 @@ noteworthy:
   if nanobind did not know about that base.
   (PR `#471 <https://github.com/wjakob/nanobind/pull/471>`__).
 
+* nanobind can now handle keyword arguments that are not interned, which
+  avoids spurious TypeErrors in constructs like ``fn(**pickle.loads(...))``.
+  The speed of normal function calls (which generally do have interned
+  keyword arguments) should be unaffected.
+  (PR `#469 <https://github.com/wjakob/nanobind/pull/469>`__).
+
 * ABI version 14.
 
 .. rubric:: Footnote

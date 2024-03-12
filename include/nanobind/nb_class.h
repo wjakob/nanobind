@@ -491,8 +491,8 @@ public:
 
     template <typename Func, typename... Extra>
     NB_INLINE class_ &def(const char *name_, Func &&f, const Extra &... extra) {
-        cpp_function_def((detail::forward_t<Func>) f, scope(*this), name(name_),
-                         is_method(), extra...);
+        cpp_function_def<T>((detail::forward_t<Func>) f, scope(*this),
+                            name(name_), is_method(), extra...);
         return *this;
     }
 
@@ -525,13 +525,14 @@ public:
         object get_p, set_p;
 
         if constexpr (!std::is_same_v<Getter, std::nullptr_t>)
-            get_p = cpp_function((detail::forward_t<Getter>) getter,
-                                 is_method(), is_getter(),
-                                 rv_policy::reference_internal, detail::filter_getter(extra)...);
+            get_p = cpp_function<T>((detail::forward_t<Getter>) getter,
+                                    is_method(), is_getter(),
+                                    rv_policy::reference_internal,
+                                    detail::filter_getter(extra)...);
 
         if constexpr (!std::is_same_v<Setter, std::nullptr_t>)
-            set_p = cpp_function((detail::forward_t<Setter>) setter,
-                                 is_method(), detail::filter_setter(extra)...);
+            set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
+                                    is_method(), detail::filter_setter(extra)...);
 
         detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr());
         return *this;

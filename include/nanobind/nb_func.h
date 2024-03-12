@@ -244,13 +244,18 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
 NAMESPACE_END(detail)
 
-template <typename Return, typename... Args, typename... Extra>
+// The initial template parameter to cpp_function/cpp_function_def is
+// used by class_ to ensure that member pointers are treated as members
+// of the class being defined; other users can safely leave it at its
+// default of void.
+
+template <typename = void, typename Return, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (*f)(Args...), const Extra&... extra) {
     return steal(detail::func_create<true, true>(
         f, f, std::make_index_sequence<sizeof...(Args)>(), extra...));
 }
 
-template <typename Return, typename... Args, typename... Extra>
+template <typename = void, typename Return, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (*f)(Args...), const Extra&... extra) {
     detail::func_create<false, true>(
         f, f, std::make_index_sequence<sizeof...(Args)>(), extra...);
@@ -258,7 +263,7 @@ NB_INLINE void cpp_function_def(Return (*f)(Args...), const Extra&... extra) {
 
 /// Construct a cpp_function from a lambda function (pot. with internal state)
 template <
-    typename Func, typename... Extra,
+    typename = void, typename Func, typename... Extra,
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE object cpp_function(Func &&f, const Extra &...extra) {
     using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
@@ -268,7 +273,7 @@ NB_INLINE object cpp_function(Func &&f, const Extra &...extra) {
 }
 
 template <
-    typename Func, typename... Extra,
+    typename = void, typename Func, typename... Extra,
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
     using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
@@ -278,44 +283,52 @@ NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
 }
 
 /// Construct a cpp_function from a class method (non-const)
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...), const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     return steal(detail::func_create<true, true>(
-        [f](Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(Class *, Args...)) nullptr,
+        (Return(*)(T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...));
 }
 
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (Class::*f)(Args...), const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     detail::func_create<false, true>(
-        [f](Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(Class *, Args...)) nullptr,
+        (Return(*)(T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...);
 }
 
 /// Construct a cpp_function from a class method (const)
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...) const, const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     return steal(detail::func_create<true, true>(
-        [f](const Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](const T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(const Class *, Args...)) nullptr,
+        (Return(*)(const T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...));
 }
 
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (Class::*f)(Args...) const, const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     detail::func_create<false, true>(
-        [f](const Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](const T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(const Class *, Args...)) nullptr,
+        (Return(*)(const T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...);
 }
 

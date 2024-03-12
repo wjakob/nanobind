@@ -162,6 +162,13 @@ noteworthy:
   indicated using the new :cpp:struct:`nb::kw_only() <kw_only>` function
   annotation. (PR `#448 <https://github.com/wjakob/nanobind/pull/448>`__).
 
+* When binding methods on a class ``T``, nanobind will now produce a Python
+  function that expects a self argument of type ``T``. Previously, it would
+  use the type of the member pointer to determine the Python function
+  signature, which could be a base of ``T``, which would create problems
+  if nanobind did not know about that base.
+  (PR `#471 <https://github.com/wjakob/nanobind/pull/471>`__).
+
 * ABI version 14.
 
 .. rubric:: Footnote

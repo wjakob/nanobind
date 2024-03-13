@@ -645,7 +645,7 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     else
         name = spec->name;
 
-    PyObject *name_o = PyUnicode_FromString(name);
+    PyObject *name_o = PyUnicode_InternFromString(name);
     if (!name_o)
         return nullptr;
 
@@ -871,7 +871,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         t_name =
             extract_name("nanobind::detail::nb_type_new", "class ", t->name);
 
-    str name(t_name), qualname = name;
+    str name = steal<str>(PyUnicode_InternFromString(t_name)),
+        qualname = name;
     object modname;
     PyObject *mod = nullptr;
 

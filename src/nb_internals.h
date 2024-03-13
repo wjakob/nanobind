@@ -67,12 +67,13 @@ struct nb_inst { // usually: 24 bytes
     /// Should nanobind call 'operator delete' when this instance is GCed?
     uint32_t cpp_delete : 1;
 
-    /// Does this instance hold reference to others? (via internals.keep_alive)
+    /// Does this instance hold references to others? (via internals.keep_alive)
     uint32_t clear_keep_alive : 1;
 
     /// Does this instance use intrusive reference counting?
     uint32_t intrusive : 1;
 
+    // That's a lot of unused space. I wonder if there is a good use for it.
     uint32_t unused: 25;
 };
 

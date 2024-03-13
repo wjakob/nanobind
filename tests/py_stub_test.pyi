@@ -1,5 +1,6 @@
 from collections.abc import Callable
-from typing import overload, TypeVar
+from typing import TypeVar, overload
+
 
 class AClass:
     __annotations__: dict = {'STATIC_VAR' : int}

@@ -220,7 +220,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
     // Check for previous overloads
     if (has_scope && has_name) {
-        name = PyUnicode_FromString(name_cstr);
+        name = PyUnicode_InternFromString(name_cstr);
         check(name, "nb::detail::nb_func_new(\"%s\"): invalid name.", name_cstr);
 
         func_prev = PyObject_GetAttr(f->scope, name);

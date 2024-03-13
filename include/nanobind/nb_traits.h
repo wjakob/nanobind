@@ -101,6 +101,20 @@ struct analyze_method<Ret (Cls::*)(Args...) const noexcept> {
     static constexpr size_t argc = sizeof...(Args);
 };
 
+template <typename F>
+struct strip_function_object {
+    using type = typename analyze_method<decltype(&F::operator())>::func;
+};
+
+// Extracts the function signature from a function, function pointer or lambda.
+template <typename Function, typename F = std::remove_reference_t<Function>>
+using function_signature_t = std::conditional_t<
+    std::is_function_v<F>, F,
+    typename std::conditional_t<
+        std::is_pointer_v<F> || std::is_member_pointer_v<F>,
+        std::remove_pointer<F>,
+        strip_function_object<F>>::type>;
+
 template <typename T>
 using forward_t = std::conditional_t<std::is_lvalue_reference_v<T>, T, T &&>;
 

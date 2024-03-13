@@ -825,3 +825,47 @@ def test45_hidden_base():
     assert s.value == 20
     assert s.get_answer() == 200
     assert s.polymorphic() == 20
+
+
+def test46_custom_new():
+    import gc
+
+    u1 = t.UniqueInt(10)
+    assert u1.value() == 10 and u1.lookups() == 1
+
+    u2 = t.UniqueInt(10)
+    assert u1 is u2
+    assert u1.lookups() == 2
+
+    # test alternate constructor
+    assert t.UniqueInt("10") is u1
+    assert u1.lookups() == 3
+
+    u3 = t.UniqueInt(20)
+    assert u1 is not u3
+    assert u3.value() == 20 and u3.lookups() == 1
+
+    del u1
+    assert u2.lookups() == 3
+    assert u2 is t.UniqueInt(10)
+    assert u2.lookups() == 4
+
+    del u2
+    gc.collect()
+    gc.collect()
+
+    u4 = t.UniqueInt(10)
+    assert u4.value() == 10 and u4.lookups() == 1
+
+    # As if unpickling:
+    empty = t.UniqueInt.__new__(t.UniqueInt)
+    with pytest.warns(RuntimeWarning, match="access an uninitialized instance"):
+        with pytest.raises(TypeError):
+            empty.value()
+
+    # Make sure pickle support doesn't allow no-args construction by mistake
+    with pytest.raises(TypeError):
+        t.UniqueInt()
+
+    with pytest.raises(RuntimeError):
+        t.UniqueInt.__new__(int)

@@ -5,6 +5,7 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/tuple.h>
+#include <map>
 #include <memory>
 #include <cstring>
 #include <vector>
@@ -93,6 +94,28 @@ struct Wrapper {
 struct StructWithWeakrefs : Struct { };
 
 struct StructWithWeakrefsAndDynamicAttrs : Struct { };
+
+struct UniqueInt {
+    static std::map<int, std::weak_ptr<UniqueInt>> instances;
+
+    static std::shared_ptr<UniqueInt> make(int val) {
+        std::weak_ptr<UniqueInt>& entry = instances[val];
+        std::shared_ptr<UniqueInt> ret = entry.lock();
+        if (!ret) {
+            entry = ret = std::shared_ptr<UniqueInt>(new UniqueInt(val));
+        }
+        ++ret->nlook;
+        return ret;
+    }
+    int value() const { return val; }
+    int lookups() const { return nlook; }
+
+  private:
+    UniqueInt(int v) : val(v) {}
+    int val;
+    int nlook = 0;
+};
+std::map<int, std::weak_ptr<UniqueInt>> UniqueInt::instances;
 
 int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
@@ -591,4 +614,12 @@ NB_MODULE(test_classes_ext, m) {
         .def_prop_rw("prop", &BoundDerived::vget, &BoundDerived::vset)
         .def("get_answer", &BoundDerived::get_answer)
         .def("polymorphic", &BoundDerived::polymorphic);
+
+    nb::class_<UniqueInt>(m, "UniqueInt")
+        .def(nb::new_(&UniqueInt::make))
+        .def(nb::new_([](std::string s) {
+            return UniqueInt::make(std::atoi(s.c_str()));
+        }))
+        .def("value", &UniqueInt::value)
+        .def("lookups", &UniqueInt::lookups);
 }

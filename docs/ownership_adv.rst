@@ -330,11 +330,11 @@ must produce type-specific code to implement the above behaviors.
    uses ``std::make_shared<T>(...)`` to construct the object, and
    returns the resulting ``std::shared_ptr<T>`` to Python.
 
-There is no way to enable ``shared_from_this`` immediately upon
+If you need to enable ``shared_from_this`` immediately upon
 regular Python-side object construction (i.e., ``SomeType(*args)``
-rather than ``SomeType.some_fn(*args)``). If this limitation creates
-a problem for your application, you might get better results by using
-:ref:`intrusive reference counting <intrusive>` instead.
+rather than ``SomeType.some_fn(*args)``), you can bind a C++ function
+that returns ``std::shared_ptr<T>`` as your class's ``__new__`` method.
+See the documentation on :ref:`customizing object creation <custom_new>`.
 
 .. warning:: C++ code that receives a raw pointer ``T *obj`` *must not*
    assume that it has exclusive ownership of ``obj``, or even that

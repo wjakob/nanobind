@@ -64,7 +64,7 @@ template <typename Set, typename Key> struct set_caster {
         if (ret.is_valid()) {
             for (auto& key : src) {
                 object k = steal(
-                    Caster::from_cpp(forward_like<T>(key), policy, cleanup));
+                    Caster::from_cpp(forward_like_<T>(key), policy, cleanup));
 
                 if (!k.is_valid() || PySet_Add(ret.ptr(), k.ptr()) != 0) {
                     ret.reset();

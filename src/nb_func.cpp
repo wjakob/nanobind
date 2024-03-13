@@ -548,17 +548,17 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
     kwnames = (PyObject **) alloca(nkwargs_in * sizeof(PyObject *));
     for (size_t i = 0; i < nkwargs_in; ++i) {
-        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i),
-                 *key_interned = key;
-        Py_INCREF(key_interned);
+        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
+        Py_INCREF(key);
 
-        PyUnicode_InternInPlace(&key_interned);
+        kwnames[i] = key;
+        PyUnicode_InternInPlace(&kwnames[i]);
+        PyObject *key_interned = kwnames[i];
 
         if (NB_LIKELY(key == key_interned)) // string was already interned
-            Py_DECREF(key_interned);
+            Py_DECREF(key);
         else
             cleanup.append(key_interned);
-        kwnames[i] = key_interned;
     }
 
 #if !defined(PYPY_VERSION) && !defined(Py_LIMITED_API)
@@ -647,9 +647,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     if (kwargs_in && ad.name_py) {
                         PyObject *hit = nullptr;
                         for (size_t j = 0; j < nkwargs_in; ++j) {
-                            PyObject *key = kwnames[j];
-                            bool match = (key == ad.name_py);
-                            if (match) {
+                            if (kwnames[j] == ad.name_py) {
                                 hit = args_in[nargs_in + j];
                                 kwarg_used[j] = true;
                                 break;

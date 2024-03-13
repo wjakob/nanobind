@@ -78,7 +78,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         bool success =
             (... &&
              ((o[Is] = steal(make_caster<Ts>::from_cpp(
-                   forward_like<T>(std::get<Is>(value)), policy, cleanup))),
+                   forward_like_<T>(std::get<Is>(value)), policy, cleanup))),
               o[Is].is_valid()));
 
         if (!success)

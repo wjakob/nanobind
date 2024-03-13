@@ -75,9 +75,9 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
         if (ret.is_valid()) {
             for (auto &item : src) {
                 object k = steal(KeyCaster::from_cpp(
-                    forward_like<T>(item.first), policy, cleanup));
+                    forward_like_<T>(item.first), policy, cleanup));
                 object e = steal(ValCaster::from_cpp(
-                    forward_like<T>(item.second), policy, cleanup));
+                    forward_like_<T>(item.second), policy, cleanup));
 
                 if (!k.is_valid() || !e.is_valid() ||
                     PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {

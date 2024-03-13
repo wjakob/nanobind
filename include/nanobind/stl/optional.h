@@ -53,7 +53,7 @@ struct type_caster<std::optional<T>> {
         if (!value)
             return none().release();
 
-        return Caster::from_cpp(forward_like<T_>(*value), policy, cleanup);
+        return Caster::from_cpp(forward_like_<T_>(*value), policy, cleanup);
     }
 };
 

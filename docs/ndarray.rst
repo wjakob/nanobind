@@ -270,25 +270,25 @@ arrays).
 Arrays and function overloads
 -----------------------------
 
-A bound function taking a ndarray argument can declare multiple overloads
-with different constraints (e.g. a CPU and GPU implementation), in which
-case the first first matching overload will be called. When no perfect
-match could be found, nanobind will try each overload once more while
+A bound function taking an ndarray argument can declare multiple overloads
+with different constraints (e.g., a CPU and GPU implementation), in which
+case the first matching overload will be called. When no perfect
+match can be found, nanobind will try each overload once more while
 performing basic implicit conversions: it will convert strided arrays
 into C- or F-contiguous arrays (if requested) and perform type
-conversion. This, e.g., makes possible to call a function expecting a
+conversion. This, e.g., makes it possible to call a function expecting a
 ``float32`` array with ``float64`` data. Implicit conversions create
 temporary ndarrays containing a copy of the data, which can be
-undesirable. To suppress them, add a
+undesirable. To suppress them, add an
 :cpp:func:`nb::arg("my_array_arg").noconvert() <arg::noconvert>`
 or
-:cpp:func:`"my_array_arg"_a.noconvert() <arg::noconvert>` or
+:cpp:func:`"my_array_arg"_a.noconvert() <arg::noconvert>`
 function binding annotation.
 
 Binding functions that return arrays
 ------------------------------------
 
-To return a ndarray from C++ code, you must indicate its type, shape, a pointer
+To return an ndarray from C++ code, you must indicate its type, shape, a pointer
 to CPU/GPU memory, and what framework (NumPy/..) should be used to encapsulate
 the data.
 
@@ -478,7 +478,7 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
            static constexpr bool is_int     = false;
            static constexpr bool is_signed  = true;
        };
-   };
+   }
 
 Frequently asked questions
 --------------------------

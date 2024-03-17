@@ -1501,7 +1501,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    Function argument annotation to enable keyword-based calling, default
    arguments, passing ``None``, and implicit conversion hints. Note that when a
-   function argument should be annotated, you *must* specify annotations for
+   function argument should be annotated, you *must* specify annotations for all
    arguments of that function.
 
    Example use:

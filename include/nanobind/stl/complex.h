@@ -55,7 +55,7 @@ template <typename T> struct type_caster<std::complex<T>> {
             return true;
         }
 
-        return true;
+        return false;
     }
 
     template <typename T2>

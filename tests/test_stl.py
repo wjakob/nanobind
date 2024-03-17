@@ -684,6 +684,9 @@ def test68_complex_value():
     assert t.complex_value_double(val_32) == val_32
     assert t.complex_value_double(val_64) == val_64
 
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float([])
+
     try:
         import numpy as np
 
@@ -718,6 +721,9 @@ def test69_complex_array():
         (-0 - 1j),
         val2_32,
     ]
+
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_array_float([[]])
 
     try:
         import numpy as np

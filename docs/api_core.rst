@@ -2414,9 +2414,9 @@ Class binding
    .. code-block:: cpp
 
       class MyType {
-        private:
+      private:
           MyType();
-        public:
+      public:
           static std::shared_ptr<MyType> create();
           int value = 0;
       };

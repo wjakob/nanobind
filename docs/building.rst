@@ -7,6 +7,8 @@ This section assumes that you have followed the instructions to :ref:`install
 <installing>` nanobind. The easiest way to compile a nanobind-based extension
 involves a CMake-based build system. Other build systems can likely be used as
 well, but they are not officially supported.
+(The first section of the :ref:`CMake API reference <api_cmake>` mentions
+some alternatives.)
 
 Here, we will create a new package from scratch. If you already have an
 existing CMake build system, it should be straightforward to merge some of the

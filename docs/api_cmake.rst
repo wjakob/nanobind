@@ -8,6 +8,19 @@ modules. This is needed because quite a few steps are involved: nanobind must
 build the module, a library component, link the two together, and add a
 different set of compilation and linker flags depending on the target platform.
 
+If you prefer another build system, then you have the following options:
+
+- `Nicholas Junge <https://github.com/nicholasjng>`__ has created a `Bazel
+  interface <https://github.com/nicholasjng/nanobind-Bazel>`__ to nanobind.
+  Please report Bazel-specific issues there.
+
+- You could create a new build system from scratch that takes care of these
+  steps. See `this file
+  <https://github.com/wjakob/nanobind/blob/master/src/nb_combined.cpp>`__ for
+  inspiration on how to do this on Linux. Note that you will be on your own if
+  you choose to go this route---I unfortunately do not have the time to respond
+  to GitHub tickets related to custom build systems.
+
 The section on :ref:`building extensions <building>` provided an introductory
 example of how to set up a basic build system via the
 :cmake:command:`nanobind_add_module` command, which is the :ref:`high level

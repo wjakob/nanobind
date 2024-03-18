@@ -1,4 +1,5 @@
 libnanobind-static.a
+libnanobind-static-abi3.a
 libnanobind.dylib
 libnanobind.so
 libnanobind-abi3.dylib
@@ -12,6 +13,7 @@ inter_module.dll
 
 /.ninja_deps
 /.ninja_log
+/.cache
 /build.ninja
 /build
 /src/nanobind/cmake
@@ -20,6 +22,7 @@ inter_module.dll
 /src/nanobind/src
 /dist
 /bench
+compile_commands.json
 
 CMakeFiles
 CMakeCache.txt

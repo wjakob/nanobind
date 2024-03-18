@@ -46,17 +46,17 @@
    - here, the libnanobind part uses -O3 (optimization for highest peformance),
      while the bindings use -Os (optimization for the smallest size). The
      assumption here is that the code in 'my_ext.cpp' is glue code that isn't
-     performance sensitive but which can become very big in a size-optimized
+     performance sensitive but which can become very big in a perf.-optimized
      build. I find generally this to be a good default, but you may have other
      preferences. If in doubt, benchmark to see what works best.
 
    - The suffix of the final shared library depends on the Python version and
-     platform. You can ask a specific Python build about the right extension via
+     platform. You can query the Python binary about the right extension via
      "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"
 
-   - Some of the above details change if you want to create a limited API /
+   - Some of the above details change when creating a limited API /
      stable ABI build, which is possible starting with Python 3.12. See the
-     CMake build system for reference.
+     CMake build system for details.
 
    - On macOS, linking should uses a "linker response file" to benefit from the
      latest macOS linker technology ("chained fixups"). For details, see
@@ -66,12 +66,10 @@
      provide symbol lists that are needed to do so.
 
    - The CMake build system can also create a shared build of the 'libnanobind'
-     component, which is useful in complex binding projects that ship
-     multiple exension libraries.
-
-     As you can see, it altogether automates quite a few tedious
-     steps. My suggestion would be to only roll your own if you are 100%
-     convinced that this is really needed.
+     component, which is useful in complex binding projects that ship multiple
+     exension libraries. As you can see from the above long list, the current
+     build system automates quite a few tedious steps. My suggestion would be to
+     not roll your own unless you are 100% convinced that this is really needed.
 */
 
 #include "nb_internals.cpp"

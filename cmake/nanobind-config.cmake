@@ -202,6 +202,8 @@ function (nanobind_build_library TARGET_NAME)
   # included in Release/MinSizeRel modes
   target_compile_definitions(${TARGET_NAME} PRIVATE
     $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
+  target_compile_definitions(${TARGET_NAME} PRIVATE
+    -DNB_COMPACT_ASSERTION_MESSAGE=\"${NB_COMPACT_ASSERTION_MESSAGE}\")
 
   # If nanobind was installed without submodule dependencies, then the
   # dependencies directory won't exist and we need to find them.

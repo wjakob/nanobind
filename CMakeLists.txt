@@ -33,6 +33,11 @@ if (NB_MASTER_PROJECT AND NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES
     "MinSizeRel" "RelWithDebInfo")
 endif()
 
+set(NB_COMPACT_ASSERTION_MESSAGE
+    "Recompile using the 'Debug' or 'RelWithDebInfo' modes to obtain further information about this problem."
+    CACHE STRING
+    "Printed in Release or MinSizeRel builds if internal checks fail")
+
 # ---------------------------------------------------------------------------
 # Check whether all dependencies are present
 # ---------------------------------------------------------------------------

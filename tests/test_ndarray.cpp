@@ -1,7 +1,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
-#include <nanobind/stl/complex.h>
 #include <algorithm>
+#include <complex>
 #include <vector>
 
 namespace nb = nanobind;
@@ -21,7 +21,7 @@ namespace nanobind {
        static constexpr bool is_int     = false;
        static constexpr bool is_signed  = true;
    };
-};
+}
 #endif
 
 NB_MODULE(test_ndarray_ext, m) {

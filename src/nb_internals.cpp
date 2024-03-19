@@ -448,9 +448,13 @@ NB_NOINLINE void init(const char *name) {
 
 #if defined(NB_COMPACT_ASSERTIONS)
 NB_NOINLINE void fail_unspecified() noexcept {
-    fail("nanobind: encountered an unrecoverable error condition. Recompile "
-         "using the 'Debug' or 'RelWithDebInfo' modes to obtain further "
-         "information about this problem.");
+    #if defined(NB_COMPACT_ASSERTION_MESSAGE)
+        fail(NB_COMPACT_ASSERTION_MESSAGE);
+    #else
+        fail("nanobind: encountered an unrecoverable error condition. Recompile "
+             "using the 'Debug' or 'RelWithDebInfo' modes to obtain further "
+             "information about this problem.");
+    #endif
 }
 #endif
 

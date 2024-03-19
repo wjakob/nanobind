@@ -16,13 +16,13 @@ endif()
 # Check if FindPython/scikit-build-core defined a SOABI/SOSABI variable
 if(DEFINED SKBUILD_SOABI)
   set(NB_SOABI "${SKBUILD_SOABI}")
-elif(DEFINED Python_SOABI)
+elseif(DEFINED Python_SOABI)
   set(NB_SOABI "${Python_SOABI}")
 endif()
 
 if(DEFINED SKBUILD_SOSABI)
   set(NB_SOSABI "${SKBUILD_SOSABI}")
-elif(DEFINED Python_SOSABI)
+elseif(DEFINED Python_SOSABI)
   set(NB_SOSABI "${Python_SOSABI}")
 endif()
 

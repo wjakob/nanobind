@@ -13,20 +13,30 @@ else()
   set(NB_SUFFIX_EXT "${CMAKE_SHARED_MODULE_SUFFIX}")
 endif()
 
-# This was added in CMake 3.17+, also available earlier in scikit-build-core.
-# PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
-# report an incorrect value. Only use it if it looks correct (X-X-X form).
-if(DEFINED Python_SOABI AND "${Python_SOABI}" MATCHES ".+-.+-.+")
-  set(NB_SUFFIX ".${Python_SOABI}${NB_SUFFIX_EXT}")
+# Check if FindPython/scikit-build-core defined a SOABI/SOSABI variable
+if(DEFINED SKBUILD_SOABI)
+  set(NB_SOABI "${SKBUILD_SOABI}")
+elif(DEFINED Python_SOABI)
+  set(NB_SOABI "${Python_SOABI}")
 endif()
 
-# Python_SOSABI is guaranteed to be available in CMake 3.26+, and it may
-# also be available as part of backported FindPython in scikit-build-core.
-if(DEFINED Python_SOSABI)
-  if(Python_SOSABI STREQUAL "")
+if(DEFINED SKBUILD_SOSABI)
+  set(NB_SOSABI "${SKBUILD_SOSABI}")
+elif(DEFINED Python_SOSABI)
+  set(NB_SOSABI "${Python_SOSABI}")
+endif()
+
+# PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
+# report an incorrect value. Only use it if it looks correct (X-X-X form).
+if(DEFINED NB_SOABI AND "${NB_SOABI}" MATCHES ".+-.+-.+")
+  set(NB_SUFFIX ".${NB_SOABI}${NB_SUFFIX_EXT}")
+endif()
+
+if(DEFINED NB_SOSABI)
+  if(NB_SOSABI STREQUAL "")
     set(NB_SUFFIX_S "${NB_SUFFIX_EXT}")
   else()
-    set(NB_SUFFIX_S ".${Python_SOSABI}${NB_SUFFIX_EXT}")
+    set(NB_SUFFIX_S ".${NB_SOSABI}${NB_SUFFIX_EXT}")
   endif()
 endif()
 

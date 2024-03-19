@@ -89,6 +89,7 @@ def test03_constrain_dtype():
     t.pass_uint32(a_u32)
     t.pass_float32(a_f32)
     t.pass_complex64(a_cf64)
+    t.pass_complex64_const(a_cf64)
     t.pass_bool(a_bool)
 
     a_f32_const = a_f32.copy()
@@ -646,7 +647,7 @@ def test_uint32_complex_do_not_convert(variant):
     assert np.all(data == data2)
 
 @needs_numpy
-def test26_check_generic():
+def test36_check_generic():
     class DLPackWrapper:
         def __init__(self, o):
             self.o = o

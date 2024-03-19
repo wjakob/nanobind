@@ -65,12 +65,6 @@ struct dltensor {
 
 NAMESPACE_END(dlpack)
 
-NAMESPACE_BEGIN(detail)
-
-template <typename T> struct is_complex : std::false_type { };
-
-NAMESPACE_END(detail)
-
 template <ssize_t... Is> struct shape {
     static_assert(
         ((Is >= 0 || Is == -1) && ...),
@@ -89,7 +83,7 @@ struct jax { };
 struct ro { };
 
 template <typename T> struct ndarray_traits {
-    static constexpr bool is_complex = detail::is_complex<T>::value;
+    static constexpr bool is_complex = detail::is_complex_v<T>;
     static constexpr bool is_float   = std::is_floating_point_v<T>;
     static constexpr bool is_bool    = std::is_same_v<std::remove_cv_t<T>, bool>;
     static constexpr bool is_int     = std::is_integral_v<T> && !is_bool;

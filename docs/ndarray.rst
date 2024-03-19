@@ -115,9 +115,8 @@ The following constraints are available
 - A scalar type (``float``, ``uint8_t``, etc.) constrains the representation
   of the ndarray.
 
-  Complex arrays (i.e., ones based on ``std::complex<float>`` or
-  ``std::complex<double>``) are supported but additionally require including
-  the header file ``<nanobind/stl/complex.h>``.
+  Complex arrays (e.g., based on ``std::complex<float>`` or
+  ``std::complex<double>``) are supported.
 
 - This scalar type can be further annotated with ``const``, which is necessary
   if you plan to call nanobind functions with arrays that do not permit write

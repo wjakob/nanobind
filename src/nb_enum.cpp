@@ -390,22 +390,30 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
         goto error;
 
     if (!supp.entries) {
-        PyObject *dict = PyDict_New();
-        if (!dict)
-            goto error;
+        for (const auto& [key, supp_field] : {
+            std::pair{"@entries", &supp.entries},
+            {"@entries_by_name", &supp.entries_by_name}
+        }) {
+            PyObject *dict = PyDict_New();
+            if (!dict)
+                goto error;
 
-        // Stash the entries dict in the type object's dict so that GC
-        // can see the enumerators. nb_type_setattro ensures that user
-        // code can't reassign or delete this attribute (its logic
-        // is based on the @ prefix in the name).
-        if (PyObject_SetAttrString(type, "@entries", dict))
-            goto error;
+            // Stash the entries dict in the type object's dict so that GC
+            // can see the enumerators. nb_type_setattro ensures that user
+            // code can't reassign or delete this attribute (its logic
+            // is based on the @ prefix in the name).
+            if (PyObject_SetAttrString(type, key, dict))
+                goto error;
 
-        supp.entries = dict;
-        Py_DECREF(dict);
+            *supp_field = dict;
+            Py_DECREF(dict);
+        }
     }
 
     if (PyDict_SetItem(supp.entries, int_val, rec))
+        goto error;
+
+    if (PyDict_SetItem(supp.entries_by_name, name_obj, rec))
         goto error;
 
     Py_DECREF(int_val);

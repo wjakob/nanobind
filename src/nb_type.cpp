@@ -479,6 +479,29 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     return NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 }
 
+static PyObject* nb_enum_type_subscript(PyObject *obj, PyObject *key) {
+    if (!PyType_Check(obj)) {
+        puts("wtf");
+        std::abort();
+    }
+
+    PyTypeObject *cls = (PyTypeObject *)obj;
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+
+    PyObject* rec = PyDict_GetItem(supp.entries_by_name, key);
+    if (!rec) {
+        PyErr_Clear();
+        PyErr_Format(PyExc_RuntimeError,
+                    "%s[]: could not convert the input into an enumeration value!",
+                    nb_type_data(cls)->name);
+        return nullptr;
+    }
+
+    PyObject* item = NB_TUPLE_GET_ITEM(rec, 2);
+    Py_INCREF(item);
+    return item;
+}
+
 #if NB_TYPE_FROM_METACLASS_IMPL || NB_TYPE_GET_SLOT_IMPL
 
 struct nb_slot {
@@ -757,20 +780,29 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 #endif
 }
 
-static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
-    object key = steal(PyLong_FromSize_t(supplement));
+static PyTypeObject *nb_type_tp(size_t supplement, uint32_t flags) noexcept {
+    const bool is_enum = flags & (uint32_t) type_flags::is_enum;
+
+    constexpr size_t key_flag_shift_is_enum = sizeof(size_t) * 8 - 1;
+    size_t key_value = supplement | ((size_t) is_enum << key_flag_shift_is_enum);
+    object key = steal(PyLong_FromSize_t(key_value));
 
     PyTypeObject *tp =
         (PyTypeObject *) PyDict_GetItem(internals->nb_type_dict, key.ptr());
 
     if (NB_UNLIKELY(!tp)) {
-        PyType_Slot slots[] = {
-            { Py_tp_base, &PyType_Type },
-            { Py_tp_dealloc, (void *) nb_type_dealloc },
-            { Py_tp_setattro, (void *) nb_type_setattro },
-            { Py_tp_init, (void *) nb_type_init },
-            { 0, nullptr }
-        };
+        // Make sure to keep the size up to date with the code below.
+        PyType_Slot slots[6] = {};
+
+        PyType_Slot *next_slot = &slots[0];
+        *next_slot++ = { Py_tp_base, &PyType_Type };
+        *next_slot++ = { Py_tp_dealloc, (void *) nb_type_dealloc };
+        *next_slot++ = { Py_tp_setattro, (void *) nb_type_setattro };
+        *next_slot++ = { Py_tp_init, (void *) nb_type_init };
+
+        if (is_enum) {
+            *next_slot++ = { Py_mp_subscript, (void *) nb_enum_type_subscript };
+        }
 
 #if PY_VERSION_HEX >= 0x030C0000
         int basicsize = -(int) (sizeof(type_data) + supplement),
@@ -780,8 +812,9 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             itemsize = (int) PyType_Type.tp_itemsize;
 #endif
 
-        char name[17 + 20 + 1];
-        snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
+        constexpr size_t uint64_max_str_repr_size = 20;
+        char name[sizeof("nanobind.nb_type_") + uint64_max_str_repr_size];
+        snprintf(name, sizeof(name), "nanobind.nb_%s_%zu", is_enum ? "enum" : "type", supplement);
 
         PyType_Spec spec = {
             /* .name = */ name,
@@ -1080,7 +1113,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0);
+    PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0, t->flags);
 
     PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
     if (!result) {

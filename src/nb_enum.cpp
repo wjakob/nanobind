@@ -353,6 +353,23 @@ void nb_enum_prepare(const type_init_data *td,
     }
 }
 
+static int nb_enum_init_entries(PyObject *type, const char *key, PyObject **dest) {
+    PyObject *entries = PyDict_New();
+    if (!entries)
+        return -1;
+
+    // Stash the entries dict in the type object's dict so that GC
+    // can see the enumerators. nb_type_setattro ensures that user
+    // code can't reassign or delete this attribute (its logic
+    // is based on the @ prefix in the name).
+    if (PyObject_SetAttrString(type, key, entries))
+        return -1;
+
+    *dest = entries;
+    Py_DECREF(entries);
+    return 0;
+}
+
 void nb_enum_put(PyObject *type, const char *name, const void *value,
                  const char *doc) noexcept {
     PyObject *doc_obj, *rec, *int_val;
@@ -390,30 +407,17 @@ void nb_enum_put(PyObject *type, const char *name, const void *value,
         goto error;
 
     if (!supp.entries) {
-        for (const auto& [key, supp_field] : {
-            std::pair{"@entries", &supp.entries},
-            {"@entries_by_name", &supp.entries_by_name}
-        }) {
-            PyObject *dict = PyDict_New();
-            if (!dict)
-                goto error;
+        if (nb_enum_init_entries(type, "@entries", &supp.entries) < 0)
+            goto error;
 
-            // Stash the entries dict in the type object's dict so that GC
-            // can see the enumerators. nb_type_setattro ensures that user
-            // code can't reassign or delete this attribute (its logic
-            // is based on the @ prefix in the name).
-            if (PyObject_SetAttrString(type, key, dict))
-                goto error;
-
-            *supp_field = dict;
-            Py_DECREF(dict);
-        }
+        if (nb_enum_init_entries(type, "@values_by_name", &supp.values_by_name) < 0)
+            goto error;
     }
 
     if (PyDict_SetItem(supp.entries, int_val, rec))
         goto error;
 
-    if (PyDict_SetItem(supp.entries_by_name, name_obj, rec))
+    if (PyDict_SetItem(supp.values_by_name, name_obj, (PyObject *) inst))
         goto error;
 
     Py_DECREF(int_val);

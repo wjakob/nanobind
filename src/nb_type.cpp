@@ -479,27 +479,56 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     return NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 }
 
-static PyObject* nb_enum_type_subscript(PyObject *obj, PyObject *key) {
-    if (!PyType_Check(obj)) {
-        puts("wtf");
-        std::abort();
+static int nb_enum_type_contains(PyTypeObject *cls, PyObject *item) {
+    if (Py_IS_TYPE(item, cls)) {
+        return 1;
     }
 
-    PyTypeObject *cls = (PyTypeObject *)obj;
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+    if (!supp.entries) {
+        return 0;
+    }
+
+    return PyDict_GetItem(supp.entries, item) != nullptr;
+}
+
+static object nb_enum_type_values(PyTypeObject *cls) {
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+    if (supp.values_by_name) {
+        return steal(PyDict_Values(supp.values_by_name));
+    } else {
+        return steal(PyTuple_New(0));
+    }
+}
+
+static PyObject *nb_enum_type_iter(PyTypeObject *cls) {
+    object values = nb_enum_type_values(cls);
+    return values ? PyObject_GetIter(values.ptr()) : nullptr;
+}
+
+static PyObject *nb_enum_type_reversed(PyObject *cls, [[maybe_unused]] PyObject *unused) {
+    object values = nb_enum_type_values((PyTypeObject *) cls);
+    return values ? values.attr("__reversed__")().release().ptr() : nullptr;
+}
+
+static PyObject *nb_enum_type_subscript(PyTypeObject *cls, PyObject *key) {
     enum_supplement &supp = type_supplement<enum_supplement>(cls);
 
-    PyObject* rec = PyDict_GetItem(supp.entries_by_name, key);
-    if (!rec) {
+    PyObject *value = supp.values_by_name ? PyDict_GetItem(supp.values_by_name, key) : nullptr;
+    if (!value) {
         PyErr_Clear();
-        PyErr_Format(PyExc_RuntimeError,
-                    "%s[]: could not convert the input into an enumeration value!",
-                    nb_type_data(cls)->name);
+        PyErr_Format(PyExc_KeyError,
+                     "%s[]: could not convert %R into an enumeration value!",
+                     nb_type_data(cls)->name, key);
         return nullptr;
     }
 
-    PyObject* item = NB_TUPLE_GET_ITEM(rec, 2);
-    Py_INCREF(item);
-    return item;
+    return value;
+}
+
+static Py_ssize_t nb_enum_type_length(PyTypeObject *cls) {
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+    return supp.entries ? PyDict_Size(supp.entries) : 0;
 }
 
 #if NB_TYPE_FROM_METACLASS_IMPL || NB_TYPE_GET_SLOT_IMPL
@@ -780,6 +809,11 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 #endif
 }
 
+static PyMethodDef enum_reversed_method[] = {
+    { "__reversed__", nb_enum_type_reversed, METH_NOARGS, nullptr },
+    { nullptr }
+};
+
 static PyTypeObject *nb_type_tp(size_t supplement, uint32_t flags) noexcept {
     const bool is_enum = flags & (uint32_t) type_flags::is_enum;
 
@@ -791,8 +825,9 @@ static PyTypeObject *nb_type_tp(size_t supplement, uint32_t flags) noexcept {
         (PyTypeObject *) PyDict_GetItem(internals->nb_type_dict, key.ptr());
 
     if (NB_UNLIKELY(!tp)) {
-        // Make sure to keep the size up to date with the code below.
-        PyType_Slot slots[6] = {};
+        // Make sure to keep the size up to date with the code below (max number of slots + 1 for
+        // the null terminator).
+        PyType_Slot slots[10] = {};
 
         PyType_Slot *next_slot = &slots[0];
         *next_slot++ = { Py_tp_base, &PyType_Type };
@@ -802,6 +837,10 @@ static PyTypeObject *nb_type_tp(size_t supplement, uint32_t flags) noexcept {
 
         if (is_enum) {
             *next_slot++ = { Py_mp_subscript, (void *) nb_enum_type_subscript };
+            *next_slot++ = { Py_mp_length, (void *) nb_enum_type_length };
+            *next_slot++ = { Py_sq_contains, (void *) nb_enum_type_contains };
+            *next_slot++ = { Py_tp_iter, (void *) nb_enum_type_iter };
+            *next_slot++ = { Py_tp_methods, (void *) enum_reversed_method };
         }
 
 #if PY_VERSION_HEX >= 0x030C0000

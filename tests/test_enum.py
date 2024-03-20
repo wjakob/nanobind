@@ -162,3 +162,32 @@ def test08_enum_comparisons():
     assert t.SEnum.B > t.Enum.A
     assert t.Enum.A <= t.SEnum.A and t.Enum.A >= t.SEnum.A
     assert t.Enum.A != t.SEnum.A
+
+def test09_enum_metaclass_methods():
+    for enum, variant_names in ((t.Enum, ["A", "B", "C"]),):
+        variants = [getattr(enum, name) for name in variant_names]
+
+        # __iter__
+        assert list(enum) == variants
+
+        # __contains__
+        for enum_variant in variants:
+            assert enum_variant in enum
+            assert enum_variant.value in enum
+
+        for not_enum_variant in (42, None, enum, "nope"):
+            assert not_enum_variant not in enum
+
+        # __getitem__
+        for variant, variant_name in zip(variants, variant_names):
+            assert variant is enum[variant_name]
+
+        for key in ("name", "value", "__class__", 42, None, enum):
+            with pytest.raises(KeyError):
+                enum[key]
+
+        # __len__
+        assert len(enum) == len(variant_names)
+
+        # __reversed__
+        assert list(reversed(enum)) == list(reversed(variants))

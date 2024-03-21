@@ -87,7 +87,7 @@ a ``MxNx3`` array of 8-bit unsigned integers.
 
 .. code-block:: cpp
 
-   m.def("process", [](nb::ndarray<uint8_t, nb::shape<nb::any, nb::any, 3>,
+   m.def("process", [](nb::ndarray<uint8_t, nb::shape<-1, -1, 3>,
                                    nb::device::cpu> data) {
        // Double brightness of the MxNx3 RGB image
        for (size_t y = 0; y < data.shape(0); ++y)
@@ -122,14 +122,14 @@ The following constraints are available
   if you plan to call nanobind functions with arrays that do not permit write
   access.
 
-- The :cpp:class:`nb::shape <shape>` annotation (as in ``nb::shape<nb::any,
+- The :cpp:class:`nb::shape <shape>` annotation (as in ``nb::shape<-1,
   3>``) simultaneously constrains the number of array dimensions and the size
-  per dimension. A value of :cpp:var:`nb::any <any>` leaves the corresponding
+  per dimension. A value of ``-1`` leaves the corresponding
   dimension unconstrained.
 
   :cpp:class:`nb::ndim <ndim>` is shorter to write when only the dimension
-  should be constrained. For example, ``nb::ndim<2>`` is equivalent to
-  ``nb::shape<nb::any, nb::any>``.
+  should be constrained. For example, ``nb::ndim<3>`` is equivalent to
+  ``nb::shape<-1, -1, -1>``.
 
 - Device tags like :cpp:class:`nb::device::cpu <device::cpu>` or
   :cpp:class:`nb::device::cuda <device::cuda>` constrain the source device
@@ -302,7 +302,7 @@ NumPy floating point matrix that does not permit write access.
    NB_MODULE(my_ext, m) {
        m.def("ret_numpy", []() {
            size_t shape[2] = { 2, 4 };
-           return nb::ndarray<nb::numpy, const float, nb::shape<2, nb::any>>(
+           return nb::ndarray<nb::numpy, const float, nb::shape<2, -1>>(
                data, /* ndim = */ 2, shape);
        });
     }

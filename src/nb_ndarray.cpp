@@ -262,8 +262,14 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
 
     scoped_pymalloc<int64_t> strides((size_t) view->ndim);
     scoped_pymalloc<int64_t> shape((size_t) view->ndim);
+    const int64_t itemsize = static_cast<int64_t>(view->itemsize);
     for (size_t i = 0; i < (size_t) view->ndim; ++i) {
-        strides[i] = (int64_t) (view->strides[i] / view->itemsize);
+        int64_t stride = view->strides[i] / itemsize;
+        if (stride * itemsize != view->strides[i]) {
+            PyBuffer_Release(view.get());
+            return nullptr;
+        }
+        strides[i] = stride;
         shape[i] = (int64_t) view->shape[i];
     }
 

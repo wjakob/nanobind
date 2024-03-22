@@ -44,6 +44,10 @@ NB_MODULE(test_ndarray_ext, m) {
         return t.nbytes();
     }, "array"_a.noconvert());
 
+    m.def("get_stride", [](const nb::ndarray<> &t, size_t i) {
+        return t.stride(i);
+    }, "array"_a.noconvert(), "i"_a);
+
     m.def("check_shape_ptr", [](const nb::ndarray<> &t) {
         std::vector<int64_t> shape(t.ndim());
         std::copy(t.shape_ptr(), t.shape_ptr() + t.ndim(), shape.begin());

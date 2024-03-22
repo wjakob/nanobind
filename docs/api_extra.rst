@@ -634,13 +634,13 @@ section <ndarrays>`.
    .. cpp:function:: size_t itemsize() const
 
       Return the size of a single array element in bytes. The returned value
-      is rounded to the next full byte in case of bit-level representations
+      is rounded up to the next full byte in case of bit-level representations
       (query :cpp:member:`dtype::bits` for bit-level granularity).
 
    .. cpp:function:: size_t nbytes() const
 
       Return the size of the entire array bytes. The returned value is rounded
-      to the next full byte in case of bit-level representations.
+      up to the next full byte in case of bit-level representations.
 
    .. cpp:function:: size_t shape(size_t i) const
 
@@ -648,7 +648,7 @@ section <ndarrays>`.
 
    .. cpp:function:: int64_t stride(size_t i) const
 
-      Return the stride of dimension `i`.
+      Return the stride (in number of elements) of dimension `i`.
 
    .. cpp:function:: const int64_t* shape_ptr() const
 

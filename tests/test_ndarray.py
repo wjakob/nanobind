@@ -558,7 +558,7 @@ def test28_reference_internal():
     assert msg in str(excinfo.value)
 
 @needs_numpy
-def test29_force_contig_pytorch():
+def test29_force_contig_numpy():
     a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
     b = t.make_contig(a)
     assert b is a
@@ -656,3 +656,28 @@ def test36_check_generic():
 
     arr = DLPackWrapper(np.zeros((1)))
     assert t.check(arr)
+
+@needs_numpy
+def test37_noninteger_stride():
+    a = np.array([[1, 2, 3, 4, 0, 0], [5, 6, 7, 8, 0, 0]], dtype=np.float32)
+    s = a[:, 0:4]  # slice
+    t.pass_float32(s)
+    assert t.get_stride(s, 0) == 6;
+    assert t.get_stride(s, 1) == 1;
+    v = s.view(np.complex64)
+    t.pass_complex64(v)
+    assert t.get_stride(v, 0) == 3;
+    assert t.get_stride(v, 1) == 1;
+
+    a = np.array([[1, 2, 3, 4, 0], [5, 6, 7, 8, 0]], dtype=np.float32)
+    s = a[:, 0:4]  # slice
+    t.pass_float32(s)
+    assert t.get_stride(s, 0) == 5;
+    assert t.get_stride(s, 1) == 1;
+    v = s.view(np.complex64)
+    with pytest.raises(TypeError) as excinfo:
+        t.pass_complex64(v)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    with pytest.raises(TypeError) as excinfo:
+        t.get_stride(v, 0);
+    assert 'incompatible function arguments' in str(excinfo.value)

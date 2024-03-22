@@ -173,11 +173,11 @@ NB_MODULE(test_ndarray_ext, m) {
 
     m.def("ret_numpy_const_ref", []() {
         size_t shape[2] = { 2, 4 };
-        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, 2, shape);
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, 2, shape, nb::handle());
     }, nb::rv_policy::reference);
 
     m.def("ret_numpy_const", []() {
-        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, { 2, 4 });
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, { 2, 4 }, nb::handle());
     });
 
     m.def("ret_pytorch", []() {
@@ -218,7 +218,7 @@ NB_MODULE(test_ndarray_ext, m) {
 
 
     struct Cls {
-        auto f1() { return nb::ndarray<nb::numpy, float>(data, { 10 }); }
+        auto f1() { return nb::ndarray<nb::numpy, float>(data, { 10 }, nb::handle()); }
         auto f2() { return nb::ndarray<nb::numpy, float>(data, { 10 }, nb::cast(this, nb::rv_policy::none)); }
         auto f3(nb::handle owner) { return nb::ndarray<nb::numpy, float>(data, { 10 }, owner); }
 
@@ -292,9 +292,9 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("cast", [](bool b) -> nb::ndarray<nb::numpy> {
         using Ret = nb::ndarray<nb::numpy>;
         if (b)
-            return Ret(nb::ndarray<nb::numpy, float, nb::shape<>>(f_global, 0, nullptr));
+            return Ret(nb::ndarray<nb::numpy, float, nb::shape<>>(f_global, 0, nullptr, nb::handle()));
         else
-            return Ret(nb::ndarray<nb::numpy, int, nb::shape<>>(i_global, 0, nullptr));
+            return Ret(nb::ndarray<nb::numpy, int, nb::shape<>>(i_global, 0, nullptr, nb::handle()));
     });
 
     // issue #365

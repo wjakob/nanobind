@@ -181,6 +181,11 @@ noteworthy:
   keyword arguments) should be unaffected.
   (PR `#469 <https://github.com/wjakob/nanobind/pull/469>`__).
 
+* The ``owner=nb::handle()`` default value of the :cpp:func:`nb::ndarray
+  <ndarray>` constructor was removed since it was bug-prone. You now have to
+  specify the owner explicitly. The previous default (``nb::handle()``)
+  continues to be a valid argument.
+
 * ABI version 14.
 
 .. rubric:: Footnote

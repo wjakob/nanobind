@@ -387,23 +387,23 @@ public:
     template <typename... Args2>
     explicit ndarray(const ndarray<Args2...> &other) : ndarray(other.m_handle) { }
 
-    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> value,
+    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> data,
             size_t ndim,
             const size_t *shape,
-            handle owner = nanobind::handle(),
+            handle owner,
             const int64_t *strides = nullptr,
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int32_t device_type = device::cpu::value,
             int32_t device_id = 0) {
         m_handle = detail::ndarray_create(
-            (void *) value, ndim, shape, owner.ptr(), strides, &dtype,
+            (void *) data, ndim, shape, owner.ptr(), strides, &dtype,
             std::is_const_v<Scalar>, device_type, device_id);
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
-    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> value,
+    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> data,
             std::initializer_list<size_t> shape,
-            handle owner = nanobind::handle(),
+            handle owner,
             std::initializer_list<int64_t> strides = { },
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int32_t device_type = device::cpu::value,
@@ -413,7 +413,7 @@ public:
             detail::fail("ndarray(): shape and strides have incompatible size!");
 
         m_handle = detail::ndarray_create(
-            (void *) value, shape.size(), shape.begin(), owner.ptr(),
+            (void *) data, shape.size(), shape.begin(), owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), &dtype,
             std::is_const_v<Scalar>, device_type, device_id);
 

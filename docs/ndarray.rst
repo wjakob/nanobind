@@ -193,7 +193,7 @@ An improved version of the example using such a view is shown below:
 .. code-block:: cpp
 
    void fill(nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu> arg) {
-       auto v = arg.view(); /// <-- new!
+       auto v = arg.view(); // <-- new!
 
        for (size_t i = 0; i < v.shape(0); ++i) // Important; use 'v' instead of 'arg' everywhere in loop
            for (size_t j = 0; j < v.shape(1); ++j)
@@ -287,11 +287,11 @@ function binding annotation.
 Binding functions that return arrays
 ------------------------------------
 
-To return an ndarray from C++ code, you must indicate its type, shape, a pointer
-to CPU/GPU memory, and what framework (NumPy/..) should be used to encapsulate
-the data.
+To return an ndarray from C++ code, you must indicate its type, shape, a
+pointer to CPU/GPU memory, the *owner* of that data, and what framework
+(NumPy/..) should be used to encapsulate the array data.
 
-The following simple binding declaration shows how to return a ``2x4``
+The following simple binding declaration shows how to return a static ``2x4``
 NumPy floating point matrix that does not permit write access.
 
 .. code-block:: cpp
@@ -303,9 +303,22 @@ NumPy floating point matrix that does not permit write access.
        m.def("ret_numpy", []() {
            size_t shape[2] = { 2, 4 };
            return nb::ndarray<nb::numpy, const float, nb::shape<2, -1>>(
-               data, /* ndim = */ 2, shape);
+               /* data = */ data,
+               /* ndim = */ 2,
+               /* shape pointer = */ shape,
+               /* owner = */ nb::handle());
        });
     }
+
+In this example, ``data`` is a global constant stored in the program's data
+segment, which means that it will never be deleted. In this special case, it is
+valid to specify a null owner (``nb::handle()``).
+
+In general, the ``owner`` argument must be specify a Python object, whose
+continued existence keeps the underlying memory region alive. If your ndarray
+bindings lead to undefined behavior (data corruption or crashes), then this is
+usually an issue related to incorrect data ownership. Please review the section
+on :ref:`data ownership <ndarray-ownership>` for further examples.
 
 The auto-generated docstring of this function is:
 
@@ -342,7 +355,7 @@ and order annotations like :cpp:class:`nb::shape <shape>`, :cpp:class:`nb::ndim
 actually satisfied. It will never convert an incompatible result into the right
 format.
 
-Furthermore, non-CPU ndarrays must be explicitly indicate the
+Furthermore, non-CPU nd-arrays must be explicitly indicate the
 device type and device ID using special parameters of the :cpp:func:`ndarray()
 <ndarray::ndarray()>` constructor shown below. Device types indicated via
 template arguments, e.g., ``nb::ndarray<..., nb::device::cuda>``, are only used
@@ -352,10 +365,10 @@ The full signature of the ndarray constructor is:
 
 .. code-block:: cpp
 
-   ndarray(void *value,
+   ndarray(void *data,
            size_t ndim,
            const size_t *shape,
-           handle owner = nb::handle(),
+           handle owner,
            const int64_t *strides = nullptr,
            dlpack::dtype dtype = nb::dtype<Scalar>(),
            int32_t device_type = nb::device::cpu::value,
@@ -371,17 +384,27 @@ of shape/stride arrays for brace-initialization and infers ``ndim``:
 
 .. code-block:: cpp
 
-   ndarray(void *value,
+   ndarray(void *data,
            std::initializer_list<size_t> shape,
-           handle owner = nb::handle(),
+           handle owner,
            st::initializer_list<int64_t> strides = { },
            dlpack::dtype dtype = nb::dtype<Scalar>(),
            int32_t device_type = nb::device::cpu::value,
            int32_t device_id = 0) { .. }
 
-The ``owner`` parameter can be used to keep another Python object alive
-while the ndarray data is referenced by a consumer. This mechanism can be
-used to implement a data destructor as follows:
+.. _ndarray-ownership:
+
+Data ownership
+--------------
+
+The ``owner`` argument of the :cpp:class:`ndarray`` constructor must specify a
+Python object that keeps the underlying memory region alive.
+
+A common use case entails returning an nd-array view of an existing C++
+container. In this case, you could construct a :cpp:class:`nb::capsule
+<capsule>` to take ownership of this container. A capsule is an opaque pointer
+with a destructor callback. In this case, its destructor would call the
+C++ ``delete`` operator. An example is shown below:
 
 .. code-block:: cpp
 
@@ -397,10 +420,32 @@ used to implement a data destructor as follows:
        return nb::ndarray<nb::pytorch, float>(data, { 2, 4 }, owner);
    });
 
-In other situations, it may be helpful to have the capsule manage the lifetime
-of a custom data structure that contains one or multiple containers. The same
-capsule can be referenced from multiple ndarrays and will call the deleter
-when all of them have expired:
+In method bindings, you can use the
+:cpp:enumerator:`rv_policy::reference_internal` return value policy to set the
+owner to the ``self`` argument of the method so that the nd-array will keep the
+associated Python/C++ instance alive. It is fine to specify a null owner in
+this case.
+
+.. code-block:: cpp
+
+   struct Vector {
+       float pos[3];
+   };
+
+   nb::class_<Vector>(m, "Vector")
+      .def("pos",
+           [](Vector &v) {
+               return nb::ndarray<nb::numpy, float>(
+                   /* data = */ v.pos,
+                   /* shape = */ { 3 },
+                   /* owner = */ nb::handle()
+               );
+           }, nb::rv_policy::reference_internal);
+
+In other situations, it may be helpful to have a capsule that manages the
+lifetime of data structures containing *multiple* containers. The same capsule
+can be referenced from different nd-arrays and will call the deleter when all
+of them have expired:
 
 .. code-block:: cpp
 
@@ -430,7 +475,7 @@ when all of them have expired:
 Return value policies
 ---------------------
 
-Function bindings that return ndarrays admit additional return value policy
+Function bindings that return nd-arrays admit additional return value policy
 annotations to determine whether or not a copy should be made. They are
 interpreted as follows:
 
@@ -482,8 +527,8 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
 Frequently asked questions
 --------------------------
 
-nanobind does not accept my NumPy array
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Why does nanobind not accept my NumPy array?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When binding a function that takes an ``nb::ndarray<T, ...>`` as input, nanobind
 will by default require that array to be writable. This means that the function

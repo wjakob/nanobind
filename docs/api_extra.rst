@@ -587,12 +587,12 @@ section <ndarrays>`.
       Move assignment operator. Steals the referenced array without changing reference counts.
       Decreases the reference count of the previously referenced array and potentially destroy it.
 
-   .. cpp:function:: ndarray(void * value, size_t ndim, const size_t * shape, handle owner = nanobind::handle(), const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+   .. cpp:function:: ndarray(void * data, size_t ndim, const size_t * shape, handle owner = nanobind::handle(), const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
 
       Create an array wrapping an existing memory allocation. The following
       parameters can be specified:
 
-      - `value`: pointer address of the memory region. When the ndarray is
+      - `data`: pointer address of the memory region. When the ndarray is
         parameterized by a constant scalar type to indicate read-only access, a
         const pointer must be passed instead.
 
@@ -612,7 +612,7 @@ section <ndarrays>`.
       - The `device_type` and `device_id` indicate the device and address
         space associated with the pointer `value`.
 
-   .. cpp:function:: ndarray(void * value, const std::initializer_list<size_t> shape, handle owner = nanobind::handle(), std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+   .. cpp:function:: ndarray(void * data, const std::initializer_list<size_t> shape, handle owner = nanobind::handle(), std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
 
       Alternative form of the above constructor, which accepts the ``shape``
       and ``strides`` arguments using a ``std::initializer_list``. It

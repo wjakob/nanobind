@@ -162,3 +162,12 @@ def test06_vector_shared():
 
     assert v[0].a == 100
     assert v[1].a == 200
+
+
+def test07_vector_noncopyable():
+    vnc = t.get_vnc(5)
+    for i in range(0, 5):
+        assert vnc[i].value == i + 1
+
+    for i, j in enumerate(vnc, start=1):
+        assert j.value == i

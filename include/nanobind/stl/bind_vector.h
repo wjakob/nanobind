@@ -37,15 +37,20 @@ template <> struct iterator_access<typename std::vector<bool>::iterator> {
 NAMESPACE_END(detail)
 
 
-template <typename Vector, typename... Args>
+template <typename Vector,
+          rv_policy getitem_policy = rv_policy::automatic_reference,
+          typename... Args>
 class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
     using ValueRef = typename detail::iterator_access<typename Vector::iterator>::result_type;
     using Value = std::decay_t<ValueRef>;
 
     static_assert(
-        !detail::is_base_caster_v<detail::make_caster<Value>> || detail::is_copy_constructible_v<Value>,
-        "bind_vector(): the value type must be copy-constructible."
-    );
+        !detail::is_base_caster_v<detail::make_caster<Value>> ||
+        detail::is_copy_constructible_v<Value> ||
+        (getitem_policy != rv_policy::automatic_reference &&
+         getitem_policy != rv_policy::copy),
+        "bind_vector(): the generated __getitem__ would copy elements, so the "
+        "element type must be copy-constructible");
 
     handle cl_cur = type<Vector>();
     if (cl_cur.is_valid()) {
@@ -76,7 +81,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
         .def("__getitem__",
              [](Vector &v, Py_ssize_t i) -> ValueRef {
                  return v[detail::wrap(i, v.size())];
-             }, std::is_pointer_v<Value> ? rv_policy::take_ownership : rv_policy::copy)
+             }, getitem_policy)
 
         .def("clear", [](Vector &v) { v.clear(); },
              "Remove all items from list.");

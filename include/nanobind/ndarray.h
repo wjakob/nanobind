@@ -265,6 +265,7 @@ template <typename T> struct ndarray_arg<T, enable_if_t<T::is_device>> {
 template <typename... Ts> struct ndarray_info {
     using scalar_type = void;
     using shape_type = void;
+    constexpr static bool is_ro = false;
     constexpr static auto name = const_name("ndarray");
     constexpr static ndarray_framework framework = ndarray_framework::none;
     constexpr static char order = '\0';
@@ -275,6 +276,11 @@ template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_i
         std::conditional_t<ndarray_traits<T>::is_float || ndarray_traits<T>::is_int ||
                            ndarray_traits<T>::is_bool || ndarray_traits<T>::is_complex,
                            T, typename ndarray_info<Ts...>::scalar_type>;
+    constexpr static bool is_ro = std::is_const_v<scalar_type>;
+};
+
+template <typename... Ts> struct ndarray_info<ro, Ts...> : ndarray_info<Ts...> {
+    constexpr static bool is_ro = true;
 };
 
 template <ssize_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {
@@ -309,8 +315,8 @@ template <typename... Ts> struct ndarray_info<jax, Ts...> : ndarray_info<Ts...> 
     constexpr static ndarray_framework framework = ndarray_framework::jax;
 };
 
-
 NAMESPACE_END(detail)
+
 
 template <typename Scalar, typename Shape, char Order> struct ndarray_view {
     static constexpr size_t Dim = Shape::size;
@@ -375,7 +381,10 @@ public:
     template <typename...> friend class ndarray;
 
     using Info = detail::ndarray_info<Args...>;
-    using Scalar = typename Info::scalar_type;
+    static constexpr bool is_ro = Info::is_ro;
+    using Scalar = std::conditional_t<is_ro,
+                           std::add_const_t<typename Info::scalar_type>,
+                           typename Info::scalar_type>;
 
     ndarray() = default;
 
@@ -387,7 +396,7 @@ public:
     template <typename... Args2>
     explicit ndarray(const ndarray<Args2...> &other) : ndarray(other.m_handle) { }
 
-    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> data,
+    ndarray(std::conditional_t<is_ro, const void *, void *> data,
             size_t ndim,
             const size_t *shape,
             handle owner,
@@ -397,11 +406,11 @@ public:
             int32_t device_id = 0) {
         m_handle = detail::ndarray_create(
             (void *) data, ndim, shape, owner.ptr(), strides, &dtype,
-            std::is_const_v<Scalar>, device_type, device_id);
+            is_ro, device_type, device_id);
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
-    ndarray(std::conditional_t<std::is_const_v<Scalar>, const void *, void *> data,
+    ndarray(std::conditional_t<is_ro, const void *, void *> data,
             std::initializer_list<size_t> shape,
             handle owner,
             std::initializer_list<int64_t> strides = { },
@@ -415,7 +424,7 @@ public:
         m_handle = detail::ndarray_create(
             (void *) data, shape.size(), shape.begin(), owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), &dtype,
-            std::is_const_v<Scalar>, device_type, device_id);
+            is_ro, device_type, device_id);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
@@ -471,26 +480,15 @@ public:
     size_t itemsize() const { return ((size_t) dtype().bits + 7) / 8; }
     size_t nbytes() const { return ((size_t) dtype().bits * size() + 7) / 8; }
 
-    const Scalar *data() const {
-        return (const Scalar *)((const uint8_t *) m_dltensor.data + m_dltensor.byte_offset);
-    }
-
-    template <typename T = Scalar, std::enable_if_t<!std::is_const_v<T>, int> = 1>
-    Scalar *data() {
+    Scalar *data() const {
         return (Scalar *) ((uint8_t *) m_dltensor.data +
                            m_dltensor.byte_offset);
     }
 
-    template <typename T = Scalar,
-              std::enable_if_t<!std::is_const_v<T>, int> = 1, typename... Ts>
-    NB_INLINE auto &operator()(Ts... indices) {
+    template <typename... Ts>
+    NB_INLINE auto& operator()(Ts... indices) const {
         return *(Scalar *) ((uint8_t *) m_dltensor.data +
                             byte_offset(indices...));
-    }
-
-    template <typename... Ts> NB_INLINE const auto & operator()(Ts... indices) const {
-        return *(const Scalar *) ((const uint8_t *) m_dltensor.data +
-                                  byte_offset(indices...));
     }
 
     template <typename... Extra> NB_INLINE auto view() const {

@@ -480,7 +480,7 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
 }
 
 static int nb_enum_type_contains(PyTypeObject *cls, PyObject *item) {
-    if (Py_IS_TYPE(item, cls)) {
+    if (Py_TYPE(item) == cls) {
         return 1;
     }
 

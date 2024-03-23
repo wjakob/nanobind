@@ -523,6 +523,7 @@ static PyObject *nb_enum_type_subscript(PyTypeObject *cls, PyObject *key) {
         return nullptr;
     }
 
+    Py_INCREF(value);
     return value;
 }
 

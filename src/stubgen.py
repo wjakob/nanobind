@@ -79,7 +79,7 @@ ENUM_OPS = [
     "add", "sub", "mul", "floordiv", "eq", "ne", "gt", "ge", "lt", "le",
     "index", "repr", "hash", "int", "rshift", "lshift", "and", "or", "xor",
     "neg", "abs", "invert",
-] 
+]
 
 
 # Exclude various standard elements found in modules, classes, etc.
@@ -87,7 +87,7 @@ SKIP_LIST = [
     "__doc__", "__module__", "__name__", "__new__", "__builtins__",
     "__cached__", "__path__", "__version__", "__spec__", "__loader__",
     "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
-    "__file__", "__dict__", "__weakref__", "@entries"
+    "__file__", "__dict__", "__weakref__", "@entries", "@values_by_name",
 ]
 # fmt: on
 
@@ -380,7 +380,8 @@ class StubGen:
     def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None):
         """Append a function of an arbitrary type to the stub"""
         # Don't generate a constructor for nanobind classes that aren't constructible
-        if name == "__init__" and type(parent).__name__.startswith("nb_type"):
+        parent_type_name = type(parent).__name__
+        if name == "__init__" and (parent_type_name.startswith("nb_type") or parent_type_name.startswith("nb_enum")):
             return
 
         fn_module = getattr(fn, "__module__", None)
@@ -1099,12 +1100,12 @@ class StubGen:
         """
         if module.startswith(".") or module == self.module.__name__.split('.')[0]:
             return 2
-        
+
         try:
             spec = importlib.util.find_spec(module)
         except ModuleNotFoundError:
             return 1
-        
+
         if spec:
             if spec.origin and "site-packages" in spec.origin:
                 return 1
@@ -1122,7 +1123,7 @@ class StubGen:
             imports = self.imports[module]
             items: List[str] = []
             party = self.check_party(module)
-            
+
             if party != last_party:
                 if last_party is not None:
                     s += "\n"
@@ -1139,7 +1140,7 @@ class StubGen:
                         items.append(f"{k} as {v2}")
                     else:
                         items.append(k)
-            
+
             items = sorted(items)
             if items:
                 items_v0 = ", ".join(items)

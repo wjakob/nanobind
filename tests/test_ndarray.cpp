@@ -90,6 +90,195 @@ NB_MODULE(test_ndarray_ext, m) {
           [](const nb::ndarray<float, nb::c_contig,
                                nb::shape<-1, -1, 4>> &) {}, "array"_a.noconvert());
 
+    m.def("check_rw_by_value",  // Pytest passes five doubles
+          [](nb::ndarray<> a) {
+              static_assert(!decltype(a)::is_ro);
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              auto v = a.view<double, nb::ndim<1>>();
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              auto cv = a.view<const double, nb::ndim<1>>();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(cv.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(cv(0))>>);
+              v(1) = 1.414214;
+              return v.data() == a.data() && cv.data() == a.data() &&
+                     cv(1) == 1.414214 && cv(3) == 3.14159;
+          });
+    m.def("check_ro_by_value_ro",  // Pytest passes five doubles
+          [](nb::ndarray<nb::ro> a) {
+              static_assert(decltype(a)::is_ro);
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              auto cv = a.view<const double, nb::ndim<1>>();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(cv.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(cv(0))>>);
+              return cv.data() == a.data() && cv(3) == 3.14159;
+          });
+    m.def("check_rw_by_value_float64",  // Pytest passes five doubles
+          [](nb::ndarray<double, nb::ndim<1>> a) {
+              static_assert(!decltype(a)::is_ro);
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(a(0))>>);
+              auto v = a.view();
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              a(2) = 2.718282;
+              v(4) = 16.0;
+              return v.data() == a.data() && v(2) == 2.718282
+                              && v(3) == 3.14159 && a(4) == 16.0;
+          });
+    m.def("check_ro_by_value_const_float64",  // Pytest passes five doubles
+          [](nb::ndarray<const double, nb::ndim<1>> a) {
+              static_assert(decltype(a)::is_ro);
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(a(0))>>);
+              auto v = a.view();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              return v.data() == a.data() && v(3) == 3.14159;
+          });
+
+    m.def("check_rw_by_const_ref",  // Pytest passes five doubles
+          [](const nb::ndarray<>& a) {
+              static_assert(!std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              auto v = a.view<double, nb::ndim<1>>();
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              auto cv = a.view<const double, nb::ndim<1>>();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(cv.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(cv(0))>>);
+              v(1) = 1.414214;
+              return v.data() == a.data() && cv.data() == a.data() &&
+                     cv(1) == 1.414214 && cv(3) == 3.14159;
+          });
+    m.def("check_ro_by_const_ref_ro",  // Pytest passes five doubles
+          [](const nb::ndarray<nb::ro>& a) {
+              static_assert(std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              auto cv = a.view<const double, nb::ndim<1>>();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(cv.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(cv(0))>>);
+              return cv.data() == a.data() && cv(3) == 3.14159;
+          });
+    m.def("check_rw_by_const_ref_float64",  // Pytest passes five doubles
+          [](const nb::ndarray<double, nb::ndim<1>>& a) {
+              static_assert(!std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(a(0))>>);
+              auto v = a.view();
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              a(2) = 2.718282;
+              v(4) = 16.0;
+              return v.data() == a.data() && v(2) == 2.718282
+                              && v(3) == 3.14159 && a(4) == 16.0;
+          });
+    m.def("check_ro_by_const_ref_const_float64",  // Pytest passes five doubles
+          [](const nb::ndarray<const double, nb::ndim<1>>& a) {
+              static_assert(std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(a(0))>>);
+              auto v = a.view();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              return v.data() == a.data() && v(3) == 3.14159;
+          });
+
+    m.def("check_rw_by_rvalue_ref",  // Pytest passes five doubles
+          [](nb::ndarray<>&& a) {
+              static_assert(!std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              auto v = a.view<double, nb::ndim<1>>();
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              auto cv = a.view<const double, nb::ndim<1>>();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(cv.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(cv(0))>>);
+              v(1) = 1.414214;
+              return v.data() == a.data() && cv.data() == a.data() &&
+                     cv(1) == 1.414214 && cv(3) == 3.14159;
+          });
+    m.def("check_ro_by_rvalue_ref_ro",  // Pytest passes five doubles
+          [](nb::ndarray<nb::ro>&& a) {
+              static_assert(std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              auto cv = a.view<const double, nb::ndim<1>>();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(cv.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(cv(0))>>);
+              return cv.data() == a.data() && cv(3) == 3.14159;
+          });
+    m.def("check_rw_by_rvalue_ref_float64",  // Pytest passes five doubles
+          [](nb::ndarray<double, nb::ndim<1>>&& a) {
+              static_assert(!std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(a(0))>>);
+              auto v = a.view();
+              static_assert(!std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(!std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              a(2) = 2.718282;
+              v(4) = 16.0;
+              return v.data() == a.data() && v(2) == 2.718282
+                              && v(3) == 3.14159 && a(4) == 16.0;
+          });
+    m.def("check_ro_by_rvalue_ref_const_float64",  // Pytest passes five doubles
+          [](nb::ndarray<const double, nb::ndim<1>>&& a) {
+              static_assert(std::remove_reference_t<decltype(a)>::is_ro);
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(a.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(a(0))>>);
+              auto v = a.view();
+              static_assert(std::is_const_v<
+                                 std::remove_pointer_t<decltype(v.data())>>);
+              static_assert(std::is_const_v<
+                                 std::remove_reference_t<decltype(v(0))>>);
+              return v.data() == a.data() && v(3) == 3.14159;
+          });
+
     m.def("check_order", [](nb::ndarray<nb::c_contig>) -> char { return 'C'; });
     m.def("check_order", [](nb::ndarray<nb::f_contig>) -> char { return 'F'; });
     m.def("check_order", [](nb::ndarray<>) -> char { return '?'; });

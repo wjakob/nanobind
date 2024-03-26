@@ -72,7 +72,7 @@ nanobind_add_stub(
   MODULE py_stub_test
   OUTPUT ${PYI_PREFIX}py_stub_test.pyi
   PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
-  DEPENDS py_stub_test.py
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PYI_PREFIX}py_stub_test.py
 )
 
 find_package (Eigen3 3.3.1 NO_MODULE)

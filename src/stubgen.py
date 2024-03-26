@@ -73,13 +73,23 @@ if sys.version_info < (3, 9):
 else:
     from re import Match, Pattern
 
+if sys.version_info < (3, 11):
+    try:
+        import typing_extensions
+    except ImportError:
+        raise RuntimeError(
+            "stubgen.py requires the 'typing_extension' package on Python <3.11"
+        )
+else:
+    typing_extensions = None
+
 # Standard operations supported by arithmetic enumerations
 # fmt: off
 ENUM_OPS = [
     "add", "sub", "mul", "floordiv", "eq", "ne", "gt", "ge", "lt", "le",
     "index", "repr", "hash", "int", "rshift", "lshift", "and", "or", "xor",
     "neg", "abs", "invert",
-] 
+]
 
 
 # Exclude various standard elements found in modules, classes, etc.
@@ -415,17 +425,11 @@ class StubGen:
 
         overloads: Sequence[Callable[..., Any]] = []
         if hasattr(fn, "__module__"):
-            if sys.version_info >= (3, 11, 0):
-                overloads = typing.get_overloads(fn)
+            if typing_extensions:
+                overloads = typing_extensions.get_overloads(fn)
             else:
-                try:
-                    import typing_extensions
+                overloads = typing.get_overloads(fn)
 
-                    overloads = typing_extensions.get_overloads(fn)
-                except ModuleNotFoundError:
-                    raise RuntimeError(
-                        "stubgen.py requires the 'typing_extension' package on Python <3.11"
-                    )
         if not overloads:
             overloads = [fn]
 
@@ -607,9 +611,7 @@ class StubGen:
                 value_str = "..."
 
             # Catch a few different typing.* constructs
-            if issubclass(tp, typing.TypeVar) or (
-                sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)
-            ):
+            if self.is_type_var(tp):
                 types = ""
             elif typing.get_origin(value):
                 types = ": " + self.import_object("typing", "TypeAlias")
@@ -617,6 +619,14 @@ class StubGen:
                 types = f": {self.type_str(tp)}"
 
             self.write_ln(f"{name}{types} = {value_str}\n")
+
+    def is_type_var(self, tp: type) -> bool:
+        return (issubclass(tp, typing.TypeVar)
+            or (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple))
+            or (typing_extensions is not None
+            and (
+                issubclass(tp, typing_extensions.TypeVar)
+                or issubclass(tp, typing_extensions.TypeVarTuple))))
 
     def simplify_types(self, s: str) -> str:
         """
@@ -952,8 +962,9 @@ class StubGen:
             return self.type_str(e)
         elif issubclass(tp, typing.ForwardRef):
             return f'"{e.__forward_arg__}"'
-        elif sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple):
-            tv = self.import_object("typing", "TypeVarTuple")
+        elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
+            or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
+            tv = self.import_object(tp.__module__, "TypeVarTuple")
             return f'{tv}("{e.__name__}")'
         elif issubclass(tp, typing.TypeVar):
             tv = self.import_object("typing", "TypeVar")

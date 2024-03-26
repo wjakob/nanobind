@@ -192,6 +192,7 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
 struct enum_supplement {
     bool is_signed = false;
     PyObject* entries = nullptr;
+    PyObject* values_by_name = nullptr;
     PyObject* scope = nullptr;
 };
 

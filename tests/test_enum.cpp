@@ -38,6 +38,8 @@ static PyType_Slot color_slots[] = {
     { 0, nullptr }
 };
 
+enum class EmptyEnum : uint8_t {};
+
 NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum", "enum-level docstring")
         .value("A", Enum::A, "Value A")
@@ -75,4 +77,7 @@ NB_MODULE(test_enum_ext, m) {
     nb::class_<EnumProperty>(m, "EnumProperty")
         .def(nb::init<>())
         .def_prop_ro("read_enum", &EnumProperty::get_enum);
+
+    // nb::enum_<EmptyEnum>(m, "EmptyEnum", "enum with no variants")
+    //     ;
 }

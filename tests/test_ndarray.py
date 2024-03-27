@@ -622,6 +622,9 @@ def test31_view():
     x2 = x1 * (-1+2j)
     t.fill_view_5(x1)
     assert np.allclose(x1, x2)
+    x2 = -x2;
+    t.fill_view_6(x1)
+    assert np.allclose(x1, x2)
 
 @needs_numpy
 def test32_half():
@@ -705,7 +708,7 @@ def test38_const_qualifiers_numpy():
     assert a[4] == 16.0;
     assert t.check_ro_by_value_ro(a);
     assert t.check_ro_by_value_const_float64(a);
-    a.flags.writeable = False
+    a.setflags(write=False)
     assert t.check_ro_by_value_ro(a);
     assert t.check_ro_by_value_const_float64(a);
     assert a[0] == 0.0;
@@ -719,7 +722,7 @@ def test38_const_qualifiers_numpy():
     assert a[4] == 16.0;
     assert t.check_ro_by_const_ref_ro(a);
     assert t.check_ro_by_const_ref_const_float64(a);
-    a.flags.writeable = False
+    a.setflags(write=False)
     assert t.check_ro_by_const_ref_ro(a);
     assert t.check_ro_by_const_ref_const_float64(a);
     assert a[0] == 0.0;
@@ -733,7 +736,7 @@ def test38_const_qualifiers_numpy():
     assert a[4] == 16.0;
     assert t.check_ro_by_rvalue_ref_ro(a);
     assert t.check_ro_by_rvalue_ref_const_float64(a);
-    a.flags.writeable = False
+    a.setflags(write=False)
     assert t.check_ro_by_rvalue_ref_ro(a);
     assert t.check_ro_by_rvalue_ref_const_float64(a);
     assert a[0] == 0.0;

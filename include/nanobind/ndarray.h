@@ -109,7 +109,7 @@ template <size_t N> using ndim = typename detail::ndim_shape<std::make_index_seq
 template <typename T> constexpr dlpack::dtype dtype() {
     static_assert(
         detail::is_ndarray_scalar_v<T>,
-        "nanobind::dtype<T>: T must be a floating point or integer variable!"
+        "nanobind::dtype<T>: T must be a floating point or integer type!"
     );
 
     dlpack::dtype result;
@@ -273,10 +273,13 @@ template <typename... Ts> struct ndarray_info {
 
 template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_info<Ts...> {
     using scalar_type =
-        std::conditional_t<ndarray_traits<T>::is_float || ndarray_traits<T>::is_int ||
-                           ndarray_traits<T>::is_bool || ndarray_traits<T>::is_complex,
-                           T, typename ndarray_info<Ts...>::scalar_type>;
-    constexpr static bool is_ro = std::is_const_v<scalar_type>;
+        std::conditional_t<
+                detail::is_ndarray_scalar_v<T> &&
+                    std::is_void_v<typename ndarray_info<Ts...>::scalar_type>,
+                T, typename ndarray_info<Ts...>::scalar_type>;
+
+    constexpr static bool is_ro = ndarray_info<Ts...>::is_ro ||
+            (detail::is_ndarray_scalar_v<T> && std::is_const_v<T>);
 };
 
 template <typename... Ts> struct ndarray_info<ro, Ts...> : ndarray_info<Ts...> {
@@ -284,33 +287,54 @@ template <typename... Ts> struct ndarray_info<ro, Ts...> : ndarray_info<Ts...> {
 };
 
 template <ssize_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {
-    using shape_type = shape<Is...>;
+    using shape_type =
+        std::conditional_t<
+                std::is_void_v<typename ndarray_info<Ts...>::shape_type>,
+                shape<Is...>, typename ndarray_info<Ts...>::shape_type>;
 };
 
 template <typename... Ts> struct ndarray_info<c_contig, Ts...> : ndarray_info<Ts...> {
+    static_assert(ndarray_info<Ts...>::order == '\0'
+               || ndarray_info<Ts...>::order == 'C',
+                  "The order can only be set once.");
     constexpr static char order = 'C';
 };
 
 template <typename... Ts> struct ndarray_info<f_contig, Ts...> : ndarray_info<Ts...> {
+    static_assert(ndarray_info<Ts...>::order == '\0'
+               || ndarray_info<Ts...>::order == 'F',
+                  "The order can only be set once.");
     constexpr static char order = 'F';
 };
 
 template <typename... Ts> struct ndarray_info<numpy, Ts...> : ndarray_info<Ts...> {
+    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
+               || ndarray_info<Ts...>::framework == ndarray_framework::numpy,
+                  "The framework can only be set once.");
     constexpr static auto name = const_name("numpy.ndarray");
     constexpr static ndarray_framework framework = ndarray_framework::numpy;
 };
 
 template <typename... Ts> struct ndarray_info<pytorch, Ts...> : ndarray_info<Ts...> {
+    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
+               || ndarray_info<Ts...>::framework == ndarray_framework::pytorch,
+                  "The framework can only be set once.");
     constexpr static auto name = const_name("torch.Tensor");
     constexpr static ndarray_framework framework = ndarray_framework::pytorch;
 };
 
 template <typename... Ts> struct ndarray_info<tensorflow, Ts...> : ndarray_info<Ts...> {
+    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
+               || ndarray_info<Ts...>::framework == ndarray_framework::tensorflow,
+                  "The framework can only be set once.");
     constexpr static auto name = const_name("tensorflow.python.framework.ops.EagerTensor");
     constexpr static ndarray_framework framework = ndarray_framework::tensorflow;
 };
 
 template <typename... Ts> struct ndarray_info<jax, Ts...> : ndarray_info<Ts...> {
+    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
+               || ndarray_info<Ts...>::framework == ndarray_framework::jax,
+                  "The framework can only be set once.");
     constexpr static auto name = const_name("jaxlib.xla_extension.DeviceArray");
     constexpr static ndarray_framework framework = ndarray_framework::jax;
 };
@@ -493,11 +517,13 @@ public:
 
     template <typename... Extra> NB_INLINE auto view() const {
         using Info2 = typename ndarray<Args..., Extra...>::Info;
-        using Scalar2 = typename Info2::scalar_type;
+        using Scalar2 = std::conditional_t<Info2::is_ro,
+                                std::add_const_t<typename Info2::scalar_type>,
+                                typename Info2::scalar_type>;
         using Shape2 = typename Info2::shape_type;
 
-        constexpr bool has_scalar = !std::is_same_v<Scalar2, void>,
-                       has_shape  = !std::is_same_v<Shape2, void>;
+        constexpr bool has_scalar = !std::is_void_v<Scalar2>,
+                       has_shape  = !std::is_void_v<Shape2>;
 
         static_assert(has_scalar,
             "To use the ndarray::view<..>() method, you must add a scalar type "
@@ -521,8 +547,8 @@ public:
 private:
     template <typename... Ts>
     NB_INLINE int64_t byte_offset(Ts... indices) const {
-        constexpr bool has_scalar = !std::is_same_v<Scalar, void>,
-                       has_shape = !std::is_same_v<typename Info::shape_type, void>;
+        constexpr bool has_scalar = !std::is_void_v<Scalar>,
+                       has_shape = !std::is_void_v<typename Info::shape_type>;
 
         static_assert(has_scalar,
             "To use ndarray::operator(), you must add a scalar type "
@@ -540,7 +566,7 @@ private:
             int64_t index = 0;
             ((index += int64_t(indices) * m_dltensor.strides[counter++]), ...);
 
-            return (int64_t) m_dltensor.byte_offset + index * sizeof(typename Info::scalar_type);
+            return (int64_t) m_dltensor.byte_offset + index * sizeof(Scalar);
         } else {
             return 0;
         }

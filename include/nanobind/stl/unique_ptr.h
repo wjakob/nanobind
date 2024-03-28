@@ -71,6 +71,24 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     Caster caster;
     handle src;
 
+    /* If true, the Python object has relinquished ownership but we have
+       not yet yielded a unique_ptr that holds ownership on the C++ side.
+
+       `nb_type_relinquish_ownership()` can fail, so we must check it in
+       `can_cast()`. If we do so, but then wind up not executing the cast
+       operator, we must remember to undo our relinquishment and push the
+       ownership back onto the Python side. For example, this might be
+       necessary the Python object `[(foo, foo)]` is converted to
+       `std::vector<std::pair<std::unique_ptr<T>, std::unique_ptr<T>>>`;
+       the pair caster won't know that it can't cast the second element
+       until after it's verified that it can cast the first one. */
+    mutable bool inflight = false;
+
+    ~type_caster() {
+        if (inflight)
+            nb_type_restore_ownership(src.ptr(), IsDefaultDeleter);
+    }
+
     bool from_python(handle src_, uint8_t, cleanup_list *) noexcept {
         // Stash source python object
         src = src_;
@@ -126,8 +144,21 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         return result;
     }
 
+    template <typename T_>
+    bool can_cast() const noexcept {
+        if (src.is_none() || inflight)
+            return true;
+        else if (!nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+            return false;
+        inflight = true;
+        return true;
+    }
+
     explicit operator Value() {
-        nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter);
+        if (inflight)
+            inflight = false;
+        else if (!nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+            throw next_overload();
 
         T *value = caster.operator T *();
         if constexpr (IsNanobindDeleter)

@@ -195,6 +195,44 @@ noteworthy:
   specify the owner explicitly. The previous default (``nb::handle()``)
   continues to be a valid argument.
 
+* There have been some changes to the API for type casters in order to
+  avoid undefined behavior in certain cases. (PR `#549
+  <https://github.com/wjakob/nanobind/pull/549>`__).
+
+  * Type casters that implement custom cast operators must now define a
+    member function template ``can_cast<T>()``, which returns false if
+    ``operator cast_t<T>()`` would raise an exception and true otherwise.
+    ``can_cast<T>()`` will be called only after a successful call to
+    ``from_python()``, and might not be called at all if the caller of
+    ``operator cast_t<T>()`` can cope with a raised exception.
+    (Users of the ``NB_TYPE_CASTER()`` convenience macro need not worry
+    about this; it produces cast operators that never raise exceptions,
+    and therefore provides a ``can_cast<T>()`` that always returns true.)
+
+  * Many type casters for container types (``std::vector<T>``,
+    ``std::optional<T>``, etc) implement their ``from_python()`` methods
+    by delegating to another, "inner" type caster (``T`` in these examples)
+    that is allocated on the stack inside ``from_python()``. Container casters
+    implemented in this way should make two changes in order to take advantage
+    of the new safety features:
+
+    * Wrap your ``flags`` (received as an argument of the outer caster's
+      ``from_python`` method) in ``flags_for_local_caster<T>()`` before
+      passing them to ``inner_caster.from_python()``. This allows nanobind
+      to prevent some casts that would produce dangling pointers or references.
+
+    * If ``inner_caster.from_python()`` succeeds, then also verify
+      ``inner_caster.template can_cast<T>()`` before you execute
+      ``inner_caster.operator cast_t<T>()``. A failure of
+      ``can_cast()`` should be treated the same as a failure of
+      ``from_python()``.  This avoids the possibility of an exception
+      being raised through the noexcept ``load_python()`` method,
+      which would crash the interpreter.
+
+  The previous ``cast_flags::none_disallowed`` flag has been removed;
+  it existed to avoid one particular source of exceptions from a cast
+  operator, but ``can_cast<T>()`` now handles that problem more generally.
+
 * ABI version 14.
 
 .. rubric:: Footnote

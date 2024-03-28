@@ -150,6 +150,7 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     using SparseMatrixCaster = type_caster<T>;
     static constexpr auto Name = SparseMatrixCaster::Name;
     template <typename T_> using Cast = Map;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
 
@@ -165,6 +166,7 @@ struct type_caster<Eigen::Ref<T, Options>, enable_if_t<is_eigen_sparse_matrix_v<
     using MapCaster = make_caster<Map>;
     static constexpr auto Name = MapCaster::Name;
     template <typename T_> using Cast = Ref;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
 

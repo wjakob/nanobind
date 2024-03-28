@@ -462,4 +462,10 @@ NB_MODULE(test_stl_ext, m) {
     });
 
     m.def("pass_wstr", [](std::wstring ws) { return ws; });
+
+    // uncomment to see compiler error:
+    // m.def("optional_intptr", [](std::optional<int*>) {});
+    m.def("optional_cstr", [](std::optional<const char*> arg) {
+        return arg.value_or("none");
+    }, nb::arg().none());
 }

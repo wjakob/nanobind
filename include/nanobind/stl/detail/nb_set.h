@@ -34,11 +34,11 @@ template <typename Set, typename Key> struct set_caster {
         Caster key_caster;
         PyObject *key;
 
-        if constexpr (is_base_caster_v<Caster> && !std::is_pointer_v<Key>)
-            flags |= (uint8_t) cast_flags::none_disallowed;
+        flags = flags_for_local_caster<Key>(flags);
 
         while ((key = PyIter_Next(iter)) != nullptr) {
-            success &= key_caster.from_python(key, flags, cleanup);
+            success &= (key_caster.from_python(key, flags, cleanup) &&
+                        key_caster.template can_cast<Key>());
             Py_DECREF(key);
 
             if (!success)

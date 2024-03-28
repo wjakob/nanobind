@@ -11,6 +11,7 @@
     using Value = Value_;                                                      \
     static constexpr auto Name = descr;                                        \
     template <typename T_> using Cast = movable_cast_t<T_>;                    \
+    template <typename T_> static constexpr bool can_cast() { return true; }   \
     template <typename T_,                                                     \
               enable_if_t<std::is_same_v<std::remove_cv_t<T_>, Value>> = 0>    \
     static handle from_cpp(T_ *p, rv_policy policy, cleanup_list *list) {      \
@@ -38,11 +39,11 @@ enum cast_flags : uint8_t {
     // Passed to the 'self' argument in a constructor call (__init__)
     construct = (1 << 1),
 
-    // Don't accept 'None' Python objects in the base class caster
-    none_disallowed = (1 << 2),
-
-    // Indicates that this cast is performed by nb::cast or nb::try_cast
-    manual = (1 << 3)
+    // Indicates that this cast is performed by nb::cast or nb::try_cast.
+    // This implies that objects added to the cleanup list may be
+    // released immediately after the caster's final output value is
+    // obtained, i.e., before it is used.
+    manual = (1 << 2),
 };
 
 /**
@@ -87,6 +88,51 @@ using precise_cast_t =
     std::conditional_t<is_pointer_v<T>, intrinsic_t<T> *,
                        std::conditional_t<std::is_rvalue_reference_v<T>,
                                           intrinsic_t<T> &&, intrinsic_t<T> &>>;
+
+/// Many type casters delegate to another caster using the pattern:
+/// ~~~ .cc
+/// bool from_python(handle src, uint8_t flags, cleanup_list *cl) noexcept {
+///     SomeCaster c;
+///     if (!c.from_python(src, flags, cl)) return false;
+///     /* do something with */ c.operator T();
+///     return true;
+/// }
+/// ~~~
+/// This function adjusts the flags to avoid issues where the resulting T object
+/// refers into storage that will dangle after SomeCaster is destroyed, and
+/// causes a static assertion failure if that's not sufficient. Use it like:
+/// ~~~ .cc
+///     if (!c.from_python(src, flags_for_local_caster<T>(flags), cl))
+///         return false;
+/// ~~~
+/// where the template argument T is the type you plan to extract.
+template <typename T>
+NB_INLINE uint8_t flags_for_local_caster(uint8_t flags) noexcept {
+    constexpr bool is_ref = std::is_pointer_v<T> || std::is_reference_v<T>;
+    if constexpr (is_base_caster_v<make_caster<T>>) {
+        if constexpr (is_ref) {
+            /* References/pointers to a type produced by implicit conversions
+               refer to storage owned by the cleanup_list. In a nb::cast() call,
+               that storage will be released before the reference can be used;
+               to prevent dangling, don't allow implicit conversions there. */
+            if (flags & ((uint8_t) cast_flags::manual))
+                flags &= ~((uint8_t) cast_flags::convert);
+        }
+    } else {
+        /* Any pointer produced by a non-base caster will generally point
+           into storage owned by the caster, which won't live long enough.
+           Exception: the 'char' caster produces a result that points to
+           storage owned by the incoming Python 'str' object, so it's OK. */
+        static_assert(!is_ref || std::is_same_v<T, const char*>,
+                      "nanobind generally cannot produce objects that "
+                      "contain interior pointers T* (or references T&) if "
+                      "the pointee T is not handled by nanobind's regular "
+                      "class binding mechanism. For example, you can write "
+                      "a function that accepts int*, or std::vector<int>, "
+                      "but not std::vector<int*>.");
+    }
+    return flags;
+}
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
@@ -162,6 +208,7 @@ template <> struct type_caster<void_type> {
 
 template <> struct type_caster<void> {
     template <typename T_> using Cast = void *;
+    template <typename T_> static constexpr bool can_cast() { return true; }
     using Value = void*;
     static constexpr auto Name = const_name("types.CapsuleType");
     explicit operator void *() { return value; }
@@ -253,10 +300,15 @@ template <> struct type_caster<char> {
         return PyUnicode_FromStringAndSize(&value, 1);
     }
 
+    template <typename T_>
+    NB_INLINE bool can_cast() const noexcept {
+        return std::is_pointer_v<T_> || (value && value[0] && value[1] == '\0');
+    }
+
     explicit operator const char *() { return value; }
 
     explicit operator char() {
-        if (value && value[0] && value[1] == '\0')
+        if (can_cast<char>())
             return value[0];
         else
             throw next_overload();
@@ -270,7 +322,8 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         Caster c;
-        if (!c.from_python(src, flags, cleanup))
+        if (!c.from_python(src, flags_for_local_caster<T*>(flags), cleanup) ||
+            !c.template can_cast<T*>())
             return false;
         value.h = src;
         value.p = c.operator T*();
@@ -305,13 +358,10 @@ template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         Caster caster;
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
+            !caster.template can_cast<T>())
             return false;
-        try {
-            value = caster.operator cast_t<T>();
-        } catch (...) {
-            return false;
-        }
+        value = caster.operator cast_t<T>();
         return true;
     }
 
@@ -410,6 +460,11 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         }
     }
 
+    template <typename T_>
+    bool can_cast() const noexcept {
+        return std::is_pointer_v<T_> || (value != nullptr);
+    }
+
     operator Type*() { return value; }
 
     operator Type&() {
@@ -433,58 +488,87 @@ template <bool Convert, typename T>
 T cast_impl(handle h) {
     using Caster = detail::make_caster<T>;
 
+    // A returned reference/pointer would usually refer into the type_caster
+    // object, which will be destroyed before the returned value can be used,
+    // so we prohibit it by default, with two exceptions that we know are safe:
+    //
+    // - If we're casting to a bound object type, the returned pointer points
+    //   into storage owned by that object, not the type caster. Note this is
+    //   only safe if we don't allow implicit conversions, because the pointer
+    //   produced after an implicit conversion points into storage owned by
+    //   a temporary object in the cleanup list, and we have to release those
+    //   temporaries before we return.
+    //
+    // - If we're casting to const char*, the caster was provided by nanobind,
+    //   and we know it will only accept Python 'str' objects, producing
+    //   a pointer to storage owned by that object.
+
+    constexpr bool is_ref = std::is_reference_v<T> || std::is_pointer_v<T>;
     static_assert(
-        !(std::is_reference_v<T> || std::is_pointer_v<T>) ||
-            detail::is_base_caster_v<Caster> ||
+        !is_ref ||
+            is_base_caster_v<Caster> ||
             std::is_same_v<const char *, T>,
         "nanobind::cast(): cannot return a reference to a temporary.");
 
     Caster caster;
     bool rv;
-    if constexpr (Convert) {
-        cleanup_list cleanup(nullptr);
+    if constexpr (Convert && !is_ref) {
+        // Release the values in the cleanup list only after we
+        // initialize the return object, since the initialization
+        // might access those temporaries.
+        struct raii_cleanup {
+            cleanup_list list{nullptr};
+            ~raii_cleanup() { list.release(); }
+        } cleanup;
         rv = caster.from_python(h.ptr(),
                                 ((uint8_t) cast_flags::convert) |
                                 ((uint8_t) cast_flags::manual),
-                                &cleanup);
-        cleanup.release(); // 'from_python' is 'noexcept', so this always runs
+                                &cleanup.list);
+        if (!rv)
+            detail::raise_cast_error();
+        return caster.operator cast_t<T>();
     } else {
         rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr);
+        if (!rv)
+            detail::raise_cast_error();
+        return caster.operator cast_t<T>();
     }
-
-    if (!rv)
-        detail::raise_cast_error();
-    return caster.operator detail::cast_t<T>();
 }
 
 template <bool Convert, typename T>
 bool try_cast_impl(handle h, T &out) noexcept {
     using Caster = detail::make_caster<T>;
 
-    static_assert(!std::is_same_v<const char *, T>,
-                  "nanobind::try_cast(): cannot return a reference to a temporary.");
+    // See comments in cast_impl above
+    constexpr bool is_ref = std::is_reference_v<T> || std::is_pointer_v<T>;
+    static_assert(
+        !is_ref ||
+            is_base_caster_v<Caster> ||
+            std::is_same_v<const char *, T>,
+        "nanobind::try_cast(): cannot return a reference to a temporary.");
 
     Caster caster;
     bool rv;
-    if constexpr (Convert) {
+    if constexpr (Convert && !is_ref) {
         cleanup_list cleanup(nullptr);
         rv = caster.from_python(h.ptr(),
                                 ((uint8_t) cast_flags::convert) |
                                 ((uint8_t) cast_flags::manual),
-                                &cleanup);
+                                &cleanup) &&
+             caster.template can_cast<T>();
+        if (rv) {
+            out = caster.operator cast_t<T>();
+        }
         cleanup.release(); // 'from_python' is 'noexcept', so this always runs
     } else {
-        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr);
+        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr) &&
+             caster.template can_cast<T>();
+        if (rv) {
+            out = caster.operator cast_t<T>();
+        }
     }
 
-    if (rv) {
-        try {
-            out = caster.operator detail::cast_t<T>();
-            return true;
-        } catch (const builtin_exception&) { }
-    }
-
-    return false;
+    return rv;
 }
 
 NAMESPACE_END(detail)

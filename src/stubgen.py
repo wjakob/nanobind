@@ -1113,7 +1113,7 @@ class StubGen:
         
         try:
             spec = importlib.util.find_spec(module)
-        except ModuleNotFoundError:
+        except (ModuleNotFoundError, ValueError):
             return 1
         
         if spec:

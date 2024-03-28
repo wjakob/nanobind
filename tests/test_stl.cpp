@@ -459,4 +459,10 @@ NB_MODULE(test_stl_ext, m) {
     m.def("vector_str", [](std::string& x){
         return x;
     });
+
+    // uncomment to see compiler error:
+    //m.def("optional_intptr", [](std::optional<int*>) {});
+    m.def("optional_cstr", [](std::optional<const char*> arg) {
+        return arg.value_or("none");
+    }, nb::arg().none());
 }

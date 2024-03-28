@@ -1213,7 +1213,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     // Convert None -> nullptr
     if (src == Py_None) {
         *out = nullptr;
-        return (flags & (uint8_t) cast_flags::none_disallowed) == 0;
+        return true;
     }
 
     PyTypeObject *src_type = Py_TYPE(src);
@@ -1662,30 +1662,45 @@ PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
     return o;
 }
 
-void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
+static void warn_relinquish_failed(const char *why, PyObject *o) noexcept {
+    PyObject *name = nb_inst_name(o);
+    int rc = PyErr_WarnFormat(
+        PyExc_RuntimeWarning, 1,
+        "nanobind::detail::nb_relinquish_ownership(): could not "
+        "transfer ownership of a Python instance of type '%U' to C++. %s",
+        name, why);
+    if (rc != 0) // user has configured warnings-as-errors
+        PyErr_WriteUnraisable(o);
+    Py_DECREF(name);
+}
+
+bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept {
     nb_inst *inst = (nb_inst *) o;
 
-    // This function is called to indicate ownership *changes*
-    check(inst->ready,
-          "nanobind::detail::nb_relinquish_ownership('%s'): ownership "
-          "status has become corrupted.",
-          PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
+    /* This function is called after nb_type_get() succeeds, so the
+       instance should be ready; but the !ready case is possible if
+       an attempt is made to transfer ownership of the same object
+       to C++ multiple times as part of the same data structure.
+       For example, converting Python (foo, foo) to C++
+       std::pair<std::unique_ptr<T>, std::unique_ptr<T>>. */
+
+    if (!inst->ready) {
+        warn_relinquish_failed(
+            "The resulting data structure would have had multiple "
+            "std::unique_ptrs that each thought they owned the same "
+            "Python instance's data, which is not allowed.", o);
+        return false;
+    }
 
     if (cpp_delete) {
         if (!inst->cpp_delete || !inst->destruct || inst->internal) {
-            PyObject *name = nb_inst_name(o);
-            PyErr_WarnFormat(
-                PyExc_RuntimeWarning, 1,
-                "nanobind::detail::nb_relinquish_ownership(): could not "
-                "transfer ownership of a Python instance of type '%U' to C++. "
+            warn_relinquish_failed(
                 "This is only possible when the instance was previously "
                 "constructed on the C++ side and is now owned by Python, which "
                 "was not the case here. You could change the unique pointer "
                 "signature to std::unique_ptr<T, nb::deleter<T>> to work around "
-                "this issue.", name);
-
-            Py_DECREF(name);
-            throw next_overload();
+                "this issue.", o);
+            return false;
         }
 
         inst->cpp_delete = false;
@@ -1693,6 +1708,22 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
     }
 
     inst->ready = false;
+    return true;
+}
+
+void nb_type_restore_ownership(PyObject *o, bool cpp_delete) noexcept {
+    nb_inst *inst = (nb_inst *) o;
+
+    check(!inst->ready,
+          "nanobind::detail::nb_type_restore_ownership('%s'): ownership "
+          "status has become corrupted.",
+          PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
+
+    inst->ready = true;
+    if (cpp_delete) {
+        inst->cpp_delete = true;
+        inst->destruct = true;
+    }
 }
 
 bool nb_type_isinstance(PyObject *o, const std::type_info *t) noexcept {

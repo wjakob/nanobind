@@ -298,8 +298,13 @@ NB_CORE PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
                                        void *value, cleanup_list *cleanup,
                                        bool cpp_delete) noexcept;
 
-/// Try to reliquish ownership from Python object to a unique_ptr
-NB_CORE void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete);
+/// Try to reliquish ownership from Python object to a unique_ptr;
+/// return true if successful, false if not. (Failure is only
+/// possible if `cpp_delete` is true.)
+NB_CORE bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept;
+
+/// Reverse the effects of nb_type_relinquish_ownership().
+NB_CORE void nb_type_restore_ownership(PyObject *o, bool cpp_delete) noexcept;
 
 /// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
 NB_CORE void *nb_type_supplement(PyObject *t) noexcept;

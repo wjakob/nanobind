@@ -44,19 +44,10 @@ template <typename... Ts> struct type_caster<std::variant<Ts...>> {
     bool try_variant(const handle &src, uint8_t flags, cleanup_list *cleanup) {
         using CasterT = make_caster<T>;
 
-        static_assert(
-            !std::is_pointer_v<T> || is_base_caster_v<CasterT>,
-            "Binding ``variant<T*, ...>`` requires that ``T`` is handled "
-            "by nanobind's regular class binding mechanism. However, a "
-            "type caster was registered to intercept this particular "
-            "type, which is not allowed.");
-
-        if constexpr (is_base_caster_v<CasterT> && !std::is_pointer_v<T>)
-            flags |= (uint8_t) cast_flags::none_disallowed;
-
         CasterT caster;
 
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
+            !caster.template can_cast<T>())
             return false;
 
         value = caster.operator cast_t<T>();

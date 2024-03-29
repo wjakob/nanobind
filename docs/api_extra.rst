@@ -678,30 +678,16 @@ section <ndarrays>`.
       In a multi-device/GPU setup, this function returns the ID of the device
       storing the array.
 
-   .. cpp:function:: const Scalar * data() const
+   .. cpp:function:: Scalar * data() const
 
-      Return a const pointer to the array data.
-
-   .. cpp:function:: Scalar * data()
-
-      Return a mutable pointer to the array data. Only enabled when `Scalar` is
-      not itself ``const``.
-
-   .. cpp:function:: template <typename... Extra> auto view()
-
-      Returns an nd-array view that is optimized for fast array access on the
-      CPU. You may optionally specify additional ndarray constraints via the
-      `Extra` parameter (though a runtime check should first be performed to
-      ensure that the array possesses these properties).
-
-      The returned view provides the operations ``data()``, ``ndim()``,
-      ``shape()``, ``stride()``, and ``operator()`` following the conventions
-      of the `ndarray` type.
+      Return a pointer to the array data.
+      If the scalar type is ``const``-qualified, a pointer-to-const is returned.
 
    .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
 
-      Return a mutable reference to the element at stored at the provided
-      index/indices. ``sizeof(Ts)`` must match :cpp:func:`ndim()`.
+      Return a reference to the element stored at the provided index/indices.
+      If the scalar type is ``const``-qualified, a reference-to-const is
+      returned.  Note that ``sizeof(Ts)`` must match :cpp:func:`ndim()`.
 
       This accessor is only available when the scalar type and array dimension
       were specified as template parameters.

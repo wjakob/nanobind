@@ -24,8 +24,23 @@ namespace nanobind {
 }
 #endif
 
+template<bool writable, bool is_shaped, typename... Ts>
+bool check_const(const nb::ndarray<Ts...>& a) {  // Pytest passes 3 doubles
+    static_assert(std::is_const_v<std::remove_pointer_t<decltype(a.data())>>
+                  == !writable);
+    if constexpr (is_shaped) {
+        static_assert(std::is_const_v<std::remove_reference_t<decltype(a(0))>>
+                      == !writable);
+        if constexpr (writable) {
+            a(1) *= 2.0;
+            return a(0) == 0.0 && a(2) == 2.718282;
+        }
+    }
+    return true;
+}
+
 NB_MODULE(test_ndarray_ext, m) {
-    m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
+    m.def("get_shape", [](const nb::ndarray<const void> &t) {
         nb::list l;
         for (size_t i = 0; i < t.ndim(); ++i)
             l.append(t.shape(i));
@@ -86,6 +101,57 @@ NB_MODULE(test_ndarray_ext, m) {
           [](const nb::ndarray<float, nb::c_contig,
                                nb::shape<-1, -1, 4>> &) {}, "array"_a.noconvert());
 
+    m.def("check_rw_by_value",
+          [](nb::ndarray<> a) {
+              return check_const</*writable=*/true, /*is_shaped=*/false>(a);
+          });
+    m.def("check_ro_by_value_const_void",
+          [](nb::ndarray<const void> a) {
+              return check_const</*writable=*/false, /*is_shaped=*/false>(a);
+          });
+    m.def("check_rw_by_value_float64",
+          [](nb::ndarray<double, nb::ndim<1>> a) {
+              return check_const</*writable=*/true, /*is_shaped=*/true>(a);
+          });
+    m.def("check_ro_by_value_const_float64",
+          [](nb::ndarray<const double, nb::ndim<1>> a) {
+              return check_const</*writable=*/false, /*is_shaped=*/true>(a);
+          });
+
+    m.def("check_rw_by_const_ref",
+          [](const nb::ndarray<>& a) {
+              return check_const</*writable=*/true, /*is_shaped=*/false>(a);
+          });
+    m.def("check_ro_by_const_ref_const_void",
+          [](const nb::ndarray<const void>& a) {
+              return check_const</*writable=*/false, /*is_shaped=*/false>(a);
+          });
+    m.def("check_rw_by_const_ref_float64",
+          [](nb::ndarray<double, nb::ndim<1>> a) {
+              return check_const</*writable=*/true, /*is_shaped=*/true>(a);
+          });
+    m.def("check_ro_by_const_ref_const_float64",
+          [](const nb::ndarray<const double, nb::ndim<1>>& a) {
+              return check_const</*writable=*/false, /*is_shaped=*/true>(a);
+          });
+
+    m.def("check_rw_by_rvalue_ref",
+          [](nb::ndarray<>&& a) {
+              return check_const</*writable=*/true, /*is_shaped=*/false>(a);
+          });
+    m.def("check_ro_by_rvalue_ref_const_void",
+          [](nb::ndarray<const void>&& a) {
+              return check_const</*writable=*/false, /*is_shaped=*/false>(a);
+          });
+    m.def("check_rw_by_rvalue_ref_float64",
+          [](nb::ndarray<double, nb::ndim<1>>&& a) {
+              return check_const</*writable=*/true, /*is_shaped=*/true>(a);
+          });
+    m.def("check_ro_by_rvalue_ref_const_float64",
+          [](nb::ndarray<const double, nb::ndim<1>>&& a) {
+              return check_const</*writable=*/false, /*is_shaped=*/true>(a);
+          });
+
     m.def("check_order", [](nb::ndarray<nb::c_contig>) -> char { return 'C'; });
     m.def("check_order", [](nb::ndarray<nb::f_contig>) -> char { return 'F'; });
     m.def("check_order", [](nb::ndarray<>) -> char { return '?'; });
@@ -119,7 +185,7 @@ NB_MODULE(test_ndarray_ext, m) {
         [](nb::ndarray<float, nb::c_contig, nb::shape<2, 2>>) { return 0; },
         "array"_a);
 
-    m.def("inspect_ndarray", [](nb::ndarray<> ndarray) {
+    m.def("inspect_ndarray", [](const nb::ndarray<>& ndarray) {
         printf("Tensor data pointer : %p\n", ndarray.data());
         printf("Tensor dimension : %zu\n", ndarray.ndim());
         for (size_t i = 0; i < ndarray.ndim(); ++i) {
@@ -240,43 +306,6 @@ NB_MODULE(test_ndarray_ext, m) {
         .def("f1_ri", &Cls::f1, nb::rv_policy::reference_internal)
         .def("f2_ri", &Cls::f2, nb::rv_policy::reference_internal)
         .def("f3_ri", &Cls::f3, nb::rv_policy::reference_internal);
-
-    m.def("fill_view_1", [](nb::ndarray<> x) {
-        if (x.ndim() == 2 && x.dtype() == nb::dtype<float>()) {
-            auto v = x.view<float, nb::ndim<2>>();
-            for (size_t i = 0; i < v.shape(0); i++)
-                for (size_t j = 0; j < v.shape(1); j++)
-                    v(i, j) *= 2;
-        }
-    }, "x"_a.noconvert());
-
-    m.def("fill_view_2", [](nb::ndarray<float, nb::ndim<2>, nb::device::cpu> x) {
-        auto v = x.view();
-        for (size_t i = 0; i < v.shape(0); ++i)
-            for (size_t j = 0; j < v.shape(1); ++j)
-                v(i, j) = (float) (i * 10 + j);
-    }, "x"_a.noconvert());
-
-    m.def("fill_view_3", [](nb::ndarray<float, nb::shape<3, 4>, nb::c_contig, nb::device::cpu> x) {
-        auto v = x.view();
-        for (size_t i = 0; i < v.shape(0); ++i)
-            for (size_t j = 0; j < v.shape(1); ++j)
-                v(i, j) = (float) (i * 10 + j);
-    }, "x"_a.noconvert());
-
-    m.def("fill_view_4", [](nb::ndarray<float, nb::shape<3, 4>, nb::f_contig, nb::device::cpu> x) {
-        auto v = x.view();
-        for (size_t i = 0; i < v.shape(0); ++i)
-            for (size_t j = 0; j < v.shape(1); ++j)
-                v(i, j) = (float) (i * 10 + j);
-    }, "x"_a.noconvert());
-
-    m.def("fill_view_5", [](nb::ndarray<std::complex<float>, nb::shape<2, 2>, nb::c_contig, nb::device::cpu> x) {
-        auto v = x.view();
-        for (size_t i = 0; i < v.shape(0); ++i)
-            for (size_t j = 0; j < v.shape(1); ++j)
-                v(i, j) *= std::complex<float>(-1.0f, 2.0f);
-    }, "x"_a.noconvert());
 
 #if defined(__aarch64__)
     m.def("ret_numpy_half", []() {

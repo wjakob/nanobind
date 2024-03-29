@@ -33,14 +33,14 @@ Binding functions that take arrays as input
 -------------------------------------------
 
 A function that accepts a :cpp:class:`nb::ndarray\<\> <ndarray>`-typed parameter
-(i.e., *without* template parameters) can be called with *any* array
+(i.e., *without* template parameters) can be called with *any* writable array
 from any framework regardless of the device on which it is stored. The
 following example binding declaration uses this functionality to inspect the
 properties of an arbitrary input array:
 
 .. code-block:: cpp
 
-   m.def("inspect", [](nb::ndarray<> a) {
+   m.def("inspect", [](const nb::ndarray<>& a) {
        printf("Array data pointer : %p\n", a.data());
        printf("Array dimension : %zu\n", a.ndim());
        for (size_t i = 0; i < a.ndim(); ++i) {
@@ -536,7 +536,7 @@ cannot be called using NumPy arrays that are marked as constant.
 
 If you wish your function to be callable with constant input, either change the
 parameter to ``nb::ndarray<const T, ...>`` (if the array is parameterized by
-type), or write ``nb::ndarray<nb::ro>`` to accept a read-only array of any
+type), or write ``nb::ndarray<const void>`` to accept a read-only array of any
 type.
 
 Limitations related to ``dtypes``

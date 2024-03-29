@@ -579,36 +579,29 @@ def test30_force_contig_pytorch():
     assert torch.all(b == a)
 
 @needs_numpy
-def test31_view():
-    # 1
-    x1 = np.array([[1,2],[3,4]], dtype=np.float32)
-    x2 = np.array([[1,2],[3,4]], dtype=np.float64)
-    assert np.allclose(x1, x2)
-    t.fill_view_1(x1)
-    assert np.allclose(x1, x2*2)
-    t.fill_view_1(x2)
-    assert np.allclose(x1, x2*2)
+def test31_noninteger_stride():
+    a = np.array([[1, 2, 3, 4, 0, 0], [5, 6, 7, 8, 0, 0]], dtype=np.float32)
+    s = a[:, 0:4]  # slice
+    t.pass_float32(s)
+    assert t.get_stride(s, 0) == 6;
+    assert t.get_stride(s, 1) == 1;
+    v = s.view(np.complex64)
+    t.pass_complex64(v)
+    assert t.get_stride(v, 0) == 3;
+    assert t.get_stride(v, 1) == 1;
 
-    # 2
-    x1 = np.zeros((3, 4), dtype=np.float32, order='C')
-    x2 = np.zeros((3, 4), dtype=np.float32, order='F')
-    t.fill_view_2(x1)
-    t.fill_view_2(x2)
-    x3 = np.zeros((3, 4), dtype=np.float32, order='C')
-    t.fill_view_3(x3)
-    x4 = np.zeros((3, 4), dtype=np.float32, order='F')
-    t.fill_view_4(x4)
-
-    assert np.all(x1 == x2) and np.all(x2 == x3) and np.all(x3 == x4)
-
-    # 3
-    x1 = np.array([[1+2j, 3+4j], [5+6j, 7+8j]], dtype=np.complex64)
-    x2 = x1 * 2
-    t.fill_view_1(x1.view(np.float32))
-    assert np.allclose(x1, x2)
-    x2 = x1 * (-1+2j)
-    t.fill_view_5(x1)
-    assert np.allclose(x1, x2)
+    a = np.array([[1, 2, 3, 4, 0], [5, 6, 7, 8, 0]], dtype=np.float32)
+    s = a[:, 0:4]  # slice
+    t.pass_float32(s)
+    assert t.get_stride(s, 0) == 5;
+    assert t.get_stride(s, 1) == 1;
+    v = s.view(np.complex64)
+    with pytest.raises(TypeError) as excinfo:
+        t.pass_complex64(v)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    with pytest.raises(TypeError) as excinfo:
+        t.get_stride(v, 0);
+    assert 'incompatible function arguments' in str(excinfo.value)
 
 @needs_numpy
 def test32_half():
@@ -658,26 +651,68 @@ def test36_check_generic():
     assert t.check(arr)
 
 @needs_numpy
-def test37_noninteger_stride():
-    a = np.array([[1, 2, 3, 4, 0, 0], [5, 6, 7, 8, 0, 0]], dtype=np.float32)
-    s = a[:, 0:4]  # slice
-    t.pass_float32(s)
-    assert t.get_stride(s, 0) == 6;
-    assert t.get_stride(s, 1) == 1;
-    v = s.view(np.complex64)
-    t.pass_complex64(v)
-    assert t.get_stride(v, 0) == 3;
-    assert t.get_stride(v, 1) == 1;
+def test37_const_qualifiers_numpy():
+    a = np.array([0, 3.14159, 2.718282], dtype=np.float64)
+    assert t.check_rw_by_value(a);
+    assert t.check_rw_by_value_float64(a);
+    assert a[1] == 6.28318;
+    assert t.check_ro_by_value_const_void(a);
+    assert t.check_ro_by_value_const_float64(a);
+    a.setflags(write=False)
+    assert t.check_ro_by_value_const_void(a);
+    assert t.check_ro_by_value_const_float64(a);
+    assert a[0] == 0.0;
+    assert a[2] == 2.718282;
 
-    a = np.array([[1, 2, 3, 4, 0], [5, 6, 7, 8, 0]], dtype=np.float32)
-    s = a[:, 0:4]  # slice
-    t.pass_float32(s)
-    assert t.get_stride(s, 0) == 5;
-    assert t.get_stride(s, 1) == 1;
-    v = s.view(np.complex64)
-    with pytest.raises(TypeError) as excinfo:
-        t.pass_complex64(v)
-    assert 'incompatible function arguments' in str(excinfo.value)
-    with pytest.raises(TypeError) as excinfo:
-        t.get_stride(v, 0);
-    assert 'incompatible function arguments' in str(excinfo.value)
+    a = np.array([0, 3.14159, 2.718282], dtype=np.float64)
+    assert t.check_rw_by_const_ref(a);
+    assert t.check_rw_by_const_ref_float64(a);
+    assert a[1] == 6.28318;
+    assert t.check_ro_by_const_ref_const_void(a);
+    assert t.check_ro_by_const_ref_const_float64(a);
+    a.setflags(write=False)
+    assert t.check_ro_by_const_ref_const_void(a);
+    assert t.check_ro_by_const_ref_const_float64(a);
+    assert a[0] == 0.0;
+    assert a[2] == 2.718282;
+
+    a = np.array([0, 3.14159, 2.718282], dtype=np.float64)
+    assert t.check_rw_by_rvalue_ref(a);
+    assert t.check_rw_by_rvalue_ref_float64(a);
+    assert a[1] == 6.28318;
+    assert t.check_ro_by_rvalue_ref_const_void(a);
+    assert t.check_ro_by_rvalue_ref_const_float64(a);
+    a.setflags(write=False)
+    assert t.check_ro_by_rvalue_ref_const_void(a);
+    assert t.check_ro_by_rvalue_ref_const_float64(a);
+    assert a[0] == 0.0;
+    assert a[2] == 2.718282;
+
+@needs_torch
+def test38_const_qualifiers_pytorch():
+    a = torch.tensor([0, 3.14159, 2.718282], dtype=torch.float64)
+    assert t.check_rw_by_value(a);
+    assert t.check_rw_by_value_float64(a);
+    assert a[1] == 6.28318;
+    assert t.check_ro_by_value_const_void(a);
+    assert t.check_ro_by_value_const_float64(a);
+    assert a[0] == 0.0;
+    assert a[2] == 2.718282;
+
+    a = torch.tensor([0, 3.14159, 2.718282], dtype=torch.float64)
+    assert t.check_rw_by_const_ref(a);
+    assert t.check_rw_by_const_ref_float64(a);
+    assert a[1] == 6.28318;
+    assert t.check_ro_by_const_ref_const_void(a);
+    assert t.check_ro_by_const_ref_const_float64(a);
+    assert a[0] == 0.0;
+    assert a[2] == 2.718282;
+
+    a = torch.tensor([0, 3.14159, 2.718282], dtype=torch.float64)
+    assert t.check_rw_by_rvalue_ref(a);
+    assert t.check_rw_by_rvalue_ref_float64(a);
+    assert a[1] == 6.28318;
+    assert t.check_ro_by_rvalue_ref_const_void(a);
+    assert t.check_ro_by_rvalue_ref_const_float64(a);
+    assert a[0] == 0.0;
+    assert a[2] == 2.718282;

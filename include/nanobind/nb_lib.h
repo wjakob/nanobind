@@ -422,6 +422,9 @@ NB_CORE void nb_enum_export(PyObject *type);
 /// Try to import a Python extension module, raises an exception upon failure
 NB_CORE PyObject *module_import(const char *name);
 
+/// Try to import a Python extension module, raises an exception upon failure
+NB_CORE PyObject *module_import(PyObject *name);
+
 /// Create a new extension module with the given name
 NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
 

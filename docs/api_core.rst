@@ -878,6 +878,12 @@ Wrapper classes
          nb::module_ np = nb::module_::import_("numpy");
          nb::object np_array = np.attr("array");
 
+   .. cpp:function:: module_ import_(handle name)
+
+      Import the Python module with the specified name and return a reference
+      to it. In contrast to the version above, this function expects a Python
+      object as key.
+
    .. cpp:function:: module_ def_submodule(const char * name, const char * doc = nullptr)
 
       Create a Python submodule within an existing module and return a

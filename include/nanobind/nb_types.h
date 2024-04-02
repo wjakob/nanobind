@@ -319,12 +319,14 @@ public:
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
 
-    /// Import and return a module or throws `python_error`.
     static NB_INLINE module_ import_(const char *name) {
         return steal<module_>(detail::module_import(name));
     }
 
-    /// Import and return a module or throws `python_error`.
+    static NB_INLINE module_ import_(handle name) {
+        return steal<module_>(detail::module_import(name.ptr()));
+    }
+
     NB_INLINE module_ def_submodule(const char *name,
                                     const char *doc = nullptr) {
         return steal<module_>(detail::module_new_submodule(m_ptr, name, doc));

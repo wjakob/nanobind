@@ -154,6 +154,13 @@ PyObject *module_import(const char *name) {
     return res;
 }
 
+PyObject *module_import(PyObject *o) {
+    PyObject *res = PyImport_Import(o);
+    if (!res)
+        throw python_error();
+    return res;
+}
+
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
     PyObject *name_py, *res;

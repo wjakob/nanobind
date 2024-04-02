@@ -471,6 +471,16 @@ class list : public object {
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
 
+    void clear() {
+        if (PyList_SetSlice(m_ptr, 0, PY_SSIZE_T_MAX, nullptr))
+            raise_python_error();
+    }
+
+    void extend(handle h) {
+        if (PyList_SetSlice(m_ptr, PY_SSIZE_T_MAX, PY_SSIZE_T_MAX, h.ptr()))
+            raise_python_error();
+    }
+
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
@@ -488,6 +498,10 @@ class dict : public object {
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
     template <typename T> bool contains(T&& key) const;
     void clear() { PyDict_Clear(m_ptr); }
+    void update(handle h) {
+        if (PyDict_Update(m_ptr, h.ptr()))
+            raise_python_error();
+    }
 };
 
 
@@ -501,6 +515,7 @@ class set : public object {
         if (PySet_Clear(m_ptr))
             raise_python_error();
     }
+    template <typename T> bool discard(T &&value);
 };
 
 class sequence : public object {

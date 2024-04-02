@@ -565,7 +565,6 @@ template <typename T> bool set::contains(T&& key) const {
     return rv == 1;
 }
 
-
 template <typename T> void set::add(T&& key) {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Add(m_ptr, o.ptr());
@@ -573,6 +572,13 @@ template <typename T> void set::add(T&& key) {
         raise_python_error();
 }
 
+template <typename T> bool set::discard(T &&value) {
+    object o = nanobind::cast((detail::forward_t<T>) value);
+    int rv = PySet_Discard(m_ptr, o.ptr());
+    if (rv < 0)
+        raise_python_error();
+    return rv == 1;
+}
 
 template <typename T> bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);

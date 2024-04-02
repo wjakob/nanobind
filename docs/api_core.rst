@@ -726,6 +726,14 @@ Wrapper classes
       negative). When `T` does not already represent a wrapped Python object,
       the function performs a cast.
 
+   .. cpp:function:: void clear()
+
+      Clear the list entries.
+
+   .. cpp:function:: void extend(handle h)
+
+      Analogous to the ``.extend(h)`` method of ``list`` in Python.
+
    .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_list> operator[](T key) const
 
       Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic
@@ -794,6 +802,10 @@ Wrapper classes
 
       Clear the contents of the dictionary.
 
+   .. cpp:function:: void update(handle h)
+
+      Analogous to the ``.update(h)`` method of ``dict`` in Python.
+
 .. cpp:class:: set: public object
 
    Wrapper class representing Python ``set`` instances.
@@ -818,7 +830,14 @@ Wrapper classes
 
    .. cpp:function:: void clear()
 
-      Clear the contents of the set
+      Clear the contents of the set.
+
+   .. cpp:function:: template <typename T> bool discard(T&& key)
+
+      Analogous to the ``.discard(h)`` method of the ``set`` type in Python.
+      Returns ``true`` if the item was deleted successfully, and ``false`` if
+      the value was not present. When `T` does not already represent a wrapped
+      Python object, the function performs a cast.
 
 .. cpp:class:: module_: public object
 

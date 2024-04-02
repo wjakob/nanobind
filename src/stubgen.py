@@ -491,7 +491,7 @@ class StubGen:
             if same_module:
                 # This is an alias of a type in the same module or same top-level module
                 alias_tp = self.import_object("typing", "TypeAlias")
-                self.write_ln(f"{name}: {alias_tp} = {tp_name}\n")
+                self.write_ln(f"{name}: {alias_tp} = {tp.__qualname__}\n")
             elif self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # Import from a different module
                 self.put_value(tp, name)

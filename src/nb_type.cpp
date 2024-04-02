@@ -1838,6 +1838,9 @@ void nb_inst_destruct(PyObject *o) noexcept {
 }
 
 void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
+    if (src == dst)
+        return;
+
     PyTypeObject *tp = Py_TYPE((PyObject *) src);
     type_data *t = nb_type_data(tp);
 
@@ -1858,6 +1861,9 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
 }
 
 void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
+    if (src == dst)
+        return;
+
     PyTypeObject *tp = Py_TYPE((PyObject *) src);
     type_data *t = nb_type_data(tp);
 
@@ -1880,6 +1886,8 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
 }
 
 void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept {
+    if (src == dst)
+        return;
     nb_inst *nbi = (nb_inst *) dst;
     bool destruct = nbi->destruct;
     nbi->destruct = true;
@@ -1889,6 +1897,8 @@ void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept {
 }
 
 void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
+    if (src == dst)
+        return;
     nb_inst *nbi = (nb_inst *) dst;
     bool destruct = nbi->destruct;
     nbi->destruct = true;

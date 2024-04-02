@@ -2631,17 +2631,13 @@ The documentation below refers to two per-instance flags with the following mean
    :cpp:func:`inst_set_state` to disable the flag following the call to
    :cpp:func:`inst_copy`.
 
+   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
+   refer to the same object.
+
 .. cpp:function:: void inst_move(handle dst, handle src)
 
-   Move-construct the contents of `src` into `dst` and set the *ready* and
-   *destruct* flags of `dst` to ``true``.
-
-   `dst` should be an uninitialized instance of the same type. Note that
-   setting the *destruct* flag may be problematic if `dst` is an offset into an
-   existing object created using :cpp:func:`inst_reference` (the destructor
-   will be called multiple times in this case). If so, you must use
-   :cpp:func:`inst_set_state` to disable the flag following the call to
-   :cpp:func:`inst_move`.
+   Analogous to :cpp:func:`inst_copy`, except that the move constructor
+   is used instead of the copy constructor.
 
 .. cpp:function:: void inst_replace_copy(handle dst, handle src)
 
@@ -2655,10 +2651,13 @@ The documentation below refers to two per-instance flags with the following mean
    :cpp:func:`inst_alloc`, :cpp:func:`inst_reference`, or
    :cpp:func:`inst_take_ownership`.
 
+   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
+   refer to the same object.
+
 .. cpp:function:: void inst_replace_move(handle dst, handle src)
 
-   Analogous to :cpp:func:`inst_replace_copy`, except that a move constructor
-   is used here.
+   Analogous to :cpp:func:`inst_replace_copy`, except that the move constructor
+   is used instead of the copy constructor.
 
 .. cpp:function:: str inst_name(handle h)
 

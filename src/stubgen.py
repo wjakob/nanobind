@@ -78,7 +78,7 @@ if sys.version_info < (3, 11):
         import typing_extensions
     except ImportError:
         raise RuntimeError(
-            "stubgen.py requires the 'typing_extension' package on Python <3.11"
+            "stubgen.py requires the 'typing_extensions' package on Python <3.11"
         )
 else:
     typing_extensions = None

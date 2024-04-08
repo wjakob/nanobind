@@ -359,7 +359,7 @@ Without reference counting
       Increases the reference count and returns a reference to the Python object.
       Never raises an exception.
 
-   .. cpp:function:: handle ref_ref() const noexcept
+   .. cpp:function:: handle dec_ref() const noexcept
 
       Decreases the reference count and returns a reference to the Python object.
       Never raises an exception.

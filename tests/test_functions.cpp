@@ -358,4 +358,9 @@ NB_MODULE(test_functions_ext, m) {
 
         return b;
     });
+
+    m.def("test_wrappers_attr_cast", [](nb::object o) {
+        nb::list l = o.attr("anattr");  // Implicit casts should be checked.
+        return l;
+    });
 }

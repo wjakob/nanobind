@@ -29,7 +29,7 @@ public:
     template <typename T> accessor& operator=(T &&value);
 
     template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
-    operator T() const { return borrow<T>(ptr()); }
+    operator T() const;
     NB_INLINE PyObject *ptr() const {
         Impl::get(m_base, m_key, &m_cache);
         return m_cache;

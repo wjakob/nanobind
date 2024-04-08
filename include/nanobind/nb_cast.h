@@ -537,6 +537,12 @@ detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
     return *this;
 }
 
+template <typename Impl>
+template <typename T, detail::enable_if_t<std::is_base_of_v<object, T>>>
+detail::accessor<Impl>::operator T() const {
+  return cast<T>(handle(ptr()));
+}
+
 template <typename T> void list::append(T &&value) {
     object o = nanobind::cast((detail::forward_t<T>) value);
     if (PyList_Append(m_ptr, o.ptr()))

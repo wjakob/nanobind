@@ -590,3 +590,11 @@ def test43_wrappers_dict():
 
 def test43_wrappers_set():
     assert t.test_wrappers_set()
+
+def test44_attr_cast():
+    class A:
+        def __init__(self):
+            self.anattr = (1, 2, 3)
+    a = A()
+    with pytest.raises(RuntimeError):
+      t.test_wrappers_attr_cast(a)

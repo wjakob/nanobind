@@ -9,14 +9,15 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-// Forward declarations for types in dlpack.h (1)
+// Forward declarations for types in ndarray.h (1)
 namespace dlpack { struct dltensor; struct dtype; }
 
 NAMESPACE_BEGIN(detail)
 
-// Forward declarations for types in dlpack.h (2)
+// Forward declarations for types in ndarray.h (2)
 struct ndarray_handle;
 struct ndarray_req;
+enum class ndarray_framework : int;
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -455,7 +456,7 @@ NB_CORE dlpack::dltensor *ndarray_inc_ref(ndarray_handle *) noexcept;
 NB_CORE void ndarray_dec_ref(ndarray_handle *) noexcept;
 
 /// Wrap a ndarray_handle* into a PyCapsule
-NB_CORE PyObject *ndarray_wrap(ndarray_handle *, int framework,
+NB_CORE PyObject *ndarray_wrap(ndarray_handle *, ndarray_framework framework,
                                rv_policy policy, cleanup_list *cleanup) noexcept;
 
 /// Check if an object represents an ndarray

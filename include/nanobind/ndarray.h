@@ -574,7 +574,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
 
     static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return ndarray_wrap(tensor.handle(), int(Value::Info::framework), policy, cleanup);
+        return ndarray_wrap(tensor.handle(), Value::Info::framework, policy, cleanup);
     }
 };
 

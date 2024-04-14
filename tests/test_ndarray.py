@@ -325,6 +325,13 @@ def test15_passthrough():
     b = t.passthrough(a)
     assert a is b
 
+    a = None
+    with pytest.raises(TypeError) as excinfo:
+        b = t.passthrough(a)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    b = t.passthrough_arg_none(a)
+    assert a is b
+
 
 @needs_numpy
 def test16_return_numpy():

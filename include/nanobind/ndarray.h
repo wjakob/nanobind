@@ -567,6 +567,10 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         detail::ndarray_req req;
         req.shape = shape;
         (detail::ndarray_arg<Args>::apply(req), ...);
+        if (src.is_none()) {
+            value = ndarray<Args...>();
+            return true;
+        }
         value = ndarray<Args...>(ndarray_import(
             src.ptr(), &req, flags & (uint8_t) cast_flags::convert, cleanup));
         return value.is_valid();

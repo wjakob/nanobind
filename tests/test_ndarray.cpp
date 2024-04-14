@@ -162,6 +162,9 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("passthrough", [](nb::ndarray<> a) { return a; }, nb::rv_policy::none);
     m.def("passthrough_copy", [](nb::ndarray<> a) { return a; }, nb::rv_policy::copy);
 
+    m.def("passthrough_arg_none", [](nb::ndarray<> a) { return a; },
+          nb::arg().none(), nb::rv_policy::none);
+
     m.def("ret_numpy", []() {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };

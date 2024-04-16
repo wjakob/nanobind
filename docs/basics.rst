@@ -79,6 +79,8 @@ session:
    cd build
    python3
 
+(The default build output directory is different on Windows: use ``cd build\Debug`` and ``python`` instead of the above.)
+
 You should be able to import the extension and call the newly defined function ``my_ext.add()``.
 
 .. code-block:: pycon

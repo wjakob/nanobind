@@ -2768,7 +2768,7 @@ Miscellaneous
       nb::class_<Target>(m, "Target")
           .def(nb::init<Source>());
 
-      nb::implicitly_convertible<Target, Source>();
+      nb::implicitly_convertible<Source, Target>();
 
    The function is provided for reasons of compatibility with pybind11, and as
    an escape hatch to enable use cases where :cpp:struct:`init_implicit`

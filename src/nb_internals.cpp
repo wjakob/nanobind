@@ -362,6 +362,8 @@ NB_NOINLINE void init(const char *name) {
     p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
+    p->keep_alive.min_load_factor(.1f);
+    p->inst_c2p.min_load_factor(.1f);
 
     check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
               p->nb_method && p->nb_bound_method,

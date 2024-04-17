@@ -237,14 +237,16 @@ static void inst_dealloc(PyObject *self) {
     }
 
     if (NB_UNLIKELY(inst->clear_keep_alive)) {
+        size_t self_hash = ptr_hash()(self);
         nb_ptr_map &keep_alive = internals->keep_alive;
-        nb_ptr_map::iterator it = keep_alive.find(self);
+        nb_ptr_map::iterator it = keep_alive.find(self, self_hash);
         check(it != keep_alive.end(),
               "nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
               "keep_alive information", t->name);
 
         nb_weakref_seq *s = (nb_weakref_seq *) it->second;
-        keep_alive.erase(it);
+        keep_alive.erase(self, self_hash);
+
         do {
             nb_weakref_seq *c = s;
             s = c->next;
@@ -258,16 +260,18 @@ static void inst_dealloc(PyObject *self) {
         } while (s);
     }
 
+    size_t p_hash = ptr_hash()(p);
+
     // Update hash table that maps from C++ to Python instance
     nb_ptr_map &inst_c2p = internals->inst_c2p;
-    nb_ptr_map::iterator it = inst_c2p.find(p);
+    nb_ptr_map::iterator it = inst_c2p.find(p, p_hash);
     bool found = false;
 
     if (NB_LIKELY(it != inst_c2p.end())) {
         void *entry = it->second;
         if (NB_LIKELY(entry == inst)) {
             found = true;
-            inst_c2p.erase(it);
+            inst_c2p.erase(p, p_hash);
         } else if (nb_is_seq(entry)) {
             // Multiple objects are associated with this address. Find the right one!
             nb_inst_seq *seq = nb_get_seq(entry),
@@ -283,7 +287,7 @@ static void inst_dealloc(PyObject *self) {
                         if (seq->next)
                             it.value() = nb_mark_seq(seq->next);
                         else
-                            inst_c2p.erase(it);
+                            inst_c2p.erase(p, p_hash);
                     }
 
                     PyMem_Free(seq);

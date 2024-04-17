@@ -82,14 +82,11 @@ void nb_func_dealloc(PyObject *self) {
         func_data *f = nb_func_data(self);
 
         // Delete from registered function list
-        auto &funcs = internals->funcs;
-        auto it = funcs.find(self);
-        check(it != funcs.end(),
+        size_t n_deleted = internals->funcs.erase(self);
+        check(n_deleted == 1,
               "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
               ((f->flags & (uint32_t) func_flags::has_name) ? f->name
                                                             : "<anonymous>"));
-        funcs.erase(it);
-
         for (size_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_free)
                 f->free_capture(f->capture);
@@ -291,10 +288,9 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
-        auto it = internals->funcs.find(func_prev);
-        check(it != internals->funcs.end(),
+        size_t n_deleted = internals->funcs.erase(func_prev);
+        check(n_deleted == 1,
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
-        internals->funcs.erase(it);
 
         Py_CLEAR(func_prev);
     }

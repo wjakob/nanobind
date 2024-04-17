@@ -344,25 +344,19 @@ static void nb_type_dealloc(PyObject *o) {
         nb_type_map_slow &type_c2p_slow = internals->type_c2p_slow;
         nb_type_map_fast &type_c2p_fast = internals->type_c2p_fast;
 
-        nb_type_map_slow::iterator it_slow = type_c2p_slow.find(t->type);
-        nb_type_map_fast::iterator it_fast = type_c2p_fast.find(t->type);
+        size_t n_del_slow = type_c2p_slow.erase(t->type);
+        size_t n_del_fast = type_c2p_fast.erase(t->type);
 
-        bool fail = it_slow == type_c2p_slow.end() ||
-                    it_fast == type_c2p_fast.end();
-
+        bool fail = n_del_fast != 1 && n_del_slow != 1;
         if (!fail) {
-            type_c2p_slow.erase(it_slow);
-            type_c2p_fast.erase(it_fast);
-
             nb_alias_chain *cur = t->alias_chain;
             while (cur) {
                 nb_alias_chain *next = cur->next;
-                it_fast = type_c2p_fast.find(cur->value);
-                if (it_fast == type_c2p_fast.end()) {
+                n_del_fast = type_c2p_fast.erase(cur->value);
+                if (n_del_fast != 1) {
                     fail = true;
                     break;
                 }
-                type_c2p_fast.erase(it_fast);
                 PyMem_Free(cur);
                 cur = next;
             }

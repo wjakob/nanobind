@@ -597,6 +597,10 @@ NB_INLINE bool isinstance(handle h) noexcept {
         return detail::make_caster<T>().from_python(h, 0, nullptr);
 }
 
+NB_INLINE bool issubclass(handle h1, handle h2) {
+    return detail::issubclass(h1.ptr(), h2.ptr());
+}
+
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
 NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
 NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }

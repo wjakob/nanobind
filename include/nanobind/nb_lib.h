@@ -407,16 +407,24 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
 
 // ========================================================================
 
-/// Fill in slots for an enum type being built
-NB_CORE void nb_enum_prepare(const type_init_data *t,
-                             PyType_Slot *&slots, size_t max_slots) noexcept;
+struct enum_init_data;
 
-/// Add an entry to an enumeration
-NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
-                         const char *doc) noexcept;
+/// Create a new enumeration type
+NB_CORE PyObject *enum_create(enum_init_data *) noexcept;
+
+/// Append an entry to an enumeration
+NB_CORE void enum_append(PyObject *tp, const char *name,
+                         int64_t value, const char *doc) noexcept;
+
+// Query an enumeration's Python object -> integer value map
+NB_CORE bool enum_from_python(const std::type_info *, PyObject *, int64_t *,
+                              uint8_t flags) noexcept;
+
+// Query an enumeration's integer value -> Python object map
+NB_CORE PyObject *enum_from_cpp(const std::type_info *, int64_t) noexcept;
 
 /// Export enum entries to the parent scope
-NB_CORE void nb_enum_export(PyObject *type);
+NB_CORE void enum_export(PyObject *tp);
 
 // ========================================================================
 
@@ -512,6 +520,10 @@ NB_CORE bool iterable_check(PyObject *o) noexcept;
 NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,
                            Py_ssize_t &start, Py_ssize_t &stop,
                            Py_ssize_t &step, size_t &slice_length);
+
+// ========================================================================
+
+NB_CORE bool issubclass(PyObject *a, PyObject *b);
 
 // ========================================================================
 

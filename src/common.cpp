@@ -1124,5 +1124,14 @@ NB_CORE PyObject *repr_map(PyObject *o) {
     return s.release().ptr();
 }
 
+// ========================================================================
+
+bool issubclass(PyObject *a, PyObject *b) {
+    int rv = PyObject_IsSubclass(a, b);
+    if (rv == -1)
+        raise_python_error();
+    return bool(rv);
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

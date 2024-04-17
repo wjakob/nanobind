@@ -73,7 +73,7 @@ struct nb_inst { // usually: 24 bytes
     /// Does this instance use intrusive reference counting?
     uint32_t intrusive : 1;
 
-    // That's a lot of unused space. I wonder if there is a good use for it.
+    // That's a lot of unused space. I wonder if there is a good use for it..
     uint32_t unused: 25;
 };
 
@@ -278,6 +278,9 @@ extern PyObject *inst_new_int(PyTypeObject *tp);
 extern PyTypeObject *nb_static_property_tp() noexcept;
 extern type_data *nb_type_c2p(nb_internals *internals,
                               const std::type_info *type);
+extern void nb_type_unregister(type_data *t) noexcept;
+
+extern PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept;
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 NB_INLINE func_data *nb_func_data(void *o) {

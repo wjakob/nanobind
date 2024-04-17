@@ -86,7 +86,11 @@ enum class type_init_flags : uint32_t {
     /// and/or 'type_slots_callback' members of type_init_data
     has_type_slots           = (1 << 23),
 
-    all_init_flags           = (0x1f << 19)
+    // This type provides extra metaclass type slots via the 'metaclass_type_slots' member of
+    // type_init_data, as well as a custom metaclass name via 'metaclass_name'.
+    has_metaclass_type_slots = (1 << 24),
+
+    all_init_flags           = (0x3f << 19)
 };
 
 // See internals.h
@@ -96,7 +100,7 @@ struct nb_alias_chain;
 struct type_data {
     uint32_t size;
     uint32_t align : 8;
-    uint32_t flags : 24;
+    uint32_t flags : 25;
     const char *name;
     const std::type_info *type;
     nb_alias_chain *alias_chain;
@@ -123,6 +127,8 @@ struct type_init_data : type_data {
     const PyType_Slot *type_slots;
     void (*type_slots_callback)(const type_init_data *d, PyType_Slot *&slots, size_t max_slots);
     size_t supplement;
+    const PyType_Slot *metaclass_type_slots;
+    const char *metaclass_name;
 };
 
 NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
@@ -712,6 +718,7 @@ public:
         static_assert(std::is_trivially_copyable_v<T>);
         d.flags = ((uint32_t) detail::type_init_flags::has_supplement |
                    (uint32_t) detail::type_init_flags::has_type_slots |
+                   (uint32_t) detail::type_init_flags::has_metaclass_type_slots |
                    (uint32_t) detail::type_flags::is_copy_constructible |
                    (uint32_t) detail::type_flags::is_move_constructible |
                    (uint32_t) detail::type_flags::is_destructible |
@@ -725,6 +732,8 @@ public:
         d.scope = scope.ptr();
         d.type_slots = nullptr;
         d.type_slots_callback = detail::nb_enum_prepare;
+        d.metaclass_type_slots = detail::nb_enum_metaclass_type_slots;
+        d.metaclass_name = "nanobind.nb_enum";
         d.is_signed = std::is_signed_v<std::underlying_type_t<T>>;
 
         (detail::type_extra_apply(d, extra), ...);

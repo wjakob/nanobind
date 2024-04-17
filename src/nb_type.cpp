@@ -479,59 +479,6 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     return NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 }
 
-static int nb_enum_type_contains(PyTypeObject *cls, PyObject *item) {
-    if (Py_TYPE(item) == cls) {
-        return 1;
-    }
-
-    enum_supplement &supp = type_supplement<enum_supplement>(cls);
-    if (!supp.entries) {
-        return 0;
-    }
-
-    return PyDict_GetItem(supp.entries, item) != nullptr;
-}
-
-static object nb_enum_type_values(PyTypeObject *cls) {
-    enum_supplement &supp = type_supplement<enum_supplement>(cls);
-    if (supp.values_by_name) {
-        return steal(PyDict_Values(supp.values_by_name));
-    } else {
-        return steal(PyTuple_New(0));
-    }
-}
-
-static PyObject *nb_enum_type_iter(PyTypeObject *cls) {
-    object values = nb_enum_type_values(cls);
-    return values ? PyObject_GetIter(values.ptr()) : nullptr;
-}
-
-static PyObject *nb_enum_type_reversed(PyObject *cls, [[maybe_unused]] PyObject *unused) {
-    object values = nb_enum_type_values((PyTypeObject *) cls);
-    return values ? values.attr("__reversed__")().release().ptr() : nullptr;
-}
-
-static PyObject *nb_enum_type_subscript(PyTypeObject *cls, PyObject *key) {
-    enum_supplement &supp = type_supplement<enum_supplement>(cls);
-
-    PyObject *value = supp.values_by_name ? PyDict_GetItem(supp.values_by_name, key) : nullptr;
-    if (!value) {
-        PyErr_Clear();
-        PyErr_Format(PyExc_KeyError,
-                     "%s[]: could not convert %R into an enumeration value!",
-                     nb_type_data(cls)->name, key);
-        return nullptr;
-    }
-
-    Py_INCREF(value);
-    return value;
-}
-
-static Py_ssize_t nb_enum_type_length(PyTypeObject *cls) {
-    enum_supplement &supp = type_supplement<enum_supplement>(cls);
-    return supp.entries ? PyDict_Size(supp.entries) : 0;
-}
-
 #if NB_TYPE_FROM_METACLASS_IMPL || NB_TYPE_GET_SLOT_IMPL
 
 struct nb_slot {
@@ -810,39 +757,43 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 #endif
 }
 
-static PyMethodDef enum_reversed_method[] = {
-    { "__reversed__", nb_enum_type_reversed, METH_NOARGS, nullptr },
-    { nullptr }
-};
+static PyTypeObject *nb_type_tp(size_t supplement, const char *custom_name,
+                                const PyType_Slot *custom_slots) noexcept {
+    check((!custom_name) == (!custom_slots),
+          "nanobind::detail::nb_type_tp(\"%s\"): must have both custom_name "
+          "and custom_slots or neither", custom_name ? custom_name : "null");
 
-static PyTypeObject *nb_type_tp(size_t supplement, uint32_t flags) noexcept {
-    const bool is_enum = flags & (uint32_t) type_flags::is_enum;
-
-    constexpr size_t key_flag_shift_is_enum = sizeof(size_t) * 8 - 1;
-    size_t key_value = supplement | ((size_t) is_enum << key_flag_shift_is_enum);
-    object key = steal(PyLong_FromSize_t(key_value));
+    object key;
+    if (custom_name) {
+        key = steal(PyUnicode_FromString(custom_name));
+    } else {
+        key = steal(PyLong_FromSize_t(supplement));
+    }
 
     PyTypeObject *tp =
         (PyTypeObject *) PyDict_GetItem(internals->nb_type_dict, key.ptr());
 
     if (NB_UNLIKELY(!tp)) {
-        // Make sure to keep the size up to date with the code below (max number of slots + 1 for
-        // the null terminator).
-        PyType_Slot slots[10] = {};
+        PyType_Slot slots[10];
 
         PyType_Slot *next_slot = &slots[0];
+        PyType_Slot *sentinel_slot = slots + sizeof(slots) / sizeof(slots[0]) - 1;
         *next_slot++ = { Py_tp_base, &PyType_Type };
         *next_slot++ = { Py_tp_dealloc, (void *) nb_type_dealloc };
         *next_slot++ = { Py_tp_setattro, (void *) nb_type_setattro };
         *next_slot++ = { Py_tp_init, (void *) nb_type_init };
 
-        if (is_enum) {
-            *next_slot++ = { Py_mp_subscript, (void *) nb_enum_type_subscript };
-            *next_slot++ = { Py_mp_length, (void *) nb_enum_type_length };
-            *next_slot++ = { Py_sq_contains, (void *) nb_enum_type_contains };
-            *next_slot++ = { Py_tp_iter, (void *) nb_enum_type_iter };
-            *next_slot++ = { Py_tp_methods, (void *) enum_reversed_method };
+        if (custom_slots) {
+            const PyType_Slot* next_custom_slot = custom_slots;
+            while (next_custom_slot->slot != 0) {
+                check(next_slot != sentinel_slot,
+                      "nanobind::detail::nb_type_tp(\"%s\"): ran out of "
+                      "metaclass type slots!", custom_name);
+                *next_slot++ = *next_custom_slot++;
+            }
         }
+
+        *next_slot++ = { 0, nullptr };
 
 #if PY_VERSION_HEX >= 0x030C0000
         int basicsize = -(int) (sizeof(type_data) + supplement),
@@ -854,10 +805,11 @@ static PyTypeObject *nb_type_tp(size_t supplement, uint32_t flags) noexcept {
 
         constexpr size_t uint64_max_str_repr_size = 20;
         char name[sizeof("nanobind.nb_type_") + uint64_max_str_repr_size];
-        snprintf(name, sizeof(name), "nanobind.nb_%s_%zu", is_enum ? "enum" : "type", supplement);
+        if (!custom_name)
+            snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
 
         PyType_Spec spec = {
-            /* .name = */ name,
+            /* .name = */ custom_name ? custom_name : name,
             /* .basicsize = */ basicsize,
             /* .itemsize = */ itemsize,
             /* .flags = */ Py_TPFLAGS_DEFAULT,
@@ -932,6 +884,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          has_base_py           = t->flags & (uint32_t) type_init_flags::has_base_py,
          has_type_slots        = t->flags & (uint32_t) type_init_flags::has_type_slots,
          has_supplement        = t->flags & (uint32_t) type_init_flags::has_supplement,
+         has_metaclass_slots   = t->flags & (uint32_t) type_init_flags::has_metaclass_type_slots,
          has_dynamic_attr      = t->flags & (uint32_t) type_flags::has_dynamic_attr,
          is_weak_referenceable = t->flags & (uint32_t) type_flags::is_weak_referenceable,
          is_generic            = t->flags & (uint32_t) type_flags::is_generic,
@@ -1153,7 +1106,10 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0, t->flags);
+    PyTypeObject *metaclass =
+        nb_type_tp(has_supplement ? t->supplement : 0,
+                   has_metaclass_slots ? t->metaclass_name : nullptr,
+                   has_metaclass_slots ? t->metaclass_type_slots : nullptr);
 
     PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
     if (!result) {

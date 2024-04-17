@@ -406,6 +406,8 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
 
 // ========================================================================
 
+NB_CORE extern PyType_Slot nb_enum_metaclass_type_slots[6];
+
 /// Fill in slots for an enum type being built
 NB_CORE void nb_enum_prepare(const type_init_data *t,
                              PyType_Slot *&slots, size_t max_slots) noexcept;

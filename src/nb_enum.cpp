@@ -302,6 +302,73 @@ Py_hash_t nb_enum_hash(PyObject *o) {
     return value;
 }
 
+static int nb_enum_type_contains(PyTypeObject *cls, PyObject *item) {
+    if (Py_TYPE(item) == cls) {
+        return 1;
+    }
+
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+    if (!supp.entries) {
+        return 0;
+    }
+
+    return PyDict_GetItem(supp.entries, item) != nullptr;
+}
+
+static object nb_enum_type_values(PyTypeObject *cls) {
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+    if (supp.values_by_name) {
+        return steal(PyDict_Values(supp.values_by_name));
+    } else {
+        return steal(PyTuple_New(0));
+    }
+}
+
+static PyObject *nb_enum_type_iter(PyTypeObject *cls) {
+    object values = nb_enum_type_values(cls);
+    return values ? PyObject_GetIter(values.ptr()) : nullptr;
+}
+
+static PyObject *nb_enum_type_reversed(PyObject *cls, [[maybe_unused]] PyObject *unused) {
+    object values = nb_enum_type_values((PyTypeObject *) cls);
+    return values ? values.attr("__reversed__")().release().ptr() : nullptr;
+}
+
+static PyObject *nb_enum_type_subscript(PyTypeObject *cls, PyObject *key) {
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+
+    PyObject *value = supp.values_by_name ? PyDict_GetItem(supp.values_by_name, key) : nullptr;
+    if (!value) {
+        PyErr_Clear();
+        PyErr_Format(PyExc_KeyError,
+                     "%s[]: could not convert %R into an enumeration value!",
+                     nb_type_data(cls)->name, key);
+        return nullptr;
+    }
+
+    Py_INCREF(value);
+    return value;
+}
+
+static Py_ssize_t nb_enum_type_length(PyTypeObject *cls) {
+    enum_supplement &supp = type_supplement<enum_supplement>(cls);
+    return supp.entries ? PyDict_Size(supp.entries) : 0;
+}
+
+static PyMethodDef nb_enum_reversed_method[] = {
+    { "__reversed__", nb_enum_type_reversed, METH_NOARGS, nullptr },
+    { nullptr }
+};
+
+PyType_Slot nb_enum_metaclass_type_slots[6] = {
+    { Py_mp_subscript, (void *) nb_enum_type_subscript },
+    { Py_mp_length, (void *) nb_enum_type_length },
+    { Py_sq_contains, (void *) nb_enum_type_contains },
+    { Py_tp_iter, (void *) nb_enum_type_iter },
+    { Py_tp_methods, (void *) nb_enum_reversed_method },
+    { 0, nullptr }
+};
+
 void nb_enum_prepare(const type_init_data *td,
                      PyType_Slot *&t, size_t max_slots) noexcept {
     /* 23 is the number of slot assignments below. Update it if you add more.

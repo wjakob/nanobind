@@ -777,7 +777,7 @@ static PyTypeObject *nb_type_tp(size_t supplement, const char *custom_name,
         PyType_Slot slots[10];
 
         PyType_Slot *next_slot = &slots[0];
-        PyType_Slot *sentinel_slot = slots + sizeof(slots) / sizeof(slots[0]) - 1;
+        PyType_Slot *last_slot = slots + sizeof(slots) / sizeof(slots[0]) - 1;
         *next_slot++ = { Py_tp_base, &PyType_Type };
         *next_slot++ = { Py_tp_dealloc, (void *) nb_type_dealloc };
         *next_slot++ = { Py_tp_setattro, (void *) nb_type_setattro };
@@ -786,7 +786,7 @@ static PyTypeObject *nb_type_tp(size_t supplement, const char *custom_name,
         if (custom_slots) {
             const PyType_Slot* next_custom_slot = custom_slots;
             while (next_custom_slot->slot != 0) {
-                check(next_slot != sentinel_slot,
+                check(next_slot != last_slot,
                       "nanobind::detail::nb_type_tp(\"%s\"): ran out of "
                       "metaclass type slots!", custom_name);
                 *next_slot++ = *next_custom_slot++;

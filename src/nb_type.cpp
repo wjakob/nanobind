@@ -359,7 +359,6 @@ void nb_type_unregister(type_data *t) noexcept {
         }
     }
 
-
     check(!fail,
           "nanobind::detail::nb_type_unregister(\"%s\"): could not "
           "find type!", t->name);
@@ -980,22 +979,12 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     if (has_type_slots) {
         size_t num_avail = nb_extra_slots;
-        if (t->type_slots_callback) {
-            PyType_Slot* first_new = s;
-            t->type_slots_callback(t, s, num_avail);
-            check(first_new + num_avail >= s,
-                  "nanobind::detail::nb_type_new(\"%s\"): type_slots_callback "
-                  "overflowed the slots array!", t_name);
-            num_avail -= (s - first_new);
-        }
-        if (t->type_slots) {
-            size_t i = 0;
-            while (t->type_slots[i].slot) {
-                check(i != num_avail,
-                      "nanobind::detail::nb_type_new(\"%s\"): ran out of "
-                      "type slots!", t_name);
-                *s++ = t->type_slots[i++];
-            }
+        size_t i = 0;
+        while (t->type_slots[i].slot) {
+            check(i != num_avail,
+                  "nanobind::detail::nb_type_new(\"%s\"): ran out of "
+                  "type slots!", t_name);
+            *s++ = t->type_slots[i++];
         }
     }
 

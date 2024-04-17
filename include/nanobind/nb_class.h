@@ -85,8 +85,7 @@ enum class type_init_flags : uint32_t {
     /// Is the 'base_py' field of the type_init_data structure set?
     has_base_py              = (1 << 22),
 
-    /// This type provides extra PyType_Slot fields via the 'type_slots'
-    /// and/or 'type_slots_callback' members of type_init_data
+    /// This type provides extra PyType_Slot fields
     has_type_slots           = (1 << 23),
 
     all_init_flags           = (0x1f << 19)
@@ -135,7 +134,6 @@ struct type_init_data : type_data {
     PyTypeObject *base_py;
     const char *doc;
     const PyType_Slot *type_slots;
-    void (*type_slots_callback)(const type_init_data *d, PyType_Slot *&slots, size_t max_slots);
     size_t supplement;
 };
 
@@ -150,19 +148,8 @@ NB_INLINE void type_extra_apply(type_init_data &t, const char *doc) {
 }
 
 NB_INLINE void type_extra_apply(type_init_data &t, type_slots c) {
-    if ((t.flags & (uint32_t) type_init_flags::has_type_slots) == 0) {
-        t.flags |= (uint32_t) type_init_flags::has_type_slots;
-        t.type_slots_callback = nullptr;
-    }
+    t.flags |= (uint32_t) type_init_flags::has_type_slots;
     t.type_slots = c.value;
-}
-
-NB_INLINE void type_extra_apply(type_init_data &t, type_slots_callback c) {
-    if ((t.flags & (uint32_t) type_init_flags::has_type_slots) == 0) {
-        t.flags |= (uint32_t) type_init_flags::has_type_slots;
-        t.type_slots = nullptr;
-    }
-    t.type_slots_callback = c.callback;
 }
 
 template <typename T>

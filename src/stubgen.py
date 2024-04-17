@@ -55,6 +55,7 @@ specifically to simplify stub generation.
 
 import argparse
 import builtins
+import enum
 from inspect import Signature, Parameter, signature, ismodule, getmembers
 import textwrap
 import importlib
@@ -83,21 +84,12 @@ if sys.version_info < (3, 11):
 else:
     typing_extensions = None
 
-# Standard operations supported by arithmetic enumerations
-# fmt: off
-ENUM_OPS = [
-    "add", "sub", "mul", "floordiv", "eq", "ne", "gt", "ge", "lt", "le",
-    "index", "repr", "hash", "int", "rshift", "lshift", "and", "or", "xor",
-    "neg", "abs", "invert",
-]
-
-
 # Exclude various standard elements found in modules, classes, etc.
 SKIP_LIST = [
     "__doc__", "__module__", "__name__", "__new__", "__builtins__",
     "__cached__", "__path__", "__version__", "__spec__", "__loader__",
     "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
-    "__file__", "__dict__", "__weakref__", "@entries"
+    "__file__", "__dict__", "__weakref__", "__format__", "__nb_enum__"
 ]
 # fmt: on
 
@@ -269,10 +261,6 @@ class StubGen:
             'Iterable|Iterator|KeysView|Mapping|MappingView|MutableMapping|'
             'MutableSequence|MutableSet|Sequence|ValuesView)'
         )
-
-        # Should we insert a dummy base class to handle enumerations?
-        self.abstract_enum = False
-        self.abstract_enum_arith = False
 
     def write(self, s: str) -> None:
         """Append raw characters to the output"""
@@ -496,30 +484,9 @@ class StubGen:
                 # Import from a different module
                 self.put_value(tp, name)
         else:
-            is_enum = self.is_enum(tp)
             docstr = tp.__doc__
             tp_dict = dict(tp.__dict__)
             tp_bases: Union[List[str], Tuple[Any, ...], None] = None
-
-            if is_enum:
-                # Rewrite enumerations so that they derive from a helper type
-                # to avoid bloat from a large number of repeated function
-                # declarations
-
-                docstr = docstr.__doc__
-                is_arith = "__add__" in tp_dict
-                self.abstract_enum = True
-                self.abstract_enum_arith |= is_arith
-
-                tp_bases = ["_Enum" + ("Arith" if is_arith else "")]
-                del tp_dict["name"]
-                del tp_dict["value"]
-                for op in ENUM_OPS:
-                    name, rname = f"__{op}__", f"__r{op}__"
-                    if name in tp_dict:
-                        del tp_dict[name]
-                    if rname in tp_dict:
-                        del tp_dict[rname]
 
             if "__nb_signature__" in tp.__dict__:
                 # Types with a custom signature override
@@ -554,10 +521,6 @@ class StubGen:
                 self.write_ln("pass\n")
             self.depth -= 1
 
-    def is_enum(self, tp: object) -> bool:
-        """Check if the given type is an enumeration"""
-        return hasattr(tp, "@entries")
-
     def is_function(self, tp: type) -> bool:
         """
         Test if this is one of the many types of built-in functions supported
@@ -591,7 +554,7 @@ class StubGen:
         ):
             return
 
-        if isinstance(parent, type) and issubclass(tp, parent) and self.is_enum(parent):
+        if isinstance(parent, type) and issubclass(tp, parent):
             # This is an entry of an enumeration
             self.write_ln(f"{name}: {self.type_str(tp)}")
             if value.__doc__ and self.include_docstrings:
@@ -956,12 +919,12 @@ class StubGen:
                 return f"float('{s}')"
             else:
                 return s
-        elif self.is_enum(tp):
-            return self.type_str(type(e)) + "." + e.__name__
         elif issubclass(tp, type) or typing.get_origin(e):
             return self.type_str(e)
         elif issubclass(tp, typing.ForwardRef):
             return f'"{e.__forward_arg__}"'
+        elif issubclass(tp, enum.Enum):
+            return self.type_str(tp) + '.' + e.name
         elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
             tv = self.import_object(tp.__module__, "TypeVarTuple")
@@ -1160,57 +1123,11 @@ class StubGen:
                 s += items_v0 if len(items_v0) <= 70 else items_v1
 
         s += "\n\n"
-        s += self.put_abstract_enum_class()
 
         # Append the main generated stub
         s += self.output
 
         return s.rstrip() + "\n"
-
-    def put_abstract_enum_class(self) -> str:
-        s = ""
-        if not self.abstract_enum:
-            return s
-
-        s += "class _Enum:\n"
-        s += "    def __init__(self, arg: object, /) -> None: ...\n"
-        s += "    def __repr__(self, /) -> str: ...\n"
-        s += "    def __hash__(self, /) -> int: ...\n"
-        s += "    def __int__(self, /) -> int: ...\n"
-        s += "    def __index__(self, /) -> int: ...\n"
-
-        for op in ["eq", "ne"]:
-            s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
-
-        for op in ["gt", "ge", "lt", "le"]:
-            s += f"    def __{op}__(self, arg: object, /) -> bool: ...\n"
-        s += "    def name(self, /) -> str: ...\n"
-        s += "    def value(self, /) -> int: ...\n"
-        s += "\n"
-
-        if not self.abstract_enum_arith:
-            return s
-
-        s += "class _EnumArith(_Enum):\n"
-        for op in ["abs", "neg", "invert"]:
-            s += f"    def __{op}__(self) -> int: ...\n"
-        for op in [
-            "add",
-            "sub",
-            "mul",
-            "floordiv",
-            "lshift",
-            "rshift",
-            "and",
-            "or",
-            "xor",
-        ]:
-            s += f"    def __{op}__(self, arg: object, /) -> int: ...\n"
-            s += f"    def __r{op}__(self, arg: object, /) -> int: ...\n"
-
-        s += "\n"
-        return s
-
 
 def parse_options(args: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(

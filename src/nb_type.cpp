@@ -337,58 +337,46 @@ type_data *nb_type_c2p(nb_internals *internals_,
     return nullptr;
 }
 
+void nb_type_unregister(type_data *t) noexcept {
+    nb_type_map_slow &type_c2p_slow = internals->type_c2p_slow;
+    nb_type_map_fast &type_c2p_fast = internals->type_c2p_fast;
+
+    size_t n_del_slow = type_c2p_slow.erase(t->type),
+           n_del_fast = type_c2p_fast.erase(t->type);
+
+    bool fail = n_del_fast != 1 || n_del_slow != 1;
+    if (!fail) {
+        nb_alias_chain *cur = t->alias_chain;
+        while (cur) {
+            nb_alias_chain *next = cur->next;
+            n_del_fast = type_c2p_fast.erase(cur->value);
+            if (n_del_fast != 1) {
+                fail = true;
+                break;
+            }
+            PyMem_Free(cur);
+            cur = next;
+        }
+    }
+
+
+    check(!fail,
+          "nanobind::detail::nb_type_unregister(\"%s\"): could not "
+          "find type!", t->name);
+}
+
 static void nb_type_dealloc(PyObject *o) {
     type_data *t = nb_type_data((PyTypeObject *) o);
 
-    if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0) {
-        nb_type_map_slow &type_c2p_slow = internals->type_c2p_slow;
-        nb_type_map_fast &type_c2p_fast = internals->type_c2p_fast;
-
-        size_t n_del_slow = type_c2p_slow.erase(t->type);
-        size_t n_del_fast = type_c2p_fast.erase(t->type);
-
-        bool fail = n_del_fast != 1 || n_del_slow != 1;
-        if (!fail) {
-            nb_alias_chain *cur = t->alias_chain;
-            while (cur) {
-                nb_alias_chain *next = cur->next;
-                n_del_fast = type_c2p_fast.erase(cur->value);
-                if (n_del_fast != 1) {
-                    fail = true;
-                    break;
-                }
-                PyMem_Free(cur);
-                cur = next;
-            }
-        }
-
-        check(!fail,
-              "nanobind::detail::nb_type_dealloc(\"%s\"): could not "
-              "find type!", t->name);
-    }
+    if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0)
+        nb_type_unregister(t);
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
-        free(t->implicit);
-        free(t->implicit_py);
+        free(t->implicit.cpp);
+        free(t->implicit.py);
     }
 
     free((char *) t->name);
-
-
-    if ((t->flags & (uint32_t) type_flags::is_enum)) {
-        PyTypeObject *tp = (PyTypeObject *) o;
-        #if defined(Py_LIMITED_API)
-            PyGetSetDef *getset = (PyGetSetDef *) PyType_GetSlot(tp, Py_tp_getset);
-        #else
-            PyGetSetDef *getset = tp->tp_getset;
-        #endif
-        if (getset && getset[0].doc) {
-            // nb_enum with a custom top-level docstring
-            free((char *) getset[0].doc);
-            free(getset);
-        }
-    }
-
     NB_SLOT(PyType_Type, tp_dealloc)(o);
 }
 
@@ -433,8 +421,8 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
     t->type_py = (PyTypeObject *) self;
-    t->implicit = nullptr;
-    t->implicit_py = nullptr;
+    t->implicit.cpp = nullptr;
+    t->implicit.py = nullptr;
     t->alias_chain = nullptr;
 
     return 0;
@@ -1145,14 +1133,32 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     return result;
 }
 
+
+PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
+    PyObject *result;
+#if PY_VERSION_HEX < 0x03090000
+    PyObject *args = PyTuple_New(1);
+    if (!args)
+        return nullptr;
+    Py_INCREF(arg);
+    NB_TUPLE_SET_ITEM(args, 0, arg);
+    result = PyObject_CallObject(fn, args);
+    Py_DECREF(args);
+#else
+    PyObject *args[2] = { nullptr, arg };
+    result = PyObject_Vectorcall(fn, args + 1, NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
+#endif
+    return result;
+}
+
 /// Encapsulates the implicit conversion part of nb_type_get()
 static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                                              const std::type_info *cpp_type_src,
                                              const type_data *dst_type,
                                              nb_internals *internals_,
                                              cleanup_list *cleanup, void **out) noexcept {
-    if (dst_type->implicit && cpp_type_src) {
-        const std::type_info **it = dst_type->implicit;
+    if (dst_type->implicit.cpp && cpp_type_src) {
+        const std::type_info **it = dst_type->implicit.cpp;
         const std::type_info *v;
 
         while ((v = *it++)) {
@@ -1160,7 +1166,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                 goto found;
         }
 
-        it = dst_type->implicit;
+        it = dst_type->implicit.cpp;
         while ((v = *it++)) {
             const type_data *d = nb_type_c2p(internals_, v);
             if (d && PyType_IsSubtype(Py_TYPE(src), d->type_py))
@@ -1168,9 +1174,9 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
         }
     }
 
-    if (dst_type->implicit_py) {
+    if (dst_type->implicit.py) {
         bool (**it)(PyTypeObject *, PyObject *, cleanup_list *) noexcept =
-            dst_type->implicit_py;
+            dst_type->implicit.py;
         bool (*v2)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
 
         while ((v2 = *it++)) {
@@ -1182,23 +1188,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
     return false;
 
 found:
-
-    PyObject *result;
-#if PY_VERSION_HEX < 0x03090000
-    PyObject *args = PyTuple_New(1);
-    if (!args) {
-        PyErr_Clear();
-        return false;
-    }
-    Py_INCREF(src);
-    NB_TUPLE_SET_ITEM(args, 0, src);
-    result = PyObject_CallObject((PyObject *) dst_type->type_py, args);
-    Py_DECREF(args);
-#else
-    PyObject *args[2] = { nullptr, src };
-    result = PyObject_Vectorcall((PyObject *) dst_type->type_py, args + 1,
-                                 NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
-#endif
+    PyObject *result = call_one_arg((PyObject *) dst_type->type_py, src);
 
     if (result) {
         cleanup->append(result);

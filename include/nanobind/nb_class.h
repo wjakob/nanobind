@@ -52,16 +52,19 @@ enum class type_flags : uint32_t {
     /// Instances of this type can be referenced by 'weakref'
     is_weak_referenceable    = (1 << 13),
 
-    /// Indicate that a type refers to an enumeration
-    is_enum                  = (1 << 14),
-
     /// A custom signature override was specified
-    has_signature            = (1 << 15),
+    has_signature            = (1 << 14),
 
     /// The class implements __class_getitem__ similar to typing.Generic
-    is_generic               = (1 << 16),
+    is_generic               = (1 << 15),
 
-    // Two more flag bits available (17 through 18) without needing
+    /// Is this an arithmetic enumeration?
+    is_arithmetic            = (1 << 16),
+
+    /// Is the number type underlying the enumeration signed?
+    is_signed                = (1 << 17)
+
+    // One more flag bits available (18) without needing
     // a larger reorganization
 };
 
@@ -99,13 +102,24 @@ struct type_data {
     uint32_t flags : 24;
     const char *name;
     const std::type_info *type;
-    nb_alias_chain *alias_chain;
     PyTypeObject *type_py;
+    nb_alias_chain *alias_chain;
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
-    const std::type_info **implicit;
-    bool (**implicit_py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
+    union {
+        // Implicit conversions for C++ type bindings
+        struct {
+            const std::type_info **cpp;
+            bool (**py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
+        } implicit;
+
+        // Forward and reverse mappings for enumerations
+        struct {
+            void *fwd;
+            void *rev;
+        } enum_tbl;
+    };
     void (*set_self_py)(void *, PyObject *) noexcept;
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
@@ -188,34 +202,30 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
     t.supplement = sizeof(T);
 }
 
-/// Information about an enum, stored as its type_data::supplement
-struct enum_supplement {
-    bool is_signed = false;
-    PyObject* entries = nullptr;
-    PyObject* scope = nullptr;
+struct enum_init_data {
+    const std::type_info *type;
+    PyObject *scope;
+    const char *name;
+    const char *docstr;
+    uint32_t flags;
 };
 
-/// Information needed to create an enum
-struct enum_init_data : type_init_data {
-    bool is_signed = false;
-    bool is_arithmetic = false;
-};
-
-NB_INLINE void type_extra_apply(enum_init_data &ed, is_arithmetic) {
-    ed.is_arithmetic = true;
+NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
+    e.flags |= (uint32_t) type_flags::is_arithmetic;
 }
 
-// Enums can't have base classes or supplements or be intrusive, and
-// are always final. They can't use type_slots_callback because that is
-// used by the enum mechanism internally, but can provide additional
-// slots using type_slots.
-void type_extra_apply(enum_init_data &, const handle &) = delete;
+NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {
+    e.docstr = doc;
+}
+
 template <typename T>
-void type_extra_apply(enum_init_data &, intrusive_ptr<T>) = delete;
-template <typename T>
-void type_extra_apply(enum_init_data &, supplement<T>) = delete;
-void type_extra_apply(enum_init_data &, is_final) = delete;
-void type_extra_apply(enum_init_data &, type_slots_callback) = delete;
+NB_INLINE void enum_extra_apply(enum_init_data &, T) {
+    static_assert(
+        std::is_void_v<T>,
+        "Invalid enum binding annotation. The implementation of "
+        "enums changed nanobind 2.0.0: only nb::is_arithmetic and "
+        "docstrings can be passed since this change.");
+}
 
 template <typename T> void wrap_copy(void *dst, const void *src) {
     new ((T *) dst) T(*(const T *) src);
@@ -698,49 +708,32 @@ public:
     }
 };
 
-template <typename T> class enum_ : public class_<T> {
+template <typename T> class enum_ : public object {
 public:
     static_assert(std::is_enum_v<T>, "nanobind::enum_<> requires an enumeration type!");
 
     using Base = class_<T>;
+    using Underlying = std::underlying_type_t<T>;
 
     template <typename... Extra>
-    NB_INLINE enum_(handle scope, const char *name, const Extra &...extra) {
-        detail::enum_init_data d;
-
-        static_assert(std::is_trivially_copyable_v<T>);
-        d.flags = ((uint32_t) detail::type_init_flags::has_supplement |
-                   (uint32_t) detail::type_init_flags::has_type_slots |
-                   (uint32_t) detail::type_flags::is_copy_constructible |
-                   (uint32_t) detail::type_flags::is_move_constructible |
-                   (uint32_t) detail::type_flags::is_destructible |
-                   (uint32_t) detail::type_flags::is_enum |
-                   (uint32_t) detail::type_flags::is_final);
-        d.align = (uint8_t) alignof(T);
-        d.size = (uint32_t) sizeof(T);
-        d.name = name;
-        d.type = &typeid(T);
-        d.supplement = sizeof(detail::enum_supplement);
-        d.scope = scope.ptr();
-        d.type_slots = nullptr;
-        d.type_slots_callback = detail::nb_enum_prepare;
-        d.is_signed = std::is_signed_v<std::underlying_type_t<T>>;
-
-        (detail::type_extra_apply(d, extra), ...);
-
-        Base::m_ptr = detail::nb_type_new(&d);
-
-        detail::enum_supplement &supp = type_supplement<detail::enum_supplement>(*this);
-        supp.is_signed = d.is_signed;
-        supp.scope = d.scope;
+    NB_INLINE enum_(handle scope, const char *name, const Extra &... extra) {
+        detail::enum_init_data ed { };
+        ed.type = &typeid(T);
+        ed.scope = scope.ptr();
+        ed.name = name;
+        ed.flags = std::is_signed_v<Underlying>
+                       ? (uint32_t) detail::type_flags::is_signed
+                       : 0;
+        (detail::enum_extra_apply(ed, extra), ...);
+        m_ptr = detail::enum_create(&ed);
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
-        detail::nb_enum_put(Base::m_ptr, name, &value, doc);
+        detail::enum_append(m_ptr, name, (int64_t) value, doc);
         return *this;
     }
 
-    NB_INLINE enum_ &export_values() { detail::nb_enum_export(Base::m_ptr); return *this; }
+    NB_INLINE enum_ &export_values() { detail::enum_export(m_ptr); return *this; }
 };
 
 template <typename Source, typename Target> void implicitly_convertible() {

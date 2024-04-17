@@ -90,7 +90,6 @@ using precise_cast_t =
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
-public:
     NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
             if constexpr (sizeof(T) == 8)
@@ -139,6 +138,22 @@ public:
     }
 
     NB_TYPE_CASTER(T, const_name<std::is_integral_v<T>>("int", "float"))
+};
+
+template <typename T>
+struct type_caster<T, enable_if_t<std::is_enum_v<T>>> {
+    NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+        int64_t result;
+        bool rv = enum_from_python(&typeid(T), src.ptr(), &result, flags);
+        value = (T) result;
+        return rv;
+    }
+
+    NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
+        return enum_from_cpp(&typeid(T), (int64_t) src);
+    }
+
+    NB_TYPE_CASTER(T, const_name<T>())
 };
 
 template <> struct type_caster<void_type> {

@@ -462,7 +462,7 @@ public:
     detail::ndarray_handle *handle() const { return m_handle; }
 
     size_t size() const {
-        size_t ret = 1;
+        size_t ret = is_valid();
         for (size_t i = 0; i < ndim(); ++i)
             ret *= shape(i);
         return ret;

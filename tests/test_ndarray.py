@@ -51,6 +51,7 @@ def test01_metadata():
     assert 'incompatible function arguments' in str(excinfo.value)
 
     a = np.zeros(shape=(3, 4, 5), dtype=np.float64)
+    assert t.get_is_valid(a)
     assert t.get_shape(a) == [3, 4, 5]
     assert t.get_size(a) == 60
     assert t.get_nbytes(a) == 60*8
@@ -66,9 +67,15 @@ def test01_metadata():
            not t.check_bool(np.array([1], dtype=np.float32)) and \
                t.check_bool(np.array([1], dtype=np.bool_))
 
+    assert not t.get_is_valid(None)
+    assert t.get_shape(None) == []
+    assert t.get_size(None) == 0
+    assert t.get_nbytes(None) == 0
+    assert t.get_itemsize(None) == 0
+
 
 def test02_docstr():
-    assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False]) -> list"
+    assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False] | None) -> list"
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
     assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
     assert t.pass_complex64.__doc__ == "pass_complex64(array: ndarray[dtype=complex64]) -> None"

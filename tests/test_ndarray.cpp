@@ -25,24 +25,28 @@ namespace nanobind {
 #endif
 
 NB_MODULE(test_ndarray_ext, m) {
+    m.def("get_is_valid", [](const nb::ndarray<nb::ro> &t) {
+        return t.is_valid();
+    }, "array"_a.noconvert().none());
+
     m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
         nb::list l;
         for (size_t i = 0; i < t.ndim(); ++i)
             l.append(t.shape(i));
         return l;
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_size", [](const nb::ndarray<> &t) {
         return t.size();
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_itemsize", [](const nb::ndarray<> &t) {
         return t.itemsize();
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_nbytes", [](const nb::ndarray<> &t) {
         return t.nbytes();
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_stride", [](const nb::ndarray<> &t, size_t i) {
         return t.stride(i);

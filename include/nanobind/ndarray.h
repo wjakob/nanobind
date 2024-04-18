@@ -462,7 +462,7 @@ public:
     detail::ndarray_handle *handle() const { return m_handle; }
 
     size_t size() const {
-        size_t ret = 1;
+        size_t ret = is_valid();
         for (size_t i = 0; i < ndim(); ++i)
             ret *= shape(i);
         return ret;
@@ -567,6 +567,10 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         detail::ndarray_req req;
         req.shape = shape;
         (detail::ndarray_arg<Args>::apply(req), ...);
+        if (src.is_none()) {
+            value = ndarray<Args...>();
+            return true;
+        }
         value = ndarray<Args...>(ndarray_import(
             src.ptr(), &req, flags & (uint8_t) cast_flags::convert, cleanup));
         return value.is_valid();

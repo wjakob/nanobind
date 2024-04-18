@@ -25,6 +25,10 @@ namespace nanobind {
 #endif
 
 NB_MODULE(test_ndarray_ext, m) {
+    m.def("get_is_valid", [](const nb::ndarray<nb::ro> &t) {
+        return t.is_valid();
+    }, "array"_a.noconvert().none());
+
     m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
         nb::list l;
         for (size_t i = 0; i < t.ndim(); ++i)
@@ -34,15 +38,15 @@ NB_MODULE(test_ndarray_ext, m) {
 
     m.def("get_size", [](const nb::ndarray<> &t) {
         return t.size();
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_itemsize", [](const nb::ndarray<> &t) {
         return t.itemsize();
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_nbytes", [](const nb::ndarray<> &t) {
         return t.nbytes();
-    }, "array"_a.noconvert());
+    }, "array"_a.noconvert().none());
 
     m.def("get_stride", [](const nb::ndarray<> &t, size_t i) {
         return t.stride(i);
@@ -161,6 +165,9 @@ NB_MODULE(test_ndarray_ext, m) {
 
     m.def("passthrough", [](nb::ndarray<> a) { return a; }, nb::rv_policy::none);
     m.def("passthrough_copy", [](nb::ndarray<> a) { return a; }, nb::rv_policy::copy);
+
+    m.def("passthrough_arg_none", [](nb::ndarray<> a) { return a; },
+          nb::arg().none(), nb::rv_policy::none);
 
     m.def("ret_numpy", []() {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };

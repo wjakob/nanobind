@@ -34,7 +34,7 @@ NB_MODULE(test_ndarray_ext, m) {
         for (size_t i = 0; i < t.ndim(); ++i)
             l.append(t.shape(i));
         return l;
-    }, "array"_a.noconvert().none());
+    }, "array"_a.noconvert());
 
     m.def("get_size", [](const nb::ndarray<> &t) {
         return t.size();

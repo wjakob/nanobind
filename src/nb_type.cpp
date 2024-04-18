@@ -347,7 +347,7 @@ static void nb_type_dealloc(PyObject *o) {
         size_t n_del_slow = type_c2p_slow.erase(t->type);
         size_t n_del_fast = type_c2p_fast.erase(t->type);
 
-        bool fail = n_del_fast != 1 && n_del_slow != 1;
+        bool fail = n_del_fast != 1 || n_del_slow != 1;
         if (!fail) {
             nb_alias_chain *cur = t->alias_chain;
             while (cur) {

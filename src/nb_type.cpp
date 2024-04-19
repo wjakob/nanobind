@@ -245,7 +245,7 @@ static void inst_dealloc(PyObject *self) {
               "keep_alive information", t->name);
 
         nb_weakref_seq *s = (nb_weakref_seq *) it->second;
-        keep_alive.erase(self, self_hash);
+        keep_alive.erase_fast(it);
 
         do {
             nb_weakref_seq *c = s;
@@ -271,7 +271,7 @@ static void inst_dealloc(PyObject *self) {
         void *entry = it->second;
         if (NB_LIKELY(entry == inst)) {
             found = true;
-            inst_c2p.erase(p, p_hash);
+            inst_c2p.erase_fast(it);
         } else if (nb_is_seq(entry)) {
             // Multiple objects are associated with this address. Find the right one!
             nb_inst_seq *seq = nb_get_seq(entry),
@@ -287,7 +287,7 @@ static void inst_dealloc(PyObject *self) {
                         if (seq->next)
                             it.value() = nb_mark_seq(seq->next);
                         else
-                            inst_c2p.erase(p, p_hash);
+                            inst_c2p.erase_fast(it);
                     }
 
                     PyMem_Free(seq);

@@ -128,6 +128,15 @@ These release breaks API and ABI compatibility, requiring a new major version
 according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
+* The :cpp:class:`nb::enum_\<T\>() <enum_>` binding declaration is now a
+  wrapper that creates either a ``enum.Enum`` or ``enum.IntEnum``-derived type.
+  Previously, nanobind relied on a custom enumeration base class that was a
+  frequent source of friction for users.
+
+  This change may break code that casts entries to integers, which now only
+  works for arithmetic (``enum.IntEnum``-derived) enumerations. Replace
+  ``int(my_enum_entry)`` with ``my_enum_entry.value`` to work around the issue.
+
 * The :cpp:func:`nb::bind_vector\<T\>() <bind_vector>` and
   :cpp:func:`nb::bind_map\<T\>() <bind_map>` interfaces were found to be
   severely flawed since element access (``__getitem__``) created views into the
@@ -144,7 +153,7 @@ noteworthy:
   solutions.
 
 * The ``nb::raw_doc`` annotation was found to be too inflexible and was
-  therefore removed in this version.
+  removed in this version.
 
 * The ``nb::typed`` wrapper listed above actually already existed in previous
   nanobind versions but was awkward to use, as it required the user to provide
@@ -175,11 +184,11 @@ noteworthy:
   if nanobind did not know about that base.
   (PR `#471 <https://github.com/wjakob/nanobind/pull/471>`__).
 
-* nanobind can now handle keyword arguments that are not interned, which
-  avoids spurious TypeErrors in constructs like ``fn(**pickle.loads(...))``.
-  The speed of normal function calls (which generally do have interned
-  keyword arguments) should be unaffected.
-  (PR `#469 <https://github.com/wjakob/nanobind/pull/469>`__).
+* nanobind can now handle keyword arguments that are not interned, which avoids
+  spurious ``TypeError`` exceptions in constructs like
+  ``fn(**pickle.loads(...))``. The speed of normal function calls (which
+  generally do have interned keyword arguments) should be unaffected. (PR `#469
+  <https://github.com/wjakob/nanobind/pull/469>`__).
 
 * The ``owner=nb::handle()`` default value of the :cpp:func:`nb::ndarray
   <ndarray>` constructor was removed since it was bug-prone. You now have to

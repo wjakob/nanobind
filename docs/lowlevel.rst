@@ -266,5 +266,4 @@ as attributes of the type object (in its ``__dict__``) and store a borrowed
 ``PyObject*`` reference in the supplemental data. If you use an attribute
 name that begins with the symbol ``@``, then nanobind will prevent Python
 code from rebinding or deleting the attribute after it has been set, making
-the borrowed reference reasonably safe. See the implementation of ``nb::enum_``
-for an example.
+the borrowed reference reasonably safe.

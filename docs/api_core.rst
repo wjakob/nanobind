@@ -1313,12 +1313,12 @@ the reference section on :ref:`class binding <class_binding>`.
    overlapping or identical input types (e.g. :cpp:class:`object`) and must run
    code at runtime to select the right overload.
 
-   You should probably write a thorough docstring explicing the expected inputs
-   in this case, since the behavior won't be obvious from the auto-generated
-   function signature list in the docstring. It can be frustrating when a
-   function call fails with an error message stating that the provided
-   arguments aren't compatible with any overload, when the associated error
-   message suggests otherwise.
+   You should probably write a thorough docstring that explicitly mentions the
+   expected inputs in this case, since the behavior won't be obvious from the
+   auto-generated function signature. It can be frustrating when a function
+   call fails with an error message stating that the provided arguments aren't
+   compatible with any overload, when the associated error message suggests
+   otherwise.
 
    .. cpp:function:: next_overload()
 
@@ -1896,9 +1896,6 @@ Enum binding annotations
 
 The following annotations can be specified using the variable-length
 ``Extra`` parameter of the constructor :cpp:func:`enum_::enum_`.
-Enums also support the :cpp:struct:`dynamic_attr` and
-:cpp:struct:`type_slots` annotations
-documented for :ref:`classes <class_binding_annotations>`.
 
 .. cpp:struct:: is_arithmetic
 
@@ -1998,7 +1995,7 @@ Class binding
 
    .. cpp:function:: template <typename Func, typename... Extra> class_ &def(new_<Func> arg, const Extra &... extra)
 
-      Bind a C++ factory fuction as a Python object constructor (``__new__``).
+      Bind a C++ factory function as a Python object constructor (``__new__``).
       This is an advanced feature; prefer :cpp:struct:`nb::init\<..\> <init>`
       where possible. See the discussion of :ref:`customizing object creation
       <custom_new>` for more details.
@@ -2317,7 +2314,7 @@ Class binding
       Bind the enumeration of type `T` to the identifier `name` within the
       scope `scope`. The variable length `extra` parameter can be used to pass
       a docstring and other :ref:`enum binding annotations
-      <enum_binding_annotations>` such as :cpp:class:`is_arithmetic`.
+      <enum_binding_annotations>` (currently, only :cpp:class:`is_arithmetic` is supported).
 
    .. cpp:function:: enum_ &value(const char * name, T value, const char * doc = nullptr)
 
@@ -2376,7 +2373,7 @@ Class binding
 
 .. cpp:struct:: template <typename Arg> init_implicit
 
-   See :cpp:class:`init` for detail on binding constructorts. The main
+   See :cpp:class:`init` for detail on binding constructors. The main
    difference between :cpp:class:`init`  and `init_implicit` is that the latter
    only supports constructors taking a single argument `Arg`, and that it marks
    the constructor as usable for implicit conversions from `Arg`.
@@ -2759,7 +2756,7 @@ Miscellaneous
 
 .. cpp:class:: template <typename T, typename... Ts> typed
 
-    This helper class provides an an interface to parameterize generic types to
+    This helper class provides an interface to parameterize generic types to
     improve generated Python function signatures (e.g., to turn ``list`` into
     ``list[MyType]``).
 

@@ -129,8 +129,8 @@ NB_CORE PyObject *bytes_from_obj(PyObject *o);
 /// Convert an UTF8 null-terminated C string into a Python byte string
 NB_CORE PyObject *bytes_from_cstr(const char *c);
 
-/// Convert an UTF8 C string + size into a Python byte string
-NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
+/// Convert a memory region into a Python byte string
+NB_CORE PyObject *bytes_from_cstr_and_size(const void *c, size_t n);
 
 // ========================================================================
 

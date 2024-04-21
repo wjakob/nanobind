@@ -568,14 +568,14 @@ PyObject *bytes_from_obj(PyObject *o) {
 PyObject *bytes_from_cstr(const char *str) {
     PyObject *result = PyBytes_FromString(str);
     if (!result)
-        raise("nanobind::detail::bytes_from_cstr(): conversion error!");
+        raise_python_error();
     return result;
 }
 
-PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyBytes_FromStringAndSize(str, (Py_ssize_t) size);
+PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
+    PyObject *result = PyBytes_FromStringAndSize((const char *) str, (Py_ssize_t) size);
     if (!result)
-        raise("nanobind::detail::bytes_from_cstr_and_size(): conversion error!");
+        raise_python_error();
     return result;
 }
 

@@ -433,7 +433,7 @@ class bytes : public object {
     explicit bytes(const char *s)
         : object(detail::bytes_from_cstr(s), detail::steal_t{}) { }
 
-    explicit bytes(const char *s, size_t n)
+    explicit bytes(const void *s, size_t n)
         : object(detail::bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
     const char *c_str() const { return PyBytes_AsString(m_ptr); }

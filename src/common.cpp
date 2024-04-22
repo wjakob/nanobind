@@ -618,6 +618,13 @@ PyObject *list_from_obj(PyObject *o) {
     return result;
 }
 
+PyObject *set_from_obj(PyObject *o) {
+    PyObject *result = PySet_New(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
 // ========================================================================
 
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {

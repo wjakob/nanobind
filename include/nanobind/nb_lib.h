@@ -151,6 +151,9 @@ NB_CORE PyObject *list_from_obj(PyObject *o);
 /// Convert a Python object into a Python tuple
 NB_CORE PyObject *tuple_from_obj(PyObject *o);
 
+/// Convert a Python object into a Python set
+NB_CORE PyObject *set_from_obj(PyObject *o);
+
 // ========================================================================
 
 /// Get an object attribute or raise an exception

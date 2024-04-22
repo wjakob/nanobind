@@ -822,6 +822,11 @@ Wrapper classes
 
       Create an empty set
 
+   .. cpp:function:: set(handle h)
+
+      Attempt to convert a given Python object into a set. Analogous to the
+      expression ``set(h)`` in Python.
+
    .. cpp:function:: size_t size() const
 
       Return the number of set elements.

@@ -516,10 +516,11 @@ class dict : public object {
     }
 };
 
-
 class set : public object {
     NB_OBJECT(set, object, "set", PySet_Check)
     set() : object(PySet_New(nullptr), detail::steal_t()) { }
+    explicit set(handle h)
+        : object(detail::set_from_obj(h.ptr()), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     template <typename T> void add(T &&value);

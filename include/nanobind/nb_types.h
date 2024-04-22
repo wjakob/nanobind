@@ -483,6 +483,16 @@ class list : public object {
             raise_python_error();
     }
 
+    void sort() {
+        if (PyList_Sort(m_ptr))
+            raise_python_error();
+    }
+
+    void reverse() {
+        if (PyList_Reverse(m_ptr))
+            raise_python_error();
+    }
+
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;

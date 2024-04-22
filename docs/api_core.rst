@@ -734,6 +734,14 @@ Wrapper classes
 
       Analogous to the ``.extend(h)`` method of ``list`` in Python.
 
+   .. cpp:function:: void sort()
+
+      Analogous to the ``.sort()`` method of ``list`` in Python.
+
+   .. cpp:function:: void reverse()
+
+      Analogous to the ``.reverse()`` method of ``list`` in Python.
+
    .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_list> operator[](T key) const
 
       Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic

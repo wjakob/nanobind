@@ -2,11 +2,11 @@ import test_enum_ext as t
 import pytest
 
 def test01_unsigned_enum():
-    assert repr(t.Enum.A) == '<Enum.A: 0>'
+    assert repr(t.Enum.A) == 'Enum.A'
     assert str(t.Enum.A) == 'Enum.A'
-    assert repr(t.Enum.B) == '<Enum.B: 1>'
+    assert repr(t.Enum.B) == 'Enum.B'
     assert str(t.Enum.B) == 'Enum.B'
-    assert repr(t.Enum.C) == '<Enum.C: 4294967295>'
+    assert repr(t.Enum.C) == 'Enum.C'
     assert str(t.Enum.C) == 'Enum.C'
     assert t.Enum.A.name == 'A'
     assert t.Enum.B.name == 'B'
@@ -52,9 +52,9 @@ def test01_unsigned_enum():
 
 
 def test02_signed_enum():
-    assert repr(t.SEnum.A) == '<SEnum.A: 0>'
-    assert repr(t.SEnum.B) == '<SEnum.B: 1>'
-    assert repr(t.SEnum.C) == '<SEnum.C: -1>'
+    assert repr(t.SEnum.A) == 'SEnum.A'
+    assert repr(t.SEnum.B) == 'SEnum.B'
+    assert repr(t.SEnum.C) == 'SEnum.C'
     assert str(t.SEnum.A) == 'SEnum.A'
     assert str(t.SEnum.B) == 'SEnum.B'
     assert str(t.SEnum.C) == 'SEnum.C'

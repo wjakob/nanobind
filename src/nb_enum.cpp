@@ -57,6 +57,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     if (is_arithmetic)
         result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
 
+    result.attr("__repr__") = result.attr("__str__");
+
     type_init_data *t = new type_init_data();
     memset(t, 0, sizeof(type_data));
     t->name = strdup_check(ed->name);

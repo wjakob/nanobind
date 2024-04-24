@@ -18,6 +18,10 @@
 #include <functional>
 #include "hash.h"
 
+#if TSL_RH_VERSION_MAJOR != 1 || TSL_RH_VERSION_MINOR < 3
+#  error nanobind depends on tsl::robin_map, in particular version >= 1.3.0, <2.0.0
+#endif
+
 #if defined(_MSC_VER)
 #  define NB_THREAD_LOCAL __declspec(thread)
 #else

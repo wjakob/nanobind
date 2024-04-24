@@ -1073,12 +1073,12 @@ class StubGen:
         """
         if module.startswith(".") or module == self.module.__name__.split('.')[0]:
             return 2
-        
+
         try:
             spec = importlib.util.find_spec(module)
         except (ModuleNotFoundError, ValueError):
             return 1
-        
+
         if spec:
             if spec.origin and "site-packages" in spec.origin:
                 return 1
@@ -1096,7 +1096,7 @@ class StubGen:
             imports = self.imports[module]
             items: List[str] = []
             party = self.check_party(module)
-            
+
             if party != last_party:
                 if last_party is not None:
                     s += "\n"
@@ -1106,14 +1106,14 @@ class StubGen:
                 if k is None:
                     if v1 and v1 != module:
                         s += f"import {module} as {v1}\n"
-                    else:
+                    elif v1 is None or (k, None) not in imports:
                         s += f"import {module}\n"
                 else:
                     if k != v2 or v1:
                         items.append(f"{k} as {v2}")
                     else:
                         items.append(k)
-            
+
             items = sorted(items)
             if items:
                 items_v0 = ", ".join(items)

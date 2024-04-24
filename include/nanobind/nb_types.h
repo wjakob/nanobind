@@ -433,7 +433,7 @@ class bytes : public object {
     explicit bytes(const char *s)
         : object(detail::bytes_from_cstr(s), detail::steal_t{}) { }
 
-    explicit bytes(const char *s, size_t n)
+    explicit bytes(const void *s, size_t n)
         : object(detail::bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
     const char *c_str() const { return PyBytes_AsString(m_ptr); }
@@ -483,6 +483,16 @@ class list : public object {
             raise_python_error();
     }
 
+    void sort() {
+        if (PyList_Sort(m_ptr))
+            raise_python_error();
+    }
+
+    void reverse() {
+        if (PyList_Reverse(m_ptr))
+            raise_python_error();
+    }
+
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
@@ -506,10 +516,11 @@ class dict : public object {
     }
 };
 
-
 class set : public object {
     NB_OBJECT(set, object, "set", PySet_Check)
     set() : object(PySet_New(nullptr), detail::steal_t()) { }
+    explicit set(handle h)
+        : object(detail::set_from_obj(h.ptr()), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     template <typename T> void add(T &&value);

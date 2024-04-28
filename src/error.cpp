@@ -19,7 +19,7 @@ Buffer buf(128);
 
 NAMESPACE_END(detail)
 
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_PY_VERSION_MIN >= 0x030C0000
 python_error::python_error() {
     m_value = PyErr_GetRaisedException();
     check(m_value,
@@ -128,7 +128,7 @@ const char *python_error::what() const noexcept {
     if (m_what)
         return m_what;
 
-#if PY_VERSION_HEX < 0x030C0000
+#if NB_PY_VERSION_MIN < 0x030C0000
     PyErr_NormalizeException(&m_type, &m_value, &m_traceback);
     check(m_type,
           "nanobind::python_error::what(): PyErr_NormalizeException() failed!");
@@ -164,7 +164,7 @@ const char *python_error::what() const noexcept {
 
         while (frame) {
             frames.push_back(frame);
-#if PY_VERSION_HEX >= 0x03090000
+#if NB_PY_VERSION_MIN >= 0x03090000
             frame = PyFrame_GetBack(frame);
 #else
             frame = frame->f_back;
@@ -175,7 +175,7 @@ const char *python_error::what() const noexcept {
         buf.put("Traceback (most recent call last):\n");
         for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
             frame = *it;
-#if PY_VERSION_HEX >= 0x03090000
+#if NB_PY_VERSION_MIN >= 0x03090000
             PyCodeObject *f_code = PyFrame_GetCode(frame);
 #else
             PyCodeObject *f_code = frame->f_code;
@@ -187,7 +187,7 @@ const char *python_error::what() const noexcept {
             buf.put(", in ");
             buf.put_dstr(borrow<str>(f_code->co_name).c_str());
             buf.put('\n');
-#if PY_VERSION_HEX >= 0x03090000
+#if NB_PY_VERSION_MIN >= 0x03090000
             Py_DECREF(f_code);
 #endif
             Py_DECREF(frame);
@@ -251,7 +251,7 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
 NAMESPACE_END(detail)
 
 static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_PY_VERSION_MIN >= 0x030C0000
     PyObject *value = PyErr_GetRaisedException();
 #else
     PyObject *tp = nullptr, *value = nullptr, *traceback = nullptr;
@@ -283,7 +283,7 @@ static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
         return;
 
     PyObject *value_2 = nullptr;
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_PY_VERSION_MIN >= 0x030C0000
     value_2 = PyErr_GetRaisedException();
 #else
     PyErr_Fetch(&tp, &value_2, &traceback);
@@ -294,7 +294,7 @@ static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
     PyException_SetCause(value_2, value); // steals
     PyException_SetContext(value_2, value); // steals
 
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_PY_VERSION_MIN >= 0x030C0000
     PyErr_SetRaisedException(value_2);
 #else
     PyErr_Restore(tp, value_2, traceback);

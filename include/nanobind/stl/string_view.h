@@ -20,7 +20,7 @@ template <> struct type_caster<std::string_view> {
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         Py_ssize_t size;
-        const char *str = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
+        const char *str = compat_PyUnicode_AsUTF8AndSize(src.ptr(), &size);
         if (!str) {
             PyErr_Clear();
             return false;

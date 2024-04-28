@@ -37,7 +37,7 @@ static PyObject **nb_weaklist_ptr(PyObject *self) {
 }
 
 static PyGetSetDef inst_getset[] = {
-    { "__dict__", PyObject_GenericGetDict, PyObject_GenericSetDict, nullptr, nullptr },
+    { "__dict__", NB_DYN_SYM_VER(310, PyObject_GenericGetDict, getter), PyObject_GenericSetDict, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
@@ -52,9 +52,8 @@ static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
     PyObject **dict = nb_dict_ptr(self);
     if (dict)
         Py_VISIT(*dict);
-#if PY_VERSION_HEX >= 0x03090000
-    Py_VISIT(Py_TYPE(self));
-#endif
+    if (NB_PY_VERSION_CHECK(0x03090000))
+        Py_VISIT(Py_TYPE(self));
     return 0;
 }
 
@@ -417,7 +416,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
     PyObject *name = nb_type_name(self);
-    t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
+    t->name = strdup_check(compat_PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
     t->type_py = (PyTypeObject *) self;
     t->implicit.cpp = nullptr;
@@ -443,7 +442,7 @@ static int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         }
         Py_DECREF(cur);
 
-        const char *cname = PyUnicode_AsUTF8AndSize(name, nullptr);
+        const char *cname = compat_PyUnicode_AsUTF8AndSize(name, nullptr);
         if (!cname) {
             PyErr_Clear(); // probably a non-string attribute name
         } else if (cname[0] == '@') {
@@ -474,7 +473,7 @@ struct nb_slot {
     uint8_t direct;
 };
 
-template <size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexpr Ei() {
+template <class PY, size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexpr Ei() {
     // Compile-time check to ensure that indices and alignment match our expectation
     static_assert(I1 == I2 && (Offset1 % sizeof(void *)) == 0 && (Offset2 % sizeof(void *)) == 0,
                   "nb_slot construction: internal error");
@@ -482,11 +481,11 @@ template <size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexp
 #if NB_TYPE_GET_SLOT_IMPL
     size_t o = 0;
     switch (Offset1) {
-        case offsetof(PyHeapTypeObject, as_async):    o = offsetof(PyTypeObject, tp_as_async); break;
-        case offsetof(PyHeapTypeObject, as_number):   o = offsetof(PyTypeObject, tp_as_number); break;
-        case offsetof(PyHeapTypeObject, as_mapping):  o = offsetof(PyTypeObject, tp_as_mapping); break;
-        case offsetof(PyHeapTypeObject, as_sequence): o = offsetof(PyTypeObject, tp_as_sequence); break;
-        case offsetof(PyHeapTypeObject, as_buffer):   o = offsetof(PyTypeObject, tp_as_buffer); break;
+        case offsetof(typename PY::PyHeapTypeObject, as_async):    o = offsetof(typename PY::PyTypeObject, tp_as_async); break;
+        case offsetof(typename PY::PyHeapTypeObject, as_number):   o = offsetof(typename PY::PyTypeObject, tp_as_number); break;
+        case offsetof(typename PY::PyHeapTypeObject, as_mapping):  o = offsetof(typename PY::PyTypeObject, tp_as_mapping); break;
+        case offsetof(typename PY::PyHeapTypeObject, as_sequence): o = offsetof(typename PY::PyTypeObject, tp_as_sequence); break;
+        case offsetof(typename PY::PyHeapTypeObject, as_buffer):   o = offsetof(typename PY::PyTypeObject, tp_as_buffer); break;
         default: break;
     }
 
@@ -501,111 +500,145 @@ template <size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexp
 }
 
 // Precomputed mapping from type slot ID to an entry in the data structure
-#define E(i1, p1, p2, name)                            \
-    Ei<i1, Py_##p2##_##name,                           \
-       offsetof(PyHeapTypeObject, p1),                 \
-       offsetof(PyHeapTypeObject, p1.p2##_##name)>()
+#define E(i1, p1, p2, name)                                         \
+    r.slots[i1-1] = Ei<PY, i1, Py_##p2##_##name,                    \
+       offsetof(typename PY::PyHeapTypeObject, p1),                 \
+       offsetof(typename PY::PyHeapTypeObject, p1.p2##_##name)>()
 
-#if PY_VERSION_HEX < 0x03090000
+#if !defined(Py_bf_getbuffer)
 #  define Py_bf_getbuffer 1
 #  define Py_bf_releasebuffer 2
 #endif
 
-static constexpr nb_slot type_slots[] {
-    E(1,  as_buffer, bf, getbuffer),
-    E(2,  as_buffer, bf, releasebuffer),
-    E(3,  as_mapping, mp, ass_subscript),
-    E(4,  as_mapping, mp, length),
-    E(5,  as_mapping, mp, subscript),
-    E(6,  as_number, nb, absolute),
-    E(7,  as_number, nb, add),
-    E(8,  as_number, nb, and),
-    E(9,  as_number, nb, bool),
-    E(10, as_number, nb, divmod),
-    E(11, as_number, nb, float),
-    E(12, as_number, nb, floor_divide),
-    E(13, as_number, nb, index),
-    E(14, as_number, nb, inplace_add),
-    E(15, as_number, nb, inplace_and),
-    E(16, as_number, nb, inplace_floor_divide),
-    E(17, as_number, nb, inplace_lshift),
-    E(18, as_number, nb, inplace_multiply),
-    E(19, as_number, nb, inplace_or),
-    E(20, as_number, nb, inplace_power),
-    E(21, as_number, nb, inplace_remainder),
-    E(22, as_number, nb, inplace_rshift),
-    E(23, as_number, nb, inplace_subtract),
-    E(24, as_number, nb, inplace_true_divide),
-    E(25, as_number, nb, inplace_xor),
-    E(26, as_number, nb, int),
-    E(27, as_number, nb, invert),
-    E(28, as_number, nb, lshift),
-    E(29, as_number, nb, multiply),
-    E(30, as_number, nb, negative),
-    E(31, as_number, nb, or),
-    E(32, as_number, nb, positive),
-    E(33, as_number, nb, power),
-    E(34, as_number, nb, remainder),
-    E(35, as_number, nb, rshift),
-    E(36, as_number, nb, subtract),
-    E(37, as_number, nb, true_divide),
-    E(38, as_number, nb, xor),
-    E(39, as_sequence, sq, ass_item),
-    E(40, as_sequence, sq, concat),
-    E(41, as_sequence, sq, contains),
-    E(42, as_sequence, sq, inplace_concat),
-    E(43, as_sequence, sq, inplace_repeat),
-    E(44, as_sequence, sq, item),
-    E(45, as_sequence, sq, length),
-    E(46, as_sequence, sq, repeat),
-    E(47, ht_type, tp, alloc),
-    E(48, ht_type, tp, base),
-    E(49, ht_type, tp, bases),
-    E(50, ht_type, tp, call),
-    E(51, ht_type, tp, clear),
-    E(52, ht_type, tp, dealloc),
-    E(53, ht_type, tp, del),
-    E(54, ht_type, tp, descr_get),
-    E(55, ht_type, tp, descr_set),
-    E(56, ht_type, tp, doc),
-    E(57, ht_type, tp, getattr),
-    E(58, ht_type, tp, getattro),
-    E(59, ht_type, tp, hash),
-    E(60, ht_type, tp, init),
-    E(61, ht_type, tp, is_gc),
-    E(62, ht_type, tp, iter),
-    E(63, ht_type, tp, iternext),
-    E(64, ht_type, tp, methods),
-    E(65, ht_type, tp, new),
-    E(66, ht_type, tp, repr),
-    E(67, ht_type, tp, richcompare),
-    E(68, ht_type, tp, setattr),
-    E(69, ht_type, tp, setattro),
-    E(70, ht_type, tp, str),
-    E(71, ht_type, tp, traverse),
-    E(72, ht_type, tp, members),
-    E(73, ht_type, tp, getset),
-    E(74, ht_type, tp, free),
-    E(75, as_number, nb, matrix_multiply),
-    E(76, as_number, nb, inplace_matrix_multiply),
-    E(77, as_async, am, await),
-    E(78, as_async, am, aiter),
-    E(79, as_async, am, anext),
-    E(80, ht_type, tp, finalize),
-#if PY_VERSION_HEX >= 0x030A0000 && !defined(PYPY_VERSION)
-    E(81, as_async, am, send),
+#if !defined(Py_am_send)
+#  define Py_am_send 81
 #endif
-};
+
+struct nb_type_slots {
+    int size;
+    nb_slot slots[81] = {};
+
+    template <class PY>
+    static constexpr nb_type_slots populate() {
+        nb_type_slots r{80};
+        E(1, as_buffer, bf, getbuffer);
+        E(2, as_buffer, bf, releasebuffer);
+        E(3, as_mapping, mp, ass_subscript);
+        E(4, as_mapping, mp, length);
+        E(5, as_mapping, mp, subscript);
+        E(6, as_number, nb, absolute);
+        E(7, as_number, nb, add);
+        E(8, as_number, nb, and);
+        E(9, as_number, nb, bool);
+        E(10, as_number, nb, divmod);
+        E(11, as_number, nb, float);
+        E(12, as_number, nb, floor_divide);
+        E(13, as_number, nb, index);
+        E(14, as_number, nb, inplace_add);
+        E(15, as_number, nb, inplace_and);
+        E(16, as_number, nb, inplace_floor_divide);
+        E(17, as_number, nb, inplace_lshift);
+        E(18, as_number, nb, inplace_multiply);
+        E(19, as_number, nb, inplace_or);
+        E(20, as_number, nb, inplace_power);
+        E(21, as_number, nb, inplace_remainder);
+        E(22, as_number, nb, inplace_rshift);
+        E(23, as_number, nb, inplace_subtract);
+        E(24, as_number, nb, inplace_true_divide);
+        E(25, as_number, nb, inplace_xor);
+        E(26, as_number, nb, int);
+        E(27, as_number, nb, invert);
+        E(28, as_number, nb, lshift);
+        E(29, as_number, nb, multiply);
+        E(30, as_number, nb, negative);
+        E(31, as_number, nb, or);
+        E(32, as_number, nb, positive);
+        E(33, as_number, nb, power);
+        E(34, as_number, nb, remainder);
+        E(35, as_number, nb, rshift);
+        E(36, as_number, nb, subtract);
+        E(37, as_number, nb, true_divide);
+        E(38, as_number, nb, xor);
+        E(39, as_sequence, sq, ass_item);
+        E(40, as_sequence, sq, concat);
+        E(41, as_sequence, sq, contains);
+        E(42, as_sequence, sq, inplace_concat);
+        E(43, as_sequence, sq, inplace_repeat);
+        E(44, as_sequence, sq, item);
+        E(45, as_sequence, sq, length);
+        E(46, as_sequence, sq, repeat);
+        E(47, ht_type, tp, alloc);
+        E(48, ht_type, tp, base);
+        E(49, ht_type, tp, bases);
+        E(50, ht_type, tp, call);
+        E(51, ht_type, tp, clear);
+        E(52, ht_type, tp, dealloc);
+        E(53, ht_type, tp, del);
+        E(54, ht_type, tp, descr_get);
+        E(55, ht_type, tp, descr_set);
+        E(56, ht_type, tp, doc);
+        E(57, ht_type, tp, getattr);
+        E(58, ht_type, tp, getattro);
+        E(59, ht_type, tp, hash);
+        E(60, ht_type, tp, init);
+        E(61, ht_type, tp, is_gc);
+        E(62, ht_type, tp, iter);
+        E(63, ht_type, tp, iternext);
+        E(64, ht_type, tp, methods);
+        E(65, ht_type, tp, new);
+        E(66, ht_type, tp, repr);
+        E(67, ht_type, tp, richcompare);
+        E(68, ht_type, tp, setattr);
+        E(69, ht_type, tp, setattro);
+        E(70, ht_type, tp, str);
+        E(71, ht_type, tp, traverse);
+        E(72, ht_type, tp, members);
+        E(73, ht_type, tp, getset);
+        E(74, ht_type, tp, free);
+        E(75, as_number, nb, matrix_multiply);
+        E(76, as_number, nb, inplace_matrix_multiply);
+        E(77, as_async, am, await);
+        E(78, as_async, am, aiter);
+        E(79, as_async, am, anext);
+        E(80, ht_type, tp, finalize);
+#if !defined(PYPY_VERSION)
+        if constexpr (PY::Version >= 0x030A0000) {
+            r.size += 1;
+            E(81, as_async, am, send);
+        }
+#endif
+        return r;
+    }
+
+    static nb_type_slots init() {
+#if defined(Py_LIMITED_API)
+        switch (py_version() >> 16) {
+            case 0x0308:
+                return populate<py38>();
+            case 0x0309:
+                return populate<py39>();
+            case 0x030A:
+                return populate<py310>();
+            case 0x030B:
+                return populate<py311>();
+        }
+        return {}; // Unused if python >= 3.12
+#else
+        return populate<py_current>();
+#endif
+    }
+} type_slots = nb_type_slots::init();
 
 #if NB_TYPE_GET_SLOT_IMPL
-void *type_get_slot(PyTypeObject *t, int slot_id) {
-    nb_slot slot = type_slots[slot_id - 1];
+void *nb_type_get_slot(PyTypeObject *t, int slot_id) {
+    nb_slot slot = type_slots.slots[slot_id - 1];
 
     if (PyType_HasFeature(t, Py_TPFLAGS_HEAPTYPE)) {
         return ((void **) t)[slot.direct];
     } else {
         if (slot.indirect_1)
-            return ((void ***) t)[slot.indirect_1][slot.indirect_2];
+                return ((void ***)t)[slot.indirect_1]
+                    ? ((void ***)t)[slot.indirect_1][slot.indirect_2] : nullptr;
         else
             return ((void **) t)[slot.indirect_2];
     }
@@ -614,15 +647,12 @@ void *type_get_slot(PyTypeObject *t, int slot_id) {
 
 #endif
 
+#if NB_TYPE_FROM_METACLASS_IMPL
+template<class PY>
 static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
-                                        PyType_Spec *spec) {
-#if NB_TYPE_FROM_METACLASS_IMPL == 0
-    // Life is good, PyType_FromMetaclass() is available
-    return PyType_FromMetaclass(meta, mod, spec, nullptr);
-#else
+                                        PyType_Spec *spec, PyObject*) {
     /* The fallback code below emulates PyType_FromMetaclass() on Python prior
-       to version 3.12. It requires access to CPython-internal structures, which
-       is why nanobind can only target the stable ABI on version 3.12+. */
+       to version 3.12. It requires access to CPython-internal structures. */
 
     const char *name = strrchr(spec->name, '.');
     if (name)
@@ -634,13 +664,13 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     if (!name_o)
         return nullptr;
 
-    const char *name_cstr = PyUnicode_AsUTF8AndSize(name_o, nullptr);
+    const char *name_cstr = compat_PyUnicode_AsUTF8AndSize(name_o, nullptr);
     if (!name_cstr) {
         Py_DECREF(name_o);
         return nullptr;
     }
 
-    PyHeapTypeObject *ht = (PyHeapTypeObject *) PyType_GenericAlloc(meta, 0);
+    auto ht = (typename PY::PyHeapTypeObject *) PyType_GenericAlloc(meta, 0);
     if (!ht) {
         Py_DECREF(name_o);
         return nullptr;
@@ -650,16 +680,14 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     ht->ht_qualname = name_o;
     Py_INCREF(name_o);
 
-#if PY_VERSION_HEX >= 0x03090000
-    if (mod) {
-        Py_INCREF(mod);
-        ht->ht_module = mod;
+    if constexpr (PY::Version >= 0x03090000) {
+        if (mod) {
+            Py_INCREF(mod);
+            ht->ht_module = mod;
+        }
     }
-#else
-    (void) mod;
-#endif
 
-    PyTypeObject *tp = &ht->ht_type;
+    typename PY::PyTypeObject *tp = &ht->ht_type;
     tp->tp_name = name_cstr;
     tp->tp_basicsize = spec->basicsize;
     tp->tp_itemsize = spec->itemsize;
@@ -677,8 +705,8 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
         if (slot == 0) {
             break;
-        } else if (slot * sizeof(nb_slot) < (int) sizeof(type_slots)) {
-            *(((void **) ht) + type_slots[slot - 1].direct) = ts->pfunc;
+        } else if (slot < type_slots.size) {
+            *(((void **) ht) + type_slots.slots[slot - 1].direct) = ts->pfunc;
         } else {
             PyErr_Format(PyExc_RuntimeError,
                          "nb_type_from_metaclass(): unhandled slot %i", slot);
@@ -693,7 +721,7 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     const char *doc = tp->tp_doc;
     tp->tp_members = nullptr;
     tp->tp_doc = nullptr;
-    Py_XINCREF(tp->tp_base);
+    Py_XINCREF((PyObject*)tp->tp_base);
 
     if (doc && !fail) {
         size_t size = strlen(doc) + 1;
@@ -733,12 +761,78 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
         }
     }
 
-    if (fail || PyType_Ready(tp) != 0) {
+    if (fail || PyType_Ready((PyTypeObject*)tp) != 0) {
         Py_DECREF(tp);
         return nullptr;
     }
 
     return (PyObject *) tp;
+}
+#endif
+
+#if defined(Py_LIMITED_API) && NB_PY_VERSION_MIN < 0x030A0000
+const char *compat_PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size) {
+    return NB_COMPAT_SYM_VER(310, PyUnicode_AsUTF8AndSize)(unicode, size);
+}
+#endif
+
+#if NB_TYPE_GET_SLOT_IMPL
+void *compat_PyType_GetSlot(PyTypeObject *type, int slot) {
+#if defined(Py_LIMITED_API)
+    static decltype(&PyType_GetSlot) f =
+        NB_PY_VERSION_CHECK(0x030A0000) ? &PyType_GetSlot : nb_type_get_slot;
+    return f(type, slot);
+#else
+    return nb_type_get_slot(type, slot);
+#endif
+}
+#endif
+
+PyObject *compat_PyType_FromMetaclass(PyTypeObject *metaclass, PyObject *module,
+                                      PyType_Spec *spec, PyObject *bases) {
+#if NB_TYPE_FROM_METACLASS_IMPL
+#if defined(Py_LIMITED_API)
+    static decltype(&compat_PyType_FromMetaclass) f = []() {
+        if (NB_PY_VERSION_CHECK(0x030C0000)) {
+            return NB_COMPAT_SYM(PyType_FromMetaclass);
+        } else if (NB_PY_VERSION_CHECK(0x030B0000)) {
+            return &nb_type_from_metaclass<py311>;
+        } else if (NB_PY_VERSION_CHECK(0x030A0000)) {
+            return &nb_type_from_metaclass<py310>;
+        } else if (NB_PY_VERSION_CHECK(0x03090000)) {
+            return &nb_type_from_metaclass<py39>;
+        } else if (NB_PY_VERSION_CHECK(0x03080000)) {
+            return &nb_type_from_metaclass<py38>;
+        }
+    }();
+    return f(metaclass, module, spec, bases);
+#else
+    return nb_type_from_metaclass<py_current>(metaclass, module, spec, bases);
+#endif
+#else
+    return PyType_FromMetaclass(metaclass, module, spec, bases);
+#endif
+}
+
+static std::pair<int, int> nb_type_size(size_t supplement) {
+    if (NB_PY_VERSION_CHECK(0x030C0000))
+        return {-(int)(sizeof(type_data) + supplement), 0}; // PEP 697
+
+    auto get = [](const auto *t, size_t supplement) {
+        return std::pair<int, int>{
+            (int)(t->tp_basicsize + (sizeof(type_data) + supplement)),
+            (int)t->tp_itemsize};
+    };
+#if Py_LIMITED_API
+    if (NB_PY_VERSION_CHECK(0x030B0000))
+        return get((py311::PyTypeObject*)&PyType_Type, supplement);
+    if (NB_PY_VERSION_CHECK(0x030A0000))
+        return get((py310::PyTypeObject*)&PyType_Type, supplement); 
+    if (NB_PY_VERSION_CHECK(0x03090000))
+        return get((py39::PyTypeObject*)&PyType_Type, supplement); 
+    return get((py38::PyTypeObject*)&PyType_Type, supplement);
+#else
+    return get(&PyType_Type, supplement);
 #endif
 }
 
@@ -757,13 +851,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             { 0, nullptr }
         };
 
-#if PY_VERSION_HEX >= 0x030C0000
-        int basicsize = -(int) (sizeof(type_data) + supplement),
-            itemsize = 0;
-#else
-        int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement)),
-            itemsize = (int) PyType_Type.tp_itemsize;
-#endif
+        auto [basicsize, itemsize] = nb_type_size(supplement);
 
         char name[17 + 20 + 1];
         snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
@@ -776,8 +864,8 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             /* .slots = */ slots
         };
 
-        tp = (PyTypeObject *) nb_type_from_metaclass(
-            internals->nb_meta, internals->nb_module, &spec);
+        tp = (PyTypeObject *) compat_PyType_FromMetaclass(
+            internals->nb_meta, internals->nb_module, &spec, nullptr);
 
         handle(tp).attr("__module__") = "nanobind";
 
@@ -830,12 +918,14 @@ NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *
     return result;
 }
 
-#if PY_VERSION_HEX >= 0x03090000
 static PyMethodDef class_getitem_method[] = {
-    { "__class_getitem__", Py_GenericAlias, METH_O | METH_CLASS, nullptr },
-    { nullptr }
+    {"__class_getitem__",
+     NB_PY_VERSION_CHECK(0x03090000)
+         ? NB_NEW_DYN_SYM_VER(39, Py_GenericAlias, PyCFunction)
+         : nullptr,
+     METH_O | METH_CLASS, nullptr},
+    {nullptr}
 };
-#endif
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
@@ -897,9 +987,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     PyObject *base = nullptr;
 
-#if PY_VERSION_HEX >= 0x03090000
     bool generic_base = false;
-#endif
 
     if (has_base_py) {
         check(!has_base,
@@ -907,8 +995,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
               "specified!", t_name);
         base = (PyObject *) t->base_py;
 
-        #if PY_VERSION_HEX >= 0x03090000 && !defined(PYPY_VERSION) // see https://github.com/pypy/pypy/issues/4914
-        if (Py_TYPE(base) == &Py_GenericAliasType) {
+        #if !defined(PYPY_VERSION) // see https://github.com/pypy/pypy/issues/4914
+        if (NB_PY_VERSION_CHECK(0x03090000) && Py_TYPE(base) == NB_NEW_DYN_SYM_VER(39, Py_GenericAliasType, PyTypeObject*)) {
             base = PyObject_GetAttrString(base, "__origin__");
             check(base != nullptr,
                   "nanobind::detail::nb_type_new(\"%s\"): could not access base of type alias!", t_name);
@@ -1043,12 +1131,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (num_members > 0)
         *s++ = { Py_tp_members, (void*) members };
 
-#if PY_VERSION_HEX < 0x03090000
-    (void) is_generic; // unsupported on Python 3.8
-#else
-    if (is_generic)
+    // unsupported on Python 3.8
+    if (NB_PY_VERSION_CHECK(0x03090000) && is_generic)
         *s++ = { Py_tp_methods, (void*) class_getitem_method };
-#endif
 
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
@@ -1057,7 +1142,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0);
 
-    PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
+    PyObject *result = compat_PyType_FromMetaclass(metaclass, mod, &spec, nullptr);
     if (!result) {
         python_error err;
         check(false,
@@ -1114,10 +1199,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         free((char *) t_name);
     }
 
-#if PY_VERSION_HEX >= 0x03090000
     if (generic_base)
         setattr(result, "__orig_bases__", make_tuple(handle(t->base_py)));
-#endif
 
     return result;
 }
@@ -1125,7 +1208,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
 PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
     PyObject *result;
-#if PY_VERSION_HEX < 0x03090000
+#if NB_PY_VERSION_MIN < 0x03090000
     PyObject *args = PyTuple_New(1);
     if (!args)
         return nullptr;
@@ -1135,7 +1218,7 @@ PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
     Py_DECREF(args);
 #else
     PyObject *args[2] = { nullptr, arg };
-    result = PyObject_Vectorcall(fn, args + 1, NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
+    result = compat_PyObject_Vectorcall(fn, args + 1, NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
 #endif
     return result;
 }
@@ -1191,7 +1274,7 @@ found:
             const char *name = Py_TYPE(src)->tp_name;
 #else
             PyObject *name_py = nb_inst_name(src);
-            const char *name = PyUnicode_AsUTF8AndSize(name_py, nullptr);
+            const char *name = compat_PyUnicode_AsUTF8AndSize(name_py, nullptr);
 #endif
             // Can't use PyErr_Warn*() if conversion failed due to a stack overflow
             fprintf(stderr,
@@ -1669,7 +1752,7 @@ void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) {
     check(inst->ready,
           "nanobind::detail::nb_relinquish_ownership('%s'): ownership "
           "status has become corrupted.",
-          PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
+          compat_PyUnicode_AsUTF8AndSize(nb_inst_name(o), nullptr));
 
     if (cpp_delete) {
         if (!inst->cpp_delete || !inst->destruct || inst->internal) {
@@ -1885,15 +1968,35 @@ void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
 }
 
 #if defined(Py_LIMITED_API)
+template<class PY>
+void *nb_type_data_static_helper(PyObject *o, PyTypeObject *) {
+    return ((char *)o) + sizeof(typename PY::PyHeapTypeObject);
+}
+
 type_data *nb_type_data_static(PyTypeObject *o) noexcept {
-    return (type_data *) PyObject_GetTypeData((PyObject *) o, Py_TYPE((PyObject *) o));
+#if NB_PY_VERSION_MIN >= 0x030C0000
+    return (type_data *)PyObject_GetTypeData((PyObject *)o, Py_TYPE((PyObject *)o));
+#else
+    static auto f = []() {
+        if (NB_PY_VERSION_CHECK(0x030C0000))
+            return reinterpret_cast<void *(*)(PyObject *, PyTypeObject *)>(detail::dyn_symbol("PyObject_GetTypeData"));
+        if (NB_PY_VERSION_CHECK(0x030B0000))
+            return &nb_type_data_static_helper<py311>;
+        if (NB_PY_VERSION_CHECK(0x030A0000))
+            return &nb_type_data_static_helper<py310>;
+        if (NB_PY_VERSION_CHECK(0x03090000))
+            return &nb_type_data_static_helper<py39>;
+        return &nb_type_data_static_helper<py38>;
+    }();
+    return (type_data *)f((PyObject *)o, Py_TYPE((PyObject *)o));
+#endif
 }
 #endif
 
 PyObject *nb_type_name(PyObject *t) noexcept {
     error_scope s;
 
-#if PY_VERSION_HEX >= 0x030B0000
+#if NB_PY_VERSION_MIN >= 0x030B0000
     PyObject *result = PyType_GetName((PyTypeObject *) t);
 #else
     PyObject *result = PyObject_GetAttrString(t, "__name__");

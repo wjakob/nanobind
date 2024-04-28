@@ -76,9 +76,10 @@ NB_MODULE(test_typing_ext, m) {
             nb::sig("def get(self, /) -> T"))
        .def(nb::self == nb::self, nb::sig("def __eq__(self, arg: object, /) -> bool"));
 
-#if PY_VERSION_HEX >= 0x03090000 && !defined(PYPY_VERSION) // https://github.com/pypy/pypy/issues/4914
+#if !defined(PYPY_VERSION) // https://github.com/pypy/pypy/issues/4914
     struct WrapperFoo : Wrapper { };
-    nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
+    if (NB_PY_VERSION_CHECK(0x03090000))
+        nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
 #endif
 
     // Some statements that will be modified by the pattern file

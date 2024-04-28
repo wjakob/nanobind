@@ -53,14 +53,45 @@ jobs:
       run: |
         python -m pip install numpy scipy
 
-    - name: Configure
+    - name: Configure Unstable ABI
       run: >
-        cmake -S . -B build -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
+        cmake -S . -B build -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
 
-    - name: Build C++
+    - name: Build C++ Unstable ABI
       run: cmake --build build -j 2
 
-    - name: Run tests
+    - name: Run tests Unstable ABI
       run: >
         cd build;
         python -m pytest
+
+    - name: Configure Stable ABI
+      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      run: >
+        cmake -S . -B build -DNB_TEST_STABLE_ABI=current -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
+
+    - name: Build C++ Stable ABI
+      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      run: cmake --build build -j 2
+
+    - name: Run tests Stable ABI
+      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      run: >
+        cd build;
+        python -m pytest
+
+    - name: Configure Stable ABI 3.8
+      if: ${{ matrix.python != 3.8 && !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      run: >
+        cmake -S . -B build -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
+
+    - name: Build C++ Stable ABI 3.8
+      if: ${{ matrix.python != 3.8 && !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      run: cmake --build build -j 2
+
+    # Currently testing with older versions of the stable ABI fails because of differences in type names
+    # - name: Run tests Stable ABI 3.8
+    #   if: ${{ matrix.python != 3.8 && !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+    #   run: >
+    #     cd build;
+    #     python -m pytest

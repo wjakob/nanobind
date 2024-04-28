@@ -421,7 +421,7 @@ class str : public object {
 
     template <typename... Args> str format(Args&&... args);
 
-    const char *c_str() const { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
+    const char *c_str() const { return detail::compat_PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };
 
 class bytes : public object {

@@ -231,7 +231,7 @@ template <> struct type_caster<char> {
     using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
-        value = PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
+        value = compat_PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
         if (!value) {
             PyErr_Clear();
             return false;
@@ -282,7 +282,7 @@ template <typename T> struct typed_name {
       static constexpr auto Name = type_caster<T>::Name;
 };
 
-#if PY_VERSION_HEX < 0x03090000
+#if NB_PY_VERSION_MIN < 0x03090000
 #define NB_TYPED_NAME_PYTHON38(type, name)                     \
     template <> struct typed_name<type> {                      \
         static constexpr auto Name = detail::const_name(name); \

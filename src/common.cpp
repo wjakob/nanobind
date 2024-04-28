@@ -307,20 +307,8 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
         }
     }
 
-#if PY_VERSION_HEX < 0x03090000
-    if (method_call) {
-        PyObject *self = PyObject_GetAttr(args[0], /* name = */ base);
-        if (self) {
-            res = _PyObject_Vectorcall(self, (PyObject **) args + 1, nargsf - 1, kwnames);
-            Py_DECREF(self);
-        }
-    } else {
-        res = _PyObject_Vectorcall(base, (PyObject **) args, nargsf, kwnames);
-    }
-#else
-    res = (method_call ? PyObject_VectorcallMethod
-                       : PyObject_Vectorcall)(base, args, nargsf, kwnames);
-#endif
+    res = (method_call ? compat_PyObject_VectorcallMethod
+                       : compat_PyObject_Vectorcall)(base, args, nargsf, kwnames);
 
 end:
     for (size_t i = 0; i < nargs_total; ++i)

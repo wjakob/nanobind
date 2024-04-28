@@ -91,11 +91,7 @@ extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
 
-#if PY_VERSION_HEX >= 0x03090000
-#  define NB_HAVE_VECTORCALL_PY39_OR_NEWER NB_HAVE_VECTORCALL
-#else
-#  define NB_HAVE_VECTORCALL_PY39_OR_NEWER 0
-#endif
+#define NB_HAVE_VECTORCALL_PY39_OR_NEWER (NB_PY_VERSION_CHECK(0x03090000) ? NB_HAVE_VECTORCALL : 0)
 
 static PyType_Slot nb_meta_slots[] = {
     { Py_tp_base, nullptr },
@@ -122,6 +118,10 @@ static PyGetSetDef nb_func_getset[] = {
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
+static void *get_PyVectorcall_Call() {
+    return (void *)NB_DYN_SYM_VER(312, PyVectorcall_Call, void *);
+}
+
 static PyType_Slot nb_func_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
@@ -131,7 +131,7 @@ static PyType_Slot nb_func_slots[] = {
     { Py_tp_dealloc, (void *) nb_func_dealloc },
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_new, (void *) PyType_GenericNew },
-    { Py_tp_call, (void *) PyVectorcall_Call },
+    { Py_tp_call, get_PyVectorcall_Call() },
     { 0, nullptr }
 };
 
@@ -139,10 +139,9 @@ static PyType_Spec nb_func_spec = {
     /* .name = */ "nanobind.nb_func",
     /* .basicsize = */ (int) sizeof(nb_func),
     /* .itemsize = */ (int) sizeof(func_data),
-    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
-    /* .slots = */ nb_func_slots
-};
+    /* .flags = */ (unsigned int)(Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+                    NB_HAVE_VECTORCALL_PY39_OR_NEWER),
+    /* .slots = */ nb_func_slots};
 
 static PyType_Slot nb_method_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
@@ -153,19 +152,18 @@ static PyType_Slot nb_method_slots[] = {
     { Py_tp_dealloc, (void *) nb_func_dealloc },
     { Py_tp_descr_get, (void *) nb_method_descr_get },
     { Py_tp_new, (void *) PyType_GenericNew },
-    { Py_tp_call, (void *) PyVectorcall_Call },
+    { Py_tp_call, get_PyVectorcall_Call() },
     { 0, nullptr }
 };
 
 static PyType_Spec nb_method_spec = {
     /*.name = */ "nanobind.nb_method",
-    /*.basicsize = */ (int) sizeof(nb_func),
-    /*.itemsize = */ (int) sizeof(func_data),
-    /*.flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                  Py_TPFLAGS_METHOD_DESCRIPTOR |
-                  NB_HAVE_VECTORCALL_PY39_OR_NEWER,
-    /*.slots = */ nb_method_slots
-};
+    /*.basicsize = */ (int)sizeof(nb_func),
+    /*.itemsize = */ (int)sizeof(func_data),
+    /*.flags = */ (unsigned int)(Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+                   Py_TPFLAGS_METHOD_DESCRIPTOR |
+                   NB_HAVE_VECTORCALL_PY39_OR_NEWER),
+    /*.slots = */ nb_method_slots};
 
 static PyMemberDef nb_bound_method_members[] = {
     { "__vectorcalloffset__", T_PYSSIZET,
@@ -184,7 +182,7 @@ static PyType_Slot nb_bound_method_slots[] = {
     { Py_tp_clear, (void *) nb_bound_method_clear },
     { Py_tp_dealloc, (void *) nb_bound_method_dealloc },
     { Py_tp_traverse, (void *) nb_bound_method_traverse },
-    { Py_tp_call, (void *) PyVectorcall_Call },
+    { Py_tp_call, get_PyVectorcall_Call() },
     { 0, nullptr }
 };
 
@@ -192,8 +190,8 @@ static PyType_Spec nb_bound_method_spec = {
     /* .name = */ "nanobind.nb_bound_method",
     /* .basicsize = */ (int) sizeof(nb_bound_method),
     /* .itemsize = */ 0,
-    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+    /* .flags = */ (unsigned int)(Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+                    NB_HAVE_VECTORCALL_PY39_OR_NEWER),
     /* .slots = */ nb_bound_method_slots
 };
 
@@ -329,10 +327,8 @@ NB_NOINLINE void init(const char *name) {
 
 #if defined(PYPY_VERSION)
     PyObject *dict = PyEval_GetBuiltins();
-#elif PY_VERSION_HEX < 0x03090000
-    PyObject *dict = PyInterpreterState_GetDict(_PyInterpreterState_Get());
 #else
-    PyObject *dict = PyInterpreterState_GetDict(PyInterpreterState_Get());
+    PyObject *dict = compat_PyInterpreterState_GetDict(compat_PyInterpreterState_Get());
 #endif
     check(dict, "nanobind::detail::init(): could not access internals dictionary!");
 
@@ -369,27 +365,34 @@ NB_NOINLINE void init(const char *name) {
               p->nb_method && p->nb_bound_method,
           "nanobind::detail::init(): initialization failed!");
 
-#if PY_VERSION_HEX < 0x03090000
-    p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
-    p->nb_func->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
-    p->nb_method->tp_flags |= NB_HAVE_VECTORCALL;
-    p->nb_method->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
-    p->nb_bound_method->tp_flags |= NB_HAVE_VECTORCALL;
-    p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
+#if NB_PY_VERSION_MIN < 0x03090000
+    if (!NB_PY_VERSION_CHECK(0x03090000)) {
+#if defined(Py_LIMITED_API)
+        using PTO = py38::PyTypeObject;
+#else
+        using PTO = PyTypeObject;
+#endif
+        ((PTO*)p->nb_func)->tp_flags |= NB_HAVE_VECTORCALL;
+        ((PTO*)p->nb_func)->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
+        ((PTO*)p->nb_method)->tp_flags |= NB_HAVE_VECTORCALL;
+        ((PTO*)p->nb_method)->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
+        ((PTO*)p->nb_bound_method)->tp_flags |= NB_HAVE_VECTORCALL;
+        ((PTO*)p->nb_bound_method)->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
+    }
 #endif
 
 #if defined(Py_LIMITED_API)
     // Cache important functions from PyType_Type and PyProperty_Type
-    p->PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
-    p->PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
+    p->PyType_Type_tp_free = (freefunc) compat_PyType_GetSlot(&PyType_Type, Py_tp_free);
+    p->PyType_Type_tp_init = (initproc) compat_PyType_GetSlot(&PyType_Type, Py_tp_init);
     p->PyType_Type_tp_dealloc =
-        (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
+        (destructor) compat_PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
     p->PyType_Type_tp_setattro =
-        (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
+        (setattrofunc) compat_PyType_GetSlot(&PyType_Type, Py_tp_setattro);
     p->PyProperty_Type_tp_descr_get =
-        (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
+        (descrgetfunc) compat_PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
     p->PyProperty_Type_tp_descr_set =
-        (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
+        (descrsetfunc) compat_PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
 #endif
 
     p->translators = { default_exception_translator, nullptr, nullptr };
@@ -397,37 +400,39 @@ NB_NOINLINE void init(const char *name) {
     is_alive_ptr = &is_alive_value;
     p->is_alive_ptr = is_alive_ptr;
 
-#if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)
-    /* The implementation of typing.py on CPython <3.12 tends to introduce
-       spurious reference leaks that upset nanobind's leak checker. The
-       following band-aid, installs an 'atexit' handler that clears LRU caches
-       used in typing.py. To be resilient to potential future changes in
-       typing.py, the implementation fails silently if any step goes wrong. For
-       context, see https://github.com/python/cpython/issues/98253. */
+#if !defined(PYPY_VERSION)
+    if (!NB_PY_VERSION_CHECK(0x030C0000)) {
+        /* The implementation of typing.py on CPython <3.12 tends to introduce
+        spurious reference leaks that upset nanobind's leak checker. The
+        following band-aid, installs an 'atexit' handler that clears LRU caches
+        used in typing.py. To be resilient to potential future changes in
+        typing.py, the implementation fails silently if any step goes wrong. For
+        context, see https://github.com/python/cpython/issues/98253. */
 
-    const char *str =
-        "def cleanup():\n"
-        "    try:\n"
-        "        import sys\n"
-        "        fs = getattr(sys.modules.get('typing'), '_cleanups', None)\n"
-        "        if fs is not None:\n"
-        "            for f in fs:\n"
-        "                f()\n"
-        "    except:\n"
-        "        pass\n"
-        "import atexit\n"
-        "atexit.register(cleanup)\n"
-        "del atexit, cleanup";
+        const char *str =
+            "def cleanup():\n"
+            "    try:\n"
+            "        import sys\n"
+            "        fs = getattr(sys.modules.get('typing'), '_cleanups', None)\n"
+            "        if fs is not None:\n"
+            "            for f in fs:\n"
+            "                f()\n"
+            "    except:\n"
+            "        pass\n"
+            "import atexit\n"
+            "atexit.register(cleanup)\n"
+            "del atexit, cleanup";
 
-    PyObject *code = Py_CompileString(str, "<internal>", Py_file_input);
-    if (code) {
-        PyObject *result = PyEval_EvalCode(code, PyEval_GetGlobals(), nullptr);
-        if (!result)
+        PyObject *code = Py_CompileString(str, "<internal>", Py_file_input);
+        if (code) {
+            PyObject *result = PyEval_EvalCode(code, PyEval_GetGlobals(), nullptr);
+            if (!result)
+                PyErr_Clear();
+            Py_XDECREF(result);
+            Py_DECREF(code);
+        } else {
             PyErr_Clear();
-        Py_XDECREF(result);
-        Py_DECREF(code);
-    } else {
-        PyErr_Clear();
+        }
     }
 #endif
 
@@ -457,6 +462,18 @@ NB_NOINLINE void fail_unspecified() noexcept {
              "using the 'Debug' or 'RelWithDebInfo' modes to obtain further "
              "information about this problem.");
     #endif
+}
+#endif
+
+#if defined(Py_LIMITED_API) && NB_PY_VERSION_MIN < 0x030B0000
+uint32_t get_python_version_hex() {
+    const char* ver = Py_GetVersion();
+    char* ptr;
+    uint32_t r = 0x1000000 * (uint8_t)strtoul(ver, &ptr, 10);
+    check(*ptr++ == '.', "Unable to parse Python version");
+    r += 0x10000 * (uint8_t)strtoul(ptr, &ptr, 10);
+    check(r >= NB_PY_VERSION_MIN, "Unsupported Python version");
+    return r;
 }
 #endif
 

@@ -10,7 +10,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// RAII wrapper that temporarily clears any Python error state
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_PY_VERSION_MIN >= 0x030C0000
 struct error_scope {
     error_scope() { value = PyErr_GetRaisedException(); }
     ~error_scope() { PyErr_SetRaisedException(value); }
@@ -35,7 +35,7 @@ public:
     NB_EXPORT_SHARED ~python_error() override;
 
     bool matches(handle exc) const noexcept {
-#if PY_VERSION_HEX < 0x030C0000
+#if NB_PY_VERSION_MIN < 0x030C0000
         return PyErr_GivenExceptionMatches(m_type, exc.ptr()) != 0;
 #else
         return PyErr_GivenExceptionMatches(m_value, exc.ptr()) != 0;
@@ -63,7 +63,7 @@ public:
 
     handle value() const { return m_value; }
 
-#if PY_VERSION_HEX < 0x030C0000
+#if NB_PY_VERSION_MIN < 0x030C0000
     handle type() const { return m_type; }
     object traceback() const { return borrow(m_traceback); }
 #else
@@ -76,7 +76,7 @@ public:
     NB_EXPORT_SHARED const char *what() const noexcept override;
 
 private:
-#if PY_VERSION_HEX < 0x030C0000
+#if NB_PY_VERSION_MIN < 0x030C0000
     mutable PyObject *m_type = nullptr;
     mutable PyObject *m_value = nullptr;
     mutable PyObject *m_traceback = nullptr;

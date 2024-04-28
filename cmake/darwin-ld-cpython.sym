@@ -852,6 +852,7 @@
 -U _Py_SymtableString
 -U _Py_UTF8Mode
 -U _Py_VaBuildValue
+-U _Py_Version
 -U _Py_XNewRef
 -U __PyArg_ParseTupleAndKeywords_SizeT
 -U __PyArg_ParseTuple_SizeT

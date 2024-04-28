@@ -535,8 +535,30 @@ NB_CORE PyObject *repr_map(PyObject *o);
 
 NB_CORE bool is_alive() noexcept;
 
+#if defined(Py_LIMITED_API) && NB_PY_VERSION_MIN < 0x030A0000
+NB_CORE const char *compat_PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size);
+#else
+static inline const char *compat_PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size) {
+    return PyUnicode_AsUTF8AndSize(unicode, size);
+}
+#endif
+
 #if NB_TYPE_GET_SLOT_IMPL
-NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
+NB_CORE void *compat_PyType_GetSlot(PyTypeObject *type, int slot);
+#else
+static inline void *compat_PyType_GetSlot(PyTypeObject *type, int slot) {
+    return PyType_GetSlot(type, slot);
+}
+#endif
+
+#if defined(Py_LIMITED_API) && NB_PY_VERSION_MIN >= 0x030B0000
+inline uint32_t py_version() { return ::Py_Version; }
+#else
+NB_CORE uint32_t get_python_version_hex();
+inline uint32_t py_version() {
+    static const uint32_t ver = get_python_version_hex();
+    return ver;
+}
 #endif
 
 NAMESPACE_END(detail)

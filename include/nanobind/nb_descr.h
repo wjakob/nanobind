@@ -84,7 +84,7 @@ constexpr auto io_name(char const (&text1)[N1], char const (&text2)[N2]) {
            const_name(text2) + const_name('@');
 }
 
-#if PY_VERSION_HEX < 0x030A0000
+#if NB_PY_VERSION_MIN < 0x030A0000
 template <typename T> constexpr auto optional_name(const T &v) {
     return const_name("typing.Optional[") + v + const_name("]");
 }

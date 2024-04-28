@@ -303,11 +303,7 @@ inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_replace_
 inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_replace_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 inline void *type_get_slot(handle h, int slot_id) {
-#if NB_TYPE_GET_SLOT_IMPL
-    return detail::type_get_slot((PyTypeObject *) h.ptr(), slot_id);
-#else
-    return PyType_GetSlot((PyTypeObject *) h.ptr(), slot_id);
-#endif
+    return detail::compat_PyType_GetSlot((PyTypeObject *) h.ptr(), slot_id);
 }
 
 

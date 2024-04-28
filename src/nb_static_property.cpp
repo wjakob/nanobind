@@ -26,7 +26,7 @@ PyTypeObject *nb_static_property_tp() noexcept {
         PyMemberDef *members;
 
         #if defined(Py_LIMITED_API)
-            members = (PyMemberDef *) PyType_GetSlot(&PyProperty_Type, Py_tp_members);
+            members = (PyMemberDef *) compat_PyType_GetSlot(&PyProperty_Type, Py_tp_members);
         #else
             members = PyProperty_Type.tp_members;
         #endif

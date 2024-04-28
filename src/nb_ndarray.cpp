@@ -123,18 +123,26 @@ static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
     PyMem_Free(view->strides);
 }
 
+#if !defined(Py_bf_getbuffer)
+#  define Py_bf_getbuffer 1
+#  define Py_bf_releasebuffer 2
+#endif
+
 static PyTypeObject *nd_ndarray_tp() noexcept {
     PyTypeObject *tp = internals->nb_ndarray;
 
     if (NB_UNLIKELY(!tp)) {
         PyType_Slot slots[] = {
             { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
-#if PY_VERSION_HEX >= 0x03090000
             { Py_bf_getbuffer, (void *) nd_ndarray_tpbuffer },
             { Py_bf_releasebuffer, (void *) nb_ndarray_releasebuffer },
-#endif
             { 0, nullptr }
         };
+
+        if (!NB_PY_VERSION_CHECK(0x03090000)) {
+            // No buffer slots on 3.8
+            slots[1] = { 0, nullptr };
+        }
 
         PyType_Spec spec = {
             /* .name = */ "nanobind.nb_ndarray",
@@ -147,10 +155,15 @@ static PyTypeObject *nd_ndarray_tp() noexcept {
         tp = (PyTypeObject *) PyType_FromSpec(&spec);
         check(tp, "nb_ndarray type creation failed!");
 
-#if PY_VERSION_HEX < 0x03090000
-        tp->tp_as_buffer->bf_getbuffer = nd_ndarray_tpbuffer;
-        tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
+        if (!NB_PY_VERSION_CHECK(0x03090000)) {
+#if defined(Py_LIMITED_API)
+            using PTO = py38::PyTypeObject;
+#else
+            using PTO = PyTypeObject;
 #endif
+            ((PTO*)tp)->tp_as_buffer->bf_getbuffer = nd_ndarray_tpbuffer;
+            ((PTO*)tp)->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
+        }
 
         internals->nb_ndarray = tp;
     }
@@ -162,7 +175,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     scoped_pymalloc<Py_buffer> view;
     scoped_pymalloc<managed_dltensor> mt;
 
-    if (PyObject_GetBuffer(o, view.get(),
+    if (compat_PyObject_GetBuffer(o, view.get(),
                            ro ? PyBUF_RECORDS_RO : PyBUF_RECORDS)) {
         PyErr_Clear();
         return nullptr;
@@ -231,14 +244,14 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     }
 
     if (fail) {
-        PyBuffer_Release(view.get());
+        compat_PyBuffer_Release(view.get());
         return nullptr;
     }
 
     mt->deleter = [](managed_dltensor *mt2) {
         gil_scoped_acquire guard;
         Py_buffer *buf = (Py_buffer *) mt2->manager_ctx;
-        PyBuffer_Release(buf);
+        compat_PyBuffer_Release(buf);
         PyMem_Free(mt2->dltensor.shape);
         PyMem_Free(mt2->dltensor.strides);
         PyMem_Free(mt2);
@@ -266,7 +279,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     for (size_t i = 0; i < (size_t) view->ndim; ++i) {
         int64_t stride = view->strides[i] / itemsize;
         if (stride * itemsize != view->strides[i]) {
-            PyBuffer_Release(view.get());
+            compat_PyBuffer_Release(view.get());
             return nullptr;
         }
         strides[i] = stride;
@@ -291,7 +304,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
 }
 
 bool ndarray_check(PyObject *o) noexcept {
-    if (PyObject_HasAttrString(o, "__dlpack__") || PyObject_CheckBuffer(o))
+    if (PyObject_HasAttrString(o, "__dlpack__") || compat_PyObject_CheckBuffer(o))
         return true;
 
     PyTypeObject *tp = Py_TYPE(o);
@@ -299,7 +312,7 @@ bool ndarray_check(PyObject *o) noexcept {
     PyObject *name = nb_type_name((PyObject *) tp);
     check(name, "Could not obtain type name! (1)");
 
-    const char *tp_name = PyUnicode_AsUTF8AndSize(name, nullptr);
+    const char *tp_name = compat_PyUnicode_AsUTF8AndSize(name, nullptr);
     check(tp_name, "Could not obtain type name! (2)");
 
     bool result =

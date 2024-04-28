@@ -298,7 +298,7 @@ endfunction()
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
     "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP"
-    "NB_DOMAIN" "")
+    "NB_DOMAIN;STABLE_ABI_VERSION" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
@@ -312,9 +312,8 @@ function(nanobind_add_module name)
     set(ARG_NB_STATIC TRUE)
   endif()
 
-  # Stable ABI builds require CPython >= 3.12 and Python::SABIModule
-  if ((Python_VERSION VERSION_LESS 3.12) OR
-      (NOT Python_INTERPRETER_ID STREQUAL "Python") OR
+  # Stable ABI builds require CPython and Python::SABIModule
+  if ((NOT Python_INTERPRETER_ID STREQUAL "Python") OR
       (NOT TARGET Python::SABIModule))
     set(ARG_STABLE_ABI FALSE)
   endif()
@@ -328,6 +327,18 @@ function(nanobind_add_module name)
     set(libname "${libname}-abi3")
   endif()
 
+  if (NOT ARG_STABLE_ABI_VERSION)
+    set(ARG_STABLE_ABI_VERSION 0x03080000)
+  endif()
+
+  if (ARG_STABLE_ABI_VERSION STREQUAL "current")
+    math(EXPR ARG_STABLE_ABI_VERSION "0x1000000 * ${Python_VERSION_MAJOR} + 0x10000 * ${Python_VERSION_MINOR}" OUTPUT_FORMAT HEXADECIMAL)
+  endif()
+
+  if (NOT ARG_STABLE_ABI_VERSION MATCHES 0x0?3[0-9A-Fa-f][0-9A-Fa-f]0000)
+    message(FATAL_ERROR "Invalid stable ABI version (${ARG_STABLE_ABI_VERSION}), should be in PY_VERSION_HEX format e.g. 0x030C0000 for 3.12")
+  endif()
+
   if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
     set(libname ${libname}-${ARG_NB_DOMAIN})
   endif()
@@ -339,7 +350,7 @@ function(nanobind_add_module name)
   endif()
 
   if (ARG_STABLE_ABI)
-    target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
+    target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=${ARG_STABLE_ABI_VERSION})
     nanobind_extension_abi3(${name})
   else()
     nanobind_extension(${name})

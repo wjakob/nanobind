@@ -59,3 +59,12 @@
 #if PY_VERSION_HEX < 0x03080000
 #  error The nanobind library requires Python 3.8 (or newer)
 #endif
+
+//Forward declare Py_buffer in 3.8 limited API
+#if defined(Py_LIMITED_API)
+#if Py_LIMITED_API < 0x030B0000
+extern "C" {
+typedef struct bufferinfo Py_buffer;
+}
+#endif
+#endif

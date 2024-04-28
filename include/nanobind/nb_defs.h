@@ -92,6 +92,13 @@
 #  define NB_VECTORCALL_NARGS(n) ((n) & ~NB_VECTORCALL_ARGUMENTS_OFFSET)
 #endif
 
+// Minimum supported version, may be < PY_VERSION_HEX if Py_LIMITED_API is set
+#if defined(Py_LIMITED_API)
+#  define NB_PY_VERSION_MIN Py_LIMITED_API
+#else
+#  define NB_PY_VERSION_MIN PY_VERSION_HEX
+#endif
+
 #if PY_VERSION_HEX < 0x03090000
 #  define NB_TYPING_ABC   "typing."
 #  define NB_TYPING_TUPLE "typing.Tuple"
@@ -121,8 +128,11 @@
 #endif
 
 #if defined(Py_LIMITED_API)
-#  if PY_VERSION_HEX < 0x030C0000 || defined(PYPY_VERSION)
-#    error "nanobind can target Python's limited API, but this requires CPython >= 3.12"
+#  if Py_LIMITED_API < 0x03080000 || defined(PYPY_VERSION)
+#    error "nanobind can target Python's limited API, but this requires CPython >= 3.8"
+#  endif
+#  if Py_LIMITED_API > PY_VERSION_HEX
+#    error "Py_LIMITED_API must be less than or equal to the python version"
 #  endif
 #  define NB_TUPLE_GET_SIZE PyTuple_Size
 #  define NB_TUPLE_GET_ITEM PyTuple_GetItem
@@ -154,12 +164,12 @@
 #endif
 
 #if !defined(PYPY_VERSION)
-#  if PY_VERSION_HEX < 0x030A0000
+#  if NB_PY_VERSION_MIN < 0x030A0000
 #    define NB_TYPE_GET_SLOT_IMPL 1 // Custom implementation of nb::type_get_slot
 #  else
 #    define NB_TYPE_GET_SLOT_IMPL 0
 #  endif
-#  if PY_VERSION_HEX < 0x030C0000
+#  if NB_PY_VERSION_MIN < 0x030C0000
 #    define NB_TYPE_FROM_METACLASS_IMPL 1 // Custom implementation of PyType_FromMetaclass
 #  else
 #    define NB_TYPE_FROM_METACLASS_IMPL 0
@@ -192,3 +202,10 @@
     }                                                                          \
     void NB_CONCAT(nanobind_init_, name)(::nanobind::module_ & (variable))
 
+#if defined(Py_LIMITED_API)
+// Check the python version, at runtime in the limited API
+#define NB_PY_VERSION_CHECK(ver)                                               \
+    ((ver) <= NB_PY_VERSION_MIN || (ver) <= nanobind::detail::py_version())
+#else
+#define NB_PY_VERSION_CHECK(ver) ((ver) <= PY_VERSION_HEX)
+#endif

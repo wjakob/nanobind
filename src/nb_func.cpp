@@ -366,7 +366,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
             arg_data &a = fc->args[i];
             if (a.name) {
                 a.name_py = PyUnicode_InternFromString(a.name);
-                a.name = PyUnicode_AsUTF8AndSize(a.name_py, nullptr);
+                a.name = compat_PyUnicode_AsUTF8AndSize(a.name_py, nullptr);
             } else {
                 a.name_py = nullptr;
             }
@@ -433,7 +433,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             PyObject *key   = NB_TUPLE_GET_ITEM(kwargs_in, j),
                      *value = args_in[nargs_in + j];
 
-            const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
+            const char *key_cstr = compat_PyUnicode_AsUTF8AndSize(key, nullptr);
             buf.put_dstr(key_cstr);
             buf.put(": ");
             str name = steal<str>(nb_inst_name(value));
@@ -1023,11 +1023,9 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
                     buf.put(": ");
                     if (has_args && f->args[arg_index].none) {
-                        #if PY_VERSION_HEX < 0x030A0000
+                        if (!NB_PY_VERSION_CHECK(0x030A0000))
                             buf.put("typing.Optional[");
-                        #else
-                            // See below
-                        #endif
+                        // else see below
                     }
                 }
                 break;
@@ -1036,11 +1034,10 @@ static uint32_t nb_func_render_signature(const func_data *f,
                 // Default argument
                 if (has_args) {
                     if (f->args[arg_index].none) {
-                        #if PY_VERSION_HEX < 0x030A0000
+                        if (!NB_PY_VERSION_CHECK(0x030A0000))
                             buf.put(']');
-                        #else
+                        else
                             buf.put(" | None");
-                        #endif
                     }
 
                     if (f->args[arg_index].value) {
@@ -1060,7 +1057,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                             if (str) {
                                 Py_ssize_t size = 0;
                                 const char *cstr =
-                                    PyUnicode_AsUTF8AndSize(str, &size);
+                                    compat_PyUnicode_AsUTF8AndSize(str, &size);
                                 if (!cstr) {
                                     PyErr_Clear();
                                 } else {
@@ -1285,7 +1282,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
 
 // PyGetSetDef entry for __module__ is ignored in Python 3.8
 PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
-    const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr);
+    const char *name = compat_PyUnicode_AsUTF8AndSize(name_, nullptr);
 
     if (!name)
         return nullptr;
@@ -1303,7 +1300,7 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
 
 PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name_) {
     bool passthrough = false;
-    if (const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr)) {
+    if (const char *name = compat_PyUnicode_AsUTF8AndSize(name_, nullptr)) {
         // These attributes do exist on nb_bound_method (because they
         // exist on every type) but we want to take their special handling
         // from nb_func_getattro instead.

@@ -53,8 +53,8 @@ foreach (NAME functions classes ndarray stl enum typing make_iterator)
     set(EXTRA "")
   endif()
 
-  if (MSVC)
-    # On MSVC, put stubs in the 'Debug' / 'Release' /.. folders
+  if (CMAKE_CONFIGURATION_TYPES)
+    # On multi-config generators like Visual Studio, put stubs in the 'Debug' / 'Release' /.. folders
     set(PYI_PREFIX $<CONFIG>/)
   endif()
 
@@ -130,7 +130,7 @@ set(TEST_FILES
 )
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
-  if (MSVC)
+  if (CMAKE_CONFIGURATION_TYPES)
     set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>)
   else()
     set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR})

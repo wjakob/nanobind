@@ -1,8 +1,3 @@
-[project]
-name = "nanobind"
-dynamic = ["version", "description", "authors", "license", "homepage", "classifiers"]
-
-
 [build-system]
 requires = ["setuptools>=42", "wheel", "scikit-build", "cmake>=3.17", "ninja", "typing_extensions"]
 build-backend = "setuptools.build_meta"

@@ -242,6 +242,7 @@ def test22_string_return():
 
 def test23_byte_return():
     assert t.test_15(b"abc") == "abc"
+    assert t.test_15_d(b"abc\x00def\x00ghi") == b"abc\x00def\x00ghi"
     assert t.test_16("hello") == b"hello"
     assert t.test_17(b"four") == 4
     assert t.test_17(b"\x00\x00\x00\x00") == 4

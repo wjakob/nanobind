@@ -438,6 +438,8 @@ class bytes : public object {
 
     const char *c_str() const { return PyBytes_AsString(m_ptr); }
 
+    const void *data() const { return (const void *)PyBytes_AsString(m_ptr); }
+
     size_t size() const { return (size_t) PyBytes_Size(m_ptr); }
 };
 

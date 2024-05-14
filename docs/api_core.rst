@@ -1035,9 +1035,9 @@ Wrapper classes
 
       Convert a null-terminated C-style string encoding into a Python ``bytes`` object.
 
-   .. cpp:function:: bytes(const char * s, size_t n)
+   .. cpp:function:: bytes(const void * buf, size_t n)
 
-      Convert a null-terminated C-style string encoding of length ``n`` bytes into a Python ``bytes`` object.
+      Convert a byte buffer ``buf`` of length ``n`` bytes into a Python ``bytes`` object.  The buffer can contain embedded null bytes.
 
    .. cpp:function:: const char * c_str() const
 
@@ -1046,6 +1046,11 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the size in bytes.
+
+   .. cpp:function:: const void * data() const
+
+      Convert a Python ``bytes`` object into a byte buffer of length :cpp:func:`bytes::size()` bytes.
+
 
 .. cpp:class:: type_object: public object
 

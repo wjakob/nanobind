@@ -556,7 +556,7 @@ class StubGen:
 
         if isinstance(parent, type) and issubclass(tp, parent):
             # This is an entry of an enumeration
-            self.write_ln(f"{name}: {self.type_str(tp)}")
+            self.write_ln(f"{name} = {typing.cast(enum.Enum, value).value}")
             if value.__doc__ and self.include_docstrings:
                 self.put_docstr(value.__doc__)
             self.write("\n")

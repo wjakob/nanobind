@@ -155,16 +155,18 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     }
 
     explicit operator Value() {
-        if (inflight)
-            inflight = false;
-        else if (!nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+        if (!inflight && !nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
             throw next_overload();
 
-        T *value = caster.operator T *();
+        T *p = caster.operator T *();
+
+        Value value;
         if constexpr (IsNanobindDeleter)
-            return Value(value, deleter<T>(src.inc_ref()));
+            value = Value(p, deleter<T>(src.inc_ref()));
         else
-            return Value(value);
+            value = Value(p);
+        inflight = false;
+        return value;
     }
 };
 

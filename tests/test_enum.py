@@ -135,3 +135,7 @@ def test08_enum_comparisons():
     assert t.Enum.B != t.SEnum.B and t.SEnum.B != t.Enum.B
     assert not (t.Enum.B == t.SEnum.B) and not (t.SEnum.B == t.Enum.B)
     assert t.Enum.B != t.SEnum.C and t.SEnum.C != t.Enum.B
+
+def test09_enum_methods():
+    assert t.Item1.my_value == 0 and t.Item2.my_value == 1
+    assert t.Item1.get_value() == 0 and t.Item2.get_value() == 1

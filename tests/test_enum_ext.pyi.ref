@@ -3,20 +3,25 @@ from typing import overload
 
 
 class ClassicEnum(enum.Enum):
-    Item1: ClassicEnum
+    Item1 = 0
 
-    Item2: ClassicEnum
+    Item2 = 1
+
+    def get_value(self) -> int: ...
+
+    @property
+    def my_value(self) -> int: ...
 
 class Enum(enum.Enum):
     """enum-level docstring"""
 
-    A: Enum
+    A = 0
     """Value A"""
 
-    B: Enum
+    B = 1
     """Value B"""
 
-    C: Enum
+    C = 4294967295
     """Value C"""
 
 class EnumProperty:
@@ -30,11 +35,11 @@ Item1: ClassicEnum = ClassicEnum.Item1
 Item2: ClassicEnum = ClassicEnum.Item2
 
 class SEnum(enum.IntEnum):
-    A: SEnum
+    A = 0
 
-    B: SEnum
+    B = 1
 
-    C: SEnum
+    C = -1
 
 @overload
 def from_enum(arg: Enum) -> int: ...

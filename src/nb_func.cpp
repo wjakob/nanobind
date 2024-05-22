@@ -1130,12 +1130,10 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
 static PyObject *nb_func_get_name(PyObject *self) {
     func_data *f = nb_func_data(self);
-    if (f->flags & (uint32_t) func_flags::has_name) {
-        return PyUnicode_FromString(f->name);
-    } else {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    const char *name = "";
+    if (f->flags & (uint32_t) func_flags::has_name)
+        name = f->name;
+    return PyUnicode_FromString(name);
 }
 
 static PyObject *nb_func_get_qualname(PyObject *self) {

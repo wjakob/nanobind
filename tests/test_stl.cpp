@@ -13,6 +13,7 @@
 #include <nanobind/stl/set.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/complex.h>
+#include <nanobind/stl/wstring.h>
 
 NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
@@ -465,4 +466,6 @@ NB_MODULE(test_stl_ext, m) {
     m.def("optional_cstr", [](std::optional<const char*> arg) {
         return arg.value_or("none");
     }, nb::arg().none());
+
+    m.def("pass_wstr", [](std::wstring ws) { return ws; });
 }

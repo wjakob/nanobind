@@ -19,10 +19,13 @@ NB_MODULE(test_enum_ext, m) {
         .value("B", SEnum::B)
         .value("C", SEnum::C);
 
-    nb::enum_<ClassicEnum>(m, "ClassicEnum")
+    auto ce = nb::enum_<ClassicEnum>(m, "ClassicEnum")
         .value("Item1", ClassicEnum::Item1)
         .value("Item2", ClassicEnum::Item2)
         .export_values();
+
+    ce.def("get_value", [](ClassicEnum &x) { return (int) x; })
+      .def_prop_ro("my_value", [](ClassicEnum &x) { return (int) x; });
 
     m.def("from_enum", [](Enum value) { return (uint32_t) value; }, nb::arg().noconvert());
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });

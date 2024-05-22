@@ -778,3 +778,7 @@ def test71_null_input():
         t.vec_movable_in_value([None])
     with pytest.raises(TypeError):
         t.map_copyable_in_value({"a": None})
+
+@skip_on_pypy # PyPy fails this test on Windows :-(
+def test72_wstr():
+    assert t.pass_wstr('🎈') == '🎈'

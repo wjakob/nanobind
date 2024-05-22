@@ -177,9 +177,8 @@ NB_MODULE(test_holders_ext, m) {
           [](std::vector<std::pair<std::unique_ptr<Example>,
                                    std::unique_ptr<Example>>> v,
              bool clear) {
-              if (clear) {
+              if (clear)
                   v.clear();
-              }
               return v;
           }, nb::arg("v"), nb::arg("clear") = false);
 

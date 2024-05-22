@@ -166,8 +166,8 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
                 PyErr_Clear();
                 return false;
             }
-            enum_map::iterator it = fwd->find((int64_t) value);
-            if (it != fwd->end()) {
+            enum_map::iterator it2 = fwd->find((int64_t) value);
+            if (it2 != fwd->end()) {
                 *out = (int64_t) value;
                 return true;
             }
@@ -177,8 +177,8 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
                 PyErr_Clear();
                 return false;
             }
-            enum_map::iterator it = fwd->find((int64_t) value);
-            if (it != fwd->end()) {
+            enum_map::iterator it2 = fwd->find((int64_t) value);
+            if (it2 != fwd->end()) {
                 *out = (int64_t) value;
                 return true;
             }

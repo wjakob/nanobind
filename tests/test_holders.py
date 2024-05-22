@@ -85,7 +85,7 @@ def test04_uniqueptr_from_cpp(clean):
     assert t.stats() == (2, 2)
 
 
-def test05_uniqueptr_from_cpp(clean):
+def test05a_uniqueptr_from_cpp(clean):
     # Test ownership exchange when the object has been created on the C++ side
     a = t.unique_from_cpp()
     b = t.unique_from_cpp_2()
@@ -121,6 +121,8 @@ def test05_uniqueptr_from_cpp(clean):
     collect()
     assert t.stats() == (2, 2)
 
+def test05b_uniqueptr_list(clean):
+    t.reset()
     # Test ownership exchange as part of a larger data structure
     k = t.unique_from_cpp(1)
     v = t.unique_from_cpp(2)
@@ -134,9 +136,13 @@ def test05_uniqueptr_from_cpp(clean):
         with pytest.warns(RuntimeWarning, match='nanobind: attempted to access an uninitialized instance of type \'test_holders_ext.Example\'!'):
             with pytest.raises(TypeError) as excinfo:
                 obj.value
+    collect()
+    assert t.stats() == (2, 2)
 
+def test05c_uniqueptr_structure_duplicate(clean):
+    t.reset()
     # Test ownership exchange that fails partway through
-    # (can't take ownershp from k twice)
+    # (can't take ownership from k twice)
     k = t.unique_from_cpp(3)
     with pytest.warns(RuntimeWarning, match=r'nanobind::detail::nb_relinquish_ownership()'):
         with pytest.raises(TypeError):
@@ -144,10 +150,9 @@ def test05_uniqueptr_from_cpp(clean):
     # Ownership passes back to Python
     assert k.value == 3
 
-    del k, v, res
+    del k
     collect()
-    collect()
-    assert t.stats() == (5, 5)
+    assert t.stats() == (1, 1)
 
 
 def test06_uniqueptr_from_py(clean):

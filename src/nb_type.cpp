@@ -1677,18 +1677,17 @@ static void warn_relinquish_failed(const char *why, PyObject *o) noexcept {
 bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept {
     nb_inst *inst = (nb_inst *) o;
 
-    /* This function is called after nb_type_get() succeeds, so the
-       instance should be ready; but the !ready case is possible if
-       an attempt is made to transfer ownership of the same object
-       to C++ multiple times as part of the same data structure.
-       For example, converting Python (foo, foo) to C++
+    /* This function is called after nb_type_get() succeeds, so the instance
+       should be ready; but the !ready case is possible if an attempt is made to
+       transfer ownership of the same object to C++ multiple times as part of
+       the same data structure. For example, converting Python (foo, foo) to C++
        std::pair<std::unique_ptr<T>, std::unique_ptr<T>>. */
 
     if (!inst->ready) {
         warn_relinquish_failed(
-            "The resulting data structure would have had multiple "
-            "std::unique_ptrs that each thought they owned the same "
-            "Python instance's data, which is not allowed.", o);
+            "The resulting data structure would have multiple "
+            "std::unique_ptrs, each thinking that they own the same instance, "
+            "which is not allowed.", o);
         return false;
     }
 
@@ -1698,8 +1697,8 @@ bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept {
                 "This is only possible when the instance was previously "
                 "constructed on the C++ side and is now owned by Python, which "
                 "was not the case here. You could change the unique pointer "
-                "signature to std::unique_ptr<T, nb::deleter<T>> to work around "
-                "this issue.", o);
+                "signature to std::unique_ptr<T, nb::deleter<T>> to work "
+                "around this issue.", o);
             return false;
         }
 

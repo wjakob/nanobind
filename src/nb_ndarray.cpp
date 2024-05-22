@@ -419,7 +419,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
             if (!t.strides) {
                 /* The provided tensor does not have a valid strides
                    field, which implies a C-style ordering. */
-                pass_order = req->req_order == 'C';
+                pass_order = req->req_order == 'C' || size == 1;
             } else {
                 for (size_t i = 0; i < (size_t) t.ndim; ++i) {
                     if (t.shape[i] != 1 && strides[i] != t.strides[i]) {

@@ -422,7 +422,6 @@ Nanobind's CMake tooling includes a convenience command to interface with the
           stub generation. Either ``OUTPUT`` or ``OUTPUT_DIR`` should be specified.
       * - ``RECURSIVE``
         - Recursively process submodules. Cannot be used with ``OUTPUT``.
-          Could be used only if ``INSTALL_TIME`` is used.
       * - ``PYTHON_PATH``
         - List of search paths that should be considered when importing the
           module. The paths are relative to ``CMAKE_CURRENT_BINARY_DIR`` for

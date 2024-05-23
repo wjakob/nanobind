@@ -195,6 +195,7 @@ def test06_uniqueptr_from_py(clean):
 
 
 def test07_uniqueptr_passthrough(clean):
+    assert t.passthrough_unique(None) is None
     assert t.passthrough_unique(t.unique_from_cpp()).value == 1
     assert t.passthrough_unique(t.unique_from_cpp_2()).value == 2
     assert t.passthrough_unique_2(t.unique_from_cpp()).value == 1

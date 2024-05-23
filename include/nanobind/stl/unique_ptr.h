@@ -78,7 +78,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
        `can_cast()`. If we do so, but then wind up not executing the cast
        operator, we must remember to undo our relinquishment and push the
        ownership back onto the Python side. For example, this might be
-       necessary the Python object `[(foo, foo)]` is converted to
+       necessary if the Python object `[(foo, foo)]` is converted to
        `std::vector<std::pair<std::unique_ptr<T>, std::unique_ptr<T>>>`;
        the pair caster won't know that it can't cast the second element
        until after it's verified that it can cast the first one. */
@@ -118,6 +118,8 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
 
         T *ptr = value.get();
         const std::type_info *type = &typeid(T);
+        if (!ptr)
+            return none().release();
 
         constexpr bool has_type_hook =
             !std::is_base_of_v<std::false_type, type_hook<T>>;
@@ -155,7 +157,8 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     }
 
     explicit operator Value() {
-        if (!inflight && !nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+        if (!inflight && !src.is_none() &&
+            !nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
             throw next_overload();
 
         T *p = caster.operator T *();

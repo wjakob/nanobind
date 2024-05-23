@@ -220,6 +220,7 @@ struct type_caster<T, enable_if_t<is_eigen_xpr_v<T> &&
     using Caster = make_caster<Array>;
     static constexpr auto Name = Caster::Name;
     template <typename T_> using Cast = T;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     /// Generating an expression template from a Python object is, of course, not possible
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
@@ -250,6 +251,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     using NDArrayCaster = type_caster<NDArray>;
     static constexpr auto Name = NDArrayCaster::Name;
     template <typename T_> using Cast = Map;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     NDArrayCaster caster;
 
@@ -403,6 +405,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         const_name<MaybeConvert>(DMapCaster::Name, MapCaster::Name);
 
     template <typename T_> using Cast = Ref;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     MapCaster caster;
     struct Empty { };

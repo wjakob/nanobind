@@ -33,15 +33,9 @@ struct type_caster<std::optional<T>> {
         }
 
         Caster caster;
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
+            !caster.template can_cast<T>())
             return false;
-
-        static_assert(
-            !std::is_pointer_v<T> || is_base_caster_v<Caster>,
-            "Binding ``optional<T*>`` requires that ``T`` is handled "
-            "by nanobind's regular class binding mechanism. However, a "
-            "type caster was registered to intercept this particular "
-            "type, which is not allowed.");
 
         value.emplace(caster.operator cast_t<T>());
 

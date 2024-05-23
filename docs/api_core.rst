@@ -359,7 +359,7 @@ Without reference counting
       Increases the reference count and returns a reference to the Python object.
       Never raises an exception.
 
-   .. cpp:function:: handle ref_ref() const noexcept
+   .. cpp:function:: handle dec_ref() const noexcept
 
       Decreases the reference count and returns a reference to the Python object.
       Never raises an exception.
@@ -726,6 +726,22 @@ Wrapper classes
       negative). When `T` does not already represent a wrapped Python object,
       the function performs a cast.
 
+   .. cpp:function:: void clear()
+
+      Clear the list entries.
+
+   .. cpp:function:: void extend(handle h)
+
+      Analogous to the ``.extend(h)`` method of ``list`` in Python.
+
+   .. cpp:function:: void sort()
+
+      Analogous to the ``.sort()`` method of ``list`` in Python.
+
+   .. cpp:function:: void reverse()
+
+      Analogous to the ``.reverse()`` method of ``list`` in Python.
+
    .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_list> operator[](T key) const
 
       Analogous to ``self[key]`` in Python, where ``key`` is an arithmetic
@@ -794,6 +810,10 @@ Wrapper classes
 
       Clear the contents of the dictionary.
 
+   .. cpp:function:: void update(handle h)
+
+      Analogous to the ``.update(h)`` method of ``dict`` in Python.
+
 .. cpp:class:: set: public object
 
    Wrapper class representing Python ``set`` instances.
@@ -801,6 +821,11 @@ Wrapper classes
    .. cpp:function:: set()
 
       Create an empty set
+
+   .. cpp:function:: set(handle h)
+
+      Attempt to convert a given Python object into a set. Analogous to the
+      expression ``set(h)`` in Python.
 
    .. cpp:function:: size_t size() const
 
@@ -818,7 +843,14 @@ Wrapper classes
 
    .. cpp:function:: void clear()
 
-      Clear the contents of the set
+      Clear the contents of the set.
+
+   .. cpp:function:: template <typename T> bool discard(T&& key)
+
+      Analogous to the ``.discard(h)`` method of the ``set`` type in Python.
+      Returns ``true`` if the item was deleted successfully, and ``false`` if
+      the value was not present. When `T` does not already represent a wrapped
+      Python object, the function performs a cast.
 
 .. cpp:class:: module_: public object
 
@@ -858,6 +890,12 @@ Wrapper classes
 
          nb::module_ np = nb::module_::import_("numpy");
          nb::object np_array = np.attr("array");
+
+   .. cpp:function:: module_ import_(handle name)
+
+      Import the Python module with the specified name and return a reference
+      to it. In contrast to the version above, this function expects a Python
+      object as key.
 
    .. cpp:function:: module_ def_submodule(const char * name, const char * doc = nullptr)
 
@@ -997,9 +1035,9 @@ Wrapper classes
 
       Convert a null-terminated C-style string encoding into a Python ``bytes`` object.
 
-   .. cpp:function:: bytes(const char * s, size_t n)
+   .. cpp:function:: bytes(const void * buf, size_t n)
 
-      Convert a null-terminated C-style string encoding of length ``n`` bytes into a Python ``bytes`` object.
+      Convert a byte buffer ``buf`` of length ``n`` bytes into a Python ``bytes`` object.  The buffer can contain embedded null bytes.
 
    .. cpp:function:: const char * c_str() const
 
@@ -1008,6 +1046,11 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the size in bytes.
+
+   .. cpp:function:: const void * data() const
+
+      Convert a Python ``bytes`` object into a byte buffer of length :cpp:func:`bytes::size()` bytes.
+
 
 .. cpp:class:: type_object: public object
 
@@ -1288,12 +1331,12 @@ the reference section on :ref:`class binding <class_binding>`.
    overlapping or identical input types (e.g. :cpp:class:`object`) and must run
    code at runtime to select the right overload.
 
-   You should probably write a thorough docstring explicing the expected inputs
-   in this case, since the behavior won't be obvious from the auto-generated
-   function signature list in the docstring. It can be frustrating when a
-   function call fails with an error message stating that the provided
-   arguments aren't compatible with any overload, when the associated error
-   message suggests otherwise.
+   You should probably write a thorough docstring that explicitly mentions the
+   expected inputs in this case, since the behavior won't be obvious from the
+   auto-generated function signature. It can be frustrating when a function
+   call fails with an error message stating that the provided arguments aren't
+   compatible with any overload, when the associated error message suggests
+   otherwise.
 
    .. cpp:function:: next_overload()
 
@@ -1851,24 +1894,6 @@ declarations in generated :ref:`stubs <stubs>`,
    zero-initialized ``PyType_Slot`` element. See :ref:`Customizing type creation
    <typeslots>` for more information about this feature.
 
-.. cpp:struct:: type_slots_callback
-
-   .. cpp:function:: type_slots_callback(void (* callback)(detail::type_init_data * , PyType_Slot * &slots, size_t max_slots) noexcept)
-
-   This is an alternative to `type_slots` that provides a callback
-   which will be invoked during type creation to populate the type's
-   list of slots. It is used by `enum_`. It can be used in addition to
-   the `type_slots` annotation; if both are provided,
-   `type_slots_callback` runs first (so `type_slots` can override its choices).
-
-   The callback should execute ``*slots++ = {Py_tp_foo, (void *) handle_foo};``
-   at most *max_slots* times.
-
-   Information about the type under construction is available via the first
-   parameter received by the callback, but be aware that this is an internal
-   type which is not subject to nanobind's usual semantic versioning guarantees.
-   See ``include/nanobind/nb_class.h`` for more details.
-
 .. cpp:struct:: template <typename T> intrusive_ptr
 
    nanobind provides a custom interface for intrusive reference-counted C++
@@ -1889,9 +1914,6 @@ Enum binding annotations
 
 The following annotations can be specified using the variable-length
 ``Extra`` parameter of the constructor :cpp:func:`enum_::enum_`.
-Enums also support the :cpp:struct:`dynamic_attr` and
-:cpp:struct:`type_slots` annotations
-documented for :ref:`classes <class_binding_annotations>`.
 
 .. cpp:struct:: is_arithmetic
 
@@ -1991,7 +2013,7 @@ Class binding
 
    .. cpp:function:: template <typename Func, typename... Extra> class_ &def(new_<Func> arg, const Extra &... extra)
 
-      Bind a C++ factory fuction as a Python object constructor (``__new__``).
+      Bind a C++ factory function as a Python object constructor (``__new__``).
       This is an advanced feature; prefer :cpp:struct:`nb::init\<..\> <init>`
       where possible. See the discussion of :ref:`customizing object creation
       <custom_new>` for more details.
@@ -2310,7 +2332,7 @@ Class binding
       Bind the enumeration of type `T` to the identifier `name` within the
       scope `scope`. The variable length `extra` parameter can be used to pass
       a docstring and other :ref:`enum binding annotations
-      <enum_binding_annotations>` such as :cpp:class:`is_arithmetic`.
+      <enum_binding_annotations>` (currently, only :cpp:class:`is_arithmetic` is supported).
 
    .. cpp:function:: enum_ &value(const char * name, T value, const char * doc = nullptr)
 
@@ -2369,7 +2391,7 @@ Class binding
 
 .. cpp:struct:: template <typename Arg> init_implicit
 
-   See :cpp:class:`init` for detail on binding constructorts. The main
+   See :cpp:class:`init` for detail on binding constructors. The main
    difference between :cpp:class:`init`  and `init_implicit` is that the latter
    only supports constructors taking a single argument `Arg`, and that it marks
    the constructor as usable for implicit conversions from `Arg`.
@@ -2631,17 +2653,13 @@ The documentation below refers to two per-instance flags with the following mean
    :cpp:func:`inst_set_state` to disable the flag following the call to
    :cpp:func:`inst_copy`.
 
+   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
+   refer to the same object.
+
 .. cpp:function:: void inst_move(handle dst, handle src)
 
-   Move-construct the contents of `src` into `dst` and set the *ready* and
-   *destruct* flags of `dst` to ``true``.
-
-   `dst` should be an uninitialized instance of the same type. Note that
-   setting the *destruct* flag may be problematic if `dst` is an offset into an
-   existing object created using :cpp:func:`inst_reference` (the destructor
-   will be called multiple times in this case). If so, you must use
-   :cpp:func:`inst_set_state` to disable the flag following the call to
-   :cpp:func:`inst_move`.
+   Analogous to :cpp:func:`inst_copy`, except that the move constructor
+   is used instead of the copy constructor.
 
 .. cpp:function:: void inst_replace_copy(handle dst, handle src)
 
@@ -2655,10 +2673,13 @@ The documentation below refers to two per-instance flags with the following mean
    :cpp:func:`inst_alloc`, :cpp:func:`inst_reference`, or
    :cpp:func:`inst_take_ownership`.
 
+   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
+   refer to the same object.
+
 .. cpp:function:: void inst_replace_move(handle dst, handle src)
 
-   Analogous to :cpp:func:`inst_replace_copy`, except that a move constructor
-   is used here.
+   Analogous to :cpp:func:`inst_replace_copy`, except that the move constructor
+   is used instead of the copy constructor.
 
 .. cpp:function:: str inst_name(handle h)
 
@@ -2744,7 +2765,7 @@ Miscellaneous
       nb::class_<Target>(m, "Target")
           .def(nb::init<Source>());
 
-      nb::implicitly_convertible<Target, Source>();
+      nb::implicitly_convertible<Source, Target>();
 
    The function is provided for reasons of compatibility with pybind11, and as
    an escape hatch to enable use cases where :cpp:struct:`init_implicit`
@@ -2753,7 +2774,7 @@ Miscellaneous
 
 .. cpp:class:: template <typename T, typename... Ts> typed
 
-    This helper class provides an an interface to parameterize generic types to
+    This helper class provides an interface to parameterize generic types to
     improve generated Python function signatures (e.g., to turn ``list`` into
     ``list[MyType]``).
 

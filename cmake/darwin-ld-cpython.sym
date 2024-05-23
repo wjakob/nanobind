@@ -83,6 +83,8 @@
 -U _PyCodec_StrictErrors
 -U _PyCodec_Unregister
 -U _PyCodec_XMLCharRefReplaceErrors
+-U _PyComplex_AsCComplex
+-U _PyComplex_FromCComplex
 -U _PyComplex_FromDoubles
 -U _PyComplex_ImagAsDouble
 -U _PyComplex_RealAsDouble

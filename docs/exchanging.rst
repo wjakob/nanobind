@@ -121,6 +121,8 @@ to external projects that provide further casters:
     - ``#include <nanobind/stl/string.h>``
   * - ``std::string_view``
     - ``#include <nanobind/stl/string_view.h>``
+  * - ``std::wstring``
+    - ``#include <nanobind/stl/wstring.h>``
   * - ``std::tuple<..>``
     - ``#include <nanobind/stl/tuple.h>``
   * - ``std::shared_ptr<..>``

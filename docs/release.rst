@@ -4,7 +4,12 @@ How to make a new release?
 1. Ensure that the full version of nanobind is checked out (including the
    ``robin_map`` submodule)
 
-2. Update version in ``src/__init__.py`` and ``include/nanobind/nanobind.h``
+2. Update version in ``src/__init__.py`` and ``include/nanobind/nanobind.h``:
+
+   Also:
+
+   - Remove ``dev1`` suffix from ``X.Y.Zdev1`` in ``src/__init__.py``
+   - Set ``NB_VERSION_DEV`` to ``0``.
 
 3. Add release date to ``docs/changelog.rst``.
 
@@ -21,3 +26,8 @@ How to make a new release?
 8. Run ``python setup.py bdist_wheel``
 
 9. Upload: ``twine upload --repository nanobind <filename>``
+
+10. Update version in ``src/__init__.py`` and ``include/nanobind/nanobind.h``:
+
+   - Append ``dev1`` suffix from ``X.Y.Zdev1`` in ``src/__init__.py``
+   - Set ``NB_VERSION_DEV`` to ``1``.

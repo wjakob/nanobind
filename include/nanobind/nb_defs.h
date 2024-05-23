@@ -22,7 +22,7 @@
 #  define NAMESPACE_END(name) }
 #endif
 
-#if defined(_WIN32) && !defined(__GNUC__)
+#if defined(_WIN32)
 #  define NB_EXPORT          __declspec(dllexport)
 #  define NB_IMPORT          __declspec(dllimport)
 #  define NB_INLINE          __forceinline
@@ -40,7 +40,7 @@
 #  endif
 #endif
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(_WIN32)
 #  define NB_NAMESPACE nanobind __attribute__((visibility("hidden")))
 #else
 #  define NB_NAMESPACE nanobind
@@ -64,7 +64,7 @@
 #  define NB_CORE
 #endif
 
-#if !defined(NB_SHARED) && defined(__GNUC__)
+#if !defined(NB_SHARED) && defined(__GNUC__) && !defined(_WIN32)
 #  define NB_EXPORT_SHARED __attribute__ ((visibility("hidden")))
 #else
 #  define NB_EXPORT_SHARED

@@ -21,12 +21,12 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
         Caster caster;
         bool success = o != nullptr;
 
-        if constexpr (is_base_caster_v<Caster> && !std::is_pointer_v<Entry>)
-            flags |= (uint8_t) cast_flags::none_disallowed;
+        flags = flags_for_local_caster<Entry>(flags);
 
         if (success) {
             for (size_t i = 0; i < Size; ++i) {
-                if (!caster.from_python(o[i], flags, cleanup)) {
+                if (!caster.from_python(o[i], flags, cleanup) ||
+                    !caster.template can_cast<Entry>()) {
                     success = false;
                     break;
                 }

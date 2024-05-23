@@ -165,10 +165,11 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_14", [](nb::object o) -> const char * { return nb::cast<const char *>(o); });
 
     // Test bytes type
-    m.def("test_15", [](nb::bytes o) -> const char * { return o.c_str(); });
-    m.def("test_16", [](const char *c) { return nb::bytes(c); });
-    m.def("test_17", [](nb::bytes c) { return c.size(); });
-    m.def("test_18", [](const char *c, int size) { return nb::bytes(c, size); });
+    m.def("test_15",   [](nb::bytes o) -> const char * { return o.c_str(); });
+    m.def("test_15_d", [](nb::bytes o) { return nb::bytes(o.data(), o.size()); });
+    m.def("test_16",   [](const char *c) { return nb::bytes(c); });
+    m.def("test_17",   [](nb::bytes c) { return c.size(); });
+    m.def("test_18",   [](const char *c, int size) { return nb::bytes(c, size); });
 
     // Test int type
     m.def("test_19", [](nb::int_ i) { return i + nb::int_(123); });
@@ -314,4 +315,48 @@ NB_MODULE(test_functions_ext, m) {
              "i"_a = 1, nb::kw_only(), "j"_a = 2);
 
     m.def("test_any", [](nb::any a) { return a; } );
+
+    m.def("test_wrappers_list", []{
+        nb::list l1, l2;
+        l1.append(1);
+        l2.append(2);
+        l1.extend(l2);
+
+        bool b = nb::len(l1) == 2 && nb::len(l2) == 1 &&
+            l1[0].equal(nb::int_(1)) && l1[1].equal(nb::int_(2));
+
+        l1.clear();
+        return b && nb::len(l1) == 0;
+    });
+
+    m.def("test_wrappers_dict", []{
+        nb::dict d1, d2;
+        d1["a"] = 1;
+        d2["b"] = 2;
+        d1.update(d2);
+
+        bool b = nb::len(d1) == 2 && nb::len(d2) == 1 &&
+            d1["a"].equal(nb::int_(1)) &&
+            d1["b"].equal(nb::int_(2));
+
+        d1.clear();
+        return b && nb::len(d1) == 0;
+    });
+
+    m.def("test_wrappers_set", []{
+        nb::set s;
+        s.add("a");
+        s.add("b");
+
+        bool b = nb::len(s) == 2 && s.contains("a") && s.contains("b");
+
+        b &= s.discard("a");
+        b &= !s.discard("q");
+
+        b &= !s.contains("a") && s.contains("b");
+        s.clear();
+        b &= s.size() == 0;
+
+        return b;
+    });
 }

@@ -242,6 +242,7 @@ def test22_string_return():
 
 def test23_byte_return():
     assert t.test_15(b"abc") == "abc"
+    assert t.test_15_d(b"abc\x00def\x00ghi") == b"abc\x00def\x00ghi"
     assert t.test_16("hello") == b"hello"
     assert t.test_17(b"four") == 4
     assert t.test_17(b"\x00\x00\x00\x00") == 4
@@ -581,3 +582,12 @@ def test41_any():
     s = "hello"
     assert t.test_any(s) is s
     assert t.test_any.__doc__ == "test_any(arg: typing.Any, /) -> typing.Any"
+
+def test42_wrappers_list():
+    assert t.test_wrappers_list()
+
+def test43_wrappers_dict():
+    assert t.test_wrappers_dict()
+
+def test43_wrappers_set():
+    assert t.test_wrappers_set()

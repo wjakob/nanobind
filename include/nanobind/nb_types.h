@@ -319,12 +319,14 @@ public:
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
 
-    /// Import and return a module or throws `python_error`.
     static NB_INLINE module_ import_(const char *name) {
         return steal<module_>(detail::module_import(name));
     }
 
-    /// Import and return a module or throws `python_error`.
+    static NB_INLINE module_ import_(handle name) {
+        return steal<module_>(detail::module_import(name.ptr()));
+    }
+
     NB_INLINE module_ def_submodule(const char *name,
                                     const char *doc = nullptr) {
         return steal<module_>(detail::module_new_submodule(m_ptr, name, doc));
@@ -431,10 +433,12 @@ class bytes : public object {
     explicit bytes(const char *s)
         : object(detail::bytes_from_cstr(s), detail::steal_t{}) { }
 
-    explicit bytes(const char *s, size_t n)
+    explicit bytes(const void *s, size_t n)
         : object(detail::bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
     const char *c_str() const { return PyBytes_AsString(m_ptr); }
+
+    const void *data() const { return (const void *) PyBytes_AsString(m_ptr); }
 
     size_t size() const { return (size_t) PyBytes_Size(m_ptr); }
 };
@@ -471,6 +475,26 @@ class list : public object {
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_list> operator[](T key) const;
 
+    void clear() {
+        if (PyList_SetSlice(m_ptr, 0, PY_SSIZE_T_MAX, nullptr))
+            raise_python_error();
+    }
+
+    void extend(handle h) {
+        if (PyList_SetSlice(m_ptr, PY_SSIZE_T_MAX, PY_SSIZE_T_MAX, h.ptr()))
+            raise_python_error();
+    }
+
+    void sort() {
+        if (PyList_Sort(m_ptr))
+            raise_python_error();
+    }
+
+    void reverse() {
+        if (PyList_Reverse(m_ptr))
+            raise_python_error();
+    }
+
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
@@ -488,12 +512,17 @@ class dict : public object {
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
     template <typename T> bool contains(T&& key) const;
     void clear() { PyDict_Clear(m_ptr); }
+    void update(handle h) {
+        if (PyDict_Update(m_ptr, h.ptr()))
+            raise_python_error();
+    }
 };
-
 
 class set : public object {
     NB_OBJECT(set, object, "set", PySet_Check)
     set() : object(PySet_New(nullptr), detail::steal_t()) { }
+    explicit set(handle h)
+        : object(detail::set_from_obj(h.ptr()), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     template <typename T> void add(T &&value);
@@ -501,6 +530,7 @@ class set : public object {
         if (PySet_Clear(m_ptr))
             raise_python_error();
     }
+    template <typename T> bool discard(T &&value);
 };
 
 class sequence : public object {
@@ -578,6 +608,10 @@ NB_INLINE bool isinstance(handle h) noexcept {
         return detail::nb_type_isinstance(h.ptr(), &typeid(detail::intrinsic_t<T>));
     else
         return detail::make_caster<T>().from_python(h, 0, nullptr);
+}
+
+NB_INLINE bool issubclass(handle h1, handle h2) {
+    return detail::issubclass(h1.ptr(), h2.ptr());
 }
 
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }

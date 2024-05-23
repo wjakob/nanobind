@@ -419,7 +419,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
             if (!t.strides) {
                 /* The provided tensor does not have a valid strides
                    field, which implies a C-style ordering. */
-                pass_order = req->req_order == 'C';
+                pass_order = req->req_order == 'C' || size == 1;
             } else {
                 for (size_t i = 0; i < (size_t) t.ndim; ++i) {
                     if (t.shape[i] != 1 && strides[i] != t.strides[i]) {
@@ -641,7 +641,7 @@ static void ndarray_capsule_destructor(PyObject *o) {
         PyErr_Clear();
 }
 
-PyObject *ndarray_wrap(ndarray_handle *th, int framework,
+PyObject *ndarray_wrap(ndarray_handle *th, ndarray_framework framework,
                        rv_policy policy, cleanup_list *cleanup) noexcept {
     if (!th)
         return none().release().ptr();
@@ -686,7 +686,7 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
         }
     }
 
-    if ((ndarray_framework) framework == ndarray_framework::numpy) {
+    if (framework == ndarray_framework::numpy) {
         try {
             nb_ndarray *h = PyObject_New(nb_ndarray, nd_ndarray_tp());
             if (!h)
@@ -709,14 +709,13 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
 
     object package;
     try {
-        switch ((ndarray_framework) framework) {
+        switch (framework) {
             case ndarray_framework::none:
                 break;
 
             case ndarray_framework::pytorch:
                 package = module_::import_("torch.utils.dlpack");
                 break;
-
 
             case ndarray_framework::tensorflow:
                 package = module_::import_("tensorflow.experimental.dlpack");
@@ -725,7 +724,6 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
             case ndarray_framework::jax:
                 package = module_::import_("jax.dlpack");
                 break;
-
 
             default:
                 check(false, "nanobind::detail::ndarray_wrap(): unknown "
@@ -739,7 +737,7 @@ PyObject *ndarray_wrap(ndarray_handle *th, int framework,
     }
 
     object o;
-    if (copy && (ndarray_framework) framework == ndarray_framework::none && th->self) {
+    if (copy && framework == ndarray_framework::none && th->self) {
         o = borrow(th->self);
     } else {
         o = steal(PyCapsule_New(th->ndarray, "dltensor",

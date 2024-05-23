@@ -82,14 +82,11 @@ void nb_func_dealloc(PyObject *self) {
         func_data *f = nb_func_data(self);
 
         // Delete from registered function list
-        auto &funcs = internals->funcs;
-        auto it = funcs.find(self);
-        check(it != funcs.end(),
+        size_t n_deleted = internals->funcs.erase(self);
+        check(n_deleted == 1,
               "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
               ((f->flags & (uint32_t) func_flags::has_name) ? f->name
                                                             : "<anonymous>"));
-        funcs.erase(it);
-
         for (size_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_free)
                 f->free_capture(f->capture);
@@ -291,10 +288,9 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
-        auto it = internals->funcs.find(func_prev);
-        check(it != internals->funcs.end(),
+        size_t n_deleted = internals->funcs.erase(func_prev);
+        check(n_deleted == 1,
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
-        internals->funcs.erase(it);
 
         Py_CLEAR(func_prev);
     }
@@ -748,7 +744,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 if (is_constructor) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
-                    self_arg_nb->ready = true;
+                    self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
@@ -849,7 +845,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 if (is_constructor) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
-                    self_arg_nb->ready = true;
+                    self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
@@ -1134,12 +1130,10 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
 static PyObject *nb_func_get_name(PyObject *self) {
     func_data *f = nb_func_data(self);
-    if (f->flags & (uint32_t) func_flags::has_name) {
-        return PyUnicode_FromString(f->name);
-    } else {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    const char *name = "";
+    if (f->flags & (uint32_t) func_flags::has_name)
+        name = f->name;
+    return PyUnicode_FromString(name);
 }
 
 static PyObject *nb_func_get_qualname(PyObject *self) {

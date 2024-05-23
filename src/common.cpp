@@ -154,6 +154,13 @@ PyObject *module_import(const char *name) {
     return res;
 }
 
+PyObject *module_import(PyObject *o) {
+    PyObject *res = PyImport_Import(o);
+    if (!res)
+        throw python_error();
+    return res;
+}
+
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
     PyObject *name_py, *res;
@@ -561,14 +568,14 @@ PyObject *bytes_from_obj(PyObject *o) {
 PyObject *bytes_from_cstr(const char *str) {
     PyObject *result = PyBytes_FromString(str);
     if (!result)
-        raise("nanobind::detail::bytes_from_cstr(): conversion error!");
+        raise_python_error();
     return result;
 }
 
-PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyBytes_FromStringAndSize(str, (Py_ssize_t) size);
+PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
+    PyObject *result = PyBytes_FromStringAndSize((const char *) str, (Py_ssize_t) size);
     if (!result)
-        raise("nanobind::detail::bytes_from_cstr_and_size(): conversion error!");
+        raise_python_error();
     return result;
 }
 
@@ -606,6 +613,13 @@ PyObject *tuple_from_obj(PyObject *o) {
 
 PyObject *list_from_obj(PyObject *o) {
     PyObject *result = PySequence_List(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *set_from_obj(PyObject *o) {
+    PyObject *result = PySet_New(o);
     if (!result)
         raise_python_error();
     return result;
@@ -1115,6 +1129,15 @@ NB_CORE PyObject *repr_map(PyObject *o) {
     }
     s += str("})");
     return s.release().ptr();
+}
+
+// ========================================================================
+
+bool issubclass(PyObject *a, PyObject *b) {
+    int rv = PyObject_IsSubclass(a, b);
+    if (rv == -1)
+        raise_python_error();
+    return bool(rv);
 }
 
 NAMESPACE_END(detail)

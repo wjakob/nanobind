@@ -51,6 +51,7 @@ def test01_metadata():
     assert 'incompatible function arguments' in str(excinfo.value)
 
     a = np.zeros(shape=(3, 4, 5), dtype=np.float64)
+    assert t.get_is_valid(a)
     assert t.get_shape(a) == [3, 4, 5]
     assert t.get_size(a) == 60
     assert t.get_nbytes(a) == 60*8
@@ -65,6 +66,11 @@ def test01_metadata():
     assert not t.check_bool(np.array([1], dtype=np.uint32)) and \
            not t.check_bool(np.array([1], dtype=np.float32)) and \
                t.check_bool(np.array([1], dtype=np.bool_))
+
+    assert not t.get_is_valid(None)
+    assert t.get_size(None) == 0
+    assert t.get_nbytes(None) == 0
+    assert t.get_itemsize(None) == 0
 
 
 def test02_docstr():
@@ -323,6 +329,13 @@ def test15_passthrough():
 
     a = np.array([1,2,3])
     b = t.passthrough(a)
+    assert a is b
+
+    a = None
+    with pytest.raises(TypeError) as excinfo:
+        b = t.passthrough(a)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    b = t.passthrough_arg_none(a)
     assert a is b
 
 

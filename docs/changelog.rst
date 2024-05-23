@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.0.0 (TBA)
--------------------
+Version 2.0.0 (May 23, 2024)
+----------------------------
 
 The 2.0.0 release of nanobind is entirely dedicated to *types* [#f1]_! The
 project has always advertised seamless Python ↔ C++ interoperability, and this

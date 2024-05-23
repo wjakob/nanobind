@@ -152,6 +152,11 @@ def test05_vector_non_shared():
     assert v[0].a == 1
     assert v[1].a == 2
 
+    # Check that elements accessed through the iterator *cannot* be modified
+    q = next(iter(v))
+    q.a = 5
+    assert v[0].a == 1
+
 def test06_vector_shared():
     v = t.VectorElShared()
     v.append(t.El(1))
@@ -163,6 +168,11 @@ def test06_vector_shared():
     assert v[0].a == 100
     assert v[1].a == 200
 
+    # Check that elements accessed through the iterator *can* be modified
+    q = next(iter(v))
+    q.a = 5
+    assert v[0].a == 5
+
 
 def test07_vector_noncopyable():
     vnc = t.get_vnc(5)
@@ -171,3 +181,8 @@ def test07_vector_noncopyable():
 
     for i, j in enumerate(vnc, start=1):
         assert j.value == i
+
+    # Check that elements accessed through the iterator *can* be modified
+    q = next(iter(vnc))
+    q.value = 5
+    assert vnc[0].value == 5

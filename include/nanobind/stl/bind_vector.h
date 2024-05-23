@@ -38,7 +38,7 @@ NAMESPACE_END(detail)
 
 
 template <typename Vector,
-          rv_policy getitem_policy = rv_policy::automatic_reference,
+          rv_policy Policy = rv_policy::automatic_reference,
           typename... Args>
 class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
     using ValueRef = typename detail::iterator_access<typename Vector::iterator>::result_type;
@@ -47,8 +47,8 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
     static_assert(
         !detail::is_base_caster_v<detail::make_caster<Value>> ||
         detail::is_copy_constructible_v<Value> ||
-        (getitem_policy != rv_policy::automatic_reference &&
-         getitem_policy != rv_policy::copy),
+        (Policy != rv_policy::automatic_reference &&
+         Policy != rv_policy::copy),
         "bind_vector(): the generated __getitem__ would copy elements, so the "
         "element type must be copy-constructible");
 
@@ -74,14 +74,14 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
 
         .def("__iter__",
              [](Vector &v) {
-                 return make_iterator(type<Vector>(), "Iterator",
-                                      v.begin(), v.end());
+                 return make_iterator<Policy>(type<Vector>(), "Iterator",
+                                              v.begin(), v.end());
              }, keep_alive<0, 1>())
 
         .def("__getitem__",
              [](Vector &v, Py_ssize_t i) -> ValueRef {
                  return v[detail::wrap(i, v.size())];
-             }, getitem_policy)
+             }, Policy)
 
         .def("clear", [](Vector &v) { v.clear(); },
              "Remove all items from list.");

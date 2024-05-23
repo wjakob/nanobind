@@ -55,6 +55,7 @@ NB_MODULE(test_make_iterator_ext, m) {
         iterator begin() const { return iterator{0}; }
         iterator end() const { return iterator{10}; }
     };
+
     nb::class_<IdentityMap>(m, "IdentityMap")
         .def(nb::init<>())
         .def("__iter__",

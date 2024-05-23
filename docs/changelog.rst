@@ -152,6 +152,17 @@ noteworthy:
   <bind_vector>` discusses the issue at length and presents alternative
   solutions.
 
+* The functions :cpp:func:`nb::make_iterator() <make_iterator>`,
+  :cpp:func:`nb::make_value_iterator() <make_value_iterator>`,
+  :cpp:func:`nb::make_key_iterator() <make_key_iterator>`,
+  :cpp:func:`nb::make_item_iterator() <make_item_iterator>` suffer from the
+  same issue as :cpp:func:`nb::bind_vector() <bind_vector>` explained above.
+
+  nanobind 2.0.0 improves these operations so that they are safe to use, but
+  this means that iterator access must now copy by default, potentially making
+  them less convenient. The documentation of :cpp:func:`nb::make_iterator()
+  <make_iterator>` discusses the issue and presents alternative solutions.
+
 * The ``nb::raw_doc`` annotation was found to be too inflexible and was
   removed in this version.
 

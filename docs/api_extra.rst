@@ -176,7 +176,7 @@ include directive:
 
    #include <nanobind/stl/bind_vector.h>
 
-.. cpp:function:: template <typename Vector, rv_policy getitem_policy = rv_policy::automatic_reference, typename... Args> class_<Vector> bind_vector(handle scope, const char * name, Args &&...args)
+.. cpp:function:: template <typename Vector, rv_policy Policy = rv_policy::automatic_reference, typename... Args> class_<Vector> bind_vector(handle scope, const char * name, Args &&...args)
 
    Bind the STL vector-derived type `Vector` to the identifier `name` and
    place it in `scope` (e.g., a :cpp:class:`module_`). The variable argument
@@ -337,16 +337,16 @@ include directive:
 
    .. note::
 
-      Previous versions of nanobind (before 2.0) and pybind11 would instead
-      return Python objects from ``__getitem__`` that wrapped *references*,
-      meaning that they were only safe to use until the next insertion or
-      deletion in the vector they were drawn from. As discussed above, any
-      use after that point could **corrupt memory or crash your program**,
-      which is why reference semantics are no longer the default.
+      Previous versions of nanobind (before 2.0) and pybind11 return Python
+      objects from ``__getitem__`` that wrap *references* (i.e., views),
+      meaning that they are only safe to use until the next insertion or
+      deletion in the vector they were drawn from. As discussed above, any use
+      after that point could **corrupt memory or crash your program**, which is
+      why reference semantics are no longer the default.
 
-      If you truly need the unsafe reference semantics, and you
-      promise that everyone who uses your bindings will be mindful
-      of the memory layout and reference-invalidation rules of the
+      If you truly need the unsafe reference semantics, and if you
+      can guarantee that all use of your bindings will respect
+      the memory layout and reference-invalidation rules of the
       underlying C++ container type, you can request the old behavior
       by passing a second template argument of
       :cpp:enumerator:`rv_policy::reference_internal` to
@@ -389,7 +389,7 @@ nanobind API and requires an additional include directive:
 
    #include <nanobind/stl/bind_map.h>
 
-.. cpp:function:: template <typename Map, rv_policy getitem_policy = rv_policy::automatic_reference, typename... Args> class_<Map> bind_map(handle scope, const char * name, Args &&...args)
+.. cpp:function:: template <typename Map, rv_policy Policy = rv_policy::automatic_reference, typename... Args> class_<Map> bind_map(handle scope, const char * name, Args &&...args)
 
    Bind the STL map-derived type `Map` (ordered or unordered) to the identifier
    `name` and place it in `scope` (e.g., a :cpp:class:`module_`). The variable
@@ -549,7 +549,7 @@ include directive:
 
    #include <nanobind/make_iterator.h>
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
 
    Create a Python iterator wrapping the C++ iterator represented by the range
    ``[first, last)``. The `Extra` parameter can be used to pass additional
@@ -577,14 +577,49 @@ include directive:
                                            v.begin(), v.end());
               }, nb::keep_alive<0, 1>());
 
+   .. note::
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Type, typename... Extra> auto make_iterator(handle scope, const char * name, Type &value, Extra &&...extra)
+      Pre-2.0 versions of nanobind and pybind11 return *references* (views)
+      into the underlying sequence.
 
-   This convenience wrapper calls the above `make_iterator` variant with
+      This is convenient when
+
+      1. Iterated elements are used to modify the underlying container.
+
+      2. Iterated elements should reflect separately made changes to
+         the underlying container.
+
+      But this strategy is *unsafe* if the allocated memory region or layout
+      of the container could change (e.g., through insertion of removal of
+      elements).
+
+      Because of this, iterators now copy by default. There are two
+      ways to still obtain references to the target elements:
+
+      1. If the iterator is over STL shared pointers, the added indirection and
+         ownership tracking removes the need for extra copies.
+
+      2. If the iterator is over reference-counted objects (e.g., ``ref<T>``
+         via the :cpp:class:`ref` wrapper) and ``T`` uses the intrusive
+         reference counting approach explained :ref:`here <intrusive>`,
+         the added indirection and ownership tracking removes the need
+         for extra copies.
+
+      If you truly need the unsafe reference semantics, and if you can
+      guarantee that all use of your bindings will respect the memory layout
+      and reference-invalidation rules of the underlying C++ container type,
+      you can request the old behavior by passing
+      :cpp:enumerator:`rv_policy::reference_internal` to the ``Policy``
+      template argument of this function.
+
+
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Type, typename... Extra> auto make_iterator(handle scope, const char * name, Type &value, Extra &&...extra)
+
+   This convenience wrapper calls the above :cpp:func:`make_iterator` variant with
    ``first`` and ``last`` set to ``std::begin(value)`` and ``std::end(value)``,
    respectively.
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_key_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename... Extra> iterator make_key_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_key_iterator` returns the first pair element to
@@ -595,7 +630,7 @@ include directive:
    ``(*first).first``.
 
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_value_iterator` returns the second pair element to

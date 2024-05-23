@@ -169,7 +169,8 @@ NB_MODULE(test_holders_ext, m) {
         .def("get", [](UniqueWrapper2 *uw) { return std::move(uw->value); });
 
     m.def("passthrough_unique",
-          [](std::unique_ptr<Example> unique) { return unique; });
+          [](std::unique_ptr<Example> unique) { return unique; },
+          nb::arg().none());
     m.def("passthrough_unique_2",
           [](std::unique_ptr<Example, nb::deleter<Example>> unique) { return unique; });
 

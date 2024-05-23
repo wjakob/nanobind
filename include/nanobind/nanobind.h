@@ -23,7 +23,8 @@
 
 #define NB_VERSION_MAJOR 2
 #define NB_VERSION_MINOR 0
-#define NB_VERSION_PATCH 0
+#define NB_VERSION_PATCH 1
+#define NB_VERSION_DEV   1 // A value > 0 indicates a development release
 
 // Core C++ headers that nanobind depends on
 #include <cstdint>

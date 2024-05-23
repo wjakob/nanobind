@@ -744,7 +744,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 if (is_constructor) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
-                    self_arg_nb->ready = true;
+                    self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
@@ -845,7 +845,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 if (is_constructor) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
-                    self_arg_nb->ready = true;
+                    self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);

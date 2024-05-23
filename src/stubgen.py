@@ -1072,7 +1072,7 @@ class StubGen:
         1 = From 3rd party package
         2 = From the package being built
         """
-        if module.startswith(".") or module == self.module.__name__.split('.')[0]:
+        if module.startswith(".") or module.split('.')[0] == self.module.__name__.split('.')[0]:
             return 2
 
         try:

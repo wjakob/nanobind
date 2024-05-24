@@ -2744,6 +2744,12 @@ Miscellaneous
 
    Return the ``globals()`` dictionary.
 
+.. cpp:function:: Py_hash_t hash(handle h)
+
+   Hash the given argument like ``hash()`` in pure Python. The type of the
+   return value (``Py_hash_t``) is an implementation-specific signed integer
+   type.
+
 .. cpp:function:: template <typename Source, typename Target> void implicitly_convertible()
 
    Indicate that the type `Source` is implicitly convertible into `Target`

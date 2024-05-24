@@ -46,6 +46,13 @@ inline dict globals() {
     return borrow<dict>(p);
 }
 
+inline Py_hash_t hash(handle h) {
+    Py_hash_t rv = PyObject_Hash(h.ptr());
+    if (rv == -1 && PyErr_Occurred())
+        nanobind::raise_python_error();
+    return rv;
+}
+
 inline bool is_alive() noexcept {
     return detail::is_alive();
 }

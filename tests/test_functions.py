@@ -591,3 +591,7 @@ def test43_wrappers_dict():
 
 def test43_wrappers_set():
     assert t.test_wrappers_set()
+
+def test44_hash():
+    value = (1, 2, 3)
+    assert t.hash_it(value) == hash(value);

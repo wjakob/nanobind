@@ -359,4 +359,6 @@ NB_MODULE(test_functions_ext, m) {
 
         return b;
     });
+
+    m.def("hash_it", [](nb::handle h) { return nb::hash(h); });
 }

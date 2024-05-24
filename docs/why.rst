@@ -38,7 +38,7 @@ welcomed in pybind11, but they will likely be rejected in this project.
 An overview of removed features is provided in a :ref:`separate section
 <removed>`. Besides feature removal, the rewrite was also an opportunity to
 address :ref:`long-standing performance issues <perf_improvements>` and add a
-number of :ref:`major quality-of-live improvements <major_additions>` and
+number of :ref:`major quality-of-life improvements <major_additions>` and
 :ref:`smaller features <minor_additions>`.
 
 .. _perf_improvements:
@@ -103,7 +103,7 @@ performance improvements:
 Major additions
 ---------------
 
-nanobind includes a number of quality-of-live improvements for developers:
+nanobind includes a number of quality-of-life improvements for developers:
 
 - **N-dimensional arrays**: nanobind can exchange data with modern array programming
   frameworks. It uses either `DLPack <https://github.com/dmlc/dlpack>`_ or the

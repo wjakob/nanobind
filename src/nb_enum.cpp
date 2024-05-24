@@ -1,5 +1,4 @@
 #include "nb_internals.h"
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -28,7 +27,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     handle scope(ed->scope);
 
     bool is_arithmetic = ed->flags & (uint32_t) type_flags::is_arithmetic;
-
+    bool is_flag_enum = ed->flags & (uint32_t) type_flags::is_flag_enum;
     str name(ed->name), qualname = name;
     object modname;
 
@@ -43,7 +42,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
                 PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
     }
 
-    const char *factory_name = is_arithmetic ? "IntEnum" : "Enum";
+    const char *factory_name = (is_arithmetic || is_flag_enum)  ? (is_flag_enum ? "Flag" : "IntEnum") : "Enum";
 
     object enum_mod = module_::import_("enum"),
            factory = enum_mod.attr(factory_name),
@@ -56,7 +55,11 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     if (is_arithmetic)
         result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
-
+    if (is_flag_enum)
+        result.attr("__str__") = enum_mod.attr("Flag").attr("__str__");
+#if PY_VERSION_HEX >= 0x030B0000
+    result.attr("_boundary_") =  enum_mod.attr("FlagBoundary").attr("KEEP");
+#endif
     result.attr("__repr__") = result.attr("__str__");
 
     type_init_data *t = new type_init_data();
@@ -149,6 +152,26 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return false;
+    auto base = PyObject_GetAttrString((PyObject *)o->ob_type, "__base__");
+    auto basename = PyObject_GetAttrString(base, "__name__");
+    Py_ssize_t size;
+    const char* data = PyUnicode_AsUTF8AndSize(basename, &size);
+    std::string s(data, size);
+    if ((t->flags & (uint32_t) type_flags::is_flag_enum) !=0  &&
+             s == "Flag") {
+        auto pValue = PyObject_GetAttrString(o, "value");
+        if(pValue == nullptr) {
+            PyErr_Clear();
+            return false;
+        }
+        long long value = PyLong_AsLongLong(pValue);
+        if (value == -1 && PyErr_Occurred()) {
+            PyErr_Clear();
+            return false;
+        }
+        *out = (int64_t) value;
+        return true;
+    }
 
     enum_map *rev = (enum_map *) t->enum_tbl.rev;
     enum_map::iterator it = rev->find((int64_t) (uintptr_t) o);
@@ -175,7 +198,6 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         } else {
             unsigned long long value = PyLong_AsUnsignedLongLong(o);
             if (value == (unsigned long long) -1 && PyErr_Occurred()) {
-                PyErr_Clear();
                 return false;
             }
             enum_map::iterator it2 = fwd->find((int64_t) value);
@@ -186,7 +208,6 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         }
 
     }
-
     return false;
 }
 
@@ -194,9 +215,12 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return nullptr;
-
     enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
-
+    if(t->flags & (uint32_t) type_flags::is_flag_enum) {
+        PyObject *value = PyLong_FromLongLong(key);
+        Py_INCREF(value);
+        return value;
+    }
     enum_map::iterator it = fwd->find(key);
     if (it != fwd->end()) {
         PyObject *value = (PyObject *) it->second;

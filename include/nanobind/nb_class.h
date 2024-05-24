@@ -62,9 +62,12 @@ enum class type_flags : uint32_t {
     is_arithmetic            = (1 << 16),
 
     /// Is the number type underlying the enumeration signed?
-    is_signed                = (1 << 17)
+    is_signed                = (1 << 17),
 
-    // One more flag bits available (18) without needing
+    /// Is the underlying enumeration type Flag?
+    is_flag_enum                  = (1 << 18)
+
+    // No more flag bits available (18). Needs
     // a larger reorganization
 };
 
@@ -199,6 +202,10 @@ struct enum_init_data {
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
     e.flags |= (uint32_t) type_flags::is_arithmetic;
+}
+
+NB_INLINE void enum_extra_apply(enum_init_data &e, is_flag_enum) {
+    e.flags |= (uint32_t) type_flags::is_flag_enum;
 }
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {

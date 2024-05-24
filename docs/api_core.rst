@@ -1926,6 +1926,14 @@ The following annotations can be specified using the variable-length
    mixed enum types (such as ``Shape.Circle + Color.Red``) are
    permissible.
 
+   .. cpp:struct:: is_flag_enum
+
+   Indicate that the enumeration may be used with bitwise
+   operations.  This enables the bitwise operators ``| & ^ ~``
+   with two enumeration as operands.
+   The result will an enumeration of the same type.
+   So ``Shape(2) | Shape(1) -> Shepe(3)`.
+
 Function binding
 ----------------
 

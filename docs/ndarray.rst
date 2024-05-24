@@ -33,14 +33,14 @@ Binding functions that take arrays as input
 -------------------------------------------
 
 A function that accepts a :cpp:class:`nb::ndarray\<\> <ndarray>`-typed parameter
-(i.e., *without* template parameters) can be called with *any* array
+(i.e., *without* template parameters) can be called with *any* writable array
 from any framework regardless of the device on which it is stored. The
 following example binding declaration uses this functionality to inspect the
 properties of an arbitrary input array:
 
 .. code-block:: cpp
 
-   m.def("inspect", [](nb::ndarray<> a) {
+   m.def("inspect", [](const nb::ndarray<>& a) {
        printf("Array data pointer : %p\n", a.data());
        printf("Array dimension : %zu\n", a.ndim());
        for (size_t i = 0; i < a.ndim(); ++i) {

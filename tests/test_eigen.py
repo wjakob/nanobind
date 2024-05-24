@@ -184,7 +184,7 @@ def test05_matrix_large_nonsymm(rowStart, colStart, rowStep, colStep, transpose)
             t.addMapMXuCC(A, A)
         with pytest.raises(TypeError, match="incompatible function arguments"):
             t.addMapCnstMXuCC(A, A)
-    
+
     assert_array_equal(t.addRefCnstMXuCC(A, A), A2)
     assert_array_equal(t.addRefCnstMXuCC(A.view(np.int32), A), A2)
     assert_array_equal(t.addRefCnstMXuCC_nc(A, A), A2)
@@ -348,7 +348,7 @@ def test12_cast():
         assert_array_equal(t.castToRefCnstVXi(v), v)
     assert_array_equal(t.castToDRefCnstVXi(vec2), vec2)
     with pytest.raises(RuntimeError, match="bad[_ ]cast"):
-        t.castToDRefCnstVXi(vecf)   
+        t.castToDRefCnstVXi(vecf)
     for v in vec, vec2, vecf:
         with pytest.raises(RuntimeError, match='bad[_ ]cast'):
             t.castToRef03CnstVXi(v)
@@ -367,3 +367,10 @@ def test13_mutate_python():
     assert_array_equal(t.modifyRef(der), vecRef)
     with pytest.raises(ValueError):
         t.modifyRefConst(der)
+
+
+@needs_numpy_and_eigen
+def test14_single_element():
+    a = np.array([[1]], dtype=np.uint32)
+    assert a.ndim == 2 and a.shape == (1, 1)
+    t.addMXuCC(a, a)

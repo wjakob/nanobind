@@ -20,13 +20,22 @@ Preliminaries
 Begin by creating a new file named ``CMakeLists.txt`` in the root directory of
 your project. It should start with the following lines that declare a project
 name and tested CMake version range. The third line line searches for Python >=
-3.8 including the ``Development.Module`` component required by nanobind.
+3.8 including the ``Development.Module`` component required by nanobind. The
+name of this module changed across CMake versions, hence the additional
+conditional check.
 
 .. code-block:: cmake
 
     cmake_minimum_required(VERSION 3.15...3.27)
     project(my_project) # Replace 'my_project' with the name of your project
-    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
+
+    if (CMAKE_VERSION VERSION_LESS 3.18)
+      set(DEV_MODULE Development)
+    else()
+      set(DEV_MODULE Development.Module)
+    endif()
+
+    find_package(Python 3.8 COMPONENTS Interpreter ${DEV_MODULE} REQUIRED)
 
 Add the following lines below. They configure CMake to perform an optimized
 *release* build by default unless another build type is specified. Without this

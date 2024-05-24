@@ -165,10 +165,11 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_14", [](nb::object o) -> const char * { return nb::cast<const char *>(o); });
 
     // Test bytes type
-    m.def("test_15", [](nb::bytes o) -> const char * { return o.c_str(); });
-    m.def("test_16", [](const char *c) { return nb::bytes(c); });
-    m.def("test_17", [](nb::bytes c) { return c.size(); });
-    m.def("test_18", [](const char *c, int size) { return nb::bytes(c, size); });
+    m.def("test_15",   [](nb::bytes o) -> const char * { return o.c_str(); });
+    m.def("test_15_d", [](nb::bytes o) { return nb::bytes(o.data(), o.size()); });
+    m.def("test_16",   [](const char *c) { return nb::bytes(c); });
+    m.def("test_17",   [](nb::bytes c) { return c.size(); });
+    m.def("test_18",   [](const char *c, int size) { return nb::bytes(c, size); });
 
     // Test int type
     m.def("test_19", [](nb::int_ i) { return i + nb::int_(123); });
@@ -358,4 +359,6 @@ NB_MODULE(test_functions_ext, m) {
 
         return b;
     });
+
+    m.def("hash_it", [](nb::handle h) { return nb::hash(h); });
 }

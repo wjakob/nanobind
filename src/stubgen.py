@@ -89,7 +89,8 @@ SKIP_LIST = [
     "__doc__", "__module__", "__name__", "__new__", "__builtins__",
     "__cached__", "__path__", "__version__", "__spec__", "__loader__",
     "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
-    "__file__", "__dict__", "__weakref__", "__format__", "__nb_enum__"
+    "__file__", "__dict__", "__weakref__", "__format__", "__nb_enum__",
+    "__firstlineno__", "__static_attributes__"
 ]
 # fmt: on
 
@@ -556,7 +557,7 @@ class StubGen:
 
         if isinstance(parent, type) and issubclass(tp, parent):
             # This is an entry of an enumeration
-            self.write_ln(f"{name}: {self.type_str(tp)}")
+            self.write_ln(f"{name} = {typing.cast(enum.Enum, value).value}")
             if value.__doc__ and self.include_docstrings:
                 self.put_docstr(value.__doc__)
             self.write("\n")
@@ -1071,7 +1072,7 @@ class StubGen:
         1 = From 3rd party package
         2 = From the package being built
         """
-        if module.startswith(".") or module == self.module.__name__.split('.')[0]:
+        if module.startswith(".") or module.split('.')[0] == self.module.__name__.split('.')[0]:
             return 2
 
         try:

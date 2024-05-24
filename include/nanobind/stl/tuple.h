@@ -89,8 +89,15 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         return r;
     }
 
+    template <typename T>
+    bool can_cast() const noexcept { return can_cast_impl(Indices{}); }
+
     explicit operator Value() { return cast_impl(Indices{}); }
 
+    template <size_t... Is>
+    bool can_cast_impl(std::index_sequence<Is...>) const noexcept {
+        return (std::get<Is>(casters).template can_cast<Ts>() && ...);
+    }
     template <size_t... Is> Value cast_impl(std::index_sequence<Is...>) {
         return Value(std::get<Is>(casters).operator cast_t<Ts>()...);
     }

@@ -234,6 +234,10 @@ def test24_vec_movable_in_value(clean):
     t.vec_movable_in_value([t.Movable(i) for i in range(10)])
     assert_stats(value_constructed=10, copy_constructed=10, destructed=20)
 
+    # Test that None values don't cause a crash
+    with pytest.raises(TypeError):
+        t.vec_movable_in_value([None])
+
 
 def test25_vec_movable_in_value(clean):
     t.vec_copyable_in_value([t.Copyable(i) for i in range(10)])
@@ -248,6 +252,11 @@ def test26_vec_movable_in_lvalue_ref(clean):
 def test27_vec_movable_in_ptr_2(clean):
     t.vec_movable_in_ptr_2([t.Movable(i) for i in range(10)])
     assert_stats(value_constructed=10, destructed=10)
+
+    # Test that None values are permitted when casting to pointer;
+    # instead we reach 'if (x.size() != 10) fail();' in the bound function
+    with pytest.raises(RuntimeError):
+        t.vec_movable_in_ptr_2([None])
 
 
 def test28_vec_movable_in_rvalue_ref(clean):
@@ -373,6 +382,8 @@ def test37_std_optional_copyable_ptr(clean):
 
 def test38_std_optional_none():
     t.optional_none(None)
+    assert t.optional_cstr(None) == "none"
+    assert t.optional_cstr("hi") == "hi"
 
 
 def test39_std_optional_ret_opt_movable(clean):
@@ -767,3 +778,7 @@ def test71_null_input():
         t.vec_movable_in_value([None])
     with pytest.raises(TypeError):
         t.map_copyable_in_value({"a": None})
+
+@skip_on_pypy # PyPy fails this test on Windows :-(
+def test72_wstr():
+    assert t.pass_wstr('🎈') == '🎈'

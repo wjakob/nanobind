@@ -73,6 +73,11 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         return r;
     }
 
+    template <typename T>
+    bool can_cast() const noexcept {
+        return caster1.template can_cast<T1>() && caster2.template can_cast<T2>();
+    }
+
     /// Return the constructed tuple by copying from the sub-casters
     explicit operator Value() {
         return Value(caster1.operator cast_t<T1>(),

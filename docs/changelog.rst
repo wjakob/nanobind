@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.0.0 (TBA)
--------------------
+Version 2.0.0 (May 23, 2024)
+----------------------------
 
 The 2.0.0 release of nanobind is entirely dedicated to *types* [#f1]_! The
 project has always advertised seamless Python ↔ C++ interoperability, and this
@@ -140,7 +140,7 @@ noteworthy:
 * The :cpp:func:`nb::bind_vector\<T\>() <bind_vector>` and
   :cpp:func:`nb::bind_map\<T\>() <bind_map>` interfaces were found to be
   severely flawed since element access (``__getitem__``) created views into the
-  internal state of the STL type that was not stable across subsequent
+  internal state of the STL type that were not stable across subsequent
   modifications.
 
   This could lead to unexpected changes to array elements and undefined
@@ -151,6 +151,16 @@ noteworthy:
   less convenient. The documentation of :cpp:func:`nb::bind_vector\<T\>()
   <bind_vector>` discusses the issue at length and presents alternative
   solutions.
+
+* The functions :cpp:func:`nb::make_iterator() <make_iterator>`,
+  :cpp:func:`nb::make_value_iterator() <make_value_iterator>` and
+  :cpp:func:`nb::make_key_iterator() <make_key_iterator>` suffer from the same
+  issue as :cpp:func:`nb::bind_vector() <bind_vector>` explained above.
+
+  nanobind 2.0.0 improves these operations so that they are safe to use, but
+  this means that iterator access must now copy by default, potentially making
+  them less convenient. The documentation of :cpp:func:`nb::make_iterator()
+  <make_iterator>` discusses the issue and presents alternative solutions.
 
 * The ``nb::raw_doc`` annotation was found to be too inflexible and was
   removed in this version.
@@ -194,6 +204,44 @@ noteworthy:
   <ndarray>` constructor was removed since it was bug-prone. You now have to
   specify the owner explicitly. The previous default (``nb::handle()``)
   continues to be a valid argument.
+
+* There have been some changes to the API for type casters in order to
+  avoid undefined behavior in certain cases. (PR `#549
+  <https://github.com/wjakob/nanobind/pull/549>`__).
+
+  * Type casters that implement custom cast operators must now define a
+    member function template ``can_cast<T>()``, which returns false if
+    ``operator cast_t<T>()`` would raise an exception and true otherwise.
+    ``can_cast<T>()`` will be called only after a successful call to
+    ``from_python()``, and might not be called at all if the caller of
+    ``operator cast_t<T>()`` can cope with a raised exception.
+    (Users of the ``NB_TYPE_CASTER()`` convenience macro need not worry
+    about this; it produces cast operators that never raise exceptions,
+    and therefore provides a ``can_cast<T>()`` that always returns true.)
+
+  * Many type casters for container types (``std::vector<T>``,
+    ``std::optional<T>``, etc) implement their ``from_python()`` methods
+    by delegating to another, "inner" type caster (``T`` in these examples)
+    that is allocated on the stack inside ``from_python()``. Container casters
+    implemented in this way should make two changes in order to take advantage
+    of the new safety features:
+
+    * Wrap your ``flags`` (received as an argument of the outer caster's
+      ``from_python`` method) in ``flags_for_local_caster<T>()`` before
+      passing them to ``inner_caster.from_python()``. This allows nanobind
+      to prevent some casts that would produce dangling pointers or references.
+
+    * If ``inner_caster.from_python()`` succeeds, then also verify
+      ``inner_caster.template can_cast<T>()`` before you execute
+      ``inner_caster.operator cast_t<T>()``. A failure of
+      ``can_cast()`` should be treated the same as a failure of
+      ``from_python()``.  This avoids the possibility of an exception
+      being raised through the noexcept ``load_python()`` method,
+      which would crash the interpreter.
+
+  The previous ``cast_flags::none_disallowed`` flag has been removed;
+  it existed to avoid one particular source of exceptions from a cast
+  operator, but ``can_cast<T>()`` now handles that problem more generally.
 
 * ABI version 14.
 

@@ -285,7 +285,8 @@ def test13_implicitly_convertible():
     b = t.B(2)
     b2 = t.B2(3)
     c = t.C(4)
-    d = 5
+    i = 5
+
     with pytest.raises(TypeError) as excinfo:
         t.get_d(c)
     assert str(excinfo.value) == (
@@ -294,10 +295,26 @@ def test13_implicitly_convertible():
         "\n"
         "Invoked with types: test_classes_ext.C"
     )
-    assert t.get_d(a) == 11
-    assert t.get_d(b) == 102
-    assert t.get_d(b2) == 103
+    with pytest.raises(TypeError):
+        t.get_optional_d(c)
+
+    for obj, expected in ((a, 11), (b, 102), (b2, 103), (i, 10005)):
+        assert t.get_d(obj) == expected
+        assert t.get_optional_d(obj) == expected
+        # The -1's here are because nb::cast() won't implicit-convert to a
+        # pointer because it would dangle
+        assert t.get_d_via_cast(obj) == (expected, -1, expected, -1)
+        assert t.get_d_via_try_cast(obj) == (expected, -1, expected, -1)
+
+    d = t.D(5)
     assert t.get_d(d) == 10005
+    assert t.get_optional_d(d) == 10005
+    assert t.get_d_via_cast(d) == (10005, 10005, 10005, 10005)
+    assert t.get_d_via_try_cast(d) == (10005, 10005, 10005, 10005)
+
+    assert t.get_optional_d(None) == -1
+    assert t.get_d_via_cast(c) == (-1, -1, -1, -1)
+    assert t.get_d_via_try_cast(c) == (-1, -1, -1, -1)
 
 
 def test14_operators():

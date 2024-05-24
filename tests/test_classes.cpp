@@ -1,6 +1,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/operators.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/shared_ptr.h>
@@ -306,6 +307,9 @@ NB_MODULE(test_classes_ext, m) {
         D(C c) : value(c.c + 1000) { }
         D(int d) : value(d + 10000) { }
         D(float) : value(0) { throw std::runtime_error("Fail!"); }
+        D(std::nullptr_t) : value(0) {}
+        // notice dangling access:
+        ~D() { static_cast<volatile int&>(value) = -100; }
         int value;
     };
 
@@ -329,6 +333,37 @@ NB_MODULE(test_classes_ext, m) {
         .def_rw("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });
+    m.def("get_optional_d", [](std::optional<const D*> arg) {
+        return arg ? arg.value()->value : -1;
+    }, nb::arg().none());
+    m.def("get_d_via_cast", [](nb::object obj) {
+        int by_val = -1, by_ptr = -1, by_opt_val = -1, by_opt_ptr = -1;
+        try {
+            by_val = nb::cast<D>(obj).value;
+        } catch (const nb::cast_error&) {}
+        try {
+            by_ptr = nb::cast<D*>(obj)->value;
+        } catch (const nb::cast_error&) {}
+        try {
+            by_opt_val = nb::cast<std::optional<D>>(obj)->value;
+        } catch (const nb::cast_error&) {}
+        try {
+            by_opt_ptr = nb::cast<std::optional<D*>>(obj).value()->value;
+        } catch (const nb::cast_error&) {}
+        return nb::make_tuple(by_val, by_ptr, by_opt_val, by_opt_ptr);
+    });
+    m.def("get_d_via_try_cast", [](nb::object obj) {
+        int by_val = -1, by_ptr = -1, by_opt_val = -1, by_opt_ptr = -1;
+        if (D val(nullptr); nb::try_cast(obj, val))
+            by_val = val.value;
+        if (D* ptr; nb::try_cast(obj, ptr))
+            by_ptr = ptr->value;
+        if (std::optional<D> opt_val; nb::try_cast(obj, opt_val))
+            by_opt_val = opt_val->value;
+        if (std::optional<D*> opt_ptr; nb::try_cast(obj, opt_ptr))
+            by_opt_ptr = opt_ptr.value()->value;
+        return nb::make_tuple(by_val, by_ptr, by_opt_val, by_opt_ptr);
+    });
 
     struct Int {
         int i;

@@ -536,7 +536,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
         PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
         kwnames_interned &= ((PyASCIIObject *) key)->state.interned != 0;
     }
-    if (NB_LIKELY(kwnames_interned)) {
+    if (kwargs_in && NB_LIKELY(kwnames_interned)) {
         kwnames = ((PyTupleObject *) kwargs_in)->ob_item;
         goto traverse_overloads;
     }
@@ -744,7 +744,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 if (is_constructor) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
-                    self_arg_nb->ready = true;
+                    self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
@@ -845,7 +845,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 if (is_constructor) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
-                    self_arg_nb->ready = true;
+                    self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
@@ -1130,12 +1130,10 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
 static PyObject *nb_func_get_name(PyObject *self) {
     func_data *f = nb_func_data(self);
-    if (f->flags & (uint32_t) func_flags::has_name) {
-        return PyUnicode_FromString(f->name);
-    } else {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    const char *name = "";
+    if (f->flags & (uint32_t) func_flags::has_name)
+        name = f->name;
+    return PyUnicode_FromString(name);
 }
 
 static PyObject *nb_func_get_qualname(PyObject *self) {

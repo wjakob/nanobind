@@ -12,6 +12,11 @@ class ClassicEnum(enum.Enum):
     @property
     def my_value(self) -> int: ...
 
+    def foo(self) -> ClassicEnum: ...
+
+    @staticmethod
+    def bar(arg: ClassicEnum, /) -> ClassicEnum: ...
+
 class Enum(enum.Enum):
     """enum-level docstring"""
 

@@ -730,6 +730,17 @@ public:
         return *this;
     }
 
+    template <typename Func, typename... Extra>
+    NB_INLINE enum_ &def_static(const char *name_, Func &&f,
+                                 const Extra &... extra) {
+        static_assert(
+            !std::is_member_function_pointer_v<Func>,
+            "def_static(...) called with a non-static member function pointer");
+        cpp_function_def((detail::forward_t<Func>) f, scope(*this), name(name_),
+                         extra...);
+        return *this;
+    }
+
     template <typename Getter, typename Setter, typename... Extra>
     NB_INLINE enum_ &def_prop_rw(const char *name_, Getter &&getter,
                                  Setter &&setter, const Extra &...extra) {

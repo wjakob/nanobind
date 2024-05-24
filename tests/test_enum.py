@@ -139,3 +139,5 @@ def test08_enum_comparisons():
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1
     assert t.Item1.get_value() == 0 and t.Item2.get_value() == 1
+    assert t.Item1.foo() == t.Item1
+    assert t.ClassicEnum.bar(t.Item1) == t.Item1

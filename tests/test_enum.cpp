@@ -25,7 +25,9 @@ NB_MODULE(test_enum_ext, m) {
         .export_values();
 
     ce.def("get_value", [](ClassicEnum &x) { return (int) x; })
-      .def_prop_ro("my_value", [](ClassicEnum &x) { return (int) x; });
+      .def_prop_ro("my_value", [](ClassicEnum &x) { return (int) x; })
+      .def("foo", [](ClassicEnum x) { return x; })
+      .def_static("bar", [](ClassicEnum x) { return x; });
 
     m.def("from_enum", [](Enum value) { return (uint32_t) value; }, nb::arg().noconvert());
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });

@@ -3,6 +3,7 @@
 namespace nb = nanobind;
 
 enum class Enum  : uint32_t { A, B, C = (uint32_t) -1 };
+enum class Flag  : uint32_t { A = 1, B = 2, C = 4};
 enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
 enum ClassicEnum { Item1, Item2 };
 
@@ -13,6 +14,12 @@ NB_MODULE(test_enum_ext, m) {
         .value("A", Enum::A, "Value A")
         .value("B", Enum::B, "Value B")
         .value("C", Enum::C, "Value C");
+
+    nb::enum_<Flag>(m, "Flag", "enum-level docstring", nb::is_flag_enum())
+            .value("A", Flag::A, "Value A")
+            .value("B", Flag::B, "Value B")
+            .value("C", Flag::C, "Value C")
+            .export_values();
 
     nb::enum_<SEnum>(m, "SEnum", nb::is_arithmetic())
         .value("A", SEnum::A)
@@ -31,11 +38,17 @@ NB_MODULE(test_enum_ext, m) {
 
     m.def("from_enum", [](Enum value) { return (uint32_t) value; }, nb::arg().noconvert());
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });
+    m.def("from_enum", [](Flag value) { return (uint32_t) value; }, nb::arg().noconvert());
+    m.def("to_enum", [](uint32_t value) { return (Flag) value; });
     m.def("from_enum", [](SEnum value) { return (int32_t) value; }, nb::arg().noconvert());
-
     m.def("from_enum_implicit", [](Enum value) { return (uint32_t) value; });
 
     m.def("from_enum_default_0", [](Enum value) { return (uint32_t) value; }, nb::arg("value") = Enum::A);
+
+    m.def("from_enum_implicit", [](Flag value) { return (uint32_t) value; });
+
+    m.def("from_enum_default_0", [](Flag value) { return (uint32_t) value; }, nb::arg("value") = Enum::A);
+
     m.def("from_enum_default_1", [](SEnum value) { return (uint32_t) value; }, nb::arg("value") = SEnum::A);
 
     // test for issue #39

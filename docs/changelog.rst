@@ -18,6 +18,9 @@ below inherit that of the preceding release.
 Version 2.2.0 (TBA)
 -------------------
 
+* The :cpp:class:`nb::enum_\<T\>() <enum_>` can now create an``enum.Flag``-derived type
+  with  flag :cpp:class:`nb::is_flag_enum() <is_flag_enum>`.
+
 - nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
   to function and method bindings, but it lacked the ability to do so for
@@ -209,9 +212,11 @@ according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
 * The :cpp:class:`nb::enum_\<T\>() <enum_>` binding declaration is now a
-  wrapper that creates either a ``enum.Enum`` or ``enum.IntEnum``-derived type.
+  wrapper that creates either a ``enum.Enum``, ``enum.IntEnum`` or ``enum.Flag``-derived type.
   Previously, nanobind relied on a custom enumeration base class that was a
   frequent source of friction for users.
+  A new flag :cpp:class:`nb::is_flag_enum() <is_flag_enum>`
+  creates a ``enum.Flag``-derived type.
 
   This change may break code that casts entries to integers, which now only
   works for arithmetic (``enum.IntEnum``-derived) enumerations. Replace

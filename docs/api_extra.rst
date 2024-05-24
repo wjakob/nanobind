@@ -664,7 +664,7 @@ section <ndarrays>`.
 
 .. cpp:class:: template <typename... Args> ndarray
 
-   .. cpp:var:: is_ro
+   .. cpp:var:: ReadOnly
 
       A constant static boolean that is true if the array's data is read-only.
       This is determined by the class template arguments, not by any dynamic
@@ -802,12 +802,12 @@ section <ndarrays>`.
    .. cpp:function:: Scalar * data() const
 
       Return a pointer to the array data.
-      If :cpp:var:`is_ro` is true, a pointer-to-const is returned.
+      If :cpp:var:`ReadOnly` is true, a pointer-to-const is returned.
 
    .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
 
       Return a reference to the element stored at the provided index/indices.
-      If :cpp:var:`is_ro` is true, a reference-to-const is returned.
+      If :cpp:var:`ReadOnly` is true, a reference-to-const is returned.
       Note that ``sizeof(Ts)`` must match :cpp:func:`ndim()`.
 
       This accessor is only available when the scalar type and array dimension

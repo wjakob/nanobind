@@ -26,7 +26,7 @@ namespace nanobind {
 
 template<bool expect_ro, bool is_shaped, typename... Ts>
 bool check_ro(const nb::ndarray<Ts...>& a) {  // Pytest passes five doubles
-    static_assert(std::remove_reference_t<decltype(a)>::is_ro == expect_ro);
+    static_assert(std::remove_reference_t<decltype(a)>::ReadOnly == expect_ro);
     static_assert(std::is_const_v<std::remove_pointer_t<decltype(a.data())>>
                   == expect_ro);
     auto vd = a.template view<double, nb::ndim<1>>();

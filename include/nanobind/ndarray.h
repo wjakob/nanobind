@@ -265,7 +265,7 @@ template <typename T> struct ndarray_arg<T, enable_if_t<T::is_device>> {
 template <typename... Ts> struct ndarray_info {
     using scalar_type = void;
     using shape_type = void;
-    constexpr static bool is_ro = false;
+    constexpr static bool ReadOnly = false;
     constexpr static auto name = const_name("ndarray");
     constexpr static ndarray_framework framework = ndarray_framework::none;
     constexpr static char order = '\0';
@@ -278,12 +278,12 @@ template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_i
                     std::is_void_v<typename ndarray_info<Ts...>::scalar_type>,
                 T, typename ndarray_info<Ts...>::scalar_type>;
 
-    constexpr static bool is_ro = ndarray_info<Ts...>::is_ro ||
+    constexpr static bool ReadOnly = ndarray_info<Ts...>::ReadOnly ||
             (detail::is_ndarray_scalar_v<T> && std::is_const_v<T>);
 };
 
 template <typename... Ts> struct ndarray_info<ro, Ts...> : ndarray_info<Ts...> {
-    constexpr static bool is_ro = true;
+    constexpr static bool ReadOnly = true;
 };
 
 template <ssize_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {
@@ -405,8 +405,8 @@ public:
     template <typename...> friend class ndarray;
 
     using Info = detail::ndarray_info<Args...>;
-    static constexpr bool is_ro = Info::is_ro;
-    using Scalar = std::conditional_t<is_ro,
+    static constexpr bool ReadOnly = Info::ReadOnly;
+    using Scalar = std::conditional_t<ReadOnly,
                            std::add_const_t<typename Info::scalar_type>,
                            typename Info::scalar_type>;
 
@@ -420,7 +420,7 @@ public:
     template <typename... Args2>
     explicit ndarray(const ndarray<Args2...> &other) : ndarray(other.m_handle) { }
 
-    ndarray(std::conditional_t<is_ro, const void *, void *> data,
+    ndarray(std::conditional_t<ReadOnly, const void *, void *> data,
             size_t ndim,
             const size_t *shape,
             handle owner,
@@ -430,11 +430,11 @@ public:
             int32_t device_id = 0) {
         m_handle = detail::ndarray_create(
             (void *) data, ndim, shape, owner.ptr(), strides, &dtype,
-            is_ro, device_type, device_id);
+            ReadOnly, device_type, device_id);
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
-    ndarray(std::conditional_t<is_ro, const void *, void *> data,
+    ndarray(std::conditional_t<ReadOnly, const void *, void *> data,
             std::initializer_list<size_t> shape,
             handle owner,
             std::initializer_list<int64_t> strides = { },
@@ -448,7 +448,7 @@ public:
         m_handle = detail::ndarray_create(
             (void *) data, shape.size(), shape.begin(), owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), &dtype,
-            is_ro, device_type, device_id);
+            ReadOnly, device_type, device_id);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
@@ -517,7 +517,7 @@ public:
 
     template <typename... Extra> NB_INLINE auto view() const {
         using Info2 = typename ndarray<Args..., Extra...>::Info;
-        using Scalar2 = std::conditional_t<Info2::is_ro,
+        using Scalar2 = std::conditional_t<Info2::ReadOnly,
                                 std::add_const_t<typename Info2::scalar_type>,
                                 typename Info2::scalar_type>;
         using Shape2 = typename Info2::shape_type;

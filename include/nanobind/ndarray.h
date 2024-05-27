@@ -80,6 +80,7 @@ struct numpy { };
 struct tensorflow { };
 struct pytorch { };
 struct jax { };
+struct cupy { };
 struct ro { };
 
 template <typename T> struct ndarray_traits {
@@ -134,7 +135,7 @@ template <typename T> constexpr dlpack::dtype dtype() {
 
 NAMESPACE_BEGIN(detail)
 
-enum class ndarray_framework : int { none, numpy, tensorflow, pytorch, jax };
+enum class ndarray_framework : int { none, numpy, tensorflow, pytorch, jax, cupy };
 
 struct ndarray_req {
     dlpack::dtype dtype;
@@ -307,6 +308,10 @@ template <typename... Ts> struct ndarray_info<tensorflow, Ts...> : ndarray_info<
 template <typename... Ts> struct ndarray_info<jax, Ts...> : ndarray_info<Ts...> {
     constexpr static auto name = const_name("jaxlib.xla_extension.DeviceArray");
     constexpr static ndarray_framework framework = ndarray_framework::jax;
+};
+template <typename... Ts> struct ndarray_info<cupy, Ts...> : ndarray_info<Ts...> {
+    constexpr static auto name = const_name("cupy.ndarray");
+    constexpr static ndarray_framework framework = ndarray_framework::cupy;
 };
 
 

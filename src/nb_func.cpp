@@ -257,7 +257,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         if (is_constructor && f->nargs == 2 && f->descr_types[0] &&
             f->descr_types[0] == f->descr_types[1]) {
             if (has_args) {
-                f->args[1].convert = false;
+                f->args[0].convert = false;
             } else {
                 args_in = method_args + 1;
                 has_args = true;

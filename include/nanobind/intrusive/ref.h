@@ -139,12 +139,23 @@ template <typename T> struct type_caster<nanobind::ref<T>> {
 
     static handle from_cpp(const ref<T> &value, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
+        bool force_new = policy == rv_policy::copy || policy == rv_policy::move;
+
         if constexpr (std::is_base_of_v<intrusive_base, T>)
-            if (policy != rv_policy::copy && policy != rv_policy::move && value.get())
+            if (!force_new && value.get())
                 if (PyObject* obj = value->self_py())
                     return handle(obj).inc_ref();
 
-        return Caster::from_cpp(value.get(), policy, cleanup);
+        /* The combination of rv_policy::_shared_ownership + not asking
+           for an is_new response, is treated as requiring intrusive ownership.
+           We could pass any policy here except copy/move, but using this one
+           allows nanobind to check that the intrusive_ptr() annotation was
+           specified correctly. */
+        if (!force_new)
+            policy = rv_policy::_shared_ownership;
+
+        return Caster::from_cpp_raw((std::decay_t<T> *) value.get(), policy,
+                                    cleanup, nullptr);
     }
 };
 NAMESPACE_END(detail)

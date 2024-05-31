@@ -38,20 +38,20 @@ public:
     ref() = default;
 
     /// Construct a reference from a pointer
-    ref(T *ptr) : m_ptr(ptr) { inc_ref((intrusive_base *) m_ptr); }
+    ref(T *ptr) : m_ptr(ptr) { inc_ref(as_base(m_ptr)); }
 
     /// Copy a reference, increases the reference count
-    ref(const ref &r) : m_ptr(r.m_ptr) { inc_ref((intrusive_base *) m_ptr); }
+    ref(const ref &r) : m_ptr(r.m_ptr) { inc_ref(as_base(m_ptr)); }
 
     /// Move a reference witout changing the reference count
     ref(ref &&r) noexcept : m_ptr(r.m_ptr) { r.m_ptr = nullptr; }
 
     /// Destroy this reference
-    ~ref() { dec_ref((intrusive_base *) m_ptr); }
+    ~ref() { dec_ref(as_base(m_ptr)); }
 
     /// Move-assign another reference into this one
     ref &operator=(ref &&r) noexcept {
-        dec_ref((intrusive_base *) m_ptr);
+        dec_ref(as_base(m_ptr));
         m_ptr = r.m_ptr;
         r.m_ptr = nullptr;
         return *this;
@@ -59,23 +59,23 @@ public:
 
     /// Copy-assign another reference into this one
     ref &operator=(const ref &r) {
-        inc_ref((intrusive_base *) r.m_ptr);
-        dec_ref((intrusive_base *) m_ptr);
+        inc_ref(as_base(r.m_ptr));
+        dec_ref(as_base(m_ptr));
         m_ptr = r.m_ptr;
         return *this;
     }
 
     /// Overwrite this reference with a pointer to another object
     ref &operator=(T *ptr) {
-        inc_ref((intrusive_base *) ptr);
-        dec_ref((intrusive_base *) m_ptr);
+        inc_ref(as_base(ptr));
+        dec_ref(as_base(m_ptr));
         m_ptr = ptr;
         return *this;
     }
 
     /// Clear the currently stored reference
     void reset() {
-        dec_ref((intrusive_base *) m_ptr);
+        dec_ref(as_base(m_ptr));
         m_ptr = nullptr;
     }
 
@@ -117,6 +117,16 @@ public:
 
 private:
     T *m_ptr = nullptr;
+
+    /* Cast `ptr` to a form suitable for passing to inc_ref() and dec_ref()
+       overloads found by ADL. This uses a C-style cast to support types that
+       inherit privately from `intrusive_base`. */
+    static auto *as_base(T *ptr) {
+        if constexpr (std::is_base_of_v<intrusive_base, T>)
+            return (intrusive_base *) ptr;
+        else
+            return ptr;
+    }
 };
 
 // Registar a type caster for ``ref<T>`` if nanobind was previously #included

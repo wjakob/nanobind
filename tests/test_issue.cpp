@@ -60,7 +60,7 @@ NB_MODULE(test_issue_ext, m) {
           }, nb::arg("v"));
 
 
-    // v2.0.0: stack corruption when binding a copy constructor with a named argument.
+    // pull/602: stack corruption when binding a copy constructor with a named argument.
     struct Empty {};
     nb::class_<Empty>(m, "Empty")
       .def(nb::init<const Empty&>(), nb::arg("original"));

@@ -125,8 +125,7 @@ NB_INLINE uint8_t flags_for_local_caster(uint8_t flags) noexcept {
            Exception: the 'char' caster produces a result that points to
            storage owned by the incoming Python 'str' object, so it's OK. */
         static_assert(!is_ref || std::is_same_v<T, const char*> ||
-                      std::conjunction_v<std::is_pointer<T>,
-                                         std::is_constructible<T*, Caster>>,
+                      (std::is_pointer_v<T> && std::is_constructible_v<T*, Caster>),
                       "nanobind generally cannot produce objects that "
                       "contain interior pointers T* (or references T&) if "
                       "the pointee T is not handled by nanobind's regular "

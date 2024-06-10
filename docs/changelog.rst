@@ -15,6 +15,15 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.0.1 (TBA)
+---------------------------
+
+* nanobind no longer prevents casting to a C++ container of pointers ``T*``
+  where ``T`` is a type with a user-defined type caster if the caster seems
+  to operate by extracting a ``T*`` from the Python object rather than a ``T``.
+  This change was prompted by discussion
+  `#605 <https://github.com/wjakob/nanobind/discussions/605>`__.
+
 Version 2.0.0 (May 23, 2024)
 ----------------------------
 

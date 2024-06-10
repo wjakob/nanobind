@@ -108,8 +108,9 @@ using precise_cast_t =
 /// where the template argument T is the type you plan to extract.
 template <typename T>
 NB_INLINE uint8_t flags_for_local_caster(uint8_t flags) noexcept {
+    using Caster = make_caster<T>;
     constexpr bool is_ref = std::is_pointer_v<T> || std::is_reference_v<T>;
-    if constexpr (is_base_caster_v<make_caster<T>>) {
+    if constexpr (is_base_caster_v<Caster>) {
         if constexpr (is_ref) {
             /* References/pointers to a type produced by implicit conversions
                refer to storage owned by the cleanup_list. In a nb::cast() call,
@@ -123,7 +124,8 @@ NB_INLINE uint8_t flags_for_local_caster(uint8_t flags) noexcept {
            into storage owned by the caster, which won't live long enough.
            Exception: the 'char' caster produces a result that points to
            storage owned by the incoming Python 'str' object, so it's OK. */
-        static_assert(!is_ref || std::is_same_v<T, const char*>,
+        static_assert(!is_ref || std::is_same_v<T, const char*> ||
+                      (std::is_pointer_v<T> && std::is_constructible_v<T*, Caster>),
                       "nanobind generally cannot produce objects that "
                       "contain interior pointers T* (or references T&) if "
                       "the pointee T is not handled by nanobind's regular "

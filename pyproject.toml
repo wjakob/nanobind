@@ -33,6 +33,16 @@ Please see the following links for tutorial and reference documentation in
 authors = [
     { name = "Wenzel Jakob", email = "wenzel.jakob@epfl.ch" },
 ]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
 
 [project.urls]
 Homepage = "https://github.com/wjakob/nanobind"
@@ -40,7 +50,7 @@ Homepage = "https://github.com/wjakob/nanobind"
 
 [tool.scikit-build]
 minimum-version = "0.9"
-cmake.define.NB_TEST = "OFF"
+cmake.define.NB_TEST = false
 wheel.platlib = false
 
 

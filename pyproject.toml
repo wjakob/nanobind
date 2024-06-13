@@ -1,7 +1,13 @@
-[build-system]
-requires = ["setuptools>=42", "wheel", "scikit-build", "cmake>=3.17", "ninja", "typing_extensions"]
-build-backend = "setuptools.build_meta"
+[project]
+name = "nanobind"
+version = "2.0.1"
 
+[build-system]
+requires = ["scikit-build-core", "cmake>=3.17", "ninja"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+cmake.define.NB_TEST = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = [ "tests" ]

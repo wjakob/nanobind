@@ -80,17 +80,17 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
 
   if(NB_USE_SUBMODULE_DEPS)
     install(
-      DIRECTORY ext/robin_map/include/
-      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include"
-    )
-    install(
-      FILES ext/robin_map/CMakeLists.txt
-      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map"
+      FILES ext/robin_map/include/tsl/robin_map.h
+            ext/robin_map/include/tsl/robin_hash.h
+            ext/robin_map/include/tsl/robin_growth_policy.h
+      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include/tsl"
     )
   endif()
 
   install(
-    DIRECTORY cmake/
+    FILES cmake/nanobind-config.cmake
+          cmake/darwin-ld-cpython.sym
+          cmake/darwin-ld-pypy.sym
     DESTINATION "${NB_INSTALL_CMAKE_DIR}"
   )
 

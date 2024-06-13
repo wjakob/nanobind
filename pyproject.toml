@@ -8,6 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
 cmake.define.NB_TEST = "OFF"
+wheel.platlib = false
 
 [tool.pytest.ini_options]
 testpaths = [ "tests" ]

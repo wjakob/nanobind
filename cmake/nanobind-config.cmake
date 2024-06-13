@@ -421,9 +421,9 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
   endif()
 
-  file(TO_CMAKE_PATH ${Python_EXECUTABLE} Python_EXECUTABLE)
+  file(TO_CMAKE_PATH ${Python_EXECUTABLE} NB_Python_EXECUTABLE)
 
-  set(NB_STUBGEN_CMD "${Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
+  set(NB_STUBGEN_CMD "${NB_Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
 
   if (NOT ARG_INSTALL_TIME)
     add_custom_command(

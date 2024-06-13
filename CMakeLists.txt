@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.15...3.27)
-project(nanobind LANGUAGES NONE VERSION 2.0.1)
+
+# ---------------------------------------------------------------------------
+# Read the project version from nanobind.h
+# ---------------------------------------------------------------------------
+
+file(STRINGS "include/nanobind/nanobind.h" _nanobind_h_version REGEX "^#define NB_VERSION_.*$")
+string(REGEX MATCH "#define NB_VERSION_MAJOR ([0-9]+)" _ "${_nanobind_h_version}")
+set(_major ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define NB_VERSION_MINOR ([0-9]+)" _ "${_nanobind_h_version}")
+set(_minor ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define NB_VERSION_PATCH ([0-9]+)" _ "${_nanobind_h_version}")
+set(_patch ${CMAKE_MATCH_1})
+
+project(nanobind LANGUAGES NONE VERSION "${_major}.${_minor}.${_patch}")
 
 # ---------------------------------------------------------------------------
 # Only build tests by default if this is the top-level CMake project

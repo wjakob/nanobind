@@ -154,25 +154,27 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return false;
-    auto base = PyObject_GetAttrString((PyObject *)o->ob_type, "__base__");
-    auto basename = PyObject_GetAttrString(base, "__name__");
-    Py_ssize_t size;
-    const char* data = PyUnicode_AsUTF8AndSize(basename, &size);
-    std::string s(data, size);
-    if ((t->flags & (uint32_t) type_flags::is_flag_enum) !=0  &&
-             s == "Flag") {
-        auto pValue = PyObject_GetAttrString(o, "value");
-        if(pValue == nullptr) {
-            PyErr_Clear();
-            return false;
+
+    if ((t->flags & (uint32_t) type_flags::is_flag_enum) !=0) {
+        auto base = PyObject_GetAttrString((PyObject *)o->ob_type, "__base__");
+        auto basename = PyObject_GetAttrString(base, "__name__");
+        Py_ssize_t size;
+        const char* data = PyUnicode_AsUTF8AndSize(basename, &size);
+        std::string s(data, size);
+        if(s == "Flag") {
+            auto pValue = PyObject_GetAttrString(o, "value");
+            if (pValue == nullptr) {
+                PyErr_Clear();
+                return false;
+            }
+            long long value = PyLong_AsLongLong(pValue);
+            if (value == -1 && PyErr_Occurred()) {
+                PyErr_Clear();
+                return false;
+            }
+            *out = (int64_t) value;
+            return true;
         }
-        long long value = PyLong_AsLongLong(pValue);
-        if (value == -1 && PyErr_Occurred()) {
-            PyErr_Clear();
-            return false;
-        }
-        *out = (int64_t) value;
-        return true;
     }
 
     enum_map *rev = (enum_map *) t->enum_tbl.rev;

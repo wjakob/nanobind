@@ -1,4 +1,5 @@
 #include "nb_internals.h"
+#include <string>
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

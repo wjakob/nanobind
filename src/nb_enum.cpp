@@ -28,7 +28,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     handle scope(ed->scope);
 
     bool is_arithmetic = ed->flags & (uint32_t) type_flags::is_arithmetic;
-    bool is_flag = ed->flags & (uint32_t) type_flags::is_flag;
+    bool is_flag = ed->flags & (uint32_t) type_flags::flag_enum;
     str name(ed->name), qualname = name;
     object modname;
 
@@ -151,7 +151,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (!t)
         return false;
 
-    if ((t->flags & (uint32_t) type_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
+    if ((t->flags & (uint32_t) type_flags::flag_enum) != 0 && Py_TYPE(o) == t->type_py) {
         auto pValue = PyObject_GetAttrString(o, "value");
         if (pValue == nullptr) {
             PyErr_Clear();

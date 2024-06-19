@@ -15,7 +15,7 @@ NB_MODULE(test_enum_ext, m) {
         .value("B", Enum::B, "Value B")
         .value("C", Enum::C, "Value C");
 
-    nb::enum_<Flag>(m, "Flag", "enum-level docstring", nb::is_flag())
+    nb::enum_<Flag>(m, "Flag", "enum-level docstring", nb::flag_enum())
             .value("A", Flag::A, "Value A")
             .value("B", Flag::B, "Value B")
             .value("C", Flag::C, "Value C")

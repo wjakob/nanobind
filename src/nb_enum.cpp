@@ -1,5 +1,5 @@
 #include "nb_internals.h"
-#include <string>
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -156,12 +156,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         return false;
 
     if ((t->flags & (uint32_t) type_flags::is_flag_enum) !=0) {
-        auto base = PyObject_GetAttrString((PyObject *)o->ob_type, "__base__");
-        auto basename = PyObject_GetAttrString(base, "__name__");
-        Py_ssize_t size;
-        const char* data = PyUnicode_AsUTF8AndSize(basename, &size);
-        std::string s(data, size);
-        if(s == "Flag") {
+        if (Py_TYPE(o) == t->type_py) {
             auto pValue = PyObject_GetAttrString(o, "value");
             if (pValue == nullptr) {
                 PyErr_Clear();
@@ -202,6 +197,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         } else {
             unsigned long long value = PyLong_AsUnsignedLongLong(o);
             if (value == (unsigned long long) -1 && PyErr_Occurred()) {
+                PyErr_Clear();
                 return false;
             }
             enum_map::iterator it2 = fwd->find((int64_t) value);
@@ -212,6 +208,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         }
 
     }
+
     return false;
 }
 
@@ -219,12 +216,9 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return nullptr;
+
     enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
-    if(t->flags & (uint32_t) type_flags::is_flag_enum) {
-        PyObject *value = PyLong_FromLongLong(key);
-        Py_INCREF(value);
-        return value;
-    }
+
     enum_map::iterator it = fwd->find(key);
     if (it != fwd->end()) {
         PyObject *value = (PyObject *) it->second;

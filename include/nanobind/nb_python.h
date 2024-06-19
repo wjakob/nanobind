@@ -20,7 +20,6 @@
 
 #include <Python.h>
 #include <frameobject.h>
-#include <object.h>
 #include <pythread.h>
 #include <structmember.h>
 

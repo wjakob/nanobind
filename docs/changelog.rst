@@ -17,8 +17,12 @@ below inherit that of the preceding release.
 
 Version 2.1.0 (TBA)
 -------------------
-* The :cpp:class:`nb::enum_\<T\>() <enum_>` can now create an``enum.Flag``-derived type
-  with  flag :cpp:class:`nb::is_flag_enum() <is_flag_enum>`.
+
+* nanobind now allows a :cpp:class:`nb::enum_\<T\>() <enum_>` to specify the
+  new class binding annotation :cpp:class:`nb::is_flag_enum() <is_flag_enum>`,
+  which produces an enumeration type derived from `enum.Flag`. Instances of such
+  an enumeration type represent a bitwise combination of the defined enumerators,
+  and they may be combined using bitwise operators ``& | ^ ~``.
 
 Version 2.0.1 (TBA)
 ---------------------------
@@ -143,11 +147,9 @@ according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
 * The :cpp:class:`nb::enum_\<T\>() <enum_>` binding declaration is now a
-  wrapper that creates either a ``enum.Enum``, ``enum.IntEnum`` or ``enum.Flag``-derived type.
+  wrapper that creates either a ``enum.Enum`` or ``enum.Flag``-derived type.
   Previously, nanobind relied on a custom enumeration base class that was a
   frequent source of friction for users.
-  A new flag :cpp:class:`nb::is_flag_enum() <is_flag_enum>`
-  creates a ``enum.Flag``-derived type.
 
   This change may break code that casts entries to integers, which now only
   works for arithmetic (``enum.IntEnum``-derived) enumerations. Replace

@@ -65,7 +65,7 @@ enum class type_flags : uint32_t {
     is_signed                = (1 << 17),
 
     /// Is the underlying enumeration type Flag?
-    is_flag_enum                  = (1 << 18)
+    is_flag_enum             = (1 << 18)
 
     // No more flag bits available (18). Needs
     // a larger reorganization

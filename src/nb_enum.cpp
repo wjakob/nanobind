@@ -28,7 +28,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     handle scope(ed->scope);
 
     bool is_arithmetic = ed->flags & (uint32_t) type_flags::is_arithmetic;
-    bool is_flag_enum = ed->flags & (uint32_t) type_flags::is_flag_enum;
+    bool is_flag = ed->flags & (uint32_t) type_flags::is_flag;
     str name(ed->name), qualname = name;
     object modname;
 
@@ -43,7 +43,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
                 PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
     }
 
-    const char *factory_name = (is_arithmetic || is_flag_enum)  ? (is_flag_enum ? "Flag" : "IntEnum") : "Enum";
+    const char *factory_name = (is_arithmetic || is_flag) ? (is_flag ? "IntFlag" : "IntEnum") : "Enum";
 
     object enum_mod = module_::import_("enum"),
            factory = enum_mod.attr(factory_name),
@@ -56,11 +56,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     if (is_arithmetic)
         result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
-    if (is_flag_enum)
+    if (is_flag)
         result.attr("__str__") = enum_mod.attr("Flag").attr("__str__");
-#if PY_VERSION_HEX >= 0x030B0000
-    result.attr("_boundary_") =  enum_mod.attr("FlagBoundary").attr("KEEP");
-#endif
     result.attr("__repr__") = result.attr("__str__");
 
     type_init_data *t = new type_init_data();
@@ -154,21 +151,19 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (!t)
         return false;
 
-    if ((t->flags & (uint32_t) type_flags::is_flag_enum) !=0) {
-        if (Py_TYPE(o) == t->type_py) {
-            auto pValue = PyObject_GetAttrString(o, "value");
-            if (pValue == nullptr) {
-                PyErr_Clear();
-                return false;
-            }
-            long long value = PyLong_AsLongLong(pValue);
-            if (value == -1 && PyErr_Occurred()) {
-                PyErr_Clear();
-                return false;
-            }
-            *out = (int64_t) value;
-            return true;
+    if ((t->flags & (uint32_t) type_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
+        auto pValue = PyObject_GetAttrString(o, "value");
+        if (pValue == nullptr) {
+            PyErr_Clear();
+            return false;
         }
+        long long value = PyLong_AsLongLong(pValue);
+        if (value == -1 && PyErr_Occurred()) {
+            PyErr_Clear();
+            return false;
+        }
+        *out = (int64_t) value;
+        return true;
     }
 
     enum_map *rev = (enum_map *) t->enum_tbl.rev;

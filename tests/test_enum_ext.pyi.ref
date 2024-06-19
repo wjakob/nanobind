@@ -41,7 +41,7 @@ class EnumProperty:
     @property
     def read_enum(self) -> Enum: ...
 
-class Flag(enum.Flag):
+class Flag(enum.IntFlag):
     """enum-level docstring"""
 
     A = 1

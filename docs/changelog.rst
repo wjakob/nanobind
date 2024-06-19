@@ -215,7 +215,7 @@ according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
 * The :cpp:class:`nb::enum_\<T\>() <enum_>` binding declaration is now a
-  wrapper that creates either a ``enum.Enum`` or ``enum.Flag``-derived type.
+  wrapper that creates either a ``enum.Enum`` or ``enum.IntEnum``-derived type.
   Previously, nanobind relied on a custom enumeration base class that was a
   frequent source of friction for users.
 

@@ -1971,7 +1971,7 @@ The following annotations can be specified using the variable-length
    mixed enum types (such as ``Shape.Circle + Color.Red``) are
    permissible.
 
-   .. cpp:struct:: is_flag
+   .. cpp:struct:: flag_enum
 
    Indicate that the enumeration may be used with bitwise
    operations.  This enables the bitwise operators ``| & ^ ~``

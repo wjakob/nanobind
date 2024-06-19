@@ -194,7 +194,7 @@ enum class enum_flags : uint32_t {
     is_signed                = (1 << 2),
 
     /// Is the underlying enumeration type Flag?
-    is_flag                  = (1 << 3)
+    flag_enum                = (1 << 3)
 };
 
 struct enum_init_data {
@@ -209,8 +209,8 @@ NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
     e.flags |= (uint32_t) enum_flags::is_arithmetic;
 }
 
-NB_INLINE void enum_extra_apply(enum_init_data &e, is_flag) {
-    e.flags |= (uint32_t) type_flags::is_flag;
+NB_INLINE void enum_extra_apply(enum_init_data &e, flag_enum) {
+    e.flags |= (uint32_t) type_flags::flag_enum;
 }
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {

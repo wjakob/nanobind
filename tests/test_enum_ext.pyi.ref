@@ -2,11 +2,11 @@ import enum
 from typing import overload
 
 
-A: Flag = Flag.A
+A: Flag = 1
 
-B: Flag = Flag.B
+B: Flag = 2
 
-C: Flag = Flag.C
+C: Flag = 4
 
 class ClassicEnum(enum.Enum):
     Item1 = 0
@@ -43,6 +43,11 @@ class EnumProperty:
 
 class Flag(enum.IntFlag):
     """enum-level docstring"""
+
+    __str__ = __repr__
+
+    def __repr__(self, /):
+        """Return repr(self)."""
 
     A = 1
     """Value A"""

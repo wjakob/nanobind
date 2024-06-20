@@ -57,7 +57,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     if (is_arithmetic)
         result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
     if (is_flag)
-        result.attr("__str__") = enum_mod.attr("Flag").attr("__str__");
+        result.attr("__str__") = enum_mod.attr("IntEnum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
 
     type_init_data *t = new type_init_data();

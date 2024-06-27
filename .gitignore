@@ -32,3 +32,4 @@ __pycache__
 nanobind.egg-info
 test_*_ext*
 py\.typed
+.mypy_cache

@@ -458,8 +458,8 @@ Nanobind's CMake tooling includes a convenience command to interface with the
           empty file named ``py.typed`` in each module directory. When this
           parameter is specified, :cmake:command:`nanobind_add_stub` will
           automatically generate such an empty file as well.
-      * - ``PATCH_FILE``
-        - Specify a patch file used to replace declarations in the stub. The
+      * - ``PATTERN_FILE``
+        - Specify a pattern file used to replace declarations in the stub. The
           syntax is described in the section on :ref:`stub generation <stubs>`.
       * - ``COMPONENT``
         - Specify a component when ``INSTALL_TIME`` stub generation is used.

@@ -56,7 +56,7 @@ constexpr bool is_contiguous_v =
      stride_t<T>::InnerStrideAtCompileTime == 1) &&
     (ndim_v<T> == 1 || stride_t<T>::OuterStrideAtCompileTime == 0 ||
      (stride_t<T>::OuterStrideAtCompileTime != Eigen::Dynamic &&
-      stride_t<T>::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime));
+      int(stride_t<T>::OuterStrideAtCompileTime) == int(T::InnerSizeAtCompileTime)));
 
 /// Identify types with a static or dynamic layout that support contiguous storage
 template <typename T>
@@ -66,7 +66,7 @@ constexpr bool can_map_contiguous_memory_v =
      stride_t<T>::InnerStrideAtCompileTime == Eigen::Dynamic) &&
     (ndim_v<T> == 1 || stride_t<T>::OuterStrideAtCompileTime == 0 ||
      stride_t<T>::OuterStrideAtCompileTime == Eigen::Dynamic ||
-     stride_t<T>::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime);
+     int(stride_t<T>::OuterStrideAtCompileTime) == int(T::InnerSizeAtCompileTime));
 
 /* This type alias builds the most suitable 'ndarray' for the given Eigen type.
    In particular, it

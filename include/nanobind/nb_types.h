@@ -314,7 +314,7 @@ inline void delattr(handle h, handle key) {
 
 class module_ : public object {
 public:
-    NB_OBJECT(module_, object, "types.ModuleType", PyModule_CheckExact);
+    NB_OBJECT(module_, object, "types.ModuleType", PyModule_CheckExact)
 
     template <typename Func, typename... Extra>
     module_ &def(const char *name_, Func &&f, const Extra &...extra);

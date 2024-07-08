@@ -19,9 +19,7 @@ struct type_caster<NestedClass> {
     static handle from_cpp(const NestedClass&, rv_policy, cleanup_list*) noexcept {
         nanobind::object py_class =
             nanobind::module_::import_("py_stub_test").attr("AClass").attr("NestedClass");
-        nanobind::object py_proto = py_class();
-        py_proto.inc_ref();
-        return py_proto;
+        return py_class().release();
     }
 };
 }

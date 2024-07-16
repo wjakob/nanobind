@@ -239,6 +239,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
         gil_scoped_acquire guard;
         Py_buffer *buf = (Py_buffer *) mt2->manager_ctx;
         PyBuffer_Release(buf);
+        PyMem_Free(mt2->manager_ctx);
         PyMem_Free(mt2->dltensor.shape);
         PyMem_Free(mt2->dltensor.strides);
         PyMem_Free(mt2);

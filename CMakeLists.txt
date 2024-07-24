@@ -139,10 +139,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Include nanobind cmake functionality
 # ---------------------------------------------------------------------------
-
-find_package(nanobind
-  PATHS ${CMAKE_CURRENT_SOURCE_DIR}/cmake
-  NO_DEFAULT_PATH)
+include(cmake/nanobind-config.cmake)
 
 if (NB_TEST)
   add_subdirectory(tests)

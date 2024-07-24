@@ -638,6 +638,12 @@ class StubGen:
 
         # Process other type names and add suitable import statements
         def process_general(m: Match[str]) -> str:
+            def is_valid_module(module_name: str) -> bool:
+                try:
+                    return importlib.util.find_spec(module_name) is not None
+                except ModuleNotFoundError:
+                    return False
+
             full_name, mod_name, cls_name = m.group(0), m.group(1)[:-1], m.group(2)
 
             if mod_name == "builtins":
@@ -650,6 +656,19 @@ class StubGen:
                 # Import frequently-occurring typing classes and ABCs directly
                 return self.import_object(mod_name, cls_name)
             else:
+                # Handle nested names. While mod_name isn't a valid module, then
+                # move the last segment of the name from mod_name to cls_name
+                # and try again until we have the right partition.
+                search_mod_name = mod_name
+                search_cls_name = cls_name
+                while search_mod_name:
+                    if is_valid_module(search_mod_name):
+                        mod_name = search_mod_name
+                        cls_name = search_cls_name
+                        break
+                    search_mod_name, _, symbol = search_mod_name.rpartition(".")
+                    search_cls_name = f"{search_cls_name}.{symbol}"
+
                 # Import the module and reference the contained class by name
                 self.import_object(mod_name, None)
                 return full_name

@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import py_stub_test
 from typing import Generic, Optional, Self, TypeAlias, TypeVar
 
 from . import submodule as submodule
@@ -48,6 +49,8 @@ class WrapperFoo(Wrapper[Foo]):
 def f() -> None: ...
 
 f_alias = f
+
+def makeNestedClass() -> py_stub_test.AClass.NestedClass: ...
 
 pytree: dict = {'a' : ('b', [123])}
 

@@ -7,6 +7,9 @@ class AClass:
 
     STATIC_VAR: int = 5
 
+    class NestedClass:
+        pass
+
     def __init__(self, x): ...
 
     def method(self, x: str): ...

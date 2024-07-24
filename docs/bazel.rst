@@ -1,7 +1,7 @@
 .. _bazel:
 
-Building nanobind extensions with Bazel
-=======================================
+Building extensions using Bazel
+===============================
 
 If you prefer the Bazel build system to CMake, you can build extensions using
 the `nanobind-bazel <https://github.com/nicholasjng/nanobind-bazel>`__ project.

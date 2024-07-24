@@ -1,7 +1,7 @@
 .. _api_bazel:
 
-Bazel API Reference (third-party)
-=================================
+Bazel API Reference (3rd party)
+===============================
 
 This page contains a reference of the basic APIs of
 `nanobind-bazel <https://github.com/nicholasjng/nanobind-bazel>`__.

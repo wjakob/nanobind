@@ -641,7 +641,7 @@ class StubGen:
             def is_valid_module(module_name: str) -> bool:
                 try:
                     return importlib.util.find_spec(module_name) is not None
-                except ModuleNotFoundError:
+                except (ModuleNotFoundError, ValueError):
                     return False
 
             full_name, mod_name, cls_name = m.group(0), m.group(1)[:-1], m.group(2)

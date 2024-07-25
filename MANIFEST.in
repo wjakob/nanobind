@@ -1,4 +1,4 @@
-include *.txt
+include CMakeLists.txt
 include *.yaml
 recursive-include cmake *.cmake
 recursive-include cmake *.py

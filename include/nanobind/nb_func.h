@@ -199,14 +199,24 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
+#if defined(_WIN32) // temporary workaround for an internal compiler error in MSVC
+            cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...);
+#else
             cap->func(in.template get<Is>().operator cast_t<Args>()...);
+#endif
             result = Py_None;
             Py_INCREF(result);
         } else {
+#if defined(_WIN32) // temporary workaround for an internal compiler error in MSVC
+            result = cast_out::from_cpp(
+                       cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...),
+                       policy, cleanup).ptr();
+#else
             result = cast_out::from_cpp(
                        cap->func((in.template get<Is>())
                                      .operator cast_t<Args>()...),
                        policy, cleanup).ptr();
+#endif
         }
 
         if constexpr (Info::keep_alive)

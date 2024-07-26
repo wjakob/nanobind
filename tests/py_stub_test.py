@@ -30,6 +30,9 @@ def f4() -> typing.Callable[[T], T]:
 class AClass:
     STATIC_VAR: int = 5
 
+    class NestedClass:
+        pass
+
     def __init__(self, x):
         pass
 

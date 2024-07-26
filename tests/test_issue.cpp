@@ -58,4 +58,11 @@ NB_MODULE(test_issue_ext, m) {
           [](const std::vector<Example>& v) {
               return v.size();
           }, nb::arg("v"));
+
+
+    // pull/602: stack corruption when binding a copy constructor with a named argument.
+    struct Empty {};
+    nb::class_<Empty>(m, "Empty")
+      .def(nb::init<const Empty&>(), nb::arg("original"));
+
 }

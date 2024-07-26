@@ -8,7 +8,7 @@ The ``nb::ndarray<..>`` class
 nanobind can exchange n-dimensional arrays (henceforth "**ndarrays**") with
 popular array programming frameworks including `NumPy
 <https://numpy.org>`__, `PyTorch <https://pytorch.org>`__, `TensorFlow
-<https://www.tensorflow.org>`__, and `JAX <https://jax.readthedocs.io>`__.
+<https://www.tensorflow.org>`__, `JAX <https://jax.readthedocs.io>`__, and `CuPy <https://cupy.dev>`_.
 It supports *zero-copy* exchange using two protocols:
 
 -  The classic `buffer
@@ -342,6 +342,7 @@ values:
    ``tensorflow.python.framework.ops.EagerTensor``.
 -  :cpp:class:`nb::jax <jax>`. Returns the ndarray as a
    ``jaxlib.xla_extension.DeviceArray``.
+-  :cpp:class:`nb::cupy <cupy>`. Returns the ndarray as a ``cupy.ndarray``.
 -  No framework annotation. In this case, nanobind will return a raw
    Python ``dltensor``
    `capsule <https://docs.python.org/3/c-api/capsule.html>`__

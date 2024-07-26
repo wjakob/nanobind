@@ -32,6 +32,12 @@ try:
 except:
     needs_jax = pytest.mark.skip(reason="JAX is required")
 
+try:
+    import cupy as cp
+    def needs_cupy(x):
+        return x
+except:
+    needs_cupy = pytest.mark.skip(reason="CuPy is required")
 
 
 @needs_numpy
@@ -776,3 +782,40 @@ def test39_const_qualifiers_pytorch():
     assert t.check_ro_by_rvalue_ref_const_float64(a);
     assert a[0] == 0.0;
     assert a[3] == 3.14159;
+
+@needs_cupy
+@pytest.mark.filterwarnings
+def test40_constrain_order_cupy():
+    try:
+        c = cp.zeros((3, 5))
+        c.__dlpack__()
+    except:
+        pytest.skip('cupy is missing')
+
+    f = cp.asarray(c, order="F")
+    assert t.check_order(c) == 'C'
+    assert t.check_order(f) == 'F'
+    assert t.check_order(c[:, 2:5]) == '?'
+    assert t.check_order(f[1:3, :]) == '?'
+    assert t.check_device(cp.zeros((3, 5))) == 'cuda'
+
+
+@needs_cupy
+def test41_implicit_conversion_cupy():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            c = cp.zeros((3, 5))
+        except:
+            pytest.skip('cupy is missing')
+
+    t.implicit(cp.zeros((2, 2), dtype=cp.int32))
+    t.implicit(cp.zeros((2, 2, 10), dtype=cp.float32)[:, :, 4])
+    t.implicit(cp.zeros((2, 2, 10), dtype=cp.int32)[:, :, 4])
+    t.implicit(cp.zeros((2, 2, 10), dtype=cp.bool_)[:, :, 4])
+
+    with pytest.raises(TypeError) as excinfo:
+        t.noimplicit(cp.zeros((2, 2), dtype=cp.int32))
+
+    with pytest.raises(TypeError) as excinfo:
+        t.noimplicit(cp.zeros((2, 2), dtype=cp.uint8))

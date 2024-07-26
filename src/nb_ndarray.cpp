@@ -239,6 +239,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
         gil_scoped_acquire guard;
         Py_buffer *buf = (Py_buffer *) mt2->manager_ctx;
         PyBuffer_Release(buf);
+        PyMem_Free(mt2->manager_ctx);
         PyMem_Free(mt2->dltensor.shape);
         PyMem_Free(mt2->dltensor.strides);
         PyMem_Free(mt2);
@@ -308,7 +309,9 @@ bool ndarray_check(PyObject *o) noexcept {
         // XLA
         strcmp(tp_name, "jaxlib.xla_extension.ArrayImpl") == 0 ||
         // Tensorflow
-        strcmp(tp_name, "tensorflow.python.framework.ops.EagerTensor") == 0;
+        strcmp(tp_name, "tensorflow.python.framework.ops.EagerTensor") == 0 ||
+        // Cupy
+        strcmp(tp_name, "cupy.ndarray") == 0;
 
     Py_DECREF(name);
     return result;
@@ -467,7 +470,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
 
         object converted;
         try {
-            if (strcmp(module_name, "numpy") == 0) {
+            if (strcmp(module_name, "numpy") == 0 || strcmp(module_name, "cupy") == 0) {
                 converted = handle(o).attr("astype")(dtype, order);
             } else if (strcmp(module_name, "torch") == 0) {
                 converted = handle(o).attr("to")(
@@ -723,6 +726,10 @@ PyObject *ndarray_wrap(ndarray_handle *th, ndarray_framework framework,
 
             case ndarray_framework::jax:
                 package = module_::import_("jax.dlpack");
+                break;
+
+            case ndarray_framework::cupy:
+                package = module_::import_("cupy");
                 break;
 
             default:

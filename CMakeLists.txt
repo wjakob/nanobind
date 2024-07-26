@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.15...3.27)
-project(nanobind LANGUAGES NONE)
+
+# ---------------------------------------------------------------------------
+# Read the project version from nanobind.h
+# ---------------------------------------------------------------------------
+
+file(STRINGS "include/nanobind/nanobind.h" _nanobind_h_version REGEX "^#define NB_VERSION_.*$")
+string(REGEX MATCH "#define NB_VERSION_MAJOR ([0-9]+)" _ "${_nanobind_h_version}")
+set(_major ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define NB_VERSION_MINOR ([0-9]+)" _ "${_nanobind_h_version}")
+set(_minor ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define NB_VERSION_PATCH ([0-9]+)" _ "${_nanobind_h_version}")
+set(_patch ${CMAKE_MATCH_1})
+
+project(nanobind LANGUAGES NONE VERSION "${_major}.${_minor}.${_patch}")
 
 # ---------------------------------------------------------------------------
 # Only build tests by default if this is the top-level CMake project
@@ -46,12 +59,11 @@ endif()
 # ---------------------------------------------------------------------------
 # Installation rules
 # ---------------------------------------------------------------------------
-
 if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
   # Silence warning in GNUInstallDirs due to no enabled languages
   set(CMAKE_INSTALL_LIBDIR "")
   include(GNUInstallDirs)
-  set(NB_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/nanobind"
+  set(NB_INSTALL_DATADIR "nanobind"
     CACHE PATH "Installation path for read-only architecture-independent nanobind data files")
 
   # Normally these would be configurable by the user, but we can't allow that
@@ -81,17 +93,27 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
 
   if(NB_USE_SUBMODULE_DEPS)
     install(
-      DIRECTORY ext/robin_map/include/
-      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include"
-    )
-    install(
-      FILES ext/robin_map/CMakeLists.txt
-      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map"
+      FILES ext/robin_map/include/tsl/robin_map.h
+            ext/robin_map/include/tsl/robin_hash.h
+            ext/robin_map/include/tsl/robin_growth_policy.h
+      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include/tsl"
     )
   endif()
 
   install(
-    DIRECTORY cmake/
+    FILES cmake/nanobind-config.cmake
+          cmake/darwin-ld-cpython.sym
+          cmake/darwin-ld-pypy.sym
+    DESTINATION "${NB_INSTALL_CMAKE_DIR}"
+  )
+
+  include(CMakePackageConfigHelpers)
+  write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+    COMPATIBILITY SameMajorVersion
+  )
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
     DESTINATION "${NB_INSTALL_CMAKE_DIR}"
   )
 endif()
@@ -139,10 +161,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Include nanobind cmake functionality
 # ---------------------------------------------------------------------------
-
-find_package(nanobind
-  PATHS ${CMAKE_CURRENT_SOURCE_DIR}/cmake
-  NO_DEFAULT_PATH)
+include(cmake/nanobind-config.cmake)
 
 if (NB_TEST)
   add_subdirectory(tests)

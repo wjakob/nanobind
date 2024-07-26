@@ -24,6 +24,43 @@ namespace nanobind {
 }
 #endif
 
+template<bool expect_ro, bool is_shaped, typename... Ts>
+bool check_ro(const nb::ndarray<Ts...>& a) {  // Pytest passes five doubles
+    static_assert(std::remove_reference_t<decltype(a)>::ReadOnly == expect_ro);
+    static_assert(std::is_const_v<std::remove_pointer_t<decltype(a.data())>>
+                  == expect_ro);
+    auto vd = a.template view<double, nb::ndim<1>>();
+    static_assert(std::is_const_v<std::remove_pointer_t<decltype(vd.data())>>
+                  == expect_ro);
+    static_assert(std::is_const_v<std::remove_reference_t<decltype(vd(0))>>
+                  == expect_ro);
+    auto vcd = a.template view<const double, nb::ndim<1>>();
+    static_assert(std::is_const_v<std::remove_pointer_t<decltype(vcd.data())>>);
+    static_assert(std::is_const_v<std::remove_reference_t<decltype(vcd(0))>>);
+
+    bool pass = vd.data() == a.data() && vcd.data() == a.data();
+    if constexpr (!expect_ro) {
+        vd(1) = 1.414214;
+        pass &= vcd(1) == 1.414214;
+    }
+    if constexpr (is_shaped) {
+        static_assert(std::is_const_v<std::remove_reference_t<decltype(a(0))>>
+                      == expect_ro);
+        auto v = a.view();
+        static_assert(std::is_const_v<std::remove_pointer_t<decltype(v.data())>>
+                      == expect_ro);
+        static_assert(std::is_const_v<std::remove_reference_t<decltype(v(0))>>
+                      == expect_ro);
+        pass &= v.data() == a.data();
+        if constexpr (!expect_ro) {
+              a(2) = 2.718282;
+              v(4) = 16.0;
+        }
+    }
+    pass &= vcd(3) == 3.14159;
+    return pass;
+}
+
 NB_MODULE(test_ndarray_ext, m) {
     m.def("get_is_valid", [](const nb::ndarray<nb::ro> &t) {
         return t.is_valid();
@@ -90,6 +127,57 @@ NB_MODULE(test_ndarray_ext, m) {
           [](const nb::ndarray<float, nb::c_contig,
                                nb::shape<-1, -1, 4>> &) {}, "array"_a.noconvert());
 
+    m.def("check_rw_by_value",
+          [](nb::ndarray<> a) {
+              return check_ro</*expect_ro=*/false, /*is_shaped=*/false>(a);
+          });
+    m.def("check_ro_by_value_ro",
+          [](nb::ndarray<nb::ro> a) {
+              return check_ro</*expect_ro=*/true, /*is_shaped=*/false>(a);
+          });
+    m.def("check_rw_by_value_float64",
+          [](nb::ndarray<double, nb::ndim<1>> a) {
+              return check_ro</*expect_ro=*/false, /*is_shaped=*/true>(a);
+          });
+    m.def("check_ro_by_value_const_float64",
+          [](nb::ndarray<const double, nb::ndim<1>> a) {
+              return check_ro</*expect_ro=*/true, /*is_shaped=*/true>(a);
+          });
+
+    m.def("check_rw_by_const_ref",
+          [](const nb::ndarray<>& a) {
+              return check_ro</*expect_ro=*/false, /*is_shaped=*/false>(a);
+          });
+    m.def("check_ro_by_const_ref_ro",
+          [](const nb::ndarray<nb::ro>& a) {
+              return check_ro</*expect_ro=*/true, /*is_shaped=*/false>(a);
+          });
+    m.def("check_rw_by_const_ref_float64",
+          [](nb::ndarray<double, nb::ndim<1>> a) {
+              return check_ro</*expect_ro=*/false, /*is_shaped=*/true>(a);
+          });
+    m.def("check_ro_by_const_ref_const_float64",
+          [](const nb::ndarray<const double, nb::ndim<1>>& a) {
+              return check_ro</*expect_ro=*/true, /*is_shaped=*/true>(a);
+          });
+
+    m.def("check_rw_by_rvalue_ref",
+          [](nb::ndarray<>&& a) {
+              return check_ro</*expect_ro=*/false, /*is_shaped=*/false>(a);
+          });
+    m.def("check_ro_by_rvalue_ref_ro",
+          [](nb::ndarray<nb::ro>&& a) {
+              return check_ro</*expect_ro=*/true, /*is_shaped=*/false>(a);
+          });
+    m.def("check_rw_by_rvalue_ref_float64",
+          [](nb::ndarray<double, nb::ndim<1>>&& a) {
+              return check_ro</*expect_ro=*/false, /*is_shaped=*/true>(a);
+          });
+    m.def("check_ro_by_rvalue_ref_const_float64",
+          [](nb::ndarray<const double, nb::ndim<1>>&& a) {
+              return check_ro</*expect_ro=*/true, /*is_shaped=*/true>(a);
+          });
+
     m.def("check_order", [](nb::ndarray<nb::c_contig>) -> char { return 'C'; });
     m.def("check_order", [](nb::ndarray<nb::f_contig>) -> char { return 'F'; });
     m.def("check_order", [](nb::ndarray<>) -> char { return '?'; });
@@ -123,7 +211,7 @@ NB_MODULE(test_ndarray_ext, m) {
         [](nb::ndarray<float, nb::c_contig, nb::shape<2, 2>>) { return 0; },
         "array"_a);
 
-    m.def("inspect_ndarray", [](nb::ndarray<> ndarray) {
+    m.def("inspect_ndarray", [](const nb::ndarray<>& ndarray) {
         printf("Tensor data pointer : %p\n", ndarray.data());
         printf("Tensor dimension : %zu\n", ndarray.ndim());
         for (size_t i = 0; i < ndarray.ndim(); ++i) {
@@ -283,6 +371,12 @@ NB_MODULE(test_ndarray_ext, m) {
         for (size_t i = 0; i < v.shape(0); ++i)
             for (size_t j = 0; j < v.shape(1); ++j)
                 v(i, j) *= std::complex<float>(-1.0f, 2.0f);
+    }, "x"_a.noconvert());
+
+    m.def("fill_view_6", [](nb::ndarray<std::complex<float>, nb::shape<2, 2>, nb::c_contig, nb::device::cpu> x) {
+        auto v = x.view<nb::shape<4>>();
+        for (size_t i = 0; i < v.shape(0); ++i)
+            v(i) = -v(i);
     }, "x"_a.noconvert());
 
 #if defined(__aarch64__)

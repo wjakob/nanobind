@@ -389,7 +389,7 @@ multithreaded computations.
 The following wrappers are available and require no additional include
 directives:
 :cpp:class:`any`,
-:cpp:class:`bytes`, :cpp:class:`callable`, :cpp:class:`capsule`,
+:cpp:class:`bytearray`, :cpp:class:`bytes`, :cpp:class:`callable`, :cpp:class:`capsule`,
 :cpp:class:`dict`, :cpp:class:`ellipsis`, :cpp:class:`handle`,
 :cpp:class:`handle_t\<T\> <handle_t>`,
 :cpp:class:`bool_`, :cpp:class:`int_`, :cpp:class:`float_`,

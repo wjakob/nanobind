@@ -50,7 +50,6 @@ Homepage = "https://github.com/wjakob/nanobind"
 
 [tool.scikit-build]
 minimum-version = "0.9"
-sdist.include = ["tests/test_*_ext.pyi.ref"]
 wheel.platlib = false
 cmake.define.NB_TEST = false
 

@@ -1083,7 +1083,9 @@ Wrapper classes
 
    .. cpp:function:: void resize(size_t n)
 
-      Resize the internal buffer of a Python ``bytearray`` object to ``n``.
+      Resize the internal buffer of a Python ``bytearray`` object to ``n``. Any
+      space added by this method, which calls `PyByteArray_Resize`, will not be
+      initialized and may contain random data.
 
 
 .. cpp:class:: type_object: public object

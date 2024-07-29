@@ -588,8 +588,8 @@ PyObject *bytearray_from_obj(PyObject *o) {
     return result;
 }
 
-PyObject *bytearray_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyByteArray_FromStringAndSize(str, (Py_ssize_t) size);
+PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
+    PyObject *result = PyByteArray_FromStringAndSize((const char *) str, (Py_ssize_t) size);
     if (!result)
         raise_python_error();
     return result;

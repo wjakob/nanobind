@@ -138,7 +138,7 @@ NB_CORE PyObject *bytes_from_cstr_and_size(const void *c, size_t n);
 NB_CORE PyObject *bytearray_from_obj(PyObject *o);
 
 /// Convert a memory region into a Python byte array
-NB_CORE PyObject *bytearray_from_cstr_and_size(const char *c, size_t n);
+NB_CORE PyObject *bytearray_from_cstr_and_size(const void *c, size_t n);
 
 // ========================================================================
 

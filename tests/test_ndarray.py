@@ -686,7 +686,10 @@ def test37_noninteger_stride():
     t.pass_float32(s)
     assert t.get_stride(s, 0) == 6;
     assert t.get_stride(s, 1) == 1;
-    v = s.view(np.complex64)
+    try:
+        v = s.view(np.complex64)
+    except:
+        pytest.skip('your version of numpy is too old')
     t.pass_complex64(v)
     assert t.get_stride(v, 0) == 3;
     assert t.get_stride(v, 1) == 1;

@@ -275,12 +275,13 @@ template <> struct type_caster<bool> {
 template <> struct type_caster<char> {
     using Value = const char *;
     Value value;
+    Py_ssize_t size;
     static constexpr auto Name = const_name("str");
     template <typename T_>
     using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
-        value = PyUnicode_AsUTF8AndSize(src.ptr(), nullptr);
+        value = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
         if (!value) {
             PyErr_Clear();
             return false;
@@ -304,7 +305,7 @@ template <> struct type_caster<char> {
 
     template <typename T_>
     NB_INLINE bool can_cast() const noexcept {
-        return std::is_pointer_v<T_> || (value && value[0] && value[1] == '\0');
+        return std::is_pointer_v<T_> || (value && size == 1);
     }
 
     explicit operator const char *() { return value; }

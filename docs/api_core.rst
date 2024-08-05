@@ -12,7 +12,7 @@ Macros
 
    This macro creates the entry point that will be invoked when the Python
    interpreter imports an extension module. The module name is given as the
-   fist argument and it should not be in quotes. It **must** match the module
+   first argument and it should not be in quotes. It **must** match the module
    name given to the :cmake:command:`nanobind_add_module()` function in the
    CMake build system.
 

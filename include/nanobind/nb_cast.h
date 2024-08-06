@@ -606,6 +606,20 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
     return steal(h);
 }
 
+template <typename T>
+object cast(T &&value, rv_policy policy, handle parent) {
+    detail::cleanup_list cleanup(parent.ptr());
+    handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
+                                                policy, &cleanup);
+
+    cleanup.release();
+
+    if (!h.is_valid())
+        detail::raise_cast_error();
+
+    return steal(h);
+}
+
 template <typename T> object find(const T &value) noexcept {
     return steal(detail::make_caster<T>::from_cpp(value, rv_policy::none, nullptr));
 }

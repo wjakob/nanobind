@@ -1494,6 +1494,15 @@ Casting
 
    The function raises a :cpp:type:`cast_error` when the conversion fails.
 
+.. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy, handle parent)
+
+   Convert the C++ object ``value`` into a Python object. The return value
+   policy `policy` is used to handle ownership-related questions when a new
+   Python object must be created. A valid `parent` object is required when 
+   specifying a `reference_internal` return value policy.
+
+   The function raises a :cpp:type:`cast_error` when the conversion fails.
+
 .. cpp:function:: template <typename T> object find(const T &value) noexcept
 
    Return the Python object associated with the C++ instance `value`. When no

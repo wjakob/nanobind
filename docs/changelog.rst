@@ -15,6 +15,15 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.1.0 (TBA)
+-------------------
+
+* nanobind now allows a :cpp:class:`nb::enum_\<T\>() <enum_>` to specify the
+  new class binding annotation :cpp:class:`nb::flag_enum() <flag_enum>`,
+  which produces an enumeration type derived from `enum.IntFlag`. Instances of such
+  an enumeration type represent a bitwise combination of the defined enumerators,
+  and they may be combined using bitwise operators ``& | ^ ~``.
+
 Version 2.0.1 (TBA)
 ---------------------------
 

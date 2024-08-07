@@ -1,4 +1,5 @@
 import test_enum_ext as t
+import enum
 import pytest
 
 def test01_unsigned_enum():
@@ -135,6 +136,14 @@ def test08_enum_comparisons():
     assert t.Enum.B != t.SEnum.B and t.SEnum.B != t.Enum.B
     assert not (t.Enum.B == t.SEnum.B) and not (t.SEnum.B == t.Enum.B)
     assert t.Enum.B != t.SEnum.C and t.SEnum.C != t.Enum.B
+
+def test06_enum_flag():
+    assert (t.Flag(1) | t.Flag(2)).value == 3
+    assert (t.Flag(3) & t.Flag(1)).value == 1
+    assert (t.Flag(3) ^ t.Flag(1)).value == 2
+    assert (t.Flag(3) ==  (t.Flag.A | t.Flag.B))
+    assert (t.from_enum(t.Flag.A | t.Flag.C) == 5)
+    assert (t.from_enum_implicit(t.Flag(1) | t.Flag(4)) == 5)
 
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1

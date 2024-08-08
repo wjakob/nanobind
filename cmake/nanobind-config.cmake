@@ -371,7 +371,7 @@ function(nanobind_add_module name)
 endfunction()
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;OUTPUT_DIR;RECURSIVE;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -414,11 +414,17 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_ARGS -m "${ARG_MODULE}")
   endif()
 
-  if (NOT ARG_OUTPUT)
-    message(FATAL_ERROR "nanobind_add_stub(): an 'OUTPUT' argument must be specified!")
-  else()
+  if (ARG_OUTPUT AND ARG_OUTPUT_DIR)
+    message(FATAL_ERROR "nanobind_add_stub(): 'OUTPUT' and 'OUTPUT_DIR' cannot be used together!")
+  elseif(ARG_OUTPUT)
     list(APPEND NB_STUBGEN_ARGS -o "${ARG_OUTPUT}")
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
+  elseif (ARG_OUTPUT_DIR)
+    list(APPEND NB_STUBGEN_ARGS -O "${ARG_OUTPUT_DIR}")
+  endif()
+
+  if (ARG_RECURSIVE)
+    list(APPEND NB_STUBGEN_ARGS -r)
   endif()
 
   file(TO_CMAKE_PATH ${Python_EXECUTABLE} NB_Python_EXECUTABLE)
@@ -426,14 +432,18 @@ function (nanobind_add_stub name)
   set(NB_STUBGEN_CMD "${NB_Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
 
   if (NOT ARG_INSTALL_TIME)
+    set(STUB_FAKE_FILE ${CMAKE_BINARY_DIR}/${name}_stub.tmp)
+    set(NB_STUBGEN_CMD ${NB_STUBGEN_CMD} "-M" ${STUB_FAKE_FILE})
     add_custom_command(
-      OUTPUT ${NB_STUBGEN_OUTPUTS}
+      OUTPUT ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE}
       COMMAND ${NB_STUBGEN_CMD}
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
       DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" "${ARG_PATTERN_FILE}"
       ${NB_STUBGEN_EXTRA}
     )
-    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})
+    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE})
+    file(GLOB STUB_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/*.pyi" )
+    set_target_properties(${name} PROPERTIES ADDITIONAL_CLEAN_FILES "${STUB_FILES}")
   else()
     set(NB_STUBGEN_EXTRA "")
     if (ARG_COMPONENT)

@@ -18,19 +18,16 @@ NAMESPACE_BEGIN(detail)
 template <typename T> struct remove_opt_mono<std::optional<T>>
     : remove_opt_mono<T> { };
 
-template <typename T>
-struct type_caster<std::optional<T>> {
+template <typename Optional, typename T = typename Optional::value_type>
+struct optional_caster {
     using Caster = make_caster<T>;
 
-    NB_TYPE_CASTER(std::optional<T>, optional_name(Caster::Name))
-
-    type_caster() : value(std::nullopt) { }
+    NB_TYPE_CASTER(Optional, optional_name(Caster::Name))
 
     bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (src.is_none()) {
-            value = std::nullopt;
+        if (src.is_none())
+            // default-constructed value is already empty
             return true;
-        }
 
         Caster caster;
         if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
@@ -50,6 +47,9 @@ struct type_caster<std::optional<T>> {
         return Caster::from_cpp(forward_like_<T_>(*value), policy, cleanup);
     }
 };
+
+template <typename T>
+struct type_caster<std::optional<T>> : optional_caster<std::optional<T>> {};
 
 template <> struct type_caster<std::nullopt_t> {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {

@@ -35,14 +35,46 @@ The main tool to build nanobind extensions is the ``nanobind_extension`` rule.
 
     It corresponds directly to the builtin
     `cc_binary <https://bazel.build/reference/be/c-cpp#cc_binary>`__ rule,
-    with all keyword arguments being directly forwarded to a ``cc_binary`` 
+    with all keyword arguments being directly forwarded to a ``cc_binary``
     target.
 
     The ``domain`` argument can be used to build the target extension under a
     different ABI domain, as described in the :ref:`FAQ <type-visibility>`
     section.
 
-To build a C++ library with nanobind as a dependency, use the 
+To generate typing stubs for an extension, you can use the ``nanobind_stubgen``
+rule.
+
+.. cmake:command:: nanobind_stubgen
+
+    Declares a Bazel target for generating a stub file from a previously
+    built nanobind bindings extension.
+
+    .. code-block:: python
+
+        def nanobind_stubgen(
+            name,
+            module,
+            output_file = None,
+            imports = [],
+            pattern_file = None,
+            marker_file = None,
+            include_private_members = False,
+            exclude_docstrings = False):
+
+    It generates a `py_binary <https://bazel.build/reference/be/
+    python#py_binary>`__ rule with a corresponding runfiles distribution,
+    which invokes nanobind's builtin stubgen script, outputs a stub file and,
+    optionally, a typing marker file into the build
+    output directory (commonly called "bindir" in Bazel terms).
+
+    All arguments (except the name, which is used only to refer to the target
+    in Bazel) correspond directly to nanobind's stubgen command line interface,
+    which is described in more detail in the :ref:`typing documentation <stubs>`.
+
+    *New in nanobind-bazel version 2.1.0.*
+
+To build a C++ library with nanobind as a dependency, use the
 ``nanobind_library`` rule.
 
 .. cmake:command:: nanobind_library
@@ -82,7 +114,7 @@ To build a C++ shared library with nanobind as a dependency, use the
     c-cpp#cc_shared_library>`__ rule, with all keyword arguments being directly
     forwarded to a ``cc_shared_library`` target.
 
-    *New in nanobind-bazel version 2.1.0 (unreleased).*
+    *New in nanobind-bazel version 2.1.0.*
 
 To build a C++ test target requiring nanobind, use the ``nanobind_test`` rule.
 
@@ -107,7 +139,7 @@ To build a C++ test target requiring nanobind, use the ``nanobind_test`` rule.
 Flags
 -----
 
-To customize some of nanobind's build options, nanobind-bazel exposes the 
+To customize some of nanobind's build options, nanobind-bazel exposes the
 following flag settings.
 
 .. cmake:command:: @nanobind_bazel//:minsize (boolean)

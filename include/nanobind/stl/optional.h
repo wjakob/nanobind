@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <nanobind/nanobind.h>
+#include "detail/nb_optional.h"
 #include <optional>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -19,37 +19,7 @@ template <typename T> struct remove_opt_mono<std::optional<T>>
     : remove_opt_mono<T> { };
 
 template <typename T>
-struct type_caster<std::optional<T>> {
-    using Caster = make_caster<T>;
-
-    NB_TYPE_CASTER(std::optional<T>, optional_name(Caster::Name))
-
-    type_caster() : value(std::nullopt) { }
-
-    bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (src.is_none()) {
-            value = std::nullopt;
-            return true;
-        }
-
-        Caster caster;
-        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
-            !caster.template can_cast<T>())
-            return false;
-
-        value.emplace(caster.operator cast_t<T>());
-
-        return true;
-    }
-
-    template <typename T_>
-    static handle from_cpp(T_ &&value, rv_policy policy, cleanup_list *cleanup) noexcept {
-        if (!value)
-            return none().release();
-
-        return Caster::from_cpp(forward_like_<T_>(*value), policy, cleanup);
-    }
-};
+struct type_caster<std::optional<T>> : optional_caster<std::optional<T>> {};
 
 template <> struct type_caster<std::nullopt_t> {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {

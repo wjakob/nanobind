@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <nanobind/nanobind.h>
+#include "detail/nb_optional.h"
 #include <optional>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -17,36 +17,6 @@ NAMESPACE_BEGIN(detail)
 
 template <typename T> struct remove_opt_mono<std::optional<T>>
     : remove_opt_mono<T> { };
-
-template <typename Optional, typename T = typename Optional::value_type>
-struct optional_caster {
-    using Caster = make_caster<T>;
-
-    NB_TYPE_CASTER(Optional, optional_name(Caster::Name))
-
-    bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (src.is_none())
-            // default-constructed value is already empty
-            return true;
-
-        Caster caster;
-        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
-            !caster.template can_cast<T>())
-            return false;
-
-        value.emplace(caster.operator cast_t<T>());
-
-        return true;
-    }
-
-    template <typename T_>
-    static handle from_cpp(T_ &&value, rv_policy policy, cleanup_list *cleanup) noexcept {
-        if (!value)
-            return none().release();
-
-        return Caster::from_cpp(forward_like_<T_>(*value), policy, cleanup);
-    }
-};
 
 template <typename T>
 struct type_caster<std::optional<T>> : optional_caster<std::optional<T>> {};

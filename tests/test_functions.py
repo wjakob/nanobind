@@ -388,8 +388,11 @@ def test35_return_capture():
 
 def test36_test_char():
     assert t.test_cast_char("c") == "c"
+    assert t.test_cast_char("\x00") == "\x00"
     with pytest.raises(TypeError):
         assert t.test_cast_char("abc")
+    with pytest.raises(TypeError):
+        assert t.test_cast_char("")
     with pytest.raises(RuntimeError):
         assert t.test_cast_char(123)
 

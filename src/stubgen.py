@@ -872,7 +872,7 @@ class StubGen:
             return name
 
         # Rewrite module name if this is relative import from a submodule
-        if module.startswith(self.module.__name__):
+        if module.startswith(self.module.__name__) and module != self.module.__name__:
             module_short = module[len(self.module.__name__) :]
             if not name and as_name and module_short[0] == ".":
                 name = as_name = module_short[1:]

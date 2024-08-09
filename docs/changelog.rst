@@ -24,6 +24,11 @@ Version 2.0.1 (TBA)
   This change was prompted by discussion
   `#605 <https://github.com/wjakob/nanobind/discussions/605>`__.
 
+* Keyword argument annotations are now properly supported with
+  :cpp:struct:`nb::new_ <new_>`, passed in the same way they would be with
+  :cpp:struct:`nb::init <init>`. (issue `#668
+  <https://github.com/wjakob/nanobind/issues/668>`__)
+  
 * Added a wrapper type :cpp:class:`bytearray`.
 
 Version 2.0.0 (May 23, 2024)

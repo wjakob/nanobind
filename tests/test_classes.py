@@ -856,16 +856,17 @@ def test46_custom_new():
 
     # test alternate constructor
     assert t.UniqueInt("10") is u1
-    assert u1.lookups() == 3
+    assert t.UniqueInt(s="10") is u1
+    assert u1.lookups() == 4
 
     u3 = t.UniqueInt(20)
     assert u1 is not u3
     assert u3.value() == 20 and u3.lookups() == 1
 
     del u1
-    assert u2.lookups() == 3
-    assert u2 is t.UniqueInt(10)
     assert u2.lookups() == 4
+    assert u2 is t.UniqueInt(10)
+    assert u2.lookups() == 5
 
     del u2
     gc.collect()

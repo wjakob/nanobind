@@ -1028,7 +1028,7 @@ Wrapper classes
 
    .. cpp:function:: bytes(handle h)
 
-      Performs a cast within Python. This is equivalent equivalent to
+      Performs a cast within Python. This is equivalent to
       the Python expression ``bytes(h)``.
 
    .. cpp:function:: bytes(const char * s)
@@ -1050,6 +1050,42 @@ Wrapper classes
    .. cpp:function:: const void * data() const
 
       Convert a Python ``bytes`` object into a byte buffer of length :cpp:func:`bytes::size()` bytes.
+
+
+.. cpp:class:: bytearray: public object
+
+   This wrapper class represents Python ``bytearray`` instances.
+
+   .. cpp:function:: bytearray()
+
+      Create an empty ``bytearray``.
+
+   .. cpp:function:: bytearray(handle h)
+
+      Performs a cast within Python. This is equivalent to
+      the Python expression ``bytearray(h)``.
+
+   .. cpp:function:: bytearray(const void * buf, size_t n)
+
+      Convert a byte buffer ``buf`` of length ``n`` bytes into a Python ``bytearray`` object.  The buffer can contain embedded null bytes.
+
+   .. cpp:function:: const char * c_str() const
+
+      Convert a Python ``bytearray`` object into a null-terminated C-style string.
+
+   .. cpp:function:: size_t size() const
+
+      Return the size in bytes.
+
+   .. cpp:function:: const void * data() const
+
+      Convert a Python ``bytearray`` object into a byte buffer of length :cpp:func:`bytearray::size()` bytes.
+
+   .. cpp:function:: void resize(size_t n)
+
+      Resize the internal buffer of a Python ``bytearray`` object to ``n``. Any
+      space added by this method, which calls `PyByteArray_Resize`, will not be
+      initialized and may contain random data.
 
 
 .. cpp:class:: type_object: public object

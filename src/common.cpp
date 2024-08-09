@@ -581,6 +581,23 @@ PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
 
 // ========================================================================
 
+PyObject *bytearray_from_obj(PyObject *o) {
+    PyObject *result = PyByteArray_FromObject(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
+    PyObject *result = PyByteArray_FromStringAndSize((const char *) str, (Py_ssize_t) size);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+
+// ========================================================================
+
 PyObject *bool_from_obj(PyObject *o) {
     int rv = PyObject_IsTrue(o);
     if (rv == -1)

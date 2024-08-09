@@ -416,12 +416,18 @@ struct new_<Func, Return(Args...)> {
         // We can't do this if the user-provided __new__ takes no
         // arguments, because it would make an ambiguous overload set.
         detail::wrap_base_new(cl, sizeof...(Args) != 0);
-        cl.def_static(
-            "__new__",
-            [func = (detail::forward_t<Func>) func](handle, Args... args) {
-                return func((detail::forward_t<Args>) args...);
-            },
-            extra...);
+
+        auto wrapper = [func = (detail::forward_t<Func>) func](handle, Args... args) {
+            return func((detail::forward_t<Args>) args...);
+        };
+        if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {
+            // If any argument annotations are specified, add another for the
+            // extra class argument that we don't forward to Func, so visible
+            // arg() annotations stay aligned with visible function arguments.
+            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...);
+        } else {
+            cl.def_static("__new__", std::move(wrapper), extra...);
+        }
         cl.def("__init__", [](handle, Args...) {}, extra...);
     }
 };

@@ -1028,7 +1028,7 @@ Wrapper classes
 
    .. cpp:function:: bytes(handle h)
 
-      Performs a cast within Python. This is equivalent equivalent to
+      Performs a cast within Python. This is equivalent to
       the Python expression ``bytes(h)``.
 
    .. cpp:function:: bytes(const char * s)
@@ -1062,8 +1062,8 @@ Wrapper classes
 
    .. cpp:function:: bytearray(handle h)
 
-      Performs a cast within Python. This is equivalent equivalent to
-      the Python expression ``bytes(h)``.
+      Performs a cast within Python. This is equivalent to
+      the Python expression ``bytearray(h)``.
 
    .. cpp:function:: bytearray(const void * buf, size_t n)
 

@@ -467,9 +467,8 @@ class bytearray : public object {
     size_t size() const { return (size_t) PyByteArray_Size(m_ptr); }
 
     void resize(size_t n) {
-        if (PyByteArray_Resize(m_ptr, (Py_ssize_t) n) != 0) {
+        if (PyByteArray_Resize(m_ptr, (Py_ssize_t) n) != 0)
             detail::raise_python_error();
-        }
     }
 };
 

@@ -398,8 +398,8 @@ of shape/stride arrays for brace-initialization and infers ``ndim``:
 Data ownership
 --------------
 
-The ``owner`` argument of the :cpp:class:`ndarray`` constructor must specify a
-Python object that keeps the underlying memory region alive.
+The ``owner`` argument of the :cpp:class:`nb::ndarray <ndarray>` constructor
+must specify a Python object that keeps the underlying memory region alive.
 
 A common use case entails returning an nd-array view of an existing C++
 container. In this case, you could construct a :cpp:class:`nb::capsule

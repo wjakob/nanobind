@@ -15,19 +15,64 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.0.1 (TBA)
----------------------------
+Version 2.1.0 (Aug 11, 2024)
+----------------------------
+
+* Temporary workaround for a internal compiler error in version 17.10 the MSVC
+  compiler. This workaround will be removed once fixed versions are deployed on
+  GitHub actions. (issue `#613
+  <https://github.com/wjakob/nanobind/issues/613>`__, commit `f2438b
+  <https://github.com/wjakob/nanobind/commit/f2438bb73a1673e4ad9d0c84d353a88cf54e55bf>`__).
 
 * nanobind no longer prevents casting to a C++ container of pointers ``T*``
-  where ``T`` is a type with a user-defined type caster if the caster seems
-  to operate by extracting a ``T*`` from the Python object rather than a ``T``.
-  This change was prompted by discussion
-  `#605 <https://github.com/wjakob/nanobind/discussions/605>`__.
+  where ``T`` is a type with a user-defined type caster if the caster seems to
+  operate by extracting a ``T*`` from the Python object rather than a ``T``.
+  This change was prompted by discussion `#605
+  <https://github.com/wjakob/nanobind/discussions/605>`__.
+
+* Switch nanobind wheel generation from `setuptools
+  <https://github.com/pypa/setuptools>`__ to `scikit-build-core
+  <https://github.com/scikit-build/scikit-build-core>`__ (PR `#618
+  <https://github.com/wjakob/nanobind/discussions/618>`__).
+
+* Improved handling of ``const`-ness in :cpp:class:`nb::ndarray <ndarray>` (PR
+  `#491 <https://github.com/wjakob/nanobind/discussions/491>`__).
 
 * Keyword argument annotations are now properly supported with
   :cpp:struct:`nb::new_ <new_>`, passed in the same way they would be with
   :cpp:struct:`nb::init <init>`. (issue `#668
   <https://github.com/wjakob/nanobind/issues/668>`__)
+
+* Ability to use :cpp:func:`nb::cast <cast>` to create object with the
+  :cpp:enumerator:`nb::rv_policy::reference_internal
+  <rv_policy::reference_internal>` return value policy (PR `#667
+  <https://github.com/wjakob/nanobind/pull/667>`__).
+
+* Enable ``char`` type caster to produce ``'\0'`` (PR `#661
+  <https://github.com/wjakob/nanobind/pull/661>`__).
+
+* Added ``.def_static()`` member to :cpp:class:`nb::enum_ <enum_>`, which had
+  been lost in a redesign of the enumeration implementation in nanobind version
+  2.0.0. (commit `38990e
+  <https://github.com/wjakob/nanobind/commit/38990ea33bb499bcc23607147555bf5bb00dcf62>`__).
+
+* Fixes for two minor sources of memory leaks (PR
+  `#595 <https://github.com/wjakob/nanobind/pull/595>`__,
+  `#647 <https://github.com/wjakob/nanobind/pull/647>`__).
+
+* The nd-array wrapper :cpp::class:`nb::ndarray <ndarray>` now properly handles
+  CuPy arrays (`#594 <https://github.com/wjakob/nanobind/pull/594>`__).
+
+* Added :cpp:func:`nb::hash() <hash>`, a wrapper for the Python ``hash()``
+  function (commit `91fafa5
+  <https://github.com/wjakob/nanobind/commit/01fafa5b9e1de0f1ab2a9d108cd0fce20ab9568f>`__).
+
+* Various minor ``stubgen`` fixes (PR
+  `#667 <https://github.com/wjakob/nanobind/pull/667>`__,
+  `#658 <https://github.com/wjakob/nanobind/pull/658>`__,
+  `#632 <https://github.com/wjakob/nanobind/pull/632>`__,
+  `#620 <https://github.com/wjakob/nanobind/pull/620>`__,
+  `#592 <https://github.com/wjakob/nanobind/pull/592>`__).
 
 Version 2.0.0 (May 23, 2024)
 ----------------------------

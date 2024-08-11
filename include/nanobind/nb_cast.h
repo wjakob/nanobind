@@ -238,19 +238,21 @@ template <> struct type_caster<void> {
     }
 };
 
-template <> struct type_caster<std::nullptr_t> {
+template <typename T> struct none_caster {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
         if (src.is_none())
             return true;
         return false;
     }
 
-    static handle from_cpp(std::nullptr_t, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(T, rv_policy, cleanup_list *) noexcept {
         return none().release();
     }
 
-    NB_TYPE_CASTER(std::nullptr_t, const_name("None"))
+    NB_TYPE_CASTER(T, const_name("None"))
 };
+
+template <> struct type_caster<std::nullptr_t> : none_caster<std::nullptr_t> { };
 
 template <> struct type_caster<bool> {
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {

@@ -134,6 +134,14 @@ NB_CORE PyObject *bytes_from_cstr_and_size(const void *c, size_t n);
 
 // ========================================================================
 
+/// Convert a Python object into a Python byte array
+NB_CORE PyObject *bytearray_from_obj(PyObject *o);
+
+/// Convert a memory region into a Python byte array
+NB_CORE PyObject *bytearray_from_cstr_and_size(const void *c, size_t n);
+
+// ========================================================================
+
 /// Convert a Python object into a Python boolean object
 NB_CORE PyObject *bool_from_obj(PyObject *o);
 

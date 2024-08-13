@@ -15,10 +15,17 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.1.1 (TBA)
+-------------------
+
+* Added the :cpp:class:`bytearray` wrapper type. (PR `#654
+  <https://github.com/wjakob/nanobind/pull/654>`__)
+
+
 Version 2.1.0 (Aug 11, 2024)
 ----------------------------
 
-* Temporary workaround for a internal compiler error in version 17.10 the MSVC
+* Temporary workaround for a internal compiler error in version 17.10 of the MSVC
   compiler. This workaround will be removed once fixed versions are deployed on
   GitHub actions. (issue `#613
   <https://github.com/wjakob/nanobind/issues/613>`__, commit `f2438b

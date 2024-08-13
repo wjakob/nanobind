@@ -286,7 +286,8 @@ template <> struct type_caster<char> {
         value = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
         if (!value) {
             PyErr_Clear();
-            return false;
+            // optimize for src being a string, check for None afterwards
+            return src.is_none();
         }
         return true;
     }

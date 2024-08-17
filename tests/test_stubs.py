@@ -19,6 +19,12 @@ def remove_platform_dependent(s):
            v.startswith('def test_slots()') or \
            v.startswith('TypeAlias'):
             i += 2
+        elif v.startswith('from typing') or \
+            v.startswith('from typing_extensions') or \
+            v.startswith('from collections.abc'):
+            i += 1
+        elif v.startswith('class DLPackBuffer(Protocol)'):
+            i += 5
         else:
             s2.append(v)
             i += 1

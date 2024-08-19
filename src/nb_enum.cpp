@@ -44,7 +44,14 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
                 PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
     }
 
-    const char *factory_name = (is_arithmetic || is_flag) ? (is_flag ? "IntFlag" : "IntEnum") : "Enum";
+    const char *factory_name = "Enum";
+
+    if (is_arithmetic && is_flag)
+        factory_name = "IntFlag";
+    else if (is_flag)
+        factory_name = "Flag";
+    else if (is_arithmetic)
+        factory_name = "IntEnum";
 
     object enum_mod = module_::import_("enum"),
            factory = enum_mod.attr(factory_name),
@@ -55,10 +62,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     scope.attr(name) = result;
     result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();
 
-    if (is_arithmetic)
-        result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
-    if (is_flag)
-        result.attr("__str__") = enum_mod.attr("IntEnum").attr("__str__");
+    result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
 
     type_init_data *t = new type_init_data();

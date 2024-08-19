@@ -1,4 +1,6 @@
+#include <iostream>
 #include <nanobind/stl/complex.h>
+#include <nanobind/stl/vector.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 #include <nanobind/trampoline.h>
@@ -251,5 +253,20 @@ NB_MODULE(test_eigen_ext, m) {
         Eigen::Vector2d input(1.0, 2.0);
         base->modRefDataConst(input);
         return input;
+    });
+
+    using MatXdR = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    using MatRefXdR = Eigen::Ref<const MatXdR>;
+    using Vec_MatRefXdR = std::vector<MatRefXdR>;
+    m.def("printRefs", [](const Vec_MatRefXdR& ms) {
+        std::cout << "[cpp] got matrices:\n";
+        std::cout << ms[0] << "\n----" << std::endl;
+        std::cout << ms[1] << std::endl;
+        // passthrough
+        std::vector<MatXdR> out(ms.size());
+        for (size_t i = 0; i < ms.size(); i++) {
+            out[i] = ms[i];
+        }
+        return out;
     });
 }

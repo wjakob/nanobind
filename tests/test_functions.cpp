@@ -81,7 +81,7 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     /// Test tuple manipulation
-    m.def("test_tuple", [](nb::tuple l) {
+    m.def("test_tuple", [](nb::typed<nb::tuple, int, nb::ellipsis> l) {
         int result = 0;
         for (size_t i = 0; i < l.size(); ++i)
             result += nb::cast<int>(l[i]);

@@ -358,8 +358,8 @@ template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {
     using Typed = typed<T, Ts...>;
 
     NB_TYPE_CASTER(Typed, typed_name<intrinsic_t<T>>::Name + const_name("[") +
-                              concat(make_caster<Ts>::Name...) +
-                              const_name("]"))
+                   concat(const_name<std::is_same_v<Ts, ellipsis>>(const_name("..."),
+                          make_caster<Ts>::Name)...) + const_name("]"))
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         Caster caster;

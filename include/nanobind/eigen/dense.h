@@ -253,17 +253,36 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     template <typename T_> using Cast = Map;
     template <typename T_> static constexpr bool can_cast() { return true; }
 
+    bool need_copy;
     NDArrayCaster caster;
+    NDArray arr_copy;  // use this if necessary
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         // Disable implicit conversions
         return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
     }
 
+    /// given inner stride + compile-time info on number of dimensions, shape and row- or col-major,
+    /// get appropriate strides for the temp copy array
+    static void get_auto_strides(const size_t *shape, int64_t *strides, bool inner_stride = 1) {
+        if constexpr (ndim_v<T> == 1) {
+            strides[0] = inner_stride;
+        } else if (!T::IsRowMajor) {
+            // col major: (1, shape[0])
+            strides[0] = inner_stride;
+            strides[1] = shape[0];
+        } else {
+            // row major: (shape[1], 1)
+            strides[0] = shape[1];
+            strides[1] = inner_stride;
+        }
+    }
+
     bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
         if (!caster.from_python(src, flags, cleanup))
             return false;
 
+        need_copy = false;
         // Check for memory layout compatibility of non-contiguous 'Map' types
         if constexpr (!is_contiguous_v<Map>)  {
             // Dynamic inner strides support any input, check the fixed case
@@ -275,7 +294,9 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
                         is_actual = caster.value.stride(
                             (ndim_v<T> != 1 && T::IsRowMajor) ? 1 : 0);
 
-                if (is_expected != is_actual)
+                need_copy |= is_expected != is_actual;
+                // do not handle non-contiguous inner dimension
+                if (need_copy && (is_expected != 1))
                     return false;
             }
 
@@ -286,8 +307,46 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
                                         : StrideType::OuterStrideAtCompileTime,
                         os_actual   = caster.value.stride(T::IsRowMajor ? 0 : 1);
 
-                if (os_expected != os_actual)
+                need_copy |= os_expected != os_actual;
+            }
+            // create a temp, copy ndarray that we will map into
+            if (need_copy) {
+                if constexpr (!std::is_const_v<T>)
                     return false;
+                if (cleanup == nullptr)
+                    return false;
+                using Scalar = typename Map::Scalar;
+                // allocate temp data on the heap
+                Scalar *data = new Scalar[caster.value.size()];
+                capsule owner(data, [](void*p) noexcept {
+                    delete[] (Scalar*)p;
+                });
+                // add to cleanup
+                cleanup->append(owner.release().ptr());
+                size_t shape[size_t(ndim_v<T>)];
+                int64_t strides[size_t(ndim_v<T>)];
+                for(size_t i = 0; i < ndim_v<T>; i++)
+                    shape[i] = caster.value.shape(i);
+                get_auto_strides(shape, strides);
+                // make mutable temp view, to be filled in
+                array_for_eigen_t<T, Scalar> tmp{
+                    data,
+                    ndim_v<T>,
+                    shape,
+                    owner, // owner, nuked when function call terminates
+                    strides,
+                };
+                if constexpr (ndim_v<T> == 1) {
+                    for (size_t i = 0; i < shape[0]; i++)
+                        tmp(i) = caster.value(i);
+                } else if (ndim_v<T> == 2) {
+                    for (size_t i = 0; i < shape[0]; i++)
+                        for (size_t j = 0; j < shape[1]; j++)
+                            tmp(i, j) = caster.value(i, j);
+                }
+                // copy into immutable view
+                arr_copy = NDArray{tmp};
+                return true;
             }
         }
         return true;
@@ -316,16 +375,16 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
             cleanup);
     }
 
-    StrideType strides() const {
+    static StrideType strides(NDArray &t) {
         constexpr int IS = StrideType::InnerStrideAtCompileTime,
                       OS = StrideType::OuterStrideAtCompileTime;
 
-        int64_t inner = caster.value.stride(0),
+        int64_t inner = t.stride(0),
                 outer;
         if constexpr (ndim_v<T> == 1)
-            outer = caster.value.shape(0);
+            outer = t.shape(0);
         else
-            outer = caster.value.stride(1);
+            outer = t.stride(1);
 
         if constexpr (ndim_v<T> == 2 && T::IsRowMajor)
             std::swap(inner, outer);
@@ -346,11 +405,11 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     }
 
     operator Map() {
-        NDArray &t = caster.value;
+        NDArray &t = need_copy ? arr_copy : caster.value;
         if constexpr (ndim_v<T> == 1)
-            return Map(t.data(), t.shape(0), strides());
+            return Map(t.data(), t.shape(0), strides(t));
         else
-            return Map(t.data(), t.shape(0), t.shape(1), strides());
+            return Map(t.data(), t.shape(0), t.shape(1), strides(t));
     }
 };
 

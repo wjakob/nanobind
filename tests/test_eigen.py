@@ -378,17 +378,19 @@ def test14_single_element():
 
 @needs_numpy_and_eigen
 @pytest.mark.parametrize(("n1", "n2"), [(4, 2), (6, 3), (8, 2)])
-def test15_vec_ref(n1, n2):
-    np.set_printoptions(precision=4, linewidth=200)
+@pytest.mark.parametrize("colMajor", (False, True))
+def test15_vec_ref(n1, n2, colMajor):
+    np.set_printoptions(precision=5, linewidth=200)
     np.random.seed(42)
     a = np.random.randn(n1, 8)
-    a = np.asfortranarray(a)  # column-major
+    if colMajor:
+        a = np.asfortranarray(a)  # column-major
     s1 = a[:n2]
     s2 = a[n2:]
     print("INPUT VALUES AND STRIDES:")
     print(s1, s1.strides)
     print(s2, s2.strides)
     r1, r2 = t.printRefs([s1, s2])
-    np.allclose(s1, r1)
-    np.allclose(s2, r2)
+    assert np.allclose(s1, r1)
+    assert np.allclose(s2, r2)
     

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core"]
+requires = ["scikit-build-core >=0.10"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -49,7 +49,7 @@ Homepage = "https://github.com/wjakob/nanobind"
 
 
 [tool.scikit-build]
-minimum-version = "0.9"
+minimum-version = "build-system.requires"
 wheel.platlib = false
 cmake.define.NB_TEST = false
 

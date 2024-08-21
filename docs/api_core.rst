@@ -2734,6 +2734,15 @@ The documentation below refers to two per-instance flags with the following mean
 Global flags
 ------------
 
+.. cpp:function:: bool leak_warnings() noexcept
+
+   Returns whether nanobind warns if any nanobind instances, types, or
+   functions are still alive when the Python interpreter shuts down.
+
+.. cpp:function:: bool implicit_cast_warnings() noexcept
+
+   Returns whether nanobind warns if an implicit conversion was not successful.
+
 .. cpp:function:: void set_leak_warnings(bool value) noexcept
 
    By default, nanobind loudly complains when any nanobind instances, types, or

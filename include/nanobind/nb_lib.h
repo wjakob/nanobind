@@ -524,6 +524,8 @@ NB_CORE void decref_checked(PyObject *o) noexcept;
 
 // ========================================================================
 
+NB_CORE bool leak_warnings() noexcept;
+NB_CORE bool implicit_cast_warnings() noexcept;
 NB_CORE void set_leak_warnings(bool value) noexcept;
 NB_CORE void set_implicit_cast_warnings(bool value) noexcept;
 

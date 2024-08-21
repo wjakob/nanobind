@@ -285,7 +285,7 @@ extern char *type_name(const std::type_info *t);
 
 // Forward declarations
 extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
-extern PyObject *inst_new_int(PyTypeObject *tp);
+extern PyObject *inst_new_int(PyTypeObject *tp, PyObject *args, PyObject *kwds);
 extern PyTypeObject *nb_static_property_tp() noexcept;
 extern type_data *nb_type_c2p(nb_internals *internals,
                               const std::type_info *type);

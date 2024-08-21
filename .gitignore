@@ -21,6 +21,7 @@ inter_module.dll
 /src/nanobind/ext
 /src/nanobind/src
 /dist
+/tests/dist
 /bench
 compile_commands.json
 

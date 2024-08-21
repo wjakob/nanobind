@@ -155,7 +155,8 @@ if (NOT TARGET Python::Module OR NOT TARGET Python::Interpreter)
 
   find_package(Python 3.8
     REQUIRED COMPONENTS Interpreter ${NB_PYTHON_DEV_MODULE}
-    OPTIONAL_COMPONENTS Development.SABIModule)
+    OPTIONAL_COMPONENTS Development.SABIModule
+    GLOBAL)
 endif()
 
 # ---------------------------------------------------------------------------

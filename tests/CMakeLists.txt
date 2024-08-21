@@ -1,8 +1,24 @@
+include_guard(GLOBAL)
+
+cmake_minimum_required(VERSION 3.15...3.27)
+project(nanobind_tests LANGUAGES CXX)
+
+if(PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
+  set(NB_TESTS ON)
+  if(APPLE)
+    set(BASEPOINT @loader_path)
+  else()
+    set(BASEPOINT $ORIGIN)
+  endif()
+  set(CMAKE_INSTALL_RPATH ${BASEPOINT} ${BASEPOINT}/${CMAKE_INSTALL_LIBDIR})
+
+  add_subdirectory(.. ./build)
+endif()
+
 # If leaks are found, abort() during interpreter shutdown to catch this in the CI
 add_definitions(-DNB_ABORT_ON_LEAK)
 
 if (EMSCRIPTEN)
-  add_subdirectory(.. ./build)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_STATIC)
 endif()
 
@@ -152,3 +168,43 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
 
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
 endif()
+
+if(DEFINED SKBUILD)
+  install(
+    FILES
+      "${CMAKE_CURRENT_BINARY_DIR}/test_functions_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/test_stl_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/test_typing_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/test_enum_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/test_ndarray_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/test_make_iterator_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/test_classes_ext.pyi"
+      "${CMAKE_CURRENT_BINARY_DIR}/py_stub_test.pyi"
+    DESTINATION
+      .
+  )
+  install(
+    TARGETS
+      inter_module
+      test_inter_module_1_ext
+      test_inter_module_2_ext
+      test_functions_ext
+      test_classes_ext
+      test_holders_ext
+      test_stl_ext
+      test_bind_map_ext
+      test_bind_vector_ext
+      test_chrono_ext
+      test_enum_ext
+      test_eval_ext
+      test_ndarray_ext
+      test_intrusive_ext
+      test_exception_ext
+      test_make_iterator_ext
+      test_typing_ext
+      test_issue_ext
+    DESTINATION
+      .
+  )
+endif()
+

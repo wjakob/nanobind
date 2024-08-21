@@ -9,6 +9,9 @@ build-backend = "scikit_build_core.build"
 name = "nanobind_tests"
 version = "0.0.1"
 dependencies = ["pytest", "pytest-timeout", "numpy", "scipy"]
+classifiers = [
+  "Private :: Do Not Upload",
+]
 
 [tool.cibuildwheel]
 test-command = "pytest -o timeout=0 -p no:cacheprovider {project}/tests/test_*.py"

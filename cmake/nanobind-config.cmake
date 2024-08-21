@@ -228,9 +228,10 @@ function (nanobind_build_library TARGET_NAME)
       ${NB_DIR}/ext/robin_map/include)
   endif()
 
+  get_property(nanobind_python_headers TARGET Python::Module PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
   target_include_directories(${TARGET_NAME} PUBLIC
-    ${Python_INCLUDE_DIRS}
-    ${NB_DIR}/include)
+    "${nanobind_python_headers}"
+    "${NB_DIR}/include")
 
   target_compile_features(${TARGET_NAME} PUBLIC cxx_std_17)
   nanobind_set_visibility(${TARGET_NAME})

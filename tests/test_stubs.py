@@ -5,6 +5,9 @@ import sys
 import platform
 import pytest
 
+import test_typing_ext
+LIB_DIR = pathlib.Path(test_typing_ext.__file__).parent.resolve()
+
 is_unsupported = platform.python_implementation() == 'PyPy' or sys.version_info < (3, 10)
 skip_on_unsupported = pytest.mark.skipif(
     is_unsupported, reason="Stub generation is only tested on CPython >= 3.10.0")
@@ -33,7 +36,7 @@ def test01_check_stub_refs(p_ref):
     """
     Check that generated stub files match reference input
     """
-    p_in = p_ref.with_suffix('')
+    p_in = LIB_DIR / p_ref.with_suffix('').name
     with open(p_ref, 'r') as f:
         s_ref = f.read().split('\n')
     with open(p_in, 'r') as f:

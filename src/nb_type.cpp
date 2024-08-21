@@ -65,7 +65,8 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 }
 
 /// Allocate memory for a nb_type instance with internal storage
-PyObject *inst_new_int(PyTypeObject *tp) {
+PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
+                       PyObject * /*kwd */) {
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
 
     nb_inst *self;
@@ -100,7 +101,6 @@ PyObject *inst_new_int(PyTypeObject *tp) {
     }
 
     return (PyObject *) self;
-
 }
 
 /// Allocate memory for a nb_type instance with external storage
@@ -1389,7 +1389,7 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
 
     nb_inst *inst;
     if (create_new)
-        inst = (nb_inst *) inst_new_int(t->type_py);
+        inst = (nb_inst *) inst_new_int(t->type_py, nullptr, nullptr);
     else
         inst = (nb_inst *) inst_new_ext(t->type_py, value);
 
@@ -1783,7 +1783,7 @@ void *nb_type_supplement(PyObject *t) noexcept {
 }
 
 PyObject *nb_inst_alloc(PyTypeObject *t) {
-    PyObject *result = inst_new_int(t);
+    PyObject *result = inst_new_int(t, nullptr, nullptr);
     if (!result)
         raise_python_error();
     return result;
@@ -1824,7 +1824,7 @@ void nb_inst_zero(PyObject *o) noexcept {
 }
 
 PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
-    PyObject *result = inst_new_int(t);
+    PyObject *result = inst_new_int(t, nullptr, nullptr);
     if (!result)
         raise_python_error();
     nb_inst *nbi = (nb_inst *) result;

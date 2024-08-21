@@ -293,7 +293,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -309,7 +309,11 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
-            rv_policy::reference, cleanup);
+            (policy == rv_policy::automatic ||
+             policy == rv_policy::automatic_reference)
+                ? rv_policy::reference
+                : policy,
+            cleanup);
     }
 
     StrideType strides() const {
@@ -440,7 +444,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         return false;
     }
 
-    static handle from_cpp(const Ref &v, rv_policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const Ref &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         // Copied from the Eigen::Map caster
 
         size_t shape[ndim_v<T>];
@@ -458,7 +462,11 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
 
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
-            rv_policy::reference, cleanup);
+            (policy == rv_policy::automatic ||
+             policy == rv_policy::automatic_reference)
+                ? rv_policy::reference
+                : policy,
+            cleanup);
     }
 
     operator Ref() {

@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h> // vsnprintf
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)

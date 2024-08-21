@@ -1254,12 +1254,13 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
             //       [construct] 2  [relinq] 1  3           no
             //       [construct] 2   [ready] 2  0           no
 
-            if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) ^ inst->state) != nb_inst::state_ready)) {
+            if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) ^
+                             inst->state) != nb_inst::state_ready)) {
                 constexpr const char* errors[4] = {
-                    /* 0=uninit */ "attempted to access an uninitialized instance",
-                    /* 1=relinq */ "attempted to access a relinquished instance",
-                    /* 2=ready */ "attempted to initialize an already-initialized instance",
-                    /* 3=invalid */ "instance state has become corrupted",
+                    /* 0 = uninit  */ "attempted to access an uninitialized instance",
+                    /* 1 = relinq  */ "attempted to access a relinquished instance",
+                    /* 2 = ready   */ "attempted to initialize an already-initialized instance",
+                    /* 3 = invalid */ "instance state has become corrupted",
                 };
                 PyErr_WarnFormat(
                     PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",

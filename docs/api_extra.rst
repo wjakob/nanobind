@@ -276,16 +276,16 @@ include directive:
 
          va = VecA()
          va.append(A(123))
-         a[0].value = 456
-         assert a[0].value == 456 # <-- assertion fails!
+         va[0].value = 456
+         assert va[0].value == 456 # <-- assertion fails!
 
       To actually modify ``va``, another write is needed.
 
       .. code-block:: python
 
-         v = a[0]
+         v = va[0]
          v.value = 456
-         a[0] = v
+         va[0] = v
 
       This may seem like a strange design, so it is worth explaining why the
       implementation works in this way.

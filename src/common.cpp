@@ -1084,6 +1084,14 @@ void decref_checked(PyObject *o) noexcept {
 
 // ========================================================================
 
+bool leak_warnings() noexcept {
+    return internals->print_leak_warnings;
+}
+
+bool implicit_cast_warnings() noexcept {
+    return internals->print_implicit_cast_warnings;
+}
+
 void set_leak_warnings(bool value) noexcept {
     internals->print_leak_warnings = value;
 }

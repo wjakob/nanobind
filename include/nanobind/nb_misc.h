@@ -31,6 +31,14 @@ private:
     PyThreadState *state;
 };
 
+inline bool leak_warnings() noexcept {
+    return detail::leak_warnings();
+}
+
+inline bool implicit_cast_warnings() noexcept {
+    return detail::implicit_cast_warnings();
+}
+
 inline void set_leak_warnings(bool value) noexcept {
     detail::set_leak_warnings(value);
 }

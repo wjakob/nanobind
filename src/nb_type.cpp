@@ -1151,9 +1151,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         }
         spec.basicsize = (int) basicsize;
 
-        if (!has_getset) {
+        if (!has_getset)
             *s++ = { Py_tp_getset, (void *) inst_getset };
-        }
     }
 
     if (is_weak_referenceable) {

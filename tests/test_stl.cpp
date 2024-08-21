@@ -71,8 +71,7 @@ int funcwrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
     Py_VISIT(f.ptr());
 
     return 0;
-};
-
+}
 
 int FuncWrapper::alive = 0;
 

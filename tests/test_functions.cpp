@@ -36,7 +36,7 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_05", [](int) -> int { return 1; }, "doc_1");
     nb::object first_overload = m.attr("test_05");
     m.def("test_05", [](float) -> int { return 2; }, "doc_2");
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(Py_GIL_DISABLED)
     // Make sure we don't leak the previous member of the overload chain
     // (pypy's refcounts are bogus and will not help us with this check)
     if (first_overload.ptr()->ob_refcnt != 1) {

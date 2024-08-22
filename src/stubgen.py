@@ -479,7 +479,10 @@ class StubGen:
 
             if same_module:
                 # This is an alias of a type in the same module or same top-level module
-                alias_tp = self.import_object("typing", "TypeAlias")
+                if sys.version_info >= (3, 10, 0):
+                    alias_tp = self.import_object("typing", "TypeAlias")
+                else:
+                    alias_tp = self.import_object("typing_extensions", "TypeAlias")
                 self.write_ln(f"{name}: {alias_tp} = {tp.__qualname__}\n")
             elif self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # Import from a different module
@@ -581,7 +584,10 @@ class StubGen:
             if self.is_type_var(tp):
                 types = ""
             elif typing.get_origin(value):
-                types = ": " + self.import_object("typing", "TypeAlias")
+                if sys.version_info >= (3, 10, 0):
+                    types = ": " + self.import_object("typing", "TypeAlias")
+                else:
+                    types = ": " + self.import_object("typing_extensions", "TypeAlias")
             else:
                 types = f": {self.type_str(tp)}"
 

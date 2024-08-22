@@ -90,7 +90,7 @@ SKIP_LIST = [
     "__cached__", "__path__", "__version__", "__spec__", "__loader__",
     "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
     "__file__", "__dict__", "__weakref__", "__format__", "__nb_enum__",
-    "__firstlineno__", "__static_attributes__"
+    "__firstlineno__", "__static_attributes__", "__annotations__", "__annotate__"
 ]
 # fmt: on
 
@@ -553,6 +553,9 @@ class StubGen:
             and tp.__module__ == "typing"
             and str(value) == f"typing.{name}"
         ):
+            return
+
+        if tp.__module__ == '__future__':
             return
 
         if isinstance(parent, type) and issubclass(tp, parent):
@@ -1051,7 +1054,9 @@ class StubGen:
         """Attempt to convert a type into a Python expression which reproduces it"""
         origin, args = typing.get_origin(tp), typing.get_args(tp)
 
-        if isinstance(tp, typing.TypeVar):
+        if isinstance(tp, str):
+            result = tp
+        elif isinstance(tp, typing.TypeVar):
             return tp.__name__
         elif isinstance(tp, typing.ForwardRef):
             return repr(tp.__forward_arg__)

@@ -8,7 +8,7 @@ import pytest
 import test_typing_ext
 LIB_DIR = pathlib.Path(test_typing_ext.__file__).parent.resolve()
 
-is_unsupported = platform.python_implementation() == 'PyPy' or sys.version_info < (3, 10)
+is_unsupported = platform.python_implementation() == 'PyPy' or sys.version_info < (3, 10) or sys.platform.startswith("emscripten")
 skip_on_unsupported = pytest.mark.skipif(
     is_unsupported, reason="Stub generation is only tested on CPython >= 3.10.0")
 

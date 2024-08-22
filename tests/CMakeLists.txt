@@ -79,22 +79,26 @@ foreach (NAME functions classes ndarray stl enum typing make_iterator)
     set(PYI_PREFIX $<CONFIG>/)
   endif()
 
-  nanobind_add_stub(
-    ${NAME}_ext_stub
-    MODULE test_${NAME}_ext
-    OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
-    DEPENDS test_${NAME}_ext
-    ${EXTRA})
+  if(NOT CMAKE_CROSSCOMPILING)
+    nanobind_add_stub(
+      ${NAME}_ext_stub
+      MODULE test_${NAME}_ext
+      OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
+      PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
+      DEPENDS test_${NAME}_ext
+      ${EXTRA})
+  endif()
 endforeach()
 
-nanobind_add_stub(
-  py_stub
-  MODULE py_stub_test
-  OUTPUT ${PYI_PREFIX}py_stub_test.pyi
-  PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
-  DEPENDS py_stub_test.py
-)
+if(NOT CMAKE_CROSSCOMPILING)
+  nanobind_add_stub(
+    py_stub
+    MODULE py_stub_test
+    OUTPUT ${PYI_PREFIX}py_stub_test.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
+    DEPENDS py_stub_test.py
+  )
+endif()
 
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)
@@ -170,19 +174,21 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
 endif()
 
 if(DEFINED SKBUILD)
-  install(
-    FILES
-      "${CMAKE_CURRENT_BINARY_DIR}/test_functions_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/test_stl_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/test_typing_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/test_enum_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/test_ndarray_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/test_make_iterator_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/test_classes_ext.pyi"
-      "${CMAKE_CURRENT_BINARY_DIR}/py_stub_test.pyi"
-    DESTINATION
-      .
-  )
+  if(NOT CMAKE_CROSSCOMPILING)
+    install(
+      FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/test_functions_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/test_stl_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/test_typing_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/test_enum_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/test_ndarray_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/test_make_iterator_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/test_classes_ext.pyi"
+        "${CMAKE_CURRENT_BINARY_DIR}/py_stub_test.pyi"
+      DESTINATION
+        .
+    )
+  endif()
   install(
     TARGETS
       inter_module

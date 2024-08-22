@@ -23,8 +23,6 @@ jobs:
         fetch-depth: 0
 
     - uses: pypa/cibuildwheel@v2.20
-      env:
-        PYODIDE_BUILD_EXPORTS: whole_archive
       with:
         package-dir: tests
         only: cp312-pyodide_wasm32

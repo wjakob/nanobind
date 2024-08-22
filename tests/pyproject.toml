@@ -2,7 +2,7 @@
 # builder for the tests (yet). Specifically, wheels can't be built from SDists.
 
 [build-system]
-requires = ["scikit-build-core"]
+requires = ["scikit-build-core>=0.10"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -13,5 +13,12 @@ classifiers = [
   "Private :: Do Not Upload",
 ]
 
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+
 [tool.cibuildwheel]
 test-command = "pytest -o timeout=0 -p no:cacheprovider {project}/tests/test_*.py"
+
+[[tool.cibuildwheel.overrides]]
+select = ["*-pyodide_wasm32"]
+environment.PYODIDE_BUILD_EXPORTS = "whole_archive"

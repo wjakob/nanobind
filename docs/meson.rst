@@ -26,17 +26,23 @@ pyproject.toml file:
 
 .. code-block:: toml
 
+   [project]
+   name = "my_project_name"
+   dynamic = ['version']
+
    [build-system]
    requires = ['meson-python']
 
    build-backend = 'mesonpy'
    
 In your project root, you will also want to create the subprojects folder
-that Meson can install into, before using ``meson wrap``:
+that Meson can install into. Then you will need to install the wrap packages
+for both nanobind and robin-map:
 
 .. code-block:: sh
 
    mkdir -p subprojects
+   meson wrap install robin-map
    meson wrap install nanobind
 
 The ``meson.build`` definition in your project root should look like:
@@ -46,6 +52,7 @@ The ``meson.build`` definition in your project root should look like:
    project(
      'my_project_name',
      'cpp',
+     version: '0.0.1',
    )
 
    py = import('python').find_installation()

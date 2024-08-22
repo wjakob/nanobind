@@ -14,6 +14,11 @@ If you prefer another build system, then you have the following options:
   interface <https://github.com/nicholasjng/nanobind-Bazel>`__ to nanobind.
   Please report Bazel-specific issues there.
 
+- `Will Ayd <https://github.com/WillAyd/>`__ has created a `Meson WrapDB
+  package https://mesonbuild.com/Wrapdb-projects.html>`__ for nanobind. Please
+  report Meson-specific issues on the `Meson WrapDB
+  <https://github.com/mesonbuild/wrapdb/issues>`__ repository.
+
 - You could create a new build system from scratch that takes care of these
   steps. See `this file
   <https://github.com/wjakob/nanobind/blob/master/src/nb_combined.cpp>`__ for

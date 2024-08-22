@@ -112,6 +112,7 @@ The nanobind logo was designed by `AndoTwin Studio
    building
    basics
    bazel
+   meson
 
 .. toctree::
    :caption: Intermediate

@@ -122,6 +122,17 @@ nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
+set(TEST_PYI_FILES
+    test_functions_ext.pyi
+    test_stl_ext.pyi
+    test_typing_ext.pyi
+    test_enum_ext.pyi
+    test_ndarray_ext.pyi
+    test_make_iterator_ext.pyi
+    test_classes_ext.pyi
+    py_stub_test.pyi
+)
+
 set(TEST_FILES
   common.py
   test_classes.py
@@ -141,18 +152,12 @@ set(TEST_FILES
   test_ndarray.py
   test_stubs.py
   test_typing.py
-
-  # Stub reference files
-  test_classes_ext.pyi.ref
-  test_functions_ext.pyi.ref
-  test_make_iterator_ext.pyi.ref
-  test_ndarray_ext.pyi.ref
-  test_stl_ext.pyi.ref
-  test_enum_ext.pyi.ref
-  test_typing_ext.pyi.ref
   py_stub_test.py
-  py_stub_test.pyi.ref
 )
+
+# Stub reference files
+list(TRANSFORM TEST_PYI_FILES APPEND ".ref" OUTPUT_VARIABLE TEST_REF_FILES)
+list(APPEND TEST_FILES ${TEST_REF_FILES})
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
   if (CMAKE_CONFIGURATION_TYPES)
@@ -175,18 +180,10 @@ endif()
 
 if(DEFINED SKBUILD)
   if(NOT CMAKE_CROSSCOMPILING)
+    list(TRANSFORM TEST_PYI_FILES PREPEND "${CMAKE_CURRENT_BINARY_DIR}/" OUTPUT_VARIABLE TEST_OUT_FILES)
     install(
-      FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/test_functions_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/test_stl_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/test_typing_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/test_enum_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/test_ndarray_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/test_make_iterator_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/test_classes_ext.pyi"
-        "${CMAKE_CURRENT_BINARY_DIR}/py_stub_test.pyi"
-      DESTINATION
-        .
+      FILES ${TEST_OUT_FILES}
+      DESTINATION .
     )
   endif()
   install(

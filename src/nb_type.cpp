@@ -810,11 +810,16 @@ NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *
           cmd, s, prefix);
     p += prefix_len;
 
-    // Find the opening parenthesis
+    // Find the opening parenthesis or bracket
     const char *p2 = strchr(p, '(');
+    const char *p3 = strchr(p, '[');
+    if (p2 == nullptr)
+        p2 = p3;
+    else if (p3 != nullptr)
+        p2 = p2 < p3 ? p2 : p3;
     check(p2 != nullptr,
           "%s(): last line of custom signature \"%s\" must contain an opening "
-          "parenthesis (\"(\")!", cmd, s);
+          "parenthesis (\"(\") or bracket (\"[\")!", cmd, s);
 
     // A few sanity checks
     size_t len = strlen(p);

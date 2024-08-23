@@ -46,9 +46,14 @@ class Wrapper(Generic[T]):
 class WrapperFoo(Wrapper[Foo]):
     pass
 
+class WrapperTypeParam[T]:
+    pass
+
 def f() -> None: ...
 
 f_alias = f
+
+def list_front[T](arg: list[T], /) -> T: ...
 
 def makeNestedClass() -> py_stub_test.AClass.NestedClass: ...
 

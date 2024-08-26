@@ -62,10 +62,12 @@ enum class type_flags : uint32_t {
     is_arithmetic            = (1 << 16),
 
     /// Is the number type underlying the enumeration signed?
-    is_signed                = (1 << 17)
+    is_signed                = (1 << 17),
 
-    // One more flag bits available (18) without needing
-    // a larger reorganization
+    /// Does the type implement a custom __new__ operator?
+    has_new                  = (1 << 18)
+
+    // No more bits bits available without needing a larger reorganization
 };
 
 /// Flags about a type that are only relevant when it is being created.
@@ -103,6 +105,7 @@ struct type_data {
     const std::type_info *type;
     PyTypeObject *type_py;
     nb_alias_chain *alias_chain;
+    void *init; // Constructor nb_func
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
@@ -122,8 +125,8 @@ struct type_data {
     void (*set_self_py)(void *, PyObject *) noexcept;
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
 #if defined(Py_LIMITED_API)
-    size_t dictoffset;
-    size_t weaklistoffset;
+    uint32_t dictoffset;
+    uint32_t weaklistoffset;
 #endif
 };
 
@@ -420,6 +423,7 @@ struct new_<Func, Return(Args...)> {
         auto wrapper = [func = (detail::forward_t<Func>) func](handle, Args... args) {
             return func((detail::forward_t<Args>) args...);
         };
+
         if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {
             // If any argument annotations are specified, add another for the
             // extra class argument that we don't forward to Func, so visible

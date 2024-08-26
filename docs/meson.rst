@@ -34,7 +34,7 @@ pyproject.toml file:
    requires = ['meson-python']
 
    build-backend = 'mesonpy'
-   
+
 In your project root, you will also want to create the subprojects folder
 that Meson can install into. Then you will need to install the wrap packages
 for both nanobind and robin-map:

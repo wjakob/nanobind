@@ -887,3 +887,7 @@ def test46_custom_new():
 
     with pytest.raises(RuntimeError):
         t.UniqueInt.__new__(int)
+
+def test47_inconstructible():
+    with pytest.raises(TypeError, match="no constructor defined"):
+        t.Foo()

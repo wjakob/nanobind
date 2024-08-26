@@ -13,6 +13,9 @@
 #  pragma warning(disable: 4706) // assignment within conditional expression
 #endif
 
+// Pending gh-100554
+// #define Py_tp_vectorcall 82
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -837,6 +840,67 @@ static PyMethodDef class_getitem_method[] = {
 };
 #endif
 
+// Implements the vector call protocol directly on a object
+// to construct instances more efficiently.
+static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
+                                    size_t nargsf,
+                                    PyObject *kwargs_in) noexcept {
+    PyTypeObject *tp = (PyTypeObject *) self;
+    type_data *td = nb_type_data(tp);
+    nb_func *func = (nb_func *) td->init;
+    bool is_init = (td->flags & (uint32_t) type_flags::has_new) == 0;
+    Py_ssize_t nargs = NB_VECTORCALL_NARGS(nargsf);
+
+    if (NB_UNLIKELY(!func)) {
+        PyErr_Format(PyExc_TypeError, "%s: no constructor defined!", td->name);
+        return nullptr;
+    }
+
+    if (NB_LIKELY(is_init)) {
+        self = inst_new_int(tp, nullptr, nullptr);
+        if (!self)
+            return nullptr;
+    } else if (nargs == 0 && !kwargs_in) {
+        if (nb_func_data(func)->nargs != 0) // fail
+            return func->vectorcall((PyObject *) func, nullptr, 0, nullptr);
+    }
+
+    PyObject **args = nullptr, *temp = nullptr;
+
+    if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
+        args = (PyObject **) (args_in - 1);
+        temp = args[0];
+    } else {
+        size_t size = nargs;
+        if (kwargs_in)
+            size += NB_TUPLE_GET_SIZE(kwargs_in);
+        args = (PyObject **) alloca(((size_t) size + 1) * sizeof(PyObject *));
+        if (size)
+            memcpy(args + 1, args_in, sizeof(PyObject *) * size);
+    }
+
+    args[0] = self;
+
+    PyObject *rv =
+        func->vectorcall((PyObject *) func, args, nargs + 1, kwargs_in);
+
+    args[0] = temp;
+
+    if (NB_LIKELY(is_init)) {
+        if (!rv) {
+            Py_DECREF(self);
+            return nullptr;
+        }
+
+        // __init__ constructor: 'rv' is None
+        Py_DECREF(rv);
+        return self;
+    } else {
+        // __new__ constructor
+        return rv;
+    }
+}
+
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool has_doc               = t->flags & (uint32_t) type_init_flags::has_doc,
@@ -952,7 +1016,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     char *name_copy = strdup_check(name.c_str());
 
-    constexpr size_t nb_type_max_slots = 10,
+    constexpr size_t nb_type_max_slots = 11,
                      nb_extra_slots = 80,
                      nb_total_slots = nb_type_max_slots +
                                       nb_extra_slots + 1;
@@ -1050,6 +1114,13 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         *s++ = { Py_tp_methods, (void*) class_getitem_method };
 #endif
 
+#if defined(Py_LIMITED_API)
+    // Pending gh-100554
+    // if (Py_Version >= 0x030e0000)
+    //     *s++ = { Py_tp_vectorcall, (void *) nb_type_vectorcall };
+    (void) nb_type_vectorcall;
+#endif
+
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
 
@@ -1066,6 +1137,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     type_data *to = nb_type_data((PyTypeObject *) result);
+
+    #if !defined(Py_LIMITED_API)
+        ((PyTypeObject *) result)->tp_vectorcall = nb_type_vectorcall;
+    #endif
+
     *to = *t; // note: slices off _init parts
     to->flags &= ~(uint32_t) type_init_flags::all_init_flags;
 
@@ -1083,18 +1159,19 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;
     to->alias_chain = nullptr;
+    to->init = nullptr;
 
     if (has_dynamic_attr) {
         to->flags |= (uint32_t) type_flags::has_dynamic_attr;
         #if defined(Py_LIMITED_API)
-            to->dictoffset = dictoffset;
+            to->dictoffset = (uint32_t) dictoffset;
         #endif
     }
 
     if (is_weak_referenceable) {
         to->flags |= (uint32_t) type_flags::is_weak_referenceable;
         #if defined(Py_LIMITED_API)
-            to->weaklistoffset = weaklistoffset;
+            to->weaklistoffset = (uint32_t) weaklistoffset;
         #endif
     }
 
@@ -1135,7 +1212,8 @@ PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
     Py_DECREF(args);
 #else
     PyObject *args[2] = { nullptr, arg };
-    result = PyObject_Vectorcall(fn, args + 1, NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
+    result = PyObject_Vectorcall(fn, args + 1,
+                                 NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
 #endif
     return result;
 }

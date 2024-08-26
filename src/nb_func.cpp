@@ -202,7 +202,10 @@ PyObject *nb_func_new(const void *in_) noexcept {
          is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
          is_method      = f->flags & (uint32_t) func_flags::is_method,
          return_ref     = f->flags & (uint32_t) func_flags::return_ref,
-         is_constructor = false;
+         is_constructor = false,
+         is_init        = false,
+         is_new         = false,
+         is_setstate    = false;
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -247,10 +250,12 @@ PyObject *nb_func_new(const void *in_) noexcept {
             PyErr_Clear();
         }
 
+        is_init = strcmp(name_cstr, "__init__") == 0;
+        is_new = strcmp(name_cstr, "__new__") == 0;
+        is_setstate = strcmp(name_cstr, "__setstate__") == 0;
+
         // Is this method a constructor that takes a class binding as first parameter?
-        is_constructor = is_method &&
-                         (strcmp(name_cstr, "__init__") == 0 ||
-                          strcmp(name_cstr, "__setstate__") == 0) &&
+        is_constructor = is_method && (is_init || is_setstate) &&
                          strncmp(f->descr, "({%}", 4) == 0;
 
         // Don't use implicit conversions in copy constructors (causes infinite recursion)
@@ -382,6 +387,20 @@ PyObject *nb_func_new(const void *in_) noexcept {
         }
     }
 
+    // Fast path for vector call object construction
+    if (((is_init && is_method) || (is_new && !is_method)) &&
+        nb_type_check(f->scope)) {
+        type_data *td = nb_type_data((PyTypeObject *) f->scope);
+        bool has_new = td->flags & (uint32_t) type_flags::has_new;
+
+        if (is_init && !has_new) {
+            td->init = func;
+        } else if (is_new) {
+            td->init = func;
+            td->flags |= (uint32_t) type_flags::has_new;
+        }
+    }
+
     if (has_scope && name) {
         int rv = PyObject_SetAttr(f->scope, name, (PyObject *) func);
         check(rv == 0, "nb::detail::nb_func_new(\"%s\"): setattr. failed.",
@@ -402,7 +421,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
                        size_t nargs_in, PyObject *kwargs_in) noexcept {
-    const uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = (uint32_t) Py_SIZE(self);
     func_data *f = nb_func_data(self);
 
     if (f->flags & (uint32_t) func_flags::is_operator)
@@ -412,6 +431,12 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     buf.put_dstr(f->name);
     buf.put("(): incompatible function arguments. The following argument types "
             "are supported:\n");
+
+    // Mask default __new__ overload created by nb::new_()
+    if (strcmp(f->name, "__new__") == 0 && count > 1 && f->nargs == 1) {
+        count -= 1;
+        f += 1;
+    }
 
     for (uint32_t i = 0; i < count; ++i) {
         buf.put("    ");

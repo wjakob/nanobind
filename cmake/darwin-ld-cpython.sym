@@ -899,3 +899,4 @@
 -U __Py_SwappedOp
 -U __Py_TrueStruct
 -U __Py_VaBuildValue_SizeT
+-U _Py_Version

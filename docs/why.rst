@@ -5,20 +5,20 @@
 Why another binding library?
 ============================
 
-I started the `pybind11 <http://github.com/pybind/pybind11>`_ project back in
+I started the `pybind11 <http://github.com/pybind/pybind11>`__ project back in
 2015 to generate better C++/Python bindings for a project I had been working
 on. Thanks to many amazing contributions by others, pybind11 has since become a
 core dependency of software used across the world including flagship projects
-like `PyTorch <https://pytorch.org>`_ and `Tensorflow
-<https://www.tensorflow.org>`_. Every day, it is downloaded over 400'000 times.
+like `PyTorch <https://pytorch.org>`__ and `Tensorflow
+<https://www.tensorflow.org>`__. Every day, it is downloaded over 400'000 times.
 Hundreds of contributed extensions and generalizations address use cases of
 this diverse audience. However, all of this success also came with costs: the
 complexity of the library grew tremendously, which had a negative impact on
 efficiency.
 
 Curiously, the situation now is reminiscent of 2015: binding generation with
-existing tools (`Boost.Python <https://github.com/boostorg/python>`_, `pybind11
-<http://github.com/pybind/pybind11>`_) is slow and produces enormous binaries
+existing tools (`Boost.Python <https://github.com/boostorg/python>`__, `pybind11
+<http://github.com/pybind/pybind11>`__) is slow and produces enormous binaries
 with overheads on runtime performance. At the same time, key improvements in
 C++17 and Python 3.8 provide opportunities for drastic simplifications.
 Therefore, I am starting *another* binding project. This time, the scope is
@@ -63,11 +63,11 @@ performance improvements:
 - **Fast hash table**: nanobind upgrades several important internal
   associative data structures that previously used ``std::unordered_map`` to a
   more efficient alternative (`tsl::robin_map
-  <https://github.com/Tessil/robin-map>`_, which is included as a git
+  <https://github.com/Tessil/robin-map>`__, which is included as a git
   submodule).
 
 - **Vector calls**: function calls from/to Python are realized using `PEP 590
-  vector calls <https://www.python.org/dev/peps/pep-0590>`_, which gives a nice
+  vector calls <https://www.python.org/dev/peps/pep-0590>`__, which gives a nice
   speed boost. The main function dispatch loop no longer allocates heap memory.
 
 - **Library component**: pybind11 was designed as a header-only library, which
@@ -106,15 +106,15 @@ Major additions
 nanobind includes a number of quality-of-life improvements for developers:
 
 - **N-dimensional arrays**: nanobind can exchange data with modern array programming
-  frameworks. It uses either `DLPack <https://github.com/dmlc/dlpack>`_ or the
-  `buffer protocol <https://docs.python.org/3/c-api/buffer.html>`_ to achieve
+  frameworks. It uses either `DLPack <https://github.com/dmlc/dlpack>`__ or the
+  `buffer protocol <https://docs.python.org/3/c-api/buffer.html>`__ to achieve
   *zero-copy* CPU/GPU array exchange with frameworks like `NumPy
-  <https://numpy.org>`_, `PyTorch <https://pytorch.org>`_, `TensorFlow
-  <https://www.tensorflow.org>`_, `JAX <https://jax.readthedocs.io>`_, etc. See
+  <https://numpy.org>`__, `PyTorch <https://pytorch.org>`__, `TensorFlow
+  <https://www.tensorflow.org>`__, `JAX <https://jax.readthedocs.io>`__, etc. See
   the :ref:`section on n-dimensional arrays <ndarrays>` for details.
 
 - **Stable ABI**: nanobind can target Python's `stable ABI interface
-  <https://docs.python.org/3/c-api/stable.html>`_ starting with Python 3.12.
+  <https://docs.python.org/3/c-api/stable.html>`__ starting with Python 3.12.
   This means that extension modules will be compatible with future version of
   Python without having to compile separate binaries per interpreter. That
   vision is still relatively far out, however: it will require Python 3.12+ to

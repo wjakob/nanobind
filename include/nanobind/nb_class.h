@@ -58,16 +58,10 @@ enum class type_flags : uint32_t {
     /// The class implements __class_getitem__ similar to typing.Generic
     is_generic               = (1 << 15),
 
-    /// Is this an arithmetic enumeration?
-    is_arithmetic            = (1 << 16),
-
-    /// Is the number type underlying the enumeration signed?
-    is_signed                = (1 << 17),
-
     /// Does the type implement a custom __new__ operator?
-    has_new                  = (1 << 18)
+    has_new                  = (1 << 16)
 
-    // No more bits bits available without needing a larger reorganization
+    // Two more bits bits available without needing a larger reorganization
 };
 
 /// Flags about a type that are only relevant when it is being created.
@@ -192,6 +186,14 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
     t.supplement = sizeof(T);
 }
 
+enum class enum_flags : uint32_t {
+    /// Is this an arithmetic enumeration?
+    is_arithmetic            = (1 << 1),
+
+    /// Is the number type underlying the enumeration signed?
+    is_signed                = (1 << 2)
+};
+
 struct enum_init_data {
     const std::type_info *type;
     PyObject *scope;
@@ -201,7 +203,7 @@ struct enum_init_data {
 };
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
-    e.flags |= (uint32_t) type_flags::is_arithmetic;
+    e.flags |= (uint32_t) enum_flags::is_arithmetic;
 }
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {
@@ -719,7 +721,7 @@ public:
         ed.scope = scope.ptr();
         ed.name = name;
         ed.flags = std::is_signed_v<Underlying>
-                       ? (uint32_t) detail::type_flags::is_signed
+                       ? (uint32_t) detail::enum_flags::is_signed
                        : 0;
         (detail::enum_extra_apply(ed, extra), ...);
         m_ptr = detail::enum_create(&ed);

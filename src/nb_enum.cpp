@@ -27,7 +27,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     handle scope(ed->scope);
 
-    bool is_arithmetic = ed->flags & (uint32_t) type_flags::is_arithmetic;
+    bool is_arithmetic = ed->flags & (uint32_t) enum_flags::is_arithmetic;
 
     str name(ed->name), qualname = name;
     object modname;
@@ -99,7 +99,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     type_data *t = enum_get_type_data(tp);
 
     object val;
-    if (t->flags & (uint32_t) type_flags::is_signed)
+    if (t->flags & (uint32_t) enum_flags::is_signed)
         val = steal(PyLong_FromLongLong((long long) value_));
     else
         val = steal(PyLong_FromUnsignedLongLong((unsigned long long) value_));
@@ -161,7 +161,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (flags & (uint8_t) cast_flags::convert) {
         enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
 
-        if (t->flags & (uint32_t) type_flags::is_signed) {
+        if (t->flags & (uint32_t) enum_flags::is_signed) {
             long long value = PyLong_AsLongLong(o);
             if (value == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
@@ -204,7 +204,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
         return value;
     }
 
-    if (t->flags & (uint32_t) type_flags::is_signed)
+    if (t->flags & (uint32_t) enum_flags::is_signed)
         PyErr_Format(PyExc_ValueError, "%lli is not a valid %s.",
                      (long long) key, t->name);
     else

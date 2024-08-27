@@ -28,7 +28,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     handle scope(ed->scope);
 
     bool is_arithmetic = ed->flags & (uint32_t) enum_flags::is_arithmetic;
-    bool is_flag_enum = ed->flags & (uint32_t) enum_flags::flag_enum;
+    bool is_flag = ed->flags & (uint32_t) enum_flags::flag_enum;
 
     str name(ed->name), qualname = name;
     object modname;
@@ -119,6 +119,21 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
         fail("refusing to add duplicate key \"%s\" to enumeration \"%s\"!",
              name_, type_name(tp).c_str());
 
+    // handle updates of the flag and bit masks by hand,
+    // since enum._proto_member.__set_name__ is not called in this code path.
+    if (t->flags & (uint32_t) enum_flags::flag_enum) {
+        int64_t flag_mask = cast<int64_t>(tp.attr("_flag_mask_"));
+        tp.attr("_flag_mask_") = int_(flag_mask | value_);
+
+        bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
+        if (is_single_bit) {
+            int64_t singles_mask = cast<int64_t>(tp.attr("_singles_mask_"));
+            tp.attr("_singles_mask_") = int_(singles_mask | value_);
+        }
+        int64_t bit_length = cast<int64_t>(tp.attr("_flag_mask_").attr("bit_length")());
+        tp.attr("_all_bits_") = int_((2 << bit_length) - 1);
+    }
+
     object el;
     if (issubclass(tp, val_tp))
         el = val_tp.attr("__new__")(tp, val);
@@ -156,7 +171,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (!t)
         return false;
 
-    if ((t->flags & (uint32_t) type_flags::flag_enum) != 0 && Py_TYPE(o) == t->type_py) {
+    if ((t->flags & (uint32_t) enum_flags::flag_enum) != 0 && Py_TYPE(o) == t->type_py) {
         auto pValue = PyObject_GetAttrString(o, "value");
         if (pValue == nullptr) {
             PyErr_Clear();

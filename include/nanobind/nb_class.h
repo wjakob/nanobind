@@ -210,7 +210,7 @@ NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
 }
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, flag_enum) {
-    e.flags |= (uint32_t) type_flags::flag_enum;
+    e.flags |= (uint32_t) enum_flags::flag_enum;
 }
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {

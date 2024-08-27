@@ -119,7 +119,8 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
         fail("refusing to add duplicate key \"%s\" to enumeration \"%s\"!",
              name_, type_name(tp).c_str());
 
-    // handle updates of the flag and bit masks by hand,
+    # if PY_VERSION_HEX >= 0x030B0000
+    // In Python 3.11+, update the flag and bit masks by hand,
     // since enum._proto_member.__set_name__ is not called in this code path.
     if (t->flags & (uint32_t) enum_flags::flag_enum) {
         int64_t flag_mask = cast<int64_t>(tp.attr("_flag_mask_"));
@@ -133,6 +134,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
         int64_t bit_length = cast<int64_t>(tp.attr("_flag_mask_").attr("bit_length")());
         tp.attr("_all_bits_") = int_((2 << bit_length) - 1);
     }
+    #endif
 
     object el;
     if (issubclass(tp, val_tp))

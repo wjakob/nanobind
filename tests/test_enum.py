@@ -1,5 +1,4 @@
 import test_enum_ext as t
-import enum
 import pytest
 
 def test01_unsigned_enum():
@@ -144,7 +143,9 @@ def test06_enum_flag():
     assert (t.Flag(3) ==  (t.Flag.A | t.Flag.B))
 
     # ensure the flag mask is set correctly by enum_append
-    assert t.Flag._flag_mask_ == 7
+    # in Python 3.11+
+    if hasattr(t.Flag, "_flag_mask_"):
+        assert t.Flag._flag_mask_ == 7
     assert (t.from_enum(t.Flag.A | t.Flag.C) == 5)
     assert (t.from_enum_implicit(t.Flag(1) | t.Flag(4)) == 5)
 

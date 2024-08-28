@@ -66,7 +66,7 @@ Declaring and building nanobind extension targets
 -------------------------------------------------
 
 The main tool to build nanobind C++ extensions for your Python bindings is the
-:cmake:command:`nanobind_extension` rule.
+:py:func:`nanobind_extension` rule.
 
 Like all public nanobind-bazel APIs, it resides in the ``build_defs`` submodule.
 To import it into a BUILD file, use the builtin ``load`` command:

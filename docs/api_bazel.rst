@@ -17,7 +17,7 @@ corresponding builtin Bazel rule producing the equivalent C++ target.
 
 The main tool to build nanobind extensions is the ``nanobind_extension`` rule.
 
-.. cmake:command:: nanobind_extension
+.. py:function:: nanobind_extension
 
     Declares a Bazel target representing a nanobind extension, which contains
     the Python bindings of your C++ code.
@@ -45,7 +45,7 @@ The main tool to build nanobind extensions is the ``nanobind_extension`` rule.
 To generate typing stubs for an extension, you can use the ``nanobind_stubgen``
 rule.
 
-.. cmake:command:: nanobind_stubgen
+.. py:function:: nanobind_stubgen
 
     Declares a Bazel target for generating a stub file from a previously
     built nanobind bindings extension.
@@ -77,7 +77,7 @@ rule.
 To build a C++ library with nanobind as a dependency, use the
 ``nanobind_library`` rule.
 
-.. cmake:command:: nanobind_library
+.. py:function:: nanobind_library
 
     Declares a Bazel target representing a C++ library depending on nanobind.
 
@@ -97,7 +97,7 @@ To build a C++ library with nanobind as a dependency, use the
 To build a C++ shared library with nanobind as a dependency, use the
 ``nanobind_shared_library`` rule.
 
-.. cmake:command:: nanobind_shared_library
+.. py:function:: nanobind_shared_library
 
     Declares a Bazel target representing a C++ shared library depending on
     nanobind.
@@ -118,7 +118,7 @@ To build a C++ shared library with nanobind as a dependency, use the
 
 To build a C++ test target requiring nanobind, use the ``nanobind_test`` rule.
 
-.. cmake:command:: nanobind_test
+.. py:function:: nanobind_test
 
     Declares a Bazel target representing a C++ test depending on nanobind.
 
@@ -142,14 +142,14 @@ Flags
 To customize some of nanobind's build options, nanobind-bazel exposes the
 following flag settings.
 
-.. cmake:command:: @nanobind_bazel//:minsize (boolean)
+.. py:function:: @nanobind_bazel//:minsize (boolean)
 
     Apply nanobind's size optimizations to the built extensions. Size
     optimizations are turned on by default, similarly to the CMake build.
     To turn off size optimizations, you can use the shorthand notation
     ``--no@nanobind_bazel//:minsize``.
 
-.. cmake:command:: @nanobind_bazel//:py-limited-api (string)
+.. py:function:: @nanobind_bazel//:py-limited-api (string)
 
     Build nanobind extensions against the stable ABI of the configured Python
     version. Allowed values are ``"cp312"``, ``"cp313"``, which target the

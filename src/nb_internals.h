@@ -268,6 +268,7 @@ struct nb_internals {
     setattrofunc PyType_Type_tp_setattro;
     descrgetfunc PyProperty_Type_tp_descr_get;
     descrsetfunc PyProperty_Type_tp_descr_set;
+    size_t type_data_offset;
 #endif
 };
 

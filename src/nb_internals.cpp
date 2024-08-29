@@ -406,6 +406,26 @@ NB_NOINLINE void init(const char *name) {
         (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
     p->PyProperty_Type_tp_descr_set =
         (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
+
+    PyType_Slot dummy_slots[] = {
+        { Py_tp_base, &PyType_Type },
+        { 0, nullptr }
+    };
+
+    PyType_Spec dummy_spec = {
+        /* .name = */ "nanobind.dummy",
+        /* .basicsize = */ - (int) sizeof(void*),
+        /* .itemsize = */ 0,
+        /* .flags = */ Py_TPFLAGS_DEFAULT,
+        /* .slots = */ dummy_slots
+    };
+
+    // Determine the offset, at which types defined by nanobind begin
+    PyObject *dummy = PyType_FromMetaclass(
+        p->nb_meta, p->nb_module, &dummy_spec, nullptr);
+    p->type_data_offset =
+        (uint8_t *) PyObject_GetTypeData(dummy, p->nb_meta) - (uint8_t *) dummy;
+    Py_DECREF(dummy);
 #endif
 
     p->translators = { default_exception_translator, nullptr, nullptr };

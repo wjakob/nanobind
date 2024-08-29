@@ -26,9 +26,7 @@ Version 2.2.0 (TBA)
   Version 2.2.0 adds this missing part, which accelerates object construction
   by up to a factor of 2×. The difference is especially pronounced when passing
   keyword arguments to constructors. Note that this feature is only supported
-  on Python 3.9+ and when building non-stable ABI extensions. If CPython PR
-  #123332 <https://github.com/python/cpython/pull/123332>`__ is accepted, this
-  fast path might also become available in the stable ABI on Python 3.14+.
+  on Python 3.9+.
 
 * Added the :cpp:class:`bytearray` wrapper type. (PR `#654
   <https://github.com/wjakob/nanobind/pull/654>`__)

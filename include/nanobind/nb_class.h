@@ -99,6 +99,9 @@ struct type_data {
     const std::type_info *type;
     PyTypeObject *type_py;
     nb_alias_chain *alias_chain;
+#if defined(Py_LIMITED_API)
+    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
+#endif
     void *init; // Constructor nb_func
     void (*destruct)(void *);
     void (*copy)(void *, const void *);

@@ -676,6 +676,7 @@
 -U _PyType_Modified
 -U _PyType_Ready
 -U _PyType_Type
+-U _PyType_GetTypeDataSize
 -U _PyUnicodeDecodeError_Create
 -U _PyUnicodeDecodeError_GetEncoding
 -U _PyUnicodeDecodeError_GetEnd

@@ -13,9 +13,6 @@
 #  pragma warning(disable: 4706) // assignment within conditional expression
 #endif
 
-// Pending gh-100554
-// #define Py_tp_vectorcall 82
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -419,6 +416,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     *t = *t_b;
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
+
     PyObject *name = nb_type_name(self);
     t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
@@ -426,6 +424,9 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->implicit.cpp = nullptr;
     t->implicit.py = nullptr;
     t->alias_chain = nullptr;
+#if defined(Py_LIMITED_API)
+    t->vectorcall = nullptr;
+#endif
 
     return 0;
 }
@@ -746,17 +747,30 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 }
 
 static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
+    nb_internals *internals_ = internals;
     object key = steal(PyLong_FromSize_t(supplement));
 
     PyTypeObject *tp =
-        (PyTypeObject *) PyDict_GetItem(internals->nb_type_dict, key.ptr());
+        (PyTypeObject *) PyDict_GetItem(internals_->nb_type_dict, key.ptr());
 
     if (NB_UNLIKELY(!tp)) {
+#if defined(Py_LIMITED_API)
+        PyMemberDef members[] = {
+            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
+            { nullptr, 0, 0, 0, nullptr }
+        };
+
+        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
+        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
+#endif
         PyType_Slot slots[] = {
             { Py_tp_base, &PyType_Type },
             { Py_tp_dealloc, (void *) nb_type_dealloc },
             { Py_tp_setattro, (void *) nb_type_setattro },
             { Py_tp_init, (void *) nb_type_init },
+#if defined(Py_LIMITED_API)
+            { Py_tp_members, (void *) members },
+#endif
             { 0, nullptr }
         };
 
@@ -779,14 +793,18 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             /* .slots = */ slots
         };
 
+#if defined(Py_LIMITED_API)
+        spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+#endif
+
         tp = (PyTypeObject *) nb_type_from_metaclass(
-            internals->nb_meta, internals->nb_module, &spec);
+            internals_->nb_meta, internals_->nb_module, &spec);
 
         handle(tp).attr("__module__") = "nanobind";
 
         int rv = 1;
         if (tp)
-            rv = PyDict_SetItem(internals->nb_type_dict, key.ptr(), (PyObject *) tp);
+            rv = PyDict_SetItem(internals_->nb_type_dict, key.ptr(), (PyObject *) tp);
         check(rv == 0, "nb_type type creation failed!");
 
         Py_DECREF(tp);
@@ -1114,13 +1132,6 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         *s++ = { Py_tp_methods, (void*) class_getitem_method };
 #endif
 
-#if defined(Py_LIMITED_API)
-    // Pending gh-100554
-    // if (Py_Version >= 0x030e0000)
-    //     *s++ = { Py_tp_vectorcall, (void *) nb_type_vectorcall };
-    (void) nb_type_vectorcall;
-#endif
-
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
 
@@ -1138,10 +1149,6 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     type_data *to = nb_type_data((PyTypeObject *) result);
 
-    #if !defined(Py_LIMITED_API)
-        ((PyTypeObject *) result)->tp_vectorcall = nb_type_vectorcall;
-    #endif
-
     *to = *t; // note: slices off _init parts
     to->flags &= ~(uint32_t) type_init_flags::all_init_flags;
 
@@ -1155,6 +1162,12 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         to->flags |= (uint32_t) type_flags::has_shared_from_this;
         to->keep_shared_from_this_alive = tb->keep_shared_from_this_alive;
     }
+
+    #if defined(Py_LIMITED_API)
+        to->vectorcall = nb_type_vectorcall;
+    #else
+        ((PyTypeObject *) result)->tp_vectorcall = nb_type_vectorcall;
+    #endif
 
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;

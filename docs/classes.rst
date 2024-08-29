@@ -296,12 +296,14 @@ C++11-style strongly typed enumerations.
    When the annotation :cpp:class:`nb::is_arithmetic() <is_arithmetic>` is
    passed to :cpp:class:`nb::enum_\<T\> <enum_>`, the resulting Python type
    will support arithmetic and bit-level operations (and, or,
-   xor, negation).  The operands of these operations may be either enumerators
+   xor, negation).  The operands of these operations may be either enumerators.
    When the annotation :cpp:class:`nb::flag_enum() <flag_enum>` is passed to
-   :cpp:class:`nb::enum_\<T\> <enum_>`, the resulting Python type will be an
-   `enum.IntFlag`, meaning its enumerators can be combined using bitwise operators
-   in a type-safe way: the result will have the same enumeration type as the operands,
-   and only enumerators of the same type can be combined.
+   :cpp:class:`nb::enum_\<T\> <enum_>`, the resulting Python type will be a class
+   derived from ``enum.Flag``, meaning its enumerators can be combined using bitwise
+   operators in a type-safe way: the result will have the same enumeration type
+   as the operands, and only enumerators of the same type can be combined.
+   When passing both ``is_arithmetic`` and ``flag_enum``, the resulting Python type
+   will be ``enum.IntFlag``, supporting both arithmetic and bitwise operations.
 
    .. code-block:: cpp
 

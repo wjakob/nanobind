@@ -123,16 +123,14 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     // In Python 3.11+, update the flag and bit masks by hand,
     // since enum._proto_member.__set_name__ is not called in this code path.
     if (t->flags & (uint32_t) enum_flags::flag_enum) {
-        int64_t flag_mask = cast<int64_t>(tp.attr("_flag_mask_"));
-        tp.attr("_flag_mask_") = int_(flag_mask | value_);
+        setattr(tp, "_flag_mask_", tp.attr("_flag_mask_") | val);
 
         bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
         if (is_single_bit) {
-            int64_t singles_mask = cast<int64_t>(tp.attr("_singles_mask_"));
-            tp.attr("_singles_mask_") = int_(singles_mask | value_);
+            setattr(tp, "_singles_mask_", tp.attr("_singles_mask_") | val);
         }
-        int64_t bit_length = cast<int64_t>(tp.attr("_flag_mask_").attr("bit_length")());
-        tp.attr("_all_bits_") = int_((2 << bit_length) - 1);
+        int_ bit_length = int_(tp.attr("_flag_mask_").attr("bit_length")());
+        setattr(tp, "_all_bits_", (int_(2) << bit_length) - int_(1));
     }
     #endif
 
@@ -174,7 +172,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         return false;
 
     if ((t->flags & (uint32_t) enum_flags::flag_enum) != 0 && Py_TYPE(o) == t->type_py) {
-        auto pValue = PyObject_GetAttrString(o, "value");
+        PyObject *pValue = PyObject_GetAttrString(o, "value");
         if (pValue == nullptr) {
             PyErr_Clear();
             return false;

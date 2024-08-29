@@ -104,6 +104,13 @@ NB_MODULE(test_typing_ext, m) {
     nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
 #endif
 
+    // Type parameter syntax for Python 3.12+
+    struct WrapperTypeParam { };
+    nb::class_<WrapperTypeParam>(m, "WrapperTypeParam",
+                                 nb::sig("class WrapperTypeParam[T]"));
+    m.def("list_front", [](nb::list l) { return l[0]; },
+          nb::sig("def list_front[T](arg: list[T], /) -> T"));
+
     // Some statements that will be modified by the pattern file
     m.def("remove_me", []{});
     m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");

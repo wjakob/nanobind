@@ -54,7 +54,7 @@ Version 2.1.0 (Aug 11, 2024)
   <https://github.com/scikit-build/scikit-build-core>`__ (PR `#618
   <https://github.com/wjakob/nanobind/discussions/618>`__).
 
-* Improved handling of ``const`-ness in :cpp:class:`nb::ndarray <ndarray>` (PR
+* Improved handling of ``const``-ness in :cpp:class:`nb::ndarray <ndarray>` (PR
   `#491 <https://github.com/wjakob/nanobind/discussions/491>`__).
 
 * Keyword argument annotations are now properly supported with
@@ -278,7 +278,7 @@ noteworthy:
   generally do have interned keyword arguments) should be unaffected. (PR `#469
   <https://github.com/wjakob/nanobind/pull/469>`__).
 
-* The ``owner=nb::handle()`` default value of the :cpp:func:`nb::ndarray
+* The ``owner=nb::handle()`` default value of the :cpp:class:`nb::ndarray
   <ndarray>` constructor was removed since it was bug-prone. You now have to
   specify the owner explicitly. The previous default (``nb::handle()``)
   continues to be a valid argument.

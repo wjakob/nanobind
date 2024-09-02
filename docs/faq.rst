@@ -84,6 +84,7 @@ other types when they are handled using :ref:`type casters <type_casters>`.
 Please read the full section on :ref:`information exchange between C++ and
 Python <exchange>` to understand the issue and alternatives.
 
+.. _leak-checker:
 
 Why am I getting errors about leaked functions and types?
 ---------------------------------------------------------

@@ -15,7 +15,7 @@ If you prefer another build system, then you have the following options:
   Please report Bazel-specific issues there.
 
 - `Will Ayd <https://github.com/WillAyd/>`__ has created a `Meson WrapDB
-  package https://mesonbuild.com/Wrapdb-projects.html>`__ for nanobind. Please
+  package <https://mesonbuild.com/Wrapdb-projects.html>`__ for nanobind. Please
   report Meson-specific issues on the `Meson WrapDB
   <https://github.com/mesonbuild/wrapdb/issues>`__ repository.
 
@@ -66,7 +66,7 @@ The high-level interface consists of just one CMake command:
 
       * - ``STABLE_ABI``
         - Perform a `stable ABI
-          <https://docs.python.org/3/c-api/stable.html>`_ build, making it
+          <https://docs.python.org/3/c-api/stable.html>`__ build, making it
           possible to use a compiled extension across Python minor versions.
           The flag is ignored on Python versions older than < 3.12.
       * - ``NB_STATIC``

@@ -66,5 +66,3 @@ class AClass:
 
     def overloaded_2(self, x):
         "docstr 3"
-
-del typing

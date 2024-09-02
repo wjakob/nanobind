@@ -664,7 +664,7 @@ section <ndarrays>`.
 
 .. cpp:class:: template <typename... Args> ndarray
 
-   .. cpp:var:: ReadOnly
+   .. cpp:var:: static constexpr bool ReadOnly
 
       A constant static boolean that is true if the array's data is read-only.
       This is determined by the class template arguments, not by any dynamic

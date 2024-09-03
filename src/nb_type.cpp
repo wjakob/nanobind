@@ -13,6 +13,10 @@
 #  pragma warning(disable: 4706) // assignment within conditional expression
 #endif
 
+// #if !defined(Py_tp_vectorcall)
+// #  define Py_tp_vectorcall 82
+// #endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -424,8 +428,11 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->implicit.cpp = nullptr;
     t->implicit.py = nullptr;
     t->alias_chain = nullptr;
+
 #if defined(Py_LIMITED_API)
     t->vectorcall = nullptr;
+#else
+    ((PyTypeObject *) self)->tp_vectorcall = nullptr;
 #endif
 
     return 0;
@@ -1085,6 +1092,13 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (has_doc)
         *s++ = { Py_tp_doc, (void *) t->doc };
 
+    vectorcallfunc type_vectorcall = nb_type_vectorcall;
+
+    bool has_traverse = false,
+         has_getset = false,
+         has_custom_init_or_new = false,
+         has_custom_type_vectorcall = false;
+
     if (has_type_slots) {
         size_t num_avail = nb_extra_slots;
         size_t i = 0;
@@ -1092,16 +1106,27 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             check(i != num_avail,
                   "nanobind::detail::nb_type_new(\"%s\"): ran out of "
                   "type slots!", t_name);
-            *s++ = t->type_slots[i++];
+
+            const PyType_Slot &ts = t->type_slots[i++];
+            int slot_id = ts.slot;
+
+            has_traverse |= slot_id == Py_tp_traverse;
+            has_getset |= slot_id == Py_tp_getset;
+            has_custom_init_or_new |=
+                slot_id == Py_tp_init || slot_id == Py_tp_new;
+
+            // if (slot_id == Py_tp_vectorcall) {
+            //     type_vectorcall = (vectorcallfunc) ts.pfunc;
+            //     has_custom_type_vectorcall = true;
+            //     continue;
+            // }
+
+            *s++ = ts;
         }
     }
 
-    bool has_traverse = false;
-    bool has_getset = false;
-    for (PyType_Slot *ts = slots; ts != s; ++ts) {
-        has_traverse |= ts->slot == Py_tp_traverse;
-        has_getset |= ts->slot == Py_tp_getset;
-    }
+    if (has_custom_init_or_new && !has_custom_type_vectorcall)
+        type_vectorcall = nullptr;
 
     Py_ssize_t dictoffset = 0, weaklistoffset = 0;
     int num_members = 0;
@@ -1190,9 +1215,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     }
 
     #if defined(Py_LIMITED_API)
-        to->vectorcall = nb_type_vectorcall;
+        to->vectorcall = type_vectorcall;
     #else
-        ((PyTypeObject *) result)->tp_vectorcall = nb_type_vectorcall;
+        ((PyTypeObject *) result)->tp_vectorcall = type_vectorcall;
     #endif
 
     to->name = name_copy;

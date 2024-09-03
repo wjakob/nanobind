@@ -822,3 +822,31 @@ def test41_implicit_conversion_cupy():
 
     with pytest.raises(TypeError) as excinfo:
         t.noimplicit(cp.zeros((2, 2), dtype=cp.uint8))
+
+@needs_numpy
+def test42_implicit_conversion_contiguous_complex():
+    # Test fix for issue #709
+    import numpy as np
+
+    c_f32 = np.random.rand(10, 10)
+    c_c64 = c_f32.astype(np.complex64)
+
+    assert c_f32.flags['C_CONTIGUOUS']
+    assert c_c64.flags['C_CONTIGUOUS']
+
+    def test_conv(x):
+        y = t.test_implicit_conversion(x)
+        assert np.all(x == y)
+        assert y.flags['C_CONTIGUOUS']
+
+    test_conv(c_f32)
+    test_conv(c_c64)
+
+    nc_f32 = c_f32.T
+    nc_c64 = c_c64.T
+
+    assert not nc_f32.flags['C_CONTIGUOUS']
+    assert not nc_c64.flags['C_CONTIGUOUS']
+
+    test_conv(nc_f32)
+    test_conv(nc_c64)

@@ -435,6 +435,7 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
     }
 
     bool refused_conversion = t.dtype.code == (uint8_t) dlpack::dtype_code::Complex &&
+                              req->req_dtype &&
                               req->dtype.code != (uint8_t) dlpack::dtype_code::Complex;
 
     // Support implicit conversion of 'dtype' and order

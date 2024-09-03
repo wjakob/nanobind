@@ -410,4 +410,10 @@ NB_MODULE(test_ndarray_ext, m) {
           [](nb::ndarray<std::complex<double>, nb::ndim<1>, nb::c_contig> data, uint32_t) {
             data(0) = 123;
           });
+
+    // issue #709
+    m.def(
+        "test_implicit_conversion",
+        [](nb::ndarray<nb::ro, nb::c_contig, nb::device::cpu> arg) { return arg; },
+        nb::arg());
 }

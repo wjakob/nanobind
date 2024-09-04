@@ -177,13 +177,23 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
             PyErr_Clear();
             return false;
         }
-        long long value = PyLong_AsLongLong(pValue);
-        if (value == -1 && PyErr_Occurred()) {
-            PyErr_Clear();
-            return false;
+        if ((t->flags & (uint32_t) enum_flags::is_signed)) {
+            long long value = PyLong_AsLongLong(pValue);
+            if (value == -1 && PyErr_Occurred()) {
+                PyErr_Clear();
+                return false;
+            }
+            *out = (int64_t) value;
+            return true;
+        } else {
+            unsigned long long value = PyLong_AsUnsignedLongLong(pValue);
+            if (value == (unsigned long long) -1 && PyErr_Occurred()) {
+                PyErr_Clear();
+                return false;
+            }
+            *out = (int64_t) value;
+            return true;
         }
-        *out = (int64_t) value;
-        return true;
     }
 
     enum_map *rev = (enum_map *) t->enum_tbl.rev;

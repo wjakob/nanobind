@@ -165,7 +165,7 @@ def test06_enum_flag():
     assert t.UnsignedFlag.All.value == 0xffffffffffffffff
     assert t.UnsignedFlag(t.UnsignedFlag.A) is t.UnsignedFlag.A
     assert t.UnsignedFlag(t.UnsignedFlag.B) is t.UnsignedFlag.B
-    assert t.UnsignedFlag(t.UnsignedFlag.All) == t.UnsignedFlag.All
+    assert t.UnsignedFlag(t.UnsignedFlag.All) is t.UnsignedFlag.All
     assert t.from_enum(t.UnsignedFlag.A) == 1
     assert t.from_enum(t.UnsignedFlag.B) == 2
     assert t.from_enum(t.UnsignedFlag.All) == 0xffffffffffffffff

@@ -28,7 +28,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     handle scope(ed->scope);
 
     bool is_arithmetic = ed->flags & (uint32_t) enum_flags::is_arithmetic;
-    bool is_flag = ed->flags & (uint32_t) enum_flags::flag_enum;
+    bool is_flag = ed->flags & (uint32_t) enum_flags::is_flag;
 
     str name(ed->name), qualname = name;
     object modname;
@@ -122,13 +122,13 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     # if PY_VERSION_HEX >= 0x030B0000
     // In Python 3.11+, update the flag and bit masks by hand,
     // since enum._proto_member.__set_name__ is not called in this code path.
-    if (t->flags & (uint32_t) enum_flags::flag_enum) {
+    if (t->flags & (uint32_t) enum_flags::is_flag) {
         setattr(tp, "_flag_mask_", tp.attr("_flag_mask_") | val);
 
         bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
-        if (is_single_bit) {
+        if (is_single_bit)
             setattr(tp, "_singles_mask_", tp.attr("_singles_mask_") | val);
-        }
+
         int_ bit_length = int_(tp.attr("_flag_mask_").attr("bit_length")());
         setattr(tp, "_all_bits_", (int_(2) << bit_length) - int_(1));
     }
@@ -171,7 +171,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (!t)
         return false;
 
-    if ((t->flags & (uint32_t) enum_flags::flag_enum) != 0 && Py_TYPE(o) == t->type_py) {
+    if ((t->flags & (uint32_t) enum_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
         PyObject *pValue = PyObject_GetAttrString(o, "value");
         if (pValue == nullptr) {
             PyErr_Clear();

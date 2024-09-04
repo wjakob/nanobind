@@ -1972,7 +1972,7 @@ The following annotations can be specified using the variable-length
    permissible.
    Changes the resulting Python enumeration type to be based on `enum.IntEnum`.
 
-   .. cpp:struct:: flag_enum
+   .. cpp:struct:: is_flag
 
    Indicate that the enumeration may be used with bitwise
    operations.  This enables the bitwise operators ``| & ^ ~``

@@ -64,6 +64,16 @@ class SEnum(enum.IntEnum):
 
     C = -1
 
+class UnsignedFlag(enum.Flag):
+    A = 1
+    """Value A"""
+
+    B = 2
+    """Value B"""
+
+    All = 18446744073709551615
+    """All values"""
+
 @overload
 def from_enum(arg: Enum) -> int: ...
 
@@ -72,6 +82,9 @@ def from_enum(arg: Flag) -> int: ...
 
 @overload
 def from_enum(arg: SEnum) -> int: ...
+
+@overload
+def from_enum(arg: UnsignedFlag) -> int: ...
 
 @overload
 def from_enum_default_0(value: Enum = Enum.A) -> int: ...
@@ -92,3 +105,6 @@ def to_enum(arg: int, /) -> Enum: ...
 
 @overload
 def to_enum(arg: int, /) -> Flag: ...
+
+@overload
+def to_enum(arg: int, /) -> UnsignedFlag: ...

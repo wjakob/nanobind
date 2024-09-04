@@ -137,17 +137,38 @@ def test08_enum_comparisons():
     assert t.Enum.B != t.SEnum.C and t.SEnum.C != t.Enum.B
 
 def test06_enum_flag():
+    # repr / str tests
+    assert repr(t.Flag.A) == 'Flag.A'
+    assert str(t.Flag.A) == 'Flag.A'
+    assert repr(t.Flag.B) == 'Flag.B'
+    assert str(t.Flag.B) == 'Flag.B'
+    assert repr(t.Flag.C) == 'Flag.C'
+    assert str(t.Flag.C) == 'Flag.C'
+
+    # Flag membership tests
     assert (t.Flag(1) | t.Flag(2)).value == 3
     assert (t.Flag(3) & t.Flag(1)).value == 1
     assert (t.Flag(3) ^ t.Flag(1)).value == 2
     assert (t.Flag(3) ==  (t.Flag.A | t.Flag.B))
 
-    # ensure the flag mask is set correctly by enum_append
-    # in Python 3.11+
+    # ensure the flag mask is set correctly by enum_append in Python 3.11+
     if hasattr(t.Flag, "_flag_mask_"):
         assert t.Flag._flag_mask_ == 7
     assert (t.from_enum(t.Flag.A | t.Flag.C) == 5)
     assert (t.from_enum_implicit(t.Flag(1) | t.Flag(4)) == 5)
+
+    # unsigned flag tests to verify correct type casting behavior
+    # (in particular, overflow protection in enum_from_python.)
+    assert (t.UnsignedFlag(1) | t.UnsignedFlag(2)).value == 3
+    assert t.UnsignedFlag.A.value == 1
+    assert t.UnsignedFlag.B.value == 2
+    assert t.UnsignedFlag.All.value == 0xffffffffffffffff
+    assert t.UnsignedFlag(t.UnsignedFlag.A) is t.UnsignedFlag.A
+    assert t.UnsignedFlag(t.UnsignedFlag.B) is t.UnsignedFlag.B
+    assert t.UnsignedFlag(t.UnsignedFlag.All) == t.UnsignedFlag.All
+    assert t.from_enum(t.UnsignedFlag.A) == 1
+    assert t.from_enum(t.UnsignedFlag.B) == 2
+    assert t.from_enum(t.UnsignedFlag.All) == 0xffffffffffffffff
 
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1

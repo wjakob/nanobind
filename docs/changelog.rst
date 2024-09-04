@@ -18,6 +18,12 @@ below inherit that of the preceding release.
 Version 2.2.0 (TBA)
 -------------------
 
+* nanobind now allows a :cpp:class:`nb::enum_\<T\>() <enum_>` to specify the
+  new class binding annotation :cpp:class:`nb::is_flag() <is_flag>`,
+  which produces an enumeration type derived from `enum.Flag`. Instances of such
+  an enumeration type represent a bitwise combination of the defined enumerators,
+  and they may be combined using bitwise operators ``& | ^ ~``.
+
 - nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
   to function and method bindings, but it lacked the ability to do so for

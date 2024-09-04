@@ -1534,7 +1534,7 @@ Casting
 
    Convert the C++ object ``value`` into a Python object. The return value
    policy `policy` is used to handle ownership-related questions when a new
-   Python object must be created. A valid `parent` object is required when 
+   Python object must be created. A valid `parent` object is required when
    specifying a `reference_internal` return value policy.
 
    The function raises a :cpp:type:`cast_error` when the conversion fails.
@@ -1970,6 +1970,18 @@ The following annotations can be specified using the variable-length
    ``Shape(2) * 1.5 == 3.0``.) It is unspecified whether operations on
    mixed enum types (such as ``Shape.Circle + Color.Red``) are
    permissible.
+   Changes the resulting Python enumeration type to be based on `enum.IntEnum`.
+
+   .. cpp:struct:: is_flag
+
+   Indicate that the enumeration may be used with bitwise
+   operations.  This enables the bitwise operators ``| & ^ ~``
+   with two enumerators as operands.
+   The result will have the same enumeration type as the operands.
+   So ``Shape(2) | Shape(1)`` is equivalent to ``Shape(3)`.
+   Changes the resulting Python enumeration type to be based on either
+   `enum.IntFlag` or `enum.Flag`, depending on whether or not the enumeration
+   is marked to support arithmetic operations.
 
 Function binding
 ----------------

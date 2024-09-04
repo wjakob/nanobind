@@ -58,6 +58,7 @@ struct is_method {};
 struct is_implicit {};
 struct is_operator {};
 struct is_arithmetic {};
+struct is_flag {};
 struct is_final {};
 struct is_generic {};
 struct kw_only {};

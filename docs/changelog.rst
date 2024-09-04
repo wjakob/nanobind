@@ -18,12 +18,6 @@ below inherit that of the preceding release.
 Version 2.2.0 (TBA)
 -------------------
 
-* nanobind now allows a :cpp:class:`nb::enum_\<T\>() <enum_>` to specify the
-  new class binding annotation :cpp:class:`nb::is_flag() <is_flag>`,
-  which produces an enumeration type derived from `enum.Flag`. Instances of such
-  an enumeration type represent a bitwise combination of the defined enumerators,
-  and they may be combined using bitwise operators ``& | ^ ~``.
-
 - nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
   to function and method bindings, but it lacked the ability to do so for
@@ -31,8 +25,17 @@ Version 2.2.0 (TBA)
 
   Version 2.2.0 adds this missing part, which accelerates object construction
   by up to a factor of 2×. The difference is especially pronounced when passing
-  keyword arguments to constructors. Note that this feature is only supported
-  on Python 3.9+.
+  keyword arguments to constructors. Note that the improvements only apply to
+  Python 3.9+.
+
+* nanobind now allows :cpp:class:`nb::enum_\<T\>() <enum_>` bindings to specify
+  :cpp:class:`nb::is_flag() <is_flag>` annotation, which produces an
+  enumeration type derived from `enum.Flag`. This enables bitwise combination
+  of enumerators using compatible operators (``&``, ``|``, ``^``, and ``~``).
+
+  The :cpp:class:`nb::is_flag() <is_flag>` annotation can further be combined
+  with :cpp:class:`nb::is_arithmetic() <is_flag>`, which yields an enumeration
+  deriving from `enum.IntFlag`.
 
 * Added the :cpp:class:`bytearray` wrapper type. (PR `#654
   <https://github.com/wjakob/nanobind/pull/654>`__)

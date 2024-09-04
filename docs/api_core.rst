@@ -1962,26 +1962,32 @@ The following annotations can be specified using the variable-length
 
 .. cpp:struct:: is_arithmetic
 
-   Indicate that the enumeration may be used with arithmetic
-   operations.  This enables the binary operators ``+ - * // & | ^ <<
-   >>`` and unary ``- ~ abs()``, with operands of either enumeration
-   or numeric type; the result will be as if the enumeration operands
-   were first converted to integers. (So ``Shape(2) + Shape(1) == 3`` and
-   ``Shape(2) * 1.5 == 3.0``.) It is unspecified whether operations on
-   mixed enum types (such as ``Shape.Circle + Color.Red``) are
-   permissible.
-   Changes the resulting Python enumeration type to be based on `enum.IntEnum`.
+   Indicate that the enumeration supports arithmetic operations.  This enables
+   both unary (``-``, ``~``, ``abs()``) and binary (``+``, ``-``, ``*``,
+   ``//``, ``&``, ``|``, ``^``, ``<<``, ``>>``) operations with operands of
+   either enumeration or numeric types.
 
-   .. cpp:struct:: is_flag
+   The result will be as if the operands were first converted to integers. (So
+   ``Shape(2) + Shape(1) == 3`` and ``Shape(2) * 1.5 == 3.0``.) It is
+   unspecified whether operations on mixed enum types (such as ``Shape.Circle +
+   Color.Red``) are permissible.
 
-   Indicate that the enumeration may be used with bitwise
-   operations.  This enables the bitwise operators ``| & ^ ~``
-   with two enumerators as operands.
-   The result will have the same enumeration type as the operands.
-   So ``Shape(2) | Shape(1)`` is equivalent to ``Shape(3)`.
-   Changes the resulting Python enumeration type to be based on either
-   `enum.IntFlag` or `enum.Flag`, depending on whether or not the enumeration
-   is marked to support arithmetic operations.
+   Passing this annotation changes the Python enumeration parent class to
+   either `enum.IntEnum` or `enum.IntFlag`, depending on whether or not the
+   flag enumeration attribute is also specified (see :cpp:class:`is_flag`).
+
+.. cpp:struct:: is_flag
+
+   Indicate that the enumeration supports bitwise operations.  This enables the
+   operators (``|``, ``&``, ``^``, and ``~``) with two enumerators as operands.
+
+   The result has the same type as the operands, i.e., ``Shape(2) | Shape(1)``
+   will be equivalent to ``Shape(3)`.
+
+   Passing this annotation changes the Python enumeration parent class to
+   either `enum.IntFlag` or `enum.Flag`, depending on whether or not the
+   enumeration is also marked to support arithmetic operations (see
+   :cpp:class:`is_arithmetic`).
 
 Function binding
 ----------------

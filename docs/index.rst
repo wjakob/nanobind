@@ -8,7 +8,7 @@ Introduction
      :align: center
      :alt: nanobind logo
      :class: only-light
-   
+
    .. image:: https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark.png
      :width: 800
      :align: center
@@ -21,7 +21,7 @@ Introduction
      :width: 800
      :align: center
      :alt: nanobind logo
-   
+
 *nanobind* is a small binding library that exposes C++ types in Python and vice
 versa. It is reminiscent of `Boost.Python
 <https://www.boost.org/doc/libs/1_64_0/libs/python/doc/html>`_ and `pybind11

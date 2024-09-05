@@ -28,17 +28,40 @@ Version 2.2.0 (TBA)
   keyword arguments to constructors. Note that the improvements only apply to
   Python 3.9+.
 
-* nanobind now allows :cpp:class:`nb::enum_\<T\>() <enum_>` bindings to specify
-  :cpp:class:`nb::is_flag() <is_flag>` annotation, which produces an
-  enumeration type derived from `enum.Flag`. This enables bitwise combination
-  of enumerators using compatible operators (``&``, ``|``, ``^``, and ``~``).
+* A new :cpp:class:`nb::is_flag() <is_flag>` annotation in
+  :cpp:class:`nb::enum_\<T\>() <enum_>` bindings produces enumeration types
+  derived from `enum.Flag`, enabling bitwise combination using compatible
+  operators (``&``, ``|``, ``^``, and ``~``).
 
   The :cpp:class:`nb::is_flag() <is_flag>` annotation can further be combined
   with :cpp:class:`nb::is_arithmetic() <is_flag>`, which yields an enumeration
   deriving from `enum.IntFlag`.
 
+* Support return value policy customization in the type casters of
+  ``Eigen::Ref<>`` and ``Eigen::Map<>`` (commit `67316e
+  <https://github.com/wjakob/nanobind/commit/67316eb88955a15e8e89a57ce9a53d8d66263287>`__).
+
 * Added the :cpp:class:`bytearray` wrapper type. (PR `#654
   <https://github.com/wjakob/nanobind/pull/654>`__)
+
+* The :cpp:class:`nb::ellipsis <ellipsis>` type now renders as ``...`` when
+  used in :cpp:class:`nb::typed\<...\> <typed>` (PR `#705
+  <https://github.com/wjakob/nanobind/pull/705>`__).
+
+* The :cpp:class:`nb::sig("...") <sig>` annotation now supports `inline type
+  parameter lists
+  <https://docs.python.org/3/reference/compound_stmts.html#type-params>`__ such
+  as ``def first[T](l: Sequence[T]) -> T`` (PR `#709
+  <https://github.com/wjakob/nanobind/pull/709>`__).
+
+* Fixed implicit conversion of complex nd-arrays. (issue `#709
+  <https://github.com/wjakob/nanobind/issues/709>`__)
+
+* Minor fixes and improvements (PR `#696
+  <https://github.com/wjakob/nanobind/pull/696>`__, `#693
+  <https://github.com/wjakob/nanobind/pull/693>`__, `#675
+  <https://github.com/wjakob/nanobind/pull/675>`__, commit `75d259
+  <https://github.com/wjakob/nanobind/commit/75d259c7c16db9586e5cd3aa4715e09a25e76d83>`__).
 
 * ABI version 15.
 
@@ -58,7 +81,7 @@ Version 2.1.0 (Aug 11, 2024)
   This change was prompted by discussion `#605
   <https://github.com/wjakob/nanobind/discussions/605>`__.
 
-* Switch nanobind wheel generation from `setuptools
+* Switched nanobind wheel generation from `setuptools
   <https://github.com/pypa/setuptools>`__ to `scikit-build-core
   <https://github.com/scikit-build/scikit-build-core>`__ (PR `#618
   <https://github.com/wjakob/nanobind/discussions/618>`__).
@@ -88,7 +111,7 @@ Version 2.1.0 (Aug 11, 2024)
   `#595 <https://github.com/wjakob/nanobind/pull/595>`__,
   `#647 <https://github.com/wjakob/nanobind/pull/647>`__).
 
-* The nd-array wrapper :cpp::class:`nb::ndarray <ndarray>` now properly handles
+* The nd-array wrapper :cpp:class:`nb::ndarray <ndarray>` now properly handles
   CuPy arrays (`#594 <https://github.com/wjakob/nanobind/pull/594>`__).
 
 * Added :cpp:func:`nb::hash() <hash>`, a wrapper for the Python ``hash()``

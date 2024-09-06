@@ -25,20 +25,18 @@ Version 2.2.0 (TBA)
 
   Version 2.2.0 adds this missing part, which accelerates object construction
   by up to a factor of 2×. The difference is especially pronounced when passing
-  keyword arguments to constructors. Note that the improvements only apply to
-  Python 3.9+.
+  keyword arguments to constructors. Note that this improvement only applies to
+  Python version 3.9 and newer.
 
 * A new :cpp:class:`nb::is_flag() <is_flag>` annotation in
-  :cpp:class:`nb::enum_\<T\>() <enum_>` bindings produces enumeration types
-  derived from `enum.Flag`, enabling bitwise combination using compatible
-  operators (``&``, ``|``, ``^``, and ``~``).
+  :cpp:class:`nb::enum_\<T\>() <enum_>` produces enumeration bindings deriving
+  from `enum.Flag`, which enables bitwise combination using compatible
+  operators (``&``, ``|``, ``^``, and ``~``). Further combining the annotation
+  with :cpp:class:`nb::is_arithmetic() <is_flag>` creates enumerations deriving
+  from `enum.IntFlag`.
 
-  The :cpp:class:`nb::is_flag() <is_flag>` annotation can further be combined
-  with :cpp:class:`nb::is_arithmetic() <is_flag>`, which yields an enumeration
-  deriving from `enum.IntFlag`.
-
-* Support return value policy customization in the type casters of
-  ``Eigen::Ref<>`` and ``Eigen::Map<>`` (commit `67316e
+* Added support for return value policy customization to the type casters of
+  ``Eigen::Ref<...>`` and ``Eigen::Map<...>`` (commit `67316e
   <https://github.com/wjakob/nanobind/commit/67316eb88955a15e8e89a57ce9a53d8d66263287>`__).
 
 * Added the :cpp:class:`bytearray` wrapper type. (PR `#654

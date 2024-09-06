@@ -18,6 +18,9 @@ below inherit that of the preceding release.
 Version 2.2.0 (TBA)
 -------------------
 
+- The NVIDIA CUDA compiler (``nvcc``) is now explicitly supported and included
+  in nanobind's CI test suite.
+
 - nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
   to function and method bindings, but it lacked the ability to do so for

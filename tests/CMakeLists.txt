@@ -21,27 +21,45 @@ if (UNIX AND (CMAKE_SIZEOF_VOID_P EQUAL 4) AND (CMAKE_SYSTEM_PROCESSOR STREQUAL 
   add_compile_options(-mfpmath=sse -msse2)
 endif()
 
+# Enforce the use of the CUDA NVCC compiler if requested
+if (NB_TEST_CUDA)
+  enable_language(CUDA)
+  set(CMAKE_CUDA_STANDARD 17)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
+
 if (NB_TEST_SANITIZE)
   add_compile_options(-fsanitize=address,undefined)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
+set(TEST_NAMES
+  functions
+  classes
+  holders
+  stl
+  stl_bind_map
+  stl_bind_vector
+  chrono
+  enum
+  eval
+  ndarray
+  exception
+  make_iterator
+  typing
+  issue
+  intrusive
+)
 
-nanobind_add_module(test_functions_ext test_functions.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_classes_ext test_classes.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_holders_ext test_holders.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_stl_ext test_stl.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_bind_map_ext test_stl_bind_map.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_bind_vector_ext test_stl_bind_vector.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_chrono_ext test_chrono.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_enum_ext test_enum.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_eval_ext test_eval.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_ndarray_ext test_ndarray.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_intrusive_ext test_intrusive.cpp test_intrusive_impl.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_exception_ext test_exception.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_make_iterator_ext test_make_iterator.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_typing_ext test_typing.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_issue_ext test_issue.cpp ${NB_EXTRA_ARGS})
+foreach (NAME ${TEST_NAMES})
+  nanobind_add_module(test_${NAME}_ext test_${NAME}.cpp ${NB_EXTRA_ARGS})
+
+  if (NB_TEST_CUDA)
+    set_property(SOURCE test_${NAME}.cpp PROPERTY LANGUAGE CUDA)
+  endif()
+endforeach()
+
+target_sources(test_intrusive_ext PRIVATE test_intrusive_impl.cpp)
 
 foreach (NAME functions classes ndarray stl enum typing make_iterator)
   if (NAME STREQUAL typing)

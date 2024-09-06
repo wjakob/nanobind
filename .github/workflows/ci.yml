@@ -64,3 +64,28 @@ jobs:
       run: >
         cd build;
         python -m pytest
+
+  nvcc:
+    runs-on: ubuntu-latest
+    container: nvidia/cuda:12.2.0-devel-ubuntu22.04
+    name: "Python 3 / NVCC (CUDA 12.2)"
+
+    steps:
+    - name: Install dependencies
+      run: apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y cmake git python3-dev python3-pytest python3-pip libeigen3-dev && python3 -m pip install typing_extensions numpy
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DNB_TEST_CUDA=ON
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Run tests
+      run: >
+        cd build;
+        python3 -m pytest

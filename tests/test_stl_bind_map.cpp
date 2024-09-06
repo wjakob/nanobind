@@ -41,7 +41,7 @@ NestMap *times_hundred(int n) {
     return m;
 }
 
-NB_MODULE(test_bind_map_ext, m) {
+NB_MODULE(test_stl_bind_map_ext, m) {
     // test_map_string_double
     nb::bind_map<std::map<std::string, double>>(m, "MapStringDouble");
     nb::bind_map<std::unordered_map<std::string, double>>(m, "UnorderedMapStringDouble");

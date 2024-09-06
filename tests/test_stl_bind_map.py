@@ -2,7 +2,7 @@ import pytest
 import sys
 import platform
 
-import test_bind_map_ext as t
+import test_stl_bind_map_ext as t
 
 
 def test_map_string_double(capfd):
@@ -35,12 +35,12 @@ def test_map_string_double(capfd):
     assert len(mm2) == 1
     mm2.clear()
     assert len(mm2) == 0
-    assert repr(mm) == "test_bind_map_ext.MapStringDouble({'a': 1.0, 'b': 2.5})"
+    assert repr(mm) == "test_stl_bind_map_ext.MapStringDouble({'a': 1.0, 'b': 2.5})"
 
     with pytest.raises(TypeError):
         mm2.update({"a" : "b"})
     captured = capfd.readouterr().err.strip()
-    ref = "nanobind: implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed!"
+    ref = "nanobind: implicit conversion from type 'dict' to type 'test_stl_bind_map_ext.MapStringDouble' failed!"
 
     # Work around Pytest-related flakiness (https://github.com/pytest-dev/pytest/issues/10843)
     if platform.system() == 'Windows':
@@ -102,7 +102,7 @@ def test_map_string_double(capfd):
 
     assert t.MapStringDouble.__init__.__doc__ == \
 """__init__(self) -> None
-__init__(self, arg: test_bind_map_ext.MapStringDouble) -> None
+__init__(self, arg: test_stl_bind_map_ext.MapStringDouble) -> None
 __init__(self, arg: %s[str, float], /) -> None
 
 Overloaded function.
@@ -111,7 +111,7 @@ Overloaded function.
 
 Default constructor
 
-2. ``__init__(self, arg: test_bind_map_ext.MapStringDouble) -> None``
+2. ``__init__(self, arg: test_stl_bind_map_ext.MapStringDouble) -> None``
 
 Copy constructor
 

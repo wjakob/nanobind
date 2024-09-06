@@ -3,7 +3,7 @@
 
 namespace nb = nanobind;
 
-NB_MODULE(test_bind_vector_ext, m) {
+NB_MODULE(test_stl_bind_vector_ext, m) {
     nb::bind_vector<std::vector<unsigned int>>(m, "VectorInt");
     nb::bind_vector<std::vector<bool>>(m, "VectorBool");
 

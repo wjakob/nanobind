@@ -1,7 +1,7 @@
 import pytest
 import platform
 
-import test_bind_vector_ext as t
+import test_stl_bind_vector_ext as t
 
 def test01_vector_int(capfd):
     v_int = t.VectorInt([0, 0])
@@ -11,7 +11,7 @@ def test01_vector_int(capfd):
     # test construction from a generator
     v_int1 = t.VectorInt(x for x in range(5))
     assert t.VectorInt(v_int1) == t.VectorInt([0, 1, 2, 3, 4])
-    assert repr(v_int1) == "test_bind_vector_ext.VectorInt([0, 1, 2, 3, 4])"
+    assert repr(v_int1) == "test_stl_bind_vector_ext.VectorInt([0, 1, 2, 3, 4])"
 
     v_int2 = t.VectorInt([0, 0])
     assert v_int == v_int2
@@ -47,7 +47,7 @@ def test01_vector_int(capfd):
         v_int2.extend([8, "a"])
 
     captured = capfd.readouterr().err.strip()
-    ref = "nanobind: implicit conversion from type 'list' to type 'test_bind_vector_ext.VectorInt' failed!"
+    ref = "nanobind: implicit conversion from type 'list' to type 'test_stl_bind_vector_ext.VectorInt' failed!"
 
     # Work around Pytest-related flakiness (https://github.com/pytest-dev/pytest/issues/10843)
     if platform.system() == 'Windows':

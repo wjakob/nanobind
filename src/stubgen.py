@@ -1105,7 +1105,7 @@ class StubGen:
             return 1
 
         if spec:
-            if spec.origin and "site-packages" in spec.origin:
+            if spec.origin and ("site-packages" in spec.origin or "dist-packages" in spec.origin):
                 return 1
             else:
                 return 0

@@ -122,7 +122,7 @@ int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
 
     // If c->value corresponds to an associated CPython object, return it
-    nb::object value = nb::find(w->value);
+    nb::handle value = nb::find(w->value);
 
     // Inform the Python GC about it
     Py_VISIT(value.ptr());

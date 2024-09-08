@@ -479,8 +479,10 @@ struct lock_obj { lock_obj(PyObject *) { } };
 
 extern char *strdup_check(const char *);
 extern void *malloc_check(size_t size);
+extern void maybe_make_immortal(PyObject *op);
 
 extern char *extract_name(const char *cmd, const char *prefix, const char *s);
+
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

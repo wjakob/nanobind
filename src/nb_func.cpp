@@ -288,6 +288,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
 
+    maybe_make_immortal((PyObject *) func);
+
     func->max_nargs = f->nargs;
     func->complex_call = f->nargs_pos < f->nargs || has_args || has_keep_alive;
 

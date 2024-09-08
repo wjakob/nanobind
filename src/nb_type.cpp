@@ -866,6 +866,8 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
         tp = (PyTypeObject *) nb_type_from_metaclass(
             internals_->nb_meta, internals_->nb_module, &spec);
 
+        maybe_make_immortal((PyObject *) tp);
+
         handle(tp).attr("__module__") = "nanobind";
 
         int rv = 1;
@@ -1267,6 +1269,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
               "nanobind::detail::nb_type_new(\"%s\"): type construction "
               "failed: %s!", t_name, err.what());
     }
+
+    maybe_make_immortal(result);
 
     type_data *to = nb_type_data((PyTypeObject *) result);
 

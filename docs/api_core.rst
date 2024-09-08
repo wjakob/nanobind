@@ -1638,6 +1638,12 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       explain it in docstrings and stubs (``str(value)``) does not produce
       acceptable output.
 
+   .. cpp:function:: arg &lock(bool value = true)
+
+      Set a flag noting that this argument must be locked when dispatching a
+      function call in free-threaded Python extensions. It does nothing in
+      regular GIL-protected extensions.
+
 .. cpp:struct:: is_method
 
    Indicate that the bound function is a method.

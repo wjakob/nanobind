@@ -89,3 +89,36 @@ jobs:
       run: >
         cd build;
         python3 -m pytest
+
+  free-threaded:
+    name: "Python 3.13-dev / ubuntu.latest [free-threaded]"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - uses: deadsnakes/action@v3.1.0
+      with:
+        python-version: 3.13-dev
+        nogil: true
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install PyTest
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DNB_TEST_FREE_THREADED=ON
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Run tests
+      run: >
+        cd build;
+        python -m pytest

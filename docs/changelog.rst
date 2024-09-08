@@ -29,14 +29,17 @@ Version 2.2.0 (TBA)
   Version 2.2.0 adds this missing part, which accelerates object construction
   by up to a factor of 2×. The difference is especially pronounced when passing
   keyword arguments to constructors. Note that this improvement only applies to
-  Python version 3.9 and newer.
+  Python version 3.9 and newer (commits
+  `#24907b0 <https://github.com/wjakob/nanobind/commit/24907b04a7f52074f41af8a256ac63a945fe5a96>`__,
+  `#e24d7f3 <https://github.com/wjakob/nanobind/commit/e24d7f3434a6bbcc33cd8965632dc47f943fb2f8>`__,
+  `#0acecb4 <https://github.com/wjakob/nanobind/commit/0acecb474874f286119dce2b97b84142b6ada1a8>`__).
 
 * A new :cpp:class:`nb::is_flag() <is_flag>` annotation in
   :cpp:class:`nb::enum_\<T\>() <enum_>` produces enumeration bindings deriving
-  from `enum.Flag`, which enables bitwise combination using compatible
+  from :py:class:`enum.Flag`, which enables bit-wise combination using compatible
   operators (``&``, ``|``, ``^``, and ``~``). Further combining the annotation
   with :cpp:class:`nb::is_arithmetic() <is_flag>` creates enumerations deriving
-  from `enum.IntFlag`.
+  from :py:class:`enum.IntFlag`.
 
 * Added support for return value policy customization to the type casters of
   ``Eigen::Ref<...>`` and ``Eigen::Map<...>`` (commit `67316e
@@ -64,7 +67,18 @@ Version 2.2.0 (TBA)
   <https://github.com/wjakob/nanobind/pull/675>`__, commit `75d259
   <https://github.com/wjakob/nanobind/commit/75d259c7c16db9586e5cd3aa4715e09a25e76d83>`__).
 
+* Casting via :cpp:func:`nb::cast <cast>` can now specify an owner object for
+  use with the :cpp:enumerator:`nb::rv_policy::reference_internal
+  <rv_policy::reference_internal>` return value policy  (PR `#667
+  <https://github.com/wjakob/nanobind/pull/667>`__) #667
+
+* The ``std::optional<T>`` type caster is now implemented so that it can also
+  accommodate other frameworks such as Boost, Abseil, etc. (PR `#675
+  <https://github.com/wjakob/nanobind/pull/675>`__)
+
 * ABI version 15.
+
+* Minor fixes and improvements.
 
 
 Version 2.1.0 (Aug 11, 2024)
@@ -240,12 +254,12 @@ according to `SemVer <http://semver.org>`__. The following changes are
 noteworthy:
 
 * The :cpp:class:`nb::enum_\<T\>() <enum_>` binding declaration is now a
-  wrapper that creates either a ``enum.Enum`` or ``enum.IntEnum``-derived type.
+  wrapper that creates either a :py:class:`enum.Enum` or :py:class:`enum.IntEnum`-derived type.
   Previously, nanobind relied on a custom enumeration base class that was a
   frequent source of friction for users.
 
   This change may break code that casts entries to integers, which now only
-  works for arithmetic (``enum.IntEnum``-derived) enumerations. Replace
+  works for arithmetic (:py:class:`enum.IntEnum`-derived) enumerations. Replace
   ``int(my_enum_entry)`` with ``my_enum_entry.value`` to work around the issue.
 
 * The :cpp:func:`nb::bind_vector\<T\>() <bind_vector>` and

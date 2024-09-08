@@ -27,6 +27,7 @@ compile_commands.json
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake
+nanobind-config-version.cmake
 \.DS_Store
 \.cmake
 __pycache__

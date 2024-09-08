@@ -475,7 +475,6 @@ def test48_std_variant_ret_var_none():
     assert t.variant_ret_var_none() is None
 
     rv_t = union("None", "test_stl_ext.Copyable", "int")
-    print(t.variant_ret_var_none.__doc__)
     assert t.variant_ret_var_none.__doc__ == (f"variant_ret_var_none() -> {rv_t}")
 
 

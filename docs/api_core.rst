@@ -1973,21 +1973,22 @@ The following annotations can be specified using the variable-length
    Color.Red``) are permissible.
 
    Passing this annotation changes the Python enumeration parent class to
-   either `enum.IntEnum` or `enum.IntFlag`, depending on whether or not the
-   flag enumeration attribute is also specified (see :cpp:class:`is_flag`).
+   either :py:class:`enum.IntEnum` or :py:class:`enum.IntFlag`, depending on
+   whether or not the flag enumeration attribute is also specified (see
+   :cpp:class:`is_flag`).
 
 .. cpp:struct:: is_flag
 
-   Indicate that the enumeration supports bitwise operations.  This enables the
+   Indicate that the enumeration supports bit-wise operations.  This enables the
    operators (``|``, ``&``, ``^``, and ``~``) with two enumerators as operands.
 
    The result has the same type as the operands, i.e., ``Shape(2) | Shape(1)``
-   will be equivalent to ``Shape(3)`.
+   will be equivalent to ``Shape(3)``.
 
    Passing this annotation changes the Python enumeration parent class to
-   either `enum.IntFlag` or `enum.Flag`, depending on whether or not the
-   enumeration is also marked to support arithmetic operations (see
-   :cpp:class:`is_arithmetic`).
+   either :py:class:`enum.IntFlag` or :py:class:`enum.Flag`, depending on
+   whether or not the enumeration is also marked to support arithmetic
+   operations (see :cpp:class:`is_arithmetic`).
 
 Function binding
 ----------------

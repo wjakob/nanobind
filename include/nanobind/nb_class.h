@@ -744,7 +744,6 @@ public:
 
     NB_INLINE enum_ &export_values() { detail::enum_export(m_ptr); return *this; }
 
-
     template <typename Func, typename... Extra>
     NB_INLINE enum_ &def(const char *name_, Func &&f, const Extra &... extra) {
         cpp_function_def<T>((detail::forward_t<Func>) f, scope(*this),

@@ -27,13 +27,14 @@ endif()
 option(NB_CREATE_INSTALL_RULES "Create installation rules" ${NB_MASTER_PROJECT})
 option(NB_USE_SUBMODULE_DEPS   "Use the nanobind dependencies shipped as a git submodule of this repository" ON)
 
-option(NB_TEST              "Compile nanobind tests?" ${NB_MASTER_PROJECT})
-option(NB_TEST_STABLE_ABI   "Test the stable ABI interface?" OFF)
-option(NB_TEST_SHARED_BUILD "Build a shared nanobind library for the test suite?" OFF)
-option(NB_TEST_CUDA         "Force the use of the CUDA/NVCC compiler for testing purposes" OFF)
+option(NB_TEST               "Compile nanobind tests?" ${NB_MASTER_PROJECT})
+option(NB_TEST_STABLE_ABI    "Test the stable ABI interface?" OFF)
+option(NB_TEST_SHARED_BUILD  "Build a shared nanobind library for the test suite?" OFF)
+option(NB_TEST_CUDA          "Force the use of the CUDA/NVCC compiler for testing purposes" OFF)
+option(NB_TEST_FREE_THREADED "Build free-threaded extensions for the test suite?" ON)
 
 if (NOT MSVC)
-  option(NB_TEST_SANITZE    "Build tests with address and undefined behavior sanitizers?" OFF)
+  option(NB_TEST_SANITIZE    "Build tests with address and undefined behavior sanitizers?" OFF)
 endif()
 
 # ---------------------------------------------------------------------------

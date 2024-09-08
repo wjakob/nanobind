@@ -1,11 +1,15 @@
 libnanobind-static.a
 libnanobind-static-abi3.a
-libnanobind.dylib
+libnanobind-static-ft.a
 libnanobind.so
-libnanobind-abi3.dylib
 libnanobind-abi3.so
+libnanobind-ft.so
+libnanobind.dylib
+libnanobind-abi3.dylib
+libnanobind-ft.dylib
 nanobind.dll
 nanobind-abi3.dll
+nanobind-ft.dll
 
 libinter_module.dylib
 libinter_module.so

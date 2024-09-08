@@ -40,6 +40,9 @@ if(DEFINED NB_SOSABI)
   endif()
 endif()
 
+# Extract Python version and extensions (e.g. free-threaded build)
+string(REGEX REPLACE "[^-]*-([^-]*)-.*" "\\1" NB_ABI "${NB_SOABI}")
+
 # If either suffix is missing, call Python to compute it
 if(NOT DEFINED NB_SUFFIX OR NOT DEFINED NB_SUFFIX_S)
   # Query Python directly to get the right suffix.
@@ -72,6 +75,7 @@ endif()
 # Stash these for later use
 set(NB_SUFFIX   ${NB_SUFFIX}   CACHE INTERNAL "")
 set(NB_SUFFIX_S ${NB_SUFFIX_S} CACHE INTERNAL "")
+set(NB_ABI      ${NB_ABI}      CACHE INTERNAL "")
 
 get_filename_component(NB_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 get_filename_component(NB_DIR "${NB_DIR}" PATH)
@@ -201,11 +205,15 @@ function (nanobind_build_library TARGET_NAME)
   endif()
 
   if (WIN32)
-    if (${TARGET_NAME} MATCHES "abi3")
+    if (${TARGET_NAME} MATCHES "-abi3")
       target_link_libraries(${TARGET_NAME} PUBLIC Python::SABIModule)
     else()
       target_link_libraries(${TARGET_NAME} PUBLIC Python::Module)
     endif()
+  endif()
+
+  if (TARGET_NAME MATCHES "-ft")
+    target_compile_definitions(${TARGET_NAME} PUBLIC NB_FREE_THREADED)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't
@@ -297,7 +305,7 @@ endfunction()
 
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "STABLE_ABI;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP"
+    "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP"
     "NB_DOMAIN" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
@@ -319,6 +327,12 @@ function(nanobind_add_module name)
     set(ARG_STABLE_ABI FALSE)
   endif()
 
+  if (NB_ABI MATCHES "t")
+    set(ARG_STABLE_ABI FALSE)
+  else(ARG_STABLE_ABI)
+    set(ARG_FREE_THREADED FALSE)
+  endif()
+
   set(libname "nanobind")
   if (ARG_NB_STATIC)
     set(libname "${libname}-static")
@@ -326,6 +340,10 @@ function(nanobind_add_module name)
 
   if (ARG_STABLE_ABI)
     set(libname "${libname}-abi3")
+  endif()
+
+  if (ARG_FREE_THREADED)
+    set(libname "${libname}-ft")
   endif()
 
   if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
@@ -343,6 +361,10 @@ function(nanobind_add_module name)
     nanobind_extension_abi3(${name})
   else()
     nanobind_extension(${name})
+  endif()
+
+  if (ARG_FREE_THREADED)
+    target_compile_definitions(${name} PRIVATE NB_FREE_THREADED)
   endif()
 
   target_link_libraries(${name} PRIVATE ${libname})

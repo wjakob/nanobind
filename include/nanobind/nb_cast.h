@@ -32,20 +32,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-enum cast_flags : uint8_t {
-    // Enable implicit conversions (impl. assumes this is 1, don't reorder..)
-    convert = (1 << 0),
-
-    // Passed to the 'self' argument in a constructor call (__init__)
-    construct = (1 << 1),
-
-    // Indicates that this cast is performed by nb::cast or nb::try_cast.
-    // This implies that objects added to the cleanup list may be
-    // released immediately after the caster's final output value is
-    // obtained, i.e., before it is used.
-    manual = (1 << 2),
-};
-
 /**
  * Type casters expose a member 'Cast<T>' which users of a type caster must
  * query to determine what the caster actually can (and prefers) to produce.

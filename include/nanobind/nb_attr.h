@@ -32,6 +32,11 @@ struct arg {
         return *this;
     }
 
+    NB_INLINE arg &lock(bool value = true) {
+        lock_ = value;
+        return *this;
+    }
+
     NB_INLINE arg &sig(const char *value) {
         signature_ = value;
         return *this;
@@ -40,6 +45,7 @@ struct arg {
     const char *name_, *signature_;
     uint8_t convert_{ true };
     bool none_{ false };
+    bool lock_{ false };
 };
 
 struct arg_v : arg {
@@ -62,6 +68,7 @@ struct is_flag {};
 struct is_final {};
 struct is_generic {};
 struct kw_only {};
+struct lock_self {};
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
@@ -126,16 +133,38 @@ enum class func_flags : uint32_t {
     /// Does this overload specify a custom function signature (for docstrings, typing)
     has_signature = (1 << 16),
     /// Does this function have one or more nb::keep_alive() annotations?
-    has_keep_alive = (1 << 17)
+    has_keep_alive = (1 << 17),
+    /// Free-threaded Python: does the binding lock the 'self' argument
+    lock_self = (1 << 18)
 };
+
+enum cast_flags : uint8_t {
+    // Enable implicit conversions (code assumes this has value 1, don't reorder..)
+    convert = (1 << 0),
+
+    // Passed to the 'self' argument in a constructor call (__init__)
+    construct = (1 << 1),
+
+    // Indicates that the function dispatcher should accept 'None' arguments
+    accepts_none = (1 << 2),
+
+    // Indicates that a function argument must be locked before dispatching a call
+    lock = (1 << 3),
+
+    // Indicates that this cast is performed by nb::cast or nb::try_cast.
+    // This implies that objects added to the cleanup list may be
+    // released immediately after the caster's final output value is
+    // obtained, i.e., before it is used.
+    manual = (1 << 4)
+};
+
 
 struct arg_data {
     const char *name;
     const char *signature;
     PyObject *name_py;
     PyObject *value;
-    bool convert;
-    bool none;
+    uint8_t flag;
 };
 
 template <size_t Size> struct func_data_prelim {
@@ -266,26 +295,36 @@ NB_INLINE void func_extra_apply(F &, std::nullptr_t, size_t &) { }
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
-    arg_data &arg = f.args[index++];
+    uint8_t flag = 0;
+    if (a.none_)
+        flag |= (uint8_t) cast_flags::accepts_none;
+    if (a.convert_)
+        flag |= (uint8_t) cast_flags::convert;
+    if (a.lock_)
+        flag |= (uint8_t) cast_flags::lock;
+
+    arg_data &arg = f.args[index];
+    arg.flag = flag;
     arg.name = a.name_;
     arg.signature = a.signature_;
     arg.value = nullptr;
-    arg.convert = a.convert_;
-    arg.none = a.none_;
+    index++;
 }
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
-    arg_data &arg = f.args[index++];
-    arg.name = a.name_;
-    arg.signature = a.signature_;
-    arg.value = a.value.ptr();
-    arg.convert = a.convert_;
-    arg.none = a.none_;
+    arg_data &ad = f.args[index];
+    func_extra_apply(f, (const arg &) a, index);
+    ad.value = a.value.ptr();
 }
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &, kw_only, size_t &) {}
+
+template <typename F>
+NB_INLINE void func_extra_apply(F &f, lock_self, size_t &) {
+    f.flags |= (uint32_t) func_flags::lock_self;
+}
 
 template <typename F, typename... Ts>
 NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t &) {}

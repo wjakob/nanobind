@@ -545,3 +545,45 @@ The following interactive session shows how to call them from Python.
    C++ libraries (e.g. GUI libraries, asynchronous networking libraries,
    etc.).
 
+.. _binding-overheads:
+
+Minimizing binding overheads
+----------------------------
+
+The code that dispatches function calls from Python to C++ is in general
+:ref:`highly optimized <benchmarks>`. When it is important to further reduce
+binding overheads to an absolute minimum, consider removing annotations for
+:ref:`keyword and default arguments <keyword_and_default_args>` along with
+other advanced binding annotations.
+
+In the snippet below, ``f1`` has lower binding overheads compared to ``f2``.
+
+.. code-block:: cpp
+
+   NB_MODULE(my_ext, m) {
+       m.def("f1", [](int) { /* no-op */ });
+       m.def("f2", [](int) { /* no-op */ }, "arg"_a);
+   }
+
+This is because ``f1``:
+
+- does not accept keyword arguments and does not specify :ref:`default argument
+  values <keyword_and_default_args>`.
+
+- has no :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>` or
+  :ref:`argument locking <argument-locks>` annotations.
+
+- takes no variable-length positional (:cpp:class:`nb::args <args>`) or keyword
+  (:cpp:class:`nb::kwargs <kwargs>`) arguments.
+
+- has 8 or fewer arguments.
+
+If all of the above conditions are satisfied, nanobind switches to a
+specialized dispatcher that is optimized to handle a small number of positional
+arguments. Otherwise, it uses the default dispatcher that works in any
+situation. It is also worth noting that functions with many overloads generally
+execute more slowly, since nanobind must first select a suitable one.
+
+These differences are mainly of interest when a function that does *very
+little* is called at a *very high rate*, in which case binding overheads can
+become noticeable.

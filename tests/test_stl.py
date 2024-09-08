@@ -306,6 +306,7 @@ def test31_std_function_roundtrip():
 # cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849
 @skip_on_pypy
 def test32_std_function_gc():
+    # Test class -> function -> class cyclic reference
     class A(t.FuncWrapper):
         pass
 
@@ -316,18 +317,29 @@ def test32_std_function_gc():
     collect()
     assert t.FuncWrapper.alive == 0
 
-    # A class -> function -> class cyclic reference
-    class B(t.FuncWrapper):
+    # t.FuncWrapper is a C extension type with a custom property 'f', which
+    # can store Python function objects It implements the tp_traverse
+    # callback so that reference cycles arising from this function object
+    # can be detected.
+
+    class Test(t.FuncWrapper):
         def __init__(self):
             super().__init__()
 
+            # The constructor creates a closure, which references 'self'
+            # and assigns it to the 'self.f' member.
+            # This creates a cycle self -> self.f -> self
             def f():
                 print(self.f)
 
             self.f = f
 
+
+    # The Test class declared above inherits from 'FuncWrapper'.
+    # This class keeps track of how many references are alive at
+    # any point to help track down leak issues.
     assert t.FuncWrapper.alive == 0
-    b = B()
+    b = Test()
     assert t.FuncWrapper.alive == 1
     del b
     collect()

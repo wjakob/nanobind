@@ -72,6 +72,12 @@
 #  define NB_STABLE_ABI ""
 #endif
 
+#if defined(NB_FREE_THREADED)
+#  define NB_FREE_THREADED_ABI "_ft"
+#else
+#  define NB_FREE_THREADED_ABI ""
+#endif
+
 #if NB_VERSION_DEV > 0
   #define NB_VERSION_DEV_STR "_dev" NB_TOSTRING(NB_VERSION_DEV)
 #else
@@ -80,7 +86,8 @@
 
 #define NB_INTERNALS_ID                                                        \
     "v" NB_TOSTRING(NB_INTERNALS_VERSION)                                      \
-        NB_COMPILER_TYPE NB_STDLIB NB_VERSION_DEV_STR NB_BUILD_ABI NB_BUILD_TYPE NB_STABLE_ABI
+        NB_COMPILER_TYPE NB_STDLIB NB_VERSION_DEV_STR NB_BUILD_ABI             \
+            NB_BUILD_TYPE NB_STABLE_ABI NB_FREE_THREADED_ABI
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)

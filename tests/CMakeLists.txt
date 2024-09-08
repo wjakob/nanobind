@@ -53,6 +53,7 @@ set(TEST_NAMES
   typing
   issue
   intrusive
+  thread
 )
 
 foreach (NAME ${TEST_NAMES})
@@ -138,6 +139,7 @@ set(TEST_FILES
   test_ndarray.py
   test_stubs.py
   test_typing.py
+  test_thread.py
 
   # Stub reference files
   test_classes_ext.pyi.ref

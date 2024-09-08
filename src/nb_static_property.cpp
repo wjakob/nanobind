@@ -5,7 +5,16 @@ NAMESPACE_BEGIN(detail)
 
 /// `nb_static_property.__get__()`: Always pass the class instead of the instance.
 static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObject *cls) {
-    if (internals->nb_static_property_enabled) {
+
+    // Flag to avoid infinite recursion during static attribute assignment
+    bool static_property_disabled;
+#if defined(NB_FREE_THREADED)
+    static_property_disabled = (bool) PyThread_tss_get(internals->nb_static_property_disabled);
+#else
+    static_property_disabled = internals->nb_static_property_disabled;
+#endif
+
+    if (!static_property_disabled) {
         return NB_SLOT(PyProperty_Type, tp_descr_get)(self, cls, cls);
     } else {
         Py_INCREF(self);
@@ -20,9 +29,16 @@ static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject 
 }
 
 PyTypeObject *nb_static_property_tp() noexcept {
-    PyTypeObject *tp = internals->nb_static_property;
+    nb_internals *internals_ = internals;
+    PyTypeObject *tp = internals_->nb_static_property;
 
     if (NB_UNLIKELY(!tp)) {
+        lock_internals guard(internals_);
+
+        tp = internals_->nb_static_property;
+        if (tp)
+            return tp;
+
         PyMemberDef *members;
 
         #if defined(Py_LIMITED_API)
@@ -49,8 +65,8 @@ PyTypeObject *nb_static_property_tp() noexcept {
         tp = (PyTypeObject *) PyType_FromSpec(&spec);
         check(tp, "nb_static_property type creation failed!");
 
-        internals->nb_static_property = tp;
-        internals->nb_static_property_descr_set = nb_static_property_descr_set;
+        internals_->nb_static_property = tp;
+        internals_->nb_static_property_descr_set = nb_static_property_descr_set;
     }
 
     return tp;

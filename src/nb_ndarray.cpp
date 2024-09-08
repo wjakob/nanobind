@@ -174,9 +174,15 @@ static PyMethodDef nb_ndarray_members[] = {
 };
 
 static PyTypeObject *nd_ndarray_tp() noexcept {
-    PyTypeObject *tp = internals->nb_ndarray;
+    nb_internals *internals_ = internals;
+    PyTypeObject *tp = internals_->nb_ndarray;
 
     if (NB_UNLIKELY(!tp)) {
+        lock_internals guard(internals_);
+        tp = internals_->nb_ndarray;
+        if (tp)
+            return tp;
+
         PyType_Slot slots[] = {
             { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
             { Py_tp_methods, (void *) nb_ndarray_members },
@@ -203,7 +209,7 @@ static PyTypeObject *nd_ndarray_tp() noexcept {
         tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
 #endif
 
-        internals->nb_ndarray = tp;
+        internals_->nb_ndarray = tp;
     }
 
     return tp;

@@ -18,7 +18,16 @@ below inherit that of the preceding release.
 Version 2.2.0 (TBA)
 -------------------
 
-* nanobind has always used `PEP 590 vector calls
+- nanobind can now target `free-threaded Python
+  <https://py-free-threading.github.io>`__, which replaces the `Global
+  Interpreter Lock (GIL)
+  <https://en.wikipedia.org/wiki/Global_interpreter_lock>`__ with a
+  fine-grained locking scheme (see `PEP 703
+  <https://peps.python.org/pep-0703/>`__) to better leverage multi-core
+  parallelism. A `separate documation page <free-threading>`__ explains this in
+  detail.
+
+- nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
   to function and method bindings, but it lacked the ability to do so for
   constructors (e.g., ``MyType(arg1, arg2, ...)``).
@@ -46,8 +55,10 @@ Version 2.2.0 (TBA)
 
      - **Memory order**: :cpp:class:`c_contig`, :cpp:class:`f_contig`.
      - **Shape**: :cpp:class:`nb::shape\<3, 4, 5\> <shape>`, etc.
-     - **Device type**: :cpp:class:`nb::device::cpu <device::cpu>`, :cpp:class:`nb::device::cuda <device::cuda>`, etc.
-     - **Framework**: :cpp:class:`nb::numpy <numpy>`, :cpp:class:`nb::pytorch <pytorch>`, etc.
+     - **Device type**: :cpp:class:`nb::device::cpu <device::cpu>`,
+       :cpp:class:`nb::device::cuda <device::cuda>`, etc.
+     - **Framework**: :cpp:class:`nb::numpy <numpy>`,
+       :cpp:class:`nb::pytorch <pytorch>`, etc.
      - **Data type**: ``uint64_t``, ``std::complex<double>``, etc.
 
      Previously, only the **framework** and **data type** annotations were

@@ -905,25 +905,36 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
                                             PyObject *kwargs_in) noexcept {
     nb_bound_method *mb = (nb_bound_method *) self;
     size_t nargs = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    const size_t buf_size = 5;
+    PyObject **args, *buf[buf_size], *temp = nullptr, *result;
+    bool alloc = false;
 
-    PyObject *result;
-    if (nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET) {
-        PyObject **args_tmp = (PyObject **) args_in - 1;
-        PyObject *tmp = args_tmp[0];
-        args_tmp[0] = mb->self;
-        result = mb->func->vectorcall((PyObject *) mb->func, args_tmp, nargs + 1, kwargs_in);
-        args_tmp[0] = tmp;
+    if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
+        args = (PyObject **) (args_in - 1);
+        temp = args[0];
     } else {
-        size_t nkwargs_in = kwargs_in ? (size_t) NB_TUPLE_GET_SIZE(kwargs_in) : 0;
-        PyObject **args_tmp = (PyObject **) PyObject_Malloc((nargs + nkwargs_in + 1) * sizeof(PyObject *));
-        if (!args_tmp)
-            return PyErr_NoMemory();
-        args_tmp[0] = mb->self;
-        for (size_t i = 0; i < nargs + nkwargs_in; ++i)
-            args_tmp[i + 1] = args_in[i];
-        result = mb->func->vectorcall((PyObject *) mb->func, args_tmp, nargs + 1, kwargs_in);
-        PyObject_Free(args_tmp);
+        size_t size = nargs + 1;
+        if (kwargs_in)
+            size += NB_TUPLE_GET_SIZE(kwargs_in);
+
+        if (size < buf_size) {
+            args = buf;
+        } else {
+            args = (PyObject **) PyMem_Malloc(size * sizeof(PyObject *));
+            if (!args)
+                return PyErr_NoMemory();
+            alloc = true;
+        }
+
+        memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
     }
+
+    args[0] = mb->self;
+    result = mb->func->vectorcall((PyObject *) mb->func, args, nargs + 1, kwargs_in);
+    args[0] = temp;
+
+    if (NB_UNLIKELY(alloc))
+        PyMem_Free(args);
 
     return result;
 }

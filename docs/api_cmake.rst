@@ -69,6 +69,11 @@ The high-level interface consists of just one CMake command:
           <https://docs.python.org/3/c-api/stable.html>`__ build, making it
           possible to use a compiled extension across Python minor versions.
           The flag is ignored on Python versions older than < 3.12.
+      * - ``FREE_THREADED``
+        - Compile an Python extension that opts into free-threaded (i.e.,
+          GIL-less) Python behavior, which requires a special free-threaded
+          build of Python 3.13 or newer. The flag is ignored on unsupported
+          Python versions.
       * - ``NB_STATIC``
         - Compile the core nanobind library as a static library. This
           simplifies redistribution but can increase the combined binary
@@ -270,6 +275,8 @@ The various commands are described below:
         - Perform a static library build (without this suffix, a shared build is used)
       * - ``-abi3``
         - Perform a stable ABI build targeting Python v3.12+.
+      * - ``-ft``
+        - Perform a build that opts into the Python 3.13+ free-threaded behavior.
 
    .. code-block:: cmake
 

@@ -82,11 +82,15 @@ void nb_func_dealloc(PyObject *self) {
         func_data *f = nb_func_data(self);
 
         // Delete from registered function list
-        size_t n_deleted = internals->funcs.erase(self);
-        check(n_deleted == 1,
-              "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
-              ((f->flags & (uint32_t) func_flags::has_name) ? f->name
+        nb_internals *internals_ = internals;
+        {
+            lock_internals guard(internals_);
+            size_t n_deleted = internals_->funcs.erase(self);
+            check(n_deleted == 1,
+                  "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
+                  ((f->flags & (uint32_t) func_flags::has_name) ? f->name
                                                             : "<anonymous>"));
+        }
         for (size_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_free)
                 f->free_capture(f->capture);
@@ -219,14 +223,15 @@ PyObject *nb_func_new(const void *in_) noexcept {
     }
 
     // Check for previous overloads
+    nb_internals *internals_ = internals;
     if (has_scope && has_name) {
         name = PyUnicode_InternFromString(name_cstr);
         check(name, "nb::detail::nb_func_new(\"%s\"): invalid name.", name_cstr);
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
-            if (Py_TYPE(func_prev) == internals->nb_func ||
-                Py_TYPE(func_prev) == internals->nb_method) {
+            if (Py_TYPE(func_prev) == internals_->nb_func ||
+                Py_TYPE(func_prev) == internals_->nb_method) {
                 func_data *fp = nb_func_data(func_prev);
 
                 check((fp->flags & (uint32_t) func_flags::is_method) ==
@@ -279,7 +284,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     // Create a new function and destroy the old one
     Py_ssize_t to_copy = func_prev ? Py_SIZE(func_prev) : 0;
     nb_func *func = (nb_func *) PyType_GenericAlloc(
-        is_method ? internals->nb_method : internals->nb_func, to_copy + 1);
+        is_method ? internals_->nb_method : internals_->nb_func, to_copy + 1);
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
 
@@ -299,7 +304,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
-        size_t n_deleted = internals->funcs.erase(func_prev);
+        lock_internals guard(internals_);
+        size_t n_deleted = internals_->funcs.erase(func_prev);
         check(n_deleted == 1,
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
 
@@ -312,16 +318,20 @@ PyObject *nb_func_new(const void *in_) noexcept {
                                           : nb_func_vectorcall_simple;
 
     // Register the function
-    auto [it, success] = internals->funcs.try_emplace(func, nullptr);
-    check(success,
-          "nanobind::detail::nb_func_new(): internal update failed (2)!");
+    nb_ptr_map::iterator it;
+    {
+        lock_internals guard(internals_);
+        bool success;
+        std::tie(it, success) = internals_->funcs.try_emplace(func, nullptr);
+        check(success,
+              "nanobind::detail::nb_func_new(): internal update failed (2)!");
+    }
 
     func_data *fc = nb_func_data(func) + to_copy;
     memcpy(fc, f, sizeof(func_data_prelim<0>));
     if (has_doc) {
-        if (fc->doc[0] == '\n') {
+        if (fc->doc[0] == '\n')
             fc->doc++;
-        }
         fc->doc = strdup_check(fc->doc);
     }
 
@@ -427,6 +437,9 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     if (f->flags & (uint32_t) func_flags::is_operator)
         return not_implemented().release().ptr();
 
+    // The buffer 'buf' is protected by 'internals.mutex'
+    lock_internals guard(internals);
+
     buf.clear();
     buf.put_dstr(f->name);
     buf.put("(): incompatible function arguments. The following argument types "
@@ -486,6 +499,10 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
     if (PyErr_Occurred())
         return nullptr;
     func_data *f = nb_func_data(self);
+
+    // The buffer 'buf' is protected by 'internals.mutex'
+    lock_internals guard(internals);
+
     buf.clear();
     buf.put("Unable to convert function return value to a Python "
             "type! The signature was\n    ");
@@ -619,7 +636,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
         until we get a result other than NB_NEXT_OVERLOAD.
     */
 
-    for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
+    for (size_t pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
         for (size_t k = 0; k < count; ++k) {
             const func_data *f = fr + k;
 
@@ -961,8 +978,8 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     }
 }
 
-
-/// Render the function signature of a single function
+/// Render the function signature of a single function. Callers must hold the
+/// 'internals' mutex.
 static uint32_t nb_func_render_signature(const func_data *f,
                                          bool nb_signature_mode) noexcept {
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
@@ -971,6 +988,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
                has_signature  = f->flags & (uint32_t) func_flags::has_signature;
 
+    nb_internals *internals_ = internals;
     if (has_signature) {
         const char *s = f->signature;
 
@@ -1086,7 +1104,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     }
 
                     if (f->args[arg_index].value) {
-                        const arg_data &arg= f->args[arg_index];
+                        const arg_data &arg = f->args[arg_index];
                         if (nb_signature_mode) {
                             buf.put(" = \\");
                             if (arg.signature)
@@ -1096,8 +1114,12 @@ static uint32_t nb_func_render_signature(const func_data *f,
                             buf.put(" = ");
                             buf.put_dstr(arg.signature);
                         } else {
-                            PyObject *o = arg.value;
-                            PyObject *str = PyObject_Repr(o);
+                            PyObject *o = arg.value, *str;
+
+                            {
+                                unlock_internals guard2(internals_);
+                                str = PyObject_Repr(o);
+                            }
 
                             if (str) {
                                 Py_ssize_t size = 0;
@@ -1129,14 +1151,17 @@ static uint32_t nb_func_render_signature(const func_data *f,
                       "nb::detail::nb_func_render_signature(): missing type!");
 
                 if (!(is_method && arg_index == 0)) {
-                    auto it = internals->type_c2p_slow.find(*descr_type);
+                    bool found = false;
+                    auto it = internals_->type_c2p_slow.find(*descr_type);
 
-                    if (it != internals->type_c2p_slow.end()) {
+                    if (it != internals_->type_c2p_slow.end()) {
                         handle th((PyObject *) it->second->type_py);
                         buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                         buf.put('.');
                         buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
-                    } else {
+                        found = true;
+                    }
+                    if (!found) {
                         if (nb_signature_mode)
                             buf.put('"');
                         char *name = type_name(*descr_type);
@@ -1227,6 +1252,9 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
             Py_INCREF(docstr);
         }
 
+        // The buffer 'buf' is protected by 'internals.mutex'
+        lock_internals guard(internals);
+
         buf.clear();
         uint32_t n_default_args = nb_func_render_signature(fi, true);
 
@@ -1284,6 +1312,9 @@ fail:
 PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
     uint32_t count = (uint32_t) Py_SIZE(self);
+
+    // The buffer 'buf' is protected by 'internals.mutex'
+    lock_internals guard(internals);
 
     buf.clear();
 

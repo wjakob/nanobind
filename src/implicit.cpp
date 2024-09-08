@@ -15,10 +15,12 @@ NAMESPACE_BEGIN(detail)
 
 void implicitly_convertible(const std::type_info *src,
                             const std::type_info *dst) noexcept {
-    type_data *t = nb_type_c2p(internals, dst);
+    nb_internals *internals_ = internals;
+    type_data *t = nb_type_c2p(internals_, dst);
     check(t, "nanobind::detail::implicitly_convertible(src=%s, dst=%s): "
              "destination type unknown!", type_name(src), type_name(dst));
 
+    lock_internals guard(internals_);
     size_t size = 0;
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
@@ -30,23 +32,25 @@ void implicitly_convertible(const std::type_info *src,
         t->flags |= (uint32_t) type_flags::has_implicit_conversions;
     }
 
-    void **data = (void **) malloc(sizeof(void *) * (size + 2));
+    void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
 
     if (size)
         memcpy(data, t->implicit.cpp, size * sizeof(void *));
     data[size] = (void *) src;
     data[size + 1] = nullptr;
-    free(t->implicit.cpp);
+    PyMem_Free(t->implicit.cpp);
     t->implicit.cpp = (decltype(t->implicit.cpp)) data;
 }
 
 void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
                                               cleanup_list *),
                             const std::type_info *dst) noexcept {
-    type_data *t = nb_type_c2p(internals, dst);
+    nb_internals *internals_ = internals;
+    type_data *t = nb_type_c2p(internals_, dst);
     check(t, "nanobind::detail::implicitly_convertible(src=<predicate>, dst=%s): "
              "destination type unknown!", type_name(dst));
 
+    lock_internals guard(internals_);
     size_t size = 0;
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
@@ -58,12 +62,12 @@ void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
         t->flags |= (uint32_t) type_flags::has_implicit_conversions;
     }
 
-    void **data = (void **) malloc(sizeof(void *) * (size + 2));
+    void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
     if (size)
         memcpy(data, t->implicit.py, size * sizeof(void *));
     data[size] = (void *) predicate;
     data[size + 1] = nullptr;
-    free(t->implicit.py);
+    PyMem_Free(t->implicit.py);
     t->implicit.py = (decltype(t->implicit.py)) data;
 }
 

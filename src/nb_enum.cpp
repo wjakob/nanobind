@@ -17,12 +17,21 @@ using enum_map = tsl::robin_map<int64_t, int64_t, int64_hash>;
 
 PyObject *enum_create(enum_init_data *ed) noexcept {
     // Update hash table that maps from std::type_info to Python type
-    auto [it, success] = internals->type_c2p_slow.try_emplace(ed->type, nullptr);
-    if (!success) {
-        PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: type '%s' was already registered!\n", ed->name);
-        PyObject *tp = (PyObject *) it->second->type_py;
-        Py_INCREF(tp);
-        return tp;
+    nb_internals *internals_ = internals;
+    bool success;
+    nb_type_map_slow::iterator it;
+
+    {
+        lock_internals guard(internals_);
+        std::tie(it, success) = internals->type_c2p_slow.try_emplace(ed->type, nullptr);
+        if (!success) {
+            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                             "nanobind: type '%s' was already registered!\n",
+                             ed->name);
+            PyObject *tp = (PyObject *) it->second->type_py;
+            Py_INCREF(tp);
+            return tp;
+        }
     }
 
     handle scope(ed->scope);
@@ -77,15 +86,21 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     it.value() = t;
 
-    internals->type_c2p_fast[ed->type] = t;
-    internals->type_c2p_slow[ed->type] = t;
+    {
+        lock_internals guard(internals_);
+        internals_->type_c2p_slow[ed->type] = t;
+
+        #if !defined(NB_FREE_THREADED)
+            internals_->type_c2p_fast[ed->type] = t;
+        #endif
+    }
 
     result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
         type_init_data *t = (type_init_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
         nb_type_unregister(t);
-        free((char*)t->name);
+        free((char*) t->name);
         delete t;
     });
 

@@ -143,6 +143,11 @@ PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
     def->m_name = name;
     def->m_size = -1;
     PyObject *m = PyModule_Create(def);
+
+    #ifdef NB_FREE_THREADED
+        PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
+    #endif
+
     check(m, "nanobind::detail::module_new(): allocation failed!");
     return m;
 }
@@ -669,13 +674,15 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
            still trigger a segfault if dereferenced. */
         if (size == 0)
             result = (PyObject **) 1;
+#  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
     } else if (PyList_CheckExact(seq)) {
         size = (size_t) PyList_GET_SIZE(seq);
         result = ((PyListObject *) seq)->ob_item;
         if (size == 0) // ditto
             result = (PyObject **) 1;
+#  endif
     } else if (PySequence_Check(seq)) {
-        temp = PySequence_Fast(seq, "");
+        temp = PySequence_Tuple(seq);
 
         if (temp)
             result = seq_get(temp, &size, temp_out);
@@ -689,8 +696,8 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
         Py_ssize_t size_seq = PySequence_Length(seq);
 
         if (size_seq >= 0) {
-            result = (PyObject **) PyObject_Malloc(sizeof(PyObject *) *
-                                                   (size_seq + 1));
+            result = (PyObject **) PyMem_Malloc(sizeof(PyObject *) *
+                                                (size_seq + 1));
 
             if (result) {
                 result[size_seq] = nullptr;
@@ -704,7 +711,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                         for (Py_ssize_t j = 0; j < i; ++j)
                             Py_DECREF(result[j]);
 
-                        PyObject_Free(result);
+                        PyMem_Free(result);
                         result = nullptr;
                         break;
                     }
@@ -716,7 +723,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                     PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
                     for (size_t i = 0; ptr[i] != nullptr; ++i)
                         Py_DECREF(ptr[i]);
-                    PyObject_Free(ptr);
+                    PyMem_Free(ptr);
                 });
 
                 if (temp) {
@@ -726,7 +733,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                     for (Py_ssize_t i = 0; i < size_seq; ++i)
                         Py_DECREF(result[i]);
 
-                    PyObject_Free(result);
+                    PyMem_Free(result);
                     result = nullptr;
                 }
             }
@@ -763,14 +770,16 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
             if (size == 0)
                 result = (PyObject **) 1;
         }
+#  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
     } else if (PyList_CheckExact(seq)) {
         if (size == (size_t) PyList_GET_SIZE(seq)) {
             result = ((PyListObject *) seq)->ob_item;
             if (size == 0) // ditto
                 result = (PyObject **) 1;
         }
+#  endif
     } else if (PySequence_Check(seq)) {
-        temp = PySequence_Fast(seq, "");
+        temp = PySequence_Tuple(seq);
 
         if (temp)
             result = seq_get_with_size(temp, size, temp_out);
@@ -785,7 +794,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
         if (size == (size_t) size_seq) {
             result =
-                (PyObject **) PyObject_Malloc(sizeof(PyObject *) * (size + 1));
+                (PyObject **) PyMem_Malloc(sizeof(PyObject *) * (size + 1));
 
             if (result) {
                 result[size] = nullptr;
@@ -799,7 +808,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                         for (Py_ssize_t j = 0; j < i; ++j)
                             Py_DECREF(result[j]);
 
-                        PyObject_Free(result);
+                        PyMem_Free(result);
                         result = nullptr;
                         break;
                     }
@@ -811,7 +820,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                     PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
                     for (size_t i = 0; ptr[i] != nullptr; ++i)
                         Py_DECREF(ptr[i]);
-                    PyObject_Free(ptr);
+                    PyMem_Free(ptr);
                 });
 
                 if (!temp) {
@@ -819,7 +828,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                     for (Py_ssize_t i = 0; i < size_seq; ++i)
                         Py_DECREF(result[i]);
 
-                    PyObject_Free(result);
+                    PyMem_Free(result);
                     result = nullptr;
                 }
             }

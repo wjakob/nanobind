@@ -142,8 +142,8 @@ void nb_bound_method_dealloc(PyObject *self) {
 }
 
 static arg_data method_args[2] = {
-    { "self", nullptr, nullptr, nullptr, false, false },
-    { nullptr, nullptr, nullptr, nullptr, false, false }
+    { "self", nullptr, nullptr, nullptr, 0 },
+    { nullptr, nullptr, nullptr, nullptr, 0 }
 };
 
 static bool set_builtin_exception_status(builtin_exception &e) {
@@ -188,6 +188,50 @@ char *strdup_check(const char *s) {
     return result;
 }
 
+#if defined(NB_FREE_THREADED)
+// Locked function wrapper for free-threaded Python
+struct locked_func {
+    void *capture[3];
+    size_t nargs;
+    PyObject *(*impl)(void *, PyObject **, uint8_t *, rv_policy,
+                      cleanup_list *);
+    void (*free_capture)(void *);
+};
+
+static void locked_func_free(void *p) {
+    locked_func *f = (locked_func *) ((void **) p)[0];
+    if (f->free_capture)
+        f->free_capture(f->capture);
+    PyMem_Free(f);
+}
+
+static PyObject *locked_func_impl(void *p, PyObject **args, uint8_t *args_flags,
+                                  rv_policy policy, cleanup_list *cleanup) {
+    handle h1, h2;
+    size_t ctr = 0;
+
+    locked_func *f = (locked_func *) ((void **) p)[0];
+
+    for (size_t i = 0; i < f->nargs; ++i) {
+        if (args_flags[i] & (uint8_t) cast_flags::lock) {
+            if (ctr == 0)
+                h1 = args[i];
+            h2 = args[i];
+            ctr++;
+        }
+    }
+
+#if !defined(NDEBUG)
+    // nb_func_new ensured that at most two arguments are locked, but
+    // can't hurt to check once more in debug builds
+    check(ctr == 1 || ctr == 2, "locked_call: expected 1 or 2 locked arguments!");
+#endif
+
+    ft_object2_guard guard(h1, h2);
+    return f->impl(f->capture, args, args_flags, policy, cleanup);
+}
+#endif
+
 /**
  * \brief Wrap a C++ function into a Python function object
  *
@@ -206,6 +250,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
          is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
          is_method      = f->flags & (uint32_t) func_flags::is_method,
          return_ref     = f->flags & (uint32_t) func_flags::return_ref,
+         lock_self      = f->flags & (uint32_t) func_flags::lock_self,
          is_constructor = false,
          is_init        = false,
          is_new         = false,
@@ -273,7 +318,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         if (is_constructor && f->nargs == 2 && f->descr_types[0] &&
             f->descr_types[0] == f->descr_types[1]) {
             if (has_args) {
-                f->args[0].convert = false;
+                f->args[0].flag &= ~(uint8_t) cast_flags::convert;
             } else {
                 args_in = method_args + 1;
                 has_args = true;
@@ -377,6 +422,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         }
     }
 
+    size_t lock_count = 0;
     if (has_args) {
         fc->args = (arg_data *) malloc_check(sizeof(arg_data) * f->nargs);
 
@@ -393,11 +439,56 @@ PyObject *nb_func_new(const void *in_) noexcept {
             } else {
                 a.name_py = nullptr;
             }
-            a.none |= a.value == Py_None;
+            if (a.value == Py_None)
+                a.flag |= (uint8_t) cast_flags::accepts_none;
+            if (a.flag & (uint8_t) cast_flags::lock)
+                lock_count++;
             a.signature = a.signature ? strdup_check(a.signature) : nullptr;
             Py_XINCREF(a.value);
         }
     }
+
+    if (lock_self) {
+        check(is_method && !is_init,
+              "nb::detail::nb_func_new(\"%s\"): the nb::lock_self annotation only "
+              "applies to regular methods.", name_cstr);
+
+#if defined(NB_FREE_THREADED)
+        // Must potentially allocate dummy 'args' if 'lock_self' is set
+        if (!has_args) {
+            fc->args = (arg_data *) malloc_check(sizeof(arg_data) * f->nargs);
+            memset(fc->args, 0, sizeof(arg_data) * f->nargs);
+            for (uint32_t i = 1; i < f->nargs; ++i)
+                fc->args[i].flag &= (uint8_t) cast_flags::convert;
+            func->vectorcall = nb_func_vectorcall_complex;
+            fc->flags |= (uint32_t) func_flags::has_args;
+            has_args = true;
+        }
+
+        fc->args[0].flag |= (uint8_t) cast_flags::lock;
+#endif
+
+        lock_count++;
+    }
+
+    check(lock_count <= 2,
+          "nb::detail::nb_func_new(\"%s\"): at most two function arguments can "
+          "be locked.", name_cstr);
+
+#if defined(NB_FREE_THREADED)
+    if (lock_count) {
+        locked_func *lf = (locked_func *) PyMem_Malloc(sizeof(locked_func));
+        check(lf, "nb::detail::nb_func_new(\"%s\"): locked function alloc. failed.", name_cstr);
+        memcpy(lf->capture, fc->capture, sizeof(func_data::capture));
+        lf->nargs = fc->nargs;
+        lf->impl = fc->impl;
+        lf->free_capture = (fc->flags & (uint32_t) func_flags::has_free) ? fc->free_capture : nullptr;
+        fc->impl = locked_func_impl;
+        fc->free_capture = locked_func_free;
+        fc->flags |= (uint32_t) func_flags::has_free;
+        fc->capture[0] = lf;
+    }
+#endif
 
     // Fast path for vector call object construction
     if (((is_init && is_method) || (is_new && !is_method)) &&
@@ -674,8 +765,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     continue; // skip nb::args parameter, will be handled below
 
                 PyObject *arg = nullptr;
-                bool arg_convert  = pass == 1,
-                     arg_none     = false;
+
+                uint8_t arg_flag = 1;
 
                 // If i >= nargs_pos, then this is a keyword-only parameter.
                 // (We skipped any *args parameter using the test above,
@@ -709,16 +800,15 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
                     if (!arg)
                         arg = ad.value;
-
-                    arg_convert &= ad.convert;
-                    arg_none = ad.none;
+                    arg_flag = ad.flag;
                 }
 
-                if (!arg || (arg == Py_None && !arg_none))
+                if (!arg || (arg == Py_None && (arg_flag & cast_flags::accepts_none) == 0))
                     break;
 
+                // Implicit conversion only active in the 2nd pass
+                args_flags[i] = arg_flag & ~uint8_t(pass == 0);
                 args[i] = arg;
-                args_flags[i] = arg_convert ? (uint8_t) cast_flags::convert : (uint8_t) 0;
             }
 
             // Skip this overload if any arguments were unavailable
@@ -761,33 +851,28 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     continue;
             }
 
+
             if (is_constructor)
-                args_flags[0] = (uint8_t) cast_flags::construct;
+                args_flags[0] |= (uint8_t) cast_flags::construct;
+
+            rv_policy policy = (rv_policy) (f->flags & 0b111);
 
             try {
+                result = nullptr;
+
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, args, args_flags,
-                                 (rv_policy) (f->flags & 0b111), &cleanup);
+                                 policy, &cleanup);
 
-                if (NB_UNLIKELY(!result)) {
+                if (NB_UNLIKELY(!result))
                     error_handler = nb_func_error_noconvert;
-                    goto done;
-                }
             } catch (builtin_exception &e) {
-                if (set_builtin_exception_status(e)) {
-                    result = nullptr;
-                    goto done;
-                } else {
+                if (!set_builtin_exception_status(e))
                     result = NB_NEXT_OVERLOAD;
-                }
             } catch (python_error &e) {
                 e.restore();
-                result = nullptr;
-                goto done;
             } catch (...) {
                 nb_func_convert_cpp_exception();
-                result = nullptr;
-                goto done;
             }
 
             if (result != NB_NEXT_OVERLOAD) {
@@ -851,7 +936,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
         goto done;
     }
 
-    for (int pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
+    for (size_t pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
         for (int i = 0; i < NB_MAXARGS_SIMPLE; ++i)
             args_flags[i] = (uint8_t) pass;
 
@@ -865,30 +950,22 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 continue;
 
             try {
+                result = nullptr;
+
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, (PyObject **) args_in,
                                  args_flags, (rv_policy) (f->flags & 0b111),
                                  &cleanup);
 
-                if (NB_UNLIKELY(!result)) {
+                if (NB_UNLIKELY(!result))
                     error_handler = nb_func_error_noconvert;
-                    goto done;
-                }
             } catch (builtin_exception &e) {
-                if (set_builtin_exception_status(e)) {
-                    result = nullptr;
-                    goto done;
-                } else {
+                if (!set_builtin_exception_status(e))
                     result = NB_NEXT_OVERLOAD;
-                }
             } catch (python_error &e) {
                 e.restore();
-                result = nullptr;
-                goto done;
             } catch (...) {
                 nb_func_convert_cpp_exception();
-                result = nullptr;
-                goto done;
             }
 
             if (result != NB_NEXT_OVERLOAD) {
@@ -1084,8 +1161,9 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     }
 
                     buf.put(": ");
-                    if (has_args && f->args[arg_index].none) {
-                        #if PY_VERSION_HEX < 0x030A0000
+                    if (has_args && f->args[arg_index].flag &
+                                        (uint8_t) cast_flags::accepts_none) {
+#if PY_VERSION_HEX < 0x030A0000
                             buf.put("typing.Optional[");
                         #else
                             // See below
@@ -1097,7 +1175,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
             case '}':
                 // Default argument
                 if (has_args) {
-                    if (f->args[arg_index].none) {
+                    if (f->args[arg_index].flag & (uint8_t) cast_flags::accepts_none) {
                         #if PY_VERSION_HEX < 0x030A0000
                             buf.put(']');
                         #else

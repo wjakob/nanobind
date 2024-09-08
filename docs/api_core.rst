@@ -2552,9 +2552,102 @@ running it in parallel from multiple Python threads.
 
       Release the GIL (**must** be currently held)
 
+      In :ref:`free-threaded extensions <free-threaded>`, this operation also
+      temporarily releases all :ref:`argument locks <argument-locks>` held by
+      the current thread.
+
    .. cpp:function:: ~gil_scoped_release()
 
       Reacquire the GIL
+
+Free-threading
+--------------
+
+Nanobind provides abstractions to implement *additional* locking that is
+needed to ensure the correctness of free-threaded Python extensions.
+
+.. cpp:struct:: ft_mutex
+
+   Object-oriented wrapper representing a `PyMutex
+   <https://docs.python.org/3.13/c-api/init.html#c.PyMutex>`__. It can be
+   slightly more efficient than OS/language-provided primitives (e.g.,
+   ``std::thread``, ``pthread_mutex_t``) and should generally be preferred when
+   adding critical sections to Python bindings.
+
+   In Python builds *without* free-threading, this class does nothing. It has
+   no attributes and the :cpp:func:`lock` and :cpp:func:`unlock` functions
+   return immediately.
+
+   .. cpp:function:: ft_mutex()
+
+      Create a new (unlocked) mutex.
+
+   .. cpp:function:: void lock()
+
+      Acquire the mutex.
+
+   .. cpp:function:: void unlock()
+
+      Release the mutex.
+
+.. cpp:struct:: ft_lock_guard
+
+   This class provides a RAII lock guard analogous to ``std::lock_guard`` and
+   ``std::unique_lock``.
+
+   .. cpp:function:: ft_lock_guard(ft_mutex &mutex)
+
+      Call :cpp:func:`mutex.lock() <ft_mutex::lock>` (no-op in non-free-threaded builds).
+
+   .. cpp:function:: ~ft_lock_guard()
+
+      Call :cpp:func:`mutex.unlock() <ft_mutex::unlock>` (no-op in non-free-threaded builds).
+
+.. cpp:struct:: ft_object_guard
+
+   This class provides a RAII guard that locks a single Python object within a
+   local scope (in contrast to :cpp:class:`ft_lock_guard`, which locks a
+   mutex).
+
+   It is a thin wrapper around the Python `critical section API
+   <https://docs.python.org/3.13/c-api/init.html#c.Py_BEGIN_CRITICAL_SECTION>`__.
+   Please refer to the Python documentation for details on the semantics of
+   this relaxed form of critical section (in particular, Python critical sections
+   may release previously held locks).
+
+   In Python builds *without* free-threading, this class does nothing---the
+   constructor and destructor return immediately.
+
+   .. cpp:function:: ft_object_guard(handle h)
+
+      Lock the object ``h`` (no-op in non-free-threaded builds)
+
+   .. cpp:function:: ~ft_object_guard()
+
+      Unlock the object ``h`` (no-op in non-free-threaded builds)
+
+.. cpp:struct:: ft_object2_guard
+
+   This class provides a RAII guard that locks *two* Python object within a
+   local scope (in contrast to :cpp:class:`ft_lock_guard`, which locks a
+   mutex).
+
+   It is a thin wrapper around the Python `critical section API
+   <https://docs.python.org/3.13/c-api/init.html#c.Py_BEGIN_CRITICAL_SECTION2>`__.
+   Please refer to the Python documentation for details on the semantics of
+   this relaxed form of critical section (in particular, Python critical sections
+   may release previously held locks).
+
+   In Python builds *without* free-threading, this class does nothing---the
+   constructor and destructor return immediately.
+
+   .. cpp:function:: ft_object2_guard(handle h1, handle h2)
+
+      Lock the objects ``h1`` and ``h2`` (no-op in non-free-threaded builds)
+
+   .. cpp:function:: ~ft_object2_guard()
+
+      Unlock the objects ``h1`` and ``h2`` (no-op in non-free-threaded builds)
 
 Low-level type and instance access
 ----------------------------------

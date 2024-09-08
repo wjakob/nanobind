@@ -18,8 +18,14 @@ below inherit that of the preceding release.
 Version 2.2.0 (TBA)
 -------------------
 
-- The NVIDIA CUDA compiler (``nvcc``) is now explicitly supported and included
-  in nanobind's CI test suite.
+- nanobind can now target `free-threaded Python
+  <https://py-free-threading.github.io>`__, which replaces the `Global
+  Interpreter Lock (GIL)
+  <https://en.wikipedia.org/wiki/Global_interpreter_lock>`__ with a
+  fine-grained locking scheme (see `PEP 703
+  <https://peps.python.org/pep-0703/>`__) to better leverage multi-core
+  parallelism. A `separate documation page <free-threading>`__ explains this in
+  detail.
 
 - nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
@@ -40,6 +46,9 @@ Version 2.2.0 (TBA)
   operators (``&``, ``|``, ``^``, and ``~``). Further combining the annotation
   with :cpp:class:`nb::is_arithmetic() <is_flag>` creates enumerations deriving
   from :py:class:`enum.IntFlag`.
+
+- The NVIDIA CUDA compiler (``nvcc``) is now explicitly supported and included
+  in nanobind's CI test suite.
 
 * Added support for return value policy customization to the type casters of
   ``Eigen::Ref<...>`` and ``Eigen::Map<...>`` (commit `67316e

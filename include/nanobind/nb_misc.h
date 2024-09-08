@@ -9,26 +9,80 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
+#define NB_NONCOPYABLE(X)                                                      \
+    X(const X &) = delete;                                                     \
+    X &operator=(const X &) = delete;
+
 struct gil_scoped_acquire {
 public:
+    NB_NONCOPYABLE(gil_scoped_acquire)
     gil_scoped_acquire() noexcept : state(PyGILState_Ensure()) { }
     ~gil_scoped_acquire() { PyGILState_Release(state); }
-    gil_scoped_acquire(const gil_scoped_acquire &) = delete;
-    gil_scoped_acquire& operator=(const gil_scoped_acquire &) = delete;
 
 private:
     const PyGILState_STATE state;
 };
 
-class gil_scoped_release {
+struct gil_scoped_release {
 public:
+    NB_NONCOPYABLE(gil_scoped_release)
     gil_scoped_release() noexcept : state(PyEval_SaveThread()) { }
     ~gil_scoped_release() { PyEval_RestoreThread(state); }
-    gil_scoped_release(const gil_scoped_release &) = delete;
-    gil_scoped_release& operator=(const gil_scoped_release &) = delete;
 
 private:
     PyThreadState *state;
+};
+
+struct ft_mutex {
+public:
+    NB_NONCOPYABLE(ft_mutex)
+    ft_mutex() = default;
+
+#if !defined(NB_FREE_THREADED)
+    void lock() { }
+    void unlock() { }
+#else
+    void lock() { PyMutex_Lock(&mutex); }
+    void unlock() { PyMutex_Unlock(&mutex); }
+private:
+    PyMutex mutex { 0 };
+#endif
+};
+
+struct ft_lock_guard {
+public:
+    NB_NONCOPYABLE(ft_lock_guard)
+    ft_lock_guard(ft_mutex &m) : m(m) { m.lock(); }
+    ~ft_lock_guard() { m.unlock(); }
+private:
+    ft_mutex &m;
+};
+
+
+struct ft_object_guard {
+public:
+    NB_NONCOPYABLE(ft_object_guard)
+#if !defined(NB_FREE_THREADED)
+    ft_object_guard(handle) { }
+#else
+    ft_object_guard(handle h) { PyCriticalSection_Begin(&cs, h.ptr()); }
+    ~ft_object_guard() { PyCriticalSection_End(&cs); }
+private:
+    PyCriticalSection cs;
+#endif
+};
+
+struct ft_object2_guard {
+public:
+    NB_NONCOPYABLE(ft_object2_guard)
+#if !defined(NB_FREE_THREADED)
+    ft_object2_guard(handle, handle) { }
+#else
+    ft_object2_guard(handle h1, handle h2) { PyCriticalSection2_Begin(&cs, h1.ptr(), h2.ptr()); }
+    ~ft_object2_guard() { PyCriticalSection2_End(&cs); }
+private:
+    PyCriticalSection2 cs;
+#endif
 };
 
 inline bool leak_warnings() noexcept {

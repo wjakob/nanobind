@@ -14,8 +14,13 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 void trampoline_new(void **data, size_t size, void *ptr) noexcept {
-    // GIL is held when the trampoline constructor runs
-    nb_ptr_map &inst_c2p = internals->inst_c2p;
+    // GIL is held when the trampoline constructor runs. Lock the
+    // associated instance shard in GIL-less Python.
+
+    nb_shard &shard = internals->shard(ptr);
+    lock_shard lock(shard);
+
+    nb_ptr_map &inst_c2p = shard.inst_c2p;
     nb_ptr_map::iterator it = inst_c2p.find(ptr);
     check(it != inst_c2p.end() && (((uintptr_t) it->second) & 1) == 0,
           "nanobind::detail::trampoline_new(): unique instance not found!");
@@ -36,6 +41,7 @@ static void trampoline_enter_internal(void **data, size_t size,
     PyGILState_STATE state{ };
     const char *error = nullptr;
     PyObject *key = nullptr, *value = nullptr;
+    PyObject *self = (PyObject *) data[0];
     PyTypeObject *value_tp = nullptr;
     size_t offset = 0;
 
@@ -51,8 +57,7 @@ static void trampoline_enter_internal(void **data, size_t size,
             } else {
                 if (pure) {
                     error = "tried to call a pure virtual function";
-                    state = PyGILState_Ensure();
-                    goto fail;
+                    break;
                 } else {
                     return;
                 }
@@ -62,6 +67,11 @@ static void trampoline_enter_internal(void **data, size_t size,
 
     // Nothing found -- retry, now with lock held
     state = PyGILState_Ensure();
+    ft_object_guard guard(self);
+
+    if (error)
+        goto fail;
+
     for (size_t i = 0; i < size; i++) {
         void *d_name  = data[2*i + 1],
              *d_value = data[2*i + 2];
@@ -101,7 +111,7 @@ static void trampoline_enter_internal(void **data, size_t size,
         goto fail;
     }
 
-    value = PyObject_GetAttr((PyObject *) data[0], key);
+    value = PyObject_GetAttr(self, key);
     if (!value) {
         error = "lookup failed";
         goto fail;
@@ -136,14 +146,14 @@ static void trampoline_enter_internal(void **data, size_t size,
     }
 
 fail:
-    type_data *td = nb_type_data(Py_TYPE((PyObject *) data[0]));
+    type_data *td = nb_type_data(Py_TYPE(self));
     PyGILState_Release(state);
 
     raise("nanobind::detail::get_trampoline('%s::%s()'): %s!",
           td->name, name, error);
 }
 
-NB_THREAD_LOCAL ticket *current_ticket = nullptr;
+static NB_THREAD_LOCAL ticket *current_ticket = nullptr;
 
 void trampoline_enter(void **data, size_t size, const char *name, bool pure, ticket *t) {
     trampoline_enter_internal(data, size, name, pure, t);

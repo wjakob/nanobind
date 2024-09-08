@@ -10,6 +10,7 @@
 #include <nanobind/nanobind.h>
 #include <structmember.h>
 #include "nb_internals.h"
+#include <thread>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -232,6 +233,7 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
     }
 }
 
+// Initialized once when the module is loaded, no locking needed
 nb_internals *internals = nullptr;
 PyTypeObject *nb_meta_cache = nullptr;
 
@@ -240,48 +242,58 @@ static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
 
 static void internals_cleanup() {
-    if (!internals)
+    nb_internals *p = internals;
+    if (!p)
         return;
 
     *is_alive_ptr = false;
 
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
     /* The memory leak checker is unsupported on PyPy, see
-       see https://foss.heptapod.net/pypy/pypy/-/issues/3855 */
+       see https://foss.heptapod.net/pypy/pypy/-/issues/3855
 
-    bool leak = false, print_leak_warnings = internals->print_leak_warnings;
+       It is explicitly disabled on free-threaded builds, which
+       immortalize function and type objects.
+    */
 
-    if (!internals->inst_c2p.empty()) {
-        if (print_leak_warnings) {
-            fprintf(stderr, "nanobind: leaked %zu instances!\n",
-                    internals->inst_c2p.size());
-            #if !defined(Py_LIMITED_API)
-                auto print_leak = [](void* k, PyObject* v) {
-                    PyTypeObject *tp = Py_TYPE(v);
-                    fprintf(stderr, " - leaked instance %p of type \"%s\"\n", k, tp->tp_name);
-                };
+    bool print_leak_warnings = p->print_leak_warnings;
+    size_t inst_leaks = 0, keep_alive_leaks = 0;
 
-                for (auto [k, v]: internals->inst_c2p) {
-                    if (NB_UNLIKELY(nb_is_seq(v))) {
-                        nb_inst_seq* seq = nb_get_seq(v);
-                        for(; seq != nullptr; seq = seq->next)
-                            print_leak(k, seq->inst);
-                    } else {
-                        print_leak(k, (PyObject*)v);
-                    }
+    // Shard locking no longer needed, Py_AtExit is single-threaded
+    for (size_t i = 0; i < p->shard_count; ++i) {
+        nb_shard &s = p->shards[i];
+        inst_leaks += s.inst_c2p.size();
+        keep_alive_leaks += s.keep_alive.size();
+    }
+
+    bool leak = inst_leaks > 0 || keep_alive_leaks > 0;
+
+    if (print_leak_warnings && inst_leaks > 0) {
+        fprintf(stderr, "nanobind: leaked %zu instances!\n", inst_leaks);
+
+#if !defined(Py_LIMITED_API)
+        auto print_leak = [](void* k, PyObject* v) {
+            type_data *tp = nb_type_data(Py_TYPE(v));
+            fprintf(stderr, " - leaked instance %p of type \"%s\"\n", k, tp->name);
+        };
+
+        for (size_t i = 0; i < p->shard_count; ++i) {
+            for (auto [k, v]: p->shards[i].inst_c2p) {
+                if (NB_UNLIKELY(nb_is_seq(v))) {
+                    nb_inst_seq* seq = nb_get_seq(v);
+                    for(; seq != nullptr; seq = seq->next)
+                        print_leak(k, seq->inst);
+                } else {
+                    print_leak(k, (PyObject*)v);
                 }
-            #endif
+            }
         }
-        leak = true;
+#endif
     }
 
-    if (!internals->keep_alive.empty()) {
-        if (print_leak_warnings) {
-            fprintf(stderr, "nanobind: leaked %zu keep_alive records!\n",
-                    internals->keep_alive.size());
-        }
-        leak = true;
-    }
+    if (print_leak_warnings && keep_alive_leaks > 0)
+        fprintf(stderr, "nanobind: leaked %zu keep_alive records!\n",
+                keep_alive_leaks);
 
     // Only report function/type leaks if actual nanobind instances were leaked
 #if !defined(NB_ABORT_ON_LEAK)
@@ -289,13 +301,12 @@ static void internals_cleanup() {
         print_leak_warnings = false;
 #endif
 
-    if (!internals->type_c2p_slow.empty() ||
-        !internals->type_c2p_fast.empty()) {
+    if (!p->type_c2p_slow.empty()) {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: leaked %zu types!\n",
-                    internals->type_c2p_slow.size());
+                    p->type_c2p_slow.size());
             int ctr = 0;
-            for (const auto &kv : internals->type_c2p_slow) {
+            for (const auto &kv : p->type_c2p_slow) {
                 fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
                 if (ctr++ == 10) {
                     fprintf(stderr, " - ... skipped remainder\n");
@@ -306,12 +317,12 @@ static void internals_cleanup() {
         leak = true;
     }
 
-    if (!internals->funcs.empty()) {
+    if (!p->funcs.empty()) {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: leaked %zu functions!\n",
-                    internals->funcs.size());
+                    p->funcs.size());
             int ctr = 0;
-            for (auto [f, p] : internals->funcs) {
+            for (auto [f, p] : p->funcs) {
                 fprintf(stderr, " - leaked function \"%s\"\n",
                         nb_func_data(f)->name);
                 if (ctr++ == 10) {
@@ -324,13 +335,19 @@ static void internals_cleanup() {
     }
 
     if (!leak) {
-        nb_translator_seq* t = internals->translators.next;
+        nb_translator_seq* t = p->translators.next;
         while (t) {
             nb_translator_seq *next = t->next;
             delete t;
             t = next;
         }
-        delete internals;
+
+#if defined(NB_FREE_THREADED)
+        PyThread_tss_delete(p->nb_static_property_disabled);
+        PyThread_tss_free(p->nb_static_property_disabled);
+#endif
+
+        delete p;
         internals = nullptr;
         nb_meta_cache = nullptr;
     } else {
@@ -376,6 +393,17 @@ NB_NOINLINE void init(const char *name) {
 
     nb_internals *p = new nb_internals();
 
+    size_t shard_count = 1;
+#if defined(NB_FREE_THREADED)
+    size_t hw_concurrency = std::thread::hardware_concurrency();
+    while (shard_count < hw_concurrency)
+        shard_count *= 2;
+    shard_count *= 2;
+    p->shards = new nb_shard[shard_count];
+    p->shard_mask = shard_count - 1;
+#endif
+    p->shard_count = shard_count;
+
     str nb_name("nanobind");
     p->nb_module = PyModule_NewObject(nb_name.ptr());
 
@@ -385,8 +413,16 @@ NB_NOINLINE void init(const char *name) {
     p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
-    p->keep_alive.min_load_factor(.1f);
-    p->inst_c2p.min_load_factor(.1f);
+
+#if defined(NB_FREE_THREADED)
+    p->nb_static_property_disabled = PyThread_tss_alloc();
+    PyThread_tss_create(p->nb_static_property_disabled);
+#endif
+
+    for (size_t i = 0; i < shard_count; ++i) {
+        p->shards[i].keep_alive.min_load_factor(.1f);
+        p->shards[i].inst_c2p.min_load_factor(.1f);
+    }
 
     check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
               p->nb_method && p->nb_bound_method,

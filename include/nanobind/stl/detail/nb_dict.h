@@ -32,6 +32,8 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
             return false;
         }
 
+        // 'items' is safe to access without locking and reference counting, it
+        // is unique to this thread
         Py_ssize_t size = NB_LIST_GET_SIZE(items);
         bool success = size >= 0;
 

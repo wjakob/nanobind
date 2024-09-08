@@ -1176,7 +1176,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         *s++ = { Py_tp_members, (void*) members };
 
 #if PY_VERSION_HEX < 0x03090000
-    (void) is_generic; // unsupported on Python 3.8
+    // Features that are unsupported in Python 3.8
+    (void) is_generic;
+    type_vectorcall = nullptr;
 #else
     if (is_generic)
         *s++ = { Py_tp_methods, (void*) class_getitem_method };

@@ -70,6 +70,10 @@ int funcwrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
     nb::object f = nb::cast(w->f, nb::rv_policy::none);
     Py_VISIT(f.ptr());
 
+    #if PY_VERSION_HEX >= 0x03090000
+        Py_VISIT(Py_TYPE(self));
+    #endif
+
     return 0;
 }
 

@@ -122,7 +122,7 @@ reference cycles:
 
        // If w->value has an associated CPython object, return it.
        // If not, value.ptr() will equal NULL, which is also fine.
-       nb::object value = nb::find(w->value);
+       nb::handle value = nb::find(w->value);
 
        // Inform the Python GC about the instance (if non-NULL)
        Py_VISIT(value.ptr());
@@ -148,6 +148,25 @@ reference cycles:
    };
 
 The type ``visitproc`` and macro ``Py_VISIT()`` are part of the Python C API.
+
+.. note::
+
+   When targeting free-threaded Python, it is important that the ``tp_traverse``
+   callback does not hold additional references to the objects being traversed.
+
+   A previous version of this documentation page suggested the following
+
+   .. code-block:: cpp
+
+      nb::object value = nb::find(w->value);
+      Py_VISIT(value.ptr());
+
+   However, these now have to change to
+
+   .. code-block:: cpp
+
+      nb::handle value = nb::find(w->value);
+      Py_VISIT(value.ptr());
 
 The expression :cpp:func:`nb::inst_ptr\<Wrapper\>(self) <inst_ptr>` efficiently
 returns the C++ instance associated with a Python object and is explained in

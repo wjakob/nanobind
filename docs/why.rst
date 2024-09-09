@@ -225,3 +225,14 @@ The following lists minor-but-useful additions relative to pybind11.
   Please see the section on :ref:`customizing function signatures
   <typing_signature_functions>` and :ref:`class signatures
   <typing_signature_classes>` for further details.
+
+TLDR
+----
+
+My recommendation is that current pybind11 users look into migrating to
+nanobind. Fixing all the long-standing issues in pybind11 (see above list)
+would require a substantial redesign and years of careful work by a team of C++
+metaprogramming experts. At the same time, changing anything in pybind11 is
+extremely hard because of the large number of downstream users and their
+requirements on API/ABI stability. I personally don't have the time and
+energy to fix pybind11 and have moved my focus to this project.

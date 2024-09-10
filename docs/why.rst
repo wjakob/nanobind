@@ -130,6 +130,13 @@ nanobind includes a number of quality-of-life improvements for developers:
   <https://github.com/microsoft/pyright>`__ and `PyType
   <https://github.com/google/pytype>`__.
 
+- **Smart pointers, ownership, etc.**: corner cases in pybind11 related to
+  smart/unique pointers and callbacks could lead to undefined behavior. A later
+  pybind11 redesign (``smart_holder``) was able to address these problems, but
+  this came at the cost of further increased runtime overheads. The object
+  ownership model of nanobind avoids this undefined behavior without penalizing
+  runtime performance.
+
 - **Leak warnings**: When the Python interpreter shuts down, nanobind reports
   instance, type, and function leaks related to bindings, which is useful for
   tracking down reference counting issues.  If these warnings are undesired,

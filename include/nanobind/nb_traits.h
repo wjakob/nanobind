@@ -174,21 +174,21 @@ template <typename Caster>
 constexpr bool is_class_caster_v = detail::detector<void, is_class_caster_test, Caster>::value;
 
 // Primary template
-template<typename T, typename SFINAE = void>
+template<typename T, typename = int>
 struct is_complex : std::false_type {};
 
 // Specialization if `T` is complex, i.e., `T` has a member type `value_type`,
 // member functions `real()` and `imag()` that return such, and the size of
 // `T` is twice that of `value_type`.
 template<typename T>
-struct is_complex<T, std::enable_if_t<std::is_same_v<
-                                          decltype(std::declval<T>().real()),
-                                          typename T::value_type>
-                                   && std::is_same_v<
-                                          decltype(std::declval<T>().imag()),
-                                          typename T::value_type>
-                                   && (sizeof(T) ==
-                                       2 * sizeof(typename T::value_type))>>
+struct is_complex<T, enable_if_t<std::is_same_v<
+                                     decltype(std::declval<T>().real()),
+                                     typename T::value_type>
+                              && std::is_same_v<
+                                     decltype(std::declval<T>().imag()),
+                                     typename T::value_type>
+                              && (sizeof(T) ==
+                                  2 * sizeof(typename T::value_type))>>
     : std::true_type {};
 
 /// True if the type `T` is a complete type representing a complex number.

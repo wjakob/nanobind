@@ -17,20 +17,7 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-NAMESPACE_BEGIN(device)
-#define NB_DEVICE(enum_name, enum_value)                              \
-    struct enum_name {                                                \
-        static constexpr auto name = detail::const_name(#enum_name);  \
-        static constexpr int32_t value = enum_value;                  \
-        static constexpr bool is_device = true;                       \
-    }
-NB_DEVICE(none, 0); NB_DEVICE(cpu, 1); NB_DEVICE(cuda, 2);
-NB_DEVICE(cuda_host, 3); NB_DEVICE(opencl, 4); NB_DEVICE(vulkan, 7);
-NB_DEVICE(metal, 8); NB_DEVICE(rocm, 10); NB_DEVICE(rocm_host, 11);
-NB_DEVICE(cuda_managed, 13); NB_DEVICE(oneapi, 14);
-#undef NB_DEVICE
-NAMESPACE_END(device)
-
+/// dlpack API/ABI data structures are part of a separate namespace
 NAMESPACE_BEGIN(dlpack)
 
 enum class dtype_code : uint8_t {
@@ -47,10 +34,11 @@ struct dtype {
     uint8_t bits = 0;
     uint16_t lanes = 0;
 
-    bool operator==(const dtype &o) const {
+    constexpr bool operator==(const dtype &o) const {
         return code == o.code && bits == o.bits && lanes == o.lanes;
     }
-    bool operator!=(const dtype &o) const { return !operator==(o); }
+
+    constexpr bool operator!=(const dtype &o) const { return !operator==(o); }
 };
 
 struct dltensor {
@@ -65,23 +53,48 @@ struct dltensor {
 
 NAMESPACE_END(dlpack)
 
-template <ssize_t... Is> struct shape {
-    static_assert(
-        ((Is >= 0 || Is == -1) && ...),
-        "The arguments to nanobind::shape must either be positive or equal to -1"
-    );
-    static constexpr size_t size = sizeof...(Is);
-};
+#define NB_FRAMEWORK(Name, Value, label)                                       \
+    struct Name {                                                              \
+        static constexpr auto name = detail::const_name(label);                \
+        static constexpr int value = Value;                                    \
+        static constexpr bool is_framework = true;                             \
+    };
 
-struct c_contig { };
-struct f_contig { };
-struct any_contig { };
-struct numpy { };
-struct tensorflow { };
-struct pytorch { };
-struct jax { };
-struct cupy { };
-struct ro { };
+#define NB_DEVICE(Name, Value)                                                 \
+    struct Name {                                                              \
+        static constexpr auto name = detail::const_name("device='" #Name "'"); \
+        static constexpr int value = Value;                                    \
+        static constexpr bool is_device_type = true;                           \
+    };
+
+#define NB_ORDER(Name, Value)                                                  \
+    struct Name {                                                              \
+        static constexpr auto name = detail::const_name("order='" Value "'");  \
+        static constexpr char value = Value[0];                                \
+        static constexpr bool is_order = true;                                 \
+    };
+
+NB_ORDER(c_contig, "C")
+NB_ORDER(f_contig, "F")
+NB_ORDER(any_contig, "A")
+
+NB_FRAMEWORK(no_framework, 0, "ndarray");
+NB_FRAMEWORK(numpy, 1, "numpy.ndarray");
+NB_FRAMEWORK(pytorch, 2, "torch.Tensor");
+NB_FRAMEWORK(tensorflow, 3, "tensorflow.python.framework.ops.EagerTensor");
+NB_FRAMEWORK(jax, 4, "jaxlib.xla_extension.DeviceArray");
+NB_FRAMEWORK(cupy, 5, "cupy.ndarray");
+
+NAMESPACE_BEGIN(device)
+NB_DEVICE(none, 0); NB_DEVICE(cpu, 1); NB_DEVICE(cuda, 2);
+NB_DEVICE(cuda_host, 3); NB_DEVICE(opencl, 4); NB_DEVICE(vulkan, 7);
+NB_DEVICE(metal, 8); NB_DEVICE(rocm, 10); NB_DEVICE(rocm_host, 11);
+NB_DEVICE(cuda_managed, 13); NB_DEVICE(oneapi, 14);
+NAMESPACE_END(device)
+
+#undef NB_FRAMEWORK
+#undef NB_DEVICE
+#undef NB_ORDER
 
 template <typename T> struct ndarray_traits {
     static constexpr bool is_complex = detail::is_complex_v<T>;
@@ -92,6 +105,29 @@ template <typename T> struct ndarray_traits {
 };
 
 NAMESPACE_BEGIN(detail)
+
+template <ssize_t... Is> struct shape {
+    static constexpr auto name =
+        const_name("shape=(") +
+        concat(const_name<Is == -1>(const_name("*"),
+                                    const_name<(size_t) Is>())...) + const_name(")");
+    static_assert(
+        ((Is >= 0 || Is == -1) && ...),
+        "The arguments to nanobind::shape must either be positive or equal to -1"
+    );
+
+    static void put(int64_t *out) {
+        size_t ctr = 0;
+        ((out[ctr++] = Is), ...);
+    }
+
+    static void put(size_t *out) {
+        if (((Is == -1) || ...))
+            detail::fail("Negative ndarray sizes are not allowed here!");
+        size_t ctr = 0;
+        ((out[ctr++] = (size_t) Is), ...);
+    }
+};
 
 template <typename T>
 constexpr bool is_ndarray_scalar_v =
@@ -105,251 +141,115 @@ template <size_t... S> struct ndim_shape<std::index_sequence<S...>> {
 
 NAMESPACE_END(detail)
 
-template <size_t N> using ndim = typename detail::ndim_shape<std::make_index_sequence<N>>::type;
+using detail::shape;
+
+struct ro { };
+
+template <size_t N>
+using ndim = typename detail::ndim_shape<std::make_index_sequence<N>>::type;
 
 template <typename T> constexpr dlpack::dtype dtype() {
+    using traits = ndarray_traits<T>;
+
     static_assert(
-        detail::is_ndarray_scalar_v<T>,
+        detail::is_ndarray_scalar_v<T> || std::is_void_v<T>,
         "nanobind::dtype<T>: T must be a floating point or integer type!"
     );
 
     dlpack::dtype result;
 
-    if constexpr (ndarray_traits<T>::is_float)
-        result.code = (uint8_t) dlpack::dtype_code::Float;
-    else if constexpr (ndarray_traits<T>::is_complex)
-        result.code = (uint8_t) dlpack::dtype_code::Complex;
-    else if constexpr (ndarray_traits<T>::is_signed)
-        result.code = (uint8_t) dlpack::dtype_code::Int;
-    else if constexpr (std::is_same_v<std::remove_cv_t<T>, bool>)
-        result.code = (uint8_t) dlpack::dtype_code::Bool;
-    else
-        result.code = (uint8_t) dlpack::dtype_code::UInt;
+    if constexpr (!std::is_void_v<T>) {
+        if constexpr (traits::is_float)
+            result.code = (uint8_t) dlpack::dtype_code::Float;
+        else if constexpr (traits::is_complex)
+            result.code = (uint8_t) dlpack::dtype_code::Complex;
+        else if constexpr (traits::is_bool)
+            result.code = (uint8_t) dlpack::dtype_code::Bool;
+        else if constexpr (traits::is_signed)
+            result.code = (uint8_t) dlpack::dtype_code::Int;
+        else
+            result.code = (uint8_t) dlpack::dtype_code::UInt;
 
-    result.bits = sizeof(T) * 8;
-    result.lanes = 1;
+        result.bits = sizeof(T) * 8;
+        result.lanes = 1;
+    }
 
     return result;
 }
 
-
 NAMESPACE_BEGIN(detail)
 
-enum class ndarray_framework : int { none, numpy, tensorflow, pytorch, jax, cupy };
+/// Sentinel type to initialize ndarray_config_t<>
+struct unused {
+    using type = void;
+    static constexpr int value = 0;
+    static constexpr auto name = descr<0>();
+};
 
-struct ndarray_req {
+/// ndarray_config describes a requested array configuration
+struct ndarray_config {
+    int device_type;
+    char order;
+    bool ro;
     dlpack::dtype dtype;
-    uint32_t ndim = 0;
-    size_t *shape = nullptr;
-    bool req_shape = false;
-    bool req_dtype = false;
-    bool req_ro = false;
-    char req_order = '\0';
-    uint8_t req_device = 0;
+    int32_t ndim;
+    int64_t *shape;
+
+    template <typename T> ndarray_config(T)
+        : device_type(T::DeviceType::value),
+          order((char) T::Order::value),
+          ro(std::is_const_v<typename T::Scalar>),
+          dtype(nanobind::dtype<typename T::Scalar>()),
+          ndim(T::N),
+          shape(nullptr) { }
 };
 
-template <typename T, typename = int> struct ndarray_arg {
-    static constexpr size_t size = 0;
-    static constexpr auto name = descr<0>{ };
-    static void apply(ndarray_req &) { }
+/// ndarray_config_t collects nd-array template parameters in a structured way.
+/// Its "storage" is purely based on types members
+template <typename /* SFINAE */ = int, typename...> struct ndarray_config_t;
+
+template <> struct ndarray_config_t<int> {
+    using Framework = no_framework;
+    using Scalar = void;
+    using Shape = unused;
+    using Order = unused;
+    using DeviceType = unused;
+    static constexpr int32_t N = -1;
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_float>> {
-    static constexpr size_t size = 0;
-
-    static constexpr auto name =
-        const_name("dtype=float") +
-        const_name<sizeof(T) * 8>() +
-        const_name<std::is_const_v<T>>(", writable=False", "");
-
-    static void apply(ndarray_req &tr) {
-        tr.dtype = dtype<T>();
-        tr.req_dtype = true;
-        tr.req_ro = std::is_const_v<T>;
-    }
+// Template infrastructure to collect ndarray annotations and fail if duplicates are found
+template <typename... Args> struct ndarray_config_t<int, ro, Args...> : ndarray_config_t<int, Args...> {
+    using Scalar = std::add_const_t<typename ndarray_config_t<int, Args...>::Scalar>;
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_complex>> {
-    static constexpr size_t size = 0;
+template <typename... Args> struct ndarray_config_t<int, unused, Args...> : ndarray_config_t<int, Args...> { };
 
-    static constexpr auto name =
-        const_name("dtype=complex") +
-        const_name<sizeof(T) * 8>() +
-        const_name<std::is_const_v<T>>(", writable=False", "");
-
-    static void apply(ndarray_req &tr) {
-        tr.dtype = dtype<T>();
-        tr.req_dtype = true;
-        tr.req_ro = std::is_const_v<T>;
-    }
+template <typename Arg, typename... Args> struct ndarray_config_t<enable_if_t<is_ndarray_scalar_v<Arg>>, Arg, Args...> : ndarray_config_t<int, Args...> {
+    using Scalar = std::conditional_t<
+        std::is_const_v<typename ndarray_config_t<int, Args...>::Scalar>,
+        std::add_const_t<Arg>, Arg>;
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_int>> {
-    static constexpr size_t size = 0;
-
-    static constexpr auto name =
-        const_name("dtype=") +
-        const_name<std::is_unsigned_v<T>>("u", "") +
-        const_name("int") + const_name<sizeof(T) * 8>() +
-        const_name<std::is_const_v<T>>(", writable=False", "");
-
-    static void apply(ndarray_req &tr) {
-        tr.dtype = dtype<T>();
-        tr.req_dtype = true;
-        tr.req_ro = std::is_const_v<T>;
-    }
+template <typename Arg, typename... Args> struct ndarray_config_t<enable_if_t<Arg::is_device_type>, Arg, Args...> : ndarray_config_t<int, Args...> {
+    using DeviceType = Arg;
 };
 
-template <typename T> struct ndarray_arg<T, enable_if_t<ndarray_traits<T>::is_bool>> {
-    static constexpr size_t size = 0;
-
-    static constexpr auto name =
-        const_name("dtype=bool") +
-        const_name<std::is_const_v<T>>(", writable=False", "");
-
-    static void apply(ndarray_req &tr) {
-        tr.dtype = dtype<T>();
-        tr.req_dtype = true;
-        tr.req_ro |= std::is_const_v<T>;
-    }
+template <typename Arg, typename... Args> struct ndarray_config_t<enable_if_t<Arg::is_framework>, Arg, Args...> : ndarray_config_t<int, Args...> {
+    using Framework = Arg;
 };
 
-template<> struct ndarray_arg<ro> {
-    static constexpr size_t size = 0;
-
-    static constexpr auto name = const_name("writable=False");
-
-    static void apply(ndarray_req &tr) {
-        tr.req_ro = true;
-    }
+template <typename Arg, typename... Args> struct ndarray_config_t<enable_if_t<Arg::is_order>, Arg, Args...> : ndarray_config_t<int, Args...> {
+    using Order = Arg;
 };
 
-template <ssize_t... Is> struct ndarray_arg<shape<Is...>> {
-    static constexpr size_t size = sizeof...(Is);
-    static constexpr auto name =
-        const_name("shape=(") +
-        concat(const_name<Is == -1>(const_name("*"), const_name<(size_t) Is>())...) +
-        const_name(")");
-
-    static void apply(ndarray_req &tr) {
-        size_t i = 0;
-        ((tr.shape[i++] = (size_t) Is), ...);
-        tr.ndim = (uint32_t) sizeof...(Is);
-        tr.req_shape = true;
-    }
-};
-
-template <> struct ndarray_arg<c_contig> {
-    static constexpr size_t size = 0;
-    static constexpr auto name = const_name("order='C'");
-    static void apply(ndarray_req &tr) { tr.req_order = 'C'; }
-};
-
-template <> struct ndarray_arg<f_contig> {
-    static constexpr size_t size = 0;
-    static constexpr auto name = const_name("order='F'");
-    static void apply(ndarray_req &tr) { tr.req_order = 'F'; }
-};
-
-template <> struct ndarray_arg<any_contig> {
-    static constexpr size_t size = 0;
-    static constexpr auto name = const_name("order='*'");
-    static void apply(ndarray_req &tr) { tr.req_order = '\0'; }
-};
-
-template <typename T> struct ndarray_arg<T, enable_if_t<T::is_device>> {
-    static constexpr size_t size = 0;
-    static constexpr auto name = const_name("device='") + T::name + const_name('\'');
-    static void apply(ndarray_req &tr) { tr.req_device = (uint8_t) T::value; }
-};
-
-template <typename... Ts> struct ndarray_info {
-    using scalar_type = void;
-    using shape_type = void;
-    constexpr static bool ReadOnly = false;
-    constexpr static auto name = const_name("ndarray");
-    constexpr static ndarray_framework framework = ndarray_framework::none;
-    constexpr static char order = '\0';
-};
-
-template <typename T, typename... Ts> struct ndarray_info<T, Ts...>  : ndarray_info<Ts...> {
-    using scalar_type =
-        std::conditional_t<
-                detail::is_ndarray_scalar_v<T> &&
-                    std::is_void_v<typename ndarray_info<Ts...>::scalar_type>,
-                T, typename ndarray_info<Ts...>::scalar_type>;
-
-    constexpr static bool ReadOnly = ndarray_info<Ts...>::ReadOnly ||
-            (detail::is_ndarray_scalar_v<T> && std::is_const_v<T>);
-};
-
-template <typename... Ts> struct ndarray_info<ro, Ts...> : ndarray_info<Ts...> {
-    constexpr static bool ReadOnly = true;
-};
-
-template <ssize_t... Is, typename... Ts> struct ndarray_info<shape<Is...>, Ts...> : ndarray_info<Ts...> {
-    using shape_type =
-        std::conditional_t<
-                std::is_void_v<typename ndarray_info<Ts...>::shape_type>,
-                shape<Is...>, typename ndarray_info<Ts...>::shape_type>;
-};
-
-template <typename... Ts> struct ndarray_info<c_contig, Ts...> : ndarray_info<Ts...> {
-    static_assert(ndarray_info<Ts...>::order == '\0'
-               || ndarray_info<Ts...>::order == 'C',
-                  "The order can only be set once.");
-    constexpr static char order = 'C';
-};
-
-template <typename... Ts> struct ndarray_info<f_contig, Ts...> : ndarray_info<Ts...> {
-    static_assert(ndarray_info<Ts...>::order == '\0'
-               || ndarray_info<Ts...>::order == 'F',
-                  "The order can only be set once.");
-    constexpr static char order = 'F';
-};
-
-template <typename... Ts> struct ndarray_info<numpy, Ts...> : ndarray_info<Ts...> {
-    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
-               || ndarray_info<Ts...>::framework == ndarray_framework::numpy,
-                  "The framework can only be set once.");
-    constexpr static auto name = const_name("numpy.ndarray");
-    constexpr static ndarray_framework framework = ndarray_framework::numpy;
-};
-
-template <typename... Ts> struct ndarray_info<pytorch, Ts...> : ndarray_info<Ts...> {
-    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
-               || ndarray_info<Ts...>::framework == ndarray_framework::pytorch,
-                  "The framework can only be set once.");
-    constexpr static auto name = const_name("torch.Tensor");
-    constexpr static ndarray_framework framework = ndarray_framework::pytorch;
-};
-
-template <typename... Ts> struct ndarray_info<tensorflow, Ts...> : ndarray_info<Ts...> {
-    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
-               || ndarray_info<Ts...>::framework == ndarray_framework::tensorflow,
-                  "The framework can only be set once.");
-    constexpr static auto name = const_name("tensorflow.python.framework.ops.EagerTensor");
-    constexpr static ndarray_framework framework = ndarray_framework::tensorflow;
-};
-
-template <typename... Ts> struct ndarray_info<jax, Ts...> : ndarray_info<Ts...> {
-    static_assert(ndarray_info<Ts...>::framework == ndarray_framework::none
-               || ndarray_info<Ts...>::framework == ndarray_framework::jax,
-                  "The framework can only be set once.");
-    constexpr static auto name = const_name("jaxlib.xla_extension.DeviceArray");
-    constexpr static ndarray_framework framework = ndarray_framework::jax;
-};
-template <typename... Ts> struct ndarray_info<cupy, Ts...> : ndarray_info<Ts...> {
-    constexpr static auto name = const_name("cupy.ndarray");
-    constexpr static ndarray_framework framework = ndarray_framework::cupy;
+template <ssize_t... Is, typename... Args> struct ndarray_config_t<int, shape<Is...>, Args...> : ndarray_config_t<int, Args...> {
+    using Shape = shape<Is...>;
+    static constexpr int32_t N = sizeof...(Is);
 };
 
 NAMESPACE_END(detail)
 
-
-template <typename Scalar, typename Shape, char Order> struct ndarray_view {
-    static constexpr size_t Dim = Shape::size;
-
+template <typename Scalar, size_t Dim, char Order> struct ndarray_view {
     ndarray_view() = default;
     ndarray_view(const ndarray_view &) = default;
     ndarray_view(ndarray_view &&) = default;
@@ -357,9 +257,9 @@ template <typename Scalar, typename Shape, char Order> struct ndarray_view {
     ndarray_view &operator=(ndarray_view &&) noexcept = default;
     ~ndarray_view() noexcept = default;
 
-    template <typename... Ts> NB_INLINE Scalar &operator()(Ts... indices) const {
+    template <typename... Args> NB_INLINE Scalar &operator()(Args... indices) const {
         static_assert(
-            sizeof...(Ts) == Dim,
+            sizeof...(Args) == Dim,
             "ndarray_view::operator(): invalid number of arguments");
 
         const int64_t indices_i64[] { (int64_t) indices... };
@@ -409,11 +309,12 @@ template <typename... Args> class ndarray {
 public:
     template <typename...> friend class ndarray;
 
-    using Info = detail::ndarray_info<Args...>;
-    static constexpr bool ReadOnly = Info::ReadOnly;
-    using Scalar = std::conditional_t<ReadOnly,
-                           std::add_const_t<typename Info::scalar_type>,
-                           typename Info::scalar_type>;
+    using Config = detail::ndarray_config_t<int, Args...>;
+    using Scalar = typename Config::Scalar;
+    static constexpr bool ReadOnly = std::is_const_v<Scalar>;
+    static constexpr char Order = Config::Order::value;
+    static constexpr int DeviceType = Config::DeviceType::value;
+    using VoidPtr = std::conditional_t<ReadOnly, const void *, void *>;
 
     ndarray() = default;
 
@@ -425,35 +326,50 @@ public:
     template <typename... Args2>
     explicit ndarray(const ndarray<Args2...> &other) : ndarray(other.m_handle) { }
 
-    ndarray(std::conditional_t<ReadOnly, const void *, void *> data,
+    ndarray(VoidPtr data,
             size_t ndim,
             const size_t *shape,
             handle owner,
             const int64_t *strides = nullptr,
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
-            int32_t device_type = device::cpu::value,
-            int32_t device_id = 0) {
+            int device_type = DeviceType,
+            int device_id = 0,
+            char order = Order) {
+
         m_handle = detail::ndarray_create(
-            (void *) data, ndim, shape, owner.ptr(), strides, &dtype,
-            ReadOnly, device_type, device_id);
+            (void *) data, ndim, shape, owner.ptr(), strides, dtype,
+            ReadOnly, device_type, device_id, order);
+
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
-    ndarray(std::conditional_t<ReadOnly, const void *, void *> data,
+    template <typename T = Config, detail::enable_if_t<(T::N > 0)> = 0>
+    ndarray(VoidPtr data) {
+        size_t shape[Config::N];
+        Config::Shape::put(shape);
+
+        m_handle = detail::ndarray_create(
+            (void *) data, Config::N, shape, nullptr, nullptr,
+            nanobind::dtype<Scalar>(), ReadOnly, DeviceType, 0, Order);
+        m_dltensor = *detail::ndarray_inc_ref(m_handle);
+    }
+
+    ndarray(VoidPtr data,
             std::initializer_list<size_t> shape,
-            handle owner,
+            handle owner = { },
             std::initializer_list<int64_t> strides = { },
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
-            int32_t device_type = device::cpu::value,
-            int32_t device_id = 0) {
+            int device_type = DeviceType,
+            int device_id = 0,
+            char order = Order) {
 
         if (strides.size() != 0 && strides.size() != shape.size())
             detail::fail("ndarray(): shape and strides have incompatible size!");
 
         m_handle = detail::ndarray_create(
             (void *) data, shape.size(), shape.begin(), owner.ptr(),
-            (strides.size() == 0) ? nullptr : strides.begin(), &dtype,
-            ReadOnly, device_type, device_id);
+            (strides.size() == 0) ? nullptr : strides.begin(), dtype,
+            ReadOnly, device_type, device_id, order);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
@@ -495,8 +411,8 @@ public:
     const int64_t* shape_ptr() const { return m_dltensor.shape; }
     const int64_t* stride_ptr() const { return m_dltensor.strides; }
     bool is_valid() const { return m_handle != nullptr; }
-    int32_t device_type() const { return m_dltensor.device.device_type; }
-    int32_t device_id() const { return m_dltensor.device.device_id; }
+    int device_type() const { return (int) m_dltensor.device.device_type; }
+    int device_id() const { return (int) m_dltensor.device.device_id; }
     detail::ndarray_handle *handle() const { return m_handle; }
 
     size_t size() const {
@@ -514,21 +430,20 @@ public:
                            m_dltensor.byte_offset);
     }
 
-    template <typename... Ts>
-    NB_INLINE auto& operator()(Ts... indices) const {
+    template <typename... Args2>
+    NB_INLINE auto& operator()(Args2... indices) const {
         return *(Scalar *) ((uint8_t *) m_dltensor.data +
                             byte_offset(indices...));
     }
 
-    template <typename... Extra> NB_INLINE auto view() const {
-        using Info2 = typename ndarray<Args..., Extra...>::Info;
-        using Scalar2 = std::conditional_t<Info2::ReadOnly,
-                                std::add_const_t<typename Info2::scalar_type>,
-                                typename Info2::scalar_type>;
-        using Shape2 = typename Info2::shape_type;
+    template <typename... Args2> NB_INLINE auto view() const {
+        using namespace detail;
+        using Config2 = detail::ndarray_config_t<int, Args2..., Args...>;
+        using Scalar2 = typename Config2::Scalar;
+        constexpr size_t N = Config2::N >= 0 ? Config2::N : 0;
 
         constexpr bool has_scalar = !std::is_void_v<Scalar2>,
-                       has_shape  = !std::is_void_v<Shape2>;
+                       has_shape  = Config2::N >= 0;
 
         static_assert(has_scalar,
             "To use the ndarray::view<..>() method, you must add a scalar type "
@@ -541,19 +456,22 @@ public:
             "ndarray, or to the call to .view<..>()");
 
         if constexpr (has_scalar && has_shape) {
-            return ndarray_view<Scalar2, Shape2, Info2::order>(
-                (Scalar2 *) data(), shape_ptr(), stride_ptr(),
-                std::make_index_sequence<Shape2::size>(), Shape2());
+            using Result = ndarray_view<Scalar2, N, Config2::Order::value>;
+            return Result((Scalar2 *) data(), shape_ptr(), stride_ptr(),
+                          std::make_index_sequence<N>(),
+                          typename Config2::Shape());
         } else {
             return nullptr;
         }
     }
 
+    auto cast(rv_policy rvp = rv_policy::automatic, class handle parent = {});
+
 private:
-    template <typename... Ts>
-    NB_INLINE int64_t byte_offset(Ts... indices) const {
+    template <typename... Args2>
+    NB_INLINE int64_t byte_offset(Args2... indices) const {
         constexpr bool has_scalar = !std::is_void_v<Scalar>,
-                       has_shape = !std::is_void_v<typename Info::shape_type>;
+                       has_shape  = Config::N != -1;
 
         static_assert(has_scalar,
             "To use ndarray::operator(), you must add a scalar type "
@@ -564,7 +482,7 @@ private:
             "ndim<> annotation to the ndarray template parameters.");
 
         if constexpr (has_scalar && has_shape) {
-            static_assert(sizeof...(Ts) == Info::shape_type::size,
+            static_assert(sizeof...(Args2) == (size_t) Config::N,
                           "ndarray::operator(): invalid number of arguments");
 
             size_t counter = 0;
@@ -585,31 +503,80 @@ inline bool ndarray_check(handle h) { return detail::ndarray_check(h.ptr()); }
 
 NAMESPACE_BEGIN(detail)
 
+template <typename T> struct dtype_name {
+    using traits = ndarray_traits<T>;
+
+    static constexpr auto name =
+        const_name("dtype=") +
+        const_name<traits::is_complex>("complex", "") +
+        const_name<traits::is_int &&  traits::is_signed>("int", "") +
+        const_name<traits::is_int && !traits::is_signed>("uint", "") +
+        const_name<traits::is_float>("float", "") +
+        const_name<traits::is_bool>(const_name("bool"), const_name<sizeof(T) * 8>());
+};
+
+template <> struct dtype_name<void> : unused { };
+template <> struct dtype_name<const void> : unused { };
+
+template <typename T> struct dtype_const_name {
+    static constexpr auto name = const_name<std::is_const_v<T>>("writable=False", "");
+};
+
 template <typename... Args> struct type_caster<ndarray<Args...>> {
-    NB_TYPE_CASTER(ndarray<Args...>, Value::Info::name + const_name("[") +
-                                        concat_maybe(detail::ndarray_arg<Args>::name...) +
-                                        const_name("]"))
+    using Config = detail::ndarray_config_t<int, Args...>;
+    using Scalar = typename Config::Scalar;
+
+    NB_TYPE_CASTER(ndarray<Args...>,
+                   Config::Framework::name +
+                   const_name("[") +
+                       concat_maybe(dtype_name<Scalar>::name,
+                                    Config::Shape::name,
+                                    Config::Order::name,
+                                    Config::DeviceType::name,
+                                    dtype_const_name<Scalar>::name) +
+                   const_name("]"))
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        constexpr size_t size = (0 + ... + detail::ndarray_arg<Args>::size);
-        size_t shape[size + 1];
-        detail::ndarray_req req;
-        req.shape = shape;
-        (detail::ndarray_arg<Args>::apply(req), ...);
         if (src.is_none()) {
             value = ndarray<Args...>();
             return true;
         }
-        value = ndarray<Args...>(ndarray_import(
-            src.ptr(), &req, flags & (uint8_t) cast_flags::convert, cleanup));
+
+        int64_t shape_buf[Config::N <= 0 ? 1 : Config::N];
+        ndarray_config config{Config()};
+
+        if constexpr (Config::N > 0) {
+            Config::Shape::put(shape_buf);
+            config.shape = shape_buf;
+        }
+
+        value = Value(ndarray_import(src.ptr(), &config,
+                                     flags & (uint8_t) cast_flags::convert,
+                                     cleanup));
+
         return value.is_valid();
     }
 
     static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return ndarray_wrap(tensor.handle(), Value::Info::framework, policy, cleanup);
+        return ndarray_export(tensor.handle(), Config::Framework::value, policy, cleanup);
     }
 };
 
+template <typename... Args>
+class ndarray_object : public object {
+public:
+    using object::object;
+    using object::operator=;
+    static constexpr auto Name = type_caster<ndarray<Args...>>::Name;
+};
+
 NAMESPACE_END(detail)
+
+template <typename... Args>
+auto ndarray<Args...>::cast(rv_policy rvp, class handle parent) {
+    return borrow<detail::ndarray_object<Args...>>(
+        nanobind::cast(*this, rvp, parent));
+}
+
 NAMESPACE_END(NB_NAMESPACE)

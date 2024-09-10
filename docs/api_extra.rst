@@ -644,8 +644,8 @@ N-dimensional array type
 ------------------------
 
 The following type can be used to exchange n-dimension arrays with frameworks
-like NumPy, PyTorch, Tensorflow, JAX, CuPy, and others. It requires an additional
-include directive:
+like NumPy, PyTorch, Tensorflow, JAX, CuPy, and others. It requires an
+additional include directive:
 
 .. code-block:: cpp
 
@@ -664,11 +664,31 @@ section <ndarrays>`.
 
 .. cpp:class:: template <typename... Args> ndarray
 
+   .. cpp:type:: Scalar
+
+      The scalar type underlying the array (or ``void`` if not specified)
+
    .. cpp:var:: static constexpr bool ReadOnly
 
-      A constant static boolean that is true if the array's data is read-only.
-      This is determined by the class template arguments, not by any dynamic
-      properties of the referenced array.
+      A ``constexpr`` Boolean value that is ``true`` if the ndarray template
+      arguments (``Args...``) include the ``nb::ro`` annotation or a
+      ``const``-qualified scalar type.
+
+   .. cpp:var:: static constexpr char Order
+
+      A ``constexpr`` character value that is set based on the ndarray template
+      arguments (``Args...``).
+
+      It equals
+
+      - ``'C'`` if :cpp:class:`c_contig` is specified.
+      - ``'F'`` if :cpp:class:`f_contig` is specified.
+      - ``'A'`` if :cpp:class:`any_contig` is specified.
+
+   .. cpp:type:: VoidPtr = std::conditional_t<ReadOnly, const void *, void *>
+
+      A potentially ``const``-qualified ``void*`` pointer type used by some
+      of the ``ndarray`` constructors.
 
    .. cpp:function:: ndarray() = default
 
@@ -708,7 +728,7 @@ section <ndarrays>`.
       Move assignment operator. Steals the referenced array without changing reference counts.
       Decreases the reference count of the previously referenced array and potentially destroy it.
 
-   .. cpp:function:: ndarray(void * data, size_t ndim, const size_t * shape, handle owner = nanobind::handle(), const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+   .. cpp:function:: ndarray(VoidPtr data, size_t ndim, const size_t * shape, handle owner, const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int device_type = DeviceType, int device_id = 0, char order = Order)
 
       Create an array wrapping an existing memory allocation. The following
       parameters can be specified:
@@ -725,7 +745,8 @@ section <ndarrays>`.
       - `owner`: if provided, the array will hold a reference to this object
         until it is destructed.
 
-      - `strides` is optional; a value of ``nullptr`` implies C-style strides.
+      - `strides` is optional; a value of ``nullptr`` implies that the order
+        is computed automatically according to the ``strides`` paramet.er
 
       - `dtype` describes the data type (floating point, signed/unsigned
         integer) and bit depth.
@@ -733,12 +754,42 @@ section <ndarrays>`.
       - The `device_type` and `device_id` indicate the device and address
         space associated with the pointer `value`.
 
-   .. cpp:function:: ndarray(void * data, const std::initializer_list<size_t> shape, handle owner = nanobind::handle(), std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+      - The `order` value denotes the coefficient order in memory and is only
+        relevant when `strides` is empty. Specify ``'C'`` for C-style or ``'F'``
+        for Fortran-style. When this parameter is not explicitly specified, the
+        implementation uses the ndarray template parameter (`Order`, which is
+        inferred from ``Args...``). C-style order is used if nothing is specified
+        there either.
+
+      Both ``strides`` and ``shape`` will be copied by the constructor, hence
+      the targets of these pointers don't need to remain valid following the
+      call.
+
+      The Python *global interpreter lock* (GIL) must be held when calling this
+      function.
+
+   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape, handle owner, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0, char order = '\0')
 
       Alternative form of the above constructor, which accepts the ``shape``
       and ``strides`` arguments using a ``std::initializer_list``. It
       automatically infers the value of ``ndim`` based on the size of
       ``shape``.
+
+      Both ``strides`` and ``shape`` will be copied by the constructor, hence
+      the targets of these initializer lists don't need to remain valid
+      following the call.
+
+      The Python *global interpreter lock* (GIL) must be held when calling this
+      function.
+
+   .. cpp:function:: ndarray(VoidPtr data)
+
+      Alternative form of the above constructor, which is usable when all
+      metadata is available through template parameters and the ``owner``
+      parameter does not need to be set.
+
+      The Python *global interpreter lock* (GIL) must be held when calling this
+      function.
 
    .. cpp:function:: dlpack::dtype dtype() const
 
@@ -788,13 +839,13 @@ section <ndarrays>`.
 
       Check whether the array is in a valid state.
 
-   .. cpp:function:: int32_t device_type() const
+   .. cpp:function:: int device_type() const
 
       ID denoting the type of device hosting the array. This will match the
       ``value`` field of a device class, such as :cpp:class:`device::cpu::value
       <device::cpu>` or :cpp:class:`device::cuda::value <device::cuda>`.
 
-   .. cpp:function:: int32_t device_id() const
+   .. cpp:function:: int device_id() const
 
       In a multi-device/GPU setup, this function returns the ID of the device
       storing the array.
@@ -804,14 +855,17 @@ section <ndarrays>`.
       Return a pointer to the array data.
       If :cpp:var:`ReadOnly` is true, a pointer-to-const is returned.
 
-   .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
+   .. cpp:function:: template <typename... Args2> auto& operator()(Args2... indices)
 
       Return a reference to the element stored at the provided index/indices.
       If :cpp:var:`ReadOnly` is true, a reference-to-const is returned.
-      Note that ``sizeof(Ts)`` must match :cpp:func:`ndim()`.
+      Note that ``sizeof...(Args2)`` must match :cpp:func:`ndim()`.
 
       This accessor is only available when the scalar type and array dimension
       were specified as template parameters.
+
+      This function should only be used when the array storage is accessible
+      through the CPU's virtual memory address space.
 
    .. cpp:function:: template <typename... Extra> auto view()
 
@@ -823,6 +877,18 @@ section <ndarrays>`.
       The returned view provides the operations ``data()``, ``ndim()``,
       ``shape()``, ``stride()``, and ``operator()`` following the conventions
       of the `ndarray` type.
+
+   .. cpp:function:: auto cast(rv_policy policy = rv_policy::automatic_reference, handle parent = {})
+
+      When this function is used in an expression like ``array.cast(policy,
+      handle)``, it returns a Python object that is equivalent to calling
+      :cpp:func:`nb::cast(array, policy, handle) <cast>`.
+
+      The main difference is that the return type of :cpp:func:`nb::cast
+      <cast>` is :cpp:class:`nb::object <object>`, which render as the rather
+      non-descriptive ``object`` in Python bindings. The ``.cast()`` method
+      instead returns a wrapper type, whose signature matches taht of the
+      original nd-array.
 
 Data types
 ^^^^^^^^^^
@@ -947,7 +1013,7 @@ Contiguity
 
 .. cpp:class:: any_contig
 
-   Don't place any demands on array contiguity (the default).
+   Accept both C or F-contiguous arrays.
 
 Device type
 +++++++++++

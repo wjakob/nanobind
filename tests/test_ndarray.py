@@ -80,13 +80,13 @@ def test01_metadata():
 
 
 def test02_docstr():
-    assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False]) -> list"
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"
+    assert t.get_shape.__doc__ == "get_shape(array: ndarray[writable=False]) -> list"
     assert t.pass_float32.__doc__ == "pass_float32(array: ndarray[dtype=float32]) -> None"
     assert t.pass_complex64.__doc__ == "pass_complex64(array: ndarray[dtype=complex64]) -> None"
     assert t.pass_bool.__doc__ == "pass_bool(array: ndarray[dtype=bool]) -> None"
     assert t.pass_float32_shaped.__doc__ == "pass_float32_shaped(array: ndarray[dtype=float32, shape=(3, *, 4)]) -> None"
-    assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: ndarray[dtype=float32, order='C', shape=(*, *, 4)]) -> None"
+    assert t.pass_float32_shaped_ordered.__doc__ == "pass_float32_shaped_ordered(array: ndarray[dtype=float32, shape=(*, *, 4), order='C']) -> None"
     assert t.check_device.__doc__ == ("check_device(arg: ndarray[device='cpu'], /) -> str\n"
                                       "check_device(arg: ndarray[device='cuda'], /) -> str")
 
@@ -402,6 +402,7 @@ def test19_single_and_empty_dimension_pytorch():
     a = torch.ones((0,0,0), dtype=torch.float32)
     t.noop_3d_c_contig(a)
 
+
 # See PR #162
 @needs_numpy
 def test20_single_and_empty_dimension_numpy():
@@ -450,28 +451,40 @@ def test22_ro_array():
 @needs_numpy
 def test22_return_ro():
     x = t.ret_numpy_const_ref()
-    assert t.ret_numpy_const.__doc__  == 'ret_numpy_const() -> numpy.ndarray[dtype=float32, writable=False, shape=(2, 4)]'
+    y = t.ret_numpy_const_ref_f()
+    assert t.ret_numpy_const_ref.__doc__  == 'ret_numpy_const_ref() -> numpy.ndarray[dtype=float32, shape=(2, 4), order=\'C\', writable=False]'
+    assert t.ret_numpy_const_ref_f.__doc__  == 'ret_numpy_const_ref_f() -> numpy.ndarray[dtype=float32, shape=(2, 4), order=\'F\', writable=False]'
     assert x.shape == (2, 4)
+    assert y.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+    assert np.all(y == [[1, 3, 5, 7], [2, 4, 6, 8]])
     with pytest.raises(ValueError) as excinfo:
         x[0,0] =1
     assert 'read-only' in str(excinfo.value)
+    with pytest.raises(ValueError) as excinfo:
+        y[0,0] =1
+    assert 'read-only' in str(excinfo.value)
+
 
 @needs_numpy
 def test23_check_numpy():
     assert t.check(np.zeros(1))
 
+
 @needs_torch
 def test24_check_torch():
     assert t.check(torch.zeros((1)))
+
 
 @needs_tensorflow
 def test25_check_tensorflow():
     assert t.check(tf.zeros((1)))
 
+
 @needs_jax
 def test26_check_jax():
     assert t.check(jnp.zeros((1)))
+
 
 @needs_numpy
 def test27_rv_policy():
@@ -497,6 +510,7 @@ def test27_rv_policy():
     assert q2 is not y2
     assert p(q1) != p(y1)
     assert p(q2) != p(y2)
+
 
 @needs_numpy
 def test28_reference_internal():
@@ -573,8 +587,9 @@ def test28_reference_internal():
     with pytest.raises(RuntimeError) as excinfo:
         c3.f3_ri(c3_t)
 
-    msg = 'nanobind::detail::ndarray_wrap(): reference_internal policy cannot be applied (ndarray already has an owner)'
+    msg = 'nanobind::detail::ndarray_export(): reference_internal policy cannot be applied (ndarray already has an owner)'
     assert msg in str(excinfo.value)
+
 
 @needs_numpy
 def test29_force_contig_numpy():
@@ -596,6 +611,7 @@ def test30_force_contig_pytorch():
     b = t.make_contig(a)
     assert b is not a
     assert torch.all(b == a)
+
 
 @needs_numpy
 def test31_view():
@@ -632,6 +648,7 @@ def test31_view():
     t.fill_view_6(x1)
     assert np.allclose(x1, x2)
 
+
 @needs_numpy
 def test32_half():
     if not hasattr(t, 'ret_numpy_half'):
@@ -649,12 +666,14 @@ def test33_cast():
     assert a.dtype == np.int32 and b.dtype == np.float32
     assert a == 1 and b == 1
 
+
 @needs_numpy
 def test34_complex_decompose():
     x1 = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64)
 
     assert np.all(x1.real == np.array([1, 3, 5], dtype=np.float32))
     assert np.all(x1.imag == np.array([2, 4, 6], dtype=np.float32))
+
 
 @needs_numpy
 @pytest.mark.parametrize("variant", [1, 2])
@@ -668,6 +687,7 @@ def test_uint32_complex_do_not_convert(variant):
     data2 = np.array([123, 3.0 + 4.0j])
     assert np.all(data == data2)
 
+
 @needs_numpy
 def test36_check_generic():
     class DLPackWrapper:
@@ -678,6 +698,7 @@ def test36_check_generic():
 
     arr = DLPackWrapper(np.zeros((1)))
     assert t.check(arr)
+
 
 @needs_numpy
 def test37_noninteger_stride():
@@ -706,6 +727,7 @@ def test37_noninteger_stride():
     with pytest.raises(TypeError) as excinfo:
         t.get_stride(v, 0);
     assert 'incompatible function arguments' in str(excinfo.value)
+
 
 @needs_numpy
 def test38_const_qualifiers_numpy():
@@ -751,6 +773,7 @@ def test38_const_qualifiers_numpy():
     assert a[0] == 0.0;
     assert a[3] == 3.14159;
 
+
 @needs_torch
 def test39_const_qualifiers_pytorch():
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
@@ -785,6 +808,7 @@ def test39_const_qualifiers_pytorch():
     assert t.check_ro_by_rvalue_ref_const_float64(a);
     assert a[0] == 0.0;
     assert a[3] == 3.14159;
+
 
 @needs_cupy
 @pytest.mark.filterwarnings
@@ -823,6 +847,7 @@ def test41_implicit_conversion_cupy():
     with pytest.raises(TypeError) as excinfo:
         t.noimplicit(cp.zeros((2, 2), dtype=cp.uint8))
 
+
 @needs_numpy
 def test42_implicit_conversion_contiguous_complex():
     # Test fix for issue #709
@@ -850,3 +875,55 @@ def test42_implicit_conversion_contiguous_complex():
 
     test_conv(nc_f32)
     test_conv(nc_c64)
+
+
+@needs_numpy
+def test_43_ret_infer():
+    import numpy as np
+    assert np.all(t.ret_infer_c() == [[1, 2, 3, 4], [5, 6, 7, 8]])
+    assert np.all(t.ret_infer_f() == [[1, 3, 5, 7], [2, 4, 6, 8]])
+
+@needs_numpy
+def test44_test_matrix4f():
+    a = t.Matrix4f()
+    ad = a.data()
+    bd = a.data()
+    for i in range(16):
+        ad[i%4, i//4] = i
+    del a, ad
+    for i in range(16):
+        assert bd[i%4, i//4] == i
+
+@needs_numpy
+def test45_test_matrix4f_ref():
+    assert t.Matrix4f.data_ref.__doc__.replace('data_ref', 'data') == t.Matrix4f.data.__doc__
+
+    a = t.Matrix4f()
+    ad = a.data_ref()
+    bd = a.data_ref()
+    for i in range(16):
+        ad[i%4, i//4] = i
+    del a, ad
+    for i in range(16):
+        assert bd[i%4, i//4] == i
+
+@needs_numpy
+def test46_test_matrix4f_copy():
+    assert t.Matrix4f.data_ref.__doc__.replace('data_ref', 'data') == t.Matrix4f.data.__doc__
+
+    a = t.Matrix4f()
+    ad = a.data_ref()
+    for i in range(16):
+        ad[i%4, i//4] = i
+    bd = a.data_copy()
+    for i in range(16):
+        ad[i%4, i//4] = 0
+    del a, ad
+    for i in range(16):
+        assert bd[i%4, i//4] == i
+
+@needs_numpy
+def test47_return_from_stack():
+    import numpy as np
+    assert np.all(t.ret_from_stack_1() == [1,2,3])
+    assert np.all(t.ret_from_stack_2() == [1,2,3])

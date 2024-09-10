@@ -272,8 +272,14 @@ NB_MODULE(test_ndarray_ext, m) {
 
     m.def("ret_numpy_const_ref", []() {
         size_t shape[2] = { 2, 4 };
-        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, 2, shape, nb::handle());
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>, nb::c_contig>(f_global, 2, shape, nb::handle());
     }, nb::rv_policy::reference);
+
+    m.def("ret_numpy_const_ref_f", []() {
+        size_t shape[2] = { 2, 4 };
+        return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>, nb::f_contig>(f_global, 2, shape, nb::handle());
+    }, nb::rv_policy::reference);
+
 
     m.def("ret_numpy_const", []() {
         return nb::ndarray<nb::numpy, const float, nb::shape<2, 4>>(f_global, { 2, 4 }, nb::handle());
@@ -388,7 +394,6 @@ NB_MODULE(test_ndarray_ext, m) {
             destruct_count++;
             delete[] (__fp16*) data;
         });
-
         return nb::ndarray<nb::numpy, __fp16, nb::shape<2, 4>>(f, 2, shape,
                                                                deleter);
     });
@@ -403,17 +408,52 @@ NB_MODULE(test_ndarray_ext, m) {
     });
 
     // issue #365
-    m.def("set_item", [](nb::ndarray<double, nb::ndim<1>, nb::c_contig> data, uint32_t) {
-        data(0) = 123;
-    });
+    m.def("set_item",
+          [](nb::ndarray<double, nb::ndim<1>, nb::c_contig> data, uint32_t) {
+              data(0) = 123;
+          });
+
     m.def("set_item",
           [](nb::ndarray<std::complex<double>, nb::ndim<1>, nb::c_contig> data, uint32_t) {
-            data(0) = 123;
+              data(0) = 123;
           });
 
     // issue #709
-    m.def(
-        "test_implicit_conversion",
-        [](nb::ndarray<nb::ro, nb::c_contig, nb::device::cpu> arg) { return arg; },
-        nb::arg());
+    m.def("test_implicit_conversion",
+          [](nb::ndarray<nb::ro, nb::c_contig, nb::device::cpu> arg) {
+              return arg;
+          },
+          nb::arg());
+
+    m.def("ret_infer_c",
+          []() { return nb::ndarray<float, nb::shape<2, 4>, nb::numpy, nb::c_contig>(f_global); });
+    m.def("ret_infer_f",
+          []() { return nb::ndarray<float, nb::shape<2, 4>, nb::numpy, nb::f_contig>(f_global); });
+
+    using Array = nb::ndarray<float, nb::numpy, nb::shape<4, 4>, nb::f_contig>;
+
+    struct Matrix4f {
+        float m[4][4];
+        Array data() { return Array(m); }
+        auto data_ref() { return Array(m).cast(nb::rv_policy::reference_internal, nb::find(this)); }
+        auto data_copy() { return Array(m).cast(nb::rv_policy::copy); }
+    };
+
+    nb::class_<Matrix4f>(m, "Matrix4f")
+        .def(nb::init<>())
+        .def("data", &Matrix4f::data, nb::rv_policy::reference_internal)
+        .def("data_ref", &Matrix4f::data_ref)
+        .def("data_copy", &Matrix4f::data_copy);
+
+    using Vector3f = nb::ndarray<float, nb::numpy, nb::shape<3>>;
+
+    m.def("ret_from_stack_1", []() {
+        float f[] { 1, 2, 3 };
+        return nb::cast(Vector3f(f));
+    });
+
+    m.def("ret_from_stack_2", []() {
+        float f[] { 1, 2, 3 };
+        return Vector3f(f).cast();
+    });
 }

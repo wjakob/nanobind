@@ -104,7 +104,7 @@ using array_for_eigen_t = ndarray<
             ndim_v<T> == 1 || T::IsRowMajor,
             c_contig,
             f_contig>,
-        any_contig>>;
+        unused>>;
 
 /// Any kind of Eigen class
 template <typename T> constexpr bool is_eigen_v = is_base_of_template_v<T, Eigen::EigenBase>;

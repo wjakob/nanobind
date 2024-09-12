@@ -127,7 +127,7 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     // Use uint64_t because subtracting tagged pointers (e.g., with
     // HardwareAddressSanitizer) may overflow, which is undefined behavior for
     // signed integers.
-    int32_t offset = (int32_t) ((uint64_t) value - (uint64_t) self);
+    int32_t offset = (int32_t) ((uintptr_t) value - (uintptr_t) self);
 
     bool direct = (intptr_t) self + offset == (intptr_t) value;
     if (NB_UNLIKELY(!direct)) {

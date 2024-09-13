@@ -91,6 +91,13 @@ performance improvements:
   bottleneck. With nanobind's split into a precompiled library and minimal
   metatemplating, LTO is no longer crucial and can be skipped.
 
+- **Free-threading**: Python 3.13+ supports a free-threaded mode that removes
+  the *Global Interpreter Lock* (GIL). Both pybind11 and nanobind support
+  free-threading as of recently. When comparing the two, nanobind provides
+  better multi-core scaling using a localized locking scheme. In pybind11, lock
+  contention on a central ``internals`` data structure used in every binding
+  operation becomes a bottleneck in practice.
+
 - **Lifetime management**: nanobind maintains efficient internal data
   structures for lifetime management (needed for :cpp:class:`nb::keep_alive
   <keep_alive>`, :cpp:enumerator:`nb::rv_policy::reference_internal

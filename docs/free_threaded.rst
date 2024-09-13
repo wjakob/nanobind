@@ -44,8 +44,11 @@ version does not support free-threading.
    ``FREE_THREADED`` arguments: the build system will choose between the two
    depending on the detected Python version.
 
-   Warning: Loading a non-free threaded extension into a free-threaded Python
-   build disables free-threading globally.
+.. warning::
+
+   Loading an Python extension that does not support free-threading disables
+   free-threading globally. In larger binding projects with multiple
+   extensions, all of them must be adapted.
 
 If free-threading was requested and is available, the build system will set the
 ``NB_FREE_THREADED`` preprocessor flag. This can be helpful to specialize
@@ -232,7 +235,7 @@ necessary based on future experience and changes in Python itself.
 Wrappers
 ________
 
-:ref:`Wrapper types <wrappers>` like :cpp:class:`nb::list <list>` may used in
+:ref:`Wrapper types <wrappers>` like :cpp:class:`nb::list <list>` may be used in
 multi-threaded code. Operations like :cpp:func:`nb::list::append()
 <list::append>` internally acquire locks and behave just like their ordinary
 Python counterparts. This means that race conditions can still occur without

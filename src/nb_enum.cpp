@@ -23,7 +23,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     {
         lock_internals guard(internals_);
-        std::tie(it, success) = internals->type_c2p_slow.try_emplace(ed->type, nullptr);
+        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(ed->type, nullptr);
         if (!success) {
             PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
                              "nanobind: type '%s' was already registered!\n",

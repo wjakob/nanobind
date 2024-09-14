@@ -1,11 +1,32 @@
+include_guard(GLOBAL)
+
+cmake_minimum_required(VERSION 3.15...3.27)
+project(nanobind_tests LANGUAGES CXX)
+
+if(PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
+  set(NB_TESTS ON)
+  if(APPLE)
+    set(BASEPOINT @loader_path)
+  else()
+    set(BASEPOINT $ORIGIN)
+  endif()
+  set(CMAKE_INSTALL_RPATH ${BASEPOINT} ${BASEPOINT}/${CMAKE_INSTALL_LIBDIR})
+
+  add_subdirectory(.. ./build)
+endif()
+
 # If leaks are found, abort() during interpreter shutdown to catch this in the CI
 add_definitions(-DNB_ABORT_ON_LEAK)
+
+if (EMSCRIPTEN)
+  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_STATIC)
+endif()
 
 if (NB_TEST_STABLE_ABI)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} STABLE_ABI)
 endif()
 
-if (NB_TEST_SHARED_BUILD)
+if (NB_TEST_SHARED_BUILD AND NOT EMSCRIPTEN)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_SHARED)
 endif()
 
@@ -76,22 +97,26 @@ foreach (NAME functions classes ndarray stl enum typing make_iterator)
     set(PYI_PREFIX $<CONFIG>/)
   endif()
 
-  nanobind_add_stub(
-    ${NAME}_ext_stub
-    MODULE test_${NAME}_ext
-    OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
-    DEPENDS test_${NAME}_ext
-    ${EXTRA})
+  if(NOT CMAKE_CROSSCOMPILING)
+    nanobind_add_stub(
+      ${NAME}_ext_stub
+      MODULE test_${NAME}_ext
+      OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
+      PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
+      DEPENDS test_${NAME}_ext
+      ${EXTRA})
+  endif()
 endforeach()
 
-nanobind_add_stub(
-  py_stub
-  MODULE py_stub_test
-  OUTPUT ${PYI_PREFIX}py_stub_test.pyi
-  PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
-  DEPENDS py_stub_test.py
-)
+if(NOT CMAKE_CROSSCOMPILING)
+  nanobind_add_stub(
+    py_stub
+    MODULE py_stub_test
+    OUTPUT ${PYI_PREFIX}py_stub_test.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
+    DEPENDS py_stub_test.py
+  )
+endif()
 
 find_package (Eigen3 3.3.1 NO_MODULE)
 if (TARGET Eigen3::Eigen)
@@ -115,6 +140,17 @@ nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
+set(TEST_PYI_FILES
+    test_functions_ext.pyi
+    test_stl_ext.pyi
+    test_typing_ext.pyi
+    test_enum_ext.pyi
+    test_ndarray_ext.pyi
+    test_make_iterator_ext.pyi
+    test_classes_ext.pyi
+    py_stub_test.pyi
+)
+
 set(TEST_FILES
   common.py
   test_classes.py
@@ -134,18 +170,12 @@ set(TEST_FILES
   test_ndarray.py
   test_stubs.py
   test_typing.py
-
-  # Stub reference files
-  test_classes_ext.pyi.ref
-  test_functions_ext.pyi.ref
-  test_make_iterator_ext.pyi.ref
-  test_ndarray_ext.pyi.ref
-  test_stl_ext.pyi.ref
-  test_enum_ext.pyi.ref
-  test_typing_ext.pyi.ref
   py_stub_test.py
-  py_stub_test.pyi.ref
 )
+
+# Stub reference files
+list(TRANSFORM TEST_PYI_FILES APPEND ".ref" OUTPUT_VARIABLE TEST_REF_FILES)
+list(APPEND TEST_FILES ${TEST_REF_FILES})
 
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
   if (CMAKE_CONFIGURATION_TYPES)
@@ -165,3 +195,37 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
 
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
 endif()
+
+if(DEFINED SKBUILD)
+  if(NOT CMAKE_CROSSCOMPILING)
+    list(TRANSFORM TEST_PYI_FILES PREPEND "${CMAKE_CURRENT_BINARY_DIR}/" OUTPUT_VARIABLE TEST_OUT_FILES)
+    install(
+      FILES ${TEST_OUT_FILES}
+      DESTINATION .
+    )
+  endif()
+  install(
+    TARGETS
+      inter_module
+      test_inter_module_1_ext
+      test_inter_module_2_ext
+      test_functions_ext
+      test_classes_ext
+      test_holders_ext
+      test_stl_ext
+      test_bind_map_ext
+      test_bind_vector_ext
+      test_chrono_ext
+      test_enum_ext
+      test_eval_ext
+      test_ndarray_ext
+      test_intrusive_ext
+      test_exception_ext
+      test_make_iterator_ext
+      test_typing_ext
+      test_issue_ext
+    DESTINATION
+      .
+  )
+endif()
+

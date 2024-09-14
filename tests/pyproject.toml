@@ -1,0 +1,24 @@
+# Warning: this is currently used for pyodide, and is not a general out-of-tree
+# builder for the tests (yet). Specifically, wheels can't be built from SDists.
+
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "nanobind_tests"
+version = "0.0.1"
+dependencies = ["pytest", "pytest-timeout", "numpy", "scipy"]
+classifiers = [
+  "Private :: Do Not Upload",
+]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+
+[tool.cibuildwheel]
+test-command = "pytest -o timeout=0 -p no:cacheprovider {project}/tests/test_*.py"
+
+[[tool.cibuildwheel.overrides]]
+select = ["*-pyodide_wasm32"]
+environment.PYODIDE_BUILD_EXPORTS = "whole_archive"

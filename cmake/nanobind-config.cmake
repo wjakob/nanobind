@@ -189,6 +189,11 @@ function (nanobind_build_library TARGET_NAME)
     target_link_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}:-Wl,--gc-sections>)
   endif()
 
+  if (CMAKE_SYSTEM_NAME MATCHES Emscripten)
+    target_compile_options(${TARGET_NAME} PUBLIC -fexceptions)
+    target_link_options(${TARGET_NAME} PUBLIC -fexceptions)
+  endif()
+
   set_target_properties(${TARGET_NAME} PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
 
@@ -228,9 +233,10 @@ function (nanobind_build_library TARGET_NAME)
       ${NB_DIR}/ext/robin_map/include)
   endif()
 
+  get_property(nanobind_python_headers TARGET Python::Module PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
   target_include_directories(${TARGET_NAME} PUBLIC
-    ${Python_INCLUDE_DIRS}
-    ${NB_DIR}/include)
+    "${nanobind_python_headers}"
+    "${NB_DIR}/include")
 
   target_compile_features(${TARGET_NAME} PUBLIC cxx_std_17)
   nanobind_set_visibility(${TARGET_NAME})
@@ -274,6 +280,9 @@ endfunction()
 function (nanobind_compile_options name)
   if (MSVC)
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/bigobj /MP>)
+  endif()
+  if (CMAKE_SYSTEM_NAME MATCHES Emscripten)
+    target_compile_options(${name} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fexceptions>)
   endif()
 endfunction()
 

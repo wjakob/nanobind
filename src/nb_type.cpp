@@ -13,9 +13,9 @@
 #  pragma warning(disable: 4706) // assignment within conditional expression
 #endif
 
-// #if !defined(Py_tp_vectorcall)
-// #  define Py_tp_vectorcall 82
-// #endif
+#if !defined(Py_tp_vectorcall)
+#  define Py_tp_vectorcall 82
+#endif
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -1118,11 +1118,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             has_custom_init_or_new |=
                 slot_id == Py_tp_init || slot_id == Py_tp_new;
 
-            // if (slot_id == Py_tp_vectorcall) {
-            //     type_vectorcall = (vectorcallfunc) ts.pfunc;
-            //     has_custom_type_vectorcall = true;
-            //     continue;
-            // }
+            if (slot_id == Py_tp_vectorcall) {
+                type_vectorcall = (vectorcallfunc) ts.pfunc;
+                has_custom_type_vectorcall = true;
+                continue;
+            }
 
             *s++ = ts;
         }

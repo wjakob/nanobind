@@ -95,6 +95,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         #endif
     }
 
+    maybe_make_immortal(result.ptr());
+
     result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
         type_init_data *t = (type_init_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;

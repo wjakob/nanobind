@@ -908,6 +908,12 @@
 -U __Py_INCREF_IncRefTotal
 -U __PyObject_GetDictPtr
 -U _PyList_GetItemRef
+-U _PyDict_GetItemRef
+-U _PyDict_GetItemStringRef
+-U _PyDict_SetDefault
+-U _PyDict_SetDefaultRef
+-U _PyWeakref_GetRef
+-U _PyImport_AddModuleRef
 -U _PyUnstable_Module_SetGIL
 -U _PyMutex_Unlock
 -U _PyMutex_Lock

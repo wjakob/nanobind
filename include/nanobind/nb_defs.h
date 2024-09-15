@@ -147,6 +147,10 @@
 #    error "nanobind requires a newer PyPy version (>= 7.3.10)"
 #endif
 
+#if defined(NB_FREE_THREADED) && !defined(Py_GIL_DISABLED)
+#    error "Free-threaded extensions require a free-threaded version of Python"
+#endif
+
 #if defined(NB_DOMAIN)
 #  define NB_DOMAIN_STR NB_TOSTRING(NB_DOMAIN)
 #else

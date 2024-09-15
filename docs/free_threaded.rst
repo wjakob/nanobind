@@ -235,12 +235,44 @@ necessary based on future experience and changes in Python itself.
 Wrappers
 ________
 
-:ref:`Wrapper types <wrappers>` like :cpp:class:`nb::list <list>` may be used in
-multi-threaded code. Operations like :cpp:func:`nb::list::append()
+:ref:`Wrapper types <wrappers>` like :cpp:class:`nb::list <list>` may be used
+in multi-threaded code. Operations like :cpp:func:`nb::list::append()
 <list::append>` internally acquire locks and behave just like their ordinary
 Python counterparts. This means that race conditions can still occur without
 larger-scale synchronization, but such races won't jeopardize the memory safety
 of the program.
+
+There is one exception: :cpp:class:`nb::detail::dict_iterator
+<detail::dict_iterator>`, the iterator of :cpp:class:`nb::dict <dict>`. This
+class wraps the CPython API function `PyDict_Next()
+<https://docs.python.org/3.13/c-api/dict.html#c.PyDict_Next>`__, which is not
+thread-safe and requires locking by the caller.
+
+This means that loops of the form
+
+.. code-block:: cpp
+
+   nb::dict d = /* ... */;
+   for (auto [k, v] : d) {
+       // ....
+   }
+
+must be rewritten to use :cpp:class:`nb::ft_object_guard <ft_object_guard>` to
+avoid potential undefined behavior (crashes, data corruption) if the dictionary
+is concurrently being modified:
+
+.. code-block:: cpp
+
+   nb::dict d = /* ... */;
+   nb::ft_object_guard guard(d);
+   for (auto [k, v] : d) {
+       // ....
+   }
+
+Loops involving other data structures (lists, other iterables) may fail with an
+exception in case of concurrent modification, but memory safety is not at risk.
+Therefore, the advice to use :cpp:class:`nb::ft_object_guard <ft_object_guard>`
+primarily applies to :cpp:class:`nb::dict <dict>`.
 
 GIL scope guards
 ________________

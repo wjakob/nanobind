@@ -65,7 +65,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
     } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
         PyObject *key, *entry;
         Py_ssize_t pos = 0;
-
+        ft_object_guard guard(value);
         while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {
             Py_INCREF(key); Py_INCREF(entry);
             args[kwargs_offset + nkwargs] = entry;

@@ -809,13 +809,13 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
     nb_internals *internals_ = internals;
 
     PyTypeObject *tp =
-        (PyTypeObject *) PyDict_GetItem(internals_->nb_type_dict, key.ptr());
+        (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
 
     if (NB_UNLIKELY(!tp)) {
         // Retry in critical section to avoid races that create the same nb_type
         lock_internals guard(internals_);
 
-        tp = (PyTypeObject *) PyDict_GetItem(internals_->nb_type_dict, key.ptr());
+        tp = (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
         if (tp)
             return tp;
 
@@ -874,8 +874,6 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
         if (tp)
             rv = PyDict_SetItem(internals_->nb_type_dict, key.ptr(), (PyObject *) tp);
         check(rv == 0, "nb_type type creation failed!");
-
-        Py_DECREF(tp);
     }
 
     return tp;
@@ -1269,6 +1267,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
               "nanobind::detail::nb_type_new(\"%s\"): type construction "
               "failed: %s!", t_name, err.what());
     }
+
+    Py_DECREF(metaclass);
 
     maybe_make_immortal(result);
 

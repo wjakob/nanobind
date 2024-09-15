@@ -296,7 +296,8 @@ struct NB_SHARD_ALIGNMENT nb_shard {
  *    concurrent append operations. We assume that this data structure is only
  *    written during module initialization and don't use locking.
  *
- * - `funcs`: data structure for function leak tracking. Protected by `mutex`.
+ * - `funcs`: data structure for function leak tracking. Not used in
+ *   free-threaded mode .
  *
  * - `print_leak_warnings`, `print_implicit_cast_warnings`: simple boolean
  *   flags. No protection against concurrent conflicting updates.
@@ -352,8 +353,11 @@ struct nb_internals {
     /// C++ -> Python type map -- slow fallback version based on hashed strings
     nb_type_map_slow type_c2p_slow;
 
+#if !defined(NB_FREE_THREADED)
     /// nb_func/meth instance map for leak reporting (used as set, the value is unused)
+    /// In free-threaded mode, functions are immortal and don't require this data structure.
     nb_ptr_map funcs;
+#endif
 
     /// Registered C++ -> Python exception translators
     nb_translator_seq translators;

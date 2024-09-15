@@ -82,15 +82,14 @@ void nb_func_dealloc(PyObject *self) {
         func_data *f = nb_func_data(self);
 
         // Delete from registered function list
-        nb_internals *internals_ = internals;
-        {
-            lock_internals guard(internals_);
-            size_t n_deleted = internals_->funcs.erase(self);
-            check(n_deleted == 1,
-                  "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
-                  ((f->flags & (uint32_t) func_flags::has_name) ? f->name
-                                                            : "<anonymous>"));
-        }
+#if !defined(NB_FREE_THREADED)
+        size_t n_deleted = internals->funcs.erase(self);
+        check(n_deleted == 1,
+              "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
+              ((f->flags & (uint32_t) func_flags::has_name) ? f->name
+                                                        : "<anonymous>"));
+#endif
+
         for (size_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_free)
                 f->free_capture(f->capture);
@@ -351,10 +350,11 @@ PyObject *nb_func_new(const void *in_) noexcept {
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
-        lock_internals guard(internals_);
+#if !defined(NB_FREE_THREADED)
         size_t n_deleted = internals_->funcs.erase(func_prev);
         check(n_deleted == 1,
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
+#endif
 
         Py_CLEAR(func_prev);
     }
@@ -364,15 +364,16 @@ PyObject *nb_func_new(const void *in_) noexcept {
     func->vectorcall = func->complex_call ? nb_func_vectorcall_complex
                                           : nb_func_vectorcall_simple;
 
+#if !defined(NB_FREE_THREADED)
     // Register the function
-    nb_ptr_map::iterator it;
     {
-        lock_internals guard(internals_);
+        nb_ptr_map::iterator it;
         bool success;
         std::tie(it, success) = internals_->funcs.try_emplace(func, nullptr);
         check(success,
               "nanobind::detail::nb_func_new(): internal update failed (2)!");
     }
+#endif
 
     func_data *fc = nb_func_data(func) + to_copy;
     memcpy(fc, f, sizeof(func_data_prelim<0>));
@@ -876,7 +877,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             }
 
             if (result != NB_NEXT_OVERLOAD) {
-                if (is_constructor) {
+                if (is_constructor && result != nullptr) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
                     self_arg_nb->state = nb_inst::state_ready;
@@ -969,7 +970,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
             }
 
             if (result != NB_NEXT_OVERLOAD) {
-                if (is_constructor) {
+                if (is_constructor && result != nullptr) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
                     self_arg_nb->destruct = true;
                     self_arg_nb->state = nb_inst::state_ready;

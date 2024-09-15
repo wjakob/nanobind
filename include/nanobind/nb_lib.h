@@ -554,6 +554,8 @@ NB_CORE bool is_alive() noexcept;
 NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 #endif
 
+NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
+
 NAMESPACE_END(detail)
 
 using detail::raise;

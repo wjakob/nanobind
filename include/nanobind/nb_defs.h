@@ -173,6 +173,11 @@
 #  define NB_TYPE_GET_SLOT_IMPL 1
 #endif
 
+#define NB_NONCOPYABLE(X)                                                      \
+    X(const X &) = delete;                                                     \
+    X &operator=(const X &) = delete;
+
+
 #define NB_MODULE_IMPL(name)                                                   \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name();           \
     extern "C" NB_EXPORT PyObject *PyInit_##name()

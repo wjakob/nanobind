@@ -9,10 +9,6 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-#define NB_NONCOPYABLE(X)                                                      \
-    X(const X &) = delete;                                                     \
-    X &operator=(const X &) = delete;
-
 struct gil_scoped_acquire {
 public:
     NB_NONCOPYABLE(gil_scoped_acquire)

@@ -790,6 +790,10 @@ Wrapper classes
       Return an item iterator that returns ``std::pair<handle, handle>``
       key-value pairs analogous to ``iter(dict.items())`` in Python.
 
+      In free-threaded Python, the :cpp:class:``detail::dict_iterator`` class
+      acquires a lock to the underlying dictionary to enable the use of the
+      efficient but thread-unsafe ``PyDict_Next()`` Python C traversal routine.
+
    .. cpp:function:: detail::dict_iterator end() const
 
       Return a sentinel that ends the iteration.

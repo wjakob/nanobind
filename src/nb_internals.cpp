@@ -250,13 +250,14 @@ static void internals_cleanup() {
 
 #if !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
     /* The memory leak checker is unsupported on PyPy, see
-       see https://foss.heptapod.net/pypy/pypy/-/issues/3855
+       see https://foss.heptapod.net/pypy/pypy/-/issues/3855.
 
-       It is explicitly disabled on free-threaded builds, which
-       immortalize function and type objects.
-    */
+       Leak reporting is explicitly disabled on free-threaded builds
+       for now because of the decision to immortalize function and
+       type objects. This may change in the future. */
 
     bool print_leak_warnings = p->print_leak_warnings;
+
     size_t inst_leaks = 0, keep_alive_leaks = 0;
 
     // Shard locking no longer needed, Py_AtExit is single-threaded
@@ -343,8 +344,12 @@ static void internals_cleanup() {
         }
 
 #if defined(NB_FREE_THREADED)
+        // This code won't run for now but is kept here for a time when
+        // immortalization isn't needed anymore.
+
         PyThread_tss_delete(p->nb_static_property_disabled);
         PyThread_tss_free(p->nb_static_property_disabled);
+        delete[] p->shards;
 #endif
 
         delete p;
@@ -356,7 +361,7 @@ static void internals_cleanup() {
                             "counting issue in the binding code.\n");
         }
 
-        #if defined(NB_ABORT_ON_LEAK)
+        #if defined(NB_ABORT_ON_LEAK) && !defined(NB_FREE_THREADED)
             abort(); // Extra-strict behavior for the CI server
         #endif
     }
@@ -380,7 +385,9 @@ NB_NOINLINE void init(const char *name) {
                                          NB_INTERNALS_ID, name ? name : "");
     check(key, "nanobind::detail::init(): could not create dictionary key!");
 
-    PyObject *capsule = PyDict_GetItem(dict, key);
+    PyObject *capsule;
+
+    capsule = dict_get_item_ref_or_fail(dict, key);
     if (capsule) {
         Py_DECREF(key);
         internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
@@ -388,6 +395,7 @@ NB_NOINLINE void init(const char *name) {
               "nanobind::detail::internals_fetch(): capsule pointer is NULL!");
         nb_meta_cache = internals->nb_meta;
         is_alive_ptr = internals->is_alive_ptr;
+        Py_DECREF(capsule);
         return;
     }
 

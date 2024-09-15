@@ -48,10 +48,10 @@
 #include "nb_error.h"
 #include "nb_attr.h"
 #include "nb_cast.h"
+#include "nb_misc.h"
 #include "nb_call.h"
 #include "nb_func.h"
 #include "nb_class.h"
-#include "nb_misc.h"
 
 #if defined(_MSC_VER)
 #  pragma warning(pop)

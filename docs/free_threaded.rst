@@ -235,8 +235,8 @@ necessary based on future experience and changes in Python itself.
 Wrappers
 ________
 
-:ref:`Wrapper types <wrappers>` like :cpp:class:`nb::list <list>` may be used in
-multi-threaded code. Operations like :cpp:func:`nb::list::append()
+:ref:`Wrapper types <wrappers>` like :cpp:class:`nb::list <list>` may be used
+in multi-threaded code. Operations like :cpp:func:`nb::list::append()
 <list::append>` internally acquire locks and behave just like their ordinary
 Python counterparts. This means that race conditions can still occur without
 larger-scale synchronization, but such races won't jeopardize the memory safety

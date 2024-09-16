@@ -168,53 +168,40 @@ PyObject *module_import(PyObject *o) {
 
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
-    PyObject *name_py, *res;
+    object tmp, res;
 
-#if !defined(PYPY_VERSION)
-    PyObject *base_name = PyModule_GetNameObject(base);
-    if (!base_name)
-        goto fail;
-
-    name_py = PyUnicode_FromFormat("%U.%s", base_name, name);
-    Py_DECREF(base_name);
-#else
     const char *base_name = PyModule_GetName(base);
     if (!base_name)
         goto fail;
 
-    name_py = PyUnicode_FromFormat("%s.%s", base_name, name);
-#endif
-    if (!name_py)
+    tmp = steal(PyUnicode_FromFormat("%s.%s", base_name, name));
+    if (!tmp.is_valid())
         goto fail;
 
 #if !defined(PYPY_VERSION)
-    res = PyImport_AddModuleObject(name_py);
+    res = borrow(PyImport_AddModule(PyUnicode_AsUTF8(tmp.ptr())));
 #else
-    res = PyImport_AddModule(PyUnicode_AsUTF8(name_py));
+    res = steal(PyImport_AddModuleRef(PyUnicode_AsUTF8(tmp.ptr())));
 #endif
-    Py_DECREF(name_py);
-    if (!res)
+
+    if (!res.is_valid())
         goto fail;
 
     if (doc) {
-        PyObject *doc_py = PyUnicode_FromString(doc);
-        if (!doc_py)
+        tmp = steal(PyUnicode_FromString(doc));
+        if (!tmp.is_valid())
             goto fail;
-        int rv = PyObject_SetAttrString(res, "__doc__", doc_py);
-        Py_DECREF(doc_py);
-        if (rv)
+        if (PyObject_SetAttrString(res.ptr(), "__doc__", tmp.ptr()))
             goto fail;
     }
 
-    Py_INCREF(res); // extra reference for PyModule_AddObject
-
-    if (PyModule_AddObject(base, name, res)) { // steals on success
-        Py_DECREF(res);
+    res.inc_ref(); // For PyModule_AddObject, which steals upon success
+    if (PyModule_AddObject(base, name, res.ptr())) {
+        res.dec_ref();
         goto fail;
     }
 
-    Py_INCREF(res); // turned borrowed into new reference
-    return res;
+    return res.release().ptr();
 
 fail:
     raise_python_error();

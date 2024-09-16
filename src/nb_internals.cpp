@@ -323,7 +323,7 @@ static void internals_cleanup() {
             fprintf(stderr, "nanobind: leaked %zu functions!\n",
                     p->funcs.size());
             int ctr = 0;
-            for (auto [f, p] : p->funcs) {
+            for (auto [f, p2] : p->funcs) {
                 fprintf(stderr, " - leaked function \"%s\"\n",
                         nb_func_data(f)->name);
                 if (ctr++ == 10) {
@@ -385,9 +385,7 @@ NB_NOINLINE void init(const char *name) {
                                          NB_INTERNALS_ID, name ? name : "");
     check(key, "nanobind::detail::init(): could not create dictionary key!");
 
-    PyObject *capsule;
-
-    capsule = dict_get_item_ref_or_fail(dict, key);
+    PyObject *capsule = dict_get_item_ref_or_fail(dict, key);
     if (capsule) {
         Py_DECREF(key);
         internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");

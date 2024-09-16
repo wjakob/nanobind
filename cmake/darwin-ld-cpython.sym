@@ -922,3 +922,4 @@
 -U _PyCriticalSection_End
 -U _PyCriticalSection2_Begin
 -U _PyCriticalSection2_End
+-U _PyUnicode_AsUTF8

@@ -1616,7 +1616,9 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    .. cpp:function:: template <typename T> arg_v operator=(T &&value) const
 
-      Assign a default value to the argument.
+      Return an argument annotation that is like this one but also assigns a
+      default value to the argument. The default will be converted into a Python
+      object immediately, so its bindings must have already been defined.
 
    .. cpp:function:: arg &none(bool value = true)
 
@@ -1638,14 +1640,11 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       explain it in docstrings and stubs (``str(value)``) does not produce
       acceptable output.
 
-   .. cpp:function:: arg_locked &lock()
+   .. cpp:function:: arg_locked lock()
 
-      Set a flag noting that this argument must be locked when dispatching a
-      function call in free-threaded Python extensions. It does nothing in
-      regular GIL-protected extensions. In order to allow nanobind to detect
-      statically whether any arguments are being locked, this method does not
-      take a parameter, so it is not possible to decide at runtime whether an
-      argument should be locked or not.
+      Return an argument annotation that is like this one but also requests that
+      this argument be locked when dispatching a function call in free-threaded
+      Python extensions. It does nothing in regular GIL-protected extensions.
 
 .. cpp:struct:: is_method
 

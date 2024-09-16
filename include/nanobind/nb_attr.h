@@ -390,6 +390,7 @@ NB_INLINE void func_extra_apply(F &f, nanobind::keep_alive<Nurse, Patient>, size
 template <typename... Ts> struct func_extra_info {
     using call_guard = void;
     static constexpr bool keep_alive = false;
+    static constexpr size_t nargs_locked = 0;
 };
 
 template <typename T, typename... Ts> struct func_extra_info<T, Ts...>
@@ -405,6 +406,16 @@ struct func_extra_info<nanobind::call_guard<Cs...>, Ts...> : func_extra_info<Ts.
 template <size_t Nurse, size_t Patient, typename... Ts>
 struct func_extra_info<nanobind::keep_alive<Nurse, Patient>, Ts...> : func_extra_info<Ts...> {
     static constexpr bool keep_alive = true;
+};
+
+template <typename... Ts>
+struct func_extra_info<nanobind::arg_locked, Ts...> : func_extra_info<Ts...> {
+    static constexpr size_t nargs_locked = 1 + func_extra_info<Ts...>::nargs_locked;
+};
+
+template <typename... Ts>
+struct func_extra_info<nanobind::lock_self, Ts...> : func_extra_info<Ts...> {
+    static constexpr size_t nargs_locked = 1 + func_extra_info<Ts...>::nargs_locked;
 };
 
 template <typename T>

@@ -168,9 +168,11 @@ PyObject *module_import(PyObject *o) {
 
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
+    const char *base_name, *tmp_str;
+    Py_ssize_t tmp_size = 0;
     object tmp, res;
 
-    const char *base_name = PyModule_GetName(base);
+    base_name = PyModule_GetName(base);
     if (!base_name)
         goto fail;
 
@@ -178,10 +180,14 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
     if (!tmp.is_valid())
         goto fail;
 
+    tmp_str = PyUnicode_AsUTF8AndSize(tmp.ptr(), &tmp_size);
+    if (!tmp_str)
+        goto fail;
+
 #if !defined(PYPY_VERSION)
-    res = borrow(PyImport_AddModule(PyUnicode_AsUTF8(tmp.ptr())));
+    res = borrow(PyImport_AddModule(tmp_str));
 #else
-    res = steal(PyImport_AddModuleRef(PyUnicode_AsUTF8(tmp.ptr())));
+    res = steal(PyImport_AddModuleRef(tmp_str));
 #endif
 
     if (!res.is_valid())

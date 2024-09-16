@@ -20,9 +20,17 @@ struct name {
 };
 
 struct arg_v;
+struct arg_locked;
+struct arg_locked_v;
+
+// Basic function argument descriptor (no default value, not locked)
 struct arg {
     NB_INLINE constexpr explicit arg(const char *name = nullptr) : name_(name), signature_(nullptr) { }
+
+    // operator= can be used to provide a default value
     template <typename T> NB_INLINE arg_v operator=(T &&value) const;
+
+    // Mutators that don't change default value or locked state
     NB_INLINE arg &noconvert(bool value = true) {
         convert_ = !value;
         return *this;
@@ -31,28 +39,74 @@ struct arg {
         none_ = value;
         return *this;
     }
-
-    NB_INLINE arg &lock(bool value = true) {
-        lock_ = value;
-        return *this;
-    }
-
     NB_INLINE arg &sig(const char *value) {
         signature_ = value;
         return *this;
     }
 
+    // After lock(), this argument is locked
+    NB_INLINE arg_locked lock();
+
     const char *name_, *signature_;
     uint8_t convert_{ true };
     bool none_{ false };
-    bool lock_{ false };
 };
 
+// Function argument descriptor with default value (not locked)
 struct arg_v : arg {
     object value;
     NB_INLINE arg_v(const arg &base, object &&value)
         : arg(base), value(std::move(value)) {}
+
+  private:
+    // Inherited mutators would slice off the default, and are not generally needed
+    using arg::noconvert;
+    using arg::none;
+    using arg::sig;
+    using arg::lock;
 };
+
+// Function argument descriptor that is locked (no default value)
+struct arg_locked : arg {
+    NB_INLINE constexpr explicit arg_locked(const char *name = nullptr) : arg(name) { }
+    NB_INLINE constexpr explicit arg_locked(const arg &base) : arg(base) { }
+
+    // operator= can be used to provide a default value
+    template <typename T> NB_INLINE arg_locked_v operator=(T &&value) const;
+
+    // Mutators must be respecified in order to not slice off the locked status
+    NB_INLINE arg_locked &noconvert(bool value = true) {
+        convert_ = !value;
+        return *this;
+    }
+    NB_INLINE arg_locked &none(bool value = true) {
+        none_ = value;
+        return *this;
+    }
+    NB_INLINE arg_locked &sig(const char *value) {
+        signature_ = value;
+        return *this;
+    }
+
+    // Redundant extra lock() is allowed
+    NB_INLINE arg_locked &lock() { return *this; }
+};
+
+// Function argument descriptor that is potentially locked and has a default value
+struct arg_locked_v : arg_locked {
+    object value;
+    NB_INLINE arg_locked_v(const arg_locked &base, object &&value)
+        : arg_locked(base), value(std::move(value)) {}
+
+  private:
+    // Inherited mutators would slice off the default, and are not generally needed
+    using arg_locked::noconvert;
+    using arg_locked::none;
+    using arg_locked::sig;
+    using arg_locked::lock;
+};
+
+NB_INLINE arg_locked arg::lock() { return arg_locked{*this}; }
 
 template <typename... Ts> struct call_guard {
     using type = detail::tuple<Ts...>;
@@ -133,9 +187,7 @@ enum class func_flags : uint32_t {
     /// Does this overload specify a custom function signature (for docstrings, typing)
     has_signature = (1 << 16),
     /// Does this function have one or more nb::keep_alive() annotations?
-    has_keep_alive = (1 << 17),
-    /// Free-threaded Python: does the binding lock the 'self' argument
-    lock_self = (1 << 18)
+    has_keep_alive = (1 << 17)
 };
 
 enum cast_flags : uint8_t {
@@ -148,14 +200,11 @@ enum cast_flags : uint8_t {
     // Indicates that the function dispatcher should accept 'None' arguments
     accepts_none = (1 << 2),
 
-    // Indicates that a function argument must be locked before dispatching a call
-    lock = (1 << 3),
-
     // Indicates that this cast is performed by nb::cast or nb::try_cast.
     // This implies that objects added to the cleanup list may be
     // released immediately after the caster's final output value is
     // obtained, i.e., before it is used.
-    manual = (1 << 4)
+    manual = (1 << 3)
 };
 
 
@@ -300,8 +349,6 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
         flag |= (uint8_t) cast_flags::accepts_none;
     if (a.convert_)
         flag |= (uint8_t) cast_flags::convert;
-    if (a.lock_)
-        flag |= (uint8_t) cast_flags::lock;
 
     arg_data &arg = f.args[index];
     arg.flag = flag;
@@ -310,6 +357,8 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
     arg.value = nullptr;
     index++;
 }
+// arg_locked will select the arg overload; the locking is added statically
+// in nb_func.h
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
@@ -317,14 +366,18 @@ NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
     func_extra_apply(f, (const arg &) a, index);
     ad.value = a.value.ptr();
 }
+template <typename F>
+NB_INLINE void func_extra_apply(F &f, const arg_locked_v &a, size_t &index) {
+    arg_data &ad = f.args[index];
+    func_extra_apply(f, (const arg_locked &) a, index);
+    ad.value = a.value.ptr();
+}
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &, kw_only, size_t &) {}
 
 template <typename F>
-NB_INLINE void func_extra_apply(F &f, lock_self, size_t &) {
-    f.flags |= (uint32_t) func_flags::lock_self;
-}
+NB_INLINE void func_extra_apply(F &, lock_self, size_t &) {}
 
 template <typename F, typename... Ts>
 NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t &) {}

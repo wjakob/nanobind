@@ -1638,11 +1638,14 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       explain it in docstrings and stubs (``str(value)``) does not produce
       acceptable output.
 
-   .. cpp:function:: arg &lock(bool value = true)
+   .. cpp:function:: arg_locked &lock()
 
       Set a flag noting that this argument must be locked when dispatching a
       function call in free-threaded Python extensions. It does nothing in
-      regular GIL-protected extensions.
+      regular GIL-protected extensions. In order to allow nanobind to detect
+      statically whether any arguments are being locked, this method does not
+      take a parameter, so it is not possible to decide at runtime whether an
+      argument should be locked or not.
 
 .. cpp:struct:: is_method
 

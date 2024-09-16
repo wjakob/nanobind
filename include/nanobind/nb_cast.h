@@ -633,6 +633,9 @@ tuple make_tuple(Args &&...args) {
 template <typename T> arg_v arg::operator=(T &&value) const {
     return arg_v(*this, cast((detail::forward_t<T>) value));
 }
+template <typename T> arg_locked_v arg_locked::operator=(T &&value) const {
+    return arg_locked_v(*this, cast((detail::forward_t<T>) value));
+}
 
 template <typename Impl> template <typename T>
 detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {

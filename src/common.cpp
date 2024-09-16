@@ -1194,10 +1194,13 @@ void maybe_make_immortal(PyObject *op) {
 
 PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k) {
     PyObject *value;
-    bool error;
+    bool error = false;
 #if PY_VERSION_HEX < 0x030D0000
     value = PyDict_GetItemWithError(d, k);
-    error = !value && PyErr_Occurred();
+    if (value)
+        Py_INCREF(value);
+    else
+        error = PyErr_Occurred();
 #else
     error = PyDict_GetItemRef(d, k, &value) == -1;
 #endif

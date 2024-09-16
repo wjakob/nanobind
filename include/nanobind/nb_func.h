@@ -112,8 +112,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     constexpr bool lock_self_det =
         (std::is_same_v<lock_self, Extra> + ... + 0) != 0;
     constexpr size_t nargs_locked =
-        ((std::is_base_of_v<arg_locked, Extra> +
-          std::is_same_v<lock_self, Extra>) + ... + 0);
+        (std::is_base_of_v<arg_locked, Extra> + ... + 0) + lock_self_det;
     static_assert(nargs_locked <= 2,
         "At most two function arguments can be locked");
     static_assert(!(lock_self_det && !is_method_det),

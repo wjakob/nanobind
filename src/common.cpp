@@ -184,7 +184,7 @@ PyObject *module_new_submodule(PyObject *base, const char *name,
     if (!tmp_str)
         goto fail;
 
-#if PY_VERSION_HEX < 0x030D0000
+#if PY_VERSION_HEX < 0x030D00A0
     res = borrow(PyImport_AddModule(tmp_str));
 #else
     res = steal(PyImport_AddModuleRef(tmp_str));

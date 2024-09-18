@@ -1066,7 +1066,7 @@ Version 0.2.0 (March 3, 2023)
   and `b5ed96
   <https://github.com/wjakob/nanobind/commit/b5ed696a7a68c9c9adc4d3aa3c6f4adb5b7defeb>`__)
 * The ``nb::tensor<..>`` class has been renamed to :cpp:class:`nb::ndarray\<..\> <ndarray>`,
-  and it is now located in a different header file (``nanobind/nd-array.h``). A
+  and it is now located in a different header file (``nanobind/ndarray.h``). A
   compatibility wrappers with a deprecation warning was retained in the
   original header file. It will be removed when nanobind reaches version 1.0.
   (commit `a6ab8b

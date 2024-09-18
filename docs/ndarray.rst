@@ -24,7 +24,7 @@ To use this feature, you must add the include directive
 
 .. code-block:: cpp
 
-   #include <nanobind/nd-array.h>
+   #include <nanobind/ndarray.h>
 
 to your code. Following this, you can bind functions with
 :cpp:class:`nb::ndarray\<...\> <ndarray>`-typed parameters and return values.
@@ -159,10 +159,10 @@ input. This produces the following error message:
 
 .. code-block:: pycon
 
-   >>> my_module.process(nd-array=np.zeros(1))
+   >>> my_module.process(array=np.zeros(1))
 
    TypeError: process(): incompatible function arguments. The following argument types are supported:
-   1. process(arg: nd-array[dtype=uint8, shape=(*, *, 3), device='cpu'], /) -> None
+   1. process(arg: ndarray[dtype=uint8, shape=(*, *, 3), device='cpu'], /) -> None
 
    Invoked with types: numpy.ndarray
 
@@ -205,11 +205,11 @@ multithreaded code even when the `GIL
 example to examine the layout of an array and access the underlying storage.
 
 There are two exceptions to this: creating *new* nd-array object from C++
-(discused :ref:`later <returning-nd-arrays>`) and casting it to Python via
+(discused :ref:`later <returning-ndarrays>`) and casting it to Python via
 :cpp:func:`ndarray::cast` function both involve Python API calls that require
 that the GIL is held.
 
-.. _returning-nd-arrays:
+.. _returning-ndarrays:
 
 Returning arrays from C++ to Python
 -----------------------------------
@@ -476,7 +476,7 @@ extra precautions.
        return Vector3f(data);
    });
 
-Recall the discussion at the :ref:`beginning <returning-nd-arrays>` of this
+Recall the discussion at the :ref:`beginning <returning-ndarrays>` of this
 subsection. The :cpp:class:`nb::ndarray\<...\> <ndarray>` constructor only
 creates *metadata* describing this array, with the actual array creation
 happening *after* of the function call. That isn't safe in this case because
@@ -529,7 +529,7 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
 .. code-block:: cpp
 
    namespace nanobind {
-       template <> struct nd-array_traits<__fp16> {
+       template <> struct ndarray_traits<__fp16> {
            static constexpr bool is_complex = false;
            static constexpr bool is_float   = true;
            static constexpr bool is_bool    = false;
@@ -562,7 +562,7 @@ While functional, this code is not perfect. The problem is that to compute the
 address of an entry, ``operator()`` accesses the DLPack array descriptor. This
 indirection can break certain compiler optimizations.
 
-nanobind provides the method :cpp:func:`nd-array\<...\>::view() <ndarray::view>`
+nanobind provides the method :cpp:func:`ndarray\<...\>::view() <ndarray::view>`
 to fix this. It creates a tiny data structure that provides all information
 needed to access the array contents, and which can be held within CPU
 registers. All relevant compile-time information (:cpp:class:`nb::ndim <ndim>`,

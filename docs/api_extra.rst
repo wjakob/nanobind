@@ -671,19 +671,22 @@ section <ndarrays>`.
    .. cpp:var:: static constexpr bool ReadOnly
 
       A ``constexpr`` Boolean value that is ``true`` if the ndarray template
-      arguments (``Args...``) include the ``nb::ro`` annotation or a
+      arguments (`Args... <Args>`) include the ``nb::ro`` annotation or a
       ``const``-qualified scalar type.
 
    .. cpp:var:: static constexpr char Order
 
-      A ``constexpr`` character value that is set based on the ndarray template
-      arguments (``Args...``).
-
-      It equals
+      A ``constexpr`` character value set based on the ndarray template
+      arguments (`Args... <Args>`). It equals
 
       - ``'C'`` if :cpp:class:`c_contig` is specified.
       - ``'F'`` if :cpp:class:`f_contig` is specified.
       - ``'A'`` if :cpp:class:`any_contig` is specified.
+
+   .. cpp:var:: static constexpr int DeviceType
+
+      A ``constexpr`` integer value set to the device type ID (if present)
+      extracted from the ndarray template arguments (`Args... <Args>`).
 
    .. cpp:type:: VoidPtr = std::conditional_t<ReadOnly, const void *, void *>
 
@@ -697,8 +700,8 @@ section <ndarrays>`.
    .. cpp:function:: template <typename... Args2> explicit ndarray(const ndarray<Args2...> &other)
 
       Reinterpreting constructor that wraps an existing nd-array (parameterized
-      by `Args`) into a new ndarray (parameterized by `Args2`).   No copy or
-      conversion is made.
+      by `Args... <Args>`) into a new ndarray (parameterized by `Args2...
+      <Args2>`). No copy or conversion is made.
 
       Dropping parameters is always safe. For example, a function that
       returns different array types could call it to convert ``ndarray<T>`` to
@@ -746,7 +749,7 @@ section <ndarrays>`.
         until it is destructed.
 
       - `strides` is optional; a value of ``nullptr`` implies that the order
-        is computed automatically according to the ``strides`` paramet.er
+        is computed automatically according to the ``strides`` parameter.
 
       - `dtype` describes the data type (floating point, signed/unsigned
         integer) and bit depth.
@@ -757,18 +760,17 @@ section <ndarrays>`.
       - The `order` value denotes the coefficient order in memory and is only
         relevant when `strides` is empty. Specify ``'C'`` for C-style or ``'F'``
         for Fortran-style. When this parameter is not explicitly specified, the
-        implementation uses the ndarray template parameter (`Order`, which is
-        inferred from ``Args...``). C-style order is used if nothing is specified
-        there either.
+        implementation uses the ndarray template parameters and C-style order
+        as a fallback.
 
       Both ``strides`` and ``shape`` will be copied by the constructor, hence
       the targets of these pointers don't need to remain valid following the
-      call.
+      constructor call.
 
       The Python *global interpreter lock* (GIL) must be held when calling this
       function.
 
-   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape, handle owner, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0, char order = '\0')
+   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape, handle owner, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = DeviceType, int32_t device_id = 0, char order = Order)
 
       Alternative form of the above constructor, which accepts the ``shape``
       and ``strides`` arguments using a ``std::initializer_list``. It
@@ -777,7 +779,7 @@ section <ndarrays>`.
 
       Both ``strides`` and ``shape`` will be copied by the constructor, hence
       the targets of these initializer lists don't need to remain valid
-      following the call.
+      following the constructor call.
 
       The Python *global interpreter lock* (GIL) must be held when calling this
       function.
@@ -880,14 +882,13 @@ section <ndarrays>`.
 
    .. cpp:function:: auto cast(rv_policy policy = rv_policy::automatic_reference, handle parent = {})
 
-      When this function is used in an expression like ``array.cast(policy,
-      handle)``, it returns a Python object that is equivalent to calling
+      The expression ``array.cast(policy, handle)`` is almost equivalent to
       :cpp:func:`nb::cast(array, policy, handle) <cast>`.
 
       The main difference is that the return type of :cpp:func:`nb::cast
-      <cast>` is :cpp:class:`nb::object <object>`, which render as the rather
+      <cast>` is :cpp:class:`nb::object <object>`, which renders as a rather
       non-descriptive ``object`` in Python bindings. The ``.cast()`` method
-      instead returns a wrapper type, whose signature matches taht of the
+      instead returns a wrapper type, whose signature matches that of the
       original nd-array.
 
 Data types

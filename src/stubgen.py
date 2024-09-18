@@ -399,7 +399,7 @@ class StubGen:
             self.write_ln("@staticmethod")
             fn = fn.__func__
         elif isinstance(fn, classmethod):
-            self.write_ln("@staticmethod")
+            self.write_ln("@classmethod")
             fn = fn.__func__
 
         # Special handling for nanobind functions with overloads

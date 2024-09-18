@@ -15,8 +15,8 @@ class AClass:
     @staticmethod
     def static_method(x): ...
 
-    @staticmethod
-    def class_method(x): ...
+    @classmethod
+    def class_method(cls, x): ...
 
     @overload
     def overloaded(self, x: int) -> None:

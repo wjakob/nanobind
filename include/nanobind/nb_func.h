@@ -35,15 +35,11 @@ constexpr size_t count_args_before_index(std::index_sequence<Is...>) {
     return ((Is < I && std::is_base_of_v<arg, Ts>) + ... + 0);
 }
 
-template <bool enable>
-struct ft_args_guard {
-    static constexpr bool enabled = false;
-};
-
+#if defined(NB_FREE_THREADED)
 struct ft_args_collector {
     PyObject **args;
-    handle h1 = nullptr;
-    handle h2 = nullptr;
+    handle h1;
+    handle h2;
     size_t index = 0;
 
     NB_INLINE explicit ft_args_collector(PyObject **a) : args(a) {}
@@ -57,9 +53,7 @@ struct ft_args_collector {
     NB_INLINE void apply(...) {}
 };
 
-#if defined(NB_FREE_THREADED)
-template<> struct ft_args_guard<true> {
-    static constexpr bool enabled = true;
+struct ft_args_guard {
     NB_INLINE void lock(const ft_args_collector& info) {
         PyCriticalSection2_Begin(&cs, info.h1.ptr(), info.h2.ptr());
     }
@@ -69,6 +63,8 @@ template<> struct ft_args_guard<true> {
     PyCriticalSection2 cs;
 };
 #endif
+
+struct no_guard {};
 
 template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
           typename... Args, size_t... Is, typename... Extra>
@@ -230,19 +226,20 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         tuple<make_caster<Args>...> in;
         (void) in;
 
-        ft_args_guard<Info::nargs_locked != 0> guard;
-        if constexpr (decltype(guard)::enabled) {
+#if defined(NB_FREE_THREADED)
+        std::conditional_t<Info::nargs_locked != 0, ft_args_guard, no_guard> guard;
+        if constexpr (Info::nargs_locked) {
             ft_args_collector collector{args};
             if constexpr (is_method_det) {
-                if constexpr (lock_self_det) {
+                if constexpr (lock_self_det)
                     collector.apply((arg_locked *) nullptr);
-                } else {
+                else
                     collector.apply((arg *) nullptr);
-                }
             }
             (collector.apply((Extra *) nullptr), ...);
             guard.lock(collector);
         }
+#endif
 
         if constexpr (Info::keep_alive) {
             if ((!from_python_keep_alive(in.template get<Is>(), args,

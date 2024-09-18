@@ -129,8 +129,8 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     }
 
     if constexpr (detail::is_equality_comparable_v<Map>) {
-        cl.def(self == self)
-          .def(self != self);
+        cl.def(self == self, sig("def __eq__(self, arg: object, /) -> bool"))
+          .def(self != self, sig("def __ne__(self, arg: object, /) -> bool"));
     }
 
     // Item, value, and key views

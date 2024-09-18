@@ -44,7 +44,7 @@ class AClass:
         pass
 
     @classmethod
-    def class_method(x):
+    def class_method(cls, x):
         pass
 
     @typing.overload

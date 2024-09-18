@@ -322,11 +322,13 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
         int64_t inner = caster.value.stride(0),
                 outer;
+
         if constexpr (ndim_v<T> == 1)
             outer = caster.value.shape(0);
         else
             outer = caster.value.stride(1);
 
+        (void) inner; (void) outer;
         if constexpr (ndim_v<T> == 2 && T::IsRowMajor)
             std::swap(inner, outer);
 

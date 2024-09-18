@@ -548,6 +548,8 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         if constexpr (Config::N > 0) {
             Config::Shape::put(shape_buf);
             config.shape = shape_buf;
+        } else {
+            (void) shape_buf;
         }
 
         value = Value(ndarray_import(src.ptr(), &config,

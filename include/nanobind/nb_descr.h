@@ -142,8 +142,8 @@ constexpr auto concat_maybe(const descr<N, Ts...> &arg, const descr<0> &, const 
 template <size_t N, size_t N2, typename... Ts, typename... Ts2, typename... Args,
           enable_if_t<N != 0 && N2 != 0> = 0>
 constexpr auto concat_maybe(const descr<N, Ts...> &arg0, const descr<N2, Ts2...> &arg1, const Args &...args)
-    -> decltype(arg0 + const_name(", ") + concat_maybe(arg1, args...)) {
-    return arg0 + const_name(", ") + concat_maybe(arg1, args...);
+    -> decltype(concat(arg0, concat_maybe(arg1, args...))) {
+    return concat(arg0, concat_maybe(arg1, args...));
 }
 
 template <size_t N, typename... Ts>

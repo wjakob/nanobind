@@ -320,8 +320,9 @@ The parameters have the following role:
 - ``shape``: number of dimensions and size along each axis.
 - ``owner``: a Python object owning the storage, which must be
   kept alive while the array object exists.
-- ``strides``: specifies the data layout in memory. Only needed if the
-  array has a non-standard ``order``.
+- ``strides``: specifies the data layout in memory. You only need to specify
+  this parameter if it has a non-standard ``order`` (e.g., if it is non-contiguous).
+  Note that the ``strides`` count elements, not bytes.
 - ``dtype`` data type (floating point, signed/unsigned integer), bit depth.
 - ``device_type`` and ``device_id``: device type and number, e.g., for multi-GPU setups.
 - ``order``: coefficient memory order. Default: ``'C'`` (C-style) ordering,

@@ -750,6 +750,7 @@ section <ndarrays>`.
 
       - `strides` is optional; a value of ``nullptr`` implies that the order
         is computed automatically according to the ``strides`` parameter.
+        Note that the ``strides`` count elements, not bytes.
 
       - `dtype` describes the data type (floating point, signed/unsigned
         integer) and bit depth.

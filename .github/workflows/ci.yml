@@ -89,3 +89,53 @@ jobs:
       run: >
         cd build;
         python3 -m pytest
+
+  old-compilers:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cc: gcc-8
+            cxx: g++-8
+            apt: gcc-8 g++-8
+          - cc: gcc-9
+            cxx: g++-9
+            apt: gcc-9
+          #- cc: clang-7
+          #  cxx: clang++-7
+          #  apt: clang-7
+          #- cc: clang-8
+          #  cxx: clang++-8
+          #  apt: clang-8
+          - cc: clang-9
+            cxx: clang++-9
+            apt: clang-9
+          - cc: clang-10
+            cxx: clang++-10
+            apt: clang-10
+
+    runs-on: ubuntu-20.04
+    name: "${{matrix.cc}} on Ubuntu 20.04"
+    env:
+      CC: ${{matrix.cc}}
+      CXX: ${{matrix.cxx}}
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install python3-numpy python3-pytest libeigen3-dev ${{matrix.apt}}
+        python3 -m pip install typing_extensions
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Configure
+      run: cmake -S . -B build
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Run tests
+      run: cd build && python3 -m pytest

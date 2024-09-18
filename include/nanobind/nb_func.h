@@ -32,8 +32,39 @@ bool from_python_keep_alive(Caster &c, PyObject **args, uint8_t *args_flags,
 template <size_t I, typename... Ts, size_t... Is>
 constexpr size_t count_args_before_index(std::index_sequence<Is...>) {
     static_assert(sizeof...(Is) == sizeof...(Ts));
-    return ((Is < I && (std::is_same_v<arg, Ts> || std::is_same_v<arg_v, Ts>)) + ... + 0);
+    return ((Is < I && std::is_base_of_v<arg, Ts>) + ... + 0);
 }
+
+#if defined(NB_FREE_THREADED)
+struct ft_args_collector {
+    PyObject **args;
+    handle h1;
+    handle h2;
+    size_t index = 0;
+
+    NB_INLINE explicit ft_args_collector(PyObject **a) : args(a) {}
+    NB_INLINE void apply(arg_locked *) {
+        if (h1.ptr() == nullptr)
+            h1 = args[index];
+        h2 = args[index];
+        ++index;
+    }
+    NB_INLINE void apply(arg *) { ++index; }
+    NB_INLINE void apply(...) {}
+};
+
+struct ft_args_guard {
+    NB_INLINE void lock(const ft_args_collector& info) {
+        PyCriticalSection2_Begin(&cs, info.h1.ptr(), info.h2.ptr());
+    }
+    ~ft_args_guard() {
+        PyCriticalSection2_End(&cs);
+    }
+    PyCriticalSection2 cs;
+};
+#endif
+
+struct no_guard {};
 
 template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
           typename... Args, size_t... Is, typename... Extra>
@@ -66,12 +97,20 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
-        ((std::is_same_v<arg, Extra> + std::is_same_v<arg_v, Extra>) + ... + 0);
+        (std::is_base_of_v<arg, Extra> + ... + 0);
     constexpr bool is_method_det =
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
     constexpr bool has_arg_annotations = nargs_provided > 0 && !is_getter_det;
+
+    // Determine the number of potentially-locked function arguments
+    constexpr bool lock_self_det =
+        (std::is_same_v<lock_self, Extra> + ... + 0) != 0;
+    static_assert(Info::nargs_locked <= 2,
+        "At most two function arguments can be locked");
+    static_assert(!(lock_self_det && !is_method_det),
+        "The nb::lock_self() annotation only applies to methods");
 
     // Detect location of nb::kw_only annotation, if supplied. As with args/kwargs
     // we find the first and last location and later verify they match each other.
@@ -186,6 +225,21 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         tuple<make_caster<Args>...> in;
         (void) in;
+
+#if defined(NB_FREE_THREADED)
+        std::conditional_t<Info::nargs_locked != 0, ft_args_guard, no_guard> guard;
+        if constexpr (Info::nargs_locked) {
+            ft_args_collector collector{args};
+            if constexpr (is_method_det) {
+                if constexpr (lock_self_det)
+                    collector.apply((arg_locked *) nullptr);
+                else
+                    collector.apply((arg *) nullptr);
+            }
+            (collector.apply((Extra *) nullptr), ...);
+            guard.lock(collector);
+        }
+#endif
 
         if constexpr (Info::keep_alive) {
             if ((!from_python_keep_alive(in.template get<Is>(), args,

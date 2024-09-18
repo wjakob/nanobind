@@ -101,12 +101,9 @@ jobs:
           - cc: gcc-9
             cxx: g++-9
             apt: gcc-9
-          #- cc: clang-7
-          #  cxx: clang++-7
-          #  apt: clang-7
-          #- cc: clang-8
-          #  cxx: clang++-8
-          #  apt: clang-8
+          - cc: clang-8
+            cxx: clang++-8
+            apt: clang-8
           - cc: clang-9
             cxx: clang++-9
             apt: clang-9

@@ -32,8 +32,8 @@ template <typename T, typename... Ts> struct tuple<T, Ts...> : tuple<Ts...> {
 
     tuple() = default;
     tuple(const tuple &) = default;
-    tuple(tuple &&) noexcept = default;
-    tuple& operator=(tuple &&) noexcept = default;
+    tuple(tuple &&) = default;
+    tuple& operator=(tuple &&) = default;
     tuple& operator=(const tuple &) = default;
 
     template <typename A, typename... As>

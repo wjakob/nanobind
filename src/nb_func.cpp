@@ -187,50 +187,6 @@ char *strdup_check(const char *s) {
     return result;
 }
 
-#if defined(NB_FREE_THREADED)
-// Locked function wrapper for free-threaded Python
-struct locked_func {
-    void *capture[3];
-    size_t nargs;
-    PyObject *(*impl)(void *, PyObject **, uint8_t *, rv_policy,
-                      cleanup_list *);
-    void (*free_capture)(void *);
-};
-
-static void locked_func_free(void *p) {
-    locked_func *f = (locked_func *) ((void **) p)[0];
-    if (f->free_capture)
-        f->free_capture(f->capture);
-    PyMem_Free(f);
-}
-
-static PyObject *locked_func_impl(void *p, PyObject **args, uint8_t *args_flags,
-                                  rv_policy policy, cleanup_list *cleanup) {
-    handle h1, h2;
-    size_t ctr = 0;
-
-    locked_func *f = (locked_func *) ((void **) p)[0];
-
-    for (size_t i = 0; i < f->nargs; ++i) {
-        if (args_flags[i] & (uint8_t) cast_flags::lock) {
-            if (ctr == 0)
-                h1 = args[i];
-            h2 = args[i];
-            ctr++;
-        }
-    }
-
-#if !defined(NDEBUG)
-    // nb_func_new ensured that at most two arguments are locked, but
-    // can't hurt to check once more in debug builds
-    check(ctr == 1 || ctr == 2, "locked_call: expected 1 or 2 locked arguments!");
-#endif
-
-    ft_object2_guard guard(h1, h2);
-    return f->impl(f->capture, args, args_flags, policy, cleanup);
-}
-#endif
-
 /**
  * \brief Wrap a C++ function into a Python function object
  *
@@ -249,7 +205,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
          is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
          is_method      = f->flags & (uint32_t) func_flags::is_method,
          return_ref     = f->flags & (uint32_t) func_flags::return_ref,
-         lock_self      = f->flags & (uint32_t) func_flags::lock_self,
          is_constructor = false,
          is_init        = false,
          is_new         = false,
@@ -419,7 +374,6 @@ PyObject *nb_func_new(const void *in_) noexcept {
         }
     }
 
-    size_t lock_count = 0;
     if (has_args) {
         fc->args = (arg_data *) malloc_check(sizeof(arg_data) * f->nargs);
 
@@ -438,54 +392,10 @@ PyObject *nb_func_new(const void *in_) noexcept {
             }
             if (a.value == Py_None)
                 a.flag |= (uint8_t) cast_flags::accepts_none;
-            if (a.flag & (uint8_t) cast_flags::lock)
-                lock_count++;
             a.signature = a.signature ? strdup_check(a.signature) : nullptr;
             Py_XINCREF(a.value);
         }
     }
-
-    if (lock_self) {
-        check(is_method && !is_init,
-              "nb::detail::nb_func_new(\"%s\"): the nb::lock_self annotation only "
-              "applies to regular methods.", name_cstr);
-
-#if defined(NB_FREE_THREADED)
-        // Must potentially allocate dummy 'args' if 'lock_self' is set
-        if (!has_args) {
-            fc->args = (arg_data *) malloc_check(sizeof(arg_data) * f->nargs);
-            memset(fc->args, 0, sizeof(arg_data) * f->nargs);
-            for (uint32_t i = 1; i < f->nargs; ++i)
-                fc->args[i].flag &= (uint8_t) cast_flags::convert;
-            func->vectorcall = nb_func_vectorcall_complex;
-            fc->flags |= (uint32_t) func_flags::has_args;
-            has_args = true;
-        }
-
-        fc->args[0].flag |= (uint8_t) cast_flags::lock;
-#endif
-
-        lock_count++;
-    }
-
-    check(lock_count <= 2,
-          "nb::detail::nb_func_new(\"%s\"): at most two function arguments can "
-          "be locked.", name_cstr);
-
-#if defined(NB_FREE_THREADED)
-    if (lock_count) {
-        locked_func *lf = (locked_func *) PyMem_Malloc(sizeof(locked_func));
-        check(lf, "nb::detail::nb_func_new(\"%s\"): locked function alloc. failed.", name_cstr);
-        memcpy(lf->capture, fc->capture, sizeof(func_data::capture));
-        lf->nargs = fc->nargs;
-        lf->impl = fc->impl;
-        lf->free_capture = (fc->flags & (uint32_t) func_flags::has_free) ? fc->free_capture : nullptr;
-        fc->impl = locked_func_impl;
-        fc->free_capture = locked_func_free;
-        fc->flags |= (uint32_t) func_flags::has_free;
-        fc->capture[0] = lf;
-    }
-#endif
 
     // Fast path for vector call object construction
     if (((is_init && is_method) || (is_new && !is_method)) &&

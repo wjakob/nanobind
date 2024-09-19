@@ -159,7 +159,7 @@ input. This produces the following error message:
 
 .. code-block:: pycon
 
-   >>> my_module.process(array=np.zeros(1))
+   >>> my_module.process(np.zeros(1))
 
    TypeError: process(): incompatible function arguments. The following argument types are supported:
    1. process(arg: ndarray[dtype=uint8, shape=(*, *, 3), device='cpu'], /) -> None
@@ -204,9 +204,9 @@ multithreaded code even when the `GIL
 <https://wiki.python.org/moin/GlobalInterpreterLock>`__ is not held, for
 example to examine the layout of an array and access the underlying storage.
 
-There are two exceptions to this: creating *new* nd-array object from C++
-(discused :ref:`later <returning-ndarrays>`) and casting it to Python via
-:cpp:func:`ndarray::cast` function both involve Python API calls that require
+There are two exceptions to this: creating a *new* nd-array object from C++
+(discussed :ref:`later <returning-ndarrays>`) and casting it to Python via
+the :cpp:func:`ndarray::cast` function both involve Python API calls that require
 that the GIL is held.
 
 .. _returning-ndarrays:
@@ -298,7 +298,7 @@ Dynamic array configurations
 The previous example was rather simple because all the array configuration was fully known
 at compile time and specified via the :cpp:class:`nb::ndarray\<...\> <ndarray>`
 template parameters. In general, there are often dynamic aspects of the
-configuration that must be explicitly passed to the constructor. It signature
+configuration that must be explicitly passed to the constructor. Its signature
 (with some simplifications) is given below. See the
 :cpp:func:`ndarray::ndarray()` documentation for a more detailed specification
 and several variants of the constructor.
@@ -307,12 +307,12 @@ and several variants of the constructor.
 
    ndarray(void *data,
            std::initializer_list<size_t> shape,
-           handle owner,
-           std::initializer_list<int64_t> strides,
-           dlpack::dtype dtype,
-           int device_type,
-           int device_id,
-           char order) { .. }
+           handle owner = { },
+           std::initializer_list<int64_t> strides = { },
+           dlpack::dtype dtype = ...,
+           int device_type = ...,
+           int device_id = 0,
+           char order = ...) { .. }
 
 The parameters have the following role:
 
@@ -606,7 +606,7 @@ when they are known at compile time); the same is also true for array views.
 However, sometimes, it is useful that a function can be called with different
 array types.
 
-You may use the :cpp:func:`nd-array\<...\>::view() <ndarray::view>` method to
+You may use the :cpp:func:`ndarray\<...\>::view() <ndarray::view>` method to
 create *specialized* views if a run-time check determines that it is safe to
 do so. For example, the function below accepts contiguous CPU arrays and
 performs a loop over a specialized 2D ``float`` view when the array is of

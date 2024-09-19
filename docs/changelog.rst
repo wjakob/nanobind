@@ -128,8 +128,7 @@ Version 2.2.0 (TBA)
 
 * Minor fixes and improvements (PR `#696
   <https://github.com/wjakob/nanobind/pull/696>`__, `#693
-  <https://github.com/wjakob/nanobind/pull/693>`__, `#675
-  <https://github.com/wjakob/nanobind/pull/675>`__, commit `75d259
+  <https://github.com/wjakob/nanobind/pull/693>`__, commit `75d259
   <https://github.com/wjakob/nanobind/commit/75d259c7c16db9586e5cd3aa4715e09a25e76d83>`__).
 
 Version 2.1.0 (Aug 11, 2024)

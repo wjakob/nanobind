@@ -679,14 +679,16 @@ section <ndarrays>`.
       A ``constexpr`` character value set based on the ndarray template
       arguments (`Args... <Args>`). It equals
 
-      - ``'C'`` if :cpp:class:`c_contig` is specified.
-      - ``'F'`` if :cpp:class:`f_contig` is specified.
-      - ``'A'`` if :cpp:class:`any_contig` is specified.
+      - ``'C'`` if :cpp:class:`c_contig` is specified,
+      - ``'F'`` if :cpp:class:`f_contig` is specified,
+      - ``'A'`` if :cpp:class:`any_contig` is specified,
+      - ``'\0'`` otherwise.
 
    .. cpp:var:: static constexpr int DeviceType
 
-      A ``constexpr`` integer value set to the device type ID (if present)
-      extracted from the ndarray template arguments (`Args... <Args>`).
+      A ``constexpr`` integer value set to the device type ID extracted from
+      the ndarray template arguments (`Args... <Args>`), or
+      :cpp:struct:`device::none::value <device::none>` when none was specified.
 
    .. cpp:type:: VoidPtr = std::conditional_t<ReadOnly, const void *, void *>
 
@@ -761,8 +763,8 @@ section <ndarrays>`.
       - The `order` value denotes the coefficient order in memory and is only
         relevant when `strides` is empty. Specify ``'C'`` for C-style or ``'F'``
         for Fortran-style. When this parameter is not explicitly specified, the
-        implementation uses the ndarray template parameters and C-style order
-        as a fallback.
+        implementation uses the order specified as an ndarray template
+        argument, or C-style order as a fallback.
 
       Both ``strides`` and ``shape`` will be copied by the constructor, hence
       the targets of these pointers don't need to remain valid following the
@@ -883,14 +885,15 @@ section <ndarrays>`.
 
    .. cpp:function:: auto cast(rv_policy policy = rv_policy::automatic_reference, handle parent = {})
 
-      The expression ``array.cast(policy, handle)`` is almost equivalent to
-      :cpp:func:`nb::cast(array, policy, handle) <cast>`.
+      The expression ``array.cast(policy, parent)`` is almost equivalent to
+      :cpp:func:`nb::cast(array, policy, parent) <cast>`.
 
       The main difference is that the return type of :cpp:func:`nb::cast
       <cast>` is :cpp:class:`nb::object <object>`, which renders as a rather
       non-descriptive ``object`` in Python bindings. The ``.cast()`` method
-      instead returns a wrapper type, whose signature matches that of the
-      original nd-array.
+      returns a custom wrapper type that still derives from
+      :cpp:class:`nb::object <object>`, but whose type signature in bindings
+      reproduces that of the original nd-array.
 
 Data types
 ^^^^^^^^^^
@@ -1015,7 +1018,10 @@ Contiguity
 
 .. cpp:class:: any_contig
 
-   Accept both C or F-contiguous arrays.
+   Accept both C- and F-contiguous arrays.
+
+If you prefer not to require contiguity, simply do not provide any of the
+``*_contig`` template parameters listed above.
 
 Device type
 +++++++++++

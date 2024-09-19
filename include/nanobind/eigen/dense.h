@@ -104,7 +104,7 @@ using array_for_eigen_t = ndarray<
             ndim_v<T> == 1 || T::IsRowMajor,
             c_contig,
             f_contig>,
-        any_contig>>;
+        unused>>;
 
 /// Any kind of Eigen class
 template <typename T> constexpr bool is_eigen_v = is_base_of_template_v<T, Eigen::EigenBase>;
@@ -322,11 +322,13 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
         int64_t inner = caster.value.stride(0),
                 outer;
+
         if constexpr (ndim_v<T> == 1)
             outer = caster.value.shape(0);
         else
             outer = caster.value.stride(1);
 
+        (void) inner; (void) outer;
         if constexpr (ndim_v<T> == 2 && T::IsRowMajor)
             std::swap(inner, outer);
 

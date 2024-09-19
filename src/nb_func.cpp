@@ -906,7 +906,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
     nb_bound_method *mb = (nb_bound_method *) self;
     size_t nargs = (size_t) NB_VECTORCALL_NARGS(nargsf);
     const size_t buf_size = 5;
-    PyObject **args, *buf[buf_size], *temp = nullptr, *result;
+    PyObject **args, *args_buf[buf_size], *temp = nullptr, *result;
     bool alloc = false;
 
     if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
@@ -918,7 +918,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
             size += NB_TUPLE_GET_SIZE(kwargs_in);
 
         if (size < buf_size) {
-            args = buf;
+            args = args_buf;
         } else {
             args = (PyObject **) PyMem_Malloc(size * sizeof(PyObject *));
             if (!args)

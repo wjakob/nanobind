@@ -581,6 +581,7 @@ NAMESPACE_END(detail)
 template <typename T, typename Derived>
 NB_INLINE T cast(const detail::api<Derived> &value, bool convert = true) {
     if constexpr (std::is_same_v<T, void>) {
+        (void) value; (void) convert;
         return;
     } else {
         if (convert)

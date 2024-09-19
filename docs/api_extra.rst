@@ -733,68 +733,87 @@ section <ndarrays>`.
       Move assignment operator. Steals the referenced array without changing reference counts.
       Decreases the reference count of the previously referenced array and potentially destroy it.
 
-   .. cpp:function:: ndarray(VoidPtr data, size_t ndim, const size_t * shape, handle owner, const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int device_type = DeviceType, int device_id = 0, char order = Order)
+   .. _ndarray_dynamic_constructor:
 
-      Create an array wrapping an existing memory allocation. The following
-      parameters can be specified:
+   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape = { }, handle owner = { }, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = DeviceType, int32_t device_id = 0, char order = Order)
 
-      - `data`: pointer address of the memory region. When the ndarray is
-        parameterized by a constant scalar type to indicate read-only access, a
-        const pointer must be passed instead.
+      Create an array wrapping an existing memory allocation.
 
-      - `ndim`: the number of dimensions.
+      Only the `data` parameter is strictly required, while some other
+      parameters can be be inferred from static :cpp:class:`nb::ndarray\<...\>
+      <ndarray>` template parameters.
 
-      - `shape`: specifies the size along each axis. The referenced array must
-        must have `ndim` entries.
+      The parameters have the following meaning:
+
+      - `data`: a CPU/GPU/.. pointer to the memory region storing the array
+        data.
+
+        When the array is parameterized by a ``const`` scalar type, or when it
+        has a :cpp:class:`nb::ro <ro>` read-only annotation, a ``const``
+        pointer can be passed here.
+
+      - `shape`: an initializer list that simultaneously specifies the number
+        of dimensions and the size along each axis. If left at its default
+        ``{}``, the :cpp:class:`nb::shape <nanobind::shape>` template parameter
+        will take precedence (if present).
 
       - `owner`: if provided, the array will hold a reference to this object
-        until it is destructed.
+        until its destruction. This makes it possible to create zero-copy views
+        into other data structures, while guaranteeing the memory safety of
+        array accesses.
 
-      - `strides` is optional; a value of ``nullptr`` implies that the order
-        is computed automatically according to the ``strides`` parameter.
-        Note that the ``strides`` count elements, not bytes.
+      - `strides`: an initializer list explaining the layout of the data in
+        memory. Each entry denotes the number of elements to jump over to
+        advance to the next item along the associated axis.
 
-      - `dtype` describes the data type (floating point, signed/unsigned
-        integer) and bit depth.
+        `strides` must either have the same size as `shape` or be empty. In the
+        latter case, strides are automatically computed according to the
+        `order` parameter.
 
-      - The `device_type` and `device_id` indicate the device and address
-        space associated with the pointer `value`.
+        Note that strides in nanobind express *element counts* rather than
+        *byte counts*. This convention differs from other frameworks (e.g.,
+        NumPy) and is a consequence of the underlying `DLPack
+        <https://github.com/dmlc/dlpack>`_ protocol.
 
-      - The `order` value denotes the coefficient order in memory and is only
+      - `dtype` describes the numeric data type of array elements (e.g.,
+        floating point, signed/unsigned integer) and their bit depth.
+
+        You can use the :cpp:func:`nb::dtype\<T\>() <nanobind::dtype>` function to obtain the right
+        value for a given type.
+
+      - `device_type` and `device_id` specify where the array data is stored.
+        The `device_type` must be an enumerant like
+        :cpp:class:`nb::device::cuda::value <device::cuda>`, while the meaning
+        of the device ID is unspecified and platform-dependent.
+
+        Note that the `device_id` is set to ``0`` by default and cannot be
+        inferred by nanobind. If your extension creates arrays on multiple
+        different compute accelerators, you *must* provide this parameter.
+
+      - The `order` parameter denotes the coefficient order in memory and is only
         relevant when `strides` is empty. Specify ``'C'`` for C-style or ``'F'``
         for Fortran-style. When this parameter is not explicitly specified, the
         implementation uses the order specified as an ndarray template
         argument, or C-style order as a fallback.
 
       Both ``strides`` and ``shape`` will be copied by the constructor, hence
-      the targets of these pointers don't need to remain valid following the
-      constructor call.
-
-      The Python *global interpreter lock* (GIL) must be held when calling this
-      function.
-
-   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape, handle owner, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = DeviceType, int32_t device_id = 0, char order = Order)
-
-      Alternative form of the above constructor, which accepts the ``shape``
-      and ``strides`` arguments using a ``std::initializer_list``. It
-      automatically infers the value of ``ndim`` based on the size of
-      ``shape``.
-
-      Both ``strides`` and ``shape`` will be copied by the constructor, hence
-      the targets of these initializer lists don't need to remain valid
+      the targets of these initializer lists do not need to remain valid
       following the constructor call.
 
-      The Python *global interpreter lock* (GIL) must be held when calling this
-      function.
+      .. warning::
 
-   .. cpp:function:: ndarray(VoidPtr data)
+         The Python *global interpreter lock* (GIL) must be held when calling
+         this function.
 
-      Alternative form of the above constructor, which is usable when all
-      metadata is available through template parameters and the ``owner``
-      parameter does not need to be set.
+   .. cpp:function:: ndarray(VoidPtr data, size_t ndim, const size_t * shape, handle owner, const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int device_type = DeviceType, int device_id = 0, char order = Order)
 
-      The Python *global interpreter lock* (GIL) must be held when calling this
-      function.
+      Alternative form of the above constructor, which accepts the `shape`
+      and `strides` arguments using pointers instead of initializer lists.
+      The number of dimensions must be specified via the `ndim` parameter
+      in this case.
+
+      See the previous constructor for details, the remaining behavior is
+      identical.
 
    .. cpp:function:: dlpack::dtype dtype() const
 

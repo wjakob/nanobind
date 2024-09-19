@@ -329,7 +329,7 @@ public:
     ndarray(VoidPtr data,
             size_t ndim,
             const size_t *shape,
-            handle owner,
+            handle owner = { },
             const int64_t *strides = nullptr,
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int device_type = DeviceType,
@@ -343,19 +343,8 @@ public:
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
-    template <typename T = Config, detail::enable_if_t<(T::N > 0)> = 0>
-    ndarray(VoidPtr data) {
-        size_t shape[Config::N];
-        Config::Shape::put(shape);
-
-        m_handle = detail::ndarray_create(
-            (void *) data, Config::N, shape, nullptr, nullptr,
-            nanobind::dtype<Scalar>(), ReadOnly, DeviceType, 0, Order);
-        m_dltensor = *detail::ndarray_inc_ref(m_handle);
-    }
-
     ndarray(VoidPtr data,
-            std::initializer_list<size_t> shape,
+            std::initializer_list<size_t> shape = { },
             handle owner = { },
             std::initializer_list<int64_t> strides = { },
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
@@ -363,11 +352,26 @@ public:
             int device_id = 0,
             char order = Order) {
 
-        if (strides.size() != 0 && strides.size() != shape.size())
+        size_t shape_size = shape.size();
+
+        if (strides.size() != 0 && strides.size() != shape_size)
             detail::fail("ndarray(): shape and strides have incompatible size!");
 
+        size_t shape_buf[Config::N <= 0 ? 1 : Config::N];
+        const size_t *shape_ptr = shape.begin();
+
+        if constexpr (Config::N > 0) {
+            if (!shape_size) {
+                Config::Shape::put(shape_buf);
+                shape_size = Config::N;
+                shape_ptr = shape_buf;
+            }
+        } else {
+            (void) shape_buf;
+        }
+
         m_handle = detail::ndarray_create(
-            (void *) data, shape.size(), shape.begin(), owner.ptr(),
+            (void *) data, shape_size, shape_ptr, owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), dtype,
             ReadOnly, device_type, device_id, order);
 

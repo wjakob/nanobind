@@ -300,13 +300,13 @@ at compile time and specified via the :cpp:class:`nb::ndarray\<...\> <ndarray>`
 template parameters. In general, there are often dynamic aspects of the
 configuration that must be explicitly passed to the constructor. Its signature
 (with some simplifications) is given below. See the
-:cpp:func:`ndarray::ndarray()` documentation for a more detailed specification
-and several variants of the constructor.
+:ref:`ndarray::ndarray() <ndarray_dynamic_constructor>` documentation for a more detailed specification
+and another variant of the constructor.
 
 .. code-block:: cpp
 
    ndarray(void *data,
-           std::initializer_list<size_t> shape,
+           std::initializer_list<size_t> shape = { },
            handle owner = { },
            std::initializer_list<int64_t> strides = { },
            dlpack::dtype dtype = ...,

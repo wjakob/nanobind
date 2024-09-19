@@ -122,7 +122,7 @@ template <ssize_t... Is> struct shape {
     }
 
     static void put(size_t *out) {
-        if (((Is == -1) || ...))
+        if constexpr (((Is == -1) || ...))
             detail::fail("Negative ndarray sizes are not allowed here!");
         size_t ctr = 0;
         ((out[ctr++] = (size_t) Is), ...);

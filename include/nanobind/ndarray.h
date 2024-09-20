@@ -188,13 +188,14 @@ struct unused {
 
 /// ndarray_config describes a requested array configuration
 struct ndarray_config {
-    int device_type;
-    char order;
-    bool ro;
-    dlpack::dtype dtype;
-    int32_t ndim;
-    int64_t *shape;
+    int device_type = 0;
+    char order = '\0';
+    bool ro = false;
+    dlpack::dtype dtype { };
+    int32_t ndim = -1;
+    int64_t *shape = nullptr;
 
+    ndarray_config() = default;
     template <typename T> ndarray_config(T)
         : device_type(T::DeviceType::value),
           order((char) T::Order::value),

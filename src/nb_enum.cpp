@@ -126,7 +126,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
         setattr(tp, "_flag_mask_", tp.attr("_flag_mask_") | val);
 
         bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
-        if (is_single_bit)
+        if (is_single_bit && hasattr(tp, "_singles_mask_"))
             setattr(tp, "_singles_mask_", tp.attr("_singles_mask_") | val);
 
         int_ bit_length = int_(tp.attr("_flag_mask_").attr("bit_length")());

@@ -1668,6 +1668,12 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    Indicate that the bound constructor can be used to perform implicit conversions.
 
+.. cpp:struct:: lock_self
+
+   Indicate that the implicit ``self`` argument of a method should be locked
+   when dispatching a call in a free-threaded extension. This annotation does
+   nothing in regular GIL-protected extensions.
+
 .. cpp:struct:: template <typename... Ts> call_guard
 
    Invoke the call guard(s) `Ts` when the bound function executes. The RAII
@@ -1887,9 +1893,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
 .. cpp:struct:: template <typename T> for_setter
 
-
    Analogous to :cpp:struct:`for_getter`, but for setters.
-
 
 .. _class_binding_annotations:
 

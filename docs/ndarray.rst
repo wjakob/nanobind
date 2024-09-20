@@ -231,22 +231,22 @@ process:
 
 Normally, step 1 is your responsibility, while step 2 is taken care of by the
 binding layer. To understand this separation, let's look at an example. The
-``.view()`` function binding below creates a 4x4 column-major NumPy array view
+``.view()`` function binding below creates a 4×4 column-major NumPy array view
 into a ``Matrix4f`` instance.
 
 .. _matrix4f-example:
 
- .. code-block:: cpp
+.. code-block:: cpp
 
-    struct Matrix4f { float m[4][4] { }; };
+   struct Matrix4f { float m[4][4] { }; };
 
-    using Array = nb::ndarray<float, nb::numpy, nb::shape<4, 4>, nb::f_contig>;
+   using Array = nb::ndarray<float, nb::numpy, nb::shape<4, 4>, nb::f_contig>;
 
-    nb::class_<Matrix4f>(m, "Matrix4f")
-        .def(nb::init<>())
-        .def("view",
-             [](Matrix4f &m){ return Array(data); },
-             nb::rv_policy::reference_internal);
+   nb::class_<Matrix4f>(m, "Matrix4f")
+       .def(nb::init<>())
+       .def("view",
+            [](Matrix4f &m){ return Array(data); },
+            nb::rv_policy::reference_internal);
 
 In this case:
 
@@ -259,11 +259,11 @@ In this case:
 Data *ownership* is an important aspect of this two-step process: because the
 NumPy array points directly into the storage of another object, nanobind must
 keep the ``Matrix4f`` instance alive as long as the NumPy array exists, which
-is explicitly requested via the :cpp:enumerator:`reference_internal
-<rv_policy::reference_internal>` return value policy. When wrapping an existing
-memory regions without copying, we must ensure that this memory region remains
-valid throughout the lifetime of the created array (more on this point
-shortly).
+the :cpp:enumerator:`reference_internal <rv_policy::reference_internal>` return
+value policy signals to nanobind. More generally, wrapping an existing memory
+region without copying requires that that this memory region remains valid
+throughout the lifetime of the created array (more on this point :ref:`shortly
+<ndarray-ownership>`).
 
 Recall the discussion of the :ref:`nd-array constraint <ndarray-constraints-1>`
 template parameters. For the return path, you will generally want to add a
@@ -328,18 +328,18 @@ The parameters have the following role:
 - ``order``: coefficient memory order. Default: ``'C'`` (C-style) ordering,
   specify ``'F'`` for Fortran-style ordering.
 
-The parameters generally have defaults inferred from the compile-time template
-parameters. Passing them explicitly overrides these defaults with information
-available at runtime.
+The parameters generally have inferred defaults based on the array's
+compile-time template parameters. Passing them explicitly overrides these
+defaults with information available at runtime.
 
 .. _ndarray-ownership:
 
 Data ownership
 ^^^^^^^^^^^^^^
 
-Let's look at a fancier example that uses the constructor arguments
-explained above to return a dynamically sized 2D array.
-This example also focuses on *data ownership*:
+Let's look at a fancier example that uses the constructor arguments explained
+above to return a dynamically sized 2D array. This example also shows another
+mechanism to express *data ownership*:
 
 .. code-block:: cpp
 
@@ -365,19 +365,19 @@ This example also focuses on *data ownership*:
 The ``owner`` parameter should specify a Python object, whose continued
 existence keeps the underlying memory region alive. Nanobind will temporarily
 increase the ``owner`` reference count in the  :cpp:func:`ndarray::ndarray()`
-constructor and decrease it again when the created NumPy array expires.
+constructor and then decrease it again when the created NumPy array expires.
 
 The above example binding returns a *new* memory region that should be deleted
 when it is no longer in use. This is done by creating a
 :cpp:class:`nb::capsule`, an opaque pointer with a destructor callback that
 runs at this point and takes care of cleaning things up.
 
-If there is an existing Python object, whose existence guarantees that it is
-safe to access the provided storage region, then you may pass this object as
-the ``owner``---nanobind will make sure that this object isn't deleted as long
-as the created array exists. If the owner is a C++ object with an associated
-Python instance, you may use :cpp:func:`nb::find() <find>` to look up the
-associated Python object. When binding methods, you can use the
+If there is already an existing Python object, whose existence guarantees that
+it is safe to access the provided storage region, then you may alternatively
+pass this object as the ``owner``---nanobind will make sure that this object
+isn't deleted as long as the created array exists. If the owner is a C++ object
+with an associated Python instance, you may use :cpp:func:`nb::find() <find>`
+to look up the associated Python object. When binding methods, you can use the
 :cpp:enumerator:`reference_internal <rv_policy::reference_internal>` return
 value policy to specify the implicit ``self`` argument as the ``owner`` upon
 return, which was done in the earlier ``Matrix4f`` :ref:`example

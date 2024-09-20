@@ -567,16 +567,23 @@ In the snippet below, ``f1`` has lower binding overheads compared to ``f2``.
 
 This is because ``f1``:
 
-- does not accept keyword arguments and does not specify :ref:`default argument
-  values <keyword_and_default_args>`.
+1. Does *not* use any of the following advanced argument annotations features:
 
-- has no :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>` or
-  :ref:`argument locking <argument-locks>` annotations.
+   - **Named function arguments**, e.g., :cpp:class:`nb::arg("name") <arg>` or ``"name"_a``.
 
-- takes no variable-length positional (:cpp:class:`nb::args <args>`) or keyword
-  (:cpp:class:`nb::kwargs <kwargs>`) arguments.
+   - **Default argument values**, e.g., :cpp:func:`nb::arg() = 0 <arg::operator=>` or ``"name"_a = false``.
 
-- has 8 or fewer arguments.
+   - **Nullability** or **implicit conversion** flags, e.g.,
+     :cpp:func:`nb::arg().none() <arg::none>` or :cpp:func:`"name"_a.noconvert()
+     <arg::noconvert>`.
+
+2. Has no :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>`
+   annotations.
+
+3. Takes no variable-length positional (:cpp:class:`nb::args <args>`) or keyword
+   (:cpp:class:`nb::kwargs <kwargs>`) arguments.
+
+4. Has a to total of **8 or fewer** function arguments.
 
 If all of the above conditions are satisfied, nanobind switches to a
 specialized dispatcher that is optimized to handle a small number of positional
@@ -587,3 +594,9 @@ execute more slowly, since nanobind must first select a suitable one.
 These differences are mainly of interest when a function that does *very
 little* is called at a *very high rate*, in which case binding overheads can
 become noticeable.
+
+Regarding point 1 of the above list, note that **locking** is okay, as long as
+the annotation does not provide an argument name. In other words, a function
+binding with a :cpp:func:`nb::arg().lock() <arg::lock>` for some of its arguments stays on the fast
+path. This is mainly of interest for :ref:`free-threaded <free-threaded>`
+extensions.

@@ -153,8 +153,8 @@ To do so, call the :cpp:func:`.lock() <arg::lock>` member of
 :cpp:class:`nb::arg() <arg>` annotations to indicate that an
 argument must be locked, e.g.:
 
-- ``nb::arg("my_parameter").lock()``
-- ``"my_parameter"_a.lock()`` (short-hand form)
+- :cpp:func:`nb::arg("my_parameter").lock() <arg::lock>`
+- :cpp:func:`"my_parameter"_a.lock() <arg::lock>` (short-hand form)
 
 In methods bindings, pass :cpp:struct:`nb::lock_self() <lock_self>` to lock
 the implicit ``self`` argument. Note that at most 2 arguments can be
@@ -189,11 +189,19 @@ larger-scale redesign of your project may be in order.
 
 .. note::
 
-   Adding locking annotations indiscriminately is inadvisable because they add
-   a runtime cost to function call dispatcher.
-   The :cpp:func:`.lock() <arg::lock>` annotation is ignored in GIL-protected
-   builds. Note that listing arguments in function bindings generally comes at
-   a small cost in terms of :ref:`binding overheads <binding-overheads>`.
+   Adding locking annotations indiscriminately is inadvisable because locked
+   calls are more costly than unlocked ones. The :cpp:func:`.lock()
+   <arg::lock>` and :cpp:struct:`nb::lock_self() <lock_self>` annotations are
+   ignored in GIL-protected builds, hence this added cost only applies to
+   free-threaded extensions.
+
+   Furthermore, when adding locking annotations to a function, consider keeping
+   the arguments *unnamed* (i.e., :cpp:func:`nb::arg().lock() <arg::lock>`
+   instead of :cpp:func:`nb::arg("name").lock() <arg::lock>`) if the function
+   will never be called with keyword arguments. Processing named arguments
+   causes small :ref:`binding overheads <binding-overheads>` that may be
+   undesirable if a function that does very little is called at a very high
+   rate.
 
 .. note::
 
@@ -269,8 +277,9 @@ high rate.
 
 Similar to free-threaded Python itself,  nanobind avoids this bottleneck by
 *immortalizing* functions (``nanobind.nb_func``, ``nanobind.nb_method``) and
-type bindings. Immortal objects don't require reference counting. In turn, the
-downside is that they leak when the interpreter shuts down. Free-threaded
+type bindings. Immortal objects don't require reference counting and therefore
+cannot cause the bottleneck mentioned above. The main downside of this approach
+is that these objects leak when the interpreter shuts down. Free-threaded
 nanobind extensions disable the internal :ref:`leak checker <leak-checker>`,
 since it would produce many warning messages caused by immortal objects.
 

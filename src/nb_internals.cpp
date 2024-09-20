@@ -87,7 +87,7 @@
 
 #define NB_INTERNALS_ID                                                        \
     "v" NB_TOSTRING(NB_INTERNALS_VERSION)                                      \
-        NB_COMPILER_TYPE NB_STDLIB NB_VERSION_DEV_STR NB_BUILD_ABI             \
+        NB_VERSION_DEV_STR NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI             \
             NB_BUILD_TYPE NB_STABLE_ABI NB_FREE_THREADED_ABI
 
 NAMESPACE_BEGIN(NB_NAMESPACE)

@@ -27,7 +27,7 @@ NB_MODULE(test_thread_ext, m) {
 
     m.def("inc_safe",
           [](Counter &c) { c.inc(); },
-          "counter"_a.lock());
+          nb::arg().lock());
 
     m.def("inc_global",
           [](Counter &c) {

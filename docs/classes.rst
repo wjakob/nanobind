@@ -99,9 +99,9 @@ Instances expose fields and methods of both types as expected:
 Automatic downcasting
 ---------------------
 
-nanobind obeys type signature when returning regular non-polymorphic C++ objects:
-building on the :ref:`previous example <inheritance>`, consider the following
-function that returns a ``Dog`` object as a ``Pet`` base pointer.
+nanobind obeys signatures when returning regular non-polymorphic C++ objects
+from functions: building on the :ref:`previous example <inheritance>`, consider
+the following function that returns a ``Dog`` object as a ``Pet`` base pointer.
 
 .. code-block:: cpp
 

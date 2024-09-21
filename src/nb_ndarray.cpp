@@ -168,8 +168,8 @@ static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyTypeObject *,
 }
 
 static PyMethodDef nb_ndarray_members[] = {
-   { "__dlpack__", (PyCFunction) nb_ndarray_dlpack, METH_FASTCALL | METH_KEYWORDS, nullptr },
-   { "__dlpack_device__", (PyCFunction) nb_ndarray_dlpack_device, METH_FASTCALL | METH_KEYWORDS, nullptr },
+   { "__dlpack__", (PyCFunction) (void *) nb_ndarray_dlpack, METH_FASTCALL | METH_KEYWORDS, nullptr },
+   { "__dlpack_device__", (PyCFunction) (void *) nb_ndarray_dlpack_device, METH_FASTCALL | METH_KEYWORDS, nullptr },
    { nullptr, nullptr, 0, nullptr }
 };
 

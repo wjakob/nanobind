@@ -626,6 +626,37 @@ this type.
         } else { /* ... */ }
    }
 
+Array libraries
+---------------
+
+The Python `array API standard <https://data-apis.org/array-api/latest/purpose_and_scope.html>`__
+defines a common interface and interchange protocol for nd-array libraries. In particular, to
+support inter-framework data exchange, custom array types should implement the
+
+- `__dlpack__ <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack__.html#array_api.array.__dlpack__>`__ and
+- `__dlpack_device__ <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack_device__.html#array_api.array.__dlpack_device__>`__
+
+methods. This is easy thanks to the nd-array integration in nanobind. An example is shown below:
+
+.. code-block:: cpp
+
+   nb::class_<MyArray>(m, "MyArray")
+      // ...
+      .def("__dlpack__", [](nb::kwargs kwargs) {
+          return nb::ndarray<>( /* ... */);
+      })
+      .def("__dlpack_device__", []() {
+          return std::make_pair(nb::device::cpu::value, 0);
+      });
+
+Returning a raw :cpp:class:`nb::ndarray <ndarray>` without framework annotation
+will produce a DLPack capsule, which is what the interface expects.
+
+The ``kwargs`` argument can be used to provide additional parameters (for
+example to request a copy), please see the DLPack documentation for details.
+Note that nanobind does not yet implement the versioned DLPack protocol. The
+version number should be ignored for now.
+
 Frequently asked questions
 --------------------------
 

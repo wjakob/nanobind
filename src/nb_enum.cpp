@@ -71,7 +71,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     scope.attr(name) = result;
     result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();
 
-    result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
+    result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
 
     type_init_data *t = new type_init_data();
@@ -265,6 +265,21 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
         PyObject *value = (PyObject *) it->second;
         Py_INCREF(value);
         return value;
+    }
+
+    if ((t->flags & (uint32_t) enum_flags::is_flag) != 0) {
+        handle enum_tp(t->type_py);
+
+        object val;
+        if (t->flags & (uint32_t) enum_flags::is_signed)
+            val = steal(PyLong_FromLongLong((long long) key));
+        else
+            val = steal(PyLong_FromUnsignedLongLong((unsigned long long) key));
+
+        object result;
+        result = enum_tp.attr("__new__")(enum_tp, val);
+        Py_INCREF(result.ptr());
+        return result.ptr();
     }
 
     if (t->flags & (uint32_t) enum_flags::is_signed)

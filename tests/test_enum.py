@@ -170,6 +170,11 @@ def test06_enum_flag():
     assert t.from_enum(t.UnsignedFlag.B) == 2
     assert t.from_enum(t.UnsignedFlag.All) == 0xffffffffffffffff
 
+    assert t.to_flag(1) == t.Flag.A
+    assert t.to_flag(2) == t.Flag.B
+    assert t.to_flag(4) == t.Flag.C
+    assert t.to_flag(5) == (t.Flag.A | t.Flag.C)
+
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1
     assert t.Item1.get_value() == 0 and t.Item2.get_value() == 1

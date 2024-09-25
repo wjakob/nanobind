@@ -295,7 +295,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     bool complex_call = has_keep_alive || has_var_kwargs || has_var_args || f->nargs >= NB_MAXARGS_SIMPLE;
     if (has_args) {
         for (size_t i = 0; i < f->nargs - is_method; ++i) {
-            arg_data &a = f->args[i - is_method];
+            arg_data &a = args_in[i];
             complex_call |= a.name != nullptr || a.value != nullptr ||
                             a.flag != cast_flags::convert;
         }

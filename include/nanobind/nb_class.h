@@ -283,13 +283,13 @@ inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
 inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
 template <typename T>
 inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
-inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())); };
+inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())); }
 
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) {
     return steal<str>(detail::nb_inst_name(h.ptr()));
-};
+}
 inline object inst_alloc(handle h) {
     return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr()));
 }

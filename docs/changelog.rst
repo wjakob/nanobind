@@ -25,7 +25,8 @@ Version 2.2.0 (TBA)
   fine-grained locking scheme (see `PEP 703
   <https://peps.python.org/pep-0703/>`__) to better leverage multi-core
   parallelism. A `separate documation page <free-threading>`__ explains this in
-  detail.
+  detail. (PRs `#695 <https://github.com/wjakob/nanobind/pull/720>`__, `#720
+  <https://github.com/wjakob/nanobind/pull/720>`__)
 
 - nanobind has always used `PEP 590 vector calls
   <https://www.python.org/dev/peps/pep-0590>`__ to efficiently dispatch calls
@@ -41,11 +42,16 @@ Version 2.2.0 (TBA)
   `#0acecb4 <https://github.com/wjakob/nanobind/commit/0acecb474874f286119dce2b97b84142b6ada1a8>`__).
 
 * A new :cpp:class:`nb::is_flag() <is_flag>` annotation in
-  :cpp:class:`nb::enum_\<T\>() <enum_>` produces enumeration bindings deriving
-  from :py:class:`enum.Flag`, which enables bit-wise combination using compatible
-  operators (``&``, ``|``, ``^``, and ``~``). Further combining the annotation
-  with :cpp:class:`nb::is_arithmetic() <is_flag>` creates enumerations deriving
-  from :py:class:`enum.IntFlag`.
+  :cpp:class:`nb::enum_\<T\>() <enum_>` produces enumeration
+  bindings deriving from :py:class:`enum.Flag`, which enables
+  bit-wise combination using compatible operators (``&``, ``|``,
+  ``^``, and ``~``). Further combining the annotation with
+  :cpp:class:`nb::is_arithmetic() <is_flag>` creates
+  enumerations deriving from :py:class:`enum.IntFlag`. (PRs
+  `#688 <https://github.com/wjakob/nanobind/pull/688>`__,
+  `#688 <https://github.com/wjakob/nanobind/pull/688>`__,
+  `#727 <https://github.com/wjakob/nanobind/pull/727>`__,
+  `#732 <https://github.com/wjakob/nanobind/pull/732>`__)
 
 * A refactor of :cpp:class:`nb::ndarray\<...\> <ndarray>` was an opportunity to
   realize two usability improvements:
@@ -103,8 +109,13 @@ Version 2.2.0 (TBA)
      which previously did nothing, now accepts C- or F-contiguous arrays and
      rejects non-contiguous ones.
 
+  PR `#721 <https://github.com/wjakob/nanobind/pull/721>`__
+  and commit `4647ef
+  <https://github.com/wjakob/nanobind/commit/4647efcc45d96e530d41a3461cd9727656bc2ca3>`__.
+
 - The NVIDIA CUDA compiler (``nvcc``) is now explicitly supported and included
-  in nanobind's CI test suite.
+  in nanobind's CI test suite (PR `#710
+  <https://github.com/wjakob/nanobind/pull/710>`__).
 
 * Added support for return value policy customization to the type casters of
   ``Eigen::Ref<...>`` and ``Eigen::Map<...>`` (commit `67316e
@@ -137,10 +148,13 @@ Version 2.2.0 (TBA)
 
 * ABI version 15.
 
-* Minor fixes and improvements (PR `#696
-  <https://github.com/wjakob/nanobind/pull/696>`__, `#693
-  <https://github.com/wjakob/nanobind/pull/693>`__, commit `75d259
-  <https://github.com/wjakob/nanobind/commit/75d259c7c16db9586e5cd3aa4715e09a25e76d83>`__).
+* Minor fixes and improvements (PRs
+  `#722 <https://github.com/wjakob/nanobind/pull/722>`__,
+  `#24 <https://github.com/wjakob/nanobind/pull/724>`__,
+  `#715 <https://github.com/wjakob/nanobind/pull/715>`__,
+  `#696 <https://github.com/wjakob/nanobind/pull/696>`__,
+  `#693 <https://github.com/wjakob/nanobind/pull/693>`__,
+  commit `75d259 <https://github.com/wjakob/nanobind/commit/75d259c7c16db9586e5cd3aa4715e09a25e76d83>`__).
 
 Version 2.1.0 (Aug 11, 2024)
 ----------------------------
@@ -194,7 +208,7 @@ Version 2.1.0 (Aug 11, 2024)
   function (commit `91fafa5
   <https://github.com/wjakob/nanobind/commit/01fafa5b9e1de0f1ab2a9d108cd0fce20ab9568f>`__).
 
-* Various minor ``stubgen`` fixes (PR
+* Various minor ``stubgen`` fixes (PRs
   `#667 <https://github.com/wjakob/nanobind/pull/667>`__,
   `#658 <https://github.com/wjakob/nanobind/pull/658>`__,
   `#632 <https://github.com/wjakob/nanobind/pull/632>`__,

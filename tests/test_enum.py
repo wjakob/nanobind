@@ -144,6 +144,10 @@ def test06_enum_flag():
     assert str(t.Flag.B) == 'Flag.B'
     assert repr(t.Flag.C) == 'Flag.C'
     assert str(t.Flag.C) == 'Flag.C'
+    assert repr(t.Flag.A | t.Flag.B) in ['Flag.A|B', 'Flag.B|A']
+    assert str(t.Flag.A | t.Flag.B) in ['Flag.A|B', 'Flag.B|A']
+    assert repr(t.Flag.A | t.Flag.B | t.Flag.C) in ['Flag.A|B|C', 'Flag.C|B|A']
+    assert str(t.Flag.A | t.Flag.B | t.Flag.C) in ['Flag.A|B|C', 'Flag.C|B|A']
 
     # Flag membership tests
     assert (t.Flag(1) | t.Flag(2)).value == 3
@@ -174,10 +178,6 @@ def test06_enum_flag():
     assert t.to_flag(2) == t.Flag.B
     assert t.to_flag(4) == t.Flag.C
     assert t.to_flag(5) == (t.Flag.A | t.Flag.C)
-
-    assert str(t.Flag.A) == 'Flag.A'
-    assert str(t.Flag.A | t.Flag.B) in ['Flag.A|B', 'Flag.B|A']
-    assert str(t.Flag.A | t.Flag.B | t.Flag.C) in ['Flag.A|B|C', 'Flag.C|B|A']
 
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1

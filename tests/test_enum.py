@@ -175,6 +175,10 @@ def test06_enum_flag():
     assert t.to_flag(4) == t.Flag.C
     assert t.to_flag(5) == (t.Flag.A | t.Flag.C)
 
+    assert str(t.Flag.A) == 'Flag.A'
+    assert str(t.Flag.A | t.Flag.B) == 'Flag.B|A'
+    assert str(t.Flag.A | t.Flag.B | t.Flag.C) == 'Flag.C|B|A'
+
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1
     assert t.Item1.get_value() == 0 and t.Item2.get_value() == 1

@@ -49,9 +49,9 @@ NB_MODULE(test_enum_ext, m) {
     m.def("from_enum", [](Enum value) { return (uint32_t) value; }, nb::arg().noconvert());
     m.def("to_enum", [](uint32_t value) { return (Enum) value; });
     m.def("from_enum", [](Flag value) { return (uint32_t) value; }, nb::arg().noconvert());
-    m.def("to_enum", [](uint32_t value) { return (Flag) value; });
+    m.def("to_flag", [](uint32_t value) { return (Flag) value; });
     m.def("from_enum", [](SEnum value) { return (int32_t) value; }, nb::arg().noconvert());
-    m.def("to_enum", [](uint64_t value) { return (UnsignedFlag) value; });
+    m.def("to_unsigned_flag", [](uint64_t value) { return (UnsignedFlag) value; });
     m.def("from_enum", [](UnsignedFlag value) { return (uint64_t) value; }, nb::arg().noconvert());
     m.def("from_enum_implicit", [](Enum value) { return (uint32_t) value; });
 

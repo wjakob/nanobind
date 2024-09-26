@@ -71,7 +71,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     scope.attr(name) = result;
     result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();
 
-    result.attr("__str__") = enum_mod.attr("Enum").attr("__str__");
+    result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
 
     type_init_data *t = new type_init_data();
@@ -267,12 +267,26 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
         return value;
     }
 
-    if (t->flags & (uint32_t) enum_flags::is_signed)
+    uint32_t flags = t->flags;
+    if ((flags & (uint32_t) enum_flags::is_flag) != 0) {
+        handle enum_tp(t->type_py);
+
+        object val;
+        if (flags & (uint32_t) enum_flags::is_signed)
+            val = steal(PyLong_FromLongLong((long long) key));
+        else
+            val = steal(PyLong_FromUnsignedLongLong((unsigned long long) key));
+
+        return enum_tp.attr("__new__")(enum_tp, val).release().ptr();
+    }
+
+    if (flags & (uint32_t) enum_flags::is_signed)
         PyErr_Format(PyExc_ValueError, "%lli is not a valid %s.",
                      (long long) key, t->name);
     else
         PyErr_Format(PyExc_ValueError, "%llu is not a valid %s.",
                      (unsigned long long) key, t->name);
+
     return nullptr;
 }
 

@@ -1341,7 +1341,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
         const func_data *fi = f + i;
         nb_func_render_signature(fi);
         buf.put('\n');
-        doc_found |= fi->flags & (uint32_t) func_flags::has_doc;
+        doc_found |= (fi->flags & (uint32_t) func_flags::has_doc) != 0;
     }
 
     if (doc_found) {

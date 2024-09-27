@@ -68,6 +68,13 @@ def test05_signature():
         "doc_2"
     )
 
+    assert t.test_05b.__doc__ == (
+        "test_05b(arg: int, /) -> int\n"
+        "test_05b(arg: float, /) -> int\n"
+        "\n"
+        "doc_1"
+    )
+
     assert t.test_07.__doc__ == (
         f"test_07(arg0: int, arg1: int, /, *args, **kwargs) -> {TYPING_TUPLE}[int, int]\n"
         f"test_07(a: int, b: int, *myargs, **mykwargs) -> {TYPING_TUPLE}[int, int]"

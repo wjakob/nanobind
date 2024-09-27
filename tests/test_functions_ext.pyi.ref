@@ -52,6 +52,13 @@ def test_05(arg: int, /) -> int:
 def test_05(arg: float, /) -> int:
     """doc_2"""
 
+@overload
+def test_05b(arg: int, /) -> int:
+    """doc_1"""
+
+@overload
+def test_05b(arg: float, /) -> int: ...
+
 def test_06() -> None: ...
 
 @overload

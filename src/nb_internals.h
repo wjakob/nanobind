@@ -96,6 +96,7 @@ struct nb_func {
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     bool complex_call;
+    bool doc_uniform;
 };
 
 /// Python object representing a `nb_ndarray` (which wraps a DLPack ndarray)

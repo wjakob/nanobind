@@ -45,6 +45,10 @@ NB_MODULE(test_functions_ext, m) {
 #endif
     first_overload.reset();
 
+    // Test an overload chain that always repeats the same docstring
+    m.def("test_05b", [](int) -> int { return 1; }, "doc_1");
+    m.def("test_05b", [](float) -> int { return 2; }, "doc_1");
+
     /// Function raising an exception
     m.def("test_06", []() { throw std::runtime_error("oops!"); });
 

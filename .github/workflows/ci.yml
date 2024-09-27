@@ -67,12 +67,12 @@ jobs:
 
   nvcc:
     runs-on: ubuntu-latest
-    container: nvidia/cuda:12.2.0-devel-ubuntu22.04
+    container: nvidia/cuda:12.6.1-devel-ubuntu24.04
     name: "Python 3 / NVCC (CUDA 12.2)"
 
     steps:
     - name: Install dependencies
-      run: apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y cmake git python3-dev python3-pytest python3-pip libeigen3-dev && python3 -m pip install typing_extensions numpy
+      run: apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y cmake git python3-dev python3-pytest python3-pip libeigen3-dev python3-typing-extensions python3-numpy
 
     - uses: actions/checkout@v4
       with:

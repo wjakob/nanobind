@@ -25,7 +25,7 @@ Version 2.2.0 (TBA)
   fine-grained locking scheme (see `PEP 703
   <https://peps.python.org/pep-0703/>`__) to better leverage multi-core
   parallelism. A `separate documation page <free-threading>`__ explains this in
-  detail. (PRs `#695 <https://github.com/wjakob/nanobind/pull/720>`__, `#720
+  detail (PRs `#695 <https://github.com/wjakob/nanobind/pull/695>`__, `#720
   <https://github.com/wjakob/nanobind/pull/720>`__)
 
 - nanobind has always used `PEP 590 vector calls
@@ -33,11 +33,12 @@ Version 2.2.0 (TBA)
   to function and method bindings, but it lacked the ability to do so for
   constructors (e.g., ``MyType(arg1, arg2, ...)``).
 
-  Version 2.2.0 adds this missing part, which accelerates object construction
-  by up to a factor of 2×. The difference is especially pronounced when passing
-  keyword arguments to constructors. Note that this improvement only applies to
-  Python version 3.9 and newer (commits
-  `#24907b0 <https://github.com/wjakob/nanobind/commit/24907b04a7f52074f41af8a256ac63a945fe5a96>`__,
+  Version 2.2.0 adds this missing part, which accelerates object
+  construction by up to a factor of 2×. The difference is
+  especially pronounced when passing keyword arguments to
+  constructors. Note that this improvement only applies to
+  Python version 3.9 and newer (PR
+  `#706 <https://github.com/wjakob/nanobind/pull/695>`__, commits
   `#e24d7f3 <https://github.com/wjakob/nanobind/commit/e24d7f3434a6bbcc33cd8965632dc47f943fb2f8>`__,
   `#0acecb4 <https://github.com/wjakob/nanobind/commit/0acecb474874f286119dce2b97b84142b6ada1a8>`__).
 
@@ -48,6 +49,7 @@ Version 2.2.0 (TBA)
   ``^``, and ``~``). Further combining the annotation with
   :cpp:class:`nb::is_arithmetic() <is_flag>` creates
   enumerations deriving from :py:class:`enum.IntFlag`. (PRs
+  `#599 <https://github.com/wjakob/nanobind/pull/599>`__,
   `#688 <https://github.com/wjakob/nanobind/pull/688>`__,
   `#688 <https://github.com/wjakob/nanobind/pull/688>`__,
   `#727 <https://github.com/wjakob/nanobind/pull/727>`__,
@@ -96,7 +98,7 @@ Version 2.2.0 (TBA)
 
   There are two minor but potentially breaking changes:
 
-  1. The ndarray type caster now interprets the
+  1. The nd-array type caster now interprets the
      :cpp:enumerator:`nb::rv_policy::automatic_reference
      <rv_policy::automatic_reference>` return value policy analogously to the
      :cpp:enumerator:`nb::rv_policy::automatic <rv_policy::automatic>`, which
@@ -109,8 +111,9 @@ Version 2.2.0 (TBA)
      which previously did nothing, now accepts C- or F-contiguous arrays and
      rejects non-contiguous ones.
 
-  PR `#721 <https://github.com/wjakob/nanobind/pull/721>`__
-  and commit `4647ef
+  For further details on the nd-array changes, see PR `#721
+  <https://github.com/wjakob/nanobind/pull/721>`__ and commit
+  `4647ef
   <https://github.com/wjakob/nanobind/commit/4647efcc45d96e530d41a3461cd9727656bc2ca3>`__.
 
 - The NVIDIA CUDA compiler (``nvcc``) is now explicitly supported and included

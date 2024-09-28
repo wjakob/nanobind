@@ -1551,6 +1551,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
 #if defined(NB_FREE_THREADED)
         nb_shard &shard = internals->shard(inst_ptr((nb_inst *) nurse));
+        lock_shard guard(shard);
 #else
         nb_shard &shard = internals->shards[0];
 #endif
@@ -1604,6 +1605,7 @@ void keep_alive(PyObject *nurse, void *payload,
     if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
 #if defined(NB_FREE_THREADED)
         nb_shard &shard = internals->shard(inst_ptr((nb_inst *) nurse));
+        lock_shard guard(shard);
 #else
         nb_shard &shard = internals->shards[0];
 #endif

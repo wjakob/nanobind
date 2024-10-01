@@ -299,3 +299,23 @@ to consistently compile either free-threaded or non-free-threaded modules.
 Free-threaded nanobind uses thread-local and sharded data structures to avoid
 lock and atomic contention on the internal data structures, which would
 otherwise become a bottleneck in multi-threaded Python programs.
+
+Thread sanitizers
+_________________
+
+The `thread sanitizer
+<https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual>`__ (TSAN)
+offers an effective way of tracking down undefined behavior in multithreaded
+application.
+
+To use TSAN with nanonbind extensions, you *must* also create a custom Python
+build that has TSAN enabled. This is because nanobind internally builds on
+Python locks. If the implementation of the locks is not instrumented by TSAN,
+the tool will detect a large volume of false positives.
+
+To make a TSAN-instrumented Python build, download a Python source release and
+to pass the following options to its ``configure`` script:
+
+.. code-block:: bash
+
+   $ ./configure --disable-gil --with-thread-sanitizer <.. other options ..>

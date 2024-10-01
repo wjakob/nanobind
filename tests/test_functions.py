@@ -75,6 +75,19 @@ def test05_signature():
         "doc_1"
     )
 
+    assert t.test_05c.__doc__ == (
+        "test_05c(arg: int, /) -> int\n"
+        "test_05c(arg: float, /) -> int\n"
+        "\n"
+        "Overloaded function.\n"
+        "\n"
+        "1. ``test_05c(arg: int, /) -> int``\n"
+        "\n"
+        "doc_1\n"
+        "\n"
+        "2. ``test_05c(arg: float, /) -> int``\n"
+    )
+
     assert t.test_07.__doc__ == (
         f"test_07(arg0: int, arg1: int, /, *args, **kwargs) -> {TYPING_TUPLE}[int, int]\n"
         f"test_07(a: int, b: int, *myargs, **mykwargs) -> {TYPING_TUPLE}[int, int]"

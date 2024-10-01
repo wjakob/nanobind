@@ -49,6 +49,10 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_05b", [](int) -> int { return 1; }, "doc_1");
     m.def("test_05b", [](float) -> int { return 2; }, "doc_1");
 
+    // Test an overload chain with an empty docstring
+    m.def("test_05c", [](int) -> int { return 1; }, "doc_1");
+    m.def("test_05c", [](float) -> int { return 2; }, "");
+
     /// Function raising an exception
     m.def("test_06", []() { throw std::runtime_error("oops!"); });
 

@@ -352,7 +352,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         if (fc->doc[0] == '\0') {
             fc->doc = nullptr;
             fc->flags &= ~(uint32_t) func_flags::has_doc;
-            has_doc = true;
+            has_doc = false;
         } else {
             fc->doc = strdup_check(fc->doc);
         }

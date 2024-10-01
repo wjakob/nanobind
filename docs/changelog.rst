@@ -56,7 +56,7 @@ Version 2.2.0 (TBA)
   `#732 <https://github.com/wjakob/nanobind/pull/732>`__)
 
 * A refactor of :cpp:class:`nb::ndarray\<...\> <ndarray>` was an opportunity to
-  realize two usability improvements:
+  realize three usability improvements:
 
   1. The constructor used to return new nd-arrays from C++ now considers
      all template arguments:
@@ -95,6 +95,12 @@ Version 2.2.0 (TBA)
      and return value policy, while preserving the type signature in return
      values. This is useful to :ref:`return temporaries (e.g. stack-allocated
      memory) <ndarray-temporaries>` from functions.
+
+  3. Added a new and more general mechanism ``nanobind::detail::dtype_traits<T>``
+     to declare custom ndarray data types like ``float16`` or ``bfloat16``. The old
+     interface (``nanobind::ndarray_traits<T>``) still exists but is deprecated
+     and will be removed in the next major release. See the :ref:`documentation
+     <ndarray-nonstandard>` for details.
 
   There are two minor but potentially breaking changes:
 

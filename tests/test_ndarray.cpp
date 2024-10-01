@@ -13,14 +13,15 @@ static float f_global[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 static int i_global[] { 1, 2, 3, 4, 5, 6, 7, 8 };
 
 #if defined(__aarch64__)
-namespace nanobind {
-   template <> struct ndarray_traits<__fp16> {
-       static constexpr bool is_complex = false;
-       static constexpr bool is_float   = true;
-       static constexpr bool is_bool    = false;
-       static constexpr bool is_int     = false;
-       static constexpr bool is_signed  = true;
-   };
+namespace nanobind::detail {
+    template <> struct dtype_traits<__fp16> {
+        static constexpr dlpack::dtype value {
+            (uint8_t) dlpack::dtype_code::Float, // type code
+            16, // size in bits
+            1   // lanes (simd)
+        };
+        static constexpr auto name = const_name("float16");
+    };
 }
 #endif
 

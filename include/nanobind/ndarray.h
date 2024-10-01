@@ -10,6 +10,7 @@
     The API below is based on the DLPack project
     (https://github.com/dmlc/dlpack/blob/main/include/dlpack/dlpack.h)
 */
+
 #pragma once
 
 #include <nanobind/nanobind.h>
@@ -106,6 +107,41 @@ template <typename T> struct ndarray_traits {
 
 NAMESPACE_BEGIN(detail)
 
+template <typename T, typename /* SFINAE */ = int> struct dtype_traits {
+    using traits = ndarray_traits<T>;
+
+    static constexpr int matches = traits::is_bool + traits::is_complex +
+                                   traits::is_float + traits::is_int;
+    static_assert(matches <= 1, "dtype matches multiple type categories!");
+
+    static constexpr dlpack::dtype value{
+        (uint8_t) ((traits::is_bool ? (int) dlpack::dtype_code::Bool : 0) +
+                   (traits::is_complex ? (int) dlpack::dtype_code::Complex : 0) +
+                   (traits::is_float ? (int) dlpack::dtype_code::Float : 0) +
+                   (traits::is_int &&  traits::is_signed ? (int) dlpack::dtype_code::Int : 0) +
+                   (traits::is_int && !traits::is_signed ? (int) dlpack::dtype_code::UInt : 0)),
+        (uint8_t) matches ? sizeof(T) * 8 : 0,
+        matches ? 1 : 0
+    };
+
+    static constexpr auto name =
+        const_name<traits::is_complex>("complex", "") +
+        const_name<traits::is_int &&  traits::is_signed>("int", "") +
+        const_name<traits::is_int && !traits::is_signed>("uint", "") +
+        const_name<traits::is_float>("float", "") +
+        const_name<traits::is_bool>(const_name("bool"), const_name<sizeof(T) * 8>());
+};
+
+template <> struct dtype_traits<void> {
+    static constexpr dlpack::dtype value{ 0, 0, 0 };
+    static constexpr auto name = descr<0>();
+};
+
+template <> struct dtype_traits<const void> {
+    static constexpr dlpack::dtype value{ 0, 0, 0 };
+    static constexpr auto name = descr<0>();
+};
+
 template <ssize_t... Is> struct shape {
     static constexpr auto name =
         const_name("shape=(") +
@@ -130,9 +166,7 @@ template <ssize_t... Is> struct shape {
 };
 
 template <typename T>
-constexpr bool is_ndarray_scalar_v =
-    ndarray_traits<T>::is_float || ndarray_traits<T>::is_int ||
-    ndarray_traits<T>::is_bool || ndarray_traits<T>::is_complex;
+constexpr bool is_ndarray_scalar_v = dtype_traits<T>::value.bits != 0;
 
 template <typename> struct ndim_shape;
 template <size_t... S> struct ndim_shape<std::index_sequence<S...>> {
@@ -149,32 +183,7 @@ template <size_t N>
 using ndim = typename detail::ndim_shape<std::make_index_sequence<N>>::type;
 
 template <typename T> constexpr dlpack::dtype dtype() {
-    using traits = ndarray_traits<T>;
-
-    static_assert(
-        detail::is_ndarray_scalar_v<T> || std::is_void_v<T>,
-        "nanobind::dtype<T>: T must be a floating point or integer type!"
-    );
-
-    dlpack::dtype result;
-
-    if constexpr (!std::is_void_v<T>) {
-        if constexpr (traits::is_float)
-            result.code = (uint8_t) dlpack::dtype_code::Float;
-        else if constexpr (traits::is_complex)
-            result.code = (uint8_t) dlpack::dtype_code::Complex;
-        else if constexpr (traits::is_bool)
-            result.code = (uint8_t) dlpack::dtype_code::Bool;
-        else if constexpr (traits::is_signed)
-            result.code = (uint8_t) dlpack::dtype_code::Int;
-        else
-            result.code = (uint8_t) dlpack::dtype_code::UInt;
-
-        result.bits = sizeof(T) * 8;
-        result.lanes = 1;
-    }
-
-    return result;
+    return detail::dtype_traits<T>::value;
 }
 
 NAMESPACE_BEGIN(detail)
@@ -509,15 +518,7 @@ inline bool ndarray_check(handle h) { return detail::ndarray_check(h.ptr()); }
 NAMESPACE_BEGIN(detail)
 
 template <typename T> struct dtype_name {
-    using traits = ndarray_traits<T>;
-
-    static constexpr auto name =
-        const_name("dtype=") +
-        const_name<traits::is_complex>("complex", "") +
-        const_name<traits::is_int &&  traits::is_signed>("int", "") +
-        const_name<traits::is_int && !traits::is_signed>("uint", "") +
-        const_name<traits::is_float>("float", "") +
-        const_name<traits::is_bool>(const_name("bool"), const_name<sizeof(T) * 8>());
+    static constexpr auto name = detail::const_name("dtype=") + dtype_traits<T>::name;
 };
 
 template <> struct dtype_name<void> : unused { };

@@ -519,22 +519,29 @@ Nonstandard arithmetic types
 ----------------------------
 
 Low or extended-precision arithmetic types (e.g., ``int128``, ``float16``,
-``bfloat``) are sometimes used but don't have standardized C++ equivalents. If
-you wish to exchange arrays based on such types, you must register a partial
-overload of ``nanobind::ndarray_traits`` to inform nanobind about it.
+``bfloat16``) are sometimes used but don't have standardized C++ equivalents.
+If you wish to exchange arrays based on such types, you must register a partial
+overload of ``nanobind::detail::dtype_traits`` to inform nanobind about it.
+
+You are expressively allowed to create partial overloads of this class despite
+it being in the ``nanobind::detail`` namespace.
 
 For example, the following snippet makes ``__fp16`` (half-precision type on
-``aarch64``) available:
+``aarch64``) available by  providing
+
+1. ``value``, a DLPack ``nanobind::dlpack::dtype`` type descriptor, and
+2. ``name``, a type name for use in docstrings and error messages.
 
 .. code-block:: cpp
 
-   namespace nanobind {
-       template <> struct ndarray_traits<__fp16> {
-           static constexpr bool is_complex = false;
-           static constexpr bool is_float   = true;
-           static constexpr bool is_bool    = false;
-           static constexpr bool is_int     = false;
-           static constexpr bool is_signed  = true;
+   namespace nanobind::detail {
+       template <> struct dtype_traits<__fp16> {
+           static constexpr dlpack::dtype value {
+               (uint8_t) dlpack::dtype_code::Float, // type code
+               16, // size in bits
+               1   // lanes (simd), usually set to 1
+           };
+           static constexpr auto name = const_name("float16");
        };
    }
 

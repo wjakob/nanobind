@@ -34,7 +34,9 @@ option(NB_TEST_CUDA          "Force the use of the CUDA/NVCC compiler for testin
 option(NB_TEST_FREE_THREADED "Build free-threaded extensions for the test suite?" ON)
 
 if (NOT MSVC)
-  option(NB_TEST_SANITIZE    "Build tests with address and undefined behavior sanitizers?" OFF)
+  option(NB_TEST_SANITIZERS_ASAN  "Build tests with the address sanitizer?" OFF)
+  option(NB_TEST_SANITIZERS_UBSAN "Build tests with the address undefined behavior sanitizer?" OFF)
+  option(NB_TEST_SANITIZERS_TSAN  "Build tests with the thread sanitizer?" OFF)
 endif()
 
 # ---------------------------------------------------------------------------

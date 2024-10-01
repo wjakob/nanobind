@@ -32,9 +32,25 @@ if (NB_TEST_CUDA)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-if (NB_TEST_SANITIZE)
-  add_compile_options(-fsanitize=address,undefined)
-  add_link_options(-fsanitize=address,undefined)
+set(NB_TEST_SANITIZER "")
+
+if (NB_TEST_SANITIZERS_ASAN)
+  list(APPEND NB_TEST_SANITIZERS address)
+endif()
+
+if (NB_TEST_SANITIZERS_UBSAN)
+  list(APPEND NB_TEST_SANITIZERS undefined)
+endif()
+
+if (NB_TEST_SANITIZERS_TSAN)
+  list(APPEND NB_TEST_SANITIZERS thread)
+endif()
+
+
+if (NB_TEST_SANITIZERS)
+  string(REPLACE ";" "," NB_TEST_SANITIZERS "${NB_TEST_SANITIZERS}")
+  add_compile_options(-fsanitize=${NB_TEST_SANITIZERS})
+  add_link_options(-fsanitize=${NB_TEST_SANITIZERS})
 endif()
 
 set(TEST_NAMES

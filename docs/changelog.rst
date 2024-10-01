@@ -118,8 +118,9 @@ Version 2.2.0 (TBA)
      rejects non-contiguous ones.
 
   For further details on the nd-array changes, see PR `#721
-  <https://github.com/wjakob/nanobind/pull/721>`__ and commit
-  `4647ef
+  <https://github.com/wjakob/nanobind/pull/721>`__, For further details on the
+  nd-array changes, see PR `#742
+  <https://github.com/wjakob/nanobind/pull/742>`__, and commit `4647ef
   <https://github.com/wjakob/nanobind/commit/4647efcc45d96e530d41a3461cd9727656bc2ca3>`__.
 
 - The NVIDIA CUDA compiler (``nvcc``) is now explicitly supported and included

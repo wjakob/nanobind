@@ -13,10 +13,17 @@ if (NB_TEST_SHARED_BUILD)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_SHARED)
 endif()
 
-# Enable extra warning flags
+# ---------------------------------------------------------------------------
+# Compile with a few more compiler warnings turned on
+# ---------------------------------------------------------------------------
+
 if (MSVC)
-  add_compile_options(/W4)
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if (CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+    string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  elseif (NOT NB_TEST_CUDA)
+    add_compile_options(/W4)
+  endif()
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
   add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
 endif()
 

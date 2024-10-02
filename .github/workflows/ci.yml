@@ -65,10 +65,10 @@ jobs:
         cd build;
         python -m pytest
 
-  nvcc:
+  nvcc-ubuntu:
     runs-on: ubuntu-latest
-    container: nvidia/cuda:12.6.1-devel-ubuntu24.04
-    name: "Python 3 / NVCC (CUDA 12.2)"
+    container: nvidia/cuda:12.5.1-devel-ubuntu24.04
+    name: "Python 3 / NVCC (CUDA 12.6.1) / ubuntu-latest"
 
     steps:
     - name: Install dependencies

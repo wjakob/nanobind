@@ -133,6 +133,9 @@ def test_map_string_double_const():
 
 
 def test_maps_with_noncopyable_values():
+    if not hasattr(t, 'get_mnc'):
+        return
+
     # std::map
     mnc = t.get_mnc(5)
     for i in range(1, 6):

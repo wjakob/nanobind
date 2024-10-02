@@ -242,6 +242,11 @@ function (nanobind_build_library TARGET_NAME)
 
   target_compile_features(${TARGET_NAME} PUBLIC cxx_std_17)
   nanobind_set_visibility(${TARGET_NAME})
+
+  if (MSVC)
+    # warning #1388-D: base class dllexport/dllimport specification differs from that of the derived class
+    target_compile_options(${TARGET_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe --diag_suppress=1388>)
+  endif()
 endfunction()
 
 # ---------------------------------------------------------------------------

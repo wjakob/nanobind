@@ -119,6 +119,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     constexpr size_t
         kwonly_pos_1 = index_1_v<std::is_same_v<kw_only, Extra>...>,
         kwonly_pos_n = index_n_v<std::is_same_v<kw_only, Extra>...>;
+
     // Arguments after nb::args are implicitly keyword-only even if there is no
     // nb::kw_only annotation
     constexpr bool explicit_kw_only = kwonly_pos_1 != sizeof...(Extra);
@@ -146,6 +147,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             ? is_method_det + count_args_before_index<kwonly_pos_1, Extra...>(
                   std::make_index_sequence<sizeof...(Extra)>())
             : nargs;
+
+    (void) kwonly_pos_n;
 
     if constexpr (explicit_kw_only) {
         static_assert(kwonly_pos_1 == kwonly_pos_n,
@@ -253,7 +256,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
-#if defined(_WIN32) // temporary workaround for an internal compiler error in MSVC
+#if defined(_WIN32) && !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
             cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...);
 #else
             cap->func(in.template get<Is>().operator cast_t<Args>()...);
@@ -261,7 +264,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             result = Py_None;
             Py_INCREF(result);
         } else {
-#if defined(_WIN32) // temporary workaround for an internal compiler error in MSVC
+#if defined(_WIN32) && !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
             result = cast_out::from_cpp(
                        cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...),
                        policy, cleanup).ptr();
@@ -300,8 +303,9 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Fill remaining fields of 'f'
     size_t arg_index = 0;
-    (void) arg_index;
     (func_extra_apply(f, extra, arg_index), ...);
+
+    (void) arg_index;
 
     return nb_func_new((const void *) &f);
 }

@@ -38,7 +38,8 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Key = typename Map::key_type;
     using Value = typename Map::mapped_type;
 
-    using ValueRef = typename detail::iterator_value_access<typename Map::iterator>::result_type;
+    using ValueRef = typename detail::iterator_value_access<
+        typename Map::iterator>::result_type;
 
     static_assert(
         !detail::is_base_caster_v<detail::make_caster<Value>> ||

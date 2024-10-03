@@ -169,7 +169,7 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("sparse_complex", []() -> Eigen::SparseMatrix<std::complex<double>> { return {}; });
 
     /// issue #166
-    using Matrix1d = Eigen::Matrix<double,1,1>;
+    using Matrix1d = Eigen::Matrix<int,1,1>;
     try {
         m.def(
             "default_arg", [](Matrix1d a, Matrix1d b) { return a + b; },

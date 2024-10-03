@@ -38,9 +38,11 @@ Version 2.2.0 (TBA)
   especially pronounced when passing keyword arguments to
   constructors. Note that this improvement only applies to
   Python version 3.9 and newer (PR
-  `#706 <https://github.com/wjakob/nanobind/pull/695>`__, commits
-  `#e24d7f3 <https://github.com/wjakob/nanobind/commit/e24d7f3434a6bbcc33cd8965632dc47f943fb2f8>`__,
-  `#0acecb4 <https://github.com/wjakob/nanobind/commit/0acecb474874f286119dce2b97b84142b6ada1a8>`__).
+  `#706 <https://github.com/wjakob/nanobind/pull/706>`__, commits
+  `#e24d7f <https://github.com/wjakob/nanobind/commit/e24d7f3434a6bbcc33cd8965632dc47f943fb2f8>`__,
+  `#0acecb <https://github.com/wjakob/nanobind/commit/0acecb474874f286119dce2b97b84142b6ada1a8>`__,
+  `#77f910 <https://github.com/wjakob/nanobind/commit/77f910f2a92c88f2c5512f3c375b4fe94369558e>`__,
+  `#2c96d5 <https://github.com/wjakob/nanobind/commit/2c96d5ae2fdbca030dccb1d01c457c7c5df29a0d>`__).
 
 * A new :cpp:class:`nb::is_flag() <is_flag>` annotation in
   :cpp:class:`nb::enum_\<T\>() <enum_>` produces enumeration
@@ -141,8 +143,8 @@ Version 2.2.0 (TBA)
 * The :cpp:class:`nb::sig("...") <sig>` annotation now supports `inline type
   parameter lists
   <https://docs.python.org/3/reference/compound_stmts.html#type-params>`__ such
-  as ``def first[T](l: Sequence[T]) -> T`` (PR `#709
-  <https://github.com/wjakob/nanobind/pull/709>`__).
+  as ``def first[T](l: Sequence[T]) -> T`` (PR `#704
+  <https://github.com/wjakob/nanobind/pull/704>`__).
 
 * Fixed implicit conversion of complex nd-arrays. (issue `#709
   <https://github.com/wjakob/nanobind/issues/709>`__)
@@ -159,8 +161,10 @@ Version 2.2.0 (TBA)
 * ABI version 15.
 
 * Minor fixes and improvements (PRs
+  `#703 <https://github.com/wjakob/nanobind/pull/703>`__,
+  `#724 <https://github.com/wjakob/nanobind/pull/724>`__,
+  `#723 <https://github.com/wjakob/nanobind/pull/723>`__,
   `#722 <https://github.com/wjakob/nanobind/pull/722>`__,
-  `#24 <https://github.com/wjakob/nanobind/pull/724>`__,
   `#715 <https://github.com/wjakob/nanobind/pull/715>`__,
   `#696 <https://github.com/wjakob/nanobind/pull/696>`__,
   `#693 <https://github.com/wjakob/nanobind/pull/693>`__,

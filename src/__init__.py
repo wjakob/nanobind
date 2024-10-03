@@ -12,7 +12,7 @@ def cmake_dir() -> str:
     "Return the path to the nanobind CMake module directory."
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), "cmake")
 
-__version__ = "2.2.0"
+__version__ = "2.3.0dev1"
 
 __all__ = (
     "__version__",

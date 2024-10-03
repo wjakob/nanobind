@@ -26,7 +26,7 @@ How to make a new release?
 
 7. Push: ``git push`` and ``git push --tags``
 
-8. Run ``python setup.py bdist_wheel``
+8. Run ``pipx run build``
 
 9. Upload: ``twine upload --repository nanobind <filename>``
 

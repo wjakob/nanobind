@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.2.0 (TBA)
--------------------
+Version 2.2.0 (October 3, 2014)
+-------------------------------
 
 - nanobind can now target `free-threaded Python
   <https://py-free-threading.github.io>`__, which replaces the `Global

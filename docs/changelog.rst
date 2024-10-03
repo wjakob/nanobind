@@ -15,7 +15,7 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.2.0 (October 3, 2014)
+Version 2.2.0 (October 3, 2024)
 -------------------------------
 
 - nanobind can now target `free-threaded Python
@@ -24,7 +24,7 @@ Version 2.2.0 (October 3, 2014)
   <https://en.wikipedia.org/wiki/Global_interpreter_lock>`__ with a
   fine-grained locking scheme (see `PEP 703
   <https://peps.python.org/pep-0703/>`__) to better leverage multi-core
-  parallelism. A `separate documation page <free-threading>`__ explains this in
+  parallelism. A :ref:`separate documation page <free-threaded>` explains this in
   detail (PRs `#695 <https://github.com/wjakob/nanobind/pull/695>`__, `#720
   <https://github.com/wjakob/nanobind/pull/720>`__)
 

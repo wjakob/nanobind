@@ -22,8 +22,16 @@ jobs:
       matrix:
         os: ['ubuntu-latest', 'windows-2022', 'macos-13']
         python: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13.0-rc.2', 'pypy3.9-v7.3.16', 'pypy3.10-v7.3.17']
+        eigen-from-source: [false]
+        include:
+        - os: 'macos-13'
+          python: '3.12'
+          eigen-from-source: true
+        - os: 'ubuntu-latest'
+          python: '3.12'
+          eigen-from-source: true
 
-    name: "Python ${{ matrix.python }} / ${{ matrix.os }}"
+    name: "Python ${{ matrix.python }} / ${{ matrix.os }} ${{ (matrix.eigen-from-source && '(eigen from source)') || '' }}"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -41,8 +49,17 @@ jobs:
       uses: lukka/get-cmake@latest
 
     - name: Install Eigen
-      if: matrix.os == 'ubuntu-latest'
+      if: ${{ matrix.os == 'ubuntu-latest'  && !matrix.eigen-from-source }}
       run: sudo apt-get -y install libeigen3-dev
+
+    - name: Install Eigen from source
+      if: matrix.eigen-from-source
+      run: |
+        git clone --depth 1 https://gitlab.com/libeigen/eigen.git
+        mkdir eigen/build
+        cd eigen/build
+        cmake ..
+        sudo make install
 
     - name: Install PyTest
       run: |

@@ -464,6 +464,10 @@ NB_MODULE(test_stl_ext, m) {
         return x;
     });
 
+    m.def("vector_optional_str", [](const std::vector<std::optional<std::string>>& x) {
+        return x;
+    });
+
     m.def("pass_wstr", [](std::wstring ws) { return ws; });
 
     // uncomment to see compiler error:

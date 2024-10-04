@@ -782,6 +782,7 @@ def test69_complex_array():
 def test70_vec_char():
     assert isinstance(t.vector_str("123"), str)
     assert isinstance(t.vector_str(["123", "345"]), list)
+    assert t.vector_optional_str(["abc", None]) == ["abc", None]
 
 
 def test71_null_input():

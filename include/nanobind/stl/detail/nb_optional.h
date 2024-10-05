@@ -21,9 +21,10 @@ struct optional_caster {
     NB_TYPE_CASTER(Optional, optional_name(Caster::Name))
 
     bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (src.is_none())
-            // default-constructed value is already empty
+        if (src.is_none()) {
+            value.reset();
             return true;
+        }
 
         Caster caster;
         if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||

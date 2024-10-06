@@ -137,9 +137,9 @@ template <> struct dtype_traits<void> {
     static constexpr auto name = descr<0>();
 };
 
-template <> struct dtype_traits<const void> {
-    static constexpr dlpack::dtype value{ 0, 0, 0 };
-    static constexpr auto name = descr<0>();
+template <typename T> struct dtype_traits<const T> {
+    static constexpr dlpack::dtype value = dtype_traits<T>::value;
+    static constexpr auto name = dtype_traits<T>::name;
 };
 
 template <ssize_t... Is> struct shape {

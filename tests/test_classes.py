@@ -891,3 +891,15 @@ def test46_custom_new():
 def test47_inconstructible():
     with pytest.raises(TypeError, match="no constructor defined"):
         t.Foo()
+
+def test48_monekypatchable():
+    # issue 750: how to monkeypatch __init__
+    q = t.MonkeyPatchable()
+    assert q.value == 123
+
+    def my_init(self):
+        t.MonkeyPatchable.custom_init(self)
+
+    t.MonkeyPatchable.__init__ = my_init
+    q = t.MonkeyPatchable()
+    assert q.value == 456

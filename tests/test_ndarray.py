@@ -20,6 +20,7 @@ except:
 
 try:
     import tensorflow as tf
+    import tensorflow.config
     def needs_tensorflow(x):
         return x
 except:

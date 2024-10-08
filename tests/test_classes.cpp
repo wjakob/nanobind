@@ -657,4 +657,34 @@ NB_MODULE(test_classes_ext, m) {
         }), "s"_a)
         .def("value", &UniqueInt::value)
         .def("lookups", &UniqueInt::lookups);
+
+    // issue #750
+    PyCFunctionWithKeywords dummy_init = [](PyObject *, PyObject *,
+                                            PyObject *) -> PyObject * {
+        PyErr_SetString(PyExc_RuntimeError, "This should never be called!");
+        return nullptr;
+    };
+
+    PyType_Slot init_slots[] {
+        // the presence of this slot enables normal object construction via __init__ and __new__
+        // instead of an optimized codepath within nanobind that skips these. That in turn
+        // makes it possible to intercept calls and implement custom logic.
+        { Py_tp_init, (void *) dummy_init },
+        { 0, nullptr }
+    };
+
+    struct MonkeyPatchable {
+        int value = 123;
+    };
+
+    nb::class_<MonkeyPatchable>(m, "MonkeyPatchable", nb::type_slots(init_slots))
+        .def(nb::init<>())
+        .def_static("custom_init", [](nb::handle_t<MonkeyPatchable> h) {
+            if (nb::inst_ready(h))
+                nb::raise_type_error("Input is already initialized!");
+            MonkeyPatchable *p = nb::inst_ptr<MonkeyPatchable>(h);
+            new (p) MonkeyPatchable{456};
+            nb::inst_mark_ready(h);
+        })
+        .def_rw("value", &MonkeyPatchable::value);
 }

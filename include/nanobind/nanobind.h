@@ -36,6 +36,7 @@
 #include <new>
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
+// IWYU pragma: begin_exports
 #include "nb_python.h"
 #include "nb_defs.h"
 #include "nb_enums.h"
@@ -52,6 +53,7 @@
 #include "nb_call.h"
 #include "nb_func.h"
 #include "nb_class.h"
+// IWYU pragma: end_exports
 
 #if defined(_MSC_VER)
 #  pragma warning(pop)

@@ -480,7 +480,7 @@ public:
     using Base  = typename detail::extract<T, detail::is_base,  Ts...>::type;
     using Alias = typename detail::extract<T, detail::is_alias, Ts...>::type;
 
-    static_assert(sizeof(Alias) < (1 << 24), "Instance size is too big!");
+    static_assert(sizeof(Alias) < (((uint64_t) 1) << 32), "Instance size is too big!");
     static_assert(alignof(Alias) < (1 << 8), "Instance alignment is too big!");
     static_assert(
         sizeof...(Ts) == !std::is_same_v<Base, T> + !std::is_same_v<Alias, T>,

@@ -398,7 +398,7 @@ function(nanobind_add_module name)
 endfunction()
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE;LD_PRELOAD" "PYTHON_PATH;DEPENDS")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -451,6 +451,9 @@ function (nanobind_add_stub name)
   file(TO_CMAKE_PATH ${Python_EXECUTABLE} NB_Python_EXECUTABLE)
 
   set(NB_STUBGEN_CMD "${NB_Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
+  if(ARG_LD_PRELOAD)
+    set(NB_STUBGEN_CMD "LD_PRELOAD=${ARG_LD_PRELOAD}" ${NB_STUBGEN_CMD})
+  endif()
 
   if (NOT ARG_INSTALL_TIME)
     add_custom_command(

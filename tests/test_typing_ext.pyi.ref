@@ -32,6 +32,8 @@ class Foo:
 
     def __ge__(self, arg: Foo, /) -> bool: ...
 
+    lt_alias = __lt__
+
 FooAlias: TypeAlias = Foo
 
 T = TypeVar("T", contravariant=True)

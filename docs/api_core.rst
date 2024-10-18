@@ -1391,49 +1391,49 @@ the reference section on :ref:`class binding <class_binding>`.
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``StopIteration`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception index_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``IndexError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception key_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``KeyError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception value_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``ValueError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception type_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``TypeError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception buffer_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``BufferError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception import_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``ImportError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception attribute_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``AttributeError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: void register_exception_translator(void (* exception_translator)(const std::exception_ptr &, void*), void * payload = nullptr)
 

@@ -155,3 +155,15 @@ following flag settings.
     version. Allowed values are ``"cp312"``, ``"cp313"``, which target the
     stable ABI starting from Python 3.12 or 3.13, respectively. By default, all
     extensions are built without any ABI limitations.
+
+.. py:function:: @nanobind_bazel//:free_threading (boolean)
+
+    Build nanobind extensions with a Python toolchain in free-threaded mode.
+    If given, the currently configured Python toolchain must support free-threading,
+    otherwise, the build will result in a compilation error.
+    Only relevant for CPython 3.13+, since support for free-threaded Python was
+    introduced in CPython 3.13.
+    For more information on free-threaded extension support in nanobind, refer to the
+    relevant :ref:`documentation section <free-threaded>`.
+
+    *New in nanobind-bazel version 2.2.0.*

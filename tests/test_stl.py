@@ -798,3 +798,9 @@ def test72_wstr():
 def test73_bad_input_to_set():
     with pytest.raises(TypeError):
         t.set_in_value(None)
+
+def test74_variant_implicit_conversions():
+    event = t.IDHavingEvent()
+    assert event.id is None
+    event.id = t.BasicID1(78)
+    assert type(event.id) is t.BasicID1

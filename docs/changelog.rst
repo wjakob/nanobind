@@ -15,6 +15,14 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (unreleased)
+------------------------
+
+- The ``std::variant`` type_caster now does two passes when converting from Python.
+  The first pass is done without implicit conversions. This fixes an issue where
+  ``std::variant<U, T>`` might cast a Python object wrapping a ``T`` to a ``U`` if
+  there is an implicit conversion available from ``T`` to ``U``.
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

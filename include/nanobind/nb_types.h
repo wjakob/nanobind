@@ -462,7 +462,8 @@ class bytearray : public object {
 
     const char *c_str() const { return PyByteArray_AsString(m_ptr); }
 
-    const void *data() const { return (const void *) PyByteArray_AsString(m_ptr); }
+    const void *data() const { return PyByteArray_AsString(m_ptr); }
+    void *data() { return PyByteArray_AsString(m_ptr); }
 
     size_t size() const { return (size_t) PyByteArray_Size(m_ptr); }
 

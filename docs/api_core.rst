@@ -1081,6 +1081,10 @@ Wrapper classes
 
       Return the size in bytes.
 
+   .. cpp:function:: void * data()
+
+      Convert a Python ``bytearray`` object into a byte buffer of length :cpp:func:`bytearray::size()` bytes.
+
    .. cpp:function:: const void * data() const
 
       Convert a Python ``bytearray`` object into a byte buffer of length :cpp:func:`bytearray::size()` bytes.

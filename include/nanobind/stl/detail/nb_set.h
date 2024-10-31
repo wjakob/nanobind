@@ -24,7 +24,7 @@ template <typename Set, typename Key> struct set_caster {
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
-        PyObject* iter = obj_iter(src.ptr());
+        PyObject* iter = PyObject_GetIter(src.ptr());
         if (!iter) {
             PyErr_Clear();
             return false;

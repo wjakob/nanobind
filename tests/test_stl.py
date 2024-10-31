@@ -794,3 +794,7 @@ def test71_null_input():
 @skip_on_pypy # PyPy fails this test on Windows :-(
 def test72_wstr():
     assert t.pass_wstr('🎈') == '🎈'
+
+def test73_bad_input_to_set():
+    with pytest.raises(TypeError):
+        t.set_in_value(None)

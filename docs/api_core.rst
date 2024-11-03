@@ -944,7 +944,7 @@ Wrapper classes
 
    This wrapper class represents Python ``bool`` instances.
 
-   .. cpp:function:: int_(handle h)
+   .. cpp:function:: bool_(handle h)
 
       Performs a boolean cast within Python. This is equivalent to the Python
       expression ``bool(h)``.

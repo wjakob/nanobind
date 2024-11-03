@@ -25,10 +25,10 @@ in your MODULE.bazel file:
 .. code-block:: python
 
     # Place this in your MODULE.bazel file.
-    # The major version of nanobind-bazel is equal to the major version
+    # The major version of nanobind-bazel is equal to the version
     # of the internally used nanobind.
-    # In this case, we are building bindings with nanobind@v2.
-    bazel_dep(name = "nanobind_bazel", version = "2.1.0")
+    # In this case, we are building bindings with nanobind v2.2.0.
+    bazel_dep(name = "nanobind_bazel", version = "2.2.0")
 
 To instead use a development version from GitHub, you can declare the
 dependency as a ``git_override()`` in your MODULE.bazel:

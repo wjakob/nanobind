@@ -45,6 +45,11 @@ template <typename... Ts> struct type_caster<std::variant<Ts...>> {
     }
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        if (flags & (uint8_t) cast_flags::convert) {
+            if ((try_variant<Ts>(src, flags & ~(uint8_t)cast_flags::convert, cleanup) || ...)){
+                return true;
+            }
+        }
         return (try_variant<Ts>(src, flags, cleanup) || ...);
     }
 

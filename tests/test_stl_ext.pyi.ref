@@ -4,6 +4,14 @@ import pathlib
 from typing import overload
 
 
+class BasicID1:
+    def __init__(self, arg: int, /) -> None: ...
+
+    def __int__(self) -> int: ...
+
+class BasicID2:
+    def __init__(self, arg: int, /) -> None: ...
+
 class ClassWithMovableField:
     def __init__(self) -> None: ...
 
@@ -37,6 +45,15 @@ class FuncWrapper:
 
     alive: int = ...
     """static read-only property"""
+
+class IDHavingEvent:
+    def __init__(self) -> None: ...
+
+    @property
+    def id(self) -> None | BasicID2 | BasicID1: ...
+
+    @id.setter
+    def id(self, arg: BasicID2 | BasicID1, /) -> None: ...
 
 class Movable:
     @overload

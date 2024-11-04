@@ -11,14 +11,14 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Caster>
-bool from_python_keep_alive(Caster &c, PyObject **args, uint8_t *args_flags,
-                            cleanup_list *cleanup, size_t index) {
+bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t *args_flags,
+                               cleanup_list *cleanup, size_t index) {
     size_t size_before = cleanup->size();
     if (!c.from_python(args[index], args_flags[index], cleanup))
         return false;
 
     // If an implicit conversion took place, update the 'args' array so that
-    // the keep_alive annotation can later process this change
+    // any keep_alive annotation or postcall hook can be aware of this change
     size_t size_after = cleanup->size();
     if (size_after != size_before)
         args[index] = (*cleanup)[size_after - 1];
@@ -244,9 +244,11 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         }
 #endif
 
-        if constexpr (Info::keep_alive) {
-            if ((!from_python_keep_alive(in.template get<Is>(), args,
-                                         args_flags, cleanup, Is) || ...))
+        if constexpr (Info::pre_post_hooks) {
+            std::integral_constant<size_t, nargs> nargs_c;
+            (process_precall(args, nargs_c, cleanup, (Extra *) nullptr), ...);
+            if ((!from_python_remember_conv(in.template get<Is>(), args,
+                                            args_flags, cleanup, Is) || ...))
                 return NB_NEXT_OVERLOAD;
         } else {
             if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
@@ -276,8 +278,10 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 #endif
         }
 
-        if constexpr (Info::keep_alive)
-            (process_keep_alive(args, result, (Extra *) nullptr), ...);
+        if constexpr (Info::pre_post_hooks) {
+            std::integral_constant<size_t, nargs> nargs_c;
+            (process_postcall(args, nargs_c, result, (Extra *) nullptr), ...);
+        }
 
         return result;
     };

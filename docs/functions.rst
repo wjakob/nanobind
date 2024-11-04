@@ -459,6 +459,13 @@ Multiple guards should be specified as :cpp:class:`nb::call_guard\<T1, T2,
 T3...\> <call_guard>`. Construction occurs left to right, while destruction
 occurs in reverse.
 
+If your wrapping needs are more complex than
+:cpp:class:`nb::call_guard\<T\>() <call_guard>` can handle, it is also
+possible to define a custom "call policy", which can observe or modify the
+Python object arguments and observe the return value. See the documentation of
+:cpp:class:`nb::call_policy\<Policy\> <call_policy>` for details.
+
+
 .. _higher_order_adv:
 
 Higher-order functions

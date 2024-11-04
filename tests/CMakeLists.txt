@@ -62,6 +62,7 @@ endif()
 
 set(TEST_NAMES
   functions
+  callbacks
   classes
   holders
   stl
@@ -137,6 +138,7 @@ target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
 set(TEST_FILES
   common.py
+  test_callbacks.py
   test_classes.py
   test_eigen.py
   test_enum.py

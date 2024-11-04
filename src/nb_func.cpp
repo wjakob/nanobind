@@ -196,21 +196,21 @@ PyObject *nb_func_new(const void *in_) noexcept {
     func_data_prelim<0> *f = (func_data_prelim<0> *) in_;
     arg_data *args_in = std::launder((arg_data *) f->args);
 
-    bool has_scope      = f->flags & (uint32_t) func_flags::has_scope,
-         has_name       = f->flags & (uint32_t) func_flags::has_name,
-         has_args       = f->flags & (uint32_t) func_flags::has_args,
-         has_var_args   = f->flags & (uint32_t) func_flags::has_var_kwargs,
-         has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_args,
-         has_keep_alive = f->flags & (uint32_t) func_flags::has_keep_alive,
-         has_doc        = f->flags & (uint32_t) func_flags::has_doc,
-         has_signature  = f->flags & (uint32_t) func_flags::has_signature,
-         is_implicit    = f->flags & (uint32_t) func_flags::is_implicit,
-         is_method      = f->flags & (uint32_t) func_flags::is_method,
-         return_ref     = f->flags & (uint32_t) func_flags::return_ref,
-         is_constructor = false,
-         is_init        = false,
-         is_new         = false,
-         is_setstate    = false;
+    bool has_scope       = f->flags & (uint32_t) func_flags::has_scope,
+         has_name        = f->flags & (uint32_t) func_flags::has_name,
+         has_args        = f->flags & (uint32_t) func_flags::has_args,
+         has_var_args    = f->flags & (uint32_t) func_flags::has_var_kwargs,
+         has_var_kwargs  = f->flags & (uint32_t) func_flags::has_var_args,
+         can_mutate_args = f->flags & (uint32_t) func_flags::can_mutate_args,
+         has_doc         = f->flags & (uint32_t) func_flags::has_doc,
+         has_signature   = f->flags & (uint32_t) func_flags::has_signature,
+         is_implicit     = f->flags & (uint32_t) func_flags::is_implicit,
+         is_method       = f->flags & (uint32_t) func_flags::is_method,
+         return_ref      = f->flags & (uint32_t) func_flags::return_ref,
+         is_constructor  = false,
+         is_init         = false,
+         is_new          = false,
+         is_setstate     = false;
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -292,7 +292,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     maybe_make_immortal((PyObject *) func);
 
     // Check if the complex dispatch loop is needed
-    bool complex_call = has_keep_alive || has_var_kwargs || has_var_args ||
+    bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||
                         f->nargs >= NB_MAXARGS_SIMPLE;
 
     if (has_args) {

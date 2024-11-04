@@ -650,3 +650,78 @@ def test49_resize():
     assert len(o) == 4
     t.test_bytearray_resize(o, 8)
     assert len(o) == 8
+
+
+def test50_call_policy():
+    def case(arg1, arg2, expect_ret):  # type: (str, str, str | None) -> str
+        if hasattr(sys, "getrefcount"):
+            refs_before = (sys.getrefcount(arg1), sys.getrefcount(arg2))
+
+        ret = None
+        try:
+            ret = t.test_call_policy(arg1, arg2)
+            assert ret == expect_ret
+            return ret
+        finally:
+            if expect_ret is None:
+                assert t.call_policy_record() == []
+            else:
+                (((arg1r, arg2r), recorded_ret),) = t.call_policy_record()
+                assert recorded_ret == expect_ret
+                assert ret is None or ret is recorded_ret
+                assert recorded_ret is not expect_ret
+
+                if hasattr(sys, "getrefcount"):
+                    # Make sure no reference leak occurred: should be
+                    # one in getrefcount args, one or two in locals,
+                    # zero or one in the pending-return-value slot.
+                    # We have to decompose this to avoid getting confused
+                    # by transient additional references added by pytest's
+                    # assertion rewriting.
+                    ret_refs = sys.getrefcount(recorded_ret)
+                    assert ret_refs == 2 + 2 * (ret is not None)
+
+                for (passed, recorded) in ((arg1, arg1r), (arg2, arg2r)):
+                    if passed == "swapfrom":
+                        assert recorded == "swapto"
+                        if hasattr(sys, "getrefcount"):
+                            recorded_refs = sys.getrefcount(recorded)
+                            # recorded, arg1r, unnamed tuple, getrefcount arg
+                            assert recorded_refs == 4
+                    else:
+                        assert passed is recorded
+
+                del passed, recorded, arg1r, arg2r
+                if hasattr(sys, "getrefcount"):
+                    refs_after = (sys.getrefcount(arg1), sys.getrefcount(arg2))
+                    assert refs_before == refs_after
+
+    # precall throws exception
+    with pytest.raises(RuntimeError, match="expected only strings"):
+        case(12345, "0", None)
+
+    # conversion of args fails
+    with pytest.raises(TypeError):
+        case("string", "xxx", "<unfinished>")
+
+    # function throws exception
+    with pytest.raises(RuntimeError, match="offset too large"):
+        case("abc", "4", "<unfinished>")
+
+    # conversion of return value fails
+    with pytest.raises(UnicodeDecodeError):
+        case("returnfail", "4", "<return conversion failed>")
+
+    # postcall throws exception
+    with pytest.raises(RuntimeError, match="postcall exception"):
+        case("postthrow", "4", "throw")
+
+    # normal call
+    case("example", "1", "xample")
+
+    # precall modifies args
+    case("swapfrom", "0", "swapto")
+    with pytest.raises(TypeError):
+        case("swapfrom", "xxx", "<unfinished>")
+    with pytest.raises(RuntimeError, match="offset too large"):
+        case("swapfrom", "10", "<unfinished>")

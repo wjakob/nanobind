@@ -1,6 +1,9 @@
+#include <string.h>
+
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -10,6 +13,74 @@ int call_guard_value = 0;
 struct my_call_guard {
     my_call_guard() { call_guard_value = 1; }
     ~my_call_guard() { call_guard_value = 2; }
+};
+
+// Example call policy for use with nb::call_policy<>. Each call will add
+// an entry to `calls` containing the arguments tuple and return value.
+// The return value will be recorded as "<unfinished>" if the function
+// did not return (still executing or threw an exception) and as
+// "<return conversion failed>" if the function returned something that we
+// couldn't convert to a Python object.
+// Additional features to test particular interactions:
+// - the precall hook will throw if any arguments are not strings
+// - any argument equal to "swapfrom" will be replaced by a temporary
+//   string object equal to "swapto", which will be destroyed at end of call
+// - the postcall hook will throw if any argument equals "postthrow"
+struct example_policy {
+    static inline std::vector<std::pair<nb::tuple, nb::object>> calls;
+    static void precall(PyObject **args, size_t nargs,
+                        nb::detail::cleanup_list *cleanup) {
+        PyObject* tup = PyTuple_New(nargs);
+        for (size_t i = 0; i < nargs; ++i) {
+            if (!PyUnicode_CheckExact(args[i])) {
+                Py_DECREF(tup);
+                throw std::runtime_error("expected only strings");
+            }
+            if (0 == PyUnicode_CompareWithASCIIString(args[i], "swapfrom")) {
+                nb::object replacement = nb::cast("swapto");
+                args[i] = replacement.ptr();
+                cleanup->append(replacement.release().ptr());
+            }
+            Py_INCREF(args[i]);
+            PyTuple_SetItem(tup, i, args[i]);
+        }
+        calls.emplace_back(nb::steal<nb::tuple>(tup), nb::cast("<unfinished>"));
+    }
+    static void postcall(PyObject **args, size_t nargs, nb::handle ret) {
+        if (!ret.is_valid()) {
+            calls.back().second = nb::cast("<return conversion failed>");
+        } else {
+            calls.back().second = nb::borrow(ret);
+        }
+        for (size_t i = 0; i < nargs; ++i) {
+            if (0 == PyUnicode_CompareWithASCIIString(args[i], "postthrow")) {
+                throw std::runtime_error("postcall exception");
+            }
+        }
+    }
+};
+
+struct numeric_string {
+    unsigned long number;
+};
+
+template <> struct nb::detail::type_caster<numeric_string> {
+    NB_TYPE_CASTER(numeric_string, const_name("str"))
+
+    bool from_python(handle h, uint8_t flags, cleanup_list* cleanup) noexcept {
+        make_caster<const char*> str_caster;
+        if (!str_caster.from_python(h, flags, cleanup))
+            return false;
+        const char* str = str_caster.operator cast_t<const char*>();
+        if (!str)
+            return false;
+        char* endp;
+        value.number = strtoul(str, &endp, 10);
+        return *str && !*endp;
+    }
+    static handle from_cpp(numeric_string, rv_policy, handle) noexcept {
+        return nullptr;
+    }
 };
 
 int test_31(int i) noexcept { return i; }
@@ -377,4 +448,23 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_bytearray_c_str",   [](nb::bytearray o) -> const char * { return o.c_str(); });
     m.def("test_bytearray_size",    [](nb::bytearray o) { return o.size(); });
     m.def("test_bytearray_resize",  [](nb::bytearray c, int size) { return c.resize(size); });
+
+    // Test call_policy feature
+    m.def("test_call_policy",
+          [](const char* s, numeric_string n) -> const char* {
+              if (0 == strcmp(s, "returnfail")) {
+                  return "not utf8 \xff";
+              }
+              if (n.number > strlen(s)) {
+                  throw std::runtime_error("offset too large");
+              }
+              return s + n.number;
+          },
+          nb::call_policy<example_policy>());
+
+    m.def("call_policy_record",
+          []() {
+              auto ret = std::move(example_policy::calls);
+              return ret;
+          });
 }

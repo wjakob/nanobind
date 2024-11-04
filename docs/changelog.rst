@@ -23,6 +23,16 @@ Version TBD (unreleased)
   ``std::variant<U, T>`` might cast a Python object wrapping a ``T`` to a ``U`` if
   there is an implicit conversion available from ``T`` to ``U``.
 
+- Added a function annotation :cpp:class:`nb::call_policy\<Policy\>()
+  <call_policy>` which supports custom function wrapping logic,
+  calling ``Policy::precall()`` before the bound function and
+  ``Policy::postcall()`` after. This is a low-level interface intended
+  for advanced users. The precall and postcall hooks are able to
+  observe the Python objects forming the function arguments and return
+  value, and the precall hook can change the arguments.  See the linked
+  documentation for more details, important caveats, and an example policy.
+  (PR `#767 <https://github.com/wjakob/nanobind/pull/767`__)
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

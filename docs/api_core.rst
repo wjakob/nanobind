@@ -1899,6 +1899,117 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    Analogous to :cpp:struct:`for_getter`, but for setters.
 
+.. cpp:struct:: template <typename Policy> call_policy
+
+   Request that custom logic be inserted around each call to the
+   bound function, by calling ``Policy::precall(args, nargs, cleanup)`` before
+   Python-to-C++ argument conversion, and ``Policy::postcall(args, nargs, ret)``
+   after C++-to-Python return value conversion.
+
+   If multiple call policy annotations are provided for the same function, then
+   their precall and postcall hooks will both execute left-to-right according
+   to the order in which the annotations were specified when binding the
+   function.
+
+   The :cpp:struct:`nb::call_guard\<T\>() <call_guard>` annotation
+   should be preferred over ``call_policy`` unless the wrapper logic
+   depends on the function arguments or return value.
+   If both annotations are combined, then
+   :cpp:struct:`nb::call_guard\<T\>() <call_guard>` always executes on
+   the "inside" (closest to the bound function, after argument
+   conversions and before return value conversion) regardless of its
+   position in the function annotations list.
+
+   Your ``Policy`` class must define two static member functions:
+
+   .. cpp:function:: static void precall(PyObject **args, size_t nargs, detail::cleanup_list *cleanup);
+
+      A hook that will be invoked before calling the bound function. More
+      precisely, it is called after any :ref:`argument locks <argument-locks>`
+      have been obtained, but before the Python arguments are converted to C++
+      objects for the function call.
+
+      This hook may access or modify the function arguments using the
+      *args* array, which holds borrowed references in one-to-one
+      correspondence with the C++ arguments of the bound function.  If
+      the bound function is a method, then ``args[0]`` is its *self*
+      argument. *nargs* is the number of function arguments. It is actually
+      passed as ``std::integral_constant<size_t, N>()``, so you can
+      match on that type if you want to do compile-time checks with it.
+
+      The *cleanup* list may be used as it is used in type casters,
+      to cause some Python object references to be released at some point
+      after the bound function completes. (If the bound function is part
+      of an overload set, the cleanup list isn't released until all overloads
+      have been tried.)
+
+      ``precall()`` may choose to throw a C++ exception. If it does,
+      it will preempt execution of the bound function, and the
+      exception will be treated as if the bound function had thrown it.
+
+   .. cpp:function:: static void postcall(PyObject **args, size_t nargs, handle ret);
+
+      A hook that will be invoked after calling the bound function and
+      converting its return value to a Python object, but only if the
+      bound function returned normally.
+
+      *args* stores the Python object arguments, with the same semantics
+      as in ``precall()``, except that arguments that participated in
+      implicit conversions will have had their ``args[i]`` pointer updated
+      to reflect the new Python object that the implicit conversion produced.
+      *nargs* is the number of arguments, passed as a ``std::integral_constant``
+      in the same way as for ``precall()``.
+
+      *ret* is the bound function's return value. If the bound function returned
+      normally but its C++ return value could not be converted to a Python
+      object, then ``postcall()`` will execute with *ret* set to null,
+      and the Python error indicator might or might not be set to explain why.
+
+      If the bound function did not return normally -- either because its
+      Python object arguments couldn't be converted to the appropriate C++
+      types, or because the C++ function threw an exception -- then
+      ``postcall()`` **will not execute**. If you need some cleanup logic to
+      run even in such cases, your ``precall()`` can add a capsule object to the
+      cleanup list; its destructor will run eventually, but with no promises
+      as to when. A :cpp:struct:`nb::call_guard <call_guard>` might be a
+      better choice.
+
+      ``postcall()`` may choose to throw a C++ exception. If it does,
+      the result of the wrapped function will be destroyed,
+      and the exception will be raised in its place, as if the bound function
+      had thrown it just before returning.
+
+   Here is an example policy to demonstrate.
+   ``nb::call_policy<returns_references_to<I>>()`` behaves like
+   :cpp:class:`nb::keep_alive\<0, I\>() <keep_alive>`, except that the
+   return value is a treated as a list of objects rather than a single one.
+
+   .. code-block:: cpp
+
+      template <size_t I>
+      struct returns_references_to {
+          static void precall(PyObject **, size_t, nb::detail::cleanup_list *) {}
+
+          template <size_t N>
+          static void postcall(PyObject **args,
+                               std::integral_constant<size_t, N>,
+                               nb::handle ret) {
+              static_assert(I > 0 && I < N,
+                            "I in returns_references_to<I> must be in the "
+                            "range [1, number of C++ function arguments]");
+              if (!nb::isinstance<nb::sequence>(ret)) {
+                  throw std::runtime_error("return value should be a sequence");
+              }
+              for (nb::handle nurse : ret) {
+                  nb::detail::keep_alive(nurse.ptr(), args[I]);
+              }
+          }
+      };
+
+   For a more complex example (binding an object that uses trivially-copyable
+   callbacks), see ``tests/test_callbacks.cpp`` in the nanobind source
+   distribution.
+
 .. _class_binding_annotations:
 
 Class binding annotations

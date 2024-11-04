@@ -151,6 +151,8 @@ struct sig {
 
 struct is_getter { };
 
+template <typename Policy> struct call_policy final {};
+
 NAMESPACE_BEGIN(literals)
 constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
 NAMESPACE_END(literals)
@@ -186,8 +188,9 @@ enum class func_flags : uint32_t {
     return_ref = (1 << 15),
     /// Does this overload specify a custom function signature (for docstrings, typing)
     has_signature = (1 << 16),
-    /// Does this function have one or more nb::keep_alive() annotations?
-    has_keep_alive = (1 << 17)
+    /// Does this function potentially modify the elements of the PyObject*[] array
+    /// representing its arguments? (nb::keep_alive() or call_policy annotations)
+    can_mutate_args = (1 << 17)
 };
 
 enum cast_flags : uint8_t {
@@ -384,12 +387,17 @@ NB_INLINE void func_extra_apply(F &, call_guard<Ts...>, size_t &) {}
 
 template <typename F, size_t Nurse, size_t Patient>
 NB_INLINE void func_extra_apply(F &f, nanobind::keep_alive<Nurse, Patient>, size_t &) {
-    f.flags |= (uint32_t) func_flags::has_keep_alive;
+    f.flags |= (uint32_t) func_flags::can_mutate_args;
+}
+
+template <typename F, typename Policy>
+NB_INLINE void func_extra_apply(F &f, call_policy<Policy>, size_t &) {
+    f.flags |= (uint32_t) func_flags::can_mutate_args;
 }
 
 template <typename... Ts> struct func_extra_info {
     using call_guard = void;
-    static constexpr bool keep_alive = false;
+    static constexpr bool pre_post_hooks = false;
     static constexpr size_t nargs_locked = 0;
 };
 
@@ -397,7 +405,7 @@ template <typename T, typename... Ts> struct func_extra_info<T, Ts...>
     : func_extra_info<Ts...> { };
 
 template <typename... Cs, typename... Ts>
-struct func_extra_info<nanobind::call_guard<Cs...>, Ts...> : func_extra_info<Ts...> {
+struct func_extra_info<call_guard<Cs...>, Ts...> : func_extra_info<Ts...> {
     static_assert(std::is_same_v<typename func_extra_info<Ts...>::call_guard, void>,
                   "call_guard<> can only be specified once!");
     using call_guard = nanobind::call_guard<Cs...>;
@@ -405,28 +413,58 @@ struct func_extra_info<nanobind::call_guard<Cs...>, Ts...> : func_extra_info<Ts.
 
 template <size_t Nurse, size_t Patient, typename... Ts>
 struct func_extra_info<nanobind::keep_alive<Nurse, Patient>, Ts...> : func_extra_info<Ts...> {
-    static constexpr bool keep_alive = true;
+    static constexpr bool pre_post_hooks = true;
+};
+
+template <typename Policy, typename... Ts>
+struct func_extra_info<call_policy<Policy>, Ts...> : func_extra_info<Ts...> {
+    static constexpr bool pre_post_hooks = true;
 };
 
 template <typename... Ts>
-struct func_extra_info<nanobind::arg_locked, Ts...> : func_extra_info<Ts...> {
+struct func_extra_info<arg_locked, Ts...> : func_extra_info<Ts...> {
     static constexpr size_t nargs_locked = 1 + func_extra_info<Ts...>::nargs_locked;
 };
 
 template <typename... Ts>
-struct func_extra_info<nanobind::lock_self, Ts...> : func_extra_info<Ts...> {
+struct func_extra_info<lock_self, Ts...> : func_extra_info<Ts...> {
     static constexpr size_t nargs_locked = 1 + func_extra_info<Ts...>::nargs_locked;
 };
 
-template <typename T>
-NB_INLINE void process_keep_alive(PyObject **, PyObject *, T *) { }
+NB_INLINE void process_precall(PyObject **, size_t, detail::cleanup_list *, void *) { }
 
-template <size_t Nurse, size_t Patient>
+template <size_t NArgs, typename Policy>
 NB_INLINE void
-process_keep_alive(PyObject **args, PyObject *result,
-                   nanobind::keep_alive<Nurse, Patient> *) {
+process_precall(PyObject **args, std::integral_constant<size_t, NArgs> nargs,
+                detail::cleanup_list *cleanup, call_policy<Policy> *) {
+    Policy::precall(args, nargs, cleanup);
+}
+
+NB_INLINE void process_postcall(PyObject **, size_t, PyObject *, void *) { }
+
+template <size_t NArgs, size_t Nurse, size_t Patient>
+NB_INLINE void
+process_postcall(PyObject **args, std::integral_constant<size_t, NArgs>,
+                 PyObject *result, nanobind::keep_alive<Nurse, Patient> *) {
+    static_assert(Nurse != Patient,
+                  "keep_alive with the same argument as both nurse and patient "
+                  "doesn't make sense");
+    static_assert(Nurse <= NArgs && Patient <= NArgs,
+                  "keep_alive template parameters must be in the range "
+                  "[0, number of C++ function arguments]");
     keep_alive(Nurse   == 0 ? result : args[Nurse - 1],
                Patient == 0 ? result : args[Patient - 1]);
+}
+
+template <size_t NArgs, typename Policy>
+NB_INLINE void
+process_postcall(PyObject **args, std::integral_constant<size_t, NArgs> nargs,
+                 PyObject *result, call_policy<Policy> *) {
+    // result_guard avoids leaking a reference to the return object
+    // if postcall throws an exception
+    object result_guard = steal(result);
+    Policy::postcall(args, nargs, handle(result));
+    result_guard.release();
 }
 
 NAMESPACE_END(detail)

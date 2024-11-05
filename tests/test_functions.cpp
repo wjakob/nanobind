@@ -483,4 +483,6 @@ NB_MODULE(test_functions_ext, m) {
               auto ret = std::move(example_policy::calls);
               return ret;
           });
+
+    m.def("abi_tag", [](){ return nb::detail::abi_tag(); });
 }

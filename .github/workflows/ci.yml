@@ -55,10 +55,22 @@ jobs:
 
     - name: Configure
       run: >
-        cmake -S . -B build -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python3 -c 'import sys; print(int(sys.version_info.minor>=11))')"
+        cmake -S . -B build -DNB_TEST_STABLE_ABI=ON -DNB_TEST_SHARED_BUILD="$(python -c 'import sys; print(int(sys.version_info.minor>=11))')"
 
     - name: Build C++
       run: cmake --build build -j 2
+
+    - name: Check ABI tag
+      if: ${{ !startsWith(matrix.os, 'windows')  }}
+      run: >
+        cd build/tests;
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
+
+    - name: Check ABI tag
+      if: ${{ startsWith(matrix.os, 'windows')  }}
+      run: >
+        cd build/tests/Debug;
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
 
     - name: Run tests
       run: >
@@ -84,6 +96,11 @@ jobs:
 
     - name: Build C++
       run: cmake --build build -j 2
+
+    - name: Check ABI tag
+      run: >
+        cd build/tests;
+        python3 -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
 
     - name: Run tests
       run: >
@@ -134,6 +151,11 @@ jobs:
     - name: Build C++
       run: cmake --build build -j 2
 
+    - name: Check ABI tag
+      run: >
+        cd build/tests;
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
+
     - name: Run tests
       run: >
         cd build;
@@ -165,7 +187,13 @@ jobs:
         cmake -S . -B build -DNB_TEST_FREE_THREADED=ON
 
     - name: Build C++
-      run: cmake --build build -j 2
+      run: >
+        cmake --build build -j 2
+
+    - name: Check ABI tag
+      run: >
+        cd build/tests;
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
 
     - name: Run tests
       run: >

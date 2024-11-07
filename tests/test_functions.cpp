@@ -377,4 +377,6 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_bytearray_c_str",   [](nb::bytearray o) -> const char * { return o.c_str(); });
     m.def("test_bytearray_size",    [](nb::bytearray o) { return o.size(); });
     m.def("test_bytearray_resize",  [](nb::bytearray c, int size) { return c.resize(size); });
+
+    m.def("abi_tag", [](){ return nb::detail::abi_tag(); });
 }

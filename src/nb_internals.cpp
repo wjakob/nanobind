@@ -18,7 +18,7 @@
 
 /// Tracks the ABI of nanobind
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 15
+#  define NB_INTERNALS_VERSION 16
 #endif
 
 /// On MSVC, debug and release builds are not ABI-compatible!
@@ -49,30 +49,52 @@
 
 /// Also standard libs
 #if defined(_LIBCPP_VERSION)
-#  define NB_STDLIB "_libcpp"
-#elif defined(__GLIBCXX__) || defined(__GLIBCPP__)
-#  define NB_STDLIB "_libstdcpp"
+#  define NB_STDLIB "_libc++"
+#elif defined(__GLIBCXX__)
+#  define NB_STDLIB "_libstdc++"
 #else
 #  define NB_STDLIB ""
 #endif
 
-/// On Linux/OSX, changes in __GXX_ABI_VERSION__ indicate ABI incompatibility.
-/// Also keep potentially ABI-incompatible visual studio builds apart.
-#if defined(__GXX_ABI_VERSION)
-#  define NB_BUILD_ABI "_cxxabi" NB_TOSTRING(__GXX_ABI_VERSION)
-#elif defined(_MSC_VER)
-#  define NB_BUILD_ABI "_mscver" NB_TOSTRING(_MSC_VER)
+// Catch other conditions that imply ABI incompatibility
+// - MSVC builds with different CRT versions
+// - An anticipated MSVC ABI break ("vNext")
+// - Builds using libc++ with unstable ABIs
+// - Builds using libstdc++ with the legacy (pre-C++11) ABI
+#if defined(_MSC_VER)
+#  if defined(_MT) && defined(_DLL) // catches /MD or /MDd
+#    define NB_BUILD_LIB "_md"
+#  elif defined(_MT)
+#    define NB_BUILD_LIB "_mt"      // catches /MT or /MTd
+#  else
+#    define NB_BUILD_LIB ""
+#  endif
+#  if (_MSC_VER) / 100 == 19
+#    define NB_BUILD_ABI NB_BUILD_LIB "_19"
+#  else
+#    define NB_BUILD_ABI NB_BUILD_LIB "_unknown"
+#  endif
+#elif defined(_LIBCPP_ABI_VERSION)
+#  define NB_BUILD_ABI "_abi" NB_TOSTRING(_LIBCPP_ABI_VERSION)
+#elif defined(__GLIBCXX__)
+#  if _GLIBCXX_USE_CXX11_ABI
+#    define NB_BUILD_ABI ""
+#  else
+#    define NB_BUILD_ABI "_legacy"
+#  endif
 #else
 #  define NB_BUILD_ABI ""
 #endif
 
-// Can have limited and non-limited-API extensions in the same process, and they might be incompatible
+// Can have limited and non-limited-API extensions in the same process.
+// Nanobind data structures will differ, so these can't talk to each other
 #if defined(Py_LIMITED_API)
 #  define NB_STABLE_ABI "_stable"
 #else
 #  define NB_STABLE_ABI ""
 #endif
 
+// As above, but for free-threaded extensions
 #if defined(NB_FREE_THREADED)
 #  define NB_FREE_THREADED_ABI "_ft"
 #else
@@ -85,7 +107,7 @@
   #define NB_VERSION_DEV_STR ""
 #endif
 
-#define NB_INTERNALS_ID                                                        \
+#define NB_ABI_TAG                                                        \
     "v" NB_TOSTRING(NB_INTERNALS_VERSION)                                      \
         NB_VERSION_DEV_STR NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI             \
             NB_BUILD_TYPE NB_STABLE_ABI NB_FREE_THREADED_ABI
@@ -241,6 +263,8 @@ static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
 
+const char *abi_tag() { return NB_ABI_TAG; }
+
 static void internals_cleanup() {
     nb_internals *p = internals;
     if (!p)
@@ -382,7 +406,7 @@ NB_NOINLINE void init(const char *name) {
     check(dict, "nanobind::detail::init(): could not access internals dictionary!");
 
     PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s__",
-                                         NB_INTERNALS_ID, name ? name : "");
+                                         abi_tag(), name ? name : "");
     check(key, "nanobind::detail::init(): could not create dictionary key!");
 
     PyObject *capsule = dict_get_item_ref_or_fail(dict, key);

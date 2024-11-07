@@ -1318,19 +1318,18 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     to->alias_chain = nullptr;
     to->init = nullptr;
 
-    if (has_dynamic_attr) {
+    if (has_dynamic_attr)
         to->flags |= (uint32_t) type_flags::has_dynamic_attr;
-        #if defined(Py_LIMITED_API)
-            to->dictoffset = (uint32_t) dictoffset;
-        #endif
-    }
-
-    if (is_weak_referenceable) {
+    if (is_weak_referenceable)
         to->flags |= (uint32_t) type_flags::is_weak_referenceable;
-        #if defined(Py_LIMITED_API)
-            to->weaklistoffset = (uint32_t) weaklistoffset;
-        #endif
-    }
+
+    #if defined(Py_LIMITED_API)
+        /* These must be set unconditionally so that nb_dict_ptr() /
+           nb_weaklist_ptr() return null (rather than garbage) on
+           objects whose types don't use the corresponding feature. */
+        to->dictoffset = (uint32_t) dictoffset;
+        to->weaklistoffset = (uint32_t) weaklistoffset;
+    #endif
 
     if (t->scope != nullptr)
         setattr(t->scope, t_name, result);

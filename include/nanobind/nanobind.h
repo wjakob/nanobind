@@ -27,6 +27,7 @@
 #define NB_VERSION_DEV   1 // A value > 0 indicates a development release
 
 // Core C++ headers that nanobind depends on
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <stdexcept>

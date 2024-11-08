@@ -112,9 +112,11 @@ Eigen types:
 
    #include <nanobind/eigen/sparse.h>
 
-The ``Eigen::SparseMatrix<..>`` type maps to either ``scipy.sparse.csr_matrix``
-or ``scipy.sparse.csc_matrix`` depending on whether row- or column-major
-storage is used.
+The ``Eigen::SparseMatrix<..>`` and ``Eigen::Map<Eigen::SparseMatrix<..>>``
+types map to either ``scipy.sparse.csr_matrix`` or ``scipy.sparse.csc_matrix``
+depending on whether row- or column-major storage is used.
 
 There is no support for Eigen sparse vectors because an equivalent type does
 not exist as part of ``scipy.sparse``.
+
+

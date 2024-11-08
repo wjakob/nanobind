@@ -31,7 +31,7 @@ Version TBD (unreleased)
   observe the Python objects forming the function arguments and return
   value, and the precall hook can change the arguments.  See the linked
   documentation for more details, important caveats, and an example policy.
-  (PR `#767 <https://github.com/wjakob/nanobind/pull/767`__)
+  (PR `#767 <https://github.com/wjakob/nanobind/pull/767>`__)
 
 Version 2.2.0 (October 3, 2024)
 -------------------------------

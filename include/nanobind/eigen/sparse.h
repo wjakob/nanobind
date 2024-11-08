@@ -206,7 +206,7 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *cleanup) noexcept
+    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *) noexcept
     {
         if (!v.isCompressed()) {
             PyErr_SetString(PyExc_ValueError,

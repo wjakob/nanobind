@@ -2,6 +2,7 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 #include <nanobind/trampoline.h>
+#include <iostream>
 
 namespace nb = nanobind;
 
@@ -166,7 +167,15 @@ NB_MODULE(test_eigen_ext, m) {
         assert(!m.isCompressed());
         return m.markAsRValue();
     });
+    // This function doesn't appear to be called in tests/test_eigen.py
     m.def("sparse_complex", []() -> Eigen::SparseMatrix<std::complex<double>> { return {}; });
+
+    m.def("sparse_map_c", [](const Eigen::Map<const SparseMatrixC> &) { });
+    m.def("sparse_map_r", [](const Eigen::Map<const SparseMatrixR> &) { });
+    m.def("sparse_update_map_to_zero_c", [](nb::object obj) {
+        Eigen::Map<SparseMatrixC> c = nb::cast<Eigen::Map<SparseMatrixC>>(obj);
+        for (int i = 0; i < c.nonZeros(); ++i) { c.valuePtr()[i] = 0; }
+    });
 
     /// issue #166
     using Matrix1d = Eigen::Matrix<double,1,1>;

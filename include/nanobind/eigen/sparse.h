@@ -183,15 +183,12 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
         }
         if (object data_o = obj.attr("data"); !data_caster.from_python(data_o, flags, cleanup))
             return false;
-        ScalarNDArray& values = data_caster.value;
 
         if (object indices_o = obj.attr("indices"); !indices_caster.from_python(indices_o, flags, cleanup))
             return false;
-        StorageIndexNDArray& inner_indices = indices_caster.value;
 
         if (object indptr_o = obj.attr("indptr"); !indptr_caster.from_python(indptr_o, flags, cleanup))
             return false;
-        StorageIndexNDArray& outer_indices = indptr_caster.value;
 
         object shape_o = obj.attr("shape"), nnz_o = obj.attr("nnz");
         try {

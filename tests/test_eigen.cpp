@@ -176,6 +176,10 @@ NB_MODULE(test_eigen_ext, m) {
         Eigen::Map<SparseMatrixC> c = nb::cast<Eigen::Map<SparseMatrixC>>(obj);
         for (int i = 0; i < c.nonZeros(); ++i) { c.valuePtr()[i] = 0; }
     });
+    m.def("sparse_update_map_to_zero_r", [](nb::object obj) {
+        Eigen::Map<SparseMatrixR> r = nb::cast<Eigen::Map<SparseMatrixR>>(obj);
+        for (int i = 0; i < r.nonZeros(); ++i) { r.valuePtr()[i] = 0; }
+    });
 
     /// issue #166
     using Matrix1d = Eigen::Matrix<double,1,1>;

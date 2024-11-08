@@ -171,7 +171,15 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     StorageIndexCaster indices_caster, indptr_caster;
     Index rows, cols, nnz;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept 
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        // Disable implicit conversions
+        //
+        // I'm not convinced this manipulation of the flags works. It seems in
+        // ndarray caster the flag is just reset to true.
+        return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
+    }
+
+    bool from_python_(handle src, uint8_t flags, cleanup_list *cleanup) noexcept 
     {
         object obj = borrow(src);
         try {
@@ -181,6 +189,12 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
         } catch (const python_error &) {
             return false;
         }
+
+        // I thought this would not allow conversions, but it does
+        // I think conversion is ok if std::is_const_v<T> is true, so long as
+        // each *_caster is the owner.
+        // For non-const, conversion seems to be a bad idea. I think the dense
+        // version will throw a RunTime error rather than convert
         if (object data_o = obj.attr("data"); !data_caster.from_python(data_o, flags, cleanup))
             return false;
 

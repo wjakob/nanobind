@@ -28,6 +28,14 @@ NB_MODULE(test_make_iterator_ext, m) {
                                           map.begin(),
                                           map.end());
              }, nb::keep_alive<0, 1>())
+        .def("items_l",
+             [](const StringMap &map) {
+                 // Make sure iterators don't dangle even if passed as lvalue
+                 auto begin = map.begin(), end = map.end();
+                 return nb::make_iterator(nb::type<StringMap>(),
+                                          "item_iterator_l",
+                                          begin, end);
+             }, nb::keep_alive<0, 1>())
         .def("values", [](const StringMap &map) {
             return nb::make_value_iterator(nb::type<StringMap>(),
                                            "value_iterator",
@@ -71,6 +79,13 @@ NB_MODULE(test_make_iterator_ext, m) {
                                           "item_iterator",
                                           map.begin(),
                                           map.end());
+             }, nb::keep_alive<0, 1>())
+        .def("items_l",
+             [](const IdentityMap &map) {
+                 auto begin = map.begin(), end = map.end();
+                 return nb::make_iterator(nb::type<IdentityMap>(),
+                                          "item_iterator_l",
+                                          begin, end);
              }, nb::keep_alive<0, 1>())
         .def("values", [](const IdentityMap &map) {
             return nb::make_value_iterator(nb::type<IdentityMap>(),

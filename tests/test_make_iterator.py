@@ -27,6 +27,7 @@ def test03_items_iterator():
     for d in data:
         m = t.StringMap(d)
         assert sorted(list(m.items())) == sorted(list(d.items()))
+        assert sorted(list(m.items_l())) == sorted(list(d.items()))
 
 
 def test04_passthrough_iterator():
@@ -40,3 +41,4 @@ def test05_iterator_returning_temporary():
     assert list(im) == list(range(10))
     assert list(im.values()) == list(range(10))
     assert list(im.items()) == list(zip(range(10), range(10)))
+    assert list(im.items_l()) == list(zip(range(10), range(10)))

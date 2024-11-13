@@ -33,6 +33,11 @@ Version TBD (unreleased)
   documentation for more details, important caveats, and an example policy.
   (PR `#767 <https://github.com/wjakob/nanobind/pull/767>`__)
 
+- :cpp:func:`make_iterator` now accepts its iterator arguments by value,
+  rather than by forwarding reference, in order to eliminate the hazard
+  of storing a dangling C++ iterator reference in the returned Python
+  iterator object. (PR `#788 <https://github.com/wjakob/nanobind/pull/788>`__)
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

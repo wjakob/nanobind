@@ -549,7 +549,7 @@ include directive:
 
    #include <nanobind/make_iterator.h>
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename Sentinel, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator first, Sentinel last, Extra &&...extra)
 
    Create a Python iterator wrapping the C++ iterator represented by the range
    ``[first, last)``. The `Extra` parameter can be used to pass additional
@@ -619,7 +619,7 @@ include directive:
    ``first`` and ``last`` set to ``std::begin(value)`` and ``std::end(value)``,
    respectively.
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename... Extra> iterator make_key_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename Sentinel, typename... Extra> iterator make_key_iterator(handle scope, const char * name, Iterator first, Sentinel last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_key_iterator` returns the first pair element to
@@ -630,7 +630,7 @@ include directive:
    ``(*first).first``.
 
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename Sentinel, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator first, Sentinel last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_value_iterator` returns the second pair element to

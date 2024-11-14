@@ -59,9 +59,13 @@ enum class type_flags : uint32_t {
     is_generic               = (1 << 15),
 
     /// Does the type implement a custom __new__ operator?
-    has_new                  = (1 << 16)
+    has_new                  = (1 << 16),
 
-    // Two more bits bits available without needing a larger reorganization
+    /// Does the type implement a custom __new__ operator that can take no args
+    /// (except the type object)?
+    has_nullary_new          = (1 << 17)
+
+    // One more bit available without needing a larger reorganization
 };
 
 /// Flags about a type that are only relevant when it is being created.
@@ -430,7 +434,13 @@ struct new_<Func, Return(Args...)> {
         // replacing it; this is important for pickle support.
         // We can't do this if the user-provided __new__ takes no
         // arguments, because it would make an ambiguous overload set.
-        detail::wrap_base_new(cl, sizeof...(Args) != 0);
+        constexpr size_t num_defaults =
+            ((std::is_same_v<Extra, arg_v> ||
+              std::is_same_v<Extra, arg_locked_v>) + ... + 0);
+        constexpr size_t num_varargs =
+            ((std::is_same_v<detail::intrinsic_t<Args>, args> ||
+              std::is_same_v<detail::intrinsic_t<Args>, kwargs>) + ... + 0);
+        detail::wrap_base_new(cl, sizeof...(Args) > num_defaults + num_varargs);
 
         auto wrapper = [func = (detail::forward_t<Func>) func](handle, Args... args) {
             return func((detail::forward_t<Args>) args...);

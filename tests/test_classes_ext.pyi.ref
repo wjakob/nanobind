@@ -130,6 +130,21 @@ class MyClass:
 
     def f(self) -> None: ...
 
+class NewDflt:
+    def __init__(self, value: int = 42) -> None: ...
+
+    @property
+    def value(self) -> int: ...
+
+class NewNone:
+    def __init__(self) -> None: ...
+
+class NewStar:
+    def __init__(self, *args, value: int = 42, **kwargs) -> None: ...
+
+    @property
+    def value(self) -> int: ...
+
 class NonCopyableVec:
     pass
 

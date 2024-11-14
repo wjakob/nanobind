@@ -432,8 +432,31 @@ PyObject *nb_func_new(const void *in_) noexcept {
         type_data *td = nb_type_data((PyTypeObject *) f->scope);
         bool has_new = td->flags & (uint32_t) type_flags::has_new;
 
-        if (is_init && !has_new) {
-            td->init = func;
+        if (is_init) {
+            if (!has_new) {
+                td->init = func;
+            } else {
+                // Keep track of whether we have a __init__ overload that
+                // accepts no arguments (except self). If not, then we
+                // shouldn't allow calling the type object with no arguments,
+                // even though (for unpickling support) we probably do have
+                // a __new__ overload that accepts no arguments (except cls).
+                // This check is necessary because our type vectorcall shortcut
+                // skips Python's usual logic where __init__ is always called
+                // if __new__ returns an instance of the type.
+                bool noargs_ok = true;
+                for (size_t i = 1; i < fc->nargs - has_var_kwargs; ++i) {
+                    if (has_var_args && i == fc->nargs_pos)
+                        continue; // skip `nb::args` since it can be empty
+                    if (has_args && fc->args[i].value != nullptr)
+                        continue; // arg with default is OK
+                    noargs_ok = false;
+                    break;
+                }
+                if (noargs_ok) {
+                    td->flags |= (uint32_t) type_flags::has_nullary_new;
+                }
+            }
         } else if (is_new) {
             td->init = func;
             td->flags |= (uint32_t) type_flags::has_new;

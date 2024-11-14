@@ -453,9 +453,8 @@ PyObject *nb_func_new(const void *in_) noexcept {
                     noargs_ok = false;
                     break;
                 }
-                if (noargs_ok) {
+                if (noargs_ok)
                     td->flags |= (uint32_t) type_flags::has_nullary_new;
-                }
             }
         } else if (is_new) {
             td->init = func;

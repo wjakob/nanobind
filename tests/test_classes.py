@@ -888,6 +888,17 @@ def test46_custom_new():
     with pytest.raises(RuntimeError):
         t.UniqueInt.__new__(int)
 
+    # Make sure we do allow no-args construction for types that declare
+    # such a __new__
+    t.NewNone()
+    assert t.NewDflt().value == 42
+    assert t.NewDflt(10).value == 10
+    assert t.NewStar().value == 42
+    assert t.NewStar("hi").value == 43
+    assert t.NewStar(value=10).value == 10
+    assert t.NewStar("hi", "lo", value=10).value == 12
+    assert t.NewStar(value=10, other="blah").value == 20
+
 def test47_inconstructible():
     with pytest.raises(TypeError, match="no constructor defined"):
         t.Foo()

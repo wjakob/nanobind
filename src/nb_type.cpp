@@ -968,12 +968,15 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
         self = inst_new_int(tp, nullptr, nullptr);
         if (!self)
             return nullptr;
-    } else if (nargs == 0 && !kwargs_in && nb_func_data(func)->nargs != 0) {
+    } else if (nargs == 0 && !kwargs_in &&
+               !(td->flags & (uint32_t) type_flags::has_nullary_new)) {
         // When the bindings define a custom __new__ operator, nanobind always
         // provides a no-argument dummy __new__ constructor to handle unpickling
         // via __setstate__. This is an implementation detail that should not be
         // exposed. Therefore, only allow argument-less calls if there is an
-        // actual __new__ overload with a compatible signature.
+        // actual __new__ overload with a compatible signature. This is
+        // detected in nb_func.cpp based on whether any __init__ overload can
+        // accept no arguments.
 
         return func->vectorcall((PyObject *) func, nullptr, 0, nullptr);
     }

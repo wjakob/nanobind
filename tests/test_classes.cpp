@@ -6,6 +6,7 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/tuple.h>
+#include <nanobind/stl/unique_ptr.h>
 #include <map>
 #include <memory>
 #include <cstring>
@@ -657,6 +658,23 @@ NB_MODULE(test_classes_ext, m) {
         }), "s"_a)
         .def("value", &UniqueInt::value)
         .def("lookups", &UniqueInt::lookups);
+
+    // issue #786
+    struct NewNone {};
+    struct NewDflt { int value; };
+    struct NewStar { size_t value; };
+    nb::class_<NewNone>(m, "NewNone")
+        .def(nb::new_([]() { return NewNone(); }));
+    nb::class_<NewDflt>(m, "NewDflt")
+        .def(nb::new_([](int value) { return NewDflt{value}; }),
+             "value"_a = 42)
+        .def_ro("value", &NewDflt::value);
+    nb::class_<NewStar>(m, "NewStar")
+        .def(nb::new_([](nb::args a, int value, nb::kwargs k) {
+            return NewStar{nb::len(a) + value + 10 * nb::len(k)};
+        }),
+            "args"_a, "value"_a = 42, "kwargs"_a)
+        .def_ro("value", &NewStar::value);
 
     // issue #750
     PyCFunctionWithKeywords dummy_init = [](PyObject *, PyObject *,

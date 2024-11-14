@@ -23,6 +23,11 @@ Version TBD (unreleased)
   ``std::variant<U, T>`` might cast a Python object wrapping a ``T`` to a ``U`` if
   there is an implicit conversion available from ``T`` to ``U``.
 
+- Restored support for constructing types with an overloaded ``__new__`` that
+  takes no arguments, which regressed with the constructor vectorcall
+  acceleration that was added in nanobind 2.2.0.
+  (issue `#786 <https://github.com/wjakob/nanobind/issues/786>`__)
+
 - Added a function annotation :cpp:class:`nb::call_policy\<Policy\>()
   <call_policy>` which supports custom function wrapping logic,
   calling ``Policy::precall()`` before the bound function and

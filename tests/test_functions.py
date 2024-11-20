@@ -280,6 +280,13 @@ def test25_int():
     assert t.test_19(5) == 128
     assert t.test_20("5") == 128
     assert t.test_21(5) == 5
+    assert t.test_21_f(5.1) == int(5.1)
+    assert t.test_21_f(1e50) == int(1e50)
+    assert type(t.test_21_f(0.5)) is int
+    assert t.test_21_g() == int(1.5)
+    assert type(t.test_21_g()) is int
+    assert t.test_21_h() == int(1e50)
+    assert type(t.test_21_h()) is int
     assert t.test_19.__doc__ == "test_19(arg: int, /) -> object"
 
 

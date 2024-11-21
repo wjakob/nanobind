@@ -223,17 +223,21 @@ NB_MODULE(test_eigen_ext, m) {
 
     struct Base {
         virtual ~Base() = default;
-        virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) { };
-        virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd>) { };
+        virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) {}
+        virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd>) {}
+        virtual Eigen::VectorXd returnVecXd() { return { 1, 2 }; }
     };
 
     struct PyBase : Base {
-        NB_TRAMPOLINE(Base, 2);
+        NB_TRAMPOLINE(Base, 3);
         void modRefData(Eigen::Ref<Eigen::VectorXd> a) override {
             NB_OVERRIDE_PURE(modRefData, a);
         }
         void modRefDataConst(Eigen::Ref<const Eigen::VectorXd> a) override {
             NB_OVERRIDE_PURE(modRefDataConst, a);
+        }
+        Eigen::VectorXd returnVecXd() override {
+            NB_OVERRIDE_PURE(returnVecXd);
         }
     };
 
@@ -251,5 +255,8 @@ NB_MODULE(test_eigen_ext, m) {
         Eigen::Vector2d input(1.0, 2.0);
         base->modRefDataConst(input);
         return input;
+    });
+    m.def("returnVecXd", [](Base* base) {
+        return base->returnVecXd();
     });
 }

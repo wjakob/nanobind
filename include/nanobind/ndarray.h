@@ -543,7 +543,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
                    const_name("]"))
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        if (src.is_none()) {
+        if (src.is_none() && flags & (uint8_t) cast_flags::accepts_none) {
             value = ndarray<Args...>();
             return true;
         }

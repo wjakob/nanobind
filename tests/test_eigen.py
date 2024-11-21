@@ -362,12 +362,16 @@ def test13_mutate_python():
         def modRefDataConst(self, input):
             input[0] = 3.0
 
+        def returnVecXd(self):
+            pass
+
     vecRef = np.array([3.0, 2.0])
     der = Derived()
     assert_array_equal(t.modifyRef(der), vecRef)
     with pytest.raises(ValueError):
         t.modifyRefConst(der)
-
+    with pytest.raises(RuntimeError, match="bad[_ ]cast"):
+        t.returnVecXd(der)
 
 @needs_numpy_and_eigen
 def test14_single_element():

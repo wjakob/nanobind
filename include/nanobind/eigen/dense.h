@@ -133,7 +133,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
         // We're in any case making a copy, so non-writable inputs area also okay
         using NDArrayConst = array_for_eigen_t<T, const typename T::Scalar>;
         make_caster<NDArrayConst> caster;
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
             return false;
 
         const NDArrayConst &array = caster.value;
@@ -261,7 +261,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     }
 
     bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
             return false;
 
         // Check for memory layout compatibility of non-contiguous 'Map' types

@@ -45,7 +45,7 @@ template <op_id id, op_type ot, typename L, typename R> struct op_ {
         using Lt = std::conditional_t<std::is_same_v<L, self_t>, Type, L>;
         using Rt = std::conditional_t<std::is_same_v<R, self_t>, Type, R>;
         using Op = op_impl<id, ot, Type, Lt, Rt>;
-        cl.def(Op::name(), &Op::execute, is_operator(), extra...);
+        cl.def(Op::name(), &Op::execute, is_operator(), Op::default_policy, extra...);
     }
 
     template <typename Class, typename... Extra> void execute_cast(Class &cl, const Extra&... extra) const {
@@ -53,17 +53,19 @@ template <op_id id, op_type ot, typename L, typename R> struct op_ {
         using Lt = std::conditional_t<std::is_same_v<L, self_t>, Type, L>;
         using Rt = std::conditional_t<std::is_same_v<R, self_t>, Type, R>;
         using Op = op_impl<id, ot, Type, Lt, Rt>;
-        cl.def(Op::name(), &Op::execute_cast, is_operator(), extra...);
+        cl.def(Op::name(), &Op::execute_cast, is_operator(), Op::default_policy, extra...);
     }
 };
 
 #define NB_BINARY_OPERATOR(id, rid, op, expr)                                          \
 template <typename B, typename L, typename R> struct op_impl<op_##id, op_l, B, L, R> { \
+    static constexpr rv_policy default_policy = rv_policy::automatic;                  \
     static char const* name() { return "__" #id "__"; }                                \
     static auto execute(const L &l, const R &r) -> decltype(expr) { return (expr); }   \
     static B execute_cast(const L &l, const R &r) { return B(expr); }                  \
 };                                                                                     \
 template <typename B, typename L, typename R> struct op_impl<op_##id, op_r, B, L, R> { \
+    static constexpr rv_policy default_policy = rv_policy::automatic;                  \
     static char const* name() { return "__" #rid "__"; }                               \
     static auto execute(const R &r, const L &l) -> decltype(expr) { return (expr); }   \
     static B execute_cast(const R &r, const L &l) { return B(expr); }                  \
@@ -80,6 +82,7 @@ template <typename T> op_<op_##id, op_r, T, self_t> op(const T &, const self_t &
 
 #define NB_INPLACE_OPERATOR(id, op, expr)                                              \
 template <typename B, typename L, typename R> struct op_impl<op_##id, op_l, B, L, R> { \
+    static constexpr rv_policy default_policy = rv_policy::move;                       \
     static char const* name() { return "__" #id "__"; }                                \
     static auto execute(L &l, const R &r) -> decltype(expr) { return expr; }           \
     static B execute_cast(L &l, const R &r) { return B(expr); }                        \
@@ -90,6 +93,7 @@ template <typename T> op_<op_##id, op_l, self_t, T> op(const self_t &, const T &
 
 #define NB_UNARY_OPERATOR(id, op, expr)                                                \
 template <typename B, typename L> struct op_impl<op_##id, op_u, B, L, undefined_t> {   \
+    static constexpr rv_policy default_policy = rv_policy::automatic;                  \
     static char const* name() { return "__" #id "__"; }                                \
     static auto execute(const L &l) -> decltype(expr) { return expr; }                 \
     static B execute_cast(const L &l) { return B(expr); }                              \

@@ -43,6 +43,12 @@ Version TBD (unreleased)
   of storing a dangling C++ iterator reference in the returned Python
   iterator object. (PR `#788 <https://github.com/wjakob/nanobind/pull/788>`__)
 
+- Bindings for augmented assignment operators (as generated, for example, by
+  ``.def(nb::self += nb::self)``) now return the same object in Python in the
+  typical case where the C++ operator returns a reference to ``*this``.
+  Previously, after ``a += b``, ``a`` would be replaced with a copy.
+  (PR `#803 <https://github.com/wjakob/nanobind/pull/803>`__)
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

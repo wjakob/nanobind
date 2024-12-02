@@ -440,6 +440,9 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     m.def("hash_it", [](nb::handle h) { return nb::hash(h); });
+    m.def("isinstance_", [](nb::handle inst, nb::handle cls) {
+        return nb::isinstance(inst, cls);
+    });
 
     // Test bytearray type
     m.def("test_bytearray_new",     []() { return nb::bytearray(); });

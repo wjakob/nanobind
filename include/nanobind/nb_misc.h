@@ -111,6 +111,13 @@ inline Py_hash_t hash(handle h) {
     return rv;
 }
 
+inline bool isinstance(handle inst, handle cls) {
+    int ret = PyObject_IsInstance(inst.ptr(), cls.ptr());
+    if (ret == -1)
+      nanobind::raise_python_error();
+    return ret;
+}
+
 inline bool is_alive() noexcept {
     return detail::is_alive();
 }

@@ -49,6 +49,10 @@ Version TBD (unreleased)
   Previously, after ``a += b``, ``a`` would be replaced with a copy.
   (PR `#803 <https://github.com/wjakob/nanobind/pull/803>`__)
 
+- Added an overload to :cpp:func:`isinstance` which tests if a Python object
+  is an instance of a Python class. This is in addition to the existing
+  overload, which tests if a Python object is an instance of a bound C++ class.
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

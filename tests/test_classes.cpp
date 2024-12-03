@@ -705,4 +705,12 @@ NB_MODULE(test_classes_ext, m) {
             nb::inst_mark_ready(h);
         })
         .def_rw("value", &MonkeyPatchable::value);
+
+    struct StaticPropertyOverride {};
+    struct StaticPropertyOverride2 : public StaticPropertyOverride {};
+
+    nb::class_<StaticPropertyOverride>(m, "StaticPropertyOverride")
+        .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 42; });
+    nb::class_<StaticPropertyOverride2, StaticPropertyOverride>(m, "StaticPropertyOverride2")
+        .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 43; });
 }

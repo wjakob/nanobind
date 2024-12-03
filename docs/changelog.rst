@@ -49,6 +49,10 @@ Version TBD (unreleased)
   Previously, after ``a += b``, ``a`` would be replaced with a copy.
   (PR `#803 <https://github.com/wjakob/nanobind/pull/803>`__)
 
+- Added support for overriding static properties, such as those defined using
+  ``def_prop_ro_static``, in subclasses. Previously this would fail with an
+  error.
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

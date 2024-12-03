@@ -916,3 +916,7 @@ def test48_monekypatchable():
     t.MonkeyPatchable.__init__ = my_init
     q = t.MonkeyPatchable()
     assert q.value == 456
+
+def test49_static_property_override():
+    assert t.StaticPropertyOverride.x == 42
+    assert t.StaticPropertyOverride2.x == 43

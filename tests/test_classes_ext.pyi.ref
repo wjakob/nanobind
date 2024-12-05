@@ -180,6 +180,14 @@ class StaticProperties:
 class StaticProperties2(StaticProperties):
     pass
 
+class StaticPropertyOverride:
+    x: int = ...
+    """(arg: object, /) -> int"""
+
+class StaticPropertyOverride2(StaticPropertyOverride):
+    x: int = ...
+    """(arg: object, /) -> int"""
+
 class Struct:
     """Some documentation"""
 

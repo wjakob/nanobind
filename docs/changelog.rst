@@ -53,6 +53,10 @@ Version TBD (unreleased)
   is an instance of a Python class. This is in addition to the existing
   overload, which tests if a Python object is an instance of a bound C++ class.
 
+- Added support for overriding static properties, such as those defined using
+  ``def_prop_ro_static``, in subclasses. Previously this would fail with an
+  error.
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

@@ -513,7 +513,9 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
 
     if (cur) {
         PyTypeObject *tp = int_p->nb_static_property;
-        if (Py_TYPE(cur) == tp) {
+        // For type.static_prop = value, call the setter.
+        // For type.static_prop = another_static_prop, replace the descriptor.
+        if (Py_TYPE(cur) == tp && Py_TYPE(value) != tp) {
             int rv = int_p->nb_static_property_descr_set(cur, obj, value);
             Py_DECREF(cur);
             return rv;

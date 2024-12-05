@@ -22,9 +22,9 @@
 #endif
 
 #define NB_VERSION_MAJOR 2
-#define NB_VERSION_MINOR 3
+#define NB_VERSION_MINOR 4
 #define NB_VERSION_PATCH 0
-#define NB_VERSION_DEV   1 // A value > 0 indicates a development release
+#define NB_VERSION_DEV   0 // A value > 0 indicates a development release
 
 // Core C++ headers that nanobind depends on
 #include <cstddef>

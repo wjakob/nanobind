@@ -725,3 +725,9 @@ def test50_call_policy():
         case("swapfrom", "xxx", "<unfinished>")
     with pytest.raises(RuntimeError, match="offset too large"):
         case("swapfrom", "10", "<unfinished>")
+
+def test51_isinstance():
+    assert t.isinstance_(3, int)
+    assert not t.isinstance_(3, bool)
+    with pytest.raises(TypeError):
+        t.isinstance_(3, 7)

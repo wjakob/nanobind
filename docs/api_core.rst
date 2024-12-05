@@ -635,6 +635,10 @@ Type queries
    to convert the object to C++. It may be more efficient to just perform the
    conversion using :cpp:func:`cast` and catch potential raised exceptions.
 
+.. cpp:function:: isinstance(handle inst, handle cls)
+
+   Checks if the Python object `inst` is an instance of the Python type `cls`.
+
 .. cpp:function:: template <typename T> handle type() noexcept
 
    Returns the Python type object associated with the C++ type `T`. When the

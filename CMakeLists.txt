@@ -96,10 +96,9 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
   )
 
   if(NB_USE_SUBMODULE_DEPS)
+    add_subdirectory(ext/robin_map)
     install(
-      FILES ext/robin_map/include/tsl/robin_map.h
-            ext/robin_map/include/tsl/robin_hash.h
-            ext/robin_map/include/tsl/robin_growth_policy.h
+      FILES  $<TARGET_PROPERTY:tsl::robin_map,INTERFACE_SOURCES>
       DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include/tsl"
     )
   endif()

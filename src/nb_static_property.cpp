@@ -30,12 +30,12 @@ static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject 
 
 PyTypeObject *nb_static_property_tp() noexcept {
     nb_internals *internals_ = internals;
-    PyTypeObject *tp = internals_->nb_static_property;
+    PyTypeObject *tp = internals_->nb_static_property.load_acquire();
 
     if (NB_UNLIKELY(!tp)) {
         lock_internals guard(internals_);
 
-        tp = internals_->nb_static_property;
+        tp = internals_->nb_static_property.load_relaxed();
         if (tp)
             return tp;
 
@@ -65,8 +65,8 @@ PyTypeObject *nb_static_property_tp() noexcept {
         tp = (PyTypeObject *) PyType_FromSpec(&spec);
         check(tp, "nb_static_property type creation failed!");
 
-        internals_->nb_static_property = tp;
         internals_->nb_static_property_descr_set = nb_static_property_descr_set;
+        internals_->nb_static_property.store_release(tp);
     }
 
     return tp;

@@ -175,11 +175,11 @@ static PyMethodDef nb_ndarray_members[] = {
 
 static PyTypeObject *nd_ndarray_tp() noexcept {
     nb_internals *internals_ = internals;
-    PyTypeObject *tp = internals_->nb_ndarray;
+    PyTypeObject *tp = internals_->nb_ndarray.load_acquire();
 
     if (NB_UNLIKELY(!tp)) {
         lock_internals guard(internals_);
-        tp = internals_->nb_ndarray;
+        tp = internals_->nb_ndarray.load_relaxed();
         if (tp)
             return tp;
 
@@ -209,7 +209,7 @@ static PyTypeObject *nd_ndarray_tp() noexcept {
         tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
 #endif
 
-        internals_->nb_ndarray = tp;
+        internals_->nb_ndarray.store_release(tp);
     }
 
     return tp;

@@ -13,6 +13,9 @@
 
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
+#if defined(NB_FREE_THREADED)
+#include <atomic>
+#endif
 #include <cstring>
 #include <string_view>
 #include <functional>
@@ -236,6 +239,32 @@ struct NB_SHARD_ALIGNMENT nb_shard {
 #endif
 };
 
+
+/**
+ * Wraps a std::atomic if free-threading is enabled, otherwise a raw value.
+ */
+#if defined(NB_FREE_THREADED)
+template<typename T>
+struct nb_maybe_atomic {
+  nb_maybe_atomic(T v) : value(v) {}
+
+  std::atomic<T> value;
+  T load_acquire() { return value.load(std::memory_order_acquire); }
+  T load_relaxed() { return value.load(std::memory_order_relaxed); }
+  void store_release(T w) { value.store(w, std::memory_order_release); }
+};
+#else
+template<typename T>
+struct nb_maybe_atomic {
+  nb_maybe_atomic(T v) : value(v) {}
+
+  T value;
+  T load_acquire() { return value; }
+  T load_relaxed() { return value; }
+  void store_release(T w) { value = w; }
+};
+#endif
+
 /**
  * `nb_internals` is the central data structure storing information related to
  * function/type bindings and instances. Separate nanobind extensions within the
@@ -318,7 +347,7 @@ struct nb_internals {
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;
 
     /// Property variant for static attributes (created on demand)
-    PyTypeObject *nb_static_property = nullptr;
+    nb_maybe_atomic<PyTypeObject *> nb_static_property = nullptr;
     descrsetfunc nb_static_property_descr_set = nullptr;
 
 #if defined(NB_FREE_THREADED)
@@ -328,7 +357,7 @@ struct nb_internals {
 #endif
 
     /// N-dimensional array wrapper (created on demand)
-    PyTypeObject *nb_ndarray = nullptr;
+    nb_maybe_atomic<PyTypeObject *> nb_ndarray = nullptr;
 
 #if defined(NB_FREE_THREADED)
     nb_shard *shards = nullptr;

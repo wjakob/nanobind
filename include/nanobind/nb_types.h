@@ -371,10 +371,12 @@ class int_ : public object {
         : object(detail::int_from_obj(h.ptr()), detail::steal_t{}) { }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
-    explicit int_(T value)
-        : object(
-              detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr),
-              detail::steal_t{}) {
+    explicit int_(T value) {
+        if constexpr (std::is_floating_point_v<T>)
+            m_ptr = PyLong_FromDouble((double) value);
+        else
+            m_ptr = detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr).ptr();
+
         if (!m_ptr)
             raise_python_error();
     }

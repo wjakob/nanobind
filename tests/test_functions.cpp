@@ -254,6 +254,9 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_19", [](nb::int_ i) { return i + nb::int_(123); });
     m.def("test_20", [](nb::str s) { return nb::int_(s) + nb::int_(123); });
     m.def("test_21", [](nb::int_ i) { return (int) i; });
+    m.def("test_21_f", [](nb::float_ f) { return nb::int_(f); });
+    m.def("test_21_g", []() { return nb::int_(1.5); });
+    m.def("test_21_h", []() { return nb::int_(1e50); });
 
     // Test capsule wrapper
     m.def("test_22", []() -> void * { return (void*) 1; });

@@ -442,8 +442,8 @@ struct new_<Func, Return(Args...)> {
               std::is_same_v<detail::intrinsic_t<Args>, kwargs>) + ... + 0);
         detail::wrap_base_new(cl, sizeof...(Args) > num_defaults + num_varargs);
 
-        auto wrapper = [func = (detail::forward_t<Func>) func](handle, Args... args) {
-            return func((detail::forward_t<Args>) args...);
+        auto wrapper = [func_ = (detail::forward_t<Func>) func](handle, Args... args) {
+            return func_((detail::forward_t<Args>) args...);
         };
 
         if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {

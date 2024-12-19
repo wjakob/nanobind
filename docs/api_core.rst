@@ -1636,9 +1636,11 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
       Set a flag noting that the function argument accepts ``None``. Can only
       be used for python wrapper types (e.g. :cpp:class:`handle`,
-      :cpp:class:`int_`) and types that have been bound using
-      :cpp:class:`class_`. You cannot use this to implement functions that
-      accept null pointers to builtin C++ types like ``int *i = nullptr``.
+      :cpp:class:`int_`), for types that have been bound using
+      :cpp:class:`class_`, for :cpp:class:`ndarray`, ``std::optional``,
+      ``std::variant``, and ``const char*``.
+      You cannot use this to implement functions that
+      accept null pointers to other builtin C++ types like ``int *i = nullptr``.
 
    .. cpp:function:: arg &noconvert(bool value = true)
 

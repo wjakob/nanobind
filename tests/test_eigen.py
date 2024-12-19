@@ -378,3 +378,29 @@ def test14_single_element():
     a = np.array([[1]], dtype=np.uint32)
     assert a.ndim == 2 and a.shape == (1, 1)
     t.addMXuCC(a, a)
+
+@needs_numpy_and_eigen
+def test15_sparse_map():
+    pytest.importorskip("scipy")
+    import scipy
+    c = scipy.sparse.csc_matrix([[1, 0], [0, 1]], dtype=np.float32)
+    # These should be copy-less
+    t.sparse_map_c(c)
+    r = scipy.sparse.csr_matrix([[1, 0], [0, 1]], dtype=np.float32)
+    t.sparse_map_r(r)
+    # These should be ok, but will copy(?)
+    t.sparse_map_c(r)
+    t.sparse_map_r(c)
+
+    t.sparse_update_map_to_zero_c(c);
+    assert c.sum() == 0
+    t.sparse_update_map_to_zero_r(r);
+    assert r.sum() == 0
+    
+    c = scipy.sparse.csc_matrix([[1, 0], [0, 1]], dtype=np.float32)
+    # Shouldn't this fail list t.castToMapVXi above?
+    t.sparse_update_map_to_zero_r(c);
+
+
+
+

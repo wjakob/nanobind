@@ -126,10 +126,22 @@ template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
     NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
-            if constexpr (sizeof(T) == 8)
-                return detail::load_f64(src.ptr(), flags, &value);
-            else
-                return detail::load_f32(src.ptr(), flags, &value);
+            if constexpr (sizeof(T) == 8) {
+                // Assume T, double, and Python float are all IEEE 754 binary64
+                return detail::load_f64(src.ptr(), flags, (double *) &value);
+            } else {
+                double d;
+                if (!detail::load_f64(src.ptr(), flags, &d))
+                    return false;
+                T result = static_cast<T>(d);
+                if ((flags & (uint8_t) cast_flags::convert)
+                        || static_cast<double>(result) == d
+                        || (result != result && d != d)) {
+                    value = result;
+                    return true;
+                }
+                return false;
+            }
         } else {
             if constexpr (std::is_signed_v<T>) {
                 if constexpr (sizeof(T) == 8)

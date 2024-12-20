@@ -904,18 +904,16 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (double) PyFloat_AS_DOUBLE(o);
+        *out = PyFloat_AS_DOUBLE(o);
         return true;
     }
-
-    is_float = false;
 #endif
 
     if (is_float || (flags & (uint8_t) cast_flags::convert)) {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (double) result;
+            *out = result;
             return true;
         } else {
             PyErr_Clear();
@@ -925,31 +923,6 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     return false;
 }
 
-bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
-    bool is_float = PyFloat_CheckExact(o);
-
-#if !defined(Py_LIMITED_API)
-    if (NB_LIKELY(is_float)) {
-        *out = (float) PyFloat_AS_DOUBLE(o);
-        return true;
-    }
-
-    is_float = false;
-#endif
-
-    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
-        double result = PyFloat_AsDouble(o);
-
-        if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (float) result;
-            return true;
-        } else {
-            PyErr_Clear();
-        }
-    }
-
-    return false;
-}
 
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && PY_VERSION_HEX < 0x030c0000
 // Direct access for compact integers. These functions are

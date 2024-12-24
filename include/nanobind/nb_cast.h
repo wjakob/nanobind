@@ -322,13 +322,13 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
     }
 };
 
-template <typename T> struct typed_name {
+template <typename T> struct typed_base_name {
       static constexpr auto Name = type_caster<T>::Name;
 };
 
 #if PY_VERSION_HEX < 0x03090000
 #define NB_TYPED_NAME_PYTHON38(type, name)                     \
-    template <> struct typed_name<type> {                      \
+    template <> struct typed_base_name<type> {                 \
         static constexpr auto Name = detail::const_name(name); \
     };
 
@@ -339,13 +339,47 @@ NB_TYPED_NAME_PYTHON38(dict, NB_TYPING_DICT)
 NB_TYPED_NAME_PYTHON38(type_object, NB_TYPING_TYPE)
 #endif
 
+// Base case: typed<T, Ts...> renders as T[Ts...], with some adjustments to
+// T for older versions of Python (typing.List instead of list, for example)
+template <typename T, typename... Ts> struct typed_name {
+    static constexpr auto Name =
+            typed_base_name<intrinsic_t<T>>::Name + const_name("[") +
+            concat(const_name<std::is_same_v<Ts, ellipsis>>(const_name("..."),
+                    make_caster<Ts>::Name)...) + const_name("]");
+};
+
+// typed<object, T> or typed<handle, T> renders as T, rather than as
+// the nonsensical object[T]
+template <typename T> struct typed_name<object, T> {
+    static constexpr auto Name = make_caster<T>::Name;
+};
+template <typename T> struct typed_name<handle, T> {
+    static constexpr auto Name = make_caster<T>::Name;
+};
+
+// typed<callable, R(Args...)> renders as Callable[[Args...], R]
+template <typename R, typename... Args>
+struct typed_name<callable, R(Args...)> {
+    using Ret = std::conditional_t<std::is_void_v<R>, void_type, R>;
+    static constexpr auto Name =
+            const_name(NB_TYPING_CALLABLE "[[") +
+            concat(make_caster<Args>::Name...) + const_name("], ") +
+            make_caster<Ret>::Name + const_name("]");
+};
+// typed<callable, R(...)> renders as Callable[..., R]
+template <typename R>
+struct typed_name<callable, R(...)> {
+    using Ret = std::conditional_t<std::is_void_v<R>, void_type, R>;
+    static constexpr auto Name =
+            const_name(NB_TYPING_CALLABLE "[..., ") +
+            make_caster<Ret>::Name + const_name("]");
+};
+
 template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {
     using Caster = make_caster<T>;
     using Typed = typed<T, Ts...>;
 
-    NB_TYPE_CASTER(Typed, typed_name<intrinsic_t<T>>::Name + const_name("[") +
-                   concat(const_name<std::is_same_v<Ts, ellipsis>>(const_name("..."),
-                          make_caster<Ts>::Name)...) + const_name("]"))
+    NB_TYPE_CASTER(Typed, (typed_name<T, Ts...>::Name))
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         Caster caster;

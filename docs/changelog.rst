@@ -15,6 +15,19 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (not yet released)
+------------------------------
+
+- Added some special forms for :cpp:class:`nb::typed\<T, Ts...\> <typed>`:
+
+  - ``nb::typed<nb::object, T>`` or ``nb::typed<nb::handle, T>`` produces
+    a parameter or return value that will be described like ``T`` in function
+    signatures but accepts any Python object at runtime
+
+  - ``nb::typed<nb::callable, R(Args...)>`` produces a Python callable signature
+    ``Callable[[Args...], R]``; similarly, ``nb::typed<nb::callable, R(...)>``
+    (with a literal ellipsis) produces the Python ``Callable[..., R]``
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

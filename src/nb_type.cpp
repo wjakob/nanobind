@@ -876,7 +876,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             /* .name = */ name,
             /* .basicsize = */ basicsize,
             /* .itemsize = */ itemsize,
-            /* .flags = */ Py_TPFLAGS_DEFAULT,
+            /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
             /* .slots = */ slots
         };
 

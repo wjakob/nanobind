@@ -445,7 +445,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
                 // skips Python's usual logic where __init__ is always called
                 // if __new__ returns an instance of the type.
                 bool noargs_ok = true;
-                for (size_t i = 1; i < fc->nargs - has_var_kwargs; ++i) {
+                for (uint32_t i = 1; i < fc->nargs - (uint32_t) has_var_kwargs; ++i) {
                     if (has_var_args && i == fc->nargs_pos)
                         continue; // skip `nb::args` since it can be empty
                     if (has_args && fc->args[i].value != nullptr)

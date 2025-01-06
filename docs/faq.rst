@@ -354,6 +354,24 @@ named domain to avoid conflicts with other extensions. To do so, specify the
 In this case, inter-extension type visibility is furthermore restricted to
 extensions in the ``"my_project"`` domain.
 
+Can I use nanobind without RTTI or C++ exceptions?
+--------------------------------------------------
+
+Certain environments (e.g., `Google-internal development
+<https://google.github.io/styleguide/cppguide.html>`__, embedded devices, etc.)
+require compilation without C++ runtime type information (``-fno-rtti``) and
+exceptions (``-fno-exceptions``).
+
+nanobind requires both of these features and cannot be used when they are not
+available. RTTI provides the central index to look up types of bindings.
+Exceptions are needed because Python relies on exceptions that must be
+converted into something equivalent on the C++ side. PRs that refactor nanobind
+to work without RTTI or exceptions will not be accepted.
+
+For Googlers: there is already an exemption from the internal rules that
+specifically permits the use of RTTI/exceptions when a project relies on
+pybind11. Likely, this exemption could be extended to include nanobind as well.
+
 I'd like to use this project, but with $BUILD_SYSTEM instead of CMake
 ---------------------------------------------------------------------
 

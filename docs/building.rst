@@ -45,6 +45,7 @@ addition, binding code may run slowly and produce large binaries.
 
    if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
      set_property(CACHE CMAKE_BUILD_TYPE PROPERTY VALUE Release)
+     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
    endif()
 
 Finding nanobind

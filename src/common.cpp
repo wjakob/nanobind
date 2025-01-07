@@ -8,6 +8,7 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <limits>
 #include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -923,6 +924,40 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     return false;
 }
 
+bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
+    static_assert(std::numeric_limits<float>::is_iec559);
+    static_assert(std::numeric_limits<double>::is_iec559);
+    bool is_float = PyFloat_CheckExact(o);
+    bool convert = flags & (uint8_t) cast_flags::convert;
+
+#if !defined(Py_LIMITED_API)
+    if (NB_LIKELY(is_float)) {
+        double d = PyFloat_AS_DOUBLE(o);
+        float result = static_cast<float>(d);
+        if (convert || static_cast<double>(result) == d || d != d) {
+            *out = result;
+            return true;
+        } else {
+            return false;
+        }
+    }
+#endif
+
+    if (is_float || convert) {
+        double d = PyFloat_AsDouble(o);
+        if (d != -1.0 || !PyErr_Occurred()) {
+            float result = static_cast<float>(d);
+            if (convert || static_cast<double>(result) == d || d != d) {
+                *out = result;
+                return true;
+            }
+        } else {
+            PyErr_Clear();
+        }
+    }
+
+    return false;
+}
 
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && PY_VERSION_HEX < 0x030c0000
 // Direct access for compact integers. These functions are

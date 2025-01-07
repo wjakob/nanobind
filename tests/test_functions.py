@@ -253,6 +253,18 @@ def test21_numpy_overloads():
     assert t.test_11_sll(np.int32(5)) == 5
     assert t.test_11_ull(np.int32(5)) == 5
 
+    with pytest.raises(TypeError) as excinfo:
+        t.test_21_dnc(np.float64(21.0))  # Python type is not exactly float
+    assert "incompatible function arguments" in str(excinfo.value)
+    assert t.test_21_dnc(float(np.float64(21.0))) == 22.0
+    assert t.test_21_dnc(float(np.float32(21.0))) == 22.0
+
+    assert t.test_21_fnc(float(np.float32(21.0))) == 22.0
+    with pytest.raises(TypeError) as excinfo:
+        t.test_21_fnc(float(np.float64(21.1)))  # Inexact narrowing to float32
+    assert "incompatible function arguments" in str(excinfo.value)
+    assert t.test_21_fnc(float(np.float32(21.1))) == np.float32(22.1)
+
 
 def test22_string_return():
     assert t.test_12("hello") == "hello"

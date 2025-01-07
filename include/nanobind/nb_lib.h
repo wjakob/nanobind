@@ -512,6 +512,7 @@ NB_CORE bool load_i32(PyObject *o, uint8_t flags, int32_t *out) noexcept;
 NB_CORE bool load_u32(PyObject *o, uint8_t flags, uint32_t *out) noexcept;
 NB_CORE bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept;
 NB_CORE bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept;
+NB_CORE bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept;
 NB_CORE bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept;
 
 // ========================================================================

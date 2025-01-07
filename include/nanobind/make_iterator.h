@@ -71,27 +71,30 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
         "make_iterator_impl(): the generated __next__ would copy elements, so the "
         "element type must be copy-constructible");
 
-    if (!type<State>().is_valid()) {
-        class_<State>(scope, name)
-            .def("__iter__", [](handle h) { return h; })
-            .def("__next__",
-                 [](State &s) -> ValueType {
-                     if (!s.first_or_done)
-                         ++s.it;
-                     else
-                         s.first_or_done = false;
+    {
+        static ft_mutex mu;
+        ft_lock_guard lock(mu);
+        if (!type<State>().is_valid()) {
+            class_<State>(scope, name)
+                .def("__iter__", [](handle h) { return h; })
+                .def("__next__",
+                    [](State &s) -> ValueType {
+                        if (!s.first_or_done)
+                            ++s.it;
+                        else
+                            s.first_or_done = false;
 
-                     if (s.it == s.end) {
-                         s.first_or_done = true;
-                         throw stop_iteration();
-                     }
+                        if (s.it == s.end) {
+                            s.first_or_done = true;
+                            throw stop_iteration();
+                        }
 
-                     return Access()(s.it);
-                 },
-                 std::forward<Extra>(extra)...,
-                 Policy);
+                        return Access()(s.it);
+                    },
+                    std::forward<Extra>(extra)...,
+                    Policy);
+        }
     }
-
     return borrow<typed<iterator, ValueType>>(cast(State{
         std::forward<Iterator>(first), std::forward<Sentinel>(last), true }));
 }

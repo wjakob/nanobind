@@ -10,107 +10,12 @@
 #include <nanobind/nanobind.h>
 #include <structmember.h>
 #include "nb_internals.h"
+#include "nb_abi.h"
 #include <thread>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
-
-/// Tracks the ABI of nanobind
-#ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 16
-#endif
-
-/// On MSVC, debug and release builds are not ABI-compatible!
-#if defined(_MSC_VER) && defined(_DEBUG)
-#  define NB_BUILD_TYPE "_debug"
-#else
-#  define NB_BUILD_TYPE ""
-#endif
-
-/// Let's assume that different compilers are ABI-incompatible.
-#if defined(_MSC_VER)
-#  define NB_COMPILER_TYPE "_msvc"
-#elif defined(__INTEL_COMPILER)
-#  define NB_COMPILER_TYPE "_icc"
-#elif defined(__clang__)
-#  define NB_COMPILER_TYPE "_clang"
-#elif defined(__PGI)
-#  define NB_COMPILER_TYPE "_pgi"
-#elif defined(__MINGW32__)
-#  define NB_COMPILER_TYPE "_mingw"
-#elif defined(__CYGWIN__)
-#  define NB_COMPILER_TYPE "_gcc_cygwin"
-#elif defined(__GNUC__)
-#  define NB_COMPILER_TYPE "_gcc"
-#else
-#  define NB_COMPILER_TYPE "_unknown"
-#endif
-
-/// Also standard libs
-#if defined(_LIBCPP_VERSION)
-#  define NB_STDLIB "_libc++"
-#elif defined(__GLIBCXX__)
-#  define NB_STDLIB "_libstdc++"
-#else
-#  define NB_STDLIB ""
-#endif
-
-// Catch other conditions that imply ABI incompatibility
-// - MSVC builds with different CRT versions
-// - An anticipated MSVC ABI break ("vNext")
-// - Builds using libc++ with unstable ABIs
-// - Builds using libstdc++ with the legacy (pre-C++11) ABI
-#if defined(_MSC_VER)
-#  if defined(_MT) && defined(_DLL) // catches /MD or /MDd
-#    define NB_BUILD_LIB "_md"
-#  elif defined(_MT)
-#    define NB_BUILD_LIB "_mt"      // catches /MT or /MTd
-#  else
-#    define NB_BUILD_LIB ""
-#  endif
-#  if (_MSC_VER) / 100 == 19
-#    define NB_BUILD_ABI NB_BUILD_LIB "_19"
-#  else
-#    define NB_BUILD_ABI NB_BUILD_LIB "_unknown"
-#  endif
-#elif defined(_LIBCPP_ABI_VERSION)
-#  define NB_BUILD_ABI "_abi" NB_TOSTRING(_LIBCPP_ABI_VERSION)
-#elif defined(__GLIBCXX__)
-#  if _GLIBCXX_USE_CXX11_ABI
-#    define NB_BUILD_ABI ""
-#  else
-#    define NB_BUILD_ABI "_legacy"
-#  endif
-#else
-#  define NB_BUILD_ABI ""
-#endif
-
-// Can have limited and non-limited-API extensions in the same process.
-// Nanobind data structures will differ, so these can't talk to each other
-#if defined(Py_LIMITED_API)
-#  define NB_STABLE_ABI "_stable"
-#else
-#  define NB_STABLE_ABI ""
-#endif
-
-// As above, but for free-threaded extensions
-#if defined(NB_FREE_THREADED)
-#  define NB_FREE_THREADED_ABI "_ft"
-#else
-#  define NB_FREE_THREADED_ABI ""
-#endif
-
-#if NB_VERSION_DEV > 0
-  #define NB_VERSION_DEV_STR "_dev" NB_TOSTRING(NB_VERSION_DEV)
-#else
-  #define NB_VERSION_DEV_STR ""
-#endif
-
-#define NB_ABI_TAG                                                        \
-    "v" NB_TOSTRING(NB_INTERNALS_VERSION)                                      \
-        NB_VERSION_DEV_STR NB_COMPILER_TYPE NB_STDLIB NB_BUILD_ABI             \
-            NB_BUILD_TYPE NB_STABLE_ABI NB_FREE_THREADED_ABI
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)

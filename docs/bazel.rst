@@ -27,8 +27,8 @@ in your MODULE.bazel file:
     # Place this in your MODULE.bazel file.
     # The major version of nanobind-bazel is equal to the version
     # of the internally used nanobind.
-    # In this case, we are building bindings with nanobind v2.2.0.
-    bazel_dep(name = "nanobind_bazel", version = "2.2.0")
+    # In this case, we are building bindings with nanobind v2.4.0.
+    bazel_dep(name = "nanobind_bazel", version = "2.4.0")
 
 To instead use a development version from GitHub, you can declare the
 dependency as a ``git_override()`` in your MODULE.bazel:
@@ -57,7 +57,7 @@ and then declare it as a ``local_path_override()`` dependency:
 
 .. note::
 
-    At minimum, Bazel version 6.4.0 is required to use nanobind-bazel.
+    At minimum, Bazel version 7.0.0 is required to use nanobind-bazel.
 
 
 .. _bazel-build:
@@ -138,6 +138,30 @@ Python script needs to be executed for stub generation.
 Naturally, since stub generation relies on the given shared object files, the
 actual extensions are built in the process before invocation of the stub
 generation script.
+
+Building extensions for free-threaded Python
+--------------------------------------------
+
+Starting from CPython 3.13, bindings extensions can be built for a free-threaded
+CPython interpreter. This requires two things: First, an eligible toolchain must
+be defined in your MODULE.bazel file, e.g. like so:
+
+.. code-block:: python
+
+    bazel_dep(name = "rules_python", version = "1.0.0")
+
+    python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+    python.toolchain(python_version = "3.13")
+
+And secondly, the ``@rules_python//python/config_settings:py_freethreaded`` flag must
+be set to "yes" when building your nanobind extension target, e.g. as
+``bazel build //path/to:my_ext --@rules_python//python/config_settings:py_freethreaded=yes``.
+
+Then, ``rules_python`` will bootstrap a free-threaded version of your target interpreter,
+and ``nanobind_bazel`` will define the ``NB_FREE_THREADED`` macro for the libnanobind
+build, indicating that nanobind should be built with free-threading support.
+For a comprehensive overview on nanobind with free-threaded Python, refer to the
+:ref:`free-threading documentation <free-threaded>`.
 
 nanobind-bazel and Python packaging
 -----------------------------------

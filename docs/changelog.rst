@@ -22,11 +22,29 @@ Version TBD (not yet released)
 
   - ``nb::typed<nb::object, T>`` or ``nb::typed<nb::handle, T>`` produces
     a parameter or return value that will be described like ``T`` in function
-    signatures but accepts any Python object at runtime
+    signatures but accepts any Python object at runtime.
 
   - ``nb::typed<nb::callable, R(Args...)>`` produces a Python callable signature
     ``Callable[[Args...], R]``; similarly, ``nb::typed<nb::callable, R(...)>``
-    (with a literal ellipsis) produces the Python ``Callable[..., R]``
+    (with a literal ellipsis) produces the Python ``Callable[..., R]``.
+
+  (PR `#835 <https://github.com/wjakob/nanobind/pull/835>`__).
+
+- Fixed the :cpp:class:`nb::int_ <int_>` constructor so that it casts to
+  an integer when invoked with a floating point argument.
+
+- Fixed (benign) reference leads that could occur when ``std::shared_ptr<T>``
+  instances were still alive at interpreter shutdown time. (commit `fb8157
+  <https://github.com/wjakob/nanobind/commit/fb815762fdb8476cfd293e3717ca41c8bb890437>`__).
+
+- Fixed a race condition in free-threaded extensions that could occur when
+  :cpp:func:`nb::make_iterator <make_iterator>` concurrently used by
+  multiple threads (PR `#832 <https://github.com/wjakob/nanobind/pull/832>`__).
+
+- Removed double-checked locking patterns in accesses to internal data
+  structures to ensure correct free-threaded behavior on architectures with
+  weak memory ordering (specifically, ARM). (PR `#819
+  <https://github.com/wjakob/nanobind/pull/819>`__).
 
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------

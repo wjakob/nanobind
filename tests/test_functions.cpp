@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/function.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
@@ -142,11 +143,16 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_bad_tuple", []() { struct Foo{}; return nb::make_tuple("Hello", Foo()); });
 
     /// Perform a Python function call from C++
-    m.def("test_call_1", [](nb::object o) { return o(1); });
-    m.def("test_call_2", [](nb::object o) { return o(1, 2); });
+    m.def("test_call_1", [](nb::typed<nb::object, std::function<int(int)>> o) {
+        return o(1);
+    });
+    m.def("test_call_2", [](nb::typed<nb::callable, void(int, int)> o) {
+        return o(1, 2);
+    });
 
     /// Test expansion of args/kwargs-style arguments
-    m.def("test_call_extra", [](nb::object o, nb::args args, nb::kwargs kwargs) {
+    m.def("test_call_extra", [](nb::typed<nb::callable, void(...)> o,
+                                nb::args args, nb::kwargs kwargs) {
         return o(1, 2, *args, **kwargs, "extra"_a = 5);
     });
 

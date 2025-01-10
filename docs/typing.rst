@@ -178,7 +178,30 @@ subclasses the type ``T`` and can be used interchangeably with ``T``. The other
 arguments (``Ts...``) are used to generate a Python type signature but have no
 other effect (for example, parameterizing by ``str`` on the Python end can
 alternatively be achieved by passing ``nb::str``, ``std::string``, or ``const
-char*`` as part of the ``Ts..`` parameter pack).
+char*`` as part of the ``Ts...`` parameter pack).
+
+There are two special forms of ``nb::typed<T, Ts...>`` that will be rendered
+as something other than ``T[Ts...]``:
+
+* In some cases, a function may wish to accept or return an arbitrary
+  Python object, but generate signatures that describe it as some more
+  specific type  ``T``. The types ``nb::typed<nb::object, T>`` and
+  ``nb::typed<nb::handle, T>`` will be rendered as ``T`` rather than
+  as the nonsensical ``object[T]`` that they would be without this rule.
+  (If you want nanobind to check that an argument is actually of type ``T``,
+  while still giving you a generic Python object to work with,
+  then use :cpp:class:`nb::handle_t\<T\> <handle_t>` instead.)
+
+* Type parameters for ``nb::callable`` can be provided using a C++ function
+  signature, since there would otherwise be no way to express the nested
+  brackets used in Python callable signatures. In order to express the Python type
+  ``Callable[[str, float], int]``, which is a function taking two parameters
+  (string and float) and returning an integer, you might write
+  ``nb::typed<nb::callable, int(nb::str, float)>``. For a callable type
+  that accepts any arguments, like ``Callable[..., int]``, use a C-style
+  variadic function signature: ``nb::typed<nb::callable, int(...)>``.
+  (The latter could also be written without this special support, as
+  ``nb::typed<nb::callable, nb::ellipsis, int>``.)
 
 .. _typing_generics_creating:
 

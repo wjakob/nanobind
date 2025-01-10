@@ -469,7 +469,14 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_config *c,
         if (!t.strides) {
             /* When the provided tensor does not have a valid
                strides field, it uses the C ordering convention */
-            pass_order = c_order || t.ndim == 1;
+            if (c_order) {
+                pass_order = true;
+            } else {
+                int nontrivial_dims = 0;
+                for (int i = 0; i < t.ndim; ++i)
+                    nontrivial_dims += (int) (t.shape[i] > 1);
+                pass_order = nontrivial_dims <= 1;
+            }
         } else {
             if (c_order) {
                 for (int64_t i = t.ndim - 1, accum = 1; i >= 0; --i) {

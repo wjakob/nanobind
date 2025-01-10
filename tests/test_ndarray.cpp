@@ -351,6 +351,12 @@ NB_MODULE(test_ndarray_ext, m) {
 
     m.def("check", [](nb::handle h) { return nb::ndarray_check(h); });
 
+    m.def("accept_np_both_true_contig_a", 
+          [](nb::ndarray<float, nb::numpy, nb::shape<2, 1>, nb::any_contig> a) { return a(0, 0); });
+    m.def("accept_np_both_true_contig_c", 
+          [](nb::ndarray<float, nb::numpy, nb::shape<2, 1>, nb::c_contig> a) { return a(0, 0); });
+    m.def("accept_np_both_true_contig_f", 
+          [](nb::ndarray<float, nb::numpy, nb::shape<2, 1>, nb::f_contig> a) { return a(0, 0); });
 
     struct Cls {
         auto f1() { return nb::ndarray<nb::numpy, float>(data, { 10 }, nb::handle()); }

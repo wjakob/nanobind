@@ -904,7 +904,7 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (double) PyFloat_AS_DOUBLE(o);
+        *out = PyFloat_AS_DOUBLE(o);
         return true;
     }
 
@@ -915,7 +915,7 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (double) result;
+            *out = result;
             return true;
         } else {
             PyErr_Clear();
@@ -927,22 +927,31 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
 
 bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
+    bool convert = flags & (uint8_t) cast_flags::convert;
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (float) PyFloat_AS_DOUBLE(o);
-        return true;
+        double d = PyFloat_AS_DOUBLE(o);
+        float result = (float) d;
+        if (convert || (double) result == d || d != d) {
+            *out = result;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     is_float = false;
 #endif
 
-    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
-        double result = PyFloat_AsDouble(o);
-
-        if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (float) result;
-            return true;
+    if (is_float || convert) {
+        double d = PyFloat_AsDouble(o);
+        if (d != -1.0 || !PyErr_Occurred()) {
+            float result = (float) d;
+            if (convert || (double) result == d || d != d) {
+                *out = result;
+                return true;
+            }
         } else {
             PyErr_Clear();
         }

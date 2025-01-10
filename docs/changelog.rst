@@ -45,6 +45,10 @@ Version TBD (not yet released)
   structures to ensure correct free-threaded behavior on architectures with
   weak memory ordering (specifically, ARM). (PR `#819
   <https://github.com/wjakob/nanobind/pull/819>`__).
+  
+- The floating-point type_caster now only performs value-changing narrowing
+  conversions if the convert flag is set.
+  (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__)
 
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------

@@ -264,6 +264,10 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_21_g", []() { return nb::int_(1.5); });
     m.def("test_21_h", []() { return nb::int_(1e50); });
 
+    // Test floating-point
+    m.def("test_21_dnc", [](double d) { return d + 1.0; }, nb::arg().noconvert());
+    m.def("test_21_fnc", [](float f) { return f + 1.0f; }, nb::arg().noconvert());
+
     // Test capsule wrapper
     m.def("test_22", []() -> void * { return (void*) 1; });
     m.def("test_23", []() -> void * { return nullptr; });

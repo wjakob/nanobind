@@ -15,6 +15,13 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.5.0 ( tbd , 2025)
+---------------------------
+
+- The floating-point type_caster now only performs value-changing narrowing
+  conversions if the convert flag is set.
+  (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__)
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

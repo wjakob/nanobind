@@ -907,6 +907,8 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
         *out = PyFloat_AS_DOUBLE(o);
         return true;
     }
+
+    is_float = false;
 #endif
 
     if (is_float || (flags & (uint8_t) cast_flags::convert)) {
@@ -938,6 +940,8 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
             return false;
         }
     }
+
+    is_float = false;
 #endif
 
     if (is_float || convert) {

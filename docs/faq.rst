@@ -372,6 +372,16 @@ For Googlers: there is already an exemption from the internal rules that
 specifically permits the use of RTTI/exceptions when a project relies on
 pybind11. Likely, this exemption could be extended to include nanobind as well.
 
+Can I make stable ABI extensios for pre-3.12 Python?
+----------------------------------------------------
+
+Stable ABI extensions are convenient because they can be reused across Python
+versions, but this unfortunately only works on Python 3.12 and newer. Nanobind
+crucially depends on several `features
+<https://docs.python.org/3/whatsnew/3.12.html#c-api-changes>`__ that were added
+in version 3.12 (specifically, `PyType_FromMetaclass()`` and limited API
+bindings of the vector call protocol).
+
 I'd like to use this project, but with $BUILD_SYSTEM instead of CMake
 ---------------------------------------------------------------------
 
@@ -419,14 +429,14 @@ the documentation.
 Are there tools to generate nanobind bindings automatically?
 ------------------------------------------------------------
 
-`litgen <https://pthom.github.io/litgen>`__ is an automatic Python bindings 
-generator compatible with both pybind11 and nanobind, designed to create 
-documented and easily discoverable bindings. 
-It reproduces header documentation directly in the bindings, making the 
-generated API intuitive and well-documented for Python users. 
-Powered by srcML (srcml.org), a high-performance, multi-language parsing tool, 
-litgen takes a developer-centric approach. 
-The C++ API to be exposed to Python must be C++14 compatible, although the 
+`litgen <https://pthom.github.io/litgen>`__ is an automatic Python bindings
+generator compatible with both pybind11 and nanobind, designed to create
+documented and easily discoverable bindings.
+It reproduces header documentation directly in the bindings, making the
+generated API intuitive and well-documented for Python users.
+Powered by srcML (srcml.org), a high-performance, multi-language parsing tool,
+litgen takes a developer-centric approach.
+The C++ API to be exposed to Python must be C++14 compatible, although the
 implementation can leverage more modern C++ features.
 
 How to cite this project?

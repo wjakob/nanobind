@@ -18,7 +18,8 @@ below inherit that of the preceding release.
 Version TBD (not yet released)
 ------------------------------
 
-- Added some special forms for :cpp:class:`nb::typed\<T, Ts...\> <typed>`:
+- Added some special forms for :cpp:class:`nb::typed\<T, Ts...\> <typed>`
+  (PR `#835 <https://github.com/wjakob/nanobind/pull/835>`__):
 
   - ``nb::typed<nb::object, T>`` or ``nb::typed<nb::handle, T>`` produces
     a parameter or return value that will be described like ``T`` in function
@@ -28,8 +29,6 @@ Version TBD (not yet released)
     ``Callable[[Args...], R]``; similarly, ``nb::typed<nb::callable, R(...)>``
     (with a literal ellipsis) produces the Python ``Callable[..., R]``.
 
-  (PR `#835 <https://github.com/wjakob/nanobind/pull/835>`__).
-
 - Fixed the :cpp:class:`nb::int_ <int_>` constructor so that it casts to
   an integer when invoked with a floating point argument.
 
@@ -38,17 +37,24 @@ Version TBD (not yet released)
   <https://github.com/wjakob/nanobind/commit/fb815762fdb8476cfd293e3717ca41c8bb890437>`__).
 
 - Fixed a race condition in free-threaded extensions that could occur when
-  :cpp:func:`nb::make_iterator <make_iterator>` concurrently used by
+  :cpp:func:`nb::make_iterator <make_iterator>` was concurrently used by
   multiple threads (PR `#832 <https://github.com/wjakob/nanobind/pull/832>`__).
 
 - Removed double-checked locking patterns in accesses to internal data
   structures to ensure correct free-threaded behavior on architectures with
-  weak memory ordering (specifically, ARM). (PR `#819
+  weak memory ordering such as ARM (PR `#819
   <https://github.com/wjakob/nanobind/pull/819>`__).
-  
-- The floating-point type_caster now only performs value-changing narrowing
-  conversions if the convert flag is set.
-  (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__)
+
+- The floating-point type caster now only performs value-changing narrowing
+  conversions during the implicit conversion phase. They can be entirely
+  avoided by passing the :cpp:func:`.noconvert() <arg::noconvert>` argument
+  annotation (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__).
+
+- Fixed an overly strict check that could cause a function taking an
+  :cpp:class:`nb::ndarray\<...\> <ndarray>` to refuse specific types of
+  column-major input without implicit conversion. (PR `#847
+  <https://github.com/wjakob/nanobind/pull/847>`__, commit `b95eb7
+  <https://github.com/wjakob/nanobind/commit/b95eb755b5a651a40562002be9ca8a4c6bf0acb9>`__).
 
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------

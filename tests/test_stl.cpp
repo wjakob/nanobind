@@ -443,17 +443,23 @@ NB_MODULE(test_stl_ext, m) {
     });
 
 
-    m.def("complex_value_float", [](const std::complex<float>& x){
+    m.def("complex_value_float", [](const std::complex<float>& x) {
         return x;
     });
-    m.def("complex_value_double", [](const std::complex<double>& x){
+    m.def("complex_value_float_nc", [](const std::complex<float>& x) {
+        return x;
+    }, nb::arg().noconvert());
+    m.def("complex_value_double", [](const std::complex<double>& x) {
         return x;
     });
+    m.def("complex_value_double_nc", [](const std::complex<double>& x) {
+        return x;
+    }, nb::arg().noconvert());
 
-    m.def("complex_array_float", [](const std::vector<std::complex<float>>& x){
+    m.def("complex_array_float", [](const std::vector<std::complex<float>>& x) {
         return x;
     });
-    m.def("complex_array_double", [](const std::vector<std::complex<double>>& x){
+    m.def("complex_array_double", [](const std::vector<std::complex<double>>& x) {
         return x;
     });
 

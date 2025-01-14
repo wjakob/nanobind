@@ -308,6 +308,35 @@ function (nanobind_musl_static_libcpp name)
   endif()
 endfunction()
 
+function (
+  nanobind_setup_libname
+  output_libname
+  ARG_NB_STATIC
+  ARG_STABLE_ABI
+  ARG_FREE_THREADED
+  ARG_NB_DOMAIN
+  ARG_NB_SHARED
+)
+  set(libname "nanobind")
+  if (ARG_NB_STATIC)
+    set(libname "${libname}-static")
+  endif()
+
+  if (ARG_STABLE_ABI)
+    set(libname "${libname}-abi3")
+  endif()
+
+  if (ARG_FREE_THREADED)
+    set(libname "${libname}-ft")
+  endif()
+
+  if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
+    set(libname ${libname}-${ARG_NB_DOMAIN})
+  endif()
+
+  set(${output_libname} ${libname} PARENT_SCOPE)
+endfunction()
+
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
     "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP"
@@ -338,22 +367,18 @@ function(nanobind_add_module name)
     set(ARG_FREE_THREADED FALSE)
   endif()
 
-  set(libname "nanobind")
-  if (ARG_NB_STATIC)
-    set(libname "${libname}-static")
+  # Avoid passing empty argument which will lead to an error when calling nanobind_setup_libname
+  if (NOT ARG_NB_DOMAIN)
+    set(ARG_NB_DOMAIN FALSE)
   endif()
-
-  if (ARG_STABLE_ABI)
-    set(libname "${libname}-abi3")
-  endif()
-
-  if (ARG_FREE_THREADED)
-    set(libname "${libname}-ft")
-  endif()
-
-  if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
-    set(libname ${libname}-${ARG_NB_DOMAIN})
-  endif()
+  nanobind_setup_libname(
+    libname
+    ${ARG_NB_STATIC}
+    ${ARG_STABLE_ABI}
+    ${ARG_FREE_THREADED}
+    ${ARG_NB_SHARED}
+    ${ARG_NB_DOMAIN}
+  )
 
   nanobind_build_library(${libname})
 

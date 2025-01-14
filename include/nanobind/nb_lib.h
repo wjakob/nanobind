@@ -557,6 +557,8 @@ NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 
 NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
 
+NB_CORE const char *abi_tag();
+
 NAMESPACE_END(detail)
 
 using detail::raise;

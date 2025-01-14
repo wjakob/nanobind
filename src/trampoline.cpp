@@ -133,7 +133,7 @@ static void trampoline_enter_internal(void **data, size_t size,
         key = Py_None;
     }
 
-    data[2 * offset + 1] = (void *) name;
+    data[2 * offset + 1] = (void *)const_cast<char *>(name);
     data[2 * offset + 2] = key;
 
     if (key != None) {

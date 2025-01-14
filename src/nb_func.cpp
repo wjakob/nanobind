@@ -99,16 +99,16 @@ void nb_func_dealloc(PyObject *self) {
                     const arg_data &arg = f->args[j];
                     Py_XDECREF(arg.value);
                     Py_XDECREF(arg.name_py);
-                    free((char *) arg.signature);
+                    free(const_cast<char *>(arg.signature));
                 }
             }
 
             if (f->flags & (uint32_t) func_flags::has_doc)
-                free((char *) f->doc);
+                free(const_cast<char *>(f->doc));
 
-            free((char *) f->name);
+            free(const_cast<char *>(f->name));
             free(f->args);
-            free((char *) f->descr);
+            free(const_cast<char *>(f->descr));
             free(f->descr_types);
             free(f->signature);
             ++f;
@@ -193,7 +193,7 @@ char *strdup_check(const char *s) {
  * This is an implementation detail of nanobind::cpp_function.
  */
 PyObject *nb_func_new(const void *in_) noexcept {
-    func_data_prelim<0> *f = (func_data_prelim<0> *) in_;
+    func_data_prelim<0> *f = (func_data_prelim<0> *) const_cast<void *>(in_);
     arg_data *args_in = std::launder((arg_data *) f->args);
 
     bool has_scope       = f->flags & (uint32_t) func_flags::has_scope,
@@ -388,7 +388,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     for (size_t i = 0;; ++i) {
         if (!f->descr[i]) {
             fc->descr = (char *) malloc_check(sizeof(char) * (i + 1));
-            memcpy((char *) fc->descr, f->descr, (i + 1) * sizeof(char));
+            memcpy(const_cast<char *>(fc->descr), f->descr, (i + 1) * sizeof(char));
             break;
         }
     }
@@ -819,7 +819,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 result = nullptr;
 
                 // Found a suitable overload, let's try calling it
-                result = f->impl((void *) f->capture, args, args_flags,
+                result = f->impl(const_cast<void **>(f->capture), args, args_flags,
                                  policy, &cleanup);
 
                 if (NB_UNLIKELY(!result))
@@ -911,7 +911,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 result = nullptr;
 
                 // Found a suitable overload, let's try calling it
-                result = f->impl((void *) f->capture, (PyObject **) args_in,
+                result = f->impl(const_cast<void **>(f->capture), const_cast<PyObject **>(args_in),
                                  args_flags, (rv_policy) (f->flags & 0b111),
                                  &cleanup);
 
@@ -964,7 +964,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
     bool alloc = false;
 
     if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
-        args = (PyObject **) (args_in - 1);
+        args = const_cast<PyObject **>(args_in - 1);
         temp = args[0];
     } else {
         size_t size = nargs + 1;

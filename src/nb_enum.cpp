@@ -102,7 +102,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
         nb_type_unregister(t);
-        free((char*) t->name);
+        free(const_cast<char*>(t->name));
         delete t;
     });
 

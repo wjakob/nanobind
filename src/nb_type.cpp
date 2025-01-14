@@ -433,7 +433,7 @@ static void nb_type_dealloc(PyObject *o) {
         PyMem_Free(t->implicit.py);
     }
 
-    free((char *) t->name);
+    free(const_cast<char *>(t->name));
     NB_SLOT(PyType_Type, tp_dealloc)(o);
 }
 
@@ -988,7 +988,7 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     bool alloc = false;
 
     if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
-        args = (PyObject **) (args_in - 1);
+        args = const_cast<PyObject **>(args_in - 1);
         temp = args[0];
     } else {
         size_t size = nargs + 1;
@@ -1074,7 +1074,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             PyObject *tp = (PyObject *) it->second->type_py;
             Py_INCREF(tp);
             if (has_signature)
-                free((char *) t_name);
+                free(const_cast<char *>(t_name));
             return tp;
         }
     }
@@ -1183,7 +1183,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     *s++ = { Py_tp_dealloc, (void *) inst_dealloc };
 
     if (has_doc)
-        *s++ = { Py_tp_doc, (void *) t->doc };
+        *s++ = { Py_tp_doc, (void *)const_cast<char *>(t->doc) };
 
     vectorcallfunc type_vectorcall = nb_type_vectorcall;
 
@@ -1355,7 +1355,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     if (has_signature) {
         setattr(result, "__nb_signature__", str(t->name));
-        free((char *) t_name);
+        free(const_cast<char *>(t_name));
     }
 
 #if PY_VERSION_HEX >= 0x03090000
@@ -2137,7 +2137,7 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
     if (src == dst)
         return;
 
-    PyTypeObject *tp = Py_TYPE((PyObject *) src);
+    PyTypeObject *tp = Py_TYPE(const_cast<PyObject *>(src));
     type_data *t = nb_type_data(tp);
 
     check(tp == Py_TYPE(dst) &&
@@ -2145,7 +2145,7 @@ void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
           "nanobind::detail::nb_inst_copy(): invalid arguments!");
 
     nb_inst *nbi = (nb_inst *) dst;
-    const void *src_data = inst_ptr((nb_inst *) src);
+    const void *src_data = inst_ptr((nb_inst *)const_cast<PyObject *>(src));
     void *dst_data = inst_ptr(nbi);
 
     if (t->flags & (uint32_t) type_flags::has_copy)
@@ -2161,7 +2161,7 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
     if (src == dst)
         return;
 
-    PyTypeObject *tp = Py_TYPE((PyObject *) src);
+    PyTypeObject *tp = Py_TYPE(const_cast<PyObject *>(src));
     type_data *t = nb_type_data(tp);
 
     check(tp == Py_TYPE(dst) &&
@@ -2169,7 +2169,7 @@ void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
           "nanobind::detail::nb_inst_move(): invalid arguments!");
 
     nb_inst *nbi = (nb_inst *) dst;
-    void *src_data = inst_ptr((nb_inst *) src);
+    void *src_data = inst_ptr((nb_inst *)const_cast<PyObject *>(src));
     void *dst_data = inst_ptr(nbi);
 
     if (t->flags & (uint32_t) type_flags::has_move) {

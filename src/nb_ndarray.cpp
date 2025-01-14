@@ -102,7 +102,7 @@ static int nd_ndarray_tpbuffer(PyObject *exporter, Py_buffer *view, int) {
         return -1;
     }
 
-    view->format = (char *) format;
+    view->format = const_cast<char *>(format);
     view->itemsize = t.dtype.bits / 8;
     view->buf = (void *) ((uintptr_t) t.data + t.byte_offset);
     view->obj = exporter;

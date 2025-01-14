@@ -36,7 +36,7 @@ void implicitly_convertible(const std::type_info *src,
 
     if (size)
         memcpy(data, t->implicit.cpp, size * sizeof(void *));
-    data[size] = (void *) src;
+    data[size] = (void *)const_cast<std::type_info *>(src);
     data[size + 1] = nullptr;
     PyMem_Free(t->implicit.cpp);
     t->implicit.cpp = (decltype(t->implicit.cpp)) data;

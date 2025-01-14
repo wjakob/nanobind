@@ -87,7 +87,7 @@ PyObject *capsule_new(const void *ptr, const char *name,
             cleanup_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
     };
 
-    PyObject *c = PyCapsule_New((void *) ptr, name, capsule_cleanup);
+    PyObject *c = PyCapsule_New(const_cast<void *>(ptr), name, capsule_cleanup);
 
     check(c, "nanobind::detail::capsule_new(): allocation failed!");
 

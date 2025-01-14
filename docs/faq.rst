@@ -372,8 +372,8 @@ For Googlers: there is already an exemption from the internal rules that
 specifically permits the use of RTTI/exceptions when a project relies on
 pybind11. Likely, this exemption could be extended to include nanobind as well.
 
-Can I make stable ABI extensios for pre-3.12 Python?
-----------------------------------------------------
+Can I make stable ABI extensions for pre-3.12 Python?
+-----------------------------------------------------
 
 Stable ABI extensions are convenient because they can be reused across Python
 versions, but this unfortunately only works on Python 3.12 and newer. Nanobind
@@ -381,6 +381,34 @@ crucially depends on several `features
 <https://docs.python.org/3/whatsnew/3.12.html#c-api-changes>`__ that were added
 in version 3.12 (specifically, `PyType_FromMetaclass()`` and limited API
 bindings of the vector call protocol).
+
+Policy on Clang-Tidy, ``-Wpedantic``, etc.
+------------------------------------------
+
+nanobind regularly receives requests from users who run it through Clang-Tidy,
+or who compile with increased warnings levels, like
+
+  ``-Wpedantic``, ``-Wcast-qual``, ``-Wsign-conversion``, etc.
+
+(i.e., beyond the increased ``-Wall``, ``-Wextra`` and ``/W4`` warning levels
+that are already enabled)
+
+Their next step is to open a big pull request needed to silence all of the
+resulting messages.
+
+My policy on this is as follows: I am always happy to fix issues in the
+codebase. However, many of the resulting change requests are in the "ritual
+purification" category: things that cause churn, decrease readability, and
+which don't fix actual problems. It's a never-ending cycle because each new
+revision of such tooling adds further warnings and purification rites.
+
+So just to be clear: I do not wish to pepper this codebase with ``const_cast``
+and ``#pragmas`` or pragma-like comments to avoid warnings in various kinds of
+external tooling just so those users can have a "silent" build. I don't think
+it is reasonable for them to impose their own style on this project.
+
+As a workaround it is likely possible to restrict the scope of style checks to
+particular C++ namespaces or source code locations.
 
 I'd like to use this project, but with $BUILD_SYSTEM instead of CMake
 ---------------------------------------------------------------------

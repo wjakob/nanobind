@@ -386,12 +386,9 @@ Policy on Clang-Tidy, ``-Wpedantic``, etc.
 ------------------------------------------
 
 nanobind regularly receives requests from users who run it through Clang-Tidy,
-or who compile with increased warnings levels, like
-
-  ``-Wpedantic``, ``-Wcast-qual``, ``-Wsign-conversion``, etc.
-
-(i.e., beyond the increased ``-Wall``, ``-Wextra`` and ``/W4`` warning levels
-that are already enabled)
+or who compile with increased warnings levels, like ``-Wpedantic``,
+``-Wcast-qual``, ``-Wsign-conversion``, etc. (i.e., beyond the increased
+``-Wall``, ``-Wextra`` and ``/W4`` warning levels that are already enabled)
 
 Their next step is to open a big pull request needed to silence all of the
 resulting messages.

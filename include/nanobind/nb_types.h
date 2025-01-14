@@ -179,8 +179,8 @@ public:
     handle &operator=(handle &&) noexcept = default;
     NB_INLINE handle(std::nullptr_t, detail::steal_t) : m_ptr(nullptr) { }
     NB_INLINE handle(std::nullptr_t) : m_ptr(nullptr) { }
-    NB_INLINE handle(const PyObject *ptr) : m_ptr((PyObject *) ptr) { }
-    NB_INLINE handle(const PyTypeObject *ptr) : m_ptr((PyObject *) ptr) { }
+    NB_INLINE handle(const PyObject *ptr) : m_ptr(const_cast<PyObject *>(ptr)) { }
+    NB_INLINE handle(const PyTypeObject *ptr) : m_ptr((PyObject *)const_cast<PyTypeObject *>(ptr)) { }
 
     const handle& inc_ref() const & noexcept {
 #if defined(NDEBUG) && !defined(Py_LIMITED_API)

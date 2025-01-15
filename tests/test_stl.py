@@ -686,28 +686,90 @@ def test67_vector_bool():
 
 def test68_complex_value():
     # double: 64bits
-    assert t.complex_value_double(1.0) == 1.0
+    assert t.complex_value_double(1.0) == complex(1.0)
     assert t.complex_value_double(1.0j) == 1.0j
-    assert t.complex_value_double(0.0) == 0.0
+    assert t.complex_value_double(0.0) == complex(0.0)
     assert t.complex_value_double(0.0j) == 0.0j
-    assert t.complex_value_double(0) == 0
-    assert t.complex_value_float(1.0) == 1.0
+    assert t.complex_value_double(0) == complex(0.0)
+    assert t.complex_value_double_nc(1.0 + 2.0j) == 1.0 + 2.0j
+    assert t.complex_value_double_nc(1.0j) == 1.0j
+    assert t.complex_value_double_nc(0.0 + 0.0j) == complex(0.0)
+    assert t.complex_value_double_nc(0.0j) == 0.0j
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(0.0)
+
+    # float: 32bits
+    assert t.complex_value_float(1.0) == complex(1.0)
     assert t.complex_value_float(1.0j) == 1.0j
-    assert t.complex_value_float(0.0) == 0.0
+    assert t.complex_value_float(0.0) == complex(0.0)
     assert t.complex_value_float(0.0j) == 0.0j
-    assert t.complex_value_float(0) == 0
+    assert t.complex_value_float(0) == complex(0.0)
+    assert t.complex_value_float_nc(1.0 + 2.0j) == 1.0 + 2.0j
+    assert t.complex_value_float_nc(1.0j) == 1.0j
+    assert t.complex_value_float_nc(0.0 + 0.0j) == complex(0.0)
+    assert t.complex_value_float_nc(0.0j) == 0.0j
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(0.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(1.1 + 2.0j)  # Inexact narrowing conversion
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(1.0 + 2.1j)  # Inexact narrowing conversion
 
     val_64 = 2.7 - 3.2j
     val_32 = 2.700000047683716 - 3.200000047683716j
     assert val_64 != val_32
 
-    assert t.complex_value_float(val_32) == val_32
-    assert t.complex_value_float(val_64) == val_32
     assert t.complex_value_double(val_32) == val_32
     assert t.complex_value_double(val_64) == val_64
+    assert t.complex_value_double_nc(val_32) == val_32
+    assert t.complex_value_double_nc(val_64) == val_64
+
+    assert t.complex_value_float(val_32) == val_32
+    assert t.complex_value_float(val_64) == val_32
+    assert t.complex_value_float_nc(val_32) == val_32
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(val_64)  # Inexact narrowing conversion
 
     with pytest.raises(TypeError, match="incompatible function arguments"):
         t.complex_value_float([])
+
+    class MyInt(int):
+        def __new__(cls, value):
+            return super().__new__(cls, value)
+
+    assert t.complex_value_double(MyInt(7)) == complex(7.0)
+    assert t.complex_value_float(MyInt(7)) == complex(7.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(MyInt(7))
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(MyInt(7))
+
+    class MyComplex:
+        def __init__(self, real, imag):
+            self.re = real
+            self.im = imag
+        def __complex__(self):
+            return complex(self.re, self.im)
+
+    assert t.complex_value_double(MyComplex(1, 2)) == complex(1.0, 2.0)
+    assert t.complex_value_float(MyComplex(1, 2)) == complex(1.0, 2.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(MyComplex(1, 2))
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(MyComplex(1, 2))
+
+    class MyComplexSubclass(complex): ...
+
+    assert t.complex_value_double(MyComplexSubclass(1, 2)) == complex(1.0, 2.0)
+    assert t.complex_value_float(MyComplexSubclass(1, 2)) == complex(1.0, 2.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(MyComplexSubclass(1, 2))
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(MyComplexSubclass(1, 2))
 
     try:
         import numpy as np
@@ -716,10 +778,17 @@ def test68_complex_value():
         assert t.complex_value_float(np.complex64(val_64)) == val_32
         assert t.complex_value_double(np.complex64(val_32)) == val_32
         assert t.complex_value_double(np.complex64(val_64)) == val_32
+
         assert t.complex_value_float(np.complex128(val_32)) == val_32
         assert t.complex_value_float(np.complex128(val_64)) == val_32
         assert t.complex_value_double(np.complex128(val_32)) == val_32
         assert t.complex_value_double(np.complex128(val_64)) == val_64
+
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.complex_value_double_nc(np.complex128(val_64))
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.complex_value_float_nc(np.complex64(val_32))
+
     except ImportError:
         pass
 

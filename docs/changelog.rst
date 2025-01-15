@@ -50,6 +50,13 @@ Version TBD (not yet released)
   avoided by passing the :cpp:func:`.noconvert() <arg::noconvert>` argument
   annotation (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__).
 
+- The ``std::complex`` type caster now only performs value-changing narrowing
+  conversions during the implicit conversion phase.  They can be entirely
+  avoided by passing the :cpp:func:`.noconvert() <arg::noconvert>` argument
+  annotation.  Also, during the implicit conversion phase, if the Python object
+  is not a complex number object but has a ``__complex__()`` method, it will be
+  called (PR `#854 <https://github.com/wjakob/nanobind/pull/854>`__).
+
 - Fixed an overly strict check that could cause a function taking an
   :cpp:class:`nb::ndarray\<...\> <ndarray>` to refuse specific types of
   column-major input without implicit conversion. (PR `#847

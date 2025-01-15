@@ -416,6 +416,112 @@ namespace detail {
             }
         }
     }
+
+    // Fix up the result of a __new__.
+    // type_requested is the type the user was trying to construct, as passed
+    // to __new__'s first argument. type_bound is the Python type object
+    // corresponding to the C++ type that the __new__ method was attached to.
+    // has_alias is true if instantiating type_bound would produce a C++
+    // object whose dynamic type differs from type_info(type_bound).
+    NB_NOINLINE inline void new_returntype_fixup(PyObject*& ret,
+                                                 handle type_requested,
+                                                 handle type_bound,
+                                                 bool has_alias) {
+        if (ret == nullptr || !type_requested.is_type())
+            return; // not a typical __new__ call, so don't meddle
+        handle type_created = Py_TYPE(ret);
+        if (type_created.is(type_requested) ||
+            PyType_IsSubtype((PyTypeObject *) type_created.ptr(),
+                             (PyTypeObject *) type_requested.ptr()))
+            return; // already created the requested type so no fixup needed
+
+        // Illustrative example where requested/created/bound all differ:
+        // (see also test_classes.py test50_new_returntype_fixup)
+        //
+        // class Pet {
+        //     static shared_ptr<Pet> make(std::string type);
+        //     virtual std::string speak() = 0;
+        // };
+        // class Cat : public Pet {
+        //     std::string speak() override { return "meow"; }
+        // };
+        //
+        // nb::class_<Pet>(m, "Pet")
+        //     .def(nb::new_(&Pet::make))
+        //     .def("speak", &Pet::speak);
+        // nb::class_<Cat, Pet>(m, "Cat");
+        //
+        // class LoudPet(Pet):
+        //     def yell(self): return self.speak().upper()
+        //
+        // assert LoudPet("Cat").yell() == "MEOW"
+        //
+        // - LoudPet construction calls LoudPet.__new__(LoudPet, "Cat")
+        // - This looks up the __new__ that was defined on Pet
+        // - Pet::make() returns a shared_ptr<Pet> that points to what is
+        //   dynamically a Cat
+        // - Conversion of that to Python produces a Cat
+        // - So: type_requested = LoudPet, type_created = Cat,
+        //       type_bound = Pet
+
+        if (!PyType_IsSubtype((PyTypeObject *) type_requested.ptr(),
+                              (PyTypeObject *) type_bound.ptr()) ||
+            !PyType_IsSubtype((PyTypeObject *) type_created.ptr(),
+                              (PyTypeObject *) type_bound.ptr())) {
+            // Types are not in the expected relationship: the user either
+            // asked for, or received, something that is not a subclass
+            // of the class that the new_ was defined on. Don't meddle.
+            return;
+        }
+
+        // Note that since type_bound is a nanobind type, its subtypes
+        // type_created and type_requested must be nanobind types also.
+        if (type_info(type_requested) != type_info(type_bound)) {
+            // requested and bound are different C++ types, so we
+            // can't safely make an instance of requested that points
+            // to the thing that new_ created.
+            return;
+        }
+
+        // requested and bound are the same C++ type, but not
+        // the same Python type. (If they were the same Python type,
+        // then created would be a subtype of requested, for which
+        // we had an early-out above.) Since bound is a directly-bound
+        // nanobind type, requested must be a Python subclass of it.
+        // We will attempt to make an instance of type `requested`
+        // that wraps a pointer to the same object that new_ returned.
+
+        if (has_alias) {
+            // We can't control the dynamic type that new_ returned;
+            // raise an error rather than silently ignoring virtual overrides
+            raise("nanobind: can't wrap %s instance returned by "
+                  "%s.__new__(%s, ...): the C++ object was already "
+                  "created without Python awareness, so overriding "
+                  "methods in Python wouldn't work",
+                  type_name(type_created).c_str(),
+                  type_name(type_bound).c_str(),
+                  type_name(type_requested).c_str());
+        }
+
+        // Otherwise, we're fine: an instance of type_requested expects
+        // to wrap a pointer to C++ type_bound or a subclass, and ours will.
+        object wrapper = inst_reference(type_requested, inst_ptr<void>(ret),
+                                        /* parent = */ ret);
+        handle(ret).dec_ref();
+        ret = wrapper.release().ptr();
+    }
+
+    // Call policy that ensures __new__ returns an instance of the correct
+    // Python type, even if deriving from the C++ class in Python
+    template <typename Class>
+    struct new_returntype_fixup_policy {
+        static void precall(PyObject **, size_t, detail::cleanup_list *) {}
+        static void postcall(PyObject **args, size_t, PyObject *&ret) {
+            new_returntype_fixup(ret, args[0], type<typename Class::Type>(),
+                                 !std::is_same_v<typename Class::Type,
+                                                 typename Class::Alias>);
+        }
+    };
 }
 
 template <typename Func, typename Sig = detail::function_signature_t<Func>>
@@ -446,13 +552,15 @@ struct new_<Func, Return(Args...)> {
             return func_((detail::forward_t<Args>) args...);
         };
 
+        auto policy = call_policy<detail::new_returntype_fixup_policy<Class>>();
         if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {
             // If any argument annotations are specified, add another for the
             // extra class argument that we don't forward to Func, so visible
             // arg() annotations stay aligned with visible function arguments.
-            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...);
+            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...,
+                          policy);
         } else {
-            cl.def_static("__new__", std::move(wrapper), extra...);
+            cl.def_static("__new__", std::move(wrapper), extra..., policy);
         }
         cl.def("__init__", [](handle, Args...) {}, extra...);
     }

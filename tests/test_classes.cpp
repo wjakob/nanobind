@@ -713,4 +713,36 @@ NB_MODULE(test_classes_ext, m) {
         .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 42; });
     nb::class_<StaticPropertyOverride2, StaticPropertyOverride>(m, "StaticPropertyOverride2")
         .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 43; });
+
+    // Test for new_returntype_fixup
+    struct NewPet {
+        virtual std::string speak() { return "??"; }
+        NewPet() { ++default_constructed; }
+        virtual ~NewPet() { ++destructed; }
+    };
+    struct NewCat : NewPet {
+        std::string speak() override { return "meow"; }
+    };
+    struct NewPython : NewPet {
+        std::string speak() override { return "hiss?"; }
+    };
+    struct PyNewPython : NewPython {
+        NB_TRAMPOLINE(NewPython, 1);
+        std::string speak() override { NB_OVERRIDE(speak); }
+    };
+    auto make = [](std::string type) -> std::shared_ptr<NewPet> {
+        if (type == "Pet") return std::make_shared<NewPet>();
+        if (type == "Cat") return std::make_shared<NewCat>();
+        if (type == "Python") return std::make_shared<NewPython>();
+        throw std::runtime_error("unsupported type of pet");
+    };
+    nb::class_<NewPet>(m, "NewPet")
+        .def(nb::new_(make))
+        .def("speak", &NewPet::speak);
+    // These rebind __new__ only so we can test some edge cases in the logic;
+    // an actual application would generally leave only the base class version.
+    nb::class_<NewCat, NewPet>(m, "NewCat")
+        .def(nb::new_(make));
+    nb::class_<NewPython, NewPet, PyNewPython>(m, "NewPython")
+        .def(nb::new_(make));
 }

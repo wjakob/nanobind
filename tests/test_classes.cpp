@@ -505,7 +505,7 @@ NB_MODULE(test_classes_ext, m) {
     m.def("test_handle_t", [](nb::handle_t<Struct> h) { return borrow(h); });
 
     // test23_type_object_t
-    m.def("test_type_object_t", [](nb::type_object_t<Struct> h) -> nb::object { return std::move(h); });
+    m.def("test_type_object_t", [](nb::type_object_t<Struct> h) -> nb::object { return h; });
 
     // test24_none_arg
     m.def("none_0", [](Struct *s) { return s == nullptr; });

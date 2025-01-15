@@ -952,9 +952,9 @@ static PyMethodDef class_getitem_method[] = {
 
 // Implements the vector call protocol directly on type objects to construct
 // instances more efficiently.
-static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
-                                    size_t nargsf,
-                                    PyObject *kwargs_in) noexcept {
+PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
+                             size_t nargsf,
+                             PyObject *kwargs_in) noexcept {
     PyTypeObject *tp = (PyTypeObject *) self;
     type_data *td = nb_type_data(tp);
     nb_func *func = (nb_func *) td->init;

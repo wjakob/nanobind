@@ -901,6 +901,23 @@ def test46_custom_new():
     assert t.NewStar("hi", "lo", value=10).value == 12
     assert t.NewStar(value=10, other="blah").value == 20
 
+    # Make sure we do overload resolution correctly when some signatures
+    # use a nontrivial __new__ and others use a nontrivial __init__
+    assert t.NewOrInit().value == -1
+    assert t.NewOrInit(5).value == 5
+
+    uses_new = t.NewOrInit.__new__(t.NewOrInit, 10)
+    assert uses_new.value == 10
+    uses_new.__init__(10)
+    assert uses_new.value == 10
+
+    uses_init = t.NewOrInit.__new__(t.NewOrInit)
+    with pytest.warns(RuntimeWarning, match="access an uninitialized instance"):
+        with pytest.raises(TypeError):
+            uses_init.value
+    uses_init.__init__()
+    assert uses_init.value == -1
+
 def test47_inconstructible():
     with pytest.raises(TypeError, match="no constructor defined"):
         t.Foo()

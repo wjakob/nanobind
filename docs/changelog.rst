@@ -56,6 +56,10 @@ Version TBD (not yet released)
   <https://github.com/wjakob/nanobind/pull/847>`__, commit `b95eb7
   <https://github.com/wjakob/nanobind/commit/b95eb755b5a651a40562002be9ca8a4c6bf0acb9>`__).
 
+- Fixed constructor overload resolution for types where some constructor
+  signatures select a nontrivial ``__new__`` while others select a nontrivial
+  ``__init__``. (PR `#860 <https://github.com/wjakob/nanobind/pull/860>`__)
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

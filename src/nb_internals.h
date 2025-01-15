@@ -439,6 +439,10 @@ extern PyTypeObject *nb_static_property_tp() noexcept;
 extern type_data *nb_type_c2p(nb_internals *internals,
                               const std::type_info *type);
 extern void nb_type_unregister(type_data *t) noexcept;
+extern PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
+                                    size_t nargsf,
+                                    PyObject *kwargs_in) noexcept;
+
 
 extern PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept;
 

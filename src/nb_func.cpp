@@ -318,6 +318,9 @@ PyObject *nb_func_new(const void *in_) noexcept {
         if (nb_func_prev->doc_uniform)
             prev_doc = prev->doc;
 
+        bool was_constructor = f->flags & (uint32_t) func_flags::is_constructor;
+        complex_call |= was_constructor != is_constructor;
+
         memcpy(cur, prev, sizeof(func_data) * prev_overloads);
         memset(prev, 0, sizeof(func_data) * prev_overloads);
 
@@ -431,12 +434,24 @@ PyObject *nb_func_new(const void *in_) noexcept {
         nb_type_check(f->scope)) {
         type_data *td = nb_type_data((PyTypeObject *) f->scope);
         bool has_new = td->flags & (uint32_t) type_flags::has_new;
+        bool disable_vectorcall = false;
 
         if (is_init) {
-            if (!has_new) {
+            if (is_constructor) {
+                // This is a full-fledged __init__ that constructs a new
+                // object, not just a stub one that gets emitted by nb::new_.
+                // Our vectorcall shortcut can call either __init__ or __new__,
+                // but doesn't know how to try both, so we need to disable
+                // tp_vectorcall if we have a type where some construction
+                // signatures call nontrivial __init__ while others call
+                // nontrivial __new__.
                 td->init = func;
+                disable_vectorcall = has_new;
             } else {
-                // Keep track of whether we have a __init__ overload that
+                // This is a stub __init__ that doesn't construct a new
+                // object. (The self arg is accepted as `handle`, not `T*`.)
+                // These are most commonly emitted by nb::new_() and do nothing.
+                // Just keep track of whether we have a __init__ overload that
                 // accepts no arguments (except self). If not, then we
                 // shouldn't allow calling the type object with no arguments,
                 // even though (for unpickling support) we probably do have
@@ -457,8 +472,20 @@ PyObject *nb_func_new(const void *in_) noexcept {
                     td->flags |= (uint32_t) type_flags::has_nullary_new;
             }
         } else if (is_new) {
+            disable_vectorcall = (!has_new && td->init != nullptr);
             td->init = func;
             td->flags |= (uint32_t) type_flags::has_new;
+        }
+
+        if (disable_vectorcall) {
+#if defined(Py_LIMITED_API)
+            vectorcallfunc& type_vectorcall = td->vectorcall;
+#else
+            vectorcallfunc& type_vectorcall =
+                    ((PyTypeObject *) f->scope)->tp_vectorcall;
+#endif
+            if (type_vectorcall == nb_type_vectorcall)
+                type_vectorcall = nullptr;
         }
     }
 
@@ -593,8 +620,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
     func_data *fr = nb_func_data(self);
 
-    const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const bool is_method = fr->flags & (uint32_t) func_flags::is_method;
 
     PyObject *result = nullptr,
              *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
@@ -691,7 +717,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
         for (size_t k = 0; k < count; ++k) {
             const func_data *f = fr + k;
 
-            const bool has_args       = f->flags & (uint32_t) func_flags::has_args,
+            const bool is_constructor = f->flags & (uint32_t) func_flags::is_constructor,
+                       has_args       = f->flags & (uint32_t) func_flags::has_args,
                        has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
                        has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 

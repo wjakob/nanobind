@@ -659,6 +659,18 @@ NB_MODULE(test_classes_ext, m) {
         .def("value", &UniqueInt::value)
         .def("lookups", &UniqueInt::lookups);
 
+    struct NewOrInit {
+        NewOrInit() : value(-1) {}
+        NewOrInit(int v) : value(v) {}
+        int value;
+    };
+    // construction with no args uses __init__, while with an arg uses __new__
+    nb::class_<NewOrInit>(m, "NewOrInit")
+        .def_static("__new__", [](nb::handle ty) { return nb::inst_alloc(ty); })
+        .def(nb::new_([](int val) { return NewOrInit(val); }))
+        .def(nb::init<>())
+        .def_rw("value", &NewOrInit::value);
+
     // issue #786
     struct NewNone {};
     struct NewDflt { int value; };

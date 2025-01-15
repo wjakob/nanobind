@@ -16,7 +16,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-bool load_cmplx(PyObject*, uint8_t flags, std::complex<double> *out) noexcept;
+NB_CORE bool load_cmplx(PyObject*, uint8_t flags, std::complex<double> *out) noexcept;
 
 template <typename T> struct type_caster<std::complex<T>> {
     NB_TYPE_CASTER(std::complex<T>, const_name("complex"))

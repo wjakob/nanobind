@@ -900,8 +900,8 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 
 // ========================================================================
 
-bool load_cmplx(PyObject *ob, uint8_t flags,
-                std::complex<double> *out) noexcept {
+NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
+                        std::complex<double> *out) noexcept {
     bool is_complex = PyComplex_CheckExact(ob);
 #if !defined(Py_LIMITED_API)
     if (is_complex || (flags & (uint8_t) cast_flags::convert)) {

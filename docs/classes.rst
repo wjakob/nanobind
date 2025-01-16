@@ -1115,9 +1115,9 @@ Two limitations of :cpp:struct:`nb::new_ <new_>` are worth noting:
   is used to implement a polymorphic factory (like if ``Pet::make()`` could
   return an instance of ``Cat``) then Python-side inheritance won't work at all.
 
-* A given class must expose all of its constructors via ``__new__`` or
+* A given C++ class must expose all of its constructors via ``__new__`` or
   all via ``__init__``, rather than a mixture of the two.
-  The only case where a class should define both of these methods is
+  The only case where a class should bind both of these methods is
   if the ``__init__`` methods are all stubs that do nothing.
   This is because nanobind internally optimizes object instantiation by
   caching the method that should be used for constructing instances of each

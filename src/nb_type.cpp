@@ -40,6 +40,72 @@ static PyObject **nb_weaklist_ptr(PyObject *self) {
     return weaklistoffset ? (PyObject **) ((uint8_t *) self + weaklistoffset) : nullptr;
 }
 
+static void nb_enable_try_inc_ref(PyObject *obj) noexcept {
+#if 0 && defined(Py_GIL_DISABLED) && Py_VERSION_HEX >= 0x031400a4
+    PyUnstable_EnableTryIncRef(obj);
+#elif defined(Py_GIL_DISABLED)
+    // TODO: Replace with PyUnstable_Object_EnableTryIncRef when available.
+    // See https://github.com/python/cpython/issues/128844
+    if (_Py_IsImmortal(obj)) {
+        return;
+    }
+    for (;;) {
+        Py_ssize_t shared = _Py_atomic_load_ssize_relaxed(&obj->ob_ref_shared);
+        if ((shared & _Py_REF_SHARED_FLAG_MASK) != 0) {
+            // Nothing to do if it's in WEAKREFS, QUEUED, or MERGED states.
+            return;
+        }
+        if (_Py_atomic_compare_exchange_ssize(
+                &obj->ob_ref_shared, &shared, shared | _Py_REF_MAYBE_WEAKREF)) {
+            return;
+        }
+    }
+#endif
+}
+
+static bool nb_try_inc_ref(PyObject *obj) noexcept {
+#if 0 && defined(Py_GIL_DISABLED) && Py_VERSION_HEX >= 0x031400a4
+    return PyUnstable_TryIncRef(obj);
+#elif defined(Py_GIL_DISABLED)
+    // See https://github.com/python/cpython/blob/d05140f9f77d7dfc753dd1e5ac3a5962aaa03eff/Include/internal/pycore_object.h#L761
+    uint32_t local = _Py_atomic_load_uint32_relaxed(&obj->ob_ref_local);
+    local += 1;
+    if (local == 0) {
+        // immortal
+        return true;
+    }
+    if (_Py_IsOwnedByCurrentThread(obj)) {
+        _Py_atomic_store_uint32_relaxed(&obj->ob_ref_local, local);
+#ifdef Py_REF_DEBUG
+        _Py_INCREF_IncRefTotal();
+#endif
+        return true;
+    }
+    Py_ssize_t shared = _Py_atomic_load_ssize_relaxed(&obj->ob_ref_shared);
+    for (;;) {
+        // If the shared refcount is zero and the object is either merged
+        // or may not have weak references, then we cannot incref it.
+        if (shared == 0 || shared == _Py_REF_MERGED) {
+            return false;
+        }
+
+        if (_Py_atomic_compare_exchange_ssize(
+                &obj->ob_ref_shared, &shared, shared + (1 << _Py_REF_SHARED_SHIFT))) {
+#ifdef Py_REF_DEBUG
+            _Py_INCREF_IncRefTotal();
+#endif
+            return true;
+        }
+    }
+#else
+    if (Py_REFCNT(obj) > 0) {
+        Py_INCREF(obj);
+        return true;
+    }
+    return false;
+#endif
+}
+
 static PyGetSetDef inst_getset[] = {
     { "__dict__", PyObject_GenericGetDict, PyObject_GenericSetDict, nullptr, nullptr },
     { nullptr, nullptr, nullptr, nullptr, nullptr }
@@ -102,6 +168,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         // Update hash table that maps from C++ to Python instance
         nb_shard &shard = internals->shard((void *) payload);
         lock_shard guard(shard);
+        nb_enable_try_inc_ref((PyObject *)self);
         auto [it, success] = shard.inst_c2p.try_emplace((void *) payload, self);
         check(success, "nanobind::detail::inst_new_int(): unexpected collision!");
     }
@@ -168,6 +235,7 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     lock_shard guard(shard);
 
     // Update hash table that maps from C++ to Python instance
+    nb_enable_try_inc_ref((PyObject *)self);
     auto [it, success] = shard.inst_c2p.try_emplace(value, self);
 
     if (NB_UNLIKELY(!success)) {
@@ -1766,16 +1834,18 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                 PyTypeObject *tp = Py_TYPE(seq.inst);
 
                 if (nb_type_data(tp)->type == cpp_type) {
-                    Py_INCREF(seq.inst);
-                    return seq.inst;
+                    if (nb_try_inc_ref(seq.inst)) {
+                        return seq.inst;
+                    }
                 }
 
                 if (!lookup_type())
                     return nullptr;
 
                 if (PyType_IsSubtype(tp, td->type_py)) {
-                    Py_INCREF(seq.inst);
-                    return seq.inst;
+                    if (nb_try_inc_ref(seq.inst)) {
+                        return seq.inst;
+                    }
                 }
 
                 if (seq.next == nullptr)

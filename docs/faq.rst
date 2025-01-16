@@ -379,7 +379,7 @@ Stable ABI extensions are convenient because they can be reused across Python
 versions, but this unfortunately only works on Python 3.12 and newer. Nanobind
 crucially depends on several `features
 <https://docs.python.org/3/whatsnew/3.12.html#c-api-changes>`__ that were added
-in version 3.12 (specifically, `PyType_FromMetaclass()`` and limited API
+in version 3.12 (specifically, ``PyType_FromMetaclass()`` and limited API
 bindings of the vector call protocol).
 
 Policy on Clang-Tidy, ``-Wpedantic``, etc.

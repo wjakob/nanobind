@@ -483,7 +483,7 @@ With reference counting
 
        PyObject* list = ...;
        Py_ssize_t index = ...;
-       nb::object o = nb::borrow(PyList_GetItem(obj, index));
+       nb::object o = nb::borrow(PyList_GetItem(list, index));
 
    Using :cpp:func:`steal()` in this setting is incorrect and would lead to a
    reference underflow.

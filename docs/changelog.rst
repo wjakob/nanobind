@@ -59,11 +59,10 @@ Version TBD (not yet released)
 - It is now possible to create Python subclasses of C++ classes that
   define their constructor bindings using :cpp:struct:`nb::new_() <new_>`.
   Previously, attempting to instantiate such a Python subclass would instead
-  produce an instance of the base C++ type. It is still not possible to
-  override virtual methods in such a Python subclass, because the object
+  produce an instance of the base C++ type. Note that it is still not possible
+  to override virtual methods in such a Python subclass, because the object
   returned by the :cpp:struct:`new_() <new_>` constructor will generally
-  not be an instance of the alias/trampoline type; you'll get an exception
-  at instantiation time if a trampoline type is defined but wouldn't be usable.
+  not be an instance of the alias/trampoline type.
   (PR `#859 <https://github.com/wjakob/nanobind/pull/859>`__)
 
 Version 2.4.0 (Dec 6, 2024)

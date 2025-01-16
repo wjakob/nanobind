@@ -901,6 +901,27 @@ def test46_custom_new():
     assert t.NewStar("hi", "lo", value=10).value == 12
     assert t.NewStar(value=10, other="blah").value == 20
 
+    # Make sure a Python class that derives from a C++ class that uses
+    # nb::new_() can be instantiated producing the correct Python type
+    class FancyInt(t.UniqueInt):
+        @staticmethod
+        def the_answer():
+            return 42
+
+        @property
+        def value_as_string(self):
+            return str(self.value())
+
+    f1 = FancyInt(10)
+    f2 = FancyInt(20)
+    # The derived-type wrapping doesn't preserve Python identity...
+    assert f1 is not FancyInt(10)
+    # ... but does preserve C++ identity
+    assert f1.lookups() == u4.lookups() == 3  # u4, f1, and anonymous
+    assert f1.the_answer() == f2.the_answer() == 42
+    assert f1.value_as_string == "10"
+    assert f2.value_as_string == "20"
+
 def test47_inconstructible():
     with pytest.raises(TypeError, match="no constructor defined"):
         t.Foo()
@@ -920,74 +941,3 @@ def test48_monekypatchable():
 def test49_static_property_override():
     assert t.StaticPropertyOverride.x == 42
     assert t.StaticPropertyOverride2.x == 43
-
-def test50_new_returntype_fixup(clean):
-    num_checked = 0
-
-    def check(obj, ty, speak_as, yell_as=None):
-        nonlocal num_checked
-        num_checked += 1
-        assert type(obj) is ty
-        assert obj.speak() == speak_as
-        if yell_as is not None:
-            assert obj.yell() == yell_as
-        else:
-            assert not hasattr(obj, "yell")
-
-    # created Cat == requested Cat
-    check(t.NewCat("Cat"), t.NewCat, "meow")
-    # created Cat <: requested Pet
-    check(t.NewPet("Cat"), t.NewCat, "meow")
-    # not (requested Pet <: bound Cat)
-    check(t.NewCat.__new__(t.NewPet, "Cat"), t.NewCat, "meow")
-    # not (created Pet <: bound Cat)
-    check(t.NewCat.__new__(t.NewCat, "Pet"), t.NewPet, "??")
-    # cpptype(requested Python) != cpptype(bound Cat)
-    check(t.NewCat.__new__(t.NewPython, "Pet"), t.NewPet, "??")
-
-    class LoudPet(t.NewPet):
-        def __new__(cls, kind, extra=""):
-            return t.NewPet.__new__(cls, kind)
-        def __init__(self, kind, extra=""):
-            assert isinstance(self, LoudPet)
-            self.extra = extra
-        def yell(self):
-            return self.speak().upper() + self.extra
-
-    # not (requested LoudPet <: bound Cat)
-    check(t.NewCat.__new__(LoudPet, "Cat"), t.NewCat, "meow")
-    # not (created Pet <: bound Cat)
-    check(t.NewCat.__new__(LoudPet, "Pet"), t.NewPet, "??")
-
-    # bound Pet, created Pet, requested LoudPet --> OK, wrap
-    check(LoudPet("Pet"), LoudPet, "??", "??")
-    check(LoudPet("Pet", ".."), LoudPet, "??", "??..")
-
-    # bound Pet, created Cat, requested LoudPet --> OK, wrap
-    check(LoudPet("Cat"), LoudPet, "meow", "MEOW")
-    check(LoudPet("Cat", "!"), LoudPet, "meow", "MEOW!")
-
-    # bound Pet, created Python, requested LoudPet --> OK, wrap
-    # note: this is allowed even though LoudPet can't override speak(),
-    # because the same semantics would exist if not using __new__
-    check(LoudPet("Python"), LoudPet, "hiss?", "HISS?")
-    check(LoudPet("Python", "!"), LoudPet, "hiss?", "HISS?!")
-
-    # LoudPython would be allowed to override speak(), so uses of
-    # __new__ that would thwart that will be forbidden
-    class LoudPython(t.NewPython):
-        def yell(self):
-            return self.speak().upper()
-        def speak(self):
-            return super().speak().replace("?", "!")
-
-    with pytest.raises(RuntimeError, match="already created without Python awareness"):
-        num_checked += 1
-        LoudPython("Python")
-
-    for unrelated_type in (42, int, t.Animal):
-        num_checked += 2
-        assert type(t.NewPet.__new__(unrelated_type, "Cat")) is t.NewCat
-        assert type(t.NewCat.__new__(unrelated_type, "Cat")) is t.NewCat
-
-    assert_stats(default_constructed=num_checked, destructed=num_checked)

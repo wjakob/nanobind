@@ -44,22 +44,10 @@ static void nb_enable_try_inc_ref(PyObject *obj) noexcept {
 #if 0 && defined(Py_GIL_DISABLED) && PY_VERSION_HEX >= 0x030E00A5
     PyUnstable_EnableTryIncRef(obj);
 #elif defined(Py_GIL_DISABLED)
-    // TODO: Replace with PyUnstable_Object_EnableTryIncRef when available.
-    // See https://github.com/python/cpython/issues/128844
-    if (_Py_IsImmortal(obj)) {
-        return;
-    }
-    for (;;) {
-        Py_ssize_t shared = _Py_atomic_load_ssize_relaxed(&obj->ob_ref_shared);
-        if ((shared & _Py_REF_SHARED_FLAG_MASK) != 0) {
-            // Nothing to do if it's in WEAKREFS, QUEUED, or MERGED states.
-            return;
-        }
-        if (_Py_atomic_compare_exchange_ssize(
-                &obj->ob_ref_shared, &shared, shared | _Py_REF_MAYBE_WEAKREF)) {
-            return;
-        }
-    }
+    // Since this is called during object construction, we know that we have
+    // the only reference to the object and can use a non-atomic write.
+    assert(obj->ob_ref_shared == 0);
+    obj->ob_ref_shared = _Py_REF_MAYBE_WEAKREF;
 #endif
 }
 
@@ -164,11 +152,11 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self->clear_keep_alive = 0;
         self->intrusive = intrusive;
         self->unused = 0;
+        nb_enable_try_inc_ref((PyObject *)self);
 
         // Update hash table that maps from C++ to Python instance
         nb_shard &shard = internals->shard((void *) payload);
         lock_shard guard(shard);
-        nb_enable_try_inc_ref((PyObject *)self);
         auto [it, success] = shard.inst_c2p.try_emplace((void *) payload, self);
         check(success, "nanobind::detail::inst_new_int(): unexpected collision!");
     }
@@ -230,12 +218,12 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     self->clear_keep_alive = 0;
     self->intrusive = intrusive;
     self->unused = 0;
+    nb_enable_try_inc_ref((PyObject *)self);
 
     nb_shard &shard = internals->shard(value);
     lock_shard guard(shard);
 
     // Update hash table that maps from C++ to Python instance
-    nb_enable_try_inc_ref((PyObject *)self);
     auto [it, success] = shard.inst_c2p.try_emplace(value, self);
 
     if (NB_UNLIKELY(!success)) {

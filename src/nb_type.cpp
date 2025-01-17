@@ -41,7 +41,7 @@ static PyObject **nb_weaklist_ptr(PyObject *self) {
 }
 
 static void nb_enable_try_inc_ref(PyObject *obj) noexcept {
-#if 0 && defined(Py_GIL_DISABLED) && Py_VERSION_HEX >= 0x031400a4
+#if 0 && defined(Py_GIL_DISABLED) && PY_VERSION_HEX >= 0x030E00A5
     PyUnstable_EnableTryIncRef(obj);
 #elif defined(Py_GIL_DISABLED)
     // TODO: Replace with PyUnstable_Object_EnableTryIncRef when available.
@@ -64,7 +64,7 @@ static void nb_enable_try_inc_ref(PyObject *obj) noexcept {
 }
 
 static bool nb_try_inc_ref(PyObject *obj) noexcept {
-#if 0 && defined(Py_GIL_DISABLED) && Py_VERSION_HEX >= 0x031400a4
+#if 0 && defined(Py_GIL_DISABLED) && PY_VERSION_HEX >= 0x030E00A5
     return PyUnstable_TryIncRef(obj);
 #elif defined(Py_GIL_DISABLED)
     // See https://github.com/python/cpython/blob/d05140f9f77d7dfc753dd1e5ac3a5962aaa03eff/Include/internal/pycore_object.h#L761

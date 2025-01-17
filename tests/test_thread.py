@@ -1,5 +1,5 @@
 import test_thread_ext as t
-from test_thread_ext import Counter
+from test_thread_ext import Counter, GlobalData
 from common import parallelize
 
 def test01_object_creation(n_threads=8):
@@ -75,3 +75,16 @@ def test05_locked_twoargs(n_threads=8):
 
     parallelize(f, n_threads=n_threads)
     assert c.value == n * n_threads
+
+
+def test_06_global_wrapper(n_threads=8):
+    # Check wrapper lookup racing with wrapper deallocation
+    n = 10000
+    def f():
+        for i in range(n):
+            GlobalData.get()
+            GlobalData.get()
+            GlobalData.get()
+            GlobalData.get()
+
+    parallelize(f, n_threads=n_threads)

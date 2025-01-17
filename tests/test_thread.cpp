@@ -12,6 +12,8 @@ struct Counter {
     }
 };
 
+struct GlobalData {} global_data;
+
 nb::ft_mutex mutex;
 
 NB_MODULE(test_thread_ext, m) {
@@ -34,4 +36,7 @@ NB_MODULE(test_thread_ext, m) {
               nb::ft_lock_guard guard(mutex);
               c.inc();
           }, "counter");
+
+    nb::class_<GlobalData>(m, "GlobalData")
+        .def_static("get", [] { return &global_data; }, nb::rv_policy::reference);
 }

@@ -236,7 +236,7 @@ function (nanobind_build_library TARGET_NAME)
       ${NB_DIR}/ext/robin_map/include)
   endif()
 
-  target_include_directories(${TARGET_NAME} PUBLIC
+  target_include_directories(${TARGET_NAME} SYSTEM PUBLIC
     ${Python_INCLUDE_DIRS}
     ${NB_DIR}/include)
 

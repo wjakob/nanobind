@@ -236,7 +236,7 @@ The following API specific to free-threading has been added:
 API stability
 _____________
 
-The interface explained in this is excluded from the project's semantic
+The interface explained in this section is excluded from nanobind's semantic
 versioning policy. Free-threading is still experimental, and API breaks may be
 necessary based on future experience and changes in Python itself.
 

@@ -1032,7 +1032,7 @@ Wrapper classes
 
 .. cpp:class:: bytes: public object
 
-   This wrapper class represents Python unicode ``bytes`` instances.
+   This wrapper class represents Python ``bytes`` instances.
 
    .. cpp:function:: bytes(handle h)
 

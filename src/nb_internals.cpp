@@ -278,15 +278,21 @@ static void internals_cleanup() {
             fprintf(stderr, " - leaked instance %p of type \"%s\"\n", k, tp->name);
         };
 
-        for (size_t i = 0; i < p->shard_count; ++i) {
+        int ctr = 0;
+        for (size_t i = 0; i < p->shard_count && ctr < 20; ++i) {
             for (auto [k, v]: p->shards[i].inst_c2p) {
                 if (NB_UNLIKELY(nb_is_seq(v))) {
                     nb_inst_seq* seq = nb_get_seq(v);
-                    for(; seq != nullptr; seq = seq->next)
+                    for(; seq != nullptr && ctr < 20; seq = seq->next) {
                         print_leak(k, seq->inst);
+                        ctr += 1;
+                    }
                 } else {
                     print_leak(k, (PyObject*)v);
+                    ctr += 1;
                 }
+                if (ctr >= 20)
+                    break;
             }
         }
 #endif

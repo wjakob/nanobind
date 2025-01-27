@@ -1178,22 +1178,6 @@ bool issubclass(PyObject *a, PyObject *b) {
 
 // ========================================================================
 
-/// Make an object immortal when targeting free-threaded Python
-void maybe_make_immortal(PyObject *op) {
-#ifdef NB_FREE_THREADED
-    // See CPython's Objects/object.c
-    if (PyObject_IS_GC(op))
-        PyObject_GC_UnTrack(op);
-    op->ob_tid = _Py_UNOWNED_TID;
-    op->ob_ref_local = _Py_IMMORTAL_REFCNT_LOCAL;
-    op->ob_ref_shared = 0;
-#else
-    (void) op;
-#endif
-}
-
-// ========================================================================
-
 PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k) {
     PyObject *value;
     bool error = false;

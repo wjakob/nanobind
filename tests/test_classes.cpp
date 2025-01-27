@@ -261,6 +261,8 @@ NB_MODULE(test_classes_ext, m) {
         std::string s;
     };
 
+    struct SiameseCat : Cat { };
+
     struct Foo { };
 
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
@@ -273,6 +275,9 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<Cat>(m, "Cat", animal)
         .def(nb::init<const std::string &>());
+
+    nb::class_<SiameseCat, Cat> sc(m, "SiameseCat");
+    (void) sc;
 
     m.def("go", [](Animal *a) {
         return a->name() + " says " + a->what();

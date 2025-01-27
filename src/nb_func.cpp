@@ -9,6 +9,7 @@
 
 #include "nb_internals.h"
 #include "buffer.h"
+#include "nb_ft.h"
 
 /// Maximum number of arguments supported by 'nb_vectorcall_simple'
 #define NB_MAXARGS_SIMPLE 8
@@ -289,7 +290,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
 
-    maybe_make_immortal((PyObject *) func);
+    make_immortal((PyObject *) func);
 
     // Check if the complex dispatch loop is needed
     bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||

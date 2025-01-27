@@ -399,10 +399,11 @@ purification" category: things that cause churn, decrease readability, and
 which don't fix actual problems. It's a never-ending cycle because each new
 revision of such tooling adds further warnings and purification rites.
 
-So just to be clear: I do not wish to pepper this codebase with ``const_cast``
-and ``#pragmas`` or pragma-like comments to avoid warnings in various kinds of
-external tooling just so those users can have a "silent" build. I don't think
-it is reasonable for them to impose their own style on this project.
+So just to have a clear policy: I do not wish to pepper this codebase with
+``const_cast`` and ``#pragmas`` or pragma-like comments to avoid warnings in
+various kinds of external tooling just so those users can have a "silent"
+build. I don't think it is reasonable for them to impose their own style on
+this project.
 
 As a workaround it is likely possible to restrict the scope of style checks to
 particular C++ namespaces or source code locations.

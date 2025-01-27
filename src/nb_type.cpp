@@ -1206,11 +1206,28 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
         /* Handle a corner case (base class larger than derived class)
            which can arise when extending trampoline base classes */
-        size_t base_basicsize = sizeof(nb_inst) + tb->size;
-        if (tb->align > ptr_size)
-            base_basicsize += tb->align - ptr_size;
-        if (base_basicsize > basicsize)
-            basicsize = base_basicsize;
+
+        PyTypeObject *base_2 = (PyTypeObject *) base;
+        type_data *tb_2 = tb;
+
+        do {
+            size_t base_basicsize = sizeof(nb_inst) + tb_2->size;
+            if (tb_2->align > ptr_size)
+                base_basicsize += tb_2->align - ptr_size;
+            if (base_basicsize > basicsize)
+                basicsize = base_basicsize;
+
+#if !defined(Py_LIMITED_API)
+            base_2 = base_2->tp_base;
+#else
+            base_2 = (PyTypeObject *) PyType_GetSlot(base_2, Py_tp_base);
+#endif
+
+            if (!base_2 || !nb_type_check((PyObject *) base_2))
+                break;
+
+            tb_2 = nb_type_data(base_2);
+        } while (true);
     }
 
     bool base_intrusive_ptr =

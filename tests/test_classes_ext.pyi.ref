@@ -170,6 +170,9 @@ class PolymorphicBase:
 class PolymorphicSubclass:
     pass
 
+class SiameseCat(Cat):
+    pass
+
 class StaticProperties:
     value: int = ...
     """Static property docstring"""

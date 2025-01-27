@@ -8,6 +8,7 @@
 */
 
 #include "nb_internals.h"
+#include "nb_ft.h"
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
@@ -38,62 +39,6 @@ static PyObject **nb_weaklist_ptr(PyObject *self) {
     Py_ssize_t weaklistoffset = tp->tp_weaklistoffset;
 #endif
     return weaklistoffset ? (PyObject **) ((uint8_t *) self + weaklistoffset) : nullptr;
-}
-
-static void nb_enable_try_inc_ref(PyObject *obj) noexcept {
-#if 0 && defined(Py_GIL_DISABLED) && PY_VERSION_HEX >= 0x030E00A5
-    PyUnstable_EnableTryIncRef(obj);
-#elif defined(Py_GIL_DISABLED)
-    // Since this is called during object construction, we know that we have
-    // the only reference to the object and can use a non-atomic write.
-    assert(obj->ob_ref_shared == 0);
-    obj->ob_ref_shared = _Py_REF_MAYBE_WEAKREF;
-#else
-    (void) obj;
-#endif
-}
-
-static bool nb_try_inc_ref(PyObject *obj) noexcept {
-#if 0 && defined(Py_GIL_DISABLED) && PY_VERSION_HEX >= 0x030E00A5
-    return PyUnstable_TryIncRef(obj);
-#elif defined(Py_GIL_DISABLED)
-    // See https://github.com/python/cpython/blob/d05140f9f77d7dfc753dd1e5ac3a5962aaa03eff/Include/internal/pycore_object.h#L761
-    uint32_t local = _Py_atomic_load_uint32_relaxed(&obj->ob_ref_local);
-    local += 1;
-    if (local == 0) {
-        // immortal
-        return true;
-    }
-    if (_Py_IsOwnedByCurrentThread(obj)) {
-        _Py_atomic_store_uint32_relaxed(&obj->ob_ref_local, local);
-#ifdef Py_REF_DEBUG
-        _Py_INCREF_IncRefTotal();
-#endif
-        return true;
-    }
-    Py_ssize_t shared = _Py_atomic_load_ssize_relaxed(&obj->ob_ref_shared);
-    for (;;) {
-        // If the shared refcount is zero and the object is either merged
-        // or may not have weak references, then we cannot incref it.
-        if (shared == 0 || shared == _Py_REF_MERGED) {
-            return false;
-        }
-
-        if (_Py_atomic_compare_exchange_ssize(
-                &obj->ob_ref_shared, &shared, shared + (1 << _Py_REF_SHARED_SHIFT))) {
-#ifdef Py_REF_DEBUG
-            _Py_INCREF_IncRefTotal();
-#endif
-            return true;
-        }
-    }
-#else
-    if (Py_REFCNT(obj) > 0) {
-        Py_INCREF(obj);
-        return true;
-    }
-    return false;
-#endif
 }
 
 static PyGetSetDef inst_getset[] = {
@@ -945,7 +890,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
         tp = (PyTypeObject *) nb_type_from_metaclass(
             internals_->nb_meta, internals_->nb_module, &spec);
 
-        maybe_make_immortal((PyObject *) tp);
+        make_immortal((PyObject *) tp);
 
         handle(tp).attr("__module__") = "nanobind";
 
@@ -1369,7 +1314,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     Py_DECREF(metaclass);
 
-    maybe_make_immortal(result);
+    make_immortal(result);
 
     type_data *to = nb_type_data((PyTypeObject *) result);
 

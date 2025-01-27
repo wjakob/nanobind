@@ -65,6 +65,14 @@ Version TBD (not yet released)
   not be an instance of the alias/trampoline type.
   (PR `#859 <https://github.com/wjakob/nanobind/pull/859>`__)
 
+- Added :cpp:class:`nb::def_visitor\<..\> <def_visitor>`, which can be used to
+  define your own binding logic that operates on a :cpp:class:`nb::class_\<..\>
+  <class_>` when an instance of the visitor object is passed to
+  :cpp:func:`class_::def()`. This generalizes the mechanism used by
+  :cpp:class:`init`, :cpp:class:`new_`, etc, so that you can create
+  binding abstractions that "feel like" the built-in ones.
+  (PR `#884 <https://github.com/wjakob/nanobind/pull/884>`__)
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

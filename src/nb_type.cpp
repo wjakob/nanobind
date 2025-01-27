@@ -99,7 +99,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self->clear_keep_alive = 0;
         self->intrusive = intrusive;
         self->unused = 0;
-        nb_enable_try_inc_ref((PyObject *)self);
+        nb_enable_try_inc_ref((PyObject *) self);
 
         // Update hash table that maps from C++ to Python instance
         nb_shard &shard = internals->shard((void *) payload);
@@ -165,7 +165,7 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     self->clear_keep_alive = 0;
     self->intrusive = intrusive;
     self->unused = 0;
-    nb_enable_try_inc_ref((PyObject *)self);
+    nb_enable_try_inc_ref((PyObject *) self);
 
     nb_shard &shard = internals->shard(value);
     lock_shard guard(shard);

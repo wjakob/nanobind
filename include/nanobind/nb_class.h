@@ -416,6 +416,39 @@ namespace detail {
             }
         }
     }
+
+    // Call policy that ensures __new__ returns an instance of the correct
+    // Python type, even when deriving from the C++ class in Python
+    struct new_returntype_fixup_policy {
+        static inline void precall(PyObject **, size_t,
+                                   detail::cleanup_list *) {}
+        NB_NOINLINE static inline void postcall(PyObject **args, size_t,
+                                                PyObject *&ret) {
+            handle type_requested = args[0];
+            if (ret == nullptr || !type_requested.is_type())
+                return; // somethign strange about this call; don't meddle
+            handle type_created = Py_TYPE(ret);
+            if (type_created.is(type_requested))
+                return; // already created the requested type so no fixup needed
+
+            if (type_check(type_created) &&
+                PyType_IsSubtype((PyTypeObject *) type_requested.ptr(),
+                                 (PyTypeObject *) type_created.ptr()) &&
+                type_info(type_created) == type_info(type_requested)) {
+                // The new_ constructor returned an instance of a bound type T.
+                // The user wanted an instance of some python subclass S of T.
+                // Since both wrap the same C++ type, we can satisfy the request
+                // by returning a pyobject of type S that wraps a C++ T*, and
+                // handling the lifetimes by having that pyobject keep the
+                // already-created T pyobject alive.
+                object wrapper = inst_reference(type_requested,
+                                                inst_ptr<void>(ret),
+                                                /* parent = */ ret);
+                handle(ret).dec_ref();
+                ret = wrapper.release().ptr();
+            }
+        }
+    };
 }
 
 template <typename Func, typename Sig = detail::function_signature_t<Func>>
@@ -446,13 +479,15 @@ struct new_<Func, Return(Args...)> {
             return func_((detail::forward_t<Args>) args...);
         };
 
+        auto policy = call_policy<detail::new_returntype_fixup_policy>();
         if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {
             // If any argument annotations are specified, add another for the
             // extra class argument that we don't forward to Func, so visible
             // arg() annotations stay aligned with visible function arguments.
-            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...);
+            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...,
+                          policy);
         } else {
-            cl.def_static("__new__", std::move(wrapper), extra...);
+            cl.def_static("__new__", std::move(wrapper), extra..., policy);
         }
         cl.def("__init__", [](handle, Args...) {}, extra...);
     }

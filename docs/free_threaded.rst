@@ -103,6 +103,11 @@ supplemental locking. The :ref:`next section <free-threaded-locks>` explains a
 Python-specific locking primitive that can be used in binding code besides
 the solutions mentioned above.
 
+Multi-threaded code that concurrently returns the same C++ instance via the
+:cpp:enumerator:`nb::rv_policy::reference` policy may observe situations, where
+multiple Python objects are created that all wrap the same C++ instance
+(however, this is harmless aside from the duplication).
+
 .. _free-threaded-locks:
 
 Python locks

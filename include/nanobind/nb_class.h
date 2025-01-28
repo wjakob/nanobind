@@ -329,8 +329,18 @@ inline void *type_get_slot(handle h, int slot_id) {
 #endif
 }
 
+template <typename Visitor> struct def_visitor {
+  protected:
+    // Ensure def_visitor<T> can only be derived from, not constructed
+    // directly
+    def_visitor() {
+        static_assert(std::is_base_of_v<def_visitor, Visitor>,
+                      "def_visitor uses CRTP: def_visitor<T> should be "
+                      "a base of T");
+    }
+};
 
-template <typename... Args> struct init {
+template <typename... Args> struct init : def_visitor<init<Args...>> {
     template <typename T, typename... Ts> friend class class_;
     NB_INLINE init() {}
 
@@ -355,7 +365,7 @@ private:
     }
 };
 
-template <typename Arg> struct init_implicit {
+template <typename Arg> struct init_implicit : def_visitor<init_implicit<Arg>> {
     template <typename T, typename... Ts> friend class class_;
     NB_INLINE init_implicit() { }
 
@@ -455,7 +465,7 @@ template <typename Func, typename Sig = detail::function_signature_t<Func>>
 struct new_;
 
 template <typename Func, typename Return, typename... Args>
-struct new_<Func, Return(Args...)> {
+struct new_<Func, Return(Args...)> : def_visitor<new_<Func, Return(Args...)>> {
     std::remove_reference_t<Func> func;
 
     new_(Func &&f) : func((detail::forward_t<Func>) f) {}
@@ -614,21 +624,9 @@ public:
         return *this;
     }
 
-    template <typename... Args, typename... Extra>
-    NB_INLINE class_ &def(init<Args...> &&arg, const Extra &... extra) {
-        arg.execute(*this, extra...);
-        return *this;
-    }
-
-    template <typename Arg, typename... Extra>
-    NB_INLINE class_ &def(init_implicit<Arg> &&arg, const Extra &... extra) {
-        arg.execute(*this, extra...);
-        return *this;
-    }
-
-    template <typename Func, typename... Extra>
-    NB_INLINE class_ &def(new_<Func> &&arg, const Extra &... extra) {
-        arg.execute(*this, extra...);
+    template <typename Visitor, typename... Extra>
+    NB_INLINE class_ &def(def_visitor<Visitor> &&arg, const Extra &... extra) {
+        static_cast<Visitor&&>(arg).execute(*this, extra...);
         return *this;
     }
 

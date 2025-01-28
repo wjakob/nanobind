@@ -389,8 +389,7 @@ struct init<detail::init_using_factory_tag, Func, Return(Args...)>
     NB_INLINE void execute(Class &cl, const Extra&... extra) {
         using Type = typename Class::Type;
         using Alias = typename Class::Alias;
-        constexpr bool has_alias = !std::is_same_v<Type, Alias>;
-        if constexpr (!has_alias) {
+        if constexpr (std::is_same_v<Type, Alias>) {
             static_assert(std::is_constructible_v<Type, Return>,
                           "nb::init() factory function must return an instance "
                           "of the type by value, or something that can "
@@ -404,7 +403,8 @@ struct init<detail::init_using_factory_tag, Func, Return(Args...)>
         cl.def(
             "__init__",
             [func_ = (detail::forward_t<Func>) func](pointer_and_handle<Type> v, Args... args) {
-                if constexpr (has_alias && std::is_constructible_v<Type, Return>) {
+                if constexpr (!std::is_same_v<Type, Alias> &&
+                              std::is_constructible_v<Type, Return>) {
                     if (!detail::nb_inst_python_derived(v.h.ptr())) {
                         new (v.p) Type{ func_((detail::forward_t<Args>) args...) };
                         return;

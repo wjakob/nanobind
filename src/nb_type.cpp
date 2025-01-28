@@ -98,7 +98,10 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self->cpp_delete = 0;
         self->clear_keep_alive = 0;
         self->intrusive = intrusive;
+        self->registered = 1;
         self->unused = 0;
+
+        // Make the object compatible with nb_try_inc_ref (free-threaded builds only)
         nb_enable_try_inc_ref((PyObject *) self);
 
         // Update hash table that maps from C++ to Python instance
@@ -111,7 +114,9 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
     return (PyObject *) self;
 }
 
-/// Allocate memory for a nb_type instance with external storage
+/// Allocate memory for a nb_type instance with external storage. In contrast to
+/// 'inst_new_int()', this does not yet register the instance in the internal
+/// data structures. The function 'inst_register()' must be used to do so.
 PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
 
@@ -164,14 +169,27 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     self->cpp_delete = 0;
     self->clear_keep_alive = 0;
     self->intrusive = intrusive;
+
+    // We already set this flag to 1 here so that we don't have to change it again
+    // afterwards. This requires that the call to 'inst_new_ext' is paired with
+    // a call to 'inst_register()'
+
+    self->registered = 1;
     self->unused = 0;
+
+    // Make the object compatible with nb_try_inc_ref (free-threaded builds only)
     nb_enable_try_inc_ref((PyObject *) self);
 
+    return (PyObject *) self;
+}
+
+/// Register the object constructed by 'inst_new_ext()' in the internal data structures
+static nb_inst *inst_register(nb_inst *inst, void *value) noexcept {
     nb_shard &shard = internals->shard(value);
     lock_shard guard(shard);
 
     // Update hash table that maps from C++ to Python instance
-    auto [it, success] = shard.inst_c2p.try_emplace(value, self);
+    auto [it, success] = shard.inst_c2p.try_emplace(value, inst);
 
     if (NB_UNLIKELY(!success)) {
         void *entry = it->second;
@@ -186,12 +204,29 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
             entry = it.value() = nb_mark_seq(first);
         }
 
+        PyTypeObject *tp = Py_TYPE(inst);
         nb_inst_seq *seq = nb_get_seq(entry);
         while (true) {
-            check((nb_inst *) seq->inst != self,
-                  "nanobind::detail::inst_new_ext(): duplicate instance!");
+            nb_inst *inst_2 = (nb_inst *) seq->inst;
+            PyTypeObject *tp_2 = Py_TYPE(inst_2);
+
+            // The following should never happen
+            check(inst_2 != inst, "nanobind::detail::inst_new_ext(): duplicate instance!");
+
+            // In the case of concurrent execution, another thread might have created an
+            // identical instance wrapper in the meantime. Let's return that one then.
+            if (tp == tp_2 &&
+                !(nb_type_data(tp_2)->flags & (uint32_t) type_flags::is_python_type) &&
+                nb_try_inc_ref((PyObject *) inst_2)) {
+                inst->destruct = inst->cpp_delete = inst->registered = false;
+                guard.unlock();
+                Py_DECREF(inst);
+                return inst_2;
+            }
+
             if (!seq->next)
                 break;
+
             seq = seq->next;
         }
 
@@ -199,13 +234,14 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
         check(next,
               "nanobind::detail::inst_new_ext(): list element allocation failed!");
 
-        next->inst = (PyObject *) self;
+        next->inst = (PyObject *) inst;
         next->next = nullptr;
         seq->next = next;
     }
 
-    return (PyObject *) self;
+    return inst;
 }
+
 
 static void inst_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
@@ -253,7 +289,7 @@ static void inst_dealloc(PyObject *self) {
 
     nb_weakref_seq *wr_seq = nullptr;
 
-    {
+    if (inst->registered) {
         // Enter critical section of shard
         nb_shard &shard = internals->shard(p);
         lock_shard guard(shard);
@@ -1737,6 +1773,9 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     if (intrusive)
         t->set_self_py(new_value, (PyObject *) inst);
 
+    if (!create_new)
+        inst = inst_register(inst, value);
+
     return (PyObject *) inst;
 }
 
@@ -2082,7 +2121,7 @@ PyObject *nb_inst_reference(PyTypeObject *t, void *ptr, PyObject *parent) {
     nbi->state = nb_inst::state_ready;
     if (parent)
         keep_alive(result, parent);
-    return result;
+    return (PyObject *) inst_register(nbi, ptr);
 }
 
 PyObject *nb_inst_take_ownership(PyTypeObject *t, void *ptr) {
@@ -2092,7 +2131,7 @@ PyObject *nb_inst_take_ownership(PyTypeObject *t, void *ptr) {
     nb_inst *nbi = (nb_inst *) result;
     nbi->destruct = nbi->cpp_delete = true;
     nbi->state = nb_inst::state_ready;
-    return result;
+    return (PyObject *) inst_register(nbi, ptr);
 }
 
 void *nb_inst_ptr(PyObject *o) noexcept {

@@ -87,8 +87,11 @@ struct nb_inst { // usually: 24 bytes
     /// Does this instance use intrusive reference counting?
     uint32_t intrusive : 1;
 
+    /// Is this instance registered in the nanobind instance map?
+    uint32_t registered : 1;
+
     // That's a lot of unused space. I wonder if there is a good use for it..
-    uint32_t unused : 24;
+    uint32_t unused : 23;
 };
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
@@ -489,8 +492,16 @@ private:
 #if defined(NB_FREE_THREADED)
 struct lock_shard {
     nb_shard &s;
-    lock_shard(nb_shard &s) : s(s) { PyMutex_Lock(&s.mutex); }
-    ~lock_shard() { PyMutex_Unlock(&s.mutex); }
+    bool active;
+    lock_shard(nb_shard &s) : s(s), active(true) { PyMutex_Lock(&s.mutex); }
+    ~lock_shard() { unlock(); }
+
+    void unlock() {
+        if (active) {
+            PyMutex_Unlock(&s.mutex);
+            active = false;
+        }
+    }
 };
 struct lock_internals {
     nb_internals *i;

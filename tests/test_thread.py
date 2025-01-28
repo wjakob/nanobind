@@ -29,7 +29,7 @@ def test02_global_lock(n_threads=8):
     n = 100000
     c = Counter()
     def f():
-        for i in range(n):
+        for _ in range(n):
             t.inc_global(c)
 
     parallelize(f, n_threads=n_threads)
@@ -53,7 +53,7 @@ def test04_locked_function(n_threads=8):
     n = 100000
     c = Counter()
     def f():
-        for i in range(n):
+        for _ in range(n):
             t.inc_safe(c)
 
     parallelize(f, n_threads=n_threads)
@@ -77,11 +77,11 @@ def test05_locked_twoargs(n_threads=8):
     assert c.value == n * n_threads
 
 
-def test_06_global_wrapper(n_threads=8):
+def test06_global_wrapper(n_threads=8):
     # Check wrapper lookup racing with wrapper deallocation
     n = 10000
     def f():
-        for i in range(n):
+        for _ in range(n):
             GlobalData.get()
             GlobalData.get()
             GlobalData.get()

@@ -295,6 +295,9 @@ static void internals_cleanup() {
                     break;
             }
         }
+        if (ctr >= 20) {
+            fprintf(stderr, " - ... skipped remainder\n");
+        }
 #endif
     }
 

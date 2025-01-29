@@ -1369,7 +1369,13 @@ def main(args: Optional[List[str]] = None) -> None:
 
             ext_loader = importlib.machinery.ExtensionFileLoader
             if isinstance(mod_imported.__loader__, ext_loader):
-                file = file.with_name(mod_imported.__name__)
+                # Splitting on "." (module nesting qualifier) handles the case
+                # of invoking stubgen on a module that's not in the current
+                # working directory - in that case, we still only want the Python
+                # module name as the stub file name, not the whole source tree
+                # hierarchy.
+                modname = mod_imported.__name__.split(".")[-1]
+                file = file.with_name(modname)
             file = file.with_suffix(".pyi")
 
             if opt.output_dir:

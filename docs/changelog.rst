@@ -73,6 +73,11 @@ Version TBD (not yet released)
   binding abstractions that "feel like" the built-in ones.
   (PR `#884 <https://github.com/wjakob/nanobind/pull/884>`__)
 
+- Added :cpp:func:`nb::is_alive() <is_alive>` checks to prevent destructors
+  from trying to re-acquire the GIL when the interpreter shuts down,
+  as that triggers a cancellation exception which isn't allowed in
+  destructors.
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

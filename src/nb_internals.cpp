@@ -267,6 +267,14 @@ static void internals_cleanup() {
         keep_alive_leaks += s.keep_alive.size();
     }
 
+#ifdef _DEBUG
+// in debug mode, show all leak records
+#define INC_CTR do {} while(0)
+#else
+// otherwise show just the first 10 or 20
+#define INC_CTR ctr++
+#endif
+
     bool leak = inst_leaks > 0 || keep_alive_leaks > 0;
 
     if (print_leak_warnings && inst_leaks > 0) {
@@ -278,16 +286,25 @@ static void internals_cleanup() {
             fprintf(stderr, " - leaked instance %p of type \"%s\"\n", k, tp->name);
         };
 
-        for (size_t i = 0; i < p->shard_count; ++i) {
+        int ctr = 0;
+        for (size_t i = 0; i < p->shard_count && ctr < 20; ++i) {
             for (auto [k, v]: p->shards[i].inst_c2p) {
                 if (NB_UNLIKELY(nb_is_seq(v))) {
                     nb_inst_seq* seq = nb_get_seq(v);
-                    for(; seq != nullptr; seq = seq->next)
+                    for(; seq != nullptr && ctr < 20; seq = seq->next) {
                         print_leak(k, seq->inst);
+                        INC_CTR;
+                    }
                 } else {
                     print_leak(k, (PyObject*)v);
+                    INC_CTR;
                 }
+                if (ctr >= 20)
+                    break;
             }
+        }
+        if (ctr >= 20) {
+            fprintf(stderr, " - ... skipped remainder\n");
         }
 #endif
     }
@@ -309,7 +326,8 @@ static void internals_cleanup() {
             int ctr = 0;
             for (const auto &kv : p->type_c2p_slow) {
                 fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
-                if (ctr++ == 10) {
+                INC_CTR;
+                if (ctr == 10) {
                     fprintf(stderr, " - ... skipped remainder\n");
                     break;
                 }
@@ -326,7 +344,8 @@ static void internals_cleanup() {
             for (auto [f, p2] : p->funcs) {
                 fprintf(stderr, " - leaked function \"%s\"\n",
                         nb_func_data(f)->name);
-                if (ctr++ == 10) {
+                if (ctr == 10) {
+                    INC_CTR;
                     fprintf(stderr, " - ... skipped remainder\n");
                     break;
                 }

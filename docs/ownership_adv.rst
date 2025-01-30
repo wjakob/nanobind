@@ -172,7 +172,7 @@ bindings are an optional component).
            Py_INCREF(o);
        },
        [](PyObject *o) noexcept {
-           if (! nb::is_alive())
+           if (!nb::is_alive())
                return;
            nb::gil_scoped_acquire guard;
            Py_DECREF(o);

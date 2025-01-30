@@ -293,7 +293,7 @@ static PyObject *dlpack_from_buffer_protocol(PyObject *o, bool ro) {
     }
 
     mt->deleter = [](managed_dltensor *mt2) {
-        if(! is_alive())
+        if (!is_alive())
             return;
         gil_scoped_acquire guard;
         Py_buffer *buf = (Py_buffer *) mt2->manager_ctx;
@@ -664,7 +664,7 @@ ndarray_handle *ndarray_create(void *value, size_t ndim, const size_t *shape_in,
     scoped_pymalloc<int64_t> shape(ndim), strides(ndim);
 
     auto deleter = [](managed_dltensor *mt) {
-        if (! is_alive())
+        if (!is_alive())
             return;
         gil_scoped_acquire guard;
         ndarray_handle *th = (ndarray_handle *) mt->manager_ctx;

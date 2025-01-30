@@ -104,6 +104,9 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_build_library TARGET_NAME)
+  cmake_parse_arguments(PARSE_ARGV 1 ARG
+    "AS_SYSINCLUDE" "" "")
+
   if (TARGET ${TARGET_NAME})
     return()
   endif()
@@ -112,6 +115,10 @@ function (nanobind_build_library TARGET_NAME)
     set (TARGET_TYPE STATIC)
   else()
     set (TARGET_TYPE SHARED)
+  endif()
+
+  if (${ARG_AS_SYSINCLUDE})
+    set (AS_SYSINCLUDE SYSTEM)
   endif()
 
   add_library(${TARGET_NAME} ${TARGET_TYPE}
@@ -238,7 +245,7 @@ function (nanobind_build_library TARGET_NAME)
       ${NB_DIR}/ext/robin_map/include)
   endif()
 
-  target_include_directories(${TARGET_NAME} PUBLIC
+  target_include_directories(${TARGET_NAME} ${AS_SYSINCLUDE} PUBLIC
     ${Python_INCLUDE_DIRS}
     ${NB_DIR}/include)
 
@@ -312,7 +319,7 @@ endfunction()
 
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP"
+    "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP;NB_SUPPRESS_WARNINGS"
     "NB_DOMAIN" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
@@ -357,7 +364,11 @@ function(nanobind_add_module name)
     set(libname ${libname}-${ARG_NB_DOMAIN})
   endif()
 
-  nanobind_build_library(${libname})
+  if (ARG_NB_SUPPRESS_WARNINGS)
+    set(EXTRA_LIBRARY_PARAMS AS_SYSINCLUDE)
+  endif()
+
+  nanobind_build_library(${libname} ${EXTRA_LIBRARY_PARAMS})
 
   if (ARG_NB_DOMAIN)
     target_compile_definitions(${name} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})

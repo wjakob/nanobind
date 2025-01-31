@@ -73,6 +73,10 @@ Version TBD (not yet released)
   binding abstractions that "feel like" the built-in ones.
   (PR `#884 <https://github.com/wjakob/nanobind/pull/884>`__)
 
+- Taught the stub generator to emit aliases late, i.e. *after* the class
+  member they're supposed to alias. (PR `#900
+  <https://github.com/wjakob/nanobind/pull/900>`__)
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

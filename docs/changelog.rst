@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version TBD (not yet released)
-------------------------------
+Version 2.5.0 (Feb 2, 2025)
+---------------------------
 
 - Added :cpp:class:`nb::def_visitor\<..\> <def_visitor>`, which can be used to
   define your own binding logic that operates on a :cpp:class:`nb::class_\<..\>
@@ -58,21 +58,6 @@ Version TBD (not yet released)
   instances were still alive at interpreter shutdown time. (commit `fb8157
   <https://github.com/wjakob/nanobind/commit/fb815762fdb8476cfd293e3717ca41c8bb890437>`__).
 
-- Fixed a race condition in free-threaded extensions that could occur when
-  :cpp:func:`nb::make_iterator <make_iterator>` was concurrently used by
-  multiple threads (PR `#832 <https://github.com/wjakob/nanobind/pull/832>`__).
-
-- Fixed a race condition in free-threaded extensions that could occur when
-  multiple threads access the Python object associated with the same C++
-  instance, which does not exist yet and therefore must be created. (issue
-  `#867 <https://github.com/wjakob/nanobind/issues/867>`__, PR `#887
-  <https://github.com/wjakob/nanobind/pull/887>`__).
-
-- Removed double-checked locking patterns in accesses to internal data
-  structures to ensure correct free-threaded behavior on architectures with
-  weak memory ordering such as ARM (PR `#819
-  <https://github.com/wjakob/nanobind/pull/819>`__).
-
 - The floating-point type caster now only performs value-changing narrowing
   conversions during the implicit conversion phase. They can be entirely
   avoided by passing the :cpp:func:`.noconvert() <arg::noconvert>` argument
@@ -90,6 +75,24 @@ Version TBD (not yet released)
   column-major input without implicit conversion. (PR `#847
   <https://github.com/wjakob/nanobind/pull/847>`__, commit `b95eb7
   <https://github.com/wjakob/nanobind/commit/b95eb755b5a651a40562002be9ca8a4c6bf0acb9>`__).
+
+Fixes for free-threaded builds
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Fixed a race condition in free-threaded extensions that could occur when
+  :cpp:func:`nb::make_iterator <make_iterator>` was concurrently used by
+  multiple threads (PR `#832 <https://github.com/wjakob/nanobind/pull/832>`__).
+
+- Fixed a race condition in free-threaded extensions that could occur when
+  multiple threads access the Python object associated with the same C++
+  instance, which does not exist yet and therefore must be created. (issue
+  `#867 <https://github.com/wjakob/nanobind/issues/867>`__, PR `#887
+  <https://github.com/wjakob/nanobind/pull/887>`__).
+
+- Removed double-checked locking patterns in accesses to internal data
+  structures to ensure correct free-threaded behavior on architectures with
+  weak memory ordering such as ARM (PR `#819
+  <https://github.com/wjakob/nanobind/pull/819>`__).
 
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------

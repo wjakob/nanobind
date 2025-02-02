@@ -15,6 +15,19 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Upcoming version (TBA)
+----------------------
+
+- nanobind assigns an ABI tag to compiled extensions and uses it to isolate
+  incompatible extensions from each other. This tag was unnecessarily
+  fine-grained, often causing isolation where an actual ABI compatibility was
+  not present. This release updates the tagging scheme to address this
+  long-standing inconvenience. (PR `#778
+  <https://github.com/wjakob/nanobind/pull/778>`__).
+
+* ABI version 16.
+
+
 Version 2.5.0 (Feb 2, 2025)
 ---------------------------
 
@@ -81,7 +94,7 @@ Fixes for free-threaded builds
 
 - Fixed a race condition in free-threaded extensions that could occur when
   :cpp:func:`nb::make_iterator <make_iterator>` was concurrently used by
-  multiple threads (PR `#832 <https://github.com/wjakob/nanobind/pull/832>`__).
+  multiple threads. (PR `#832 <https://github.com/wjakob/nanobind/pull/832>`__).
 
 - Fixed a race condition in free-threaded extensions that could occur when
   multiple threads access the Python object associated with the same C++

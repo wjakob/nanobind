@@ -67,6 +67,16 @@ Version 2.5.0 (Feb 2, 2025)
   This is now fixed. (commit `92d9cb
   <https://github.com/wjakob/nanobind/commit/92d9cb3d62b743a9eca2d9d9d8e5fb14a1e00a2a>`__).
 
+- A new ``NB_SUPPRESS_WARNINGS`` parameter of
+  :cmake:command:`nanobind_add_module` that marks the nanobind and Python
+  include directories as
+  [SYSTEM](https://cmake.org/cmake/help/latest/command/include_directories.html)
+  include directories, which suppresses any potential warning messages
+  originating there. This is mainly of relevance for projects that artificially
+  raise the warning level using flags like `-pedantic`, ``-Wcast-qual``,
+  ``-Wsign-conversion``. (PR `#868
+  <https://github.com/wjakob/nanobind/pull/868>`__).
+
 - Fixed (benign) reference leads that could occur when ``std::shared_ptr<T>``
   instances were still alive at interpreter shutdown time. (commit `fb8157
   <https://github.com/wjakob/nanobind/commit/fb815762fdb8476cfd293e3717ca41c8bb890437>`__).

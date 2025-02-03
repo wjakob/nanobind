@@ -77,21 +77,21 @@ Version 2.5.0 (Feb 2, 2025)
   ``-Wsign-conversion``. (PR `#868
   <https://github.com/wjakob/nanobind/pull/868>`__).
 
-- Fixed (benign) reference leads that could occur when ``std::shared_ptr<T>``
+- Fixed (benign) reference leaks that could occur when ``std::shared_ptr<T>``
   instances were still alive at interpreter shutdown time. (commit `fb8157
   <https://github.com/wjakob/nanobind/commit/fb815762fdb8476cfd293e3717ca41c8bb890437>`__).
 
 - The floating-point type caster now only performs value-changing narrowing
   conversions during the implicit conversion phase. They can be entirely
   avoided by passing the :cpp:func:`.noconvert() <arg::noconvert>` argument
-  annotation (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__).
+  annotation. (PR `#829 <https://github.com/wjakob/nanobind/pull/829>`__)
 
 - The ``std::complex`` type caster now only performs value-changing narrowing
   conversions during the implicit conversion phase.  They can be entirely
   avoided by passing the :cpp:func:`.noconvert() <arg::noconvert>` argument
   annotation.  Also, during the implicit conversion phase, if the Python object
   is not a complex number object but has a ``__complex__()`` method, it will be
-  called (PR `#854 <https://github.com/wjakob/nanobind/pull/854>`__).
+  called. (PR `#854 <https://github.com/wjakob/nanobind/pull/854>`__)
 
 - Fixed an overly strict check that could cause a function taking an
   :cpp:class:`nb::ndarray\<...\> <ndarray>` to refuse specific types of

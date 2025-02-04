@@ -85,7 +85,7 @@ The high-level interface consists of just one CMake command:
           extensions.
       * - ``NB_SUPPRESS_WARNINGS``
         - Mark the include directories of nanobind and Python as
-          [SYSTEM](https://cmake.org/cmake/help/latest/command/include_directories.html)
+          `SYSTEM <https://cmake.org/cmake/help/latest/command/include_directories.html>`__
           include directories, which suppresses any potential warning messages
           originating there. This is mainly of relevance if your project artificially
           raises the warning level via flags like `-pedantic`, ``-Wcast-qual``,

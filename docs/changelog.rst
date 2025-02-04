@@ -70,7 +70,7 @@ Version 2.5.0 (Feb 2, 2025)
 - A new ``NB_SUPPRESS_WARNINGS`` parameter of
   :cmake:command:`nanobind_add_module` that marks the nanobind and Python
   include directories as
-  [SYSTEM](https://cmake.org/cmake/help/latest/command/include_directories.html)
+  `SYSTEM <https://cmake.org/cmake/help/latest/command/include_directories.html>`__
   include directories, which suppresses any potential warning messages
   originating there. This is mainly of relevance for projects that artificially
   raise the warning level using flags like `-pedantic`, ``-Wcast-qual``,

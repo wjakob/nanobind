@@ -50,9 +50,9 @@ struct type_caster<std::function<Return(Args...)>> {
         std::conditional_t<std::is_void_v<Return>, void_type, Return>>;
 
     NB_TYPE_CASTER(std::function <Return(Args...)>,
-                   const_name(NB_TYPING_CALLABLE "[[") +
+                   optional_name(const_name(NB_TYPING_CALLABLE "[[") +
                        concat(make_caster<Args>::Name...) + const_name("], ") +
-                       ReturnCaster::Name + const_name("]"))
+                       ReturnCaster::Name + const_name("]")))
 
     struct pyfunc_wrapper_t : pyfunc_wrapper {
         using pyfunc_wrapper::pyfunc_wrapper;

@@ -25,6 +25,9 @@ Upcoming version (TBA)
   long-standing inconvenience. (PR `#778
   <https://github.com/wjakob/nanobind/pull/778>`__).
 
+- The type caster for ``std::function`` now properly identifies its type as
+  optional (the runtime behavior is unaffected; this only impacts stubs)
+
 * ABI version 16.
 
 

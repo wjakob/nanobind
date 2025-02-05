@@ -1998,14 +1998,14 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
           static void postcall(PyObject **args,
                                std::integral_constant<size_t, N>,
                                nb::handle ret) {
-              static_assert(I > 0 && I < N,
+              static_assert(I > 0 && I <= N,
                             "I in returns_references_to<I> must be in the "
                             "range [1, number of C++ function arguments]");
               if (!nb::isinstance<nb::sequence>(ret)) {
                   throw std::runtime_error("return value should be a sequence");
               }
               for (nb::handle nurse : ret) {
-                  nb::detail::keep_alive(nurse.ptr(), args[I]);
+                  nb::detail::keep_alive(nurse.ptr(), args[I - 1]);
               }
           }
       };

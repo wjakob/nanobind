@@ -483,7 +483,7 @@ With reference counting
 
        PyObject* list = ...;
        Py_ssize_t index = ...;
-       nb::object o = nb::borrow(PyList_GetItem(obj, index));
+       nb::object o = nb::borrow(PyList_GetItem(list, index));
 
    Using :cpp:func:`steal()` in this setting is incorrect and would lead to a
    reference underflow.
@@ -1998,14 +1998,14 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
           static void postcall(PyObject **args,
                                std::integral_constant<size_t, N>,
                                nb::handle ret) {
-              static_assert(I > 0 && I < N,
+              static_assert(I > 0 && I <= N,
                             "I in returns_references_to<I> must be in the "
                             "range [1, number of C++ function arguments]");
               if (!nb::isinstance<nb::sequence>(ret)) {
                   throw std::runtime_error("return value should be a sequence");
               }
               for (nb::handle nurse : ret) {
-                  nb::detail::keep_alive(nurse.ptr(), args[I]);
+                  nb::detail::keep_alive(nurse.ptr(), args[I - 1]);
               }
           }
       };
@@ -2216,6 +2216,13 @@ Class binding
       This is an advanced feature; prefer :cpp:struct:`nb::init\<..\> <init>`
       where possible. See the discussion of :ref:`customizing object creation
       <custom_new>` for more details.
+
+   .. cpp:function:: template <typename Visitor, typename... Extra> class_ &def(def_visitor<Visitor> arg, const Extra &... extra)
+
+      Dispatch to custom user-provided binding logic implemented by the type
+      ``Visitor``, passing it the binding annotations ``extra...``.
+      See the documentation of :cpp:struct:`nb::def_visitor\<..\> <def_visitor>`
+      for details.
 
    .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_rw(const char * name, D C::* p, const Extra &...extra)
 
@@ -2653,6 +2660,41 @@ Class binding
 
    See the discussion of :ref:`customizing Python object creation <custom_new>`
    for more information.
+
+.. cpp:struct:: template <typename Visitor> def_visitor
+
+   An empty base object which serves as a tag to allow :cpp:func:`class_::def()`
+   to dispatch to custom logic implemented by the type ``Visitor``. This is the
+   same mechanism used by :cpp:class:`init`, :cpp:class:`init_implicit`, and
+   :cpp:class:`new_`; it's exposed publicly so that you can create your own
+   reusable abstractions for binding logic.
+
+   To define a ``def_visitor``, you would write something like:
+
+   .. code-block:: cpp
+
+      struct my_ops : nb::def_visitor<my_ops> {
+          template <typename Class, typename... Extra>
+          void execute(Class &cl, const Extra&... extra) {
+              /* series of def() statements on `cl`, which is a nb::class_ */
+          }
+      };
+
+   Then use it like:
+
+   .. code-block:: cpp
+
+      nb::class_<MyType>(m, "MyType")
+          .def("some_method", &MyType::some_method)
+          .def(my_ops())
+          ... ;
+
+   Any arguments to :cpp:func:`class_::def()` after the ``def_visitor`` object
+   get passed through as the ``Extra...`` parameters to ``execute()``.
+   As with any other C++ object, data needed by the ``def_visitor`` can be passed
+   through template arguments or ordinary constructor arguments.
+   The ``execute()`` method may be static if it doesn't need to access anything
+   in ``*this``.
 
 
 GIL Management
@@ -3099,7 +3141,8 @@ Miscellaneous
     from the signature. To make this explicit, use the ``nb::typed<T, Ts...>``
     wrapper to pass additional type parameters. This has no effect besides
     clarifying the signature---in particular, nanobind does *not* insert
-    additional runtime checks!
+    additional runtime checks! At runtime, a ``nb::typed<T, Ts...>`` behaves
+    exactly like a ``T``.
 
     .. code-block:: cpp
 
@@ -3108,3 +3151,21 @@ Miscellaneous
                // ...
            }
        });
+
+    ``nb::typed<nb::object, T>`` and ``nb::typed<nb::handle, T>`` are
+    treated specially: they generate a signature that refers just to ``T``,
+    rather than to the nonsensical ``object[T]`` that would otherwise
+    be produced. This can be useful if you want to replace the type of
+    a parameter instead of augmenting it. Note that at runtime these
+    perform no checks at all, since ``nb::object`` and ``nb::handle``
+    can refer to any Python object.
+
+    To support callable types, you can specify a C++ function signature in
+    ``nb::typed<nb::callable, Sig>`` and nanobind will attempt to convert
+    it to a Python callable signature.
+    ``nb::typed<nb::callable, int(float, std::string)>`` becomes
+    ``Callable[[float, str], int]``, while
+    ``nb::typed<nb::callable, int(...)>`` becomes ``Callable[..., int]``.
+    Type checkers will verify that any callable passed for such an argument
+    has a compatible signature. (At runtime, any sort of callable object
+    will be accepted.)

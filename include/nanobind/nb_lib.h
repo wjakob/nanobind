@@ -305,7 +305,7 @@ NB_CORE PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
                                        void *value, cleanup_list *cleanup,
                                        bool cpp_delete) noexcept;
 
-/// Try to reliquish ownership from Python object to a unique_ptr;
+/// Try to relinquish ownership from Python object to a unique_ptr;
 /// return true if successful, false if not. (Failure is only
 /// possible if `cpp_delete` is true.)
 NB_CORE bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept;
@@ -556,6 +556,8 @@ NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 #endif
 
 NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
+
+NB_CORE const char *abi_tag();
 
 NAMESPACE_END(detail)
 

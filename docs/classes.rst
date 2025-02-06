@@ -1104,6 +1104,29 @@ type object that Python passes as the first argument of ``__new__``
 ``.def_static("__new__", ...)`` and matching ``.def("__init__", ...)``
 yourself.
 
+Two limitations of :cpp:struct:`nb::new_ <new_>` are worth noting:
+
+* The possibilities for Python-side inheritance from C++ classes that
+  are bound using :cpp:struct:`nb::new_ <new_>` constructors are substantially
+  reduced. Simple inheritance situations (``class PyPet(Pet): ...``) should
+  work OK, but you can't :ref:`override virtual functions <trampolines>`
+  in Python (because the C++ object returned by :cpp:struct:`new_ <new_>`
+  doesn't contain the Python trampoline glue), and if :cpp:struct:`new_ <new_>`
+  is used to implement a polymorphic factory (like if ``Pet::make()`` could
+  return an instance of ``Cat``) then Python-side inheritance won't work at all.
+
+* A given C++ class must expose all of its constructors via ``__new__`` or
+  all via ``__init__``, rather than a mixture of the two.
+  The only case where a class should bind both of these methods is
+  if the ``__init__`` methods are all stubs that do nothing.
+  This is because nanobind internally optimizes object instantiation by
+  caching the method that should be used for constructing instances of each
+  given type, and that optimization doesn't support trying both methods.
+  If you really need to combine nontrivial ``__new__`` and nontrivial
+  ``__init__`` in the same type, you can disable the optimization by
+  defining a :ref:`custom type slot <typeslots>` of ``Py_tp_new`` or
+  ``Py_tp_init``.
+
 .. note::
 
    Unpickling an object of type ``Foo`` normally requires that

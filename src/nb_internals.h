@@ -460,8 +460,6 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
     #endif
 }
 
-extern PyObject *nb_type_name(PyObject *o) noexcept;
-
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);
     return self->direct ? ptr : *(void **) ptr;
@@ -513,7 +511,6 @@ struct lock_obj { lock_obj(PyObject *) { } };
 
 extern char *strdup_check(const char *);
 extern void *malloc_check(size_t size);
-extern void maybe_make_immortal(PyObject *op);
 
 extern char *extract_name(const char *cmd, const char *prefix, const char *s);
 

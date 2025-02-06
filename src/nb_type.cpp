@@ -8,6 +8,7 @@
 */
 
 #include "nb_internals.h"
+#include "nb_ft.h"
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
@@ -99,6 +100,9 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self->intrusive = intrusive;
         self->unused = 0;
 
+        // Make the object compatible with nb_try_inc_ref (free-threaded builds only)
+        nb_enable_try_inc_ref((PyObject *) self);
+
         // Update hash table that maps from C++ to Python instance
         nb_shard &shard = internals->shard((void *) payload);
         lock_shard guard(shard);
@@ -109,7 +113,9 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
     return (PyObject *) self;
 }
 
-/// Allocate memory for a nb_type instance with external storage
+/// Allocate memory for a nb_type instance with external storage. In contrast to
+/// 'inst_new_int()', this does not yet register the instance in the internal
+/// data structures. The function 'inst_register()' must be used to do so.
 PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
 
@@ -164,11 +170,19 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     self->intrusive = intrusive;
     self->unused = 0;
 
+    // Make the object compatible with nb_try_inc_ref (free-threaded builds only)
+    nb_enable_try_inc_ref((PyObject *) self);
+
+    return (PyObject *) self;
+}
+
+/// Register the object constructed by 'inst_new_ext()' in the internal data structures
+static void inst_register(PyObject *inst, void *value) noexcept {
     nb_shard &shard = internals->shard(value);
     lock_shard guard(shard);
 
     // Update hash table that maps from C++ to Python instance
-    auto [it, success] = shard.inst_c2p.try_emplace(value, self);
+    auto [it, success] = shard.inst_c2p.try_emplace(value, inst);
 
     if (NB_UNLIKELY(!success)) {
         void *entry = it->second;
@@ -185,8 +199,9 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
 
         nb_inst_seq *seq = nb_get_seq(entry);
         while (true) {
-            check((nb_inst *) seq->inst != self,
-                  "nanobind::detail::inst_new_ext(): duplicate instance!");
+            // The following should never happen
+            check(inst != seq->inst, "nanobind::detail::inst_new_ext(): duplicate instance!");
+
             if (!seq->next)
                 break;
             seq = seq->next;
@@ -196,13 +211,12 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
         check(next,
               "nanobind::detail::inst_new_ext(): list element allocation failed!");
 
-        next->inst = (PyObject *) self;
+        next->inst = (PyObject *) inst;
         next->next = nullptr;
         seq->next = next;
     }
-
-    return (PyObject *) self;
 }
+
 
 static void inst_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
@@ -887,7 +901,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
         tp = (PyTypeObject *) nb_type_from_metaclass(
             internals_->nb_meta, internals_->nb_module, &spec);
 
-        maybe_make_immortal((PyObject *) tp);
+        make_immortal((PyObject *) tp);
 
         handle(tp).attr("__module__") = "nanobind";
 
@@ -1148,15 +1162,35 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
         /* Handle a corner case (base class larger than derived class)
            which can arise when extending trampoline base classes */
-        size_t base_basicsize = sizeof(nb_inst) + tb->size;
-        if (tb->align > ptr_size)
-            base_basicsize += tb->align - ptr_size;
-        if (base_basicsize > basicsize)
-            basicsize = base_basicsize;
+
+        PyTypeObject *base_2 = (PyTypeObject *) base;
+        type_data *tb_2 = tb;
+
+        do {
+            size_t base_basicsize = sizeof(nb_inst) + tb_2->size;
+            if (tb_2->align > ptr_size)
+                base_basicsize += tb_2->align - ptr_size;
+            if (base_basicsize > basicsize)
+                basicsize = base_basicsize;
+
+#if !defined(Py_LIMITED_API)
+            base_2 = base_2->tp_base;
+#else
+            base_2 = (PyTypeObject *) PyType_GetSlot(base_2, Py_tp_base);
+#endif
+
+            if (!base_2 || !nb_type_check((PyObject *) base_2))
+                break;
+
+            tb_2 = nb_type_data(base_2);
+        } while (true);
     }
 
     bool base_intrusive_ptr =
         tb && (tb->flags & (uint32_t) type_flags::intrusive_ptr);
+
+    // tp_basicsize must satisfy pointer alignment.
+    basicsize = (basicsize + ptr_size - 1) / ptr_size * ptr_size;
 
     char *name_copy = strdup_check(name.c_str());
 
@@ -1294,7 +1328,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     Py_DECREF(metaclass);
 
-    maybe_make_immortal(result);
+    make_immortal(result);
 
     type_data *to = nb_type_data((PyTypeObject *) result);
 
@@ -1717,6 +1751,9 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     if (intrusive)
         t->set_self_py(new_value, (PyObject *) inst);
 
+    if (!create_new)
+        inst_register((PyObject *) inst, value);
+
     return (PyObject *) inst;
 }
 
@@ -1766,16 +1803,16 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                 PyTypeObject *tp = Py_TYPE(seq.inst);
 
                 if (nb_type_data(tp)->type == cpp_type) {
-                    Py_INCREF(seq.inst);
-                    return seq.inst;
+                    if (nb_try_inc_ref(seq.inst))
+                        return seq.inst;
                 }
 
                 if (!lookup_type())
                     return nullptr;
 
                 if (PyType_IsSubtype(tp, td->type_py)) {
-                    Py_INCREF(seq.inst);
-                    return seq.inst;
+                    if (nb_try_inc_ref(seq.inst))
+                        return seq.inst;
                 }
 
                 if (seq.next == nullptr)
@@ -1852,8 +1889,8 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                 const std::type_info *p = nb_type_data(tp)->type;
 
                 if (p == cpp_type || p == cpp_type_p) {
-                    Py_INCREF(seq.inst);
-                    return seq.inst;
+                    if (nb_try_inc_ref(seq.inst))
+                        return seq.inst;
                 }
 
                 if (!lookup_type())
@@ -1861,8 +1898,8 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
                 if (PyType_IsSubtype(tp, td->type_py) ||
                     (td_p && PyType_IsSubtype(tp, td_p->type_py))) {
-                    Py_INCREF(seq.inst);
-                    return seq.inst;
+                    if (nb_try_inc_ref(seq.inst))
+                        return seq.inst;
                 }
 
                 if (seq.next == nullptr)
@@ -2062,6 +2099,7 @@ PyObject *nb_inst_reference(PyTypeObject *t, void *ptr, PyObject *parent) {
     nbi->state = nb_inst::state_ready;
     if (parent)
         keep_alive(result, parent);
+    inst_register(result, ptr);
     return result;
 }
 
@@ -2072,6 +2110,7 @@ PyObject *nb_inst_take_ownership(PyTypeObject *t, void *ptr) {
     nb_inst *nbi = (nb_inst *) result;
     nbi->destruct = nbi->cpp_delete = true;
     nbi->state = nb_inst::state_ready;
+    inst_register(result, ptr);
     return result;
 }
 

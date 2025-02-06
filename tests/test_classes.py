@@ -901,6 +901,27 @@ def test46_custom_new():
     assert t.NewStar("hi", "lo", value=10).value == 12
     assert t.NewStar(value=10, other="blah").value == 20
 
+    # Make sure a Python class that derives from a C++ class that uses
+    # nb::new_() can be instantiated producing the correct Python type
+    class FancyInt(t.UniqueInt):
+        @staticmethod
+        def the_answer():
+            return 42
+
+        @property
+        def value_as_string(self):
+            return str(self.value())
+
+    f1 = FancyInt(10)
+    f2 = FancyInt(20)
+    # The derived-type wrapping doesn't preserve Python identity...
+    assert f1 is not FancyInt(10)
+    # ... but does preserve C++ identity
+    assert f1.lookups() == u4.lookups() == 3  # u4, f1, and anonymous
+    assert f1.the_answer() == f2.the_answer() == 42
+    assert f1.value_as_string == "10"
+    assert f2.value_as_string == "20"
+
 def test47_inconstructible():
     with pytest.raises(TypeError, match="no constructor defined"):
         t.Foo()

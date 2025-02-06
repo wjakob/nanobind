@@ -8,6 +8,7 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <complex>
 #include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -899,12 +900,63 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 
 // ========================================================================
 
+NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
+                        std::complex<double> *out) noexcept {
+    bool is_complex = PyComplex_CheckExact(ob),
+         convert = (flags & (uint8_t) cast_flags::convert);
+#if !defined(Py_LIMITED_API)
+    if (is_complex || convert) {
+        Py_complex result = PyComplex_AsCComplex(ob);
+        if (result.real != -1.0 || !PyErr_Occurred()) {
+            *out = std::complex<double>(result.real, result.imag);
+            return true;
+        } else {
+            PyErr_Clear();
+        }
+    }
+#else
+#if Py_LIMITED_API < 0x030D0000
+    // Before version 3.13, __complex__() was not called by the Stable ABI
+    // functions PyComplex_{Real,Imag}AsDouble(), so we do so ourselves.
+    if (!is_complex && convert
+            && !PyType_IsSubtype(Py_TYPE(ob), &PyComplex_Type)
+            && PyObject_HasAttrString(ob, "__complex__")) {
+        PyObject* tmp = PyObject_CallFunctionObjArgs(
+                (PyObject*) &PyComplex_Type, ob, NULL);
+        if (tmp) {
+            double re = PyComplex_RealAsDouble(tmp);
+            double im = PyComplex_ImagAsDouble(tmp);
+            Py_DECREF(tmp);
+            if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
+                *out = std::complex<double>(re, im);
+                return true;
+            }
+        }
+        PyErr_Clear();
+        return false;
+    }
+#endif
+    if (is_complex || convert) {
+        double re = PyComplex_RealAsDouble(ob);
+        double im = PyComplex_ImagAsDouble(ob);
+        if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
+            *out = std::complex<double>(re, im);
+            return true;
+        } else {
+            PyErr_Clear();
+        }
+    }
+#endif
+
+    return false;
+}
+
 bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (double) PyFloat_AS_DOUBLE(o);
+        *out = PyFloat_AS_DOUBLE(o);
         return true;
     }
 
@@ -915,7 +967,7 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (double) result;
+            *out = result;
             return true;
         } else {
             PyErr_Clear();
@@ -927,22 +979,31 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
 
 bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
+    bool convert = flags & (uint8_t) cast_flags::convert;
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (float) PyFloat_AS_DOUBLE(o);
-        return true;
+        double d = PyFloat_AS_DOUBLE(o);
+        float result = (float) d;
+        if (convert || (double) result == d || d != d) {
+            *out = result;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     is_float = false;
 #endif
 
-    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
-        double result = PyFloat_AsDouble(o);
-
-        if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (float) result;
-            return true;
+    if (is_float || convert) {
+        double d = PyFloat_AsDouble(o);
+        if (d != -1.0 || !PyErr_Occurred()) {
+            float result = (float) d;
+            if (convert || (double) result == d || d != d) {
+                *out = result;
+                return true;
+            }
         } else {
             PyErr_Clear();
         }
@@ -1165,22 +1226,6 @@ bool issubclass(PyObject *a, PyObject *b) {
     if (rv == -1)
         raise_python_error();
     return bool(rv);
-}
-
-// ========================================================================
-
-/// Make an object immortal when targeting free-threaded Python
-void maybe_make_immortal(PyObject *op) {
-#ifdef NB_FREE_THREADED
-    // See CPython's Objects/object.c
-    if (PyObject_IS_GC(op))
-        PyObject_GC_UnTrack(op);
-    op->ob_tid = _Py_UNOWNED_TID;
-    op->ob_ref_local = _Py_IMMORTAL_REFCNT_LOCAL;
-    op->ob_ref_shared = 0;
-#else
-    (void) op;
-#endif
 }
 
 // ========================================================================

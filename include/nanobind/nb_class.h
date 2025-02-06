@@ -329,8 +329,18 @@ inline void *type_get_slot(handle h, int slot_id) {
 #endif
 }
 
+template <typename Visitor> struct def_visitor {
+  protected:
+    // Ensure def_visitor<T> can only be derived from, not constructed
+    // directly
+    def_visitor() {
+        static_assert(std::is_base_of_v<def_visitor, Visitor>,
+                      "def_visitor uses CRTP: def_visitor<T> should be "
+                      "a base of T");
+    }
+};
 
-template <typename... Args> struct init {
+template <typename... Args> struct init : def_visitor<init<Args...>> {
     template <typename T, typename... Ts> friend class class_;
     NB_INLINE init() {}
 
@@ -355,7 +365,7 @@ private:
     }
 };
 
-template <typename Arg> struct init_implicit {
+template <typename Arg> struct init_implicit : def_visitor<init_implicit<Arg>> {
     template <typename T, typename... Ts> friend class class_;
     NB_INLINE init_implicit() { }
 
@@ -416,13 +426,46 @@ namespace detail {
             }
         }
     }
+
+    // Call policy that ensures __new__ returns an instance of the correct
+    // Python type, even when deriving from the C++ class in Python
+    struct new_returntype_fixup_policy {
+        static inline void precall(PyObject **, size_t,
+                                   detail::cleanup_list *) {}
+        NB_NOINLINE static inline void postcall(PyObject **args, size_t,
+                                                PyObject *&ret) {
+            handle type_requested = args[0];
+            if (ret == nullptr || !type_requested.is_type())
+                return; // somethign strange about this call; don't meddle
+            handle type_created = Py_TYPE(ret);
+            if (type_created.is(type_requested))
+                return; // already created the requested type so no fixup needed
+
+            if (type_check(type_created) &&
+                PyType_IsSubtype((PyTypeObject *) type_requested.ptr(),
+                                 (PyTypeObject *) type_created.ptr()) &&
+                type_info(type_created) == type_info(type_requested)) {
+                // The new_ constructor returned an instance of a bound type T.
+                // The user wanted an instance of some python subclass S of T.
+                // Since both wrap the same C++ type, we can satisfy the request
+                // by returning a pyobject of type S that wraps a C++ T*, and
+                // handling the lifetimes by having that pyobject keep the
+                // already-created T pyobject alive.
+                object wrapper = inst_reference(type_requested,
+                                                inst_ptr<void>(ret),
+                                                /* parent = */ ret);
+                handle(ret).dec_ref();
+                ret = wrapper.release().ptr();
+            }
+        }
+    };
 }
 
 template <typename Func, typename Sig = detail::function_signature_t<Func>>
 struct new_;
 
 template <typename Func, typename Return, typename... Args>
-struct new_<Func, Return(Args...)> {
+struct new_<Func, Return(Args...)> : def_visitor<new_<Func, Return(Args...)>> {
     std::remove_reference_t<Func> func;
 
     new_(Func &&f) : func((detail::forward_t<Func>) f) {}
@@ -442,17 +485,19 @@ struct new_<Func, Return(Args...)> {
               std::is_same_v<detail::intrinsic_t<Args>, kwargs>) + ... + 0);
         detail::wrap_base_new(cl, sizeof...(Args) > num_defaults + num_varargs);
 
-        auto wrapper = [func = (detail::forward_t<Func>) func](handle, Args... args) {
-            return func((detail::forward_t<Args>) args...);
+        auto wrapper = [func_ = (detail::forward_t<Func>) func](handle, Args... args) {
+            return func_((detail::forward_t<Args>) args...);
         };
 
+        auto policy = call_policy<detail::new_returntype_fixup_policy>();
         if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {
             // If any argument annotations are specified, add another for the
             // extra class argument that we don't forward to Func, so visible
             // arg() annotations stay aligned with visible function arguments.
-            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...);
+            cl.def_static("__new__", std::move(wrapper), arg("cls"), extra...,
+                          policy);
         } else {
-            cl.def_static("__new__", std::move(wrapper), extra...);
+            cl.def_static("__new__", std::move(wrapper), extra..., policy);
         }
         cl.def("__init__", [](handle, Args...) {}, extra...);
     }
@@ -579,21 +624,9 @@ public:
         return *this;
     }
 
-    template <typename... Args, typename... Extra>
-    NB_INLINE class_ &def(init<Args...> &&arg, const Extra &... extra) {
-        arg.execute(*this, extra...);
-        return *this;
-    }
-
-    template <typename Arg, typename... Extra>
-    NB_INLINE class_ &def(init_implicit<Arg> &&arg, const Extra &... extra) {
-        arg.execute(*this, extra...);
-        return *this;
-    }
-
-    template <typename Func, typename... Extra>
-    NB_INLINE class_ &def(new_<Func> &&arg, const Extra &... extra) {
-        arg.execute(*this, extra...);
+    template <typename Visitor, typename... Extra>
+    NB_INLINE class_ &def(def_visitor<Visitor> &&arg, const Extra &... extra) {
+        static_cast<Visitor&&>(arg).execute(*this, extra...);
         return *this;
     }
 
@@ -801,6 +834,7 @@ public:
 
 template <typename Source, typename Target> void implicitly_convertible() {
     using Caster = detail::make_caster<Source>;
+    static_assert(!std::is_enum_v<Target>, "implicitly_convertible(): 'Target' cannot be an enumeration.");
 
     if constexpr (detail::is_base_caster_v<Caster>) {
         detail::implicitly_convertible(&typeid(Source), &typeid(Target));

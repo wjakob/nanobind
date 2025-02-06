@@ -154,7 +154,7 @@ struct is_getter { };
 template <typename Policy> struct call_policy final {};
 
 NAMESPACE_BEGIN(literals)
-constexpr arg operator"" _a(const char *name, size_t) { return arg(name); }
+constexpr arg operator""_a(const char *name, size_t) { return arg(name); }
 NAMESPACE_END(literals)
 
 NAMESPACE_BEGIN(detail)
@@ -459,11 +459,11 @@ process_postcall(PyObject **args, std::integral_constant<size_t, NArgs>,
 template <size_t NArgs, typename Policy>
 NB_INLINE void
 process_postcall(PyObject **args, std::integral_constant<size_t, NArgs> nargs,
-                 PyObject *result, call_policy<Policy> *) {
+                 PyObject *&result, call_policy<Policy> *) {
     // result_guard avoids leaking a reference to the return object
     // if postcall throws an exception
     object result_guard = steal(result);
-    Policy::postcall(args, nargs, handle(result));
+    Policy::postcall(args, nargs, result);
     result_guard.release();
 }
 

@@ -957,3 +957,13 @@ def test51_return_from_stack():
     import numpy as np
     assert np.all(t.ret_from_stack_1() == [1,2,3])
     assert np.all(t.ret_from_stack_2() == [1,2,3])
+
+@needs_numpy
+def test52_accept_np_both_true_contig():
+    import numpy as np
+    a = np.zeros((2, 1), dtype=np.float32)
+    assert a.flags['C_CONTIGUOUS'] and a.flags['F_CONTIGUOUS']
+    t.accept_np_both_true_contig_a(a)
+    t.accept_np_both_true_contig_c(a)
+    t.accept_np_both_true_contig_f(a)
+

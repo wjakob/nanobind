@@ -41,6 +41,8 @@ def test01_check_stub_refs(p_ref):
 
     if "test_functions_ext" in p_in.name and sys.version_info < (3, 13):
         s_ref = [line.replace("types.CapsuleType", "typing_extensions.CapsuleType") for line in s_ref]
+        s_ref.insert(3, "")
+        s_ref.insert(4, "import typing_extensions")
 
     s_in = remove_platform_dependent(s_in)
     s_ref = remove_platform_dependent(s_ref)

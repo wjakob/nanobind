@@ -30,8 +30,6 @@ assert len(ref_paths) > 0, "Stub reference files not found!"
 exclude_pattern = "test_functions_ext_3_13" if sys.version_info < (3, 13) else "test_functions_ext_3_12"
 ref_paths = [ref for ref in ref_paths if exclude_pattern not in str(ref)]
 
-print(ref_paths)
-
 @skip_on_unsupported
 @pytest.mark.parametrize('p_ref', ref_paths)
 def test01_check_stub_refs(p_ref):

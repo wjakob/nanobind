@@ -1189,6 +1189,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool base_intrusive_ptr =
         tb && (tb->flags & (uint32_t) type_flags::intrusive_ptr);
 
+    // tp_basicsize must satisfy pointer alignment.
+    basicsize = (basicsize + ptr_size - 1) / ptr_size * ptr_size;
+
     char *name_copy = strdup_check(name.c_str());
 
     constexpr size_t nb_type_max_slots = 11,

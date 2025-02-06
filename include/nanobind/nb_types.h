@@ -334,13 +334,7 @@ public:
 };
 
 class capsule : public object {
-    NB_OBJECT_DEFAULT(capsule, object,
-#if PY_VERSION_HEX < 0x030D00A0
-    "typing_extensions.CapsuleType",
-#else
-    "types.CapsuleType",
-#endif
-    PyCapsule_CheckExact)
+    NB_OBJECT_DEFAULT(capsule, object, NB_TYPING_CAPSULE, PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
         m_ptr = detail::capsule_new(ptr, nullptr, cleanup);

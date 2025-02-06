@@ -198,7 +198,13 @@ template <> struct type_caster<void> {
     template <typename T_> using Cast = void *;
     template <typename T_> static constexpr bool can_cast() { return true; }
     using Value = void*;
-    static constexpr auto Name = const_name("types.CapsuleType");
+    static constexpr auto Name = const_name(
+#if PY_VERSION_HEX < 0x030D00A0
+    "typing_extensions.CapsuleType"
+#else
+    "types.CapsuleType"
+#endif
+    );
     explicit operator void *() { return value; }
     Value value;
 

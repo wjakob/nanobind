@@ -803,8 +803,12 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     }
 
     if (copy) {
+        const char* copy_str = "copy";
+        if (framework == pytorch::value)
+            copy_str = "clone";
+        
         try {
-            o = o.attr("copy")();
+            o = o.attr(copy_str)();
         } catch (std::exception &e) {
             PyErr_Format(PyExc_RuntimeError,
                          "nanobind::detail::ndarray_export(): copy failed: %s",

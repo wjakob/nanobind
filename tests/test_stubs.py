@@ -27,9 +27,6 @@ def remove_platform_dependent(s):
 ref_paths = list(pathlib.Path(__file__).parent.glob('*.pyi.ref'))
 assert len(ref_paths) > 0, "Stub reference files not found!"
 
-exclude_pattern = "test_functions_ext_3_13" if sys.version_info < (3, 13) else "test_functions_ext_3_12"
-ref_paths = [ref for ref in ref_paths if exclude_pattern not in str(ref)]
-
 @skip_on_unsupported
 @pytest.mark.parametrize('p_ref', ref_paths)
 def test01_check_stub_refs(p_ref):
@@ -37,14 +34,15 @@ def test01_check_stub_refs(p_ref):
     Check that generated stub files match reference input
     """
     p_in = p_ref.with_suffix('')
-    if "_3_13" in p_in.name or "_3_12" in p_in.name:
-        p_in = p_in.with_name("test_functions_ext.pyi")
     with open(p_ref, 'r') as f:
         s_ref = f.read().split('\n')
     with open(p_in, 'r') as f:
         s_in = f.read().split('\n')
     s_in = remove_platform_dependent(s_in)
     s_ref = remove_platform_dependent(s_ref)
+
+    if p_in.name == "test_functions_ext" and sys.version_info < (3, 13):
+        s_in.replace("types.CapsuleType", "typing_extensions.CapsuleType")
 
     diff = list(difflib.unified_diff(
         s_ref,

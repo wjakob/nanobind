@@ -2,6 +2,8 @@ from collections.abc import Callable
 import types
 from typing import Annotated, Any, overload
 
+import typing_extensions
+
 
 def abi_tag() -> str: ...
 

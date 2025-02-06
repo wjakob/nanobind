@@ -160,8 +160,7 @@ set(TEST_FILES
 
   # Stub reference files
   test_classes_ext.pyi.ref
-  test_functions_ext_3_12.pyi.ref
-  test_functions_ext_3_13.pyi.ref
+  test_functions_ext.pyi.ref
   test_make_iterator_ext.pyi.ref
   test_ndarray_ext.pyi.ref
   test_stl_ext.pyi.ref

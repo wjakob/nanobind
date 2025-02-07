@@ -63,9 +63,13 @@ enum class type_flags : uint32_t {
 
     /// Does the type implement a custom __new__ operator that can take no args
     /// (except the type object)?
-    has_nullary_new          = (1 << 17)
+    has_nullary_new          = (1 << 17),
 
-    // One more bit available without needing a larger reorganization
+    /// Does the type provide a upcast_hook?
+    has_upcast_hook          = (1 << 18)
+
+    // Reorganization will be needed to add any more flags;
+    // try splitting type_init_flags into a separate field in type_init_data
 };
 
 /// Flags about a type that are only relevant when it is being created.
@@ -125,6 +129,7 @@ struct type_data {
     };
     void (*set_self_py)(void *, PyObject *) noexcept;
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
+    void* (*upcast_hook)(PyObject *, const std::type_info *) noexcept;
 #if defined(Py_LIMITED_API)
     uint32_t dictoffset;
     uint32_t weaklistoffset;
@@ -181,6 +186,11 @@ NB_INLINE void type_extra_apply(type_init_data & t, is_generic) {
 NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
     t.flags |= (uint32_t) type_flags::has_signature;
     t.name = s.value;
+}
+
+NB_INLINE void type_extra_apply(type_init_data &t, upcast_hook h) {
+    t.flags |= (uint32_t) type_flags::has_upcast_hook;
+    t.upcast_hook = h.hook;
 }
 
 template <typename T>

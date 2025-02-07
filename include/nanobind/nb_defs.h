@@ -108,6 +108,12 @@
 #  define NB_TYPING_TYPE  "type"
 #endif
 
+#if PY_VERSION_HEX < 0x030D0000
+#  define NB_TYPING_CAPSULE "typing_extensions.CapsuleType"
+#else
+#  define NB_TYPING_CAPSULE "types.CapsuleType"
+#endif
+
 #define NB_TYPING_SEQUENCE     NB_TYPING_ABC "Sequence"
 #define NB_TYPING_MAPPING      NB_TYPING_ABC "Mapping"
 #define NB_TYPING_CALLABLE     NB_TYPING_ABC "Callable"

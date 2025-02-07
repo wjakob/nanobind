@@ -267,3 +267,57 @@ as attributes of the type object (in its ``__dict__``) and store a borrowed
 name that begins with the symbol ``@``, then nanobind will prevent Python
 code from rebinding or deleting the attribute after it has been set, making
 the borrowed reference reasonably safe.
+
+.. _typeslots:
+
+Customizing type creation
+=========================
+
+nanobind exposes a low-level interface to install custom *type slots*
+(``PyType_Slot`` in the `CPython API
+<https://docs.python.org/3/c-api/type.html#c.PyType_Slot>`_) in newly
+constructed types. This provides an escape hatch to realize features that were
+not foreseen in the design of this library.
+
+To use this feature, specify the :cpp:class:`nb::type_slots() <type_slots>`
+annotation when creating the type.
+
+.. code-block:: cpp
+
+   nb::class_<MyClass>(m, "MyClass", nb::type_slots(slots));
+
+Here, ``slots`` should refer to an array of function pointers that are tagged
+with a corresponding slot identifier. For example, here is an example
+function that overrides the addition operator so that it behaves like a
+multiplication.
+
+.. code-block:: cpp
+
+   PyObject *myclass_tp_add(PyObject *a, PyObject *b) {
+       return PyNumber_Multiply(a, b);
+   }
+
+   PyType_Slot slots[] = {
+       { Py_nb_add, (void *) myclass_tp_add },
+       { 0, nullptr }
+   };
+
+The ``slots`` array specified in the previous
+:cpp:class:`nb::class_\<MyClass\>() <class_>` declaration references the
+function ``myclass_tp_add`` and is followed by a mandatory null terminator.
+Information on type slots can be found in the CPython documentation sections
+covering `type objects <https://docs.python.org/3/c-api/typeobj.html>`_ and
+`type construction <https://docs.python.org/3/c-api/type.html>`_.
+
+This example is contrived because it could have been accomplished using
+builtin features:
+
+.. code-block:: cpp
+
+   nb::class_<MyClass>(m, "MyClass")
+       .def("__add__",
+            [](const MyClass &a, const MyClass &b) { return a * b; },
+            nb::is_operator())
+
+The documentation section on :ref:`reference leaks <refleaks>` discusses
+another important use case of type slots.

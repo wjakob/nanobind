@@ -124,6 +124,7 @@ The nanobind logo was designed by `AndoTwin Studio
    classes
    exceptions
    ndarray_index
+   refleaks
    packaging
    typing
    utilities
@@ -135,7 +136,6 @@ The nanobind logo was designed by `AndoTwin Studio
    free_threaded
    ownership_adv
    lowlevel
-   typeslots
 
 .. toctree::
    :caption: API Reference

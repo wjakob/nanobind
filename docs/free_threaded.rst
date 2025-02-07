@@ -285,7 +285,7 @@ Similar to free-threaded Python itself,  nanobind avoids this bottleneck by
 type bindings. Immortal objects don't require reference counting and therefore
 cannot cause the bottleneck mentioned above. The main downside of this approach
 is that these objects leak when the interpreter shuts down. Free-threaded
-nanobind extensions disable the internal :ref:`leak checker <leak-checker>`,
+nanobind extensions disable the internal :ref:`leak checker <refleaks>`,
 since it would produce many warning messages caused by immortal objects.
 
 Internal data structures

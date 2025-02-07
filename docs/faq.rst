@@ -84,93 +84,10 @@ other types when they are handled using :ref:`type casters <type_casters>`.
 Please read the full section on :ref:`information exchange between C++ and
 Python <exchange>` to understand the issue and alternatives.
 
-.. _leak-checker:
+Why am I getting errors about leaked instances/functions/types?
+---------------------------------------------------------------
 
-Why am I getting errors about leaked functions and types?
----------------------------------------------------------
-
-When the Python interpreter shuts down, it informs nanobind about this using a
-``Py_AtExit()`` callback. If any nanobind-created instances, functions, or
-types are still alive at this point, then *something went wrong* because they
-should have been deleted by the garbage collector. Although this does not
-always indicate a serious problem, the decision was made to have nanobind
-complain rather noisily about the presence of such leaks.
-
-Other binding tools (e.g., pybind11) are on the opposite of the spectrum:
-because they never report leaks, it is quite easy to accidentally introduce
-many of them until a developer eventually realizes that something is very
-wrong.
-
-Leaks mainly occur for four reasons:
-
-- **Reference counting bugs**.  If you write raw Python C API code or use the
-  nanobind wrappers including functions like ``Py_[X]INCREF()``,
-  ``Py_[X]DECREF()``, :cpp:func:`nb::steal() <steal>`, :cpp:func:`nb::borrow()
-  <borrow>`, :cpp:func:`.dec_ref() <detail::api::dec_ref>`,
-  :cpp:func:`.inc_ref() <detail::api::inc_ref>`
-  , etc., then incorrect
-  use of such calls can cause a reference to leak that prevents the associated
-  object from being deleted.
-
-- **Reference cycles**. Python's garbage collector frees unused objects that are
-  part of a circular reference chains (e.g., ``A->B->C->A``). This requires all
-  types in the cycle to implement the ``tp_traverse`` *type slot*, and at least
-  one of them to implement the ``tp_clear`` type slot. See the section on
-  :ref:`cyclic garbage collection <cyclic_gc>` for details on how to do this with
-  nanobind.
-
-- **Interactions with other tools that leak references**. Python extension
-  libraries---especially *huge* ones with C library components like PyTorch,
-  Tensorflow, etc., have been observed to leak references to nanobind
-  objects.
-
-  Some of these frameworks cache JIT-compiled functions based on the arguments
-  with which they were called, and such caching schemes could leak references
-  to nanobind types if they aren't cleaned up by the responsible extensions
-  (this is a hypothesis). In this case, the leak would be benign---even so, it
-  should be fixed in the responsible framework so that leak warnings aren't
-  cluttered with flukes and can be more broadly useful.
-
-- **Older Python versions**: Very old Python versions (e.g., 3.8) don't
-  do a good job cleaning up global references when the interpreter shuts down.
-  The following code may leak a reference if it is a top-level statement in a
-  Python file or the REPL.
-
-  .. code-block:: python
-
-     a = my_ext.MyObject()
-
-  Such a warning is benign and does not indicate an actual leak. It simply
-  highlights a flaws in the interpreter shutdown logic of old Python versions.
-  Wrap your code into a function to address this issue even on such versions:
-
-  .. code-block:: python
-
-     def run():
-         a = my_ext.MyObject()
-         # ...
-
-     if __name__ == '__main__':
-         run()
-
-- **Exceptions**. Some exceptions such as ``AttributeError`` have been observed
-  to hold references, e.g. to the object which lacked the desired attribute. If
-  the last exception raised by the program references a nanobind instance, then
-  this may be reported as a leak since Python finalization appears not to
-  release the exception object. See `issue #376
-  <https://github.com/wjakob/nanobind/issues/376>`__ for a discussion.
-
-If you find leak warnings to be a nuisance, then you can disable them in the
-C++ binding code via the :cpp:func:`nb::set_leak_warnings() <set_leak_warnings>`
-function.
-
-.. code-block:: python
-
-   nb::set_leak_warnings(false);
-
-This is a *global flag* shared by all nanobind extension libraries in the same
-ABI domain. If you do so, then please isolate your extension from others by
-passing the ``NB_DOMAIN`` parameter to :cmake:command:`nanobind_add_module()`.
+Please see the dedicated documentation section on :ref:`reference leaks <refleaks>`.
 
 Compilation fails with a static assertion mentioning ``NB_MAKE_OPAQUE()``
 -------------------------------------------------------------------------

@@ -62,7 +62,7 @@ Version 2.5.0 (Feb 2, 2025)
 - Fixed the :cpp:class:`nb::int_ <int_>` constructor so that it casts to
   an integer when invoked with a floating point argument.
 
-- Multi-level inheritance (e.g., `A → B → C`) previously did not work on Python
+- Multi-level inheritance (e.g., ``A → B → C``) previously did not work on Python
   3.12+ when a base class (e.g., ``A``) provided a trampoline implementation.
   This is now fixed. (commit `92d9cb
   <https://github.com/wjakob/nanobind/commit/92d9cb3d62b743a9eca2d9d9d8e5fb14a1e00a2a>`__).
@@ -73,7 +73,7 @@ Version 2.5.0 (Feb 2, 2025)
   `SYSTEM <https://cmake.org/cmake/help/latest/command/include_directories.html>`__
   include directories, which suppresses any potential warning messages
   originating there. This is mainly of relevance for projects that artificially
-  raise the warning level using flags like `-pedantic`, ``-Wcast-qual``,
+  raise the warning level using flags like ``-pedantic``, ``-Wcast-qual``,
   ``-Wsign-conversion``. (PR `#868
   <https://github.com/wjakob/nanobind/pull/868>`__).
 
@@ -1433,7 +1433,7 @@ Version 0.0.5 (May 13, 2022)
 ----------------------------
 
 * Enumeration export.
-* Implicit number conversion for numpy scalars.
+* Implicit number conversion for NumPy scalars.
 * Various minor fixes and improvements.
 
 Version 0.0.4 (May 13, 2022)

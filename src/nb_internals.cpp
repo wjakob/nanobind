@@ -306,7 +306,8 @@ static void internals_cleanup() {
     } else {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: this is likely caused by a reference "
-                            "counting issue in the binding code.\n");
+                            "counting issue in the binding code.\n"
+                            "See https://nanobind.readthedocs.io/en/latest/refleaks.html");
         }
 
         #if defined(NB_ABORT_ON_LEAK) && !defined(NB_FREE_THREADED)

@@ -192,7 +192,7 @@ The following lists minor-but-useful additions relative to pybind11.
   <cast>` will create that Python object if it doesn't yet exist,
   :cpp:func:`nb::find() <find>` will return a ``nullptr`` object. This function
   is useful to interface with Python's :ref:`cyclic garbage collector
-  <cyclic_gc>`.
+  <fixing_refleaks>`.
 
 - **Parameterized wrappers**: The :cpp:class:`nb::handle_t\<T\> <handle_t>` type
   behaves just like the :cpp:class:`nb::handle <handle>` class and wraps a

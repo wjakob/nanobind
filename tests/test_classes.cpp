@@ -718,4 +718,26 @@ NB_MODULE(test_classes_ext, m) {
         .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 42; });
     nb::class_<StaticPropertyOverride2, StaticPropertyOverride>(m, "StaticPropertyOverride2")
         .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 43; });
+
+    struct MultA { int a = 10; };
+    struct MultB { int b = 20; };
+    struct MultD : MultA, MultB { int d = 30; };
+    struct MultE : MultD { int e = 40; };
+
+    nb::class_<MultA>(m, "MultA").def(nb::init<>()).def_rw("a", &MultA::a);
+    auto clsB = nb::class_<MultB>(m, "MultB").def(nb::init<>()).def_rw("b", &MultB::b);
+
+    auto try_D_to_B = [](PyObject *self_py, const std::type_info *target) noexcept -> void* {
+        MultD *self = nb::inst_ptr<MultD>(self_py);
+        if (*target == typeid(MultB)) {
+            return static_cast<MultB*>(self);
+        }
+        return nullptr;
+    };
+
+    auto clsD = nb::class_<MultD, MultA>(m, "MultD", nb::upcast_hook(try_D_to_B))
+        .def(nb::init<>())
+        .def_rw("d", &MultD::d);
+    clsD.attr("b") = clsB.attr("b");
+    nb::class_<MultE, MultD>(m, "MultE").def(nb::init<>()).def_rw("e", &MultE::e);
 }

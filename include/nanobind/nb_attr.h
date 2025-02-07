@@ -137,11 +137,10 @@ struct type_slots {
     const PyType_Slot *value;
 };
 
-struct type_slots_callback {
-    using cb_t = void (*)(const detail::type_init_data *t,
-                          PyType_Slot *&slots, size_t max_slots) noexcept;
-    type_slots_callback(cb_t callback) : callback(callback) { }
-    cb_t callback;
+struct upcast_hook {
+    using cb_t = void* (*)(PyObject *, const std::type_info *) noexcept;
+    upcast_hook(cb_t hook) : hook(hook) { }
+    cb_t hook;
 };
 
 struct sig {

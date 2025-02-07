@@ -25,6 +25,12 @@ Upcoming version (TBA)
   long-standing inconvenience. (PR `#778
   <https://github.com/wjakob/nanobind/pull/778>`__).
 
+- Added the class binding annotation :cpp:class:`nb::upcast_hook()
+  <upcast_hook>` which allows the bound type to describe how to
+  extract self-pointers of other types from its instances. This can
+  be useful as part of a strategy for mimicking multiple inheritance.
+  (PR `#920 <https://github.com/wjakob/nanobind/pull/920>`__)
+
 * ABI version 16.
 
 

@@ -941,3 +941,35 @@ def test48_monekypatchable():
 def test49_static_property_override():
     assert t.StaticPropertyOverride.x == 42
     assert t.StaticPropertyOverride2.x == 43
+
+def test50_i_cant_believe_its_not_multiple_inheritance(monkeypatch):
+    objs = [t.MultB(), t.MultD(), t.MultE()]
+    for i, obj in enumerate(objs):
+        assert obj.b == 20
+        obj.b += i
+        try:
+            assert obj.d == 30
+            obj.d += 100 * i
+        except AttributeError:
+            if i != 0:
+                raise
+
+    assert objs[0].b == 20
+    assert objs[1].b == 21
+    assert objs[2].b == 22
+    assert objs[1].d == 130
+    assert objs[2].d == 230
+
+    def patched_instancecheck(cls, inst, *, _orig=type(t.MultB).__instancecheck__):
+        if _orig(t.MultD, inst) and cls is t.MultB:
+            return True
+        return _orig(cls, inst)
+
+    monkeypatch.setattr(type(t.MultB), "__instancecheck__", patched_instancecheck)
+    assert isinstance(objs[0], t.MultB)
+    assert not isinstance(objs[0], t.MultD)
+    assert isinstance(objs[1], t.MultB)
+    assert isinstance(objs[1], t.MultD)
+    assert isinstance(objs[2], t.MultB)
+    assert isinstance(objs[2], t.MultD)
+    assert isinstance(objs[2], t.MultE)

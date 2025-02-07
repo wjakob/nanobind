@@ -2086,6 +2086,44 @@ declarations in generated :ref:`stubs <stubs>`,
       Declares a callback that will be invoked when a C++ instance is first
       cast into a Python object.
 
+.. cpp:struct:: upcast_hook
+
+   .. cpp:function:: upcast_hook(void* (* hook)(PyObject*, const std::type_info*) noexcept)
+
+   Allow Python instances of the class being bound to be passed to C++
+   functions that expect a pointer to a subobject of that class.
+   Since nanobind only acknowledges at most one base class of each bound type,
+   the upcast hook can be helpful for providing some minimal emulation of
+   additional bases.
+
+   The hook receives a nanobind instance as its first argument and the
+   desired subobject type as its second. If it can make the cast, it
+   returns a pointer to something of the requested type; if not, it
+   returns nullptr.
+
+   **Example:**
+
+   .. code-block:: cpp
+
+      struct A { int a = 10; };
+      struct B { int b = 20; };
+      struct D : A, B { int d = 30; };
+
+      nb::class_<A>(m, "A").def_rw("a", &A::a);
+      auto clsB = nb::class_<B>(m, "B").def_rw("b", &B::b);
+
+      auto try_D_to_B = [](PyObject *self_py, const std::type_info *target) noexcept -> void* {
+          D *self = nb::inst_ptr<D>(self_py);
+          if (*target == &typeid(B)) {
+              return static_cast<B*>(self);
+          }
+          return nullptr;
+      };
+
+      auto clsD = nb::class_<D, A>(m, "D", nb::upcast_hook(try_D_to_B))
+          .def_rw("d", &D::d);
+      clsD.attr("b") = clsB.attr("b");
+
 
 .. _enum_binding_annotations:
 

@@ -3,12 +3,14 @@
 #include <nanobind/operators.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/string_view.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/unique_ptr.h>
 #include <map>
 #include <memory>
+#include <charconv>
 #include <cstring>
 #include <vector>
 #include <nanobind/stl/detail/traits.h>
@@ -149,6 +151,13 @@ NB_MODULE(test_classes_ext, m) {
     auto cls = nb::class_<Struct>(m, "Struct", "Some documentation")
         .def(nb::init<>())
         .def(nb::init<int>())
+        .def(nb::init([](std::string_view sv) {
+            int value;
+            auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(),
+                                             value);
+            if (ec != std::errc()) throw nb::value_error("invalid integer");
+            return Struct(value);
+        }))
         .def("value", &Struct::value)
         .def("set_value", &Struct::set_value, "value"_a)
         .def("self", &Struct::self, nb::rv_policy::none)
@@ -244,6 +253,7 @@ NB_MODULE(test_classes_ext, m) {
         NB_TRAMPOLINE(Dog, 2);
 
         PyDog(const std::string &s) : Dog(s) { }
+        PyDog(Dog&& dog) : Dog(std::move(dog)) { }
 
         std::string name() const override {
             NB_OVERRIDE(name);
@@ -267,11 +277,18 @@ NB_MODULE(test_classes_ext, m) {
 
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
         .def(nb::init<>(), "A constructor")
+        .def(nb::init([](std::nullptr_t) { return PyAnimal(); }),
+             nb::arg().none())
         .def("name", &Animal::name, "A method")
         .def("what", &Animal::what);
 
     nb::class_<Dog, Animal, PyDog>(m, "Dog")
-        .def(nb::init<const std::string &>());
+        .def(nb::init<const std::string &>())
+        .def(nb::init([](nb::bytes b) {
+            return Dog(std::string(b.c_str(), b.size()));
+        }))
+        .def(nb::init([](int i) { return Dog(std::string(i, '.')); },
+                      [](int i) { return Dog(std::string(i, '_')); }));
 
     nb::class_<Cat>(m, "Cat", animal)
         .def(nb::init<const std::string &>());

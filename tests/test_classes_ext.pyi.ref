@@ -5,8 +5,12 @@ class A:
     def __init__(self, arg: int, /) -> None: ...
 
 class Animal:
+    @overload
     def __init__(self) -> None:
         """A constructor"""
+
+    @overload
+    def __init__(self, arg: None | None) -> None: ...
 
     def name(self) -> str:
         """A method"""
@@ -88,7 +92,14 @@ class D:
     def value(self, arg: int, /) -> None: ...
 
 class Dog(Animal):
+    @overload
     def __init__(self, arg: str, /) -> None: ...
+
+    @overload
+    def __init__(self, arg: bytes, /) -> None: ...
+
+    @overload
+    def __init__(self, arg: int, /) -> None: ...
 
 class FinalType:
     def __init__(self) -> None: ...
@@ -199,6 +210,9 @@ class Struct:
 
     @overload
     def __init__(self, arg: int, /) -> None: ...
+
+    @overload
+    def __init__(self, arg: str, /) -> None: ...
 
     def value(self) -> int: ...
 

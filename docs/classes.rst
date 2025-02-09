@@ -543,7 +543,8 @@ propagated to Python:
 
 To fix this behavior, you must implement a *trampoline class*. A trampoline has
 the sole purpose of capturing virtual function calls in C++ and forwarding them
-to Python.
+to Python. (If you're reading nanobind's source code, you might see references
+to an *alias class*; it's the same thing as a trampoline class.)
 
 .. code-block:: cpp
 

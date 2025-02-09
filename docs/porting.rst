@@ -146,30 +146,66 @@ accepts ``std::shared_ptr<T>``. That means a C++ function that accepts
 a raw ``T*`` and calls ``shared_from_this()`` on it might stop working
 when ported from pybind11 to nanobind. You can solve this problem
 by always passing such objects across the Python/C++ boundary as
-``std::shared_ptr<T>`` rather than as ``T*``. See the :ref:`advanced section
+``std::shared_ptr<T>`` rather than as ``T*``, or by exposing all
+constructors using :cpp:struct:`nb::new_() <new_>` wrappers that
+return ``std::shared_ptr<T>``. See the :ref:`advanced section
 on object ownership <enable_shared_from_this>` for more details.
 
 Custom constructors
 -------------------
 In pybind11, custom constructors (i.e. ones that do not already exist in the
 C++ class) could be specified as a lambda function returning an instance of
-the desired type.
+the desired type or a pointer to it.
 
 .. code-block:: cpp
 
    py::class_<MyType>(m, "MyType")
-       .def(py::init([](int) { return MyType(...); }));
+       .def(py::init([](int) { return MyType(...); }))
+       .def(py::init([](std::string_view) {
+           return std::make_unique<MyType>(...);
+       }));
 
-Unfortunately, the implementation of this feature was quite complex and
-often required further internal calls to the move or copy
-constructor. nanobind instead reverts to how pybind11 originally
-implemented this feature using in-place construction (`placement
-new <https://en.wikipedia.org/wiki/Placement_syntax>`_):
+nanobind supports only the first form (where the lambda returns by value). Note
+that thanks to C++17's guaranteed copy elision, it now works even for types that
+are not copyable or movable, so you may be able to mechanically convert custom
+constructors that return by pointer into those that return by value.
+
+.. note:: If *any* of your custom constructors still need to return a pointer or
+   smart pointer, perhaps because they wrap a C++ factory method that only
+   exposes those return types, you must switch *all* of them to use
+   :cpp:struct:`nb::new_() <new_>` instead of :cpp:struct:`nb::init() <init>`.
+   Be aware that :cpp:struct:`nb::new_() <new_>` cannot construct in-place, so
+   using it gives up some of nanobind's performance benefits (but should still be
+   faster than ``py::init()`` in pybind11). It comes with some other caveats
+   as well, which are explained in the documentation on :ref:`customizing
+   Python object creation <custom_new>`.
+
+Guaranteed copy elision only works if the object is constructed as a temporary
+directly within the ``return`` statement. If you need to do something to the
+object before you return it, as in this example:
+
+.. code-block:: cpp
+
+   py::class_<MyType>(m, "MyType")
+       .def(py::init([](int value) {
+           auto ret = MyType();
+           ret.value = value;
+           return ret;
+       }));
+
+then ``MyType`` must be movable, and depending on compiler optimizations the move
+constructor might actually be called at runtime, which is more expensive than
+in-place construction. In such cases, nanobind recommends instead that you
+directly bind a ``__init__`` method using `placement new
+<https://en.wikipedia.org/wiki/Placement_syntax>`_:
 
 .. code-block:: cpp
 
    nb::class_<MyType>(m, "MyType")
-       .def("__init__", [](MyType *t) { new (t) MyType(...); });
+       .def("__init__", [](MyType *t, int value) {
+           auto* self = new (t) MyType(...);
+           self->value = value;
+       });
 
 The provided lambda function will be called with a pointer to uninitialized
 memory that has already been allocated (this memory region is co-located
@@ -177,15 +213,6 @@ with the Python object for reasons of efficiency). The lambda function can
 then either run an in-place constructor and return normally (in which case
 the instance is assumed to be correctly constructed) or fail by raising an
 exception.
-
-To turn an existing factory function into a constructor, you will need to
-combine the above pattern with an invocation of the move/copy-constructor,
-e.g.:
-
-.. code-block:: cpp
-
-   nb::class_<MyType>(m, "MyType")
-       .def("__init__", [](MyType *t) { new (t) MyType(MyType::create()); });
 
 Implicit conversions
 --------------------

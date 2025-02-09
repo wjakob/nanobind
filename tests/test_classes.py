@@ -38,7 +38,8 @@ def assert_stats(**kwargs):
 
 def test01_signature():
     assert t.Struct.__init__.__doc__ == (
-        "__init__(self) -> None\n" "__init__(self, arg: int, /) -> None"
+        "__init__(self) -> None\n" "__init__(self, arg: int, /) -> None\n"
+        "__init__(self, arg: str, /) -> None"
     )
 
     assert t.Struct.value.__doc__ == "value(self) -> int"
@@ -61,9 +62,14 @@ def test03_instantiate(clean):
     assert s1.value() == 5
     s2 = t.Struct(10)
     assert s2.value() == 10
+    s3 = t.Struct("15")
+    assert s3.value() == 15
+    with pytest.raises(ValueError, match="invalid integer"):
+        t.Struct("xyzzy")
     del s1
     del s2
-    assert_stats(default_constructed=1, value_constructed=1, destructed=2)
+    del s3
+    assert_stats(default_constructed=1, value_constructed=2, destructed=3)
 
 
 def test04_double_init():
@@ -148,6 +154,13 @@ def test08_inheritance():
     assert t.go(dog) == "Dog says woof"
     assert t.go(cat) == "Cat says meow"
 
+    dog2 = t.Dog(b"arf")
+    dog3 = t.Dog(4)
+    assert dog2.what() == "arf"
+    assert dog3.what() == "...."
+    assert t.go(dog2) == "Dog says arf"
+    assert t.go(dog3) == "Dog says ...."
+
     assert t.animal_passthrough(dog) is dog
     assert t.animal_passthrough(cat) is cat
     assert t.dog_passthrough(dog) is dog
@@ -178,8 +191,8 @@ def test10_trampoline(clean):
     for _ in range(10):
 
         class Dachshund(t.Animal):
-            def __init__(self):
-                super().__init__()
+            def __init__(self, *args):
+                super().__init__(*args)
 
             def name(self):
                 return "Dachshund"
@@ -188,6 +201,13 @@ def test10_trampoline(clean):
                 return "yap"
 
         d = Dachshund()
+        for _ in range(10):
+            assert t.go(d) == "Dachshund says yap"
+
+        assert t.animal_passthrough(d) is d
+
+        # custom constructor that returns alias type
+        d = Dachshund(None)
         for _ in range(10):
             assert t.go(d) == "Dachshund says yap"
 
@@ -215,14 +235,26 @@ def test10_trampoline(clean):
     del ga
     del d
 
-    assert_stats(default_constructed=11, destructed=11)
+    assert_stats(default_constructed=21, destructed=21)
 
     class GenericDog(t.Dog):
-        pass
+        def name(self):
+            return "GenericDog"
 
-    d = GenericDog("GenericDog")
+    # built-in constructor
+    d = GenericDog("doggo")
+    assert t.go(d) == "GenericDog says doggo"
     assert t.dog_passthrough(d) is d
     assert t.animal_passthrough(d) is d
+
+    # custom constructor that returns bound type, which can initialize alias type
+    d = GenericDog(b"woofer")
+    assert t.go(d) == "GenericDog says woofer"
+
+    # custom constructor with variants for bound type vs alias type
+    # (selecting the bound type variant was tested in test08)
+    d = GenericDog(6)
+    assert t.go(d) == "GenericDog says ______"
 
 
 def test11_trampoline_failures():

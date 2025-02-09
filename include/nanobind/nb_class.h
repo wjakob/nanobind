@@ -278,6 +278,8 @@ struct is_copy_constructible : std::is_copy_constructible<T> { };
 template <typename T>
 constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
 
+struct init_using_factory_tag {};
+
 NAMESPACE_END(detail)
 
 // Low level access to nanobind type objects
@@ -364,6 +366,106 @@ private:
             extra...);
     }
 };
+
+template <typename... Args>
+struct init<detail::init_using_factory_tag, Args...> {
+    static_assert(sizeof...(Args) == 2 || sizeof...(Args) == 4,
+                  "Unexpected instantiation convention for factory init");
+    static_assert(sizeof...(Args) != 2,
+                  "Couldn't deduce function signature for factory function");
+    static_assert(sizeof...(Args) != 4,
+                  "Base factory and alias factory accept different arguments, "
+                  "or we couldn't otherwise deduce their signatures");
+};
+
+template <typename Func, typename Return, typename... Args>
+struct init<detail::init_using_factory_tag, Func, Return(Args...)>
+  : def_visitor<init<detail::init_using_factory_tag, Func, Return(Args...)>> {
+    std::remove_reference_t<Func> func;
+
+    init(Func &&f) : func((detail::forward_t<Func>) f) {}
+
+    template <typename Class, typename... Extra>
+    NB_INLINE void execute(Class &cl, const Extra&... extra) {
+        using Type = typename Class::Type;
+        using Alias = typename Class::Alias;
+        if constexpr (std::is_same_v<Type, Alias>) {
+            static_assert(std::is_constructible_v<Type, Return>,
+                          "nb::init() factory function must return an instance "
+                          "of the type by value, or something that can "
+                          "direct-initialize it");
+        } else {
+            static_assert(std::is_constructible_v<Alias, Return>,
+                          "nb::init() factory function must return an instance "
+                          "of the alias type by value, or something that can "
+                          "direct-initialize it");
+        }
+        cl.def(
+            "__init__",
+            [func_ = (detail::forward_t<Func>) func](pointer_and_handle<Type> v, Args... args) {
+                if constexpr (!std::is_same_v<Type, Alias> &&
+                              std::is_constructible_v<Type, Return>) {
+                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                        new (v.p) Type{ func_((detail::forward_t<Args>) args...) };
+                        return;
+                    }
+                }
+                new ((void *) v.p) Alias{ func_((detail::forward_t<Args>) args...) };
+            },
+            extra...);
+    }
+};
+
+template <typename CFunc, typename CReturn, typename AFunc, typename AReturn,
+          typename... Args>
+struct init<detail::init_using_factory_tag, CFunc, CReturn(Args...),
+            AFunc, AReturn(Args...)>
+  : def_visitor<init<detail::init_using_factory_tag, CFunc, CReturn(Args...),
+                     AFunc, AReturn(Args...)>> {
+    std::remove_reference_t<CFunc> cfunc;
+    std::remove_reference_t<AFunc> afunc;
+
+    init(CFunc &&cf, AFunc &&af)
+      : cfunc((detail::forward_t<CFunc>) cf),
+        afunc((detail::forward_t<AFunc>) af) {}
+
+    template <typename Class, typename... Extra>
+    NB_INLINE void execute(Class &cl, const Extra&... extra) {
+        using Type = typename Class::Type;
+        using Alias = typename Class::Alias;
+        static_assert(!std::is_same_v<Type, Alias>,
+                      "The form of nb::init() that takes two factory functions "
+                      "doesn't make sense to use on classes that don't have an "
+                      "alias type");
+        static_assert(std::is_constructible_v<Type, CReturn>,
+                      "nb::init() first factory function must return an "
+                      "instance of the type by value, or something that can "
+                      "direct-initialize it");
+        static_assert(std::is_constructible_v<Alias, AReturn>,
+                      "nb::init() second factory function must return an "
+                      "instance of the alias type by value, or something that "
+                      "can direct-initialize it");
+        cl.def(
+            "__init__",
+            [cfunc_ = (detail::forward_t<CFunc>) cfunc,
+             afunc_ = (detail::forward_t<AFunc>) afunc](pointer_and_handle<Type> v, Args... args) {
+                if (!detail::nb_inst_python_derived(v.h.ptr()))
+                    new (v.p) Type{ cfunc_((detail::forward_t<Args>) args...) };
+                else
+                    new ((void *) v.p) Alias{ afunc_((detail::forward_t<Args>) args...) };
+            },
+            extra...);
+    }
+};
+
+template <typename Func>
+init(Func&& f) -> init<detail::init_using_factory_tag,
+                       Func, detail::function_signature_t<Func>>;
+
+template <typename CFunc, typename AFunc>
+init(CFunc&& cf, AFunc&& af) -> init<detail::init_using_factory_tag,
+                                     CFunc, detail::function_signature_t<CFunc>,
+                                     AFunc, detail::function_signature_t<AFunc>>;
 
 template <typename Arg> struct init_implicit : def_visitor<init_implicit<Arg>> {
     template <typename T, typename... Ts> friend class class_;

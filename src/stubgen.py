@@ -376,7 +376,7 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
-    def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None):
+    def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None, deferred: Optional[List[str]] = None):
         """Append a function of an arbitrary type to the stub"""
         # Don't generate a constructor for nanobind classes that aren't constructible
         if name == "__init__" and type(parent).__name__.startswith("nb_type"):
@@ -392,7 +392,11 @@ class StubGen:
 
         # Check if this function is an alias from the *same* module
         if name and fn_name and name != fn_name:
-            self.write_ln(f"{name} = {fn_name}\n")
+            line = f"{name} = {fn_name}\n"
+            if deferred is None:
+                self.write_ln(line)
+            else:
+                deferred.append(line)
             return
 
         if isinstance(fn, staticmethod):
@@ -519,8 +523,11 @@ class StubGen:
                 self.put_docstr(docstr)
                 if len(tp_dict):
                     self.write("\n")
+            deferred = []
             for k, v in tp_dict.items():
-                self.put(v, k, tp)
+                self.put(v, k, tp, deferred)
+            for line in deferred:
+                self.write_ln(line)
             if output_len == len(self.output):
                 self.write_ln("pass\n")
             self.depth -= 1
@@ -751,7 +758,7 @@ class StubGen:
         # Success, pattern was applied
         return True
 
-    def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
+    def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None, deferred: Optional[List[str]] = None) -> None:
         old_prefix = self.prefix
 
         if value in self.stack:
@@ -841,7 +848,7 @@ class StubGen:
                     self.apply_pattern(self.prefix + ".__suffix__", None)
             elif self.is_function(tp):
                 value = cast(NbFunction, value)
-                self.put_function(value, name, parent)
+                self.put_function(value, name, parent, deferred)
             elif issubclass(tp, type):
                 value = cast(NbType, value)
                 self.put_type(value, name)

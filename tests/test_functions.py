@@ -268,6 +268,8 @@ def test21_numpy_overloads():
 
 def test22_string_return():
     assert t.test_12("hello") == "hello"
+    assert t.test_12_n("hello") == "hello"
+    assert t.test_12_n(None) == "n/a"
     assert t.test_13() == "test"
     assert t.test_14("abc") == "abc"
 

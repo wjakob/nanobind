@@ -480,8 +480,8 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         }
     }
 
-    if (base_index != 0) {
-        PyErr_SetString(PyExc_TypeError, "nb_type_init(): nanobound class must be first base to inherit from!");
+    if (base_index == -1) {
+        PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
         return -1;
     }
 

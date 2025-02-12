@@ -977,3 +977,4 @@ def test52_multiple_inheritance_checks():
     with pytest.raises(TypeError):
         class A(t.Struct, t.Foo):
             pass
+

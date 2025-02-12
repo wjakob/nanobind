@@ -962,25 +962,15 @@ def test50_multiple_inheritance_nb_first_base():
     assert sd.name() == "Animal"
     assert sd.who() == "SausageDog"
     
-def test51_multiple_inheritance_py_first_base():
+def test51_multiple_inheritance_py_first_base_check():
     """Test multiple inheritance with a Python class first in the inheritance list."""
     class Python:
         def name(self):
             return "Python"
         
-    class SausageDog(Python, t.Animal):
-        def __init__(self):
-            super().__init__()
-            
-        def who(self):
-            return "SausageDog"
-    
-    sd = SausageDog()
-    assert isinstance(sd, SausageDog)
-    assert isinstance(sd, t.Animal)
-    assert isinstance(sd, Python)
-    assert sd.name() == "Python"
-    assert sd.who() == "SausageDog"
+    with pytest.raises(TypeError):
+        class SausageDog(Python, t.Animal):
+            pass
     
 def test52_multiple_inheritance_checks():
     """Test checks to prevent multiple nb class inheritance."""

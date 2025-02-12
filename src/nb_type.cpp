@@ -470,10 +470,9 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
         PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
         if (PyType_Check(base)) {
-            type_data *t_b = nb_type_data((PyTypeObject *) base);
-            if (t_b->flags) {
+            if (nb_type_check(base)) {
                 if (base_index != -1) {
-                    PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): multiple nb_type base classes are not allowed!");
+                    PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): multiple inheritance of multiple nanobound classes are not allowed!");
                     return -1;
                 }
                 base_index = i;

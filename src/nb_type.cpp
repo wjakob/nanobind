@@ -460,18 +460,33 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     }
 
     PyObject *bases = NB_TUPLE_GET_ITEM(args, 1);
-    if (!PyTuple_CheckExact(bases) || NB_TUPLE_GET_SIZE(bases) != 1) {
+    if (!PyTuple_CheckExact(bases)) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "nb_type_init(): invalid number of bases!");
+                        "nb_type_init(): expected a base type object!");
         return -1;
     }
 
-    PyObject *base = NB_TUPLE_GET_ITEM(bases, 0);
-    if (!PyType_Check(base)) {
+    Py_ssize_t base_index = -1;
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
+        PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
+        if (PyType_Check(base)) {
+            type_data *t_b = nb_type_data((PyTypeObject *) base);
+            if (t_b->flags) {
+                if (base_index != -1) {
+                    PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): multiple nb_type base classes are not allowed!");
+                    return -1;
+                }
+                base_index = i;
+            }
+        }
+    }
+
+    if (base_index == -1) {
         PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
         return -1;
     }
 
+    PyObject *base = NB_TUPLE_GET_ITEM(bases, base_index);
     type_data *t_b = nb_type_data((PyTypeObject *) base);
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",

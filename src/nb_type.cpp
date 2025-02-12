@@ -466,27 +466,26 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         return -1;
     }
 
-    // type_data t_b = nullptr;
-    PyObject *nb_base = nullptr;
+    type_data *t_b = NULL;
     for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
         PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
         if (PyType_Check(base)) {
-            if (nb_type_check(base)) {
-                if (nb_base) {
+            type_data *t_b_i = nb_type_data((PyTypeObject *) base);
+            if (t_b_i->flags) {
+                if (t_b) {
                     PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): multiple inheritance of multiple nanobound classes are not allowed!");
                     return -1;
                 }
-                nb_base = base;
+                t_b = t_b_i;
             }
         }
     }
 
-    if (!nb_base) {
+    if (!t_b) {
         PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
         return -1;
     }
 
-    type_data *t_b = nb_type_data((PyTypeObject *) nb_base);
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);

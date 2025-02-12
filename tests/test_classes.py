@@ -982,7 +982,7 @@ def test51_multiple_inheritance_py_first_base():
     assert sd.name() == "Python"
     assert sd.who() == "SausageDog"
     
-def test44_multiple_inheritance_checks():
+def test52_multiple_inheritance_checks():
     """Test checks to prevent multiple nb class inheritance."""
     with pytest.raises(TypeError):
         class A(t.Struct, t.Foo):

@@ -90,7 +90,7 @@ endforeach()
 
 target_sources(test_intrusive_ext PRIVATE test_intrusive_impl.cpp)
 
-foreach (NAME functions classes ndarray stl enum typing make_iterator)
+foreach (NAME functions chrono classes ndarray stl enum typing make_iterator)
   if (NAME STREQUAL typing)
     set(EXTRA
       MARKER_FILE py.typed
@@ -159,6 +159,7 @@ set(TEST_FILES
   test_thread.py
 
   # Stub reference files
+  test_chrono_ext.pyi.ref
   test_classes_ext.pyi.ref
   test_functions_ext.pyi.ref
   test_make_iterator_ext.pyi.ref

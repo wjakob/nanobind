@@ -7,6 +7,8 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+#pragma once
+
 #if !defined(Py_GIL_DISABLED)
 /// Trivial implementations for non-free-threaded Python
 inline void make_immortal(PyObject *) noexcept { }

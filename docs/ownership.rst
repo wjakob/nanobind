@@ -56,7 +56,7 @@ To avoid this problem, we can
 
 1. **Provide more information**: the problem was that nanobind *incorrectly*
    transferred ownership of a C++ instance to the Python side. To fix this, we
-   can add add a :ref:`return value policy <rvp>` annotation that clarifies
+   can add a :ref:`return value policy <rvp>` annotation that clarifies
    what to do with the return value.
 
 2. **Make ownership transfer explicit**: C++ types passed via :ref:`unique

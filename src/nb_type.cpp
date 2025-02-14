@@ -9,6 +9,7 @@
 
 #include "nb_internals.h"
 #include "nb_ft.h"
+#include <iostream>
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
@@ -466,15 +467,8 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         return -1;
     }
 
-    #if defined(PYPY_VERSION)
-    if (NB_TUPLE_GET_SIZE(bases) != 1) {
-        PyErr_SetString(PyExc_TypeError,
-                        "nb_type_init(): expected exactly one base type object!");
-        return -1;
-    }
-    #endif
-
     PyObject *nb_base = nullptr;
+    Py_ssize_t nb_base_index = 0;
     for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
         PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
         if (PyType_Check(base)) {
@@ -484,6 +478,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
                     return -1;
                 }
                 nb_base = base;
+                nb_base_index = i;
             }
         }
     }
@@ -492,8 +487,15 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
         return -1;
     }
+
+    // Reorder
+    if (nb_base_index != 0) {
+        PyObject *tmp = PyTuple_GET_ITEM(bases, 0);
+        PyTuple_SET_ITEM(bases, 0, nb_base);
+        PyTuple_SET_ITEM(bases, nb_base_index, tmp);
+    }
     
-    type_data *t_b = nb_type_data((PyTypeObject *) nb_base);
+    type_data *t_b = nb_type_data((PyTypeObject *) PyTuple_GET_ITEM(bases, 0));
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);
@@ -507,7 +509,6 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     type_data *t = nb_type_data((PyTypeObject *) self);
 
     *t = *t_b;
-
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
 

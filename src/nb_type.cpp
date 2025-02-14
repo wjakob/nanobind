@@ -495,7 +495,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         NB_TUPLE_SET_ITEM(bases, nb_base_index, tmp);
     }
     
-    type_data *t_b = nb_type_data((PyTypeObject *) PyTuple_GET_ITEM(bases, 0));
+    type_data *t_b = nb_type_data((PyTypeObject *) NB_TUPLE_GET_ITEM(bases, 0));
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);

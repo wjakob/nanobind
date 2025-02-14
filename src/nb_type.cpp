@@ -507,7 +507,6 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     type_data *t = nb_type_data((PyTypeObject *) self);
 
     *t = *t_b;
-
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
 

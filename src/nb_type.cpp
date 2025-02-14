@@ -490,9 +490,9 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
     // Reorder
     if (nb_base_index != 0) {
-        PyObject *tmp = PyTuple_GET_ITEM(bases, 0);
-        PyTuple_SET_ITEM(bases, 0, nb_base);
-        PyTuple_SET_ITEM(bases, nb_base_index, tmp);
+        PyObject *tmp = NB_TUPLE_GET_ITEM(bases, 0);
+        NB_TUPLE_SET_ITEM(bases, 0, nb_base);
+        NB_TUPLE_SET_ITEM(bases, nb_base_index, tmp);
     }
     
     type_data *t_b = nb_type_data((PyTypeObject *) PyTuple_GET_ITEM(bases, 0));

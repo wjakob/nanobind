@@ -453,131 +453,79 @@ static void nb_type_dealloc(PyObject *o) {
 
 /// Called when a C++ type is extended from within Python
 static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
-    PyObject *bases = nullptr, *nb_base = nullptr, *name = nullptr;
-    Py_ssize_t n_bases = 0;
-    type_data *t = nullptr, *t_b = nullptr;
-    int rv = 0;
+    if (NB_TUPLE_GET_SIZE(args) != 3) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "nb_type_init(): invalid number of arguments!");
+        return -1;
+    }
 
-    if (NB_TUPLE_GET_SIZE(args) != 3)
-        goto fail;
+    PyObject *bases = NB_TUPLE_GET_ITEM(args, 1);
+    if (!PyTuple_CheckExact(bases)) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "nb_type_init(): expected a base type object!");
+        return -1;
+    }
 
-    bases = NB_TUPLE_GET_ITEM(args, 1);
-    if (!PyTuple_CheckExact(bases))
-        goto fail;
+    #if defined(PYPY_VERSION)
+    if (NB_TUPLE_GET_SIZE(bases) != 1) {
+        PyErr_SetString(PyExc_TypeError,
+                        "nb_type_init(): expected exactly one base type object!");
+        return -1;
+    }
+    #endif
 
-    n_bases = NB_TUPLE_GET_SIZE(bases);
-    for (Py_ssize_t i = 0; i < n_bases; ++i) {
+    PyObject *nb_base = nullptr;
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
         PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
-        if (!PyType_Check(base))
-            goto fail;
-        if (nb_type_check(base)) {
-            if (nb_base) {
-                PyErr_SetString(PyExc_TypeError,
-                                "Multiple inheritance from multiple nanobind "
-                                "classes is not permitted!");
-                return -1;
+        if (PyType_Check(base)) {
+            if (nb_type_check(base)) {
+                if (nb_base) {
+                    PyErr_SetString(PyExc_TypeError, "nb_type_init(): multiple inheritance of multiple nanobound classes are not allowed!");
+                    return -1;
+                }
+                nb_base = base;
             }
-            nb_base = base;
         }
     }
 
-    if (!nb_base)
-        goto fail;
-
-    t_b = nb_type_data((PyTypeObject *) nb_base);
+    if (!nb_base) {
+        PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
+        return -1;
+    }
+    
+    type_data *t_b = nb_type_data((PyTypeObject *) nb_base);
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);
         return -1;
     }
 
-    rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
+    int rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
     if (rv)
         return rv;
 
-    t = nb_type_data((PyTypeObject *) self);
+    type_data *t = nb_type_data((PyTypeObject *) self);
 
     *t = *t_b;
+
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
-    name = nb_type_name(self);
+
+    PyObject *name = nb_type_name(self);
     t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
     Py_DECREF(name);
     t->type_py = (PyTypeObject *) self;
-   
+    t->implicit.cpp = nullptr;
+    t->implicit.py = nullptr;
     t->alias_chain = nullptr;
 
+#if defined(Py_LIMITED_API)
+    t->vectorcall = nullptr;
+#else
+    ((PyTypeObject *) self)->tp_vectorcall = nullptr;
+#endif
+
     return 0;
-
-fail:
-    PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): invalid arguments!");
-    return -1;
-
-
-//     if (NB_TUPLE_GET_SIZE(args) != 3) {
-//         PyErr_SetString(PyExc_RuntimeError,
-//                         "nb_type_init(): invalid number of arguments!");
-//         return -1;
-//     }
-
-//     PyObject *bases = NB_TUPLE_GET_ITEM(args, 1);
-//     if (!PyTuple_CheckExact(bases)) {
-//         PyErr_SetString(PyExc_RuntimeError,
-//                         "nb_type_init(): expected a base type object!");
-//         return -1;
-//     }
-
-//     PyObject *nb_base = nullptr;
-//     for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
-//         PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
-//         if (PyType_Check(base)) {
-//             if (nb_type_check(base)) {
-//                 if (nb_base) {
-//                     PyErr_SetString(PyExc_TypeError, "nb_type_init(): multiple inheritance of multiple nanobound classes are not allowed!");
-//                     return -1;
-//                 }
-//                 nb_base = base;
-//             }
-//         }
-//     }
-
-//     if (!nb_base) {
-//         PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
-//         return -1;
-//     }
-    
-//     type_data *t_b = nb_type_data((PyTypeObject *) nb_base);
-//     if (t_b->flags & (uint32_t) type_flags::is_final) {
-//         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
-//                      t_b->name);
-//         return -1;
-//     }
-
-//     int rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
-//     if (rv)
-//         return rv;
-
-//     type_data *t = nb_type_data((PyTypeObject *) self);
-
-//     *t = *t_b;
-//     t->flags |=  (uint32_t) type_flags::is_python_type;
-//     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
-
-//     PyObject *name = nb_type_name(self);
-//     t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
-//     Py_DECREF(name);
-//     t->type_py = (PyTypeObject *) self;
-//     t->implicit.cpp = nullptr;
-//     t->implicit.py = nullptr;
-//     t->alias_chain = nullptr;
-
-// #if defined(Py_LIMITED_API)
-//     t->vectorcall = nullptr;
-// #else
-//     ((PyTypeObject *) self)->tp_vectorcall = nullptr;
-// #endif
-
-//     return 0;
 }
 
 /// Special case to handle 'Class.property = value' assignments

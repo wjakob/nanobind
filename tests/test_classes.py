@@ -942,6 +942,7 @@ def test49_static_property_override():
     assert t.StaticPropertyOverride.x == 42
     assert t.StaticPropertyOverride2.x == 43
 
+@skip_on_pypy
 def test50_multiple_inheritance_nb_first_base():
     """Test multiple inheritance with a NC class first in the inheritance list."""
     class Python:
@@ -962,6 +963,7 @@ def test50_multiple_inheritance_nb_first_base():
     assert sd.name() == "Animal"
     assert sd.who() == "SausageDog"
     
+@skip_on_pypy
 def test51_multiple_inheritance_py_first_base():
     """Test multiple inheritance with a Python class first in the inheritance list."""
     class Python:
@@ -985,5 +987,5 @@ def test51_multiple_inheritance_py_first_base():
 def test52_multiple_inheritance_checks():
     """Test checks to prevent multiple nb class inheritance."""
     with pytest.raises(TypeError):
-        class A(t.Struct, t.Foo):
+        class A(t.Animal, t.Foo):
             pass

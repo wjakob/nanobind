@@ -481,7 +481,14 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         else
             ptr = (Type *) &value;
 
-        policy = infer_policy<T>(policy);
+        return from_cpp_raw(ptr, infer_policy<T>(policy), cleanup, nullptr);
+    }
+
+    /* Version of from_cpp that uses the rv_policy you give it as-is,
+       without resolving through infer_policy */
+    NB_INLINE static handle from_cpp_raw(Type *ptr, rv_policy policy,
+                                         cleanup_list *cleanup,
+                                         bool *is_new) noexcept {
         const std::type_info *type = &typeid(Type);
 
         constexpr bool has_type_hook =
@@ -490,11 +497,11 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
             type = type_hook<Type>::get(ptr);
 
         if constexpr (!std::is_polymorphic_v<Type>) {
-            return nb_type_put(type, ptr, policy, cleanup);
+            return nb_type_put(type, ptr, policy, cleanup, is_new);
         } else {
             const std::type_info *type_p =
                 (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
-            return nb_type_put_p(type, type_p, ptr, policy, cleanup);
+            return nb_type_put_p(type, type_p, ptr, policy, cleanup, is_new);
         }
     }
 

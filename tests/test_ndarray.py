@@ -967,3 +967,9 @@ def test52_accept_np_both_true_contig():
     t.accept_np_both_true_contig_c(a)
     t.accept_np_both_true_contig_f(a)
 
+
+@needs_numpy
+def test53_issue_930():
+    import numpy as np
+    wrapper = t.Wrapper(np.ones(3, dtype=np.float32))
+    assert wrapper.value[0] == 1

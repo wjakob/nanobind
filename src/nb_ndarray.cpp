@@ -721,7 +721,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     bool copy;
     switch (policy) {
         case rv_policy::reference_internal:
-            if (cleanup && cleanup->self() != th->owner) {
+            if (cleanup && cleanup->self() != th->owner && !th->self) {
                 if (th->owner) {
                     PyErr_SetString(PyExc_RuntimeError,
                                     "nanobind::detail::ndarray_export(): "

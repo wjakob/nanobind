@@ -492,4 +492,35 @@ NB_MODULE(test_ndarray_ext, m) {
         float f[] { 1, 2, 3 };
         return Vector3f(f).cast();
     });
+
+    // Fix issue reported in discussion #930
+    struct Wrapper {
+        nb::ndarray<float> value;
+
+        static int tp_traverse(PyObject* self, visitproc visit, void* arg) {
+            Wrapper* w = nb::inst_ptr<Wrapper>(self);
+            nb::handle value = nb::find(w->value);
+            Py_VISIT(value.ptr());
+#if PY_VERSION_HEX >= 0x03090000
+            Py_VISIT(Py_TYPE(self));
+#endif
+            return 0;
+        }
+
+        static int tp_clear(PyObject* self) {
+            Wrapper* w = nb::inst_ptr<Wrapper>(self);
+            w->value = {};
+            return 0;
+        }
+    };
+
+    PyType_Slot wrapper_slots[] = {
+        {Py_tp_traverse, (void*)Wrapper::tp_traverse},
+        {Py_tp_clear, (void*)Wrapper::tp_clear},
+        {0, 0},
+    };
+
+    nb::class_<Wrapper>(m, "Wrapper", nb::type_slots(wrapper_slots))
+        .def(nb::init<nb::ndarray<float>>())
+        .def_rw("value", &Wrapper::value);
 }

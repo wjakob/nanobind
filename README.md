@@ -45,7 +45,7 @@ To compile the project and run the tests:
 sudo apt-get -y install libeigen3-dev
 
 # Python dev dependencies
-pip install pytest typing_extension
+python -m pip install pytest typing_extension
 
 # Configure cmake build directory
 cmake -S . -B build
@@ -55,7 +55,7 @@ cmake --build build -j 2
 
 # Run tests
 cd build
-pytest
+python -m pytest
 ```
 
 ## License and attribution

@@ -56,23 +56,28 @@ rule.
             name,
             module,
             output_file = None,
+            output_directory = None,
             imports = [],
             pattern_file = None,
             marker_file = None,
             include_private_members = False,
-            exclude_docstrings = False):
+            exclude_docstrings = False,
+            recursive = False):
 
     It generates a `py_binary <https://bazel.build/reference/be/
     python#py_binary>`__ rule with a corresponding runfiles distribution,
     which invokes nanobind's builtin stubgen script, outputs a stub file and,
-    optionally, a typing marker file into the build
-    output directory (commonly called "bindir" in Bazel terms).
+    optionally, a typing marker file into ``output_directory`` (defaults to
+    the build output directory, commonly called "bindir" in Bazel terms).
 
     All arguments (except the name, which is used only to refer to the target
     in Bazel) correspond directly to nanobind's stubgen command line interface,
     which is described in more detail in the :ref:`typing documentation <stubs>`.
 
     *New in nanobind-bazel version 2.1.0.*
+
+    *New in nanobind-bazel v2.5.0: Added the "output_directory" and "recursive"
+    keyword arguments.*
 
 To build a C++ library with nanobind as a dependency, use the
 ``nanobind_library`` rule.

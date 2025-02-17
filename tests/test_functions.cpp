@@ -243,6 +243,10 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_11_ul",  [](unsigned long x)      { return x; });
     m.def("test_11_sll", [](signed long long x)   { return x; });
     m.def("test_11_ull", [](unsigned long long x) { return x; });
+    m.def("test_11_b", [](bool x) { return x; });
+
+    // Test bool type
+    m.def("test_11_bnc", [](bool x) { return x; }, nb::arg().noconvert());
 
     // Test string caster
     m.def("test_12", [](const char *c) { return nb::str(c); });

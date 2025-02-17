@@ -252,6 +252,10 @@ def test21_numpy_overloads():
     assert t.test_11_ul(np.int32(5)) == 5
     assert t.test_11_sll(np.int32(5)) == 5
     assert t.test_11_ull(np.int32(5)) == 5
+    assert t.test_11_ull(np.int32(5)) == 5
+    assert t.test_11_b(np.bool_(True))
+    assert not t.test_11_b(np.bool_(False))
+    assert t.test_11_bnc(np.bool_(True))  # np.bool_ is supported even with noconvert
 
     with pytest.raises(TypeError) as excinfo:
         t.test_21_dnc(np.float64(21.0))  # Python type is not exactly float
@@ -619,23 +623,28 @@ def test41_kw_only():
 def test42_ptr_return():
     assert t.test_ptr_return() == (10, 100)
 
+
 def test41_any():
     s = "hello"
     assert t.test_any(s) is s
     assert t.test_any.__doc__ == "test_any(arg: typing.Any, /) -> typing.Any"
 
+
 def test42_wrappers_list():
     assert t.test_wrappers_list()
+
 
 def test43_wrappers_dict():
     assert t.test_wrappers_dict()
 
+
 def test43_wrappers_set():
     assert t.test_wrappers_set()
 
+
 def test44_hash():
     value = (1, 2, 3)
-    assert t.hash_it(value) == hash(value);
+    assert t.hash_it(value) == hash(value)
 
 
 def test45_new():
@@ -745,8 +754,47 @@ def test50_call_policy():
     with pytest.raises(RuntimeError, match="offset too large"):
         case("swapfrom", "10", "<unfinished>")
 
+
 def test51_isinstance():
     assert t.isinstance_(3, int)
     assert not t.isinstance_(3, bool)
     with pytest.raises(TypeError):
         t.isinstance_(3, 7)
+
+
+def test52_bool():
+    # straight up bool
+    assert t.test_11_b(True) is True
+    assert t.test_11_b(False) is False
+    assert t.test_11_bnc(True) is True
+    assert t.test_11_bnc(False) is False
+
+    # None requires implicit conversion
+    with pytest.raises(TypeError):
+        assert t.test_11_bnc(None)
+    # t.test_11_b(None) is False
+
+    class A(object):
+        def __init__(self, x):
+            self.x = x
+
+        def __nonzero__(self):
+            return self.x
+
+        def __bool__(self):
+            return self.x
+
+    class B(object):
+        pass
+
+    # Arbitrary objects are not accepted
+    with pytest.raises(TypeError):
+        t.test_11_b(object())
+    with pytest.raises(TypeError):
+        t.test_11_b(B)
+
+    # Objects with __nonzero__ / __bool__ defined can be converted
+    with pytest.raises(TypeError):
+        t.test_11_bnc(A(True))
+    assert t.test_11_b(A(True)) is True
+    assert t.test_11_b(A(False)) is False

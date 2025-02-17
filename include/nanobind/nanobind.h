@@ -29,12 +29,13 @@
 // Core C++ headers that nanobind depends on
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
+#include <new>
 #include <stdexcept>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
-#include <new>
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
 // IWYU pragma: begin_exports

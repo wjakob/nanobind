@@ -254,13 +254,41 @@ template <typename T> struct none_caster {
 template <> struct type_caster<std::nullptr_t> : none_caster<std::nullptr_t> { };
 
 template <> struct type_caster<bool> {
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if (src.ptr() == Py_True) {
             value = true;
             return true;
         } else if (src.ptr() == Py_False) {
             value = false;
             return true;
+        } else if (flags & (uint8_t)cast_flags::convert ||
+                   // allow non-implicit conversion for numpy booleans
+                   is_numpy_bool(src)) {
+            Py_ssize_t res = -1;
+            if (src.is_none()) {
+                res = 0; // None is implicitly converted to False
+            }
+#if defined(PYPY_VERSION)
+            // On PyPy, check that "__bool__" attr exists
+            else if (hasattr(src, "__bool__")) {
+                res = PyObject_IsTrue(src.ptr());
+            }
+#else
+            // Alternate approach for CPython: this does the same as the above,
+            // but optimized using the CPython API so as to avoid an unneeded
+            // attribute lookup.
+            else if (auto *tp_as_number = Py_TYPE(src.ptr())->tp_as_number) {
+                if (tp_as_number->nb_bool) {
+                    res = (*(tp_as_number->nb_bool))(src.ptr());
+                }
+            }
+#endif
+            if (res == 0 || res == 1) {
+                value = (res != 0);
+                return true;
+            }
+            PyErr_Clear();
+            return false;
         } else {
             return false;
         }
@@ -268,6 +296,15 @@ template <> struct type_caster<bool> {
 
     static handle from_cpp(bool src, rv_policy, cleanup_list *) noexcept {
         return handle(src ? Py_True : Py_False).inc_ref();
+    }
+
+    // Test if an object is a NumPy boolean (without fetching the type).
+    static inline bool is_numpy_bool(handle object) {
+        const char *type_name = Py_TYPE(object.ptr())->tp_name;
+        // Name changed to `numpy.bool` in NumPy 2, `numpy.bool_` is needed
+        // for 1.x support
+        return std::strcmp("numpy.bool", type_name) == 0 ||
+               std::strcmp("numpy.bool_", type_name) == 0;
     }
 
     NB_TYPE_CASTER(bool, const_name("bool"))

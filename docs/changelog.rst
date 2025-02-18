@@ -117,6 +117,13 @@ Fixes for free-threaded builds
   weak memory ordering such as ARM (PR `#819
   <https://github.com/wjakob/nanobind/pull/819>`__).
 
+* Nanobind now avoids returning an existing non-owning Python instance when
+  an owning Python instance was requested. Instead, it will create a new
+  Python instance that holds (unique or shared) ownership of the C++ object,
+  and allow the existing instance to continue to hold a reference to it.
+  This also helps in situations where <TODO...>
+  (PR `#889 <https://github.com/wjakob/nanobind/pull/889>`__)
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

@@ -24,15 +24,21 @@ def remove_platform_dependent(s):
             i += 1
     return s2
 
+
 ref_paths = list(pathlib.Path(__file__).parent.glob('*.pyi.ref'))
+ref_path_ids = [p.name[:-len('.pyi.ref')] for p in ref_paths]
 assert len(ref_paths) > 0, "Stub reference files not found!"
 
 @skip_on_unsupported
-@pytest.mark.parametrize('p_ref', ref_paths)
-def test01_check_stub_refs(p_ref):
+@pytest.mark.parametrize('p_ref', ref_paths, ids=ref_path_ids)
+def test01_check_stub_refs(p_ref, request):
     """
     Check that generated stub files match reference input
     """
+    if not request.config.getoption('enable-slow-tests') and any(
+        (x in p_ref.name for x in ['jax', 'tensorflow'])):
+        pytest.skip("skipping because slow tests are not enabled")
+
     p_in = p_ref.with_suffix('')
     with open(p_ref, 'r') as f:
         s_ref = f.read().split('\n')

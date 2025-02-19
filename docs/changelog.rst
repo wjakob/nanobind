@@ -117,6 +117,17 @@ Fixes for free-threaded builds
   weak memory ordering such as ARM (PR `#819
   <https://github.com/wjakob/nanobind/pull/819>`__).
 
+- :cpp:struct:`nb::init() <init>` may now be written with a function argument
+  and no template parameters to express a custom constructor that doesn't exist
+  in C++. For example, you could use this to adapt Python strings to a
+  pointer-and-length argument convention:
+  ``.def(nb::init([](std::string_view sv) { return MyType(sv.data(), sv.size()); }))``.
+  This feature is syntactic sugar for writing a custom ``"__init__"`` binding
+  using placement new, which remains fully supported, and which should continue
+  to be used in cases where the custom constructor cannot be written as a
+  function that finishes by returning a prvalue (``return MyType(some, args);``).
+  (PR `#885 <https://github.com/wjakob/nanobind/pull/885>`__)
+
 Version 2.4.0 (Dec 6, 2024)
 ---------------------------
 

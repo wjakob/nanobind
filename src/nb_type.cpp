@@ -1061,7 +1061,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
          is_generic            = t->flags & (uint32_t) type_flags::is_generic,
          intrusive_ptr         = t->flags & (uint32_t) type_flags::intrusive_ptr,
          has_shared_from_this  = t->flags & (uint32_t) type_flags::has_shared_from_this,
-         has_signature         = t->flags & (uint32_t) type_flags::has_signature;
+         has_signature         = t->flags & (uint32_t) type_flags::has_signature,
+         has_upcast_hook       = t->flags & (uint32_t) type_flags::has_upcast_hook;
 
     const char *t_name = t->name;
     if (has_signature)
@@ -1346,6 +1347,12 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         to->keep_shared_from_this_alive = tb->keep_shared_from_this_alive;
     }
 
+    if (!has_upcast_hook && tb &&
+        (tb->flags & (uint32_t) type_flags::has_upcast_hook)) {
+        to->flags |= (uint32_t) type_flags::has_upcast_hook;
+        to->upcast_hook = tb->upcast_hook;
+    }
+
     #if defined(Py_LIMITED_API)
         to->vectorcall = type_vectorcall;
     #else
@@ -1550,6 +1557,16 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
             *out = inst_ptr(inst);
 
             return true;
+        }
+
+        // This is a nanobind type but not the right one; try an upcast hook
+        // if one was provided
+        if (t->flags & (uint32_t) type_flags::has_upcast_hook) {
+            void *ptr = t->upcast_hook(src, cpp_type);
+            if (ptr) {
+                *out = ptr;
+                return true;
+            }
         }
     }
 

@@ -1,4 +1,6 @@
 import test_ndarray_ext as t
+import test_jax_ext as tj
+import test_tensorflow_ext as tt
 import pytest
 import warnings
 import importlib
@@ -377,26 +379,26 @@ def test18_return_pytorch():
 @needs_jax
 def test19_return_jax():
     collect()
-    dc = t.destruct_count()
-    x = t.ret_jax()
+    dc = tj.destruct_count()
+    x = tj.ret_jax()
     assert x.shape == (2, 4)
     assert jnp.all(x == jnp.array([[1,2,3,4], [5,6,7,8]], dtype=jnp.float32))
     del x
     collect()
-    assert t.destruct_count() - dc == 1
+    assert tj.destruct_count() - dc == 1
 
 
 @needs_tensorflow
 def test20_return_tensorflow():
     collect()
-    dc = t.destruct_count()
-    x = t.ret_tensorflow()
+    dc = tt.destruct_count()
+    x = tt.ret_tensorflow()
     assert x.get_shape().as_list() == [2, 4]
     assert tf.math.reduce_all(
                x == tf.constant([[1,2,3,4], [5,6,7,8]], dtype=tf.float32))
     del x
     collect()
-    assert t.destruct_count() - dc == 1
+    assert tt.destruct_count() - dc == 1
 
 
 @needs_numpy

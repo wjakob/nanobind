@@ -867,6 +867,7 @@
 -U __PyObject_GC_New
 -U __PyObject_GC_NewVar
 -U __PyObject_GC_Resize
+-U __PyObject_LookupAttr
 -U __PyObject_MakeTpCall
 -U __PyObject_New
 -U __PyObject_NewVar

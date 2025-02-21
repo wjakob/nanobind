@@ -9,6 +9,7 @@
 
 #include "nb_internals.h"
 #include "nb_ft.h"
+#include <iostream>
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
@@ -460,19 +461,41 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     }
 
     PyObject *bases = NB_TUPLE_GET_ITEM(args, 1);
-    if (!PyTuple_CheckExact(bases) || NB_TUPLE_GET_SIZE(bases) != 1) {
+    if (!PyTuple_CheckExact(bases)) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "nb_type_init(): invalid number of bases!");
+                        "nb_type_init(): expected a base type object!");
         return -1;
     }
 
-    PyObject *base = NB_TUPLE_GET_ITEM(bases, 0);
-    if (!PyType_Check(base)) {
+    PyObject *nb_base = nullptr;
+    Py_ssize_t nb_base_index = 0;
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
+        PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
+        if (PyType_Check(base)) {
+            if (nb_type_check(base)) {
+                if (nb_base) {
+                    PyErr_SetString(PyExc_TypeError, "nb_type_init(): multiple inheritance of multiple nanobound classes are not allowed!");
+                    return -1;
+                }
+                nb_base = base;
+                nb_base_index = i;
+            }
+        }
+    }
+
+    if (!nb_base) {
         PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
         return -1;
     }
 
-    type_data *t_b = nb_type_data((PyTypeObject *) base);
+    // Reorder
+    if (nb_base_index != 0) {
+        PyObject *tmp = NB_TUPLE_GET_ITEM(bases, 0);
+        NB_TUPLE_SET_ITEM(bases, 0, nb_base);
+        NB_TUPLE_SET_ITEM(bases, nb_base_index, tmp);
+    }
+    
+    type_data *t_b = nb_type_data((PyTypeObject *) NB_TUPLE_GET_ITEM(bases, 0));
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);

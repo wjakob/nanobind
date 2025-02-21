@@ -649,8 +649,14 @@ class StubGen:
         def process_general(m: Match[str]) -> str:
             def is_valid_module(module_name: str) -> bool:
                 try:
-                    return importlib.util.find_spec(module_name) is not None
-                except (ModuleNotFoundError, ValueError):
+                    importlib.util.find_spec(module_name)
+                    # If we get here, the module exists and has a valid spec.
+                    return True
+                except ValueError:
+                    # The module exists but has no spec, `find_spec` raises a
+                    # `ValueError`, so if we get here, the module does exist.
+                    return True
+                except ModuleNotFoundError:
                     return False
 
             full_name, mod_name, cls_name = m.group(0), m.group(1)[:-1], m.group(2)
@@ -676,7 +682,7 @@ class StubGen:
                         cls_name = search_cls_name
                         break
                     search_mod_name, _, symbol = search_mod_name.rpartition(".")
-                    search_cls_name = f"{search_cls_name}.{symbol}"
+                    search_cls_name = f"{symbol}.{search_cls_name}"
 
                 # Import the module and reference the contained class by name
                 self.import_object(mod_name, None)

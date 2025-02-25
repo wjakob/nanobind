@@ -9,6 +9,7 @@
 
 #include "nb_internals.h"
 #include "nb_ft.h"
+#include <iostream>
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
@@ -460,26 +461,61 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     }
 
     PyObject *bases = NB_TUPLE_GET_ITEM(args, 1);
-    if (!PyTuple_CheckExact(bases) || NB_TUPLE_GET_SIZE(bases) != 1) {
+    if (!PyTuple_CheckExact(bases)) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "nb_type_init(): invalid number of bases!");
+                        "nb_type_init(): expected a base type object!");
         return -1;
     }
 
-    PyObject *base = NB_TUPLE_GET_ITEM(bases, 0);
-    if (!PyType_Check(base)) {
+    PyObject *nb_base = nullptr;
+    Py_ssize_t nb_base_index = 0;
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
+        PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
+        if (PyType_Check(base)) {
+            if (nb_type_check(base)) {
+                if (nb_base) {
+                    PyErr_SetString(PyExc_TypeError, "nb_type_init(): multiple inheritance of multiple nanobound classes are not allowed!");
+                    return -1;
+                }
+                nb_base = base;
+                nb_base_index = i;
+            }
+        }
+    }
+
+    if (!nb_base) {
         PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
         return -1;
     }
 
-    type_data *t_b = nb_type_data((PyTypeObject *) base);
+    // Reorder the bases tuple to ensure that the nanobind base is at the front
+    PyObject *bases_new = PyTuple_New(NB_TUPLE_GET_SIZE(bases));
+    NB_TUPLE_SET_ITEM(bases_new, 0, nb_base); // Set base at position 0
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
+        if (i != nb_base_index) {
+            PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
+            PyTuple_SET_ITEM(bases_new, i < nb_base_index ? i + 1 : i, base);
+        }
+    }
+
+    // Create a new args tuple with the reordered bases
+    PyObject *args_new = PyTuple_New(NB_TUPLE_GET_SIZE(args));
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(args); i++) {
+        if (i != 1) {
+            PyTuple_SET_ITEM(args_new, i, NB_TUPLE_GET_ITEM(args, i));
+        } else {
+            PyTuple_SET_ITEM(args_new, i, bases_new);
+        }
+    }
+    
+    type_data *t_b = nb_type_data((PyTypeObject *) NB_TUPLE_GET_ITEM(bases_new, 0));
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);
         return -1;
     }
 
-    int rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
+    int rv = NB_SLOT(PyType_Type, tp_init)(self, args_new, kwds);
     if (rv)
         return rv;
 

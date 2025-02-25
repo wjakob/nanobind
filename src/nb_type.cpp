@@ -488,21 +488,34 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         return -1;
     }
 
-    // Reorder
-    if (nb_base_index != 0) {
-        PyObject *tmp = NB_TUPLE_GET_ITEM(bases, 0);
-        NB_TUPLE_SET_ITEM(bases, 0, nb_base);
-        NB_TUPLE_SET_ITEM(bases, nb_base_index, tmp);
+    // Reorder the bases tuple to ensure that the nanobind base is at the front
+    PyObject *bases_new = PyTuple_New(NB_TUPLE_GET_SIZE(bases));
+    NB_TUPLE_SET_ITEM(bases_new, 0, nb_base); // Set base at position 0
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(bases); i++) {
+        if (i != nb_base_index) {
+            PyObject *base = NB_TUPLE_GET_ITEM(bases, i);
+            PyTuple_SET_ITEM(bases_new, i < nb_base_index ? i + 1 : i, base);
+        }
+    }
+
+    // Create a new args tuple with the reordered bases
+    PyObject *args_new = PyTuple_New(NB_TUPLE_GET_SIZE(args));
+    for (Py_ssize_t i = 0; i < NB_TUPLE_GET_SIZE(args); i++) {
+        if (i != 1) {
+            PyTuple_SET_ITEM(args_new, i, NB_TUPLE_GET_ITEM(args, i));
+        } else {
+            PyTuple_SET_ITEM(args_new, i, bases_new);
+        }
     }
     
-    type_data *t_b = nb_type_data((PyTypeObject *) NB_TUPLE_GET_ITEM(bases, 0));
+    type_data *t_b = nb_type_data((PyTypeObject *) NB_TUPLE_GET_ITEM(bases_new, 0));
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);
         return -1;
     }
 
-    int rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
+    int rv = NB_SLOT(PyType_Type, tp_init)(self, args_new, kwds);
     if (rv)
         return rv;
 

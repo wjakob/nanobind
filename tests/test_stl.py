@@ -374,6 +374,20 @@ def test35_string_and_string_view():
     assert t.identity_string_view("🍊") == "🍊"
 
 
+
+def test36a_std_optional_int(clean):
+    v = t.optional_int(None)
+    assert v == None
+    v = t.optional_int(5)
+    assert v == None
+
+    opt_copyable = optional("test_stl_ext.Copyable")
+    assert t.optional_copyable.__doc__ == (
+        f"optional_copyable(x: {opt_copyable}) -> None"
+    )
+    assert_stats(default_constructed=1, copy_constructed=1, destructed=2)
+ 
+
 def test36_std_optional_copyable(clean):
     t.optional_copyable(t.Copyable())
     opt_copyable = optional("test_stl_ext.Copyable")

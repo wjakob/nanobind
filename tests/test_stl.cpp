@@ -262,6 +262,7 @@ NB_MODULE(test_stl_ext, m) {
     m.def("identity_string_view", [](std::string_view& x) { return x; });
 
     // ----- test36-test42 ------
+    m.def("optional_int", [](std::optional<int> x) { return x; }, nb::arg("x"));
     m.def("optional_copyable", [](std::optional<Copyable> &) {}, nb::arg("x").none());
     m.def("optional_copyable_ptr", [](std::optional<Copyable *> &) {}, nb::arg("x").none());
     m.def("optional_none", [](std::optional<Copyable> &x) { if(x) fail(); }, nb::arg("x").none());

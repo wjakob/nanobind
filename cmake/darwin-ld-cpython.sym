@@ -501,6 +501,8 @@
 -U _PyObject_Format
 -U _PyObject_Free
 -U _PyObject_GetTypeData
+-U _PyObject_GetOptionalAttr
+-U _PyObject_GetOptionalAttrString
 -U _PyObject_GC_Del
 -U _PyObject_GC_IsFinalized
 -U _PyObject_GC_IsTracked

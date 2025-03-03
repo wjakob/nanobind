@@ -72,6 +72,8 @@ set(TEST_NAMES
   enum
   eval
   ndarray
+  jax
+  tensorflow
   exception
   make_iterator
   typing
@@ -90,7 +92,7 @@ endforeach()
 
 target_sources(test_intrusive_ext PRIVATE test_intrusive_impl.cpp)
 
-foreach (NAME functions classes ndarray stl enum typing make_iterator)
+foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iterator)
   if (NAME STREQUAL typing)
     set(EXTRA
       MARKER_FILE py.typed
@@ -138,6 +140,7 @@ target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
 set(TEST_FILES
   common.py
+  conftest.py
   test_callbacks.py
   test_classes.py
   test_eigen.py
@@ -154,6 +157,8 @@ set(TEST_FILES
   test_stl_bind_vector.py
   test_chrono.py
   test_ndarray.py
+  test_jax.py
+  test_tensorflow.py
   test_stubs.py
   test_typing.py
   test_thread.py
@@ -163,6 +168,8 @@ set(TEST_FILES
   test_functions_ext.pyi.ref
   test_make_iterator_ext.pyi.ref
   test_ndarray_ext.pyi.ref
+  test_jax_ext.pyi.ref
+  test_tensorflow_ext.pyi.ref
   test_stl_ext.pyi.ref
   test_enum_ext.pyi.ref
   test_typing_ext.pyi.ref

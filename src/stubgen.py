@@ -178,7 +178,8 @@ class StubGen:
         max_expr_length: int = 50,
         patterns: List[ReplacePattern] = [],
         quiet: bool = True,
-        output_file: Optional[Path] = None
+        output_file: Optional[Path] = None,
+        member_sort: Optional[Union[Callable[[Tuple[str, Any]], Any], Literal['as-defined']]] = None,
     ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
@@ -209,6 +210,10 @@ class StubGen:
 
         # Target filename, only needed for recursive stub generation
         self.output_file = output_file
+
+        # Key function for sorting module member names
+        # if 'as-defined', members are sorted in the order they appear in the module __dict__
+        self.member_sort = member_sort
 
         # ---------- Internal fields ----------
 
@@ -836,7 +841,15 @@ class StubGen:
                     return
                 else:
                     self.apply_pattern(self.prefix + ".__prefix__", None)
-                    for name, child in getmembers(value):
+                    if self.member_sort == 'as-defined':
+                        order_map = {
+                            name: index for index, name in enumerate(value.__dict__.keys())
+                        }
+                        def sort_key(i: tuple[str, Any]) -> Any:
+                            return order_map.get(i[0], float('inf'))
+                    else:
+                        sort_key = self.member_sort
+                    for name, child in sorted(getmembers(value), key=sort_key):
                         self.put(child, name=name, parent=value)
                     self.apply_pattern(self.prefix + ".__suffix__", None)
             elif self.is_function(tp):

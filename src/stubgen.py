@@ -676,7 +676,7 @@ class StubGen:
                         cls_name = search_cls_name
                         break
                     search_mod_name, _, symbol = search_mod_name.rpartition(".")
-                    search_cls_name = f"{search_cls_name}.{symbol}"
+                    search_cls_name = f"{symbol}.{search_cls_name}"
 
                 # Import the module and reference the contained class by name
                 self.import_object(mod_name, None)

@@ -34,7 +34,7 @@ struct pyfunc_wrapper {
     }
 
     ~pyfunc_wrapper() {
-        if (f) {
+        if (f && is_alive()) {
             gil_scoped_acquire acq;
             Py_DECREF(f);
         }

@@ -295,6 +295,7 @@
 -U _PyGILState_GetThisThreadState
 -U _PyGILState_Release
 -U _PyGetSetDescr_Type
+-U _PyGen_Type
 -U _PyImport_AddModule
 -U _PyImport_AddModuleObject
 -U _PyImport_AppendInittab

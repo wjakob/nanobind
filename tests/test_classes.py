@@ -487,6 +487,20 @@ def test20_supplement():
     assert t.check_supplement(c)
     assert not t.check_supplement(t.Struct())
 
+    class Set:
+        pass
+
+    class List:
+        pass
+
+    t.Collection.register(Set)
+    t.Sequence.register(List)
+
+    assert isinstance(Set(), t.Collection)
+    assert not isinstance(Set(), t.Sequence)
+    assert isinstance(List(), t.Collection)
+    assert isinstance(List(), t.Sequence)
+
 
 def test21_type_callback():
     o = t.ClassWithLen()

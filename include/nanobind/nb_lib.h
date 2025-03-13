@@ -316,6 +316,10 @@ NB_CORE void nb_type_restore_ownership(PyObject *o, bool cpp_delete) noexcept;
 /// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
 NB_CORE void *nb_type_supplement(PyObject *t) noexcept;
 
+/// Determine whether the nb_type t has a supplement whose type matches supp_type.
+NB_CORE bool nb_type_has_supplement(PyObject *t,
+                                    const std::type_info *supp_type) noexcept;
+
 /// Check if the given python object represents a nanobind type
 NB_CORE bool nb_type_check(PyObject *t) noexcept;
 

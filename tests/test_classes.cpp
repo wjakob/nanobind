@@ -416,7 +416,7 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<StaticProperties2, StaticProperties>(m, "StaticProperties2");
 
-    // test19_supplement
+    // test20_supplement
     struct ClassWithSupplement { };
     struct Supplement {
         uint8_t data[0xFF];
@@ -431,6 +431,8 @@ NB_MODULE(test_classes_ext, m) {
 
     m.def("check_supplement", [](nb::handle h) {
         if (nb::isinstance<ClassWithSupplement>(h)) {
+            if (!nb::type_has_supplement<Supplement>(h.type()))
+                return false;
             Supplement &s2 = nb::type_supplement<Supplement>(h.type());
             for (uint16_t i = 0; i < 0xFF; ++i) {
                 if (s2.data[i] != i)
@@ -440,6 +442,95 @@ NB_MODULE(test_classes_ext, m) {
         }
         return false;
     });
+
+    static int meta_creations = 0;
+    static int type_creations = 0;
+    static int type_destructions = 0;
+
+    struct HasVirtualSubclasses {
+        static void init_metaclass(PyTypeObject *metatype) {
+            ++meta_creations;
+            nb::cpp_function_def(
+                    [](nb::handle cls, nb::handle instance) {
+                        if (!nb::type_check(cls) ||
+                            !nb::type_has_supplement<HasVirtualSubclasses>(cls))
+                            return false;
+
+                        auto& supp = nb::type_supplement<HasVirtualSubclasses>(cls);
+                        return PyType_IsSubtype((PyTypeObject *) instance.type().ptr(),
+                                                (PyTypeObject *) cls.ptr()) ||
+                               nb::borrow<nb::set>(supp.subclasses).contains(
+                                       instance.type());
+                    },
+                    nb::is_method(), nb::scope(metatype),
+                    nb::name("__instancecheck__"));
+
+            nb::cpp_function_def(
+                    [](nb::handle cls, nb::handle vsub) {
+                        while (nb::type_check(cls) &&
+                               nb::type_has_supplement<HasVirtualSubclasses>(cls)) {
+                            auto& supp = nb::type_supplement<HasVirtualSubclasses>(cls);
+                            nb::borrow<nb::set>(supp.subclasses).add(vsub);
+                            cls = (PyObject *) PyType_GetSlot(
+                                    (PyTypeObject *) cls.ptr(), Py_tp_base);
+                        }
+                    },
+                    nb::is_method(), nb::scope(metatype), nb::name("register"));
+        }
+
+        explicit HasVirtualSubclasses(PyTypeObject *tp) {
+            ++type_creations;
+            nb::set subclasses_set;
+            nb::handle(tp).attr("__subclasses") = subclasses_set;
+            subclasses = subclasses_set;
+        }
+
+        ~HasVirtualSubclasses() {
+            ++type_destructions;
+        }
+
+        nb::handle subclasses;
+    };
+
+    struct Collection {};
+    struct Sequence : Collection {};
+
+    nb::class_<Collection>(
+            m, "Collection",
+            nb::supplement<HasVirtualSubclasses>().inheritable());
+
+    nb::class_<Sequence, Collection>(m, "Sequence").def(nb::init<>());
+
+    if (meta_creations != 1 || type_creations != 2 || type_destructions != 0) {
+        throw nb::value_error("Invalid ctor/dtor counts (1)");
+    }
+
+    m.attr("Collection") = nb::none();
+    m.attr("Sequence") = nb::none();
+    nb::module_::import_("gc").attr("collect")();
+#if defined(PYPY_VERSION)
+    nb::module_::import_("gc").attr("collect")();
+    nb::module_::import_("gc").attr("collect")();
+#endif
+
+    if (meta_creations != 1 || type_creations != 2 || type_destructions != 2) {
+        throw nb::value_error("Invalid ctor/dtor counts (2)");
+    }
+
+    // A second gc seems to be needed to reap the metaclass, even on CPython
+    nb::module_::import_("gc").attr("collect")();
+
+    nb::class_<Collection>(
+            m, "Collection",
+            nb::supplement<HasVirtualSubclasses>().inheritable());
+
+    nb::class_<Sequence, Collection>(m, "Sequence").def(nb::init<>());
+
+    if (meta_creations != 2 || type_creations != 4 || type_destructions != 2) {
+        throw nb::value_error("Invalid ctor/dtor counts (3)");
+    }
+
+    meta_creations = type_creations = type_destructions = 0;
 
     // test20_type_callback
     PyType_Slot slots[] {

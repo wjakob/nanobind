@@ -31,6 +31,9 @@ extern int nb_bound_method_traverse(PyObject *, visitproc, void *);
 extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
+extern PyTypeObject *nb_meta_new(nb_internals *internals,
+                                 const supplement_data *supplement) noexcept;
+extern void nb_meta_dealloc(PyObject *);
 
 #if PY_VERSION_HEX >= 0x03090000
 #  define NB_HAVE_VECTORCALL_PY39_OR_NEWER NB_HAVE_VECTORCALL
@@ -40,6 +43,7 @@ extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
 
 static PyType_Slot nb_meta_slots[] = {
     { Py_tp_base, nullptr },
+    { Py_tp_dealloc, (void *) nb_meta_dealloc },
     { 0, nullptr }
 };
 
@@ -363,8 +367,12 @@ NB_NOINLINE void init(const char *name) {
     p->nb_module = PyModule_NewObject(nb_name.ptr());
 
     nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
+#if PY_VERSION_HEX >= 0x030C0000
+    nb_meta_spec.basicsize = -(int) sizeof(const supplement_data*);
+#else
+    nb_meta_spec.basicsize = (int) (PyType_Type.tp_basicsize + sizeof(const supplement_data*));
+#endif
     nb_meta_cache = p->nb_meta = (PyTypeObject *) PyType_FromSpec(&nb_meta_spec);
-    p->nb_type_dict = PyDict_New();
     p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
     p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
     p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
@@ -379,7 +387,7 @@ NB_NOINLINE void init(const char *name) {
         p->shards[i].inst_c2p.min_load_factor(.1f);
     }
 
-    check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
+    check(p->nb_module && p->nb_meta && p->nb_func &&
               p->nb_method && p->nb_bound_method,
           "nanobind::detail::init(): initialization failed!");
 
@@ -430,6 +438,8 @@ NB_NOINLINE void init(const char *name) {
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;
     p->is_alive_ptr = is_alive_ptr;
+
+    p->nb_type_0 = nb_meta_new(p, nullptr);
 
 #if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)
     /* The implementation of typing.py on CPython <3.12 tends to introduce

@@ -2059,9 +2059,20 @@ declarations in generated :ref:`stubs <stubs>`,
 
 .. cpp:struct:: template <typename T> supplement
 
-   Indicate that ``sizeof(T)`` bytes of memory should be set aside to
-   store supplemental data in the type object. See :ref:`Supplemental
-   type data <supplement>` for more information.
+   Indicate that the type being created (not its instances) should contain
+   a subobject of type ``T``, which can later be accessed using
+   :cpp:func:`nb::type_supplement\<T\>() <type_supplement>`. nanobind will
+   create a separate metaclass per type ``T``. See
+   :ref:`Supplemental type data <supplement>` for more information.
+
+   .. cpp::function:: supplement&& inheritable() &&
+
+      By default, specifying a supplement for a type prevents that type from
+      being inherited, since there would be no general way to initialize the
+      supplemental data for the derived type. If you instead pass the binding
+      annotation ``nb::supplement<T>().inheritable()``, inheritance will be
+      allowed. Any derived type gets a new default-constructed copy of the
+      supplemental data, not a copy of the data stored in the base type.
 
 .. cpp:struct:: type_slots
 
@@ -2865,6 +2876,13 @@ Type objects
    creating the type; no type check is performed, and invalid supplement
    accesses may crash the interpreter. Also refer to
    :cpp:class:`nb::supplement\<T\> <supplement>`.
+
+.. cpp:function:: template <typename T> bool type_has_supplement(handle h)
+
+   Assuming that `h` represents a bound type (see :cpp:func:`type_check`),
+   check whether it stores supplemental data of type ``T``. If this function
+   returns true, then it is valid to call :cpp:func:`nb::type_supplement\<T\>(h)
+   <type_supplement>`.
 
 .. cpp:function:: str type_name(handle h)
 

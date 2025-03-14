@@ -928,12 +928,6 @@ void nb_meta_dealloc(PyObject *o) {
         nb_internals *internals_ = internals;
         lock_internals guard(internals_);
         internals_->nb_type_for_supplement.erase(s->type);
-        while (s) {
-            s->metaclass_cache = nullptr;
-            auto *next = s->next_in_chain;
-            s->next_in_chain = nullptr;
-            s = next;
-        }
     }
 }
 
@@ -941,30 +935,16 @@ void nb_meta_dealloc(PyObject *o) {
 // with the given supplement type, creating it if necessary. supplement must
 // not be nullptr. Must not be called concurrently from multiple threads.
 static PyTypeObject *nb_meta_lookup(const supplement_data *supplement) noexcept {
-    // First, try the cache. This will succeed for any metaclass that has been
-    // used in this module.
-    if (NB_LIKELY(supplement->metaclass_cache)) {
-        Py_INCREF((PyObject *) supplement->metaclass_cache);
-        return supplement->metaclass_cache;
-    }
-
-    // Next, try the nb_types map. This will succeed for any metaclass that
-    // has been used in any other nanobind module in this domain.
     nb_internals *internals_ = internals;
     auto [it, inserted] = internals_->nb_type_for_supplement.try_emplace(
             supplement->type);
     if (inserted) {
-        // If it's not in the dict either, then we need to create a new nb_type.
+        // If it's not in the map, then we need to create a new metaclass.
         it.value() = (type_data *) nb_meta_new(internals_, supplement);
     } else {
-        auto *head = nb_meta_supplement_data((PyTypeObject *) it->second);
-        supplement->next_in_chain = head->next_in_chain;
-        head->next_in_chain = supplement;
         Py_INCREF((PyObject *) it->second);
     }
-    PyTypeObject *tp = (PyTypeObject *) it->second;
-    supplement->metaclass_cache = tp;
-    return tp;
+    return (PyTypeObject *) it->second;
 }
 
 // This helper function extracts the function/class name from a custom signature attribute

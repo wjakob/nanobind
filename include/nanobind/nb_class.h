@@ -143,17 +143,6 @@ struct supplement_data {
     constructor_t construct; // nullptr if trivial
     destructor_t destruct; // nullptr if trivial
     init_metaclass_t init_metaclass; // nullptr if not defined
-
-    // Cache the metaclass object that nanobind has created to serve as
-    // the type of all nanobind types that use this supplement type.
-    // Due to this cache, the cost of looking up a given supplement type is
-    // paid once per module rather than once per nanobind type that uses it.
-    mutable PyTypeObject *metaclass_cache = nullptr;
-
-    // Link together all the supplement_data structures for the same type
-    // in different extension modules, so that all of their metaclass_cache
-    // members can be cleared when the metaclass is destroyed.
-    mutable const supplement_data *next_in_chain = nullptr;
 };
 
 template <typename T, typename = void>

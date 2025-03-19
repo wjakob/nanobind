@@ -295,6 +295,7 @@
 -U _PyGILState_GetThisThreadState
 -U _PyGILState_Release
 -U _PyGetSetDescr_Type
+-U _PyGen_Type
 -U _PyImport_AddModule
 -U _PyImport_AddModuleObject
 -U _PyImport_AppendInittab
@@ -501,6 +502,8 @@
 -U _PyObject_Format
 -U _PyObject_Free
 -U _PyObject_GetTypeData
+-U _PyObject_GetOptionalAttr
+-U _PyObject_GetOptionalAttrString
 -U _PyObject_GC_Del
 -U _PyObject_GC_IsFinalized
 -U _PyObject_GC_IsTracked
@@ -867,6 +870,7 @@
 -U __PyObject_GC_New
 -U __PyObject_GC_NewVar
 -U __PyObject_GC_Resize
+-U __PyObject_LookupAttr
 -U __PyObject_MakeTpCall
 -U __PyObject_New
 -U __PyObject_NewVar
@@ -923,3 +927,4 @@
 -U _PyCriticalSection2_Begin
 -U _PyCriticalSection2_End
 -U _PyUnicode_AsUTF8
+-U _Py_REFCNT

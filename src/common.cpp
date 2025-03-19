@@ -371,20 +371,59 @@ PyObject *getattr(PyObject *obj, PyObject *key) {
     return res;
 }
 
-PyObject *getattr(PyObject *obj, const char *key, PyObject *def) noexcept {
-    PyObject *res = PyObject_GetAttrString(obj, key);
-    if (res)
+PyObject *getattr(PyObject *obj, const char *key_, PyObject *def) noexcept {
+#if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
+    str key(key_);
+    if (PyObject_HasAttr(obj, key.ptr())) {
+        PyObject *res = PyObject_GetAttr(obj, key.ptr());
+        if (res)
+            return res;
+        PyErr_Clear();
+    }
+#else
+    PyObject *res;
+    int rv;
+
+    #if PY_VERSION_HEX < 0x030d0000
+        rv = _PyObject_LookupAttr(obj, str(key_).ptr(), &res);
+    #else
+        rv = PyObject_GetOptionalAttrString(obj, key_, &res);
+    #endif
+
+    if (rv == 1)
         return res;
-    PyErr_Clear();
+    else if (rv < 0)
+        PyErr_Clear();
+#endif
+
     Py_XINCREF(def);
     return def;
 }
 
 PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
-    PyObject *res = PyObject_GetAttr(obj, key);
-    if (res)
+#if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
+    if (PyObject_HasAttr(obj, key)) {
+        PyObject *res = PyObject_GetAttr(obj, key);
+        if (res)
+            return res;
+        PyErr_Clear();
+    }
+#else
+    PyObject *res;
+    int rv;
+
+    #if PY_VERSION_HEX < 0x030d0000
+        rv = _PyObject_LookupAttr(obj, key, &res);
+    #else
+        rv = PyObject_GetOptionalAttr(obj, key, &res);
+    #endif
+
+    if (rv == 1)
         return res;
-    PyErr_Clear();
+    else if (rv < 0)
+        PyErr_Clear();
+#endif
+
     Py_XINCREF(def);
     return def;
 }

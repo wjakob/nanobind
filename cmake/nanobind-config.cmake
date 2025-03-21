@@ -26,6 +26,12 @@ elseif(DEFINED Python_SOSABI)
   set(NB_SOSABI "${Python_SOSABI}")
 endif()
 
+
+# Error if scikit-build-core is trying to build Stable ABI < 3.12 wheels
+if(DEFINED SKBUILD_SABI_VERSION AND SKBUILD_SABI_VERSION VERSION_LESS "3.12")
+  message(FATAL_ERROR "You must set 'tool.scikit-build.wheel.py-api to cp312 or later when using scikit-build-core with nanobind.")
+endif()
+
 # PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
 # report an incorrect value. Only use it if it looks correct (X-X-X form).
 if(DEFINED NB_SOABI AND "${NB_SOABI}" MATCHES ".+-.+-.+")

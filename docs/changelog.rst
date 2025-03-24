@@ -173,6 +173,10 @@ Version 2.3.0
 
 There is no version 2.3.0 due to a deployment mishap.
 
+- Added casters for `Eigen::Map<Eigen::SparseMatrix<...>` types from the `Eigen library
+  <https://eigen.tuxfamily.org/index.php?title=Main_Page>`__. (PR `#782
+  <https://github.com/wjakob/nanobind/pull/782>`_).
+
 Version 2.2.0 (October 3, 2024)
 -------------------------------
 

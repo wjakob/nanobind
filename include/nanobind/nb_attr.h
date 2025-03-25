@@ -125,7 +125,14 @@ struct kw_only {};
 struct lock_self {};
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
-template <typename T> struct supplement {};
+template <typename T> struct supplement {
+    bool is_inheritable = false;
+
+    supplement&& inheritable() && {
+        is_inheritable = true;
+        return std::move(*this);
+    }
+};
 template <typename T> struct intrusive_ptr {
     intrusive_ptr(void (*set_self_py)(T *, PyObject *) noexcept)
         : set_self_py(set_self_py) { }

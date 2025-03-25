@@ -281,15 +281,13 @@ struct nb_maybe_atomic {
  *
  * The following list clarifies locking semantics for each member.
  *
- * - `nb_module`, `nb_meta`, `nb_func`, `nb_method`, `nb_bound_method`,
- *   `*_Type_tp_*`, `shard_count`, `is_alive_ptr`: these are initialized when
- *   loading the first nanobind extension within a domain, which happens within
- *   a critical section. They do not require locking.
+ * - `nb_module`, `nb_meta`, `nb_type_0`, `nb_func`, `nb_method`,
+ *   `nb_bound_method`, `*_Type_tp_*`, `shard_count`, `is_alive_ptr`: these are
+ *   initialized when loading the first nanobind extension within a domain,
+ *   which happens within a critical section. They do not require locking.
  *
- * - `nb_type_dict`: created when the loading the first nanobind extension
- *   within a domain. While the dictionary itself is protected by its own
- *   lock, additional locking is needed to avoid races that create redundant
- *   entries. The `mutex` member is used for this.
+ * - `nb_type_tps`: protected by `mutex`; only manipulated when binding a new
+ *   type, which already must lock the mutex for other reasons.
  *
  * - `nb_static_property` and `nb_static_propert_descr_set`: created only once
  *   on demand, protected by `mutex`.
@@ -340,8 +338,14 @@ struct nb_internals {
     /// Meta-metaclass of nanobind instances
     PyTypeObject *nb_meta;
 
-    /// Dictionary with nanobind metaclass(es) for different payload sizes
-    PyObject *nb_type_dict;
+    /// Metaclass of nanobind instances with no supplementary data
+    PyTypeObject *nb_type_0;
+
+    /// Map of nanobind metaclasses for different supplementary data types.
+    /// The value is a cast `PyTypeObject*`; we reuse `nb_type_map_slow` despite
+    /// the incorrect value type in order to avoid instantiating another
+    /// `robin_map`.
+    nb_type_map_slow nb_type_for_supplement;
 
     /// Types of nanobind functions and methods
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;
@@ -452,7 +456,7 @@ extern type_data *nb_type_data_static(PyTypeObject *o) noexcept;
 #endif
 
 /// Fetch the nanobind type record from a 'nb_type' instance
-NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
+NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept {
     #if !defined(Py_LIMITED_API)
         return (type_data *) (((char *) o) + sizeof(PyHeapTypeObject));
     #else

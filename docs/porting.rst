@@ -338,7 +338,12 @@ Removed features include:
   annotation was removed. However, the same behavior can be achieved by
   creating unnamed arguments; see the discussion in the section on
   :ref:`keyword-only arguments <kw_only>`.
-- ○ **Metaclasses**: creating types with custom metaclasses is unsupported.
+- ○ **Metaclasses**: Creating types with arbitrary custom metaclasses is
+  unsupported. However, many of the things you might want a metaclass for can
+  be accomplished using :ref:`supplemental type data <supplement>`. Each
+  supplement type is associated with its own metaclass, so you can add some
+  customizations after the metaclass has been created, but nanobind does not
+  allow customizing the metaclass's type, bases, or slots.
 - ○ **Module-local bindings**: support was removed (both for types and exceptions).
 - ○ **Custom allocation**: C++ classes with an overloaded or deleted ``operator
   new`` / ``operator delete`` are not supported.

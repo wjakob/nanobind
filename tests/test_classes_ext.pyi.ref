@@ -68,6 +68,9 @@ class ClassWithLen:
 class ClassWithSupplement:
     def __init__(self) -> None: ...
 
+class Collection:
+    __subclasses: set = ...
+
 class D:
     @overload
     def __init__(self, arg: A, /) -> None: ...
@@ -169,6 +172,11 @@ class PolymorphicBase:
 
 class PolymorphicSubclass:
     pass
+
+class Sequence(Collection):
+    def __init__(self) -> None: ...
+
+    __subclasses: set = ...
 
 class SiameseCat(Cat):
     pass

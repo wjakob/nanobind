@@ -238,11 +238,10 @@ Here is what this might look like in an implementation:
 
   struct MyTensorMetadata {
       bool stored_on_gpu;
-      // ..
-      // should be a POD (plain old data) type
+      // ...
   };
 
-  // Register a new type MyTensor, and reserve space for sizeof(MyTensorMedadata)
+  // Register a new type MyTensor, and reserve space for MyTensorMedadata
   nb::class_<MyTensor> cls(m, "MyTensor", nb::supplement<MyTensorMedadata>())
 
   /// Mutable reference to 'MyTensorMedadata' portion in Python type object
@@ -251,13 +250,17 @@ Here is what this might look like in an implementation:
 
 The :cpp:class:`nb::supplement\<T\>() <supplement>` annotation implicitly also
 passes :cpp:class:`nb::is_final() <is_final>` to ensure that type objects with
-supplemental data cannot be subclassed in Python.
+supplemental data cannot be subclassed in Python. If you do wish to allow
+subclassing, write ``nb::supplement<T>().inheritable()`` instead. Any subclasses
+will get a new default-constructed copy of the supplemental ``T`` data, **not**
+a copy of their base class's data.
 
-nanobind requires that the specified type ``T`` be trivially default
-constructible. It zero-initializes the supplement when the type is first
-created but does not perform any further custom initialization or destruction.
-You can fill the supplement with different contents following the type
-creation, e.g., using the placement new operator.
+nanobind requires that the specified type ``T`` be either constructible from
+``PyTypeObject*`` (the type that contains this supplement instance) or default
+constructible. If ``T`` has a trivial default constructor, it will be
+zero-initialized when the type is first created; otherwise, the appropriate
+constructor will be run. You can fill the supplement with different contents
+following the type creation.
 
 The contents of the supplemental data are not directly visible to Python's
 cyclic garbage collector, which creates challenges if you want to reference
@@ -267,6 +270,71 @@ as attributes of the type object (in its ``__dict__``) and store a borrowed
 name that begins with the symbol ``@``, then nanobind will prevent Python
 code from rebinding or deleting the attribute after it has been set, making
 the borrowed reference reasonably safe.
+
+Metaclass customizations
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+nanobind internally creates a separate metaclass for each distinct
+supplement type ``T`` used in your program. It is possible to customize this
+metaclass in some limited ways, by providing a static member function of the
+supplement type: ``static void T::init_metaclass(PyTypeObject *mcls)``.
+If provided, this function will be invoked once after the metaclass has been
+created but before any types that use it have been created. It can customize
+the metaclass's behavior by assigning attributes, including ``__dunder__``
+methods.
+
+It is not possible to provide custom :ref:`type slots <typeslots>` for the
+metaclass, nor can the metaclass itself contain user-provided data (try
+defining properties backed by global variables instead). It is not possible
+to customize the metaclass's base or its type, because nanobind requires all
+nanobind instances to have the same meta-metaclass for quick identification.
+
+The following example shows how you could customize
+``__instancecheck__`` to obtain results similar to :py:class:`abc.ABC`\'s
+support for virtual base classes.
+
+.. code-block:: cpp
+
+   struct HasVirtualSubclasses {
+       static void init_metaclass(PyTypeObject *mcls) {
+          nb::cpp_function_def(
+                   [](nb::handle cls, nb::handle instance) {
+                       if (!nb::type_check(cls) ||
+                           !nb::type_has_supplement<HasVirtualSubclasses>(cls))
+                           return false;
+
+                       auto& supp = nb::type_supplement<HasVirtualSubclasses>(cls);
+                       return PyType_IsSubtype((PyTypeObject *) instance.type(),
+                                               (PyTypeObject *) cls.ptr()) ||
+                              nb::borrow<nb::set>(supp.subclasses).contains(
+                                      instance.type());
+                   },
+                   nb::is_method(), nb::scope(metatype),
+                   nb::name("__instancecheck__"));
+       }
+
+       explicit HasVirtualSubclasses(PyTypeObject *tp) {
+           nb::set subclasses_set;
+           nb::handle(tp).attr("@subclasses") = subclasses_set;
+           subclasses = subclasses_set;
+       }
+
+       void register(nb::handle tp) {
+           nb::borrow<nb::set>(subclasses).add(tp);
+       }
+
+       nb::handle subclasses;
+   };
+
+   struct Collection {};
+   struct Set {};
+
+   auto coll = nb::class_<Collection>(m, "Collection",
+                                      nb::supplement<HasVirtualSubclasses>());
+   auto set = nb::class_<Set>(m, "Set").def(nb::init<>());
+   nb::type_supplement<HasVirtualSubclasses>(coll).register(set);
+
+   // assert isinstance(m.Set(), m.Collection)
 
 .. _typeslots:
 

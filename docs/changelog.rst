@@ -25,7 +25,20 @@ Upcoming version (TBA)
   long-standing inconvenience. (PR `#778
   <https://github.com/wjakob/nanobind/pull/778>`__).
 
-* ABI version 16.
+- nanobind now creates a separate metaclass for each supplemental data type
+  named in a :cpp:class:`nb::supplement\<T\>() <supplement>` class
+  binding annotation. (Previously, it created a separate metaclass for each
+  **size** of supplemental data.) This enables the use of supplemental data
+  types with non-trivial construction and destruction. You can also now query
+  whether a nanobind type uses a particular supplement type via the new
+  function :cpp:func:`nb::type_has_supplement\<T\>() <type_has_supplement>`,
+  and can implement certain metaclass customizations by defining a method
+  ``static void T::init_metaclass(PyTypeObject *metatype)``. Review the
+  documentation of :ref:`supplemental type data <supplement>` for more
+  information about the new capabilities. (PR `#972
+  <https://github.com/wjakob/nanobind/pull/972>`__).
+
+- ABI version 16.
 
 
 Version 2.5.0 (Feb 2, 2025)

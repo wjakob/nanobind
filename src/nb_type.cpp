@@ -436,8 +436,17 @@ void nb_type_unregister(type_data *t) noexcept {
           "find type!", t->name);
 }
 
-static void nb_type_dealloc(PyObject *o) {
+NB_INLINE const supplement_data *&nb_meta_supplement_data(PyTypeObject *o) noexcept {
+    return *(const supplement_data **)nb_type_data(o);
+}
+
+static void nb_type_dealloc(PyObject *o) noexcept {
     type_data *t = nb_type_data((PyTypeObject *) o);
+    PyTypeObject *metatype = Py_TYPE(o);
+    const supplement_data *s = nb_meta_supplement_data(metatype);
+
+    if (s && s->destruct)
+        s->destruct(t + 1);
 
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0)
         nb_type_unregister(t);
@@ -449,6 +458,7 @@ static void nb_type_dealloc(PyObject *o) {
 
     free((char *) t->name);
     NB_SLOT(PyType_Type, tp_dealloc)(o);
+    Py_DECREF(metatype);
 }
 
 /// Called when a C++ type is extended from within Python
@@ -502,6 +512,10 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 #else
     ((PyTypeObject *) self)->tp_vectorcall = nullptr;
 #endif
+
+    const supplement_data *s = nb_meta_supplement_data(Py_TYPE(self));
+    if (s && s->construct)
+        s->construct(t + 1, t->type_py);
 
     return 0;
 }
@@ -839,79 +853,98 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
 extern int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value);
 
-static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
-    object key = steal(PyLong_FromSize_t(supplement));
-    nb_internals *internals_ = internals;
-
-    PyTypeObject *tp =
-        (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
-
-    if (NB_UNLIKELY(!tp)) {
-        // Retry in critical section to avoid races that create the same nb_type
-        lock_internals guard(internals_);
-
-        tp = (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
-        if (tp)
-            return tp;
-
+// Create and return a new metaclass type that is appropriate for use with
+// the given supplement type, or for classes without a supplement if
+// supplement is nullptr. Must not be called concurrently from multiple threads.
+PyTypeObject *nb_meta_new(nb_internals *internals_,
+                          const supplement_data *supplement) noexcept {
 #if defined(Py_LIMITED_API)
-        PyMemberDef members[] = {
-            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
-            { nullptr, 0, 0, 0, nullptr }
-        };
+    PyMemberDef members[] = {
+        { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
+        { nullptr, 0, 0, 0, nullptr }
+    };
 
-        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
-        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
+    // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
+    members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
 #endif
 
-        PyType_Slot slots[] = {
-            { Py_tp_base, &PyType_Type },
-            { Py_tp_dealloc, (void *) nb_type_dealloc },
-            { Py_tp_setattro, (void *) nb_type_setattro },
-            { Py_tp_init, (void *) nb_type_init },
+    PyType_Slot slots[] = {
+        { Py_tp_base, &PyType_Type },
+        { Py_tp_dealloc, (void *) nb_type_dealloc },
+        { Py_tp_setattro, (void *) nb_type_setattro },
+        { Py_tp_init, (void *) nb_type_init },
 #if defined(Py_LIMITED_API)
-            { Py_tp_members, (void *) members },
+        { Py_tp_members, (void *) members },
 #endif
-            { 0, nullptr }
-        };
+        { 0, nullptr }
+    };
+
+    size_t supplement_size = supplement ? supplement->size : 0;
 
 #if PY_VERSION_HEX >= 0x030C0000
-        int basicsize = -(int) (sizeof(type_data) + supplement),
-            itemsize = 0;
+    int basicsize = -(int) (sizeof(type_data) + supplement_size),
+        itemsize = 0;
 #else
-        int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement)),
-            itemsize = (int) PyType_Type.tp_itemsize;
+    int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement_size)),
+        itemsize = (int) PyType_Type.tp_itemsize;
 #endif
 
-        char name[17 + 20 + 1];
-        snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
+    const char *cpp_name = supplement ? supplement->type->name() : "0";
+    size_t py_namelen = strlen("nanobind.nb_type_") + strlen(cpp_name) + 1;
+    char *py_name = (char *) alloca(py_namelen);
+    snprintf(py_name, py_namelen, "nanobind.nb_type_%s", cpp_name);
 
-        PyType_Spec spec = {
-            /* .name = */ name,
-            /* .basicsize = */ basicsize,
-            /* .itemsize = */ itemsize,
-            /* .flags = */ Py_TPFLAGS_DEFAULT,
-            /* .slots = */ slots
-        };
+    PyType_Spec spec = {
+        /* .name = */ py_name,
+        /* .basicsize = */ basicsize,
+        /* .itemsize = */ itemsize,
+        /* .flags = */ Py_TPFLAGS_DEFAULT,
+        /* .slots = */ slots
+    };
 
 #if defined(Py_LIMITED_API)
-        spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+    spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
 #endif
 
-        tp = (PyTypeObject *) nb_type_from_metaclass(
-            internals_->nb_meta, internals_->nb_module, &spec);
+    PyTypeObject *tp = (PyTypeObject *) nb_type_from_metaclass(
+        internals_->nb_meta, internals_->nb_module, &spec);
+    check(tp, "%s type creation failed!", py_name);
+    nb_meta_supplement_data(tp) = supplement;
 
-        make_immortal((PyObject *) tp);
+    make_immortal((PyObject *) tp);
 
-        handle(tp).attr("__module__") = "nanobind";
+    handle(tp).attr("__module__") = "nanobind";
 
-        int rv = 1;
-        if (tp)
-            rv = PyDict_SetItem(internals_->nb_type_dict, key.ptr(), (PyObject *) tp);
-        check(rv == 0, "nb_type type creation failed!");
+    if (supplement && supplement->init_metaclass) {
+        supplement->init_metaclass(tp);
     }
 
     return tp;
+}
+
+void nb_meta_dealloc(PyObject *o) {
+    const supplement_data *s = nb_meta_supplement_data((PyTypeObject *) o);
+    if (s) {
+        nb_internals *internals_ = internals;
+        lock_internals guard(internals_);
+        internals_->nb_type_for_supplement.erase(s->type);
+    }
+}
+
+// Return a new reference to the metaclass type that is appropriate for use
+// with the given supplement type, creating it if necessary. supplement must
+// not be nullptr. Must not be called concurrently from multiple threads.
+static PyTypeObject *nb_meta_lookup(const supplement_data *supplement) noexcept {
+    nb_internals *internals_ = internals;
+    auto [it, inserted] = internals_->nb_type_for_supplement.try_emplace(
+            supplement->type);
+    if (inserted) {
+        // If it's not in the map, then we need to create a new metaclass.
+        it.value() = (type_data *) nb_meta_new(internals_, supplement);
+    } else {
+        Py_INCREF((PyObject *) it->second);
+    }
+    return (PyTypeObject *) it->second;
 }
 
 // This helper function extracts the function/class name from a custom signature attribute
@@ -1073,25 +1106,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     object modname;
     PyObject *mod = nullptr;
 
-    // Update hash table that maps from std::type_info to Python type
-    nb_type_map_slow::iterator it;
-    bool success;
     nb_internals *internals_ = internals;
-
-    {
-        lock_internals guard(internals_);
-        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(t->type, nullptr);
-        if (!success) {
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: type '%s' was already registered!\n",
-                             t_name);
-            PyObject *tp = (PyObject *) it->second->type_py;
-            Py_INCREF(tp);
-            if (has_signature)
-                free((char *) t_name);
-            return tp;
-        }
-    }
 
     if (t->scope != nullptr) {
         if (PyModule_Check(t->scope)) {
@@ -1191,6 +1206,48 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     // tp_basicsize must satisfy pointer alignment.
     basicsize = (basicsize + ptr_size - 1) / ptr_size * ptr_size;
+
+    const supplement_data *supplement = t->supplement;
+    if (tb) {
+        const supplement_data *base_supplement =
+                nb_meta_supplement_data(Py_TYPE(base));
+        if (base_supplement) {
+            check(!has_supplement || std_typeinfo_eq{}(supplement->type,
+                                                       base_supplement->type),
+                  "nanobind::detail::nb_type_new(\"%s\"): supplement type %s "
+                  "conflict with %s from base %s!",
+                  t_name, type_name(supplement->type),
+                  type_name(base_supplement->type), tb->name);
+            has_supplement = true;
+            supplement = base_supplement;
+        }
+    }
+
+    PyTypeObject *metaclass;
+    {
+        lock_internals guard(internals_);
+
+        // Update hash table that maps from std::type_info to Python type
+        auto [it, success] = internals_->type_c2p_slow.try_emplace(t->type, nullptr);
+        if (!success) {
+            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                             "nanobind: type '%s' was already registered!\n",
+                             t_name);
+            PyObject *tp = (PyObject *) it->second->type_py;
+            Py_INCREF(tp);
+            if (has_signature)
+                free((char *) t_name);
+            return tp;
+        }
+
+        // Determine metaclass to use, creating it if needed
+        if (has_supplement)
+            metaclass = nb_meta_lookup(supplement);
+        else {
+            metaclass = (PyTypeObject *) internals_->nb_type_0;
+            Py_INCREF((PyObject *) metaclass);
+        }
+    }
 
     char *name_copy = strdup_check(name.c_str());
 
@@ -1316,8 +1373,6 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0);
-
     PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
     if (!result) {
         python_error err;
@@ -1377,6 +1432,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     if (modname.is_valid())
         setattr(result, "__module__", modname.ptr());
+
+    if (has_supplement && supplement->construct)
+        supplement->construct(to + 1, to->type_py);
 
     {
         lock_internals guard(internals_);
@@ -2081,6 +2139,12 @@ const std::type_info *nb_type_info(PyObject *t) noexcept {
 
 void *nb_type_supplement(PyObject *t) noexcept {
     return nb_type_data((PyTypeObject *) t) + 1;
+}
+
+bool nb_type_has_supplement(PyObject *t,
+                            const std::type_info *supp_type) noexcept {
+    const supplement_data *supp = nb_meta_supplement_data(Py_TYPE(t));
+    return supp && std_typeinfo_eq{}(supp->type, supp_type);
 }
 
 PyObject *nb_inst_alloc(PyTypeObject *t) {

@@ -131,6 +131,46 @@ struct type_data {
 #endif
 };
 
+/// Information about a type T used as nb::supplement<T>()
+struct supplement_data {
+    // These aliases are required to work around a MSVC bug
+    using constructor_t = void (*)(void *supp, PyTypeObject *tp);
+    using destructor_t = void (*)(void *supp);
+    using init_metaclass_t = void (*)(PyTypeObject *metatype);
+
+    const std::type_info *type;
+    size_t size;
+    constructor_t construct; // nullptr if trivial
+    destructor_t destruct; // nullptr if trivial
+    init_metaclass_t init_metaclass; // nullptr if not defined
+};
+
+template <typename T, typename = void>
+inline supplement_data::init_metaclass_t init_metaclass_for = nullptr;
+
+template <typename T>
+inline supplement_data::init_metaclass_t init_metaclass_for<
+        T, std::void_t<decltype(&T::init_metaclass)>> = &T::init_metaclass;
+
+template <typename T, typename = int>
+inline supplement_data::constructor_t construct_supplement_for =
+        std::is_trivially_default_constructible_v<T> ? nullptr :
+                +[](void *p, PyTypeObject *) { new (p) T{}; };
+
+template <typename T>
+inline supplement_data::constructor_t construct_supplement_for<
+        T, enable_if_t<std::is_constructible_v<T, PyTypeObject *>>> =
+                +[](void *p, PyTypeObject *tp) { new (p) T{tp}; };
+
+template <typename T>
+inline const supplement_data supplement_data_for = {
+        &typeid(T), sizeof(T),
+        construct_supplement_for<T>,
+        std::is_trivially_destructible_v<T> ? nullptr :
+                +[](void *p) { ((T *) p)->~T(); },
+        init_metaclass_for<T>,
+};
+
 /// Information about a type that is only relevant when it is being created
 struct type_init_data : type_data {
     PyObject *scope;
@@ -138,7 +178,7 @@ struct type_init_data : type_data {
     PyTypeObject *base_py;
     const char *doc;
     const PyType_Slot *type_slots;
-    size_t supplement;
+    const supplement_data *supplement;
 };
 
 NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
@@ -184,13 +224,13 @@ NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
 }
 
 template <typename T>
-NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
-    static_assert(std::is_trivially_default_constructible_v<T>,
-                  "The supplement must be a POD (plain old data) type");
+NB_INLINE void type_extra_apply(type_init_data &t, supplement<T> supp) {
     static_assert(alignof(T) <= alignof(void *),
                   "The alignment requirement of the supplement is too high.");
-    t.flags |= (uint32_t) type_init_flags::has_supplement | (uint32_t) type_flags::is_final;
-    t.supplement = sizeof(T);
+    t.flags |= (uint32_t) type_init_flags::has_supplement;
+    if (!supp.is_inheritable)
+        t.flags |= (uint32_t) type_flags::is_final;
+    t.supplement = &supplement_data_for<T>;
 }
 
 enum class enum_flags : uint32_t {
@@ -287,6 +327,8 @@ inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
 inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
 template <typename T>
 inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
+template <typename T>
+inline bool type_has_supplement(handle h) { return detail::nb_type_has_supplement(h.ptr(), &typeid(T)); }
 inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())); }
 
 // Low level access to nanobind instance objects

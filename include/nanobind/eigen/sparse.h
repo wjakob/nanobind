@@ -86,7 +86,11 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
             return false;
         }
 
-        value = SparseMap(rows, cols, nnz, outer_indices.data(), inner_indices.data(), values.data());
+        SparseMap mapped_matrix(rows, cols, nnz, outer_indices.data(), inner_indices.data(), values.data());
+#if EIGEN_VERSION_AT_LEAST(3, 4, 90)
+        mapped_matrix.sortInnerIndices();
+#endif
+        value = mapped_matrix;
 
         return true;
     }

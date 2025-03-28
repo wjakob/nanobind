@@ -15,7 +15,7 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.6.0 (Mar 28, 2025)
+Version 2.6.1 (Mar 28, 2025)
 ----------------------------
 
 - nanobind assigns an ABI tag to compiled extensions and uses it to isolate
@@ -43,6 +43,11 @@ Version 2.6.0 (Mar 28, 2025)
   <https://github.com/wjakob/nanobind/pull/931>`__, `#978
   <https://github.com/wjakob/nanobind/pull/978>`__, commit `1595d2
   <https://github.com/wjakob/nanobind/commit/1595d2d40717d65835ed984b06cfc2b4da0e4858>`__).
+
+Version 2.6.0 (Mar 28, 2025)
+----------------------------
+
+- This release was yanked due to a regression.
 
 Version 2.5.0 (Feb 2, 2025)
 ---------------------------

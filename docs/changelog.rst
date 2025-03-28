@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Upcoming version (TBA)
-----------------------
+Version 2.6.0 (Mar 28, 2025)
+----------------------------
 
 - nanobind assigns an ABI tag to compiled extensions and uses it to isolate
   incompatible extensions from each other. This tag was unnecessarily
@@ -25,8 +25,24 @@ Upcoming version (TBA)
   long-standing inconvenience. (PR `#778
   <https://github.com/wjakob/nanobind/pull/778>`__).
 
+- Added specialized function dispatchers to accelerate calls to 0 and
+  1-argument functions. (PR `#944
+  <https://github.com/wjakob/nanobind/pull/944>`__).
+
+- Improved the efficiency of :cpp:func:`nb::getattr(obj, key,
+  default) <getattr>` in cases where ``obj[key]`` does exist. (commit
+  `bb05f5
+  <https://github.com/wjakob/nanobind/commit/bb05f5503aef9b70498302bf30bf958e8cc605c7>`__).
+
 * ABI version 16.
 
+* Miscellaneous fixes and improvements (PRs `#913
+  <https://github.com/wjakob/nanobind/pull/913>`__, `#914
+  <https://github.com/wjakob/nanobind/pull/914>`__, `#916
+  <https://github.com/wjakob/nanobind/pull/916>`__, `#931
+  <https://github.com/wjakob/nanobind/pull/931>`__, `#978
+  <https://github.com/wjakob/nanobind/pull/978>`__, commit `1595d2
+  <https://github.com/wjakob/nanobind/commit/1595d2d40717d65835ed984b06cfc2b4da0e4858>`__).
 
 Version 2.5.0 (Feb 2, 2025)
 ---------------------------

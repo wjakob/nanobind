@@ -28,8 +28,9 @@ endif()
 
 
 # Error if scikit-build-core is trying to build Stable ABI < 3.12 wheels
-if(DEFINED SKBUILD_SABI_VERSION AND SKBUILD_SABI_VERSION VERSION_LESS "3.12")
-  message(FATAL_ERROR "You must set tool.scikit-build.wheel.py-api to 'cp312' or later when using scikit-build-core with nanobind.")
+if(DEFINED SKBUILD_SABI_VERSION AND SKBUILD_ABI_VERSION AND SKBUILD_SABI_VERSION VERSION_LESS "3.12")
+  message(FATAL_ERROR "You must set tool.scikit-build.wheel.py-api to 'cp312' or later when "
+                      "using scikit-build-core with nanobind, '${SKBUILD_SABI_VERSION}' is too old.")
 endif()
 
 # PyPy sets an invalid SOABI (platform missing), causing older FindPythons to

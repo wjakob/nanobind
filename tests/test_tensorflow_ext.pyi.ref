@@ -1,0 +1,4 @@
+import tensorflow.python.framework.ops
+
+
+def ret_tensorflow() -> tensorflow.python.framework.ops.EagerTensor[dtype=float32, shape=(2, 4)]: ...

@@ -1,8 +1,6 @@
 from typing import Annotated, overload
 
-import jaxlib.xla_extension
 from numpy.typing import ArrayLike
-import tensorflow.python.framework.ops
 
 
 class Cls:
@@ -175,8 +173,6 @@ def ret_infer_c() -> Annotated[ArrayLike, dict(dtype='float32', shape=(2, 4), or
 
 def ret_infer_f() -> Annotated[ArrayLike, dict(dtype='float32', shape=(2, 4), order='F')]: ...
 
-def ret_jax() -> jaxlib.xla_extension.DeviceArray[dtype=float32, shape=(2, 4)]: ...
-
 def ret_numpy() -> Annotated[ArrayLike, dict(dtype='float32', shape=(2, 4))]: ...
 
 def ret_numpy_const() -> Annotated[ArrayLike, dict(dtype='float32', shape=(2, 4), writable=False)]: ...
@@ -188,8 +184,6 @@ def ret_numpy_const_ref_f() -> Annotated[ArrayLike, dict(dtype='float32', shape=
 def ret_numpy_half() -> Annotated[ArrayLike, dict(dtype='float16', shape=(2, 4))]: ...
 
 def ret_pytorch() -> Annotated[ArrayLike, dict(dtype='float32', shape=(2, 4))]: ...
-
-def ret_tensorflow() -> tensorflow.python.framework.ops.EagerTensor[dtype=float32, shape=(2, 4)]: ...
 
 def return_dlpack() -> Annotated[ArrayLike, dict(dtype='float32', shape=(2, 4))]: ...
 

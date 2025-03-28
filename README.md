@@ -36,6 +36,28 @@ Please see the following links for tutorial and reference documentation in
 [HTML](https://nanobind.readthedocs.io/en/latest/) and
 [PDF](https://nanobind.readthedocs.io/_/downloads/en/latest/pdf/) formats.
 
+## Development of nanobind
+
+To compile the project and run the tests:
+
+```bash
+# If Linux, install Eigen
+sudo apt-get -y install libeigen3-dev
+
+# Python dev dependencies
+python -m pip install pytest typing_extension
+
+# Configure cmake build directory
+cmake -S . -B build
+
+# Build C++ project
+cmake --build build -j 2
+
+# Run tests
+cd build
+python -m pytest
+```
+
 ## License and attribution
 
 All material in this repository is licensed under a three-clause [BSD

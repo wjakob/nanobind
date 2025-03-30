@@ -376,6 +376,20 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
+    def put_nb_method(self, fn: NbFunction, name: Optional[str], parent: Optional[object]) -> None:
+        fn_qualname = getattr(fn, "__qualname__", None)
+        if name and fn_qualname:
+            fn_class, _, fn_name = fn_qualname.rpartition('.')
+            # Check if this function is an alias
+            if name != fn_name:
+                if fn_class == getattr(parent, "__qualname__", None):
+                    real_name = fn_name
+                else:
+                    real_name = fn_qualname
+                self.write_ln(f"{name} = {real_name}\n")
+                return
+        self.put_nb_func(fn, name)
+
     def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None):
         """Append a function of an arbitrary type to the stub"""
         # Don't generate a constructor for nanobind classes that aren't constructible
@@ -848,7 +862,7 @@ class StubGen:
             elif tp_mod == "nanobind":
                 if tp_name == "nb_method":
                     value = cast(NbFunction, value)
-                    self.put_nb_func(value, name)
+                    self.put_nb_method(value, name, parent)
                 elif tp_name == "nb_static_property":
                     value = cast(NbStaticProperty, value)
                     self.put_nb_static_property(name, value)

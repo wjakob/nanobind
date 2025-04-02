@@ -154,7 +154,7 @@ NB_MODULE(test_holders_ext, m) {
     // ------- unique_ptr -------
 
     m.def("unique_from_cpp",
-          [](int val) { return std::make_unique<Example>(val); },
+          [](int val) { return std::make_unique<const Example>(val); },
           nb::arg() = 1);
     m.def("unique_from_cpp_2", []() {
         return std::unique_ptr<Example, nb::deleter<Example>>(new Example(2));

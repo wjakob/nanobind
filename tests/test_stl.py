@@ -502,6 +502,15 @@ def test49_std_variant_unbound_type():
         f"variant_unbound_type(x: {arg_t} = None) -> {rv_t}"
     )
 
+def test49b_std_variant_nondefault(clean):
+    assert t.variant_nondefault(t.NonDefaultConstructible(10)) == 10
+    assert t.variant_nondefault(20) == -20
+    assert_stats(
+        value_constructed=1, # constructed in NonDefaultConstructible pyobject
+        copy_constructed=1, # copied into type_caster variant member
+        move_constructed=1, # moved into function argument value
+        destructed=3,
+    )
 
 def test50_map_return_movable_value():
     for i, (k, v) in enumerate(sorted(t.map_return_movable_value().items())):

@@ -15,6 +15,13 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (unreleased)
+------------------------
+
+- Added support for binding functions that accept a ``std::variant`` that is
+  not default-constructible (because its first alternative isn't).
+  (PR `#987 <https://github.com/wjakob/nanobind/pull/987>`__).
+
 Version 2.6.1 (Mar 28, 2025)
 ----------------------------
 

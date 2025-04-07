@@ -62,6 +62,10 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
             return false;
         }
 
+        bool indices_sorted = cast<bool>(obj.attr("has_sorted_indices"));
+        if (!indices_sorted)
+            obj.attr("sort_indices")();
+
         if (object data_o = obj.attr("data"); !data_caster.from_python(data_o, flags, cleanup))
             return false;
         ScalarNDArray& values = data_caster.value;

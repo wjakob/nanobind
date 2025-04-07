@@ -231,6 +231,26 @@ def test07_mutate_arg():
     assert_array_equal(A, 2*A2)
 
 
+def create_spmat_unsorted():
+    import scipy.sparse as sparse
+    # Create a small matrix with explicit indices and indptr
+    data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    
+    # Deliberately unsorted indices within columns
+    # For a properly sorted CSC matrix, indices should be sorted within each column
+    indices = np.array([0, 2, 1, 4, 3])  # Unsorted (should be [0, 1, 2, 3, 4])
+    
+    # indptr points to where each column starts in the indices/data arrays
+    indptr = np.array([0, 2, 3, 5])
+    
+    # Create a 5x3 matrix with unsorted indices
+    unsorted_csc = sparse.csc_matrix((data, indices, indptr), shape=(5, 3))
+    
+    # Verify that indices are unsorted
+    assert not unsorted_csc.has_sorted_indices
+    return unsorted_csc
+
+
 @needs_numpy_and_eigen
 def test08_sparse():
     pytest.importorskip("scipy")
@@ -243,6 +263,7 @@ def test08_sparse():
     assert type(t.sparse_copy_c(t.sparse_c())) is scipy.sparse.csc_matrix
     assert type(t.sparse_copy_r(t.sparse_c())) is scipy.sparse.csr_matrix
     assert type(t.sparse_copy_c(t.sparse_r())) is scipy.sparse.csc_matrix
+
 
     def assert_sparse_equal_ref(sparse_mat):
         ref = np.array(
@@ -262,6 +283,11 @@ def test08_sparse():
     assert_sparse_equal_ref(t.sparse_copy_c(t.sparse_c()))
     assert_sparse_equal_ref(t.sparse_copy_r(t.sparse_c()))
     assert_sparse_equal_ref(t.sparse_copy_c(t.sparse_r()))
+
+    # construct scipy matrix with unsorted indices
+    assert type(t.sparse_copy_c(create_spmat_unsorted())) is scipy.sparse.csc_matrix
+    mat_unsort = create_spmat_unsorted()
+    assert_array_equal(t.sparse_copy_c(mat_unsort).toarray(), create_spmat_unsorted().toarray())
 
 
 @needs_numpy_and_eigen

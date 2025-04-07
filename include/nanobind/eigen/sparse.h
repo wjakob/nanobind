@@ -62,11 +62,9 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
             return false;
         }
 
-#if !EIGEN_VERSION_AT_LEAST(3, 4, 90)
         bool indices_sorted = cast<bool>(obj.attr("has_sorted_indices"));
         if (!indices_sorted)
             obj.attr("sort_indices")();
-#endif
 
         if (object data_o = obj.attr("data"); !data_caster.from_python(data_o, flags, cleanup))
             return false;
@@ -92,11 +90,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
             return false;
         }
 
-        SparseMap mapped_matrix(rows, cols, nnz, outer_indices.data(), inner_indices.data(), values.data());
-#if EIGEN_VERSION_AT_LEAST(3, 4, 90)
-        mapped_matrix.sortInnerIndices();
-#endif
-        value = mapped_matrix;
+        value = SparseMap(rows, cols, nnz, outer_indices.data(), inner_indices.data(), values.data());
 
         return true;
     }

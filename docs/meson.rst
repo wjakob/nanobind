@@ -71,7 +71,7 @@ With this configuration, you may then call:
    meson setup builddir
    meson compile -C builddir
 
-To compile the extension in the ``builddir`` folder.
+to compile the extension in the ``builddir`` folder.
 
 Alternatively, if you don't care to have a local build folder, you can use
 the Python build frontend of your choosing to install the package as an
@@ -101,4 +101,4 @@ to build extensions against the CPython 3.12 stable ABI, you would use:
      limited_api: '3.12',
    )
 
-In your ``meson.build`` file.
+in your ``meson.build`` file.

@@ -235,17 +235,17 @@ def create_spmat_unsorted():
     import scipy.sparse as sparse
     # Create a small matrix with explicit indices and indptr
     data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    
+
     # Deliberately unsorted indices within columns
     # For a properly sorted CSC matrix, indices should be sorted within each column
     indices = np.array([0, 2, 1, 4, 3])  # Unsorted (should be [0, 1, 2, 3, 4])
-    
+
     # indptr points to where each column starts in the indices/data arrays
     indptr = np.array([0, 2, 3, 5])
-    
+
     # Create a 5x3 matrix with unsorted indices
     unsorted_csc = sparse.csc_matrix((data, indices, indptr), shape=(5, 3))
-    
+
     # Verify that indices are unsorted
     assert not unsorted_csc.has_sorted_indices
     return unsorted_csc

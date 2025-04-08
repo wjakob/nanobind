@@ -491,7 +491,19 @@ function(nanobind_sanitizer_preload_env env_var)
       endif()
 
       # Check if a real path was returned (and not just echoing back the input)
-      if(san_libpath AND NOT (san_libpath STREQUAL san_libname))
+      if(NOT san_libpath OR (san_libpath STREQUAL san_libname))
+        continue()
+      endif()
+
+      # Read the file content and turn into a single-line string
+      file(READ "${san_libpath}" san_libdata LIMIT 1024)
+      string(REPLACE "\n" " " san_libdata "${san_libdata}")
+
+      if(san_libdata MATCHES "INPUT[ \t]*\\([ \t]*([^ \t)]+)")
+        # If this is a linker script with INPUT directive, extract the path
+        list(APPEND libs "${CMAKE_MATCH_1}")
+      else()
+        # Use the original library path
         list(APPEND libs "${san_libpath}")
       endif()
     endforeach()

@@ -148,15 +148,16 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
         return true;
     }
 
-    static handle from_cpp(T &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
-        if (policy == rv_policy::automatic ||
-            policy == rv_policy::automatic_reference)
-            policy = rv_policy::move;
-
-        return from_cpp((const T &) v, policy, cleanup);
+    template <typename T2>
+    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        policy = infer_policy<T2>(policy);
+        if constexpr (std::is_pointer_v<T2>)
+            return from_cpp_internal((const T &) *v, policy, cleanup);
+        else
+            return from_cpp_internal((const T &) v, policy, cleanup);
     }
 
-    static handle from_cpp(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp_internal(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -172,24 +173,11 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
 
         void *ptr = (void *) v.data();
 
-        switch (policy) {
-            case rv_policy::automatic:
+        if (policy == rv_policy::move) {
+            // Don't bother moving when the data is static or occupies <1KB
+            if ((T::SizeAtCompileTime != Eigen::Dynamic ||
+                 (size_t) v.size() < (1024 / sizeof(Scalar))))
                 policy = rv_policy::copy;
-                break;
-
-            case rv_policy::automatic_reference:
-                policy = rv_policy::reference;
-                break;
-
-            case rv_policy::move:
-                // Don't bother moving when the data is static or occupies <1KB
-                if ((T::SizeAtCompileTime != Eigen::Dynamic ||
-                     (size_t) v.size() < (1024 / sizeof(Scalar))))
-                    policy = rv_policy::copy;
-                break;
-
-            default: // leave policy unchanged
-                break;
         }
 
         object owner;

@@ -103,7 +103,16 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
         return from_cpp((const T &) v, policy, cleanup);
     }
 
-    static handle from_cpp(const T &v, rv_policy policy, cleanup_list *) noexcept {
+    template <typename T2>
+    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        policy = infer_policy<T2>(policy);
+        if constexpr (std::is_pointer_v<T2>)
+            return from_cpp_internal((const T &) *v, policy, cleanup);
+        else
+            return from_cpp_internal((const T &) v, policy, cleanup);
+    }
+
+    static handle from_cpp_internal(const T &v, rv_policy policy, cleanup_list *) noexcept {
         if (!v.isCompressed()) {
             PyErr_SetString(PyExc_ValueError,
                             "nanobind: unable to return an Eigen sparse matrix that is not in a compressed format. "

@@ -349,6 +349,8 @@ def test11_prop():
             gc.collect()
 
         member = c.member
+        assert_array_equal(c.member_ro_ref, ref)
+        assert_array_equal(c.member_ro_copy, ref)
         del c
         gc.collect()
         gc.collect()

@@ -196,10 +196,14 @@ NB_MODULE(test_eigen_ext, m) {
 
     struct ClassWithEigenMember {
         Eigen::MatrixXd member = Eigen::Matrix2d::Ones();
+        const Eigen::MatrixXd &get_member_ref() { return member; }
+        const Eigen::MatrixXd get_member_copy() { return member; }
     };
 
     nb::class_<ClassWithEigenMember>(m, "ClassWithEigenMember")
         .def(nb::init<>())
+        .def_prop_ro("member_ro_ref", &ClassWithEigenMember::get_member_ref)
+        .def_prop_ro("member_ro_copy", &ClassWithEigenMember::get_member_copy)
         .def_rw("member", &ClassWithEigenMember::member);
 
     m.def("castToMapVXi", [](nb::object obj) {

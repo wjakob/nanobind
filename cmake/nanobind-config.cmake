@@ -473,13 +473,8 @@ function(nanobind_sanitizer_preload_env env_var)
       set(san_libname "")
 
       if(APPLE AND is_clang)
-        # Clang on macOS
         set(san_libname "libclang_rt.${san}_osx_dynamic.dylib")
       elseif(is_clang)
-        # Clang on Linux
-        set(san_libname "libclang_rt.${san}-${CMAKE_SYSTEM_PROCESSOR}.so")
-      else()
-        # GCC on both Linux and macOS
         set(san_libname "lib${san}.so")
       endif()
 
@@ -496,7 +491,7 @@ function(nanobind_sanitizer_preload_env env_var)
       endif()
 
       # Check if a real path was returned (and not just echoing back the input)
-      if(san_libpath AND NOT san_libpath STREQUAL san_libname)
+      if(san_libpath AND NOT (san_libpath STREQUAL san_libname))
         list(APPEND libs "${san_libpath}")
       endif()
     endforeach()

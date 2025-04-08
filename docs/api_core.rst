@@ -2191,9 +2191,14 @@ Class binding
 
    .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> arg, const Extra &... extra)
 
-      Bind a constructor. The variable length `extra` parameter can be used to
+      Bind a C++ constructor that takes parameters of types ``Args...``.
+      The variable length `extra` parameter can be used to
       pass a docstring and other :ref:`function binding annotations
-      <function_binding_annotations>`.
+      <function_binding_annotations>`. You can also bind a custom constructor
+      (one that does not exist in the C++ code) by writing
+      ``.def(nb::init(<lambda>))``, provided the lambda returns an instance of
+      the class by value. If you need to wrap a factory function that returns
+      a pointer or shared pointer, see :cpp:struct:`nb::new_() <new_>` instead.
 
    .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> arg, const Extra &... extra)
 
@@ -2567,18 +2572,25 @@ Class binding
    constructor. It is only meant to be used in binding declarations done via
    :cpp:func:`class_::def()`.
 
-   Sometimes, it is necessary to bind constructors that don't exist in the
-   underlying C++ type (meaning that they are specific to the Python bindings).
-   Because `init` only works for existing C++ constructors, this requires
-   a manual workaround noting that
+   To bind a constructor that exists in the C++ class, taking ``Args...``, write
+   ``nb::init<Args...>()``.
 
-   .. code-block:: cpp
+   To bind a constructor that is specific to the Python bindings (a
+   "custom constructor"), write ``nb::init(<some function>)`` (write a
+   lambda expression or a function pointer inside the
+   parentheses). The function should return a prvalue of the bound
+   type, by ending with a statement like ``return MyType(some,
+   args);``. If you write a custom constructor in this way, then
+   nanobind can construct the object without any extra copies or
+   moves, and the object therefore doesn't need to be copyable or movable.
 
-      nb::class_<MyType>(m, "MyType")
-          .def(nb::init<const char*, int>());
-
-   is syntax sugar for the following lower-level implementation using
-   "`placement new <https://en.wikipedia.org/wiki/Placement_syntax>`_":
+   If your custom constructor needs to take some actions after constructing
+   the C++ object, then nanobind recommends that you eschew
+   :cpp:struct:`nb::init() <init>` and instead bind an ``__init__`` method
+   directly. By convention, any nanobind method named ``"__init__"`` will
+   receive as its first argument a pointer to uninitialized storage that it
+   can initialize using `placement new
+   <https://en.wikipedia.org/wiki/Placement_syntax>`_:
 
    .. code-block:: cpp
 
@@ -2586,6 +2598,7 @@ Class binding
           .def("__init__",
                [](MyType* t, const char* arg0, int arg1) {
                    new (t) MyType(arg0, arg1);
+                   t->doSomething();
                });
 
    The provided lambda function will be called with a pointer to uninitialized
@@ -2593,35 +2606,61 @@ Class binding
    with the Python object for reasons of efficiency). The lambda function can
    then either run an in-place constructor and return normally (in which case
    the instance is assumed to be correctly constructed) or fail by raising an
-   exception.
+   exception. If an exception is raised, nanobind assumes the object *was not*
+   constructed; in the above example, if ``doSomething()`` could throw, then you
+   would need to take care to call the destructor explicitly (``t->~MyType();``)
+   in case of an exception after the C++ constructor had completed.
+
+   When binding a custom constructor using :cpp:struct:`nb::init() <init>` for
+   a type that supports :ref:`overriding virtual methods in Python
+   <trampolines>`, you must return either an instance of the trampoline
+   type (``PyPet`` in ``nb::class_<Pet, PyPet>(...)``) or something that
+   can initialize both the bound type and the trampoline type (e.g.,
+   you can return a ``Pet`` if there exists a ``PyPet(Pet&&)`` constructor).
+   If that's not possible, you can alternatively write :cpp:struct:`nb::init()
+   <init>` with two function arguments instead of one. The first returns
+   an instance of the bound type (``Pet``), and will be called when constructing
+   an instance of the C++ class that has not been extended from Python.
+   The second returns an instance of the trampoline type (``PyPet``),
+   and will be called when constructing an instance that does need to consider
+   the possibility of Python-based virtual method overrides.
+
+   .. note:: :cpp:struct:`nb::init() <init>` always creates Python ``__init__``
+      methods, which construct a C++ object in already-allocated Python object
+      storage. If you need to wrap a constructor that performs its own
+      allocation, such as a factory function that returns a pointer, you must
+      use :cpp:struct:`nb::new_() <new_>` instead in order to create a Python
+      ``__new__`` method.
 
 .. cpp:struct:: template <typename Arg> init_implicit
 
    See :cpp:class:`init` for detail on binding constructors. The main
-   difference between :cpp:class:`init`  and `init_implicit` is that the latter
-   only supports constructors taking a single argument `Arg`, and that it marks
-   the constructor as usable for implicit conversions from `Arg`.
+   difference between :cpp:class:`init` and `init_implicit` is that the latter
+   only supports constructors that exist in the C++ code and take a single
+   argument `Arg`, and that it marks the constructor as usable for implicit
+   conversions from `Arg`.
 
    Sometimes, it is necessary to bind implicit conversion-capable constructors
    that don't exist in the underlying C++ type (meaning that they are specific
-   to the Python bindings). This can be done manually noting that
+   to the Python bindings). This can be done manually, noting that
 
    .. code-block:: cpp
 
-      nb::class_<MyType>(m, "MyType")
-          .def(nb::init_implicit<const char*>());
+       nb::class_<MyType>(m, "MyType")
+           .def(nb::init_implicit<const char*>());
 
    can be replaced by the lower-level code
 
    .. code-block:: cpp
 
        nb::class_<MyType>(m, "MyType")
-           .def("__init__",
-                [](MyType* t, const char* arg0) {
-                    new (t) MyType(arg0);
-                });
+           .def(nb::init<const char*>());
 
        nb::implicitly_convertible<const char*, MyType>();
+
+   and that this transformation works equally well if you use one of the forms
+   of :cpp:class:`nb::init() <init>` that cannot be expressed by
+   :cpp:class:`init_implicit`.
 
 .. cpp:struct:: template <typename Func> new_
 

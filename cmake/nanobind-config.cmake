@@ -212,6 +212,11 @@ function (nanobind_build_library TARGET_NAME)
   set_target_properties(${TARGET_NAME} PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
 
+  if (${ARG_AS_SYSINCLUDE})
+    set_target_properties(${TARGET_NAME} PROPERTIES
+      CXX_CLANG_TIDY "")
+  endif()
+
   if (MSVC)
     # Do not complain about vsnprintf
     target_compile_definitions(${TARGET_NAME} PRIVATE -D_CRT_SECURE_NO_WARNINGS)

@@ -1565,6 +1565,8 @@ NB_NOINLINE char *type_name(const std::type_info *t) {
 #if defined(__GNUG__)
     int status = 0;
     char *name = abi::__cxa_demangle(name_in, nullptr, nullptr, &status);
+    if (!name)
+        return strdup_check(name_in);
 #else
     char *name = strdup_check(name_in);
     strexc(name, "class ");

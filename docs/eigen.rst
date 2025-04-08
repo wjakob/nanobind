@@ -85,7 +85,7 @@ unevaluated expression template) either evaluate or copy the array.
          m.def("sum", [](Eigen::Vector3f a, Eigen::Vector3d b) { return (a + b).eval(); });
 
    3. If the expression to be returned only references function arguments,
-      then can turn the arguments themselves into references:
+      then you can turn the arguments themselves into references:
 
       .. code-block:: cpp
 

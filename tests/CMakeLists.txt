@@ -92,14 +92,22 @@ endforeach()
 
 target_sources(test_intrusive_ext PRIVATE test_intrusive_impl.cpp)
 
+if (CMAKE_CONFIGURATION_TYPES)
+  set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>)
+else()
+  set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR})
+endif()
+
 foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iterator)
   if (NAME STREQUAL typing)
     set(EXTRA
       MARKER_FILE py.typed
       PATTERN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pattern_file.nb"
     )
+    set(EXTRA_DEPENDS "${OUT_DIR}/py_stub_test.py")
   else()
     set(EXTRA "")
+    set(EXTRA_DEPENDS "")
   endif()
 
   if (CMAKE_CONFIGURATION_TYPES)
@@ -112,7 +120,7 @@ foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iter
     MODULE test_${NAME}_ext
     OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
     PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
-    DEPENDS test_${NAME}_ext
+    DEPENDS test_${NAME}_ext ${EXTRA_DEPENDS}
     ${EXTRA})
 endforeach()
 
@@ -179,12 +187,6 @@ set(TEST_FILES
 
 set (PY_STUB_TEST py_stub_test.py)
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
-  if (CMAKE_CONFIGURATION_TYPES)
-    set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>)
-  else()
-    set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR})
-  endif()
-
   foreach(TEST_FILE IN LISTS TEST_FILES)
     set(IN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE})
     set(OUT_FILE ${OUT_DIR}/${TEST_FILE})

@@ -28,7 +28,7 @@ python_error::python_error() {
 }
 
 python_error::~python_error() {
-    if (m_value) {
+    if (m_value && detail::is_alive()) {
         gil_scoped_acquire acq;
         /* With GIL held */ {
             // Clear error status in case the following executes Python code
@@ -73,7 +73,7 @@ python_error::python_error() {
 }
 
 python_error::~python_error() {
-    if (m_type) {
+    if (m_type && detail::is_alive()) {
         gil_scoped_acquire acq;
         /* With GIL held */ {
             // Clear error status in case the following executes Python code

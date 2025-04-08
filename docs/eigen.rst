@@ -50,6 +50,29 @@ evaluated expression, nanobind will capture and wrap it in a NumPy array
 without making a copy. All other cases (returning by reference, returning an
 unevaluated expression template) either evaluate or copy the array.
 
+.. warning::
+
+   Please be aware of the following dangerous situation that can arise when
+   binding Eigen code using short hand lambda functions:
+
+   .. code-block:: cpp
+
+      m.def("sum", [](Eigen::Vector3f a, Eigen::Vector3d b) { return a + b; });
+
+   This declaration looks innocent but in fact triggers undefined behavior. The
+   problem is that the sum ``a + b`` is an *expression template*, which
+   explains how to compute the expression at some later point. This leads to a
+   use-after-free issue when nanobind tries to read the result following the
+   return of the function, at which point ``a`` and ``b`` are no longer alive.
+
+   To address this issue, the return type must be declared explicitly, which
+   forces an evaluation of the expression into a container that *owns* the
+   underlying storage.
+
+   .. code-block:: cpp
+
+      m.def("sum", [](Eigen::Vector3f a, Eigen::Vector3d b) -> Eigen::Vector3d { return a + b; });
+
 Python → C++
 ^^^^^^^^^^^^
 

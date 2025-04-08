@@ -462,7 +462,10 @@ class StubGen:
     def put_nb_static_property(self, name: Optional[str], prop: NbStaticProperty):
         """Append a 'nb_static_property' object"""
         getter_sig = prop.fget.__nb_signature__[0][0]
-        getter_sig = getter_sig[getter_sig.find("/) -> ") + 6 :]
+        pos = getter_sig.find("/) -> ")
+        if pos == -1:
+            raise RuntimeError(f"Static property '{name}' ({getter_sig}) has an invalid signature!")
+        getter_sig = getter_sig[pos + 6 :]
         self.write_ln(f"{name}: {getter_sig} = ...")
         if prop.__doc__ and self.include_docstrings:
             self.put_docstr(prop.__doc__)

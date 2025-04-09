@@ -436,9 +436,20 @@ function(nanobind_sanitizer_preload_env env_var)
       continue()
     endif()
 
-    # Check for sanitizer flags in both compile and link options
+    # Check for sanitizer flags in various compile and link options
     set(san_flags "")
-    foreach(prop COMPILE_OPTIONS LINK_OPTIONS)
+    set(san_options_to_search
+      COMPILE_OPTIONS LINK_OPTIONS
+      INTERFACE_LINK_OPTIONS INTERFACE_COMPILE_OPTIONS
+    )
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
+      set(san_options_to_search
+        ${san_options_to_search}
+        TRANSITIVE_LINK_PROPERTIES
+        TRANSITIVE_COMPILE_PROPERTIES
+      )
+    endif()
+    foreach(prop ${san_options_to_search})
       get_target_property(options ${target} ${prop})
       if(options)
         foreach(opt ${options})
@@ -451,6 +462,7 @@ function(nanobind_sanitizer_preload_env env_var)
 
     # Parse sanitizer flags
     foreach(flag ${san_flags})
+      string(REPLACE "\"" "" flag "${flag}")
       string(REPLACE "," ";" san_list "${flag}")
       foreach(san ${san_list})
         if(san MATCHES "^(address|asan)$")
@@ -466,15 +478,14 @@ function(nanobind_sanitizer_preload_env env_var)
 
   if (detected_san)
     list(REMOVE_DUPLICATES detected_san)
-    set(is_clang CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(libs "")
 
     foreach(san ${detected_san})
       set(san_libname "")
 
-      if(APPLE AND is_clang)
+      if (APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         set(san_libname "libclang_rt.${san}_osx_dynamic.dylib")
-      elseif(is_clang)
+      elseif()
         set(san_libname "lib${san}.so")
       endif()
 
@@ -606,6 +617,9 @@ function (nanobind_add_stub name)
     nanobind_sanitizer_preload_env(NB_STUBGEN_ENV ${ARG_DEPENDS})
     if (NB_STUBGEN_ENV)
       nanobind_resolve_python_path()
+      if (NB_STUBGEN_ENV MATCHES asan)
+        list(APPEND NB_STUBGEN_ENV "ASAN_OPTIONS=detect_leaks=0")
+      endif()
       set(NB_STUBGEN_CMD ${CMAKE_COMMAND} -E env "${NB_STUBGEN_ENV}" "${NB_PY_PATH}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
     endif()
   endif()

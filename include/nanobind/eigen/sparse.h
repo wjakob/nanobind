@@ -54,45 +54,45 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         object obj = borrow(src);
+
         try {
-            object matrix_type = module_::import_("scipy.sparse").attr(RowMajor ? "csr_matrix" : "csc_matrix");
+            object matrix_type =
+                module_::import_("scipy.sparse")
+                    .attr(RowMajor ? "csr_matrix" : "csc_matrix");
             if (!obj.type().is(matrix_type))
                 obj = matrix_type(obj);
-        } catch (const python_error &) {
-            return false;
-        }
 
-        bool indices_sorted = cast<bool>(obj.attr("has_sorted_indices"));
-        if (!indices_sorted)
-            obj.attr("sort_indices")();
+            if (!cast<bool>(obj.attr("has_sorted_indices")))
+                obj.attr("sort_indices")();
 
-        if (object data_o = obj.attr("data"); !data_caster.from_python(data_o, flags, cleanup))
-            return false;
-        ScalarNDArray& values = data_caster.value;
+            if (object data_o = obj.attr("data");
+                !data_caster.from_python(data_o, flags, cleanup))
+                return false;
 
-        if (object indices_o = obj.attr("indices"); !indices_caster.from_python(indices_o, flags, cleanup))
-            return false;
-        StorageIndexNDArray& inner_indices = indices_caster.value;
+            if (object indices_o = obj.attr("indices");
+                !indices_caster.from_python(indices_o, flags, cleanup))
+                return false;
 
-        if (object indptr_o = obj.attr("indptr"); !indptr_caster.from_python(indptr_o, flags, cleanup))
-            return false;
-        StorageIndexNDArray& outer_indices = indptr_caster.value;
+            if (object indptr_o = obj.attr("indptr");
+                !indptr_caster.from_python(indptr_o, flags, cleanup))
+                return false;
 
-        object shape_o = obj.attr("shape"), nnz_o = obj.attr("nnz");
-        Index rows, cols, nnz;
-        try {
+            object shape_o = obj.attr("shape");
             if (len(shape_o) != 2)
                 return false;
-            rows = cast<Index>(shape_o[0]);
-            cols = cast<Index>(shape_o[1]);
-            nnz = cast<Index>(nnz_o);
+
+            Index rows = cast<Index>(shape_o[0]),
+                  cols = cast<Index>(shape_o[1]),
+                  nnz = cast<Index>(obj.attr("nnz"));
+
+            value = SparseMap(rows, cols, nnz,
+                              indptr_caster.value.data(),
+                              indices_caster.value.data(),
+                              data_caster.value.data());
+            return true;
         } catch (const python_error &) {
             return false;
         }
-
-        value = SparseMap(rows, cols, nnz, outer_indices.data(), inner_indices.data(), values.data());
-
-        return true;
     }
 
     static handle from_cpp(T &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
@@ -185,86 +185,74 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     Index rows, cols, nnz;
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        // Disable implicit conversions
-        //
-        // I'm not convinced this manipulation of the flags works. It seems in
-        // ndarray caster the flag is just reset to true.
-        return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
-    }
+        flags = ~(uint8_t) cast_flags::convert;
 
-    bool from_python_(handle src, uint8_t flags, cleanup_list *cleanup) noexcept 
-    {
-        object obj = borrow(src);
         try {
-            object matrix_type = module_::import_("scipy.sparse").attr(RowMajor ? "csr_matrix" : "csc_matrix");
-            if (!obj.type().is(matrix_type))
-                obj = matrix_type(obj);
-        } catch (const python_error &) {
-            return false;
-        }
+            object matrix_type =
+                module_::import_("scipy.sparse")
+                    .attr(RowMajor ? "csr_matrix" : "csc_matrix");
+            if (!src.type().is(matrix_type))
+                return false;
 
-        // I thought this would not allow conversions, but it does
-        // I think conversion is ok if std::is_const_v<T> is true, so long as
-        // each *_caster is the owner.
-        // For non-const, conversion seems to be a bad idea. I think the dense
-        // version will throw a RunTime error rather than convert
-        if (object data_o = obj.attr("data"); !data_caster.from_python(data_o, flags, cleanup))
-            return false;
+            if (!cast<bool>(src.attr("has_sorted_indices")))
+                src.attr("sort_indices")();
 
-        if (object indices_o = obj.attr("indices"); !indices_caster.from_python(indices_o, flags, cleanup))
-            return false;
+            if (object data_o = src.attr("data");
+                !data_caster.from_python(data_o, flags, cleanup))
+                return false;
 
-        if (object indptr_o = obj.attr("indptr"); !indptr_caster.from_python(indptr_o, flags, cleanup))
-            return false;
+            if (object indices_o = src.attr("indices");
+                !indices_caster.from_python(indices_o, flags, cleanup))
+                return false;
 
-        object shape_o = obj.attr("shape"), nnz_o = obj.attr("nnz");
-        try {
+            if (object indptr_o = src.attr("indptr");
+                !indptr_caster.from_python(indptr_o, flags, cleanup))
+                return false;
+
+            object shape_o = src.attr("shape");
             if (len(shape_o) != 2)
                 return false;
+
             rows = cast<Index>(shape_o[0]);
             cols = cast<Index>(shape_o[1]);
-            nnz = cast<Index>(nnz_o);
+            nnz = cast<Index>(src.attr("nnz"));
         } catch (const python_error &) {
             return false;
         }
+
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *) noexcept
-    {
+    static handle from_cpp(const Map &v, rv_policy, cleanup_list *) noexcept {
         if (!v.isCompressed()) {
-            PyErr_SetString(PyExc_ValueError,
-                            "nanobind: unable to return an Eigen sparse matrix that is not in a compressed format. "
-                            "Please call `.makeCompressed()` before returning the value on the C++ end.");
+            PyErr_SetString(
+                PyExc_ValueError,
+                "nanobind: unable to return an Eigen sparse matrix that is not "
+                "in a compressed format. Please call `.makeCompressed()` "
+                "before returning the value on the C++ end.");
             return handle();
         }
 
         object matrix_type;
         try {
-            matrix_type = module_::import_("scipy.sparse").attr(RowMajor ? "csr_matrix" : "csc_matrix");
-        } catch (python_error &e) {
-            e.restore();
-            return handle();
-        }
+            matrix_type = module_::import_("scipy.sparse")
+                              .attr(RowMajor ? "csr_matrix" : "csc_matrix");
 
-        const Index rows = v.rows(), cols = v.cols();
-        const size_t data_shape[] = { (size_t) v.nonZeros() };
-        const size_t outer_indices_shape[] = { (size_t) ((RowMajor ? rows : cols) + 1) };
+            const Index rows = v.rows(), cols = v.cols();
+            const size_t data_shape[] = { (size_t) v.nonZeros() };
+            const size_t outer_indices_shape[] = {
+                (size_t) ((RowMajor ? rows : cols) + 1)
+            };
 
-        T *src = std::addressof(const_cast<T &>(v));
-        object owner;
-        if (policy == rv_policy::move) {
-            src = new T(std::move(v));
-            owner = capsule(src, [](void *p) noexcept { delete (T *) p; });
-        }
+            ScalarNDArray data((void *) v.valuePtr(), 1, data_shape);
+            StorageIndexNDArray
+                outer_indices((void *) v.outerIndexPtr(), 1, outer_indices_shape),
+                inner_indices((void *) v.innerIndexPtr(), 1, data_shape);
 
-        ScalarNDArray data(src->valuePtr(), 1, data_shape, owner);
-        StorageIndexNDArray outer_indices(src->outerIndexPtr(), 1, outer_indices_shape, owner);
-        StorageIndexNDArray inner_indices(src->innerIndexPtr(), 1, data_shape, owner);
-
-        try {
             return matrix_type(nanobind::make_tuple(
-                                   std::move(data), std::move(inner_indices), std::move(outer_indices)),
+                                   cast(data, rv_policy::reference),
+                                   cast(inner_indices, rv_policy::reference),
+                                   cast(outer_indices, rv_policy::reference)),
                                nanobind::make_tuple(rows, cols))
                 .release();
         } catch (python_error &e) {
@@ -273,12 +261,11 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
         }
     };
 
-    operator Map()
-    {
-        ScalarNDArray& values = data_caster.value;
-        StorageIndexNDArray& inner_indices = indices_caster.value;
-        StorageIndexNDArray& outer_indices = indptr_caster.value;
-        return SparseMap(rows, cols, nnz, outer_indices.data(), inner_indices.data(), values.data());
+    operator Map() {
+        return SparseMap(rows, cols, nnz,
+                         indptr_caster.value.data(),
+                         indices_caster.value.data(),
+                         data_caster.value.data());
     }
 };
 

@@ -106,6 +106,7 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
 
   install(
     FILES cmake/nanobind-config.cmake
+          cmake/darwin-python-path.py
           cmake/darwin-ld-cpython.sym
           cmake/darwin-ld-pypy.sym
     DESTINATION "${NB_INSTALL_CMAKE_DIR}"

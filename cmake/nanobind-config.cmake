@@ -26,7 +26,6 @@ elseif(DEFINED Python_SOSABI)
   set(NB_SOSABI "${Python_SOSABI}")
 endif()
 
-
 # Error if scikit-build-core is trying to build Stable ABI < 3.12 wheels
 if(DEFINED SKBUILD_SABI_VERSION AND SKBUILD_ABI_VERSION AND SKBUILD_SABI_VERSION VERSION_LESS "3.12")
   message(FATAL_ERROR "You must set tool.scikit-build.wheel.py-api to 'cp312' or later when "
@@ -422,6 +421,146 @@ function(nanobind_add_module name)
   nanobind_set_visibility(${name})
 endfunction()
 
+# ---------------------------------------------------------------------------
+# Detect if a list of targets uses sanitizers (ASAN/UBSAN/TSAN). If so, compute
+# a shared library preload directive so that these sanitizers can be safely
+# together with a Python binary that will in general not import them.
+# ---------------------------------------------------------------------------
+
+function(nanobind_sanitizer_preload_env env_var)
+  set(detected_san "")
+
+  # Process each target
+  foreach(target ${ARGN})
+    if (NOT TARGET ${target})
+      continue()
+    endif()
+
+    # Check for sanitizer flags in various compile and link options
+    set(san_flags "")
+    set(san_options_to_search
+      COMPILE_OPTIONS LINK_OPTIONS
+      INTERFACE_LINK_OPTIONS INTERFACE_COMPILE_OPTIONS
+    )
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
+      set(san_options_to_search
+        ${san_options_to_search}
+        TRANSITIVE_LINK_PROPERTIES
+        TRANSITIVE_COMPILE_PROPERTIES
+      )
+    endif()
+    foreach(prop ${san_options_to_search})
+      get_target_property(options ${target} ${prop})
+      if(options)
+        foreach(opt ${options})
+          if(opt MATCHES "-fsanitize=([^ ]+)")
+            list(APPEND san_flags "${CMAKE_MATCH_1}")
+          endif()
+        endforeach()
+      endif()
+    endforeach()
+
+    # Parse sanitizer flags
+    foreach(flag ${san_flags})
+      string(REPLACE "\"" "" flag "${flag}")
+      string(REPLACE "," ";" san_list "${flag}")
+      foreach(san ${san_list})
+        if(san MATCHES "^(address|asan)$")
+          list(APPEND detected_san "asan")
+        elseif(san MATCHES "^(thread|tsan)$")
+          list(APPEND detected_san "tsan")
+        elseif(san MATCHES "^(undefined|ubsan)$")
+          list(APPEND detected_san "ubsan")
+        endif()
+      endforeach()
+    endforeach()
+  endforeach()
+
+  if (detected_san)
+    list(REMOVE_DUPLICATES detected_san)
+    set(libs "")
+
+    foreach(san ${detected_san})
+      set(san_libname "")
+
+      if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        if(APPLE)
+          set(san_libname "libclang_rt.${san}_osx_dynamic.dylib")
+        else()
+          set(san_libname "libclang_rt.${san}.so")
+        endif()
+      else()
+        set(san_libname "lib${san}.so")
+      endif()
+
+      # Get the full path using a file name query
+      execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=${san_libname}
+        RESULT_VARIABLE san_success
+        OUTPUT_VARIABLE san_libpath
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+
+      if(NOT san_success EQUAL 0)
+        message(FATAL_ERROR "Error querying ${san_libname}: ${san_success}")
+      endif()
+
+      # Check if a real path was returned (and not just echoing back the input)
+      if(NOT san_libpath OR (san_libpath STREQUAL san_libname))
+        continue()
+      endif()
+
+      # Read the file content and turn into a single-line string
+      file(READ "${san_libpath}" san_libdata LIMIT 1024)
+      string(REPLACE "\n" " " san_libdata "${san_libdata}")
+
+      if(san_libdata MATCHES "INPUT[ \t]*\\([ \t]*([^ \t)]+)")
+        # If this is a linker script with INPUT directive, extract the path
+        list(APPEND libs "${CMAKE_MATCH_1}")
+      else()
+        # Use the original library path
+        list(APPEND libs "${san_libpath}")
+      endif()
+    endforeach()
+
+    # Set platform-specific environment variable
+    string(REPLACE ";" ":" libs_str "${libs}")
+    if(APPLE)
+      set(${env_var} "DYLD_INSERT_LIBRARIES=${libs_str}" PARENT_SCOPE)
+    else()
+      set(${env_var} "LD_PRELOAD=${libs_str}" PARENT_SCOPE)
+    endif()
+  else()
+    set(${env_var} "" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# On macOS, it's quite tricky to get the actual path of the Python executable
+# which is often hidden behind several layers of shims. We need this path to
+# inject sanitizers.
+function(nanobind_resolve_python_path)
+  if(NOT DEFINED NB_PY_PATH)
+    if (APPLE)
+      execute_process(
+        COMMAND ${Python_EXECUTABLE} "${NB_DIR}/cmake/darwin-python-path.py"
+        RESULT_VARIABLE rv
+        OUTPUT_VARIABLE NB_PY_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+      if(NOT rv EQUAL 0)
+        message(FATAL_ERROR "Could not query Python binary path")
+      endif()
+    else()
+      set(NB_PY_PATH "${Python_EXECUTABLE}")
+    endif()
+    set(NB_PY_PATH ${NB_PY_PATH} CACHE STRING "" FORCE)
+  endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Convenient Cmake frontent for nanobind's stub generator
+# ---------------------------------------------------------------------------
+
 function (nanobind_add_stub name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
 
@@ -476,6 +615,18 @@ function (nanobind_add_stub name)
   file(TO_CMAKE_PATH ${Python_EXECUTABLE} NB_Python_EXECUTABLE)
 
   set(NB_STUBGEN_CMD "${NB_Python_EXECUTABLE}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
+
+  if (NOT WIN32)
+    # Pass sanitizer flags to nanobind if needed
+    nanobind_sanitizer_preload_env(NB_STUBGEN_ENV ${ARG_DEPENDS})
+    if (NB_STUBGEN_ENV)
+      nanobind_resolve_python_path()
+      if (NB_STUBGEN_ENV MATCHES asan)
+        list(APPEND NB_STUBGEN_ENV "ASAN_OPTIONS=detect_leaks=0")
+      endif()
+      set(NB_STUBGEN_CMD ${CMAKE_COMMAND} -E env "${NB_STUBGEN_ENV}" "${NB_PY_PATH}" "${NB_STUBGEN}" ${NB_STUBGEN_ARGS})
+    endif()
+  endif()
 
   if (NOT ARG_INSTALL_TIME)
     add_custom_command(

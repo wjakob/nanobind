@@ -8,6 +8,23 @@ from .submodule import F as F, f as f2
 
 # a prefix
 
+class Foo:
+    def __lt__(self, arg: int, /) -> bool: ...
+
+    def __gt__(self, arg: int, /) -> bool: ...
+
+    def __le__(self, arg: Foo, /) -> bool: ...
+
+    def __ge__(self, arg: Foo, /) -> bool: ...
+
+def f() -> None: ...
+
+def makeNestedClass() -> py_stub_test.AClass.NestedClass: ...
+
+FooAlias: TypeAlias = Foo
+
+f_alias = f
+
 @my_decorator
 class CustomSignature(Iterable[int]):
     @my_decorator
@@ -23,16 +40,7 @@ class CustomSignature(Iterable[int]):
     def value(self, value: Optional[int], /) -> None:
         """docstring for setter"""
 
-class Foo:
-    def __lt__(self, arg: int, /) -> bool: ...
-
-    def __gt__(self, arg: int, /) -> bool: ...
-
-    def __le__(self, arg: Foo, /) -> bool: ...
-
-    def __ge__(self, arg: Foo, /) -> bool: ...
-
-FooAlias: TypeAlias = Foo
+pytree: dict = {'a' : ('b', [123])}
 
 T = TypeVar("T", contravariant=True)
 
@@ -49,15 +57,7 @@ class WrapperFoo(Wrapper[Foo]):
 class WrapperTypeParam[T]:
     pass
 
-def f() -> None: ...
-
-f_alias = f
-
 def list_front[T](arg: list[T], /) -> T: ...
-
-def makeNestedClass() -> py_stub_test.AClass.NestedClass: ...
-
-pytree: dict = {'a' : ('b', [123])}
 
 def tweak_me(arg: int):
     """

@@ -2,11 +2,52 @@ import enum
 from typing import overload
 
 
+class Enum(enum.Enum):
+    """enum-level docstring"""
+
+    A = 0
+    """Value A"""
+
+    B = 1
+    """Value B"""
+
+    C = 4294967295
+    """Value C"""
+
+class Flag(enum.Flag):
+    """enum-level docstring"""
+
+    A = 1
+    """Value A"""
+
+    B = 2
+    """Value B"""
+
+    C = 4
+    """Value C"""
+
 A: Flag = Flag.A
 
 B: Flag = Flag.B
 
 C: Flag = Flag.C
+
+class UnsignedFlag(enum.Flag):
+    A = 1
+    """Value A"""
+
+    B = 2
+    """Value B"""
+
+    All = 18446744073709551615
+    """All values"""
+
+class SEnum(enum.IntEnum):
+    A = 0
+
+    B = 1
+
+    C = -1
 
 class ClassicEnum(enum.Enum):
     Item1 = 0
@@ -23,56 +64,9 @@ class ClassicEnum(enum.Enum):
     @staticmethod
     def bar(arg: ClassicEnum, /) -> ClassicEnum: ...
 
-class Enum(enum.Enum):
-    """enum-level docstring"""
-
-    A = 0
-    """Value A"""
-
-    B = 1
-    """Value B"""
-
-    C = 4294967295
-    """Value C"""
-
-class EnumProperty:
-    def __init__(self) -> None: ...
-
-    @property
-    def read_enum(self) -> Enum: ...
-
-class Flag(enum.Flag):
-    """enum-level docstring"""
-
-    A = 1
-    """Value A"""
-
-    B = 2
-    """Value B"""
-
-    C = 4
-    """Value C"""
-
 Item1: ClassicEnum = ClassicEnum.Item1
 
 Item2: ClassicEnum = ClassicEnum.Item2
-
-class SEnum(enum.IntEnum):
-    A = 0
-
-    B = 1
-
-    C = -1
-
-class UnsignedFlag(enum.Flag):
-    A = 1
-    """Value A"""
-
-    B = 2
-    """Value B"""
-
-    All = 18446744073709551615
-    """All values"""
 
 @overload
 def from_enum(arg: Enum) -> int: ...
@@ -86,6 +80,18 @@ def from_enum(arg: SEnum) -> int: ...
 @overload
 def from_enum(arg: UnsignedFlag) -> int: ...
 
+def to_enum(arg: int, /) -> Enum: ...
+
+def to_flag(arg: int, /) -> Flag: ...
+
+def to_unsigned_flag(arg: int, /) -> UnsignedFlag: ...
+
+@overload
+def from_enum_implicit(arg: Enum, /) -> int: ...
+
+@overload
+def from_enum_implicit(arg: Flag, /) -> int: ...
+
 @overload
 def from_enum_default_0(value: Enum = Enum.A) -> int: ...
 
@@ -94,14 +100,8 @@ def from_enum_default_0(value: Flag = Enum.A) -> int: ...
 
 def from_enum_default_1(value: SEnum = SEnum.A) -> int: ...
 
-@overload
-def from_enum_implicit(arg: Enum, /) -> int: ...
+class EnumProperty:
+    def __init__(self) -> None: ...
 
-@overload
-def from_enum_implicit(arg: Flag, /) -> int: ...
-
-def to_enum(arg: int, /) -> Enum: ...
-
-def to_flag(arg: int, /) -> Flag: ...
-
-def to_unsigned_flag(arg: int, /) -> UnsignedFlag: ...
+    @property
+    def read_enum(self) -> Enum: ...

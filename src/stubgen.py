@@ -56,7 +56,7 @@ specifically to simplify stub generation.
 import argparse
 import builtins
 import enum
-from inspect import Signature, Parameter, signature, ismodule, getmembers
+from inspect import Signature, Parameter, signature, ismodule
 import textwrap
 import importlib
 import importlib.machinery
@@ -845,7 +845,9 @@ class StubGen:
                     return
                 else:
                     self.apply_pattern(self.prefix + ".__prefix__", None)
-                    for name, child in getmembers(value):
+                    # using value.__dict__ rather than inspect.getmembers
+                    # to preserve insertion order
+                    for name, child in value.__dict__.items():
                         self.put(child, name=name, parent=value)
                     self.apply_pattern(self.prefix + ".__suffix__", None)
             elif self.is_function(tp):

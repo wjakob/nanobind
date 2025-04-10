@@ -183,7 +183,7 @@ public:
     NB_INLINE handle(const PyTypeObject *ptr) : m_ptr((PyObject *) ptr) { }
 
     const handle& inc_ref() const & noexcept {
-#if defined(NDEBUG) && !defined(Py_LIMITED_API)
+#if defined(NDEBUG)
         Py_XINCREF(m_ptr);
 #else
         detail::incref_checked(m_ptr);
@@ -192,7 +192,7 @@ public:
     }
 
     const handle& dec_ref() const & noexcept {
-#if defined(NDEBUG) && !defined(Py_LIMITED_API)
+#if defined(NDEBUG)
         Py_XDECREF(m_ptr);
 #else
         detail::decref_checked(m_ptr);

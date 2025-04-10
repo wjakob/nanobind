@@ -2,11 +2,11 @@ import test_enum_ext as t
 import pytest
 
 def test01_unsigned_enum():
-    assert repr(t.Enum.A) == 'Enum.A'
+    assert repr(t.Enum.A) == '<Enum.A: 0>'
     assert str(t.Enum.A) == 'Enum.A'
-    assert repr(t.Enum.B) == 'Enum.B'
+    assert repr(t.Enum.B) == '<Enum.B: 1>'
     assert str(t.Enum.B) == 'Enum.B'
-    assert repr(t.Enum.C) == 'Enum.C'
+    assert repr(t.Enum.C) == '<Enum.C: 4294967295>'
     assert str(t.Enum.C) == 'Enum.C'
     assert t.Enum.A.name == 'A'
     assert t.Enum.B.name == 'B'
@@ -52,12 +52,12 @@ def test01_unsigned_enum():
 
 
 def test02_signed_enum():
-    assert repr(t.SEnum.A) == 'SEnum.A'
-    assert repr(t.SEnum.B) == 'SEnum.B'
-    assert repr(t.SEnum.C) == 'SEnum.C'
-    assert str(t.SEnum.A) == 'SEnum.A'
-    assert str(t.SEnum.B) == 'SEnum.B'
-    assert str(t.SEnum.C) == 'SEnum.C'
+    assert repr(t.SEnum.A) == '<SEnum.A: 0>'
+    assert repr(t.SEnum.B) == '<SEnum.B: 1>'
+    assert repr(t.SEnum.C) == '<SEnum.C: -1>'
+    assert str(t.SEnum.A) == '0'
+    assert str(t.SEnum.B) == '1'
+    assert str(t.SEnum.C) == '-1'
     assert int(t.SEnum.A) == 0
     assert int(t.SEnum.B) == 1
     assert int(t.SEnum.C) == -1
@@ -138,15 +138,15 @@ def test08_enum_comparisons():
 
 def test06_enum_flag():
     # repr / str tests
-    assert repr(t.Flag.A) == 'Flag.A'
+    assert repr(t.Flag.A) == '<Flag.A: 1>'
     assert str(t.Flag.A) == 'Flag.A'
-    assert repr(t.Flag.B) == 'Flag.B'
+    assert repr(t.Flag.B) == '<Flag.B: 2>'
     assert str(t.Flag.B) == 'Flag.B'
-    assert repr(t.Flag.C) == 'Flag.C'
+    assert repr(t.Flag.C) == '<Flag.C: 4>'
     assert str(t.Flag.C) == 'Flag.C'
-    assert repr(t.Flag.A | t.Flag.B) in ['Flag.A|B', 'Flag.B|A']
+    assert repr(t.Flag.A | t.Flag.B) in ['<Flag.A|B: 3>', '<Flag.B|A: 3>']
     assert str(t.Flag.A | t.Flag.B) in ['Flag.A|B', 'Flag.B|A']
-    assert repr(t.Flag.A | t.Flag.B | t.Flag.C) in ['Flag.A|B|C', 'Flag.C|B|A']
+    assert repr(t.Flag.A | t.Flag.B | t.Flag.C) in ['<Flag.A|B|C: 7>', '<Flag.C|B|A: 7>']
     assert str(t.Flag.A | t.Flag.B | t.Flag.C) in ['Flag.A|B|C', 'Flag.C|B|A']
 
     # Flag membership tests

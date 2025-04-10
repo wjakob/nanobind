@@ -61,7 +61,7 @@ NB_MODULE(test_enum_ext, m) {
 
     m.def("from_enum_default_0", [](Flag value) { return (uint32_t) value; }, nb::arg("value") = Enum::A);
 
-    m.def("from_enum_default_1", [](SEnum value) { return (uint32_t) value; }, nb::arg("value") = SEnum::A);
+    m.def("from_enum_default_1", [](SEnum value) { return (uint32_t) value; }, nb::arg("value").sig("SEnum.A") = SEnum::A);
 
     // test for issue #39
     nb::class_<EnumProperty>(m, "EnumProperty")

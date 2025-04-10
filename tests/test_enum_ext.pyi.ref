@@ -43,6 +43,8 @@ class UnsignedFlag(enum.Flag):
     """All values"""
 
 class SEnum(enum.IntEnum):
+    __str__ = __repr__
+
     A = 0
 
     B = 1

@@ -72,8 +72,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     scope.attr(name) = result;
     result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();
 
-    result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
-    result.attr("__repr__") = result.attr("__str__");
+    result.attr("__str__") = factory.attr("__str__");
+    result.attr("__repr__") = factory.attr("__repr__");
 
     type_init_data *t = new type_init_data();
     memset(t, 0, sizeof(type_data));

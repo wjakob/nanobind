@@ -18,9 +18,47 @@ below inherit that of the preceding release.
 Version TBD (unreleased)
 ------------------------
 
-- Added support for binding functions that accept a ``std::variant`` that is
-  not default-constructible (because its first alternative isn't).
-  (PR `#987 <https://github.com/wjakob/nanobind/pull/987>`__).
+- Nanobind's CMake stub generation command :cmake:command:`nanobind_add_stub`
+  now detects when an extension uses sanitizers (TSAN, ASAN, UBSAN). It then
+  injects the sanitizer library into the Python process ahead of time so that
+  the extension can be loaded. Previously, stub generation failed in
+  such cases. (PR `#1000 <https://github.com/wjakob/nanobind/pull/1000>`__).
+
+- The entries of stub files are now sorted in their original definition order.
+  Previously, they were alphabetically sorted, which caused issues with
+  external tooling. (PR `#938
+  <https://github.com/wjakob/nanobind/pull/938>`__).
+
+- Fixed detection and handling of imports and types in external modules in
+  stubgen that could lead to incorrect declarations in some cases. (PRs `#939
+  <https://github.com/wjakob/nanobind/pull/939>`__, `#940
+  <https://github.com/wjakob/nanobind/pull/940>`__).
+
+- Added support for binding functions that accept a ``std::variant<...>`` that
+  is not default-constructible (because its first alternative isn't). (PR `#987
+  <https://github.com/wjakob/nanobind/pull/987>`__).
+
+- Added support for casting const-qualified ``std::unique_ptr<T>`` values. (PR
+  `#988 <https://github.com/wjakob/nanobind/pull/988>`__).
+
+- Made handling of return value policies in Eigen type casters more consistent
+  with the rest of nanobind. (Issue `#971
+  <https://github.com/wjakob/nanobind/issues/971>`__, commit `5cdf59
+  <https://github.com/wjakob/nanobind/commit/5cdf58984e7a8b520935c3771029fe0e87edee73>`__).
+
+- The caster between ``scipy.sparse`` matrices now correctly handles matrices
+  with unsorted indices. (PR `#981
+  <https://github.com/wjakob/nanobind/pull/981>`__).
+
+- Miscellaneous fixes and improvements (PRs
+  `#990 <https://github.com/wjakob/nanobind/pull/990>`__,
+  `#997 <https://github.com/wjakob/nanobind/pull/997>`__, commits
+  `f2b08c <https://github.com/wjakob/nanobind/commit/f2b08c936ec4b1dd06d374fef2637d89daa905f4>`__,
+  `eef931 <https://github.com/wjakob/nanobind/commit/eef93122ad49ea6ef02d645497d426a4dfc303bd>`__,
+  `f1b2f5 <https://github.com/wjakob/nanobind/commit/f1b2f579adb538671c985c9c86a878f6e82de597>`__,
+  `dbd602 <https://github.com/wjakob/nanobind/commit/dbdb602cfa00d46600e048f992cd3f81540c777d>`__,
+  `2c83fb <https://github.com/wjakob/nanobind/commit/2c83fbbbed3b82edc6491efbdc83e56f98da0db2>`__,
+  `87de84 <https://github.com/wjakob/nanobind/commit/87de84d3afad270c02099af82132240b3216ac3b>`__).
 
 Version 2.6.1 (Mar 28, 2025)
 ----------------------------
@@ -37,13 +75,13 @@ Version 2.6.1 (Mar 28, 2025)
   <https://github.com/wjakob/nanobind/pull/944>`__).
 
 - Improved the efficiency of :cpp:func:`nb::getattr(obj, key,
-  default) <getattr>` in cases where ``obj[key]`` does exist. (commit
+  default) <getattr>` in cases where ``obj[key]`` does not exist. (commit
   `bb05f5
   <https://github.com/wjakob/nanobind/commit/bb05f5503aef9b70498302bf30bf958e8cc605c7>`__).
 
-* ABI version 16.
+- ABI version 16.
 
-* Miscellaneous fixes and improvements (PRs `#913
+- Miscellaneous fixes and improvements (PRs `#913
   <https://github.com/wjakob/nanobind/pull/913>`__, `#914
   <https://github.com/wjakob/nanobind/pull/914>`__, `#916
   <https://github.com/wjakob/nanobind/pull/916>`__, `#931

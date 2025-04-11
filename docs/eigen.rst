@@ -145,6 +145,20 @@ apply:
 
      void f4(nb::DRef<Eigen::MatrixXf> x) { x *= 2; }
 
+Maps
+----
+
+Besides ``Eigen::Ref<...>``, nanobind also supports binding functions that take
+and return ``Eigen::Map<...>``. The underlying map type caster strictly
+prevents conversion of incompatible inputs into an ``Eigen::Map<...>`` when
+this would require implicit layout or type conversion. This restriction exists
+because the primary purpose of this interface is to efficiently access existing
+memory without conversion overhead. When binding functions that return
+``Eigen::Map<...>``, you must ensure that the mapped memory remains valid
+throughout the map's lifetime. This typically requires appropriate lifetime
+annotations (such as :cpp:enumerator:`rv_policy::reference_internal` or
+:cpp:struct:`keep_alive`) to prevent access to memory that has been deallocated
+on the C++ side.
 
 Sparse matrices
 ---------------
@@ -156,9 +170,11 @@ Eigen types:
 
    #include <nanobind/eigen/sparse.h>
 
-The ``Eigen::SparseMatrix<..>`` type maps to either ``scipy.sparse.csr_matrix``
-or ``scipy.sparse.csc_matrix`` depending on whether row- or column-major
-storage is used.
+The ``Eigen::SparseMatrix<..>`` and ``Eigen::Map<Eigen::SparseMatrix<..>>``
+types map to either ``scipy.sparse.csr_matrix`` or ``scipy.sparse.csc_matrix``
+depending on whether row- or column-major storage is used. The previously
+mentioned precautions related to returning dense maps also apply in the sparse
+case.
 
 There is no support for Eigen sparse vectors because an equivalent type does
 not exist as part of ``scipy.sparse``.

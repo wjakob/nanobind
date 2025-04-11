@@ -395,18 +395,18 @@ class StubGen:
             self.write_ln(f"{name} = {fn_name}\n")
             return
 
+        # Special handling for nanobind functions with overloads
+        if type(fn).__module__ == "nanobind":
+            fn = cast(NbFunction, fn)
+            self.put_nb_func(fn, name)
+            return
+
         if isinstance(fn, staticmethod):
             self.write_ln("@staticmethod")
             fn = fn.__func__
         elif isinstance(fn, classmethod):
             self.write_ln("@classmethod")
             fn = fn.__func__
-
-        # Special handling for nanobind functions with overloads
-        if type(fn).__module__ == "nanobind":
-            fn = cast(NbFunction, fn)
-            self.put_nb_func(fn, name)
-            return
 
         if name is None:
             name = fn.__name__
@@ -859,7 +859,7 @@ class StubGen:
             elif tp_mod == "nanobind":
                 if tp_name == "nb_method":
                     value = cast(NbFunction, value)
-                    self.put_nb_func(value, name)
+                    self.put_function(value, name)
                 elif tp_name == "nb_static_property":
                     value = cast(NbStaticProperty, value)
                     self.put_nb_static_property(name, value)

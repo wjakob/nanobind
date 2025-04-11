@@ -34,6 +34,10 @@ Version TBD (unreleased)
   <https://github.com/wjakob/nanobind/pull/939>`__, `#940
   <https://github.com/wjakob/nanobind/pull/940>`__).
 
+- The stub generator now detects method aliases and preserves this information
+  instead of duplicating the definition. (PR `#735
+  <https://github.com/wjakob/nanobind/pull/735>`__).
+
 - Added support for binding functions that accept a ``std::variant<...>`` that
   is not default-constructible (because its first alternative isn't). (PR `#987
   <https://github.com/wjakob/nanobind/pull/987>`__).

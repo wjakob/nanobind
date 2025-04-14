@@ -54,6 +54,10 @@ Version TBD (unreleased)
   with unsorted indices. (PR `#981
   <https://github.com/wjakob/nanobind/pull/981>`__).
 
+- Functions that return ``nb::typed<nb::object, ...>`` now support copy and move
+  construction, making it more ergonomic to return that type. (PR `#1012
+  <https://github.com/wjakob/nanobind/pull/1012>`__
+
 - Miscellaneous fixes and improvements (PRs
   `#990 <https://github.com/wjakob/nanobind/pull/990>`__,
   `#997 <https://github.com/wjakob/nanobind/pull/997>`__, commits

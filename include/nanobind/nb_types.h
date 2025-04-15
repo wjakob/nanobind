@@ -765,6 +765,8 @@ public:
     constexpr static bool nb_typed = true;
     using T::T;
     using T::operator=;
+    typed(const T& o) : T(o) {}
+    typed(T&& o) : T(std::move(o)) {}
 };
 
 template <typename T> struct pointer_and_handle {

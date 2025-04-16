@@ -107,6 +107,61 @@ jobs:
         cd build;
         python3 -m pytest
 
+  old-compilers:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cc: gcc-8
+            cxx: g++-8
+            apt: gcc-8 g++-8
+          - cc: gcc-9
+            cxx: g++-9
+            apt: gcc-9
+          - cc: clang-8
+            cxx: clang++-8
+            apt: clang-8
+          - cc: clang-9
+            cxx: clang++-9
+            apt: clang-9
+          - cc: clang-10
+            cxx: clang++-10
+            apt: clang-10
+
+    runs-on: ubuntu-latest
+    container: ubuntu:20.04
+    name: "${{matrix.cc}} on Ubuntu 20.04"
+    env:
+      CC: ${{matrix.cc}}
+      CXX: ${{matrix.cxx}}
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y python3-numpy python3-pip python3-pytest libeigen3-dev cmake git ${{matrix.apt}}
+        python3 -m pip install typing_extensions
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Configure
+      run: cmake -S . -B build
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Check ABI tag
+      run: >
+        cd build/tests;
+        python3 -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
+
+    - name: Run tests
+      run: >
+        cd build;
+        python3 -m pytest
 
   free-threaded:
     name: "Python 3.13-dev / ubuntu.latest [free-threaded]"

@@ -292,8 +292,7 @@ def test08_sparse():
 
 @needs_numpy_and_eigen
 def test09_sparse_failures():
-    pytest.importorskip("scipy")
-    import scipy
+    scipy = pytest.importorskip("scipy")
 
     with pytest.raises(
         ValueError,
@@ -406,3 +405,64 @@ def test14_single_element():
     a = np.array([[1]], dtype=np.uint32)
     assert a.ndim == 2 and a.shape == (1, 1)
     t.addMXuCC(a, a)
+
+@needs_numpy_and_eigen
+def test15_sparse_map():
+    scipy = pytest.importorskip("scipy")
+
+    def assert_same_array(a, b):
+        assert a.shape == b.shape
+        assert a.__array_interface__['data'] == b.__array_interface__['data']
+
+    def assert_same_sparse_array(a, b):
+        assert_same_array(a.data, b.data)
+        assert_same_array(a.indices, b.indices)
+        assert_same_array(a.indptr, b.indptr)
+
+    c1 = scipy.sparse.csc_matrix([[1, 0], [0, 1]], dtype=np.float32)
+    c2 = t.sparse_map_c(c1)
+    assert_same_sparse_array(c1, c2)
+
+    r1 = scipy.sparse.csr_matrix([[1, 0], [0, 1]], dtype=np.float32)
+    r2 = t.sparse_map_r(r1)
+    assert_same_sparse_array(r1, r2)
+
+    # Implicit CSR <-> CSC conversion is not permitted by the map type caster
+    with pytest.raises(TypeError):
+        t.sparse_map_c(r1)
+
+    with pytest.raises(TypeError):
+        t.sparse_map_r(c1)
+
+    assert c1.sum() != 0
+    t.sparse_update_map_to_zero_c(c1);
+    assert c1.sum() == 0
+
+    assert r1.sum() != 0
+    t.sparse_update_map_to_zero_r(r1);
+    assert r1.sum() == 0
+
+    # Implicit type conversion is not permitted by the map type caster
+    c1 = scipy.sparse.csc_matrix([[1, 0], [0, 1]], dtype=np.float64)
+    r1 = scipy.sparse.csr_matrix([[1, 0], [0, 1]], dtype=np.float64)
+    with pytest.raises(TypeError):
+        t.sparse_map_c(c1)
+
+    with pytest.raises(TypeError):
+        t.sparse_map_r(r1)
+
+@needs_numpy_and_eigen
+def test16_sparse_complex():
+    scipy = pytest.importorskip("scipy")
+
+    c1 = scipy.sparse.csc_matrix([[1j+2, 0], [-3j, 1]], dtype=np.complex128)
+    c2 = t.sparse_complex(c1)
+    assert np.array_equal(c1.todense(), c2.todense())
+
+@needs_numpy_and_eigen
+def test17_sparse_map_complex():
+    scipy = pytest.importorskip("scipy")
+
+    c1 = scipy.sparse.csc_matrix([[1j+2, 0], [-3j, 1]], dtype=np.complex128)
+    c2 = t.sparse_complex_map_c(c1)
+    assert np.array_equal(c1.todense(), c2.todense())

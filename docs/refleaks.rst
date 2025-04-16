@@ -330,11 +330,26 @@ In particular, *all* types in the cycle must implement the ``tp_traverse``
 *type slot*, and *at least one* of them must implement the ``tp_clear`` type
 slot.
 
-Here is an example of the required code for the prior ``Wrapper`` type:
+Here is an example of the required code for a ``Wrapper`` type:
 
 .. code-block:: cpp
 
+   struct Wrapper { std::shared_ptr<Wrapper> value; };
+
    int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+       // On Python 3.9+, we must traverse the implicit dependency
+       // of an object on its associated type object.
+       #if PY_VERSION_HEX >= 0x03090000
+           Py_VISIT(Py_TYPE(self));
+       #endif
+
+       // The tp_traverse method may be called after __new__ but before or during
+       // __init__, before the C++ constructor has been completed. We must not
+       // inspect the C++ state if the constructor has not yet completed.
+       if (!nb::inst_ready(self)) {
+          return 0;
+       }
+
        // Get the C++ object associated with 'self' (this always succeeds)
        Wrapper *w = nb::inst_ptr<Wrapper>(self);
 
@@ -344,12 +359,6 @@ Here is an example of the required code for the prior ``Wrapper`` type:
 
        // Inform the Python GC about the instance
        Py_VISIT(value.ptr());
-
-       // On Python 3.9+, we must traverse the implicit dependency
-       // of an object on its associated type object.
-       #if PY_VERSION_HEX >= 0x03090000
-           Py_VISIT(Py_TYPE(self));
-       #endif
 
        return 0;
    }

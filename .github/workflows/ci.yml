@@ -128,8 +128,8 @@ jobs:
             cxx: clang++-10
             apt: clang-10
 
-    runs-on: ubuntu-20.04
-    name: "${{matrix.cc}} on Ubuntu 20.04"
+    runs-on: ubuntu-22.04
+    name: "${{matrix.cc}} on Ubuntu 22.04"
     env:
       CC: ${{matrix.cc}}
       CXX: ${{matrix.cxx}}

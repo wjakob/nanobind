@@ -164,7 +164,7 @@ jobs:
         python3 -m pytest
 
   free-threaded:
-    name: "Python 3.13-dev / ubuntu.latest [free-threaded]"
+    name: "Python 3.14-dev / ubuntu.latest [free-threaded]"
     runs-on: ubuntu-latest
 
     steps:
@@ -174,7 +174,7 @@ jobs:
 
     - uses: deadsnakes/action@v3.1.0
       with:
-        python-version: 3.13-dev
+        python-version: 3.14-dev
         nogil: true
 
     - name: Install the latest CMake

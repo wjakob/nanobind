@@ -12,7 +12,7 @@ void make_immortal(PyObject *op) noexcept {
     op->ob_ref_shared = 0;
 }
 
-#if !(0 && PY_VERSION_HEX >= 0x030E00A5)
+#if PY_VERSION_HEX < 0x030E00A5
 void nb_enable_try_inc_ref(PyObject *obj) noexcept {
     // Since this is called during object construction, we know that we have
     // the only reference to the object and can use a non-atomic write.

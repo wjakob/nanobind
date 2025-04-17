@@ -64,7 +64,7 @@ import importlib.util
 import types
 import typing
 from dataclasses import dataclass
-from typing import Dict, Sequence, List, Optional, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal
+from typing import Dict, Sequence, List, Optional, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal, Set
 from pathlib import Path
 import re
 import sys
@@ -173,7 +173,7 @@ class StubGen:
         recursive: bool = False,
         include_docstrings: bool = True,
         include_private: bool = False,
-        private_exceptions: set[str] = set(),
+        private_exceptions: Set[str] = set(),
         include_internal_imports: bool = True,
         include_external_imports: bool = False,
         max_expr_length: int = 50,

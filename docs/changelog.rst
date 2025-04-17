@@ -38,6 +38,10 @@ Version TBD (unreleased)
   instead of duplicating the definition. (PR `#735
   <https://github.com/wjakob/nanobind/pull/735>`__).
 
+- Corrected a flaw in the recommended implementation of ``tp_traverse`` in
+  garbage-collected bidnings. (PRs `#1015
+  <https://github.com/wjakob/nanobind/pull/1015>`__).
+
 - Added support for binding functions that accept a ``std::variant<...>`` that
   is not default-constructible (because its first alternative isn't). (PR `#987
   <https://github.com/wjakob/nanobind/pull/987>`__).
@@ -50,7 +54,12 @@ Version TBD (unreleased)
   <https://github.com/wjakob/nanobind/issues/971>`__, commit `5cdf59
   <https://github.com/wjakob/nanobind/commit/5cdf58984e7a8b520935c3771029fe0e87edee73>`__).
 
-- The caster between ``scipy.sparse`` matrices now correctly handles matrices
+- nanobind now provides a zero-copy type caster for
+  ``Eigen::Map<Eigen::SparseMatrix>``. (PRs `#1003
+  <https://github.com/wjakob/nanobind/pull/1003>`__, `#782
+  <https://github.com/wjakob/nanobind/pull/782>`__).
+
+- The Eigen sparse matrix caster now correctly handles ``scipy.sparse`` objects
   with unsorted indices. (PR `#981
   <https://github.com/wjakob/nanobind/pull/981>`__).
 
@@ -59,6 +68,8 @@ Version TBD (unreleased)
   <https://github.com/wjakob/nanobind/pull/1012>`__
 
 - Miscellaneous fixes and improvements (PRs
+  `#1005 <https://github.com/wjakob/nanobind/pull/1005>`__,
+  `#1004 <https://github.com/wjakob/nanobind/pull/1004>`__,
   `#990 <https://github.com/wjakob/nanobind/pull/990>`__,
   `#997 <https://github.com/wjakob/nanobind/pull/997>`__, commits
   `f2b08c <https://github.com/wjakob/nanobind/commit/f2b08c936ec4b1dd06d374fef2637d89daa905f4>`__,

@@ -68,6 +68,7 @@ Version TBD (unreleased)
   <https://github.com/wjakob/nanobind/pull/1012>`__
 
 - Miscellaneous fixes and improvements (PRs
+  `#1014 <https://github.com/wjakob/nanobind/pull/1014>`__,
   `#1005 <https://github.com/wjakob/nanobind/pull/1005>`__,
   `#1004 <https://github.com/wjakob/nanobind/pull/1004>`__,
   `#990 <https://github.com/wjakob/nanobind/pull/990>`__,

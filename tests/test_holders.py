@@ -3,6 +3,8 @@ import test_holders_ext as t
 import pytest
 from common import collect
 
+# Reference counting behavior changed on 3.14a7+
+py_3_14a7_or_newer = sys.version_info >= (3, 14, 0, 'alpha', 7)
 
 @pytest.fixture
 def clean():
@@ -279,7 +281,13 @@ def check_shared_from_this_py_owned(ty, factory, value):
         # One reference is held by the C++ shared_ptr, one by our
         # locals dict, and one by the arg to getrefcount
         rc = sys.getrefcount(e)
-        assert rc == 3
+
+        # On Python 3.14a7, an optimization was introduced where
+        # stack-based function calling no longer acquires a reference
+        if py_3_14a7_or_newer:
+            assert rc == 2 or rc == 3
+        else:
+            assert rc == 3
 
     # Dropping the Python object does not actually destroy it, because
     # the shared_ptr holds a reference. There is still a PyObject* at
@@ -340,7 +348,13 @@ def test12_shared_from_this_create_shared_in_cpp(clean):
         # One reference is held by our locals dict and one by the
         # arg to getrefcount
         rc = sys.getrefcount(e)
-        assert rc == 2
+
+        # On Python 3.14a7, an optimization was introduced where
+        # stack-based function calling no longer acquires a reference
+        if py_3_14a7_or_newer:
+            assert rc == 1 or rc == 2
+        else:
+            assert rc == 2
 
     w = t.SharedWrapperST.from_existing(e)
     assert w.ptr is e

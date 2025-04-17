@@ -9,6 +9,8 @@ if sys.version_info < (3, 9):
 else:
     TYPING_TUPLE = "tuple"
 
+# Reference counting behavior changed on 3.14a7+
+py_3_14a7_or_newer = sys.version_info >= (3, 14, 0, 'alpha', 7)
 
 def fail_fn():  # used in test_30
     raise RuntimeError("Foo")
@@ -698,22 +700,35 @@ def test50_call_policy():
                     # by transient additional references added by pytest's
                     # assertion rewriting.
                     ret_refs = sys.getrefcount(recorded_ret)
-                    assert ret_refs == 2 + 2 * (ret is not None)
+                    expected_refs = 2 + 2 * (ret is not None)
+
+                    # On Python 3.14a7, an optimization was introduced where
+                    # stack-based function calling no longer acquires a reference
+                    if py_3_14a7_or_newer:
+                        assert ret_refs == expected_refs - 1 or ret_refs == expected_refs
+                    else:
+                        assert ret_refs == expected_refs
 
                 for (passed, recorded) in ((arg1, arg1r), (arg2, arg2r)):
                     if passed == "swapfrom":
                         assert recorded == "swapto"
                         if hasattr(sys, "getrefcount"):
                             recorded_refs = sys.getrefcount(recorded)
+
                             # recorded, arg1r, unnamed tuple, getrefcount arg
-                            assert recorded_refs == 4
+                            if py_3_14a7_or_newer:
+                                assert recorded_refs == 3 or recorded_refs == 4
+                            else:
+                                assert recorded_refs == 4
                     else:
                         assert passed is recorded
 
                 del passed, recorded, arg1r, arg2r
                 if hasattr(sys, "getrefcount"):
                     refs_after = (sys.getrefcount(arg1), sys.getrefcount(arg2))
-                    assert refs_before == refs_after
+
+                    if not py_3_14a7_or_newer or ret is not None:
+                        assert refs_before == refs_after
 
     # precall throws exception
     with pytest.raises(RuntimeError, match="expected only strings"):

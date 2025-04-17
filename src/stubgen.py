@@ -173,6 +173,7 @@ class StubGen:
         recursive: bool = False,
         include_docstrings: bool = True,
         include_private: bool = False,
+        private_exceptions: set[str] = set(),
         include_internal_imports: bool = True,
         include_external_imports: bool = False,
         max_expr_length: int = 50,
@@ -191,6 +192,9 @@ class StubGen:
 
         # Include private members that start or end with a single underscore?
         self.include_private = include_private
+
+        # Private members that should be included regardless of `include_private`.
+        self.private_exceptions = private_exceptions
 
         # Include types and functions imported from the same package (but a different module)
         self.include_internal_imports = include_internal_imports
@@ -794,6 +798,7 @@ class StubGen:
                     (name[0] == "_" and name[1] != "_")
                     or (name[-1] == "_" and name[-2] != "_")
                 )
+                and name not in self.private_exceptions
             ):
                 return
 
@@ -1252,6 +1257,14 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-E",
+        "--private-exceptions",
+        dest="private_exceptions",
+        default="",
+        help="Comma-separated list of names of private members that should be included regardless of `include_private`",
+    )
+
+    parser.add_argument(
         "-D",
         "--exclude-docstrings",
         dest="include_docstrings",
@@ -1400,6 +1413,7 @@ def main(args: Optional[List[str]] = None) -> None:
             recursive=opt.recursive,
             include_docstrings=opt.include_docstrings,
             include_private=opt.include_private,
+            private_exceptions=set(opt.private_exceptions.split(",")),
             patterns=patterns,
             output_file=file
         )

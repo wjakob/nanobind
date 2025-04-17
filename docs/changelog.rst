@@ -18,6 +18,20 @@ below inherit that of the preceding release.
 Version TBD (unreleased)
 ------------------------
 
+- nanobind now provides a zero-copy type caster for
+  ``Eigen::Map<Eigen::SparseMatrix>``. (PRs `#1003
+  <https://github.com/wjakob/nanobind/pull/1003>`__, `#782
+  <https://github.com/wjakob/nanobind/pull/782>`__).
+
+- Made handling of return value policies in Eigen type casters more consistent
+  with the rest of nanobind. (Issue `#971
+  <https://github.com/wjakob/nanobind/issues/971>`__, commit `5cdf59
+  <https://github.com/wjakob/nanobind/commit/5cdf58984e7a8b520935c3771029fe0e87edee73>`__).
+
+- The Eigen sparse matrix caster now correctly handles ``scipy.sparse`` objects
+  with unsorted indices. (PR `#981
+  <https://github.com/wjakob/nanobind/pull/981>`__).
+
 - Nanobind's CMake stub generation command :cmake:command:`nanobind_add_stub`
   now detects when an extension uses sanitizers (TSAN, ASAN, UBSAN). It then
   injects the sanitizer library into the Python process ahead of time so that
@@ -39,7 +53,7 @@ Version TBD (unreleased)
   <https://github.com/wjakob/nanobind/pull/735>`__).
 
 - Corrected a flaw in the recommended implementation of ``tp_traverse`` in
-  garbage-collected bidnings. (PRs `#1015
+  garbage-collected bindings. (PRs `#1015
   <https://github.com/wjakob/nanobind/pull/1015>`__).
 
 - Added support for binding functions that accept a ``std::variant<...>`` that
@@ -48,20 +62,6 @@ Version TBD (unreleased)
 
 - Added support for casting const-qualified ``std::unique_ptr<T>`` values. (PR
   `#988 <https://github.com/wjakob/nanobind/pull/988>`__).
-
-- Made handling of return value policies in Eigen type casters more consistent
-  with the rest of nanobind. (Issue `#971
-  <https://github.com/wjakob/nanobind/issues/971>`__, commit `5cdf59
-  <https://github.com/wjakob/nanobind/commit/5cdf58984e7a8b520935c3771029fe0e87edee73>`__).
-
-- nanobind now provides a zero-copy type caster for
-  ``Eigen::Map<Eigen::SparseMatrix>``. (PRs `#1003
-  <https://github.com/wjakob/nanobind/pull/1003>`__, `#782
-  <https://github.com/wjakob/nanobind/pull/782>`__).
-
-- The Eigen sparse matrix caster now correctly handles ``scipy.sparse`` objects
-  with unsorted indices. (PR `#981
-  <https://github.com/wjakob/nanobind/pull/981>`__).
 
 - ``nb::typed<T, ...>`` now supports construction from ``T``, making it more
   ergonomic to return values with type annotations. (PR `#1012

@@ -43,7 +43,7 @@ public:
     /// Copy a reference, increases the reference count
     ref(const ref &r) : m_ptr(r.m_ptr) { inc_ref((intrusive_base *) m_ptr); }
 
-    /// Move a reference witout changing the reference count
+    /// Move a reference without changing the reference count
     ref(ref &&r) noexcept : m_ptr(r.m_ptr) { r.m_ptr = nullptr; }
 
     /// Destroy this reference

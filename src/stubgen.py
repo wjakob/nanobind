@@ -1064,6 +1064,10 @@ class StubGen:
         if has_def:
             result += " = " if has_type else "="
             p_default_str = self.expr_str(p.default)
+            if p_default_str is None:
+                # self.expr_str(p.default) could return None in some rare cases, 
+                # e.g. p.default is a nanobind object. If so, use ellipsis as a placeholder.
+                p_default_str = "..."
             assert p_default_str
             result += p_default_str
         return result

@@ -381,6 +381,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
     // Extended version taking arbitrary strides
     using DMap = Eigen::Map<const T, Options, DStride>;
     using DMapCaster = make_caster<DMap>;
+    static constexpr bool DMapIsDifferent = !std::is_same_v<Map, DMap>;
 
     /**
      * The constructor of ``Ref<const T>`` uses one of two strategies
@@ -391,14 +392,66 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
      *
      * When the value below is ``true``, then it is guaranteed that
      * ``Ref(<DMap instance>)`` owns the underlying data.
+     * Note that this ownership does *not* propagate to any further ``Ref``
+     * that might be constructed from it; the ``ToRef`` wrapper below
+     * attempts to avoid this hazard by ensuring there is no need to copy
+     * or move the initial ``Ref``.
      */
     static constexpr bool DMapConstructorOwnsData =
         !Eigen::internal::traits<Ref>::template match<DMap>::type::value;
 
+    /**
+     * Result type of our cast operator, which can be used to construct a
+     * ``Ref`` from either ``Map`` or ``DMap``. Unfortunately, ``Ref`` does
+     * not model any sort of shared ownership; if we wind up creating a ``Ref``
+     * that owns the data, then copying it will produce a second ``Ref`` that
+     * refers to the original ``Ref``, which is likely to go out of scope
+     * soon. Eigen also has very minimal support for C++11 features such as
+     * moves, and in particular moving a ``Ref`` is equivalent to copying it
+     * in all released versions of Eigen as of this writing.
+     * This creates problems for nested type casters such as
+     * ``std::optional<Eigen::Ref<..>>``, which can't directly construct the
+     * cast operator's return value inside their data structure.
+     */
+    struct ToRef {
+        // DMap has maximally dynamic strides, so it won't contain
+        // fewer fields than Map (which might have some stride info
+        // known at compile time).
+        static_assert(alignof(DMap) >= alignof(Map) &&
+                      sizeof(DMap) >= sizeof(Map));
+        alignas(DMap) char storage[sizeof(DMap)];
+        bool holds_dmap;
+        static constexpr bool MightHoldDMap = MaybeConvert && DMapIsDifferent;
+
+        ToRef(Map m) : holds_dmap(false) { new(&storage) Map(m); }
+        template <bool Enable = MightHoldDMap, enable_if_t<Enable> = 0>
+        ToRef(DMap m) : holds_dmap(true) { new(&storage) DMap(m); }
+        ToRef(const ToRef&) = delete;
+        ToRef& operator=(const ToRef&) = delete;
+        ~ToRef() {
+            if constexpr (MightHoldDMap) {
+                if (holds_dmap) {
+                    ((DMap *) storage)->~DMap();
+                    return;
+                }
+            }
+            ((Map *) storage)->~Map();
+        }
+
+        operator Ref() const {
+            if constexpr (MightHoldDMap) {
+                if (holds_dmap) {
+                    return Ref(*(DMap *) storage);
+                }
+            }
+            return Ref(*(Map *) storage);
+        }
+    };
+
     static constexpr auto Name =
         const_name<MaybeConvert>(DMapCaster::Name, MapCaster::Name);
 
-    template <typename T_> using Cast = Ref;
+    template <typename T_> using Cast = ToRef;
     template <typename T_> static constexpr bool can_cast() { return true; }
 
     MapCaster caster;
@@ -459,13 +512,13 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
             cleanup);
     }
 
-    operator Ref() {
+    operator ToRef() {
         if constexpr (MaybeConvert) {
             if (dcaster.caster.value.is_valid())
-                return Ref(dcaster.operator DMap());
+                return ToRef(dcaster.operator DMap());
         }
 
-        return Ref(caster.operator Map());
+        return ToRef(caster.operator Map());
     }
 };
 

@@ -15,8 +15,15 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.7.0 (Apr 18, 2025)
+Version TBD (unreleased)
 ------------------------
+
+- Casts to ``std::optional<Eigen::Ref<const ..>>`` that require conversion
+  no longer produce a dangling reference. (PR `#1025
+  <https://github.com/wjakob/nanobind/pull/1025>`__).
+
+Version 2.7.0 (Apr 18, 2025)
+----------------------------
 
 - nanobind now provides a zero-copy type caster for
   ``Eigen::Map<Eigen::SparseMatrix>``. (PRs `#1003

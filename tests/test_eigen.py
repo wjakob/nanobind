@@ -77,6 +77,12 @@ def test02_vector_dynamic():
     # Try with a big array. This will move the result to avoid a copy
     assert_array_equal(t.addVXi(x, x), 2*x)
 
+    # Regression test for lifetime issues casting std::optional<Ref<VectorXi>>
+    assert_array_equal(t.addOptRefVXi(af, b), c)
+    assert_array_equal(t.addOptRefVXi(af, None), af)
+    assert_array_equal(t.addOptRefVXi(None, b), b)
+    assert t.addOptRefVXi(None, None) is None
+
 
 @needs_numpy_and_eigen
 def test03_update_map():

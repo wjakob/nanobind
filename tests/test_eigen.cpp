@@ -1,4 +1,5 @@
 #include <nanobind/stl/complex.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 #include <nanobind/trampoline.h>
@@ -143,6 +144,22 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("updateRefV3i_nc", [](Eigen::Ref<Eigen::Vector3i> a) { a[2] = 123; }, nb::arg().noconvert());
     m.def("updateRefVXi", [](Eigen::Ref<Eigen::VectorXi> a) { a[2] = 123; });
     m.def("updateRefVXi_nc", [](Eigen::Ref<Eigen::VectorXi> a) { a[2] = 123; }, nb::arg().noconvert());
+
+    m.def("addOptRefVXi",
+          [](std::optional<Eigen::Ref<const Eigen::VectorXi>> r1,
+             std::optional<Eigen::Ref<const Eigen::VectorXi>> r2)
+                  -> std::optional<Eigen::VectorXi> {
+              if (!r1.has_value() && !r2.has_value()) {
+                  return std::nullopt;
+              }
+              if (!r1.has_value()) {
+                  return *r2;
+              }
+              if (!r2.has_value()) {
+                  return *r1;
+              }
+              return *r1 + *r2;
+          }, "r1"_a.none(), "r2"_a.none());
 
     using SparseMatrixR = Eigen::SparseMatrix<float, Eigen::RowMajor>;
     using SparseMatrixC = Eigen::SparseMatrix<float>;

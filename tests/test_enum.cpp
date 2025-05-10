@@ -26,10 +26,17 @@ NB_MODULE(test_enum_ext, m) {
             .value("C", Flag::C, "Value C")
             .export_values();
 
-    nb::enum_<UnsignedFlag>(m, "UnsignedFlag", nb::is_flag())
-                .value("A", UnsignedFlag::A, "Value A")
-                .value("B", UnsignedFlag::B, "Value B")
-                .value("All", UnsignedFlag::All, "All values");
+    nb::enum_<UnsignedFlag>(
+        m,
+        nb::enum_init_with_members{},
+        "UnsignedFlag",
+        {
+            {"A", UnsignedFlag::A, "Value A"},
+            {"B", UnsignedFlag::B, "Value B"},
+            {"All", UnsignedFlag::All, "All values"}
+        },
+        nb::is_flag{}
+    );
 
     nb::enum_<SEnum>(m, "SEnum", nb::is_arithmetic())
         .value("A", SEnum::A)

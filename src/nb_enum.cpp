@@ -65,9 +65,19 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     object enum_mod = module_::import_("enum"),
            factory = enum_mod.attr(factory_name),
-           result = factory(name, nanobind::tuple(),
+           result = factory(name, ed->members,
                             arg("module") = modname,
                             arg("qualname") = qualname);
+    // Set the `__doc__` attribute of each enum member.
+    {
+      auto member_iter{ed->members.begin()}, member_end_iter{ed->members.end()};
+      auto doc_iter{ed->member_docs.begin()}, doc_end_iter{ed->member_docs.end()};
+      while (member_iter != member_end_iter && doc_iter != doc_end_iter) {
+        result.attr((*member_iter)[0]).attr("__doc__") = *doc_iter;
+        ++member_iter;
+        ++doc_iter;
+      }
+    }
 
     scope.attr(name) = result;
     result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();

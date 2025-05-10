@@ -8,6 +8,16 @@
 */
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
+
+template <typename T>
+struct enum_member {
+    const char *name;
+    const T value;
+    const char *doc = nullptr;
+};
+
+struct enum_init_with_members {};
+
 NAMESPACE_BEGIN(detail)
 
 /// Flags about a type that persist throughout its lifetime
@@ -204,12 +214,15 @@ enum class enum_flags : uint32_t {
     is_flag                = (1 << 3)
 };
 
+
 struct enum_init_data {
     const std::type_info *type;
     PyObject *scope;
     const char *name;
     const char *docstr;
     uint32_t flags;
+    nanobind::list members;
+    nanobind::list member_docs;
 };
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
@@ -767,8 +780,34 @@ public:
     using Base = class_<T>;
     using Underlying = std::underlying_type_t<T>;
 
+    // Note: I need to use a tag class `enum_init_with_members` to distinguish the new API from the old in order for
+    //       implicit type conversion to work for the `members` parameter. For instance, if we try to use
+    //       initializer_list for the `members` parameter, without having the tag class to distinguish the new and old
+    //       API, it will be lumped into the `extra` parameter of the old API and call old API instead.
     template <typename... Extra>
-    NB_INLINE enum_(handle scope, const char *name, const Extra &... extra) {
+    NB_INLINE enum_(
+        handle scope,
+        enum_init_with_members,
+        const char *name,
+        const std::vector<enum_member<T>> &members,
+        const Extra &... extra
+    ): enum_(scope, enum_init_with_members{}, name, &members, extra...) {}
+
+    template <typename... Extra>
+    NB_INLINE enum_(
+        handle scope,
+        const char *name,
+        const Extra &... extra
+    ): enum_(scope, enum_init_with_members{}, name, nullptr, extra...) {}
+
+    template <typename... Extra>
+    NB_INLINE enum_(
+        handle scope,
+        enum_init_with_members,
+        const char *name,
+        const std::vector<enum_member<T>> *members_ptr,
+        const Extra &... extra
+    ) {
         detail::enum_init_data ed { };
         ed.type = &typeid(T);
         ed.scope = scope.ptr();
@@ -777,6 +816,20 @@ public:
                        ? (uint32_t) detail::enum_flags::is_signed
                        : 0;
         (detail::enum_extra_apply(ed, extra), ...);
+        if (members_ptr != nullptr) {
+          for (const auto &member: *members_ptr) {
+            object value_obj{
+                std::is_signed_v<Underlying>
+                    ? steal(PyLong_FromLongLong((long long) member.value))
+                    : steal(PyLong_FromUnsignedLongLong((unsigned long long) member.value))
+            };
+            ed.members.append(make_tuple(str{member.name}, value_obj));
+            // Note: We send the docstring of enum members to the enum_create function because when we create the Enum
+            //       class, each enum member will be wrapped in another object, and we want to set the docstring to the
+            //       wrapper object.
+            ed.member_docs.append(member.doc != nullptr ? str(member.doc) : none());
+          }
+        }
         m_ptr = detail::enum_create(&ed);
     }
 

@@ -943,6 +943,11 @@ Wrapper classes
 
       Return the pointer wrapped by the capsule.
 
+   .. cpp:function:: void * data(const char *name) const
+
+      Return the pointer wrapped by the capsule. Check that the
+      capsule name matches the specified value, or raise an exception.
+
 
 .. cpp:class:: bool_: public object
 

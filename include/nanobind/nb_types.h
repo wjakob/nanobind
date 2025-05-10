@@ -348,6 +348,12 @@ class capsule : public object {
     const char *name() const { return PyCapsule_GetName(m_ptr); }
 
     void *data() const { return PyCapsule_GetPointer(m_ptr, name()); }
+    void *data(const char *name) const {
+        void *p = PyCapsule_GetPointer(m_ptr, name);
+        if (!p && PyErr_Occurred())
+            raise_python_error();
+        return p;
+    }
 };
 
 class bool_ : public object {

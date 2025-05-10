@@ -463,13 +463,21 @@ void setattr(PyObject *obj, PyObject *key, PyObject *value) {
 }
 
 void delattr(PyObject *obj, const char *key) {
+    #if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000)
+    int rv = PyObject_SetAttrString(obj, key, nullptr);
+    #else
     int rv = PyObject_DelAttrString(obj, key);
+    #endif
     if (rv)
         raise_python_error();
 }
 
 void delattr(PyObject *obj, PyObject *key) {
+    #if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000)
+    int rv = PyObject_SetAttr(obj, key, nullptr);
+    #else
     int rv = PyObject_DelAttr(obj, key);
+    #endif
     if (rv)
         raise_python_error();
 }

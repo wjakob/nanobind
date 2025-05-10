@@ -354,6 +354,9 @@ bool ndarray_check(PyObject *o) noexcept {
 
     PyTypeObject *tp = Py_TYPE(o);
 
+    if (tp == &PyCapsule_Type)
+        return true;
+
     PyObject *name = nb_type_name((PyObject *) tp);
     check(name, "Could not obtain type name! (1)");
 

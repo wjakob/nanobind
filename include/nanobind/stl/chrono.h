@@ -153,8 +153,13 @@ public:
         ch::microseconds msecs;
         int yy, mon, dd, hh, min, ss, uu;
         try {
-            if (!unpack_datetime(src.ptr(), &yy, &mon, &dd,
-                                 &hh, &min, &ss, &uu)) {
+            PyObject* shifted_time_ptr{};
+            if (!shift_to_timezone(src.ptr(), &shifted_time_ptr)) {
+                return false;
+            }
+
+            if (!unpack_datetime(bool(shifted_time_ptr) ? steal(shifted_time_ptr).ptr() : src.ptr(),
+                                 &yy, &mon, &dd, &hh, &min, &ss, &uu)) {
                 return false;
             }
         } catch (python_error& e) {

@@ -562,7 +562,7 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DLL_PATH;DEPENDS")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -588,6 +588,10 @@ function (nanobind_add_stub name)
 
   foreach (TMP IN LISTS ARG_PYTHON_PATH)
     list(APPEND NB_STUBGEN_ARGS -i "${TMP}")
+  endforeach()
+
+  foreach (TMP IN LISTS ARG_DLL_PATH)
+    list(APPEND NB_STUBGEN_ARGS -L "${TMP}")
   endforeach()
 
   if (ARG_PATTERN_FILE)

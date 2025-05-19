@@ -15,6 +15,12 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (unreleased)
+------------------------
+
+- The ``nanobind::literals`` namespace now includes ``_s`` to create a Python string
+  from source code literals
+
 Version 2.7.0 (Apr 18, 2025)
 ------------------------
 

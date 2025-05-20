@@ -1138,10 +1138,6 @@ Wrapper classes
       Check whether the map contains a particular key. When `T` does not
       already represent a wrapped Python object, the function performs a cast.
 
-   .. cpp:function:: bool empty() const
-
-      Check whether the map is empty.
-
    .. cpp:function:: list keys() const
 
       Return a list containing all of the map's keys.

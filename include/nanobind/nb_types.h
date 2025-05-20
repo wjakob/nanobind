@@ -585,7 +585,6 @@ class mapping : public object {
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
     template <typename T> bool contains(T&& key) const;
-    bool empty() const { return size() == 0; }
 };
 
 class args : public tuple {

@@ -676,6 +676,10 @@ Wrapper classes
 
       Return the number of tuple elements.
 
+   .. cpp:function:: bool empty() const
+
+      Check whether the tuple is empty.
+
    .. cpp:function:: detail::fast_iterator begin() const
 
       Return a forward iterator analogous to ``iter()`` in Python. The function
@@ -718,6 +722,10 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the number of list elements.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the list is empty.
 
    .. cpp:function:: template <typename T> void append(T&& value)
 
@@ -784,6 +792,10 @@ Wrapper classes
 
       Return the number of dictionary elements.
 
+   .. cpp:function:: bool empty() const
+
+      Check whether the dictionary is empty.
+
    .. cpp:function:: template <typename T> bool contains(T&& key) const
 
       Check whether the dictionary contains a particular key. When `T` does not
@@ -838,6 +850,10 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the number of set elements.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the set is empty.
 
    .. cpp:function:: template <typename T> void add(T&& key)
 
@@ -1121,6 +1137,10 @@ Wrapper classes
 
       Check whether the map contains a particular key. When `T` does not
       already represent a wrapped Python object, the function performs a cast.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the map is empty.
 
    .. cpp:function:: list keys() const
 

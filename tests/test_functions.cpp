@@ -195,7 +195,7 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_print", []{
         nb::print("Test 1");
-        nb::print(nb::str("Test 2"));
+        nb::print("Test 2"_s);
     });
 
     m.def("test_iter", [](nb::object in) {
@@ -237,7 +237,7 @@ NB_MODULE(test_functions_ext, m) {
     });
 
     m.def("test_10_contains", [](nb::dict d) {
-        return d.contains(nb::str("foo"));
+        return d.contains("foo"_s);
     });
 
     // Test implicit conversion of various types
@@ -320,7 +320,7 @@ NB_MODULE(test_functions_ext, m) {
         const char *name = "Foo";
 
         auto callback = [=]() {
-            return nb::str("Test {}").format(name);
+            return "Test {}"_s.format(name);
         };
 
         return nb::cpp_function(callback);

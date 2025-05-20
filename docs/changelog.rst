@@ -22,7 +22,7 @@ Version TBD (unreleased)
   from source code literals
 
 Version 2.7.0 (Apr 18, 2025)
-------------------------
+----------------------------
 
 - nanobind now provides a zero-copy type caster for
   ``Eigen::Map<Eigen::SparseMatrix>``. (PRs `#1003

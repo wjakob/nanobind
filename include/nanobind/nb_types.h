@@ -500,6 +500,7 @@ class tuple : public object {
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
 #endif
+    bool empty() const { return size() == 0; }
 };
 
 class type_object : public object {
@@ -543,6 +544,7 @@ class list : public object {
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
 #endif
+    bool empty() const { return size() == 0; }
 };
 
 class dict : public object {
@@ -560,6 +562,7 @@ class dict : public object {
         if (PyDict_Update(m_ptr, h.ptr()))
             raise_python_error();
     }
+    bool empty() const { return size() == 0; }
 };
 
 class set : public object {
@@ -575,6 +578,7 @@ class set : public object {
             raise_python_error();
     }
     template <typename T> bool discard(T &&value);
+    bool empty() const { return size() == 0; }
 };
 
 class sequence : public object {

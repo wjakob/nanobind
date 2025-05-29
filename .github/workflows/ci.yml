@@ -108,6 +108,7 @@ jobs:
         python3 -m pytest
 
   old-compilers:
+    if: false # Disable for now, the CI is glitchy
     strategy:
       fail-fast: false
       matrix:

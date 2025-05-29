@@ -145,10 +145,6 @@ PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
     def->m_size = -1;
     PyObject *m = PyModule_Create(def);
 
-    #ifdef NB_FREE_THREADED
-        PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
-    #endif
-
     check(m, "nanobind::detail::module_new(): allocation failed!");
     return m;
 }

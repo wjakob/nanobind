@@ -47,19 +47,21 @@ for both nanobind and robin-map:
 
 The ``meson.build`` definition in your project root should look like:
 
-.. code-block:: python
+.. code-block:: meson
 
    project(
      'my_project_name',
      'cpp',
      version: '0.0.1',
+     meson_version: '>=1.0.0',
+     default_options: ['cpp_std=c++17', 'b_ndebug=if-release'],
    )
 
    py = import('python').find_installation()
-   nanobind_dep = dependency('nanobind', static: true)
+   nanobind_dep = dependency('nanobind')
    py.extension_module(
      'my_module_name',
-     sources: ['path_to_module.cc'],
+     sources: ['path_to_module.cpp'],
      dependencies: [nanobind_dep],
      install: true,
    )
@@ -68,7 +70,7 @@ With this configuration, you may then call:
 
 .. code-block:: sh
 
-   meson setup builddir
+   meson setup --buildtype release builddir
    meson compile -C builddir
 
 to compile the extension in the ``builddir`` folder.
@@ -89,16 +91,26 @@ Building against the stable ABI
 As in nanobind's CMake config, you can build bindings targeting Python's
 stable ABI, starting from version 3.12. To do this, specify the target
 version using the ``limited_api`` argument in your configuration. For example,
-to build extensions against the CPython 3.12 stable ABI, you would use:
+to build extensions against the CPython 3.12 stable ABI, use:
 
-.. code-block:: python
+.. code-block:: meson
 
+   project(
+     'my_project_name',
+     'cpp',
+     version: '0.0.1',
+     meson_version: '>=1.3.0',
+     default_options: ['cpp_std=c++17', 'b_ndebug=if-release'],
+   )
+
+   py = import('python').find_installation()
+   nanobind_dep = dependency('nanobind')
    py.extension_module(
      'my_module_name',
-     sources: ['path_to_module.cc'],
+     sources: ['path_to_module.cpp'],
      dependencies: [nanobind_dep],
      install: true,
      limited_api: '3.12',
    )
 
-in your ``meson.build`` file.
+as your ``meson.build`` file.

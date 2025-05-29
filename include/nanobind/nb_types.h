@@ -451,6 +451,12 @@ class bytes : public object {
     size_t size() const { return (size_t) PyBytes_Size(m_ptr); }
 };
 
+NAMESPACE_BEGIN(literals)
+inline str operator"" _s(const char *s, size_t n) {
+    return str(s, n);
+}
+NAMESPACE_END(literals)
+
 class bytearray : public object {
     NB_OBJECT(bytearray, object, "bytearray", PyByteArray_Check)
 

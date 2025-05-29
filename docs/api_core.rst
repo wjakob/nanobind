@@ -1021,6 +1021,12 @@ Wrapper classes
 
       Convert a C-style string in UTF-8 encoding of length ``n`` bytes into a Python string.
 
+      There is a user-defined string literal ``_s`` accessible in the
+      ``nanobind::literals`` namespace::
+
+            using namespace nanobind::literals;
+            auto s = "Hello world!"_s; // equivalent to str("Hello world!")
+
    .. cpp:function:: const char * c_str() const
 
       Convert a Python string into a null-terminated C-style string with UTF-8

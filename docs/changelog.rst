@@ -19,7 +19,28 @@ Version TBD (unreleased)
 ------------------------
 
 - The ``nanobind::literals`` namespace now includes ``_s`` to create a Python string
-  from source code literals
+  from source code literals. (PR `#1051
+  <https://github.com/wjakob/nanobind/pull/1051>`__).
+
+- Nanobind now uses multi-phase (as opposed to single-phase) initialization API
+  when registering modules. However, multi-interpreter extensions remain
+  unsupported. (PR `#1059 <https://github.com/wjakob/nanobind/pull/1059>`__).
+
+- Added :cpp:func:`nb::dict::empty() <dict::empty>`,
+  :cpp:func:`nb::list::empty() <list::empty>`, :cpp:func:`nb::set::empty()
+  <set::empty>`, and :cpp:func:`nb::tuple::empty() <tuple::empty>` convenience
+  methods.
+
+- Nanobind now uses multi-phase (as opposed to single-phase) initialization API
+  when registering modules. However, multi-interpreter extensions remain
+  unsupported. (PR `#1059 <https://github.com/wjakob/nanobind/pull/1059>`__).
+
+- Miscellaneous fixes and improvements (
+  commits
+  `d4b245 <https://github.com/wjakob/nanobind/commit/d4b245ad69f729c3d2095be4c1cb5b94810dae26>`__,
+  `667451 <https://github.com/wjakob/nanobind/commit/667451fb4566dcd7151d64d81e118f9ba194a889>`__,
+  `62fc99 <https://github.com/wjakob/nanobind/commit/62fc996018d9ea4d51af9c86cf008c2562b4eeab>`__).
+
 
 Version 2.7.0 (Apr 18, 2025)
 ----------------------------

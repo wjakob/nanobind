@@ -331,7 +331,7 @@ def test_chrono_invalid(test_type, roundtrip_name):
             # attribute accesses.
             pass
         else:
-            from _pytest.unraisableexception import catch_unraisable_exception
+            from test.support import catch_unraisable_exception
 
             with catch_unraisable_exception() as cm:
                 with pytest.raises(TypeError, match="incompatible function arguments"):

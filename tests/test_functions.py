@@ -765,3 +765,14 @@ def test51_isinstance():
     assert not t.isinstance_(3, bool)
     with pytest.raises(TypeError):
         t.isinstance_(3, 7)
+
+
+def test52_frozenset():
+    x = t.test_frozenset()
+    assert isinstance(x, frozenset)
+    assert len(x) == 2
+    assert 123 in x and "123" in x
+    assert t.test_frozenset_contains(x, 123)
+    assert t.test_frozenset_contains(x, "123")
+    assert not t.test_frozenset_contains(x, "1234")
+    assert not t.test_frozenset_contains(x, 1234)

@@ -581,6 +581,16 @@ class set : public object {
     bool empty() const { return size() == 0; }
 };
 
+class frozenset : public object {
+    NB_OBJECT(frozenset, object, "frozenset", PyFrozenSet_Check)
+    frozenset() : object(PyFrozenSet_New(nullptr), detail::steal_t()) { }
+    explicit frozenset(handle h)
+        : object(detail::frozenset_from_obj(h.ptr()), detail::steal_t{}) { }
+    size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
+    template <typename T> bool contains(T&& key) const;
+    bool empty() const { return size() == 0; }
+};
+
 class sequence : public object {
     NB_OBJECT_DEFAULT(sequence, object, NB_TYPING_SEQUENCE, PySequence_Check)
 };

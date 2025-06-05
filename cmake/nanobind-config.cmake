@@ -449,7 +449,8 @@ function(nanobind_sanitizer_preload_env env_var)
         TRANSITIVE_COMPILE_PROPERTIES
       )
     endif()
-    
+
+    # create a list of all dependent target and scan those for dependencies on sanitizers
     set(all_deps "${target}")
     get_target_property(deps ${target} LINK_LIBRARIES)
     foreach(dep ${deps})
@@ -457,7 +458,6 @@ function(nanobind_sanitizer_preload_env env_var)
             list(APPEND all_deps "${dep}")
         endif()
     endforeach()
-
     foreach(tgt ${all_deps})
       foreach(prop ${san_options_to_search})
         get_target_property(options ${tgt} ${prop})

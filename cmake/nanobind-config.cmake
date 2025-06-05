@@ -450,7 +450,7 @@ function(nanobind_sanitizer_preload_env env_var)
       )
     endif()
 
-    # create a list of all dependent target and scan those for dependencies on sanitizers
+    # create a list of all dependent targets and scan those for dependencies on sanitizers
     set(all_deps "${target}")
     get_target_property(deps ${target} LINK_LIBRARIES)
     foreach(dep ${deps})

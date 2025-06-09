@@ -876,6 +876,32 @@ Wrapper classes
       the value was not present. When `T` does not already represent a wrapped
       Python object, the function performs a cast.
 
+.. cpp:class:: frozenset: public object
+
+   Wrapper class representing Python ``frozenset`` instances.
+
+   .. cpp:function:: frozenset()
+
+      Create an empty frozenset
+
+   .. cpp:function:: frozenset(handle h)
+
+      Attempt to convert a given Python object into a ``frozenset``. Analogous
+      to the expression ``frozenset(h)`` in Python.
+
+   .. cpp:function:: size_t size() const
+
+      Return the number of set elements.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the set is empty.
+
+   .. cpp:function:: template <typename T> bool contains(T&& key) const
+
+      Check whether the set contains a particular key. When `T` does not
+      already represent a wrapped Python object, the function performs a cast.
+
 .. cpp:class:: module_: public object
 
    Wrapper class representing Python ``module`` instances. The underscore at

@@ -735,6 +735,14 @@ template <typename T> bool set::discard(T &&value) {
     return rv == 1;
 }
 
+template <typename T> bool frozenset::contains(T&& key) const {
+    object o = nanobind::cast((detail::forward_t<T>) key);
+    int rv = PySet_Contains(m_ptr, o.ptr());
+    if (rv == -1)
+        raise_python_error();
+    return rv == 1;
+}
+
 template <typename T> bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PyMapping_HasKey(m_ptr, o.ptr());

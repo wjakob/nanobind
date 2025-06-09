@@ -42,6 +42,8 @@ Version TBD (unreleased)
   `62fc99 <https://github.com/wjakob/nanobind/commit/62fc996018d9ea4d51af9c86cf008c2562b4eeab>`__).
 
 
+- Added :cpp:class:`nb::frozenset` that wraps the Python ``frozenset`` type.
+
 Version 2.7.0 (Apr 18, 2025)
 ----------------------------
 

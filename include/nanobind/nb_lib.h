@@ -161,6 +161,9 @@ NB_CORE PyObject *tuple_from_obj(PyObject *o);
 /// Convert a Python object into a Python set
 NB_CORE PyObject *set_from_obj(PyObject *o);
 
+/// Convert a Python object into a Python frozenset
+NB_CORE PyObject *frozenset_from_obj(PyObject *o);
+
 // ========================================================================
 
 /// Get an object attribute or raise an exception

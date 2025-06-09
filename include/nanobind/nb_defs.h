@@ -232,4 +232,4 @@
     extern "C" PyObject *PyInit_##name(void) {                                 \
         return PyModuleDef_Init(&nanobind_##name##_module);                    \
     }                                                                          \
-    void nanobind_##name##_exec_impl(nanobind::module_ variable)               \
+    void nanobind_##name##_exec_impl(nanobind::module_ variable)

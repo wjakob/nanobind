@@ -1755,11 +1755,11 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    The annotation has the following runtime characteristics:
 
-    - It does nothing when the nurse or patient object are ``None``.
+   - It does nothing when the nurse or patient object are ``None``.
 
-    - It raises an exception when the nurse object is neither
-      weak-referenceable nor an instance of a binding created via
-      :cpp:class:`nb::class_\<..\> <class_>`.
+   - It raises an exception when the nurse object is neither
+     weak-referenceable nor an instance of a binding created via
+     :cpp:class:`nb::class_\<..\> <class_>`.
 
    Two additional caveats regarding :cpp:class:`keep_alive <keep_alive>` are
    noteworthy:

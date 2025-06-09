@@ -375,7 +375,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
         }
     }
 
-    // Detect when an entire overload chain has the dame docstring
+    // Detect when an entire overload chain has the same docstring
     func->doc_uniform =
         (has_doc && ((prev_overloads == 0) ||
                      (prev_doc && strcmp(fc->doc, prev_doc) == 0)));

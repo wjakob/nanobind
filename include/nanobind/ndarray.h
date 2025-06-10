@@ -59,25 +59,25 @@ NAMESPACE_END(dlpack)
         static constexpr auto name = detail::const_name(label);                \
         static constexpr int value = Value;                                    \
         static constexpr bool is_framework = true;                             \
-    };
+    }
 
 #define NB_DEVICE(Name, Value)                                                 \
     struct Name {                                                              \
         static constexpr auto name = detail::const_name("device='" #Name "'"); \
         static constexpr int value = Value;                                    \
         static constexpr bool is_device_type = true;                           \
-    };
+    }
 
 #define NB_ORDER(Name, Value)                                                  \
     struct Name {                                                              \
         static constexpr auto name = detail::const_name("order='" Value "'");  \
         static constexpr char value = Value[0];                                \
         static constexpr bool is_order = true;                                 \
-    };
+    }
 
-NB_ORDER(c_contig, "C")
-NB_ORDER(f_contig, "F")
-NB_ORDER(any_contig, "A")
+NB_ORDER(c_contig, "C");
+NB_ORDER(f_contig, "F");
+NB_ORDER(any_contig, "A");
 
 NB_FRAMEWORK(no_framework, 0, "ndarray");
 NB_FRAMEWORK(numpy, 1, "numpy.ndarray");

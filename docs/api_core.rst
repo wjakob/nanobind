@@ -882,7 +882,7 @@ Wrapper classes
 
    .. cpp:function:: frozenset()
 
-      Create an empty frozenset
+      Create an empty frozenset.
 
    .. cpp:function:: frozenset(handle h)
 

@@ -5,11 +5,7 @@
 // The changes are as follows:
 //
 // - fmix32 and fmix64 are exported to other compilation units, since they
-//   are useful has a hash function for 32/64 bit integers and pointers
-//
-// - The MurmurHash3_x64_64() function is a variant of the original
-//   MurmurHash3_x64_128() that only returns the low 64 bit of the hash
-//   value.
+//   are useful as a hash function for 32/64 bit integers and pointers.
 //-----------------------------------------------------------------------------
 
 #pragma once

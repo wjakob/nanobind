@@ -202,7 +202,9 @@
     X(const X &) = delete;                                                     \
     X &operator=(const X &) = delete;
 
-#define NB_MODULE(name, variable)                                              \
+// Helper macros to ensure macro arguments are expanded before token pasting/stringification
+#define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)
+#define NB_MODULE_IMPL2(name, variable)                                        \
     static void nanobind_##name##_exec_impl(nanobind::module_);                \
     static int nanobind_##name##_exec(PyObject *m) {                           \
         nanobind::detail::init(NB_DOMAIN_STR);                                 \
@@ -233,3 +235,5 @@
         return PyModuleDef_Init(&nanobind_##name##_module);                    \
     }                                                                          \
     void nanobind_##name##_exec_impl(nanobind::module_ variable)
+
+#define NB_MODULE(name, variable) NB_MODULE_IMPL(name, variable)

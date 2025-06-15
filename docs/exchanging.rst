@@ -398,8 +398,9 @@ directives:
 :cpp:class:`module_`, :cpp:class:`object`, :cpp:class:`set`, :cpp:class:`sequence`,
 :cpp:class:`slice`, :cpp:class:`str`, :cpp:class:`tuple`,
 :cpp:class:`weakref`,
-:cpp:class:`type_object`, :cpp:class:`type_object_t\<T\> <handle_t>`,
-:cpp:class:`args`, and :cpp:class:`kwargs`.
+:cpp:class:`type_object`, :cpp:class:`type_object_t\<T\> <type_object_t>`,
+:cpp:class:`args`, :cpp:class:`kwargs`, and
+:cpp:class:`fallback <fallback>`.
 
 Discussion
 ----------

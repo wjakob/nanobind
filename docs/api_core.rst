@@ -1291,6 +1291,24 @@ Wrapper classes
    difference is the type signature when used in function arguments and return
    values.
 
+.. cpp:class:: fallback : public object
+
+   Instances of this wrapper class behave just like :cpp:class:`handle`. When
+   used to pass arguments in function bindings, the associated arguments
+   *require* implicit conversion (which, however, adds no runtime cost).
+
+   The type is convenient in overload chains where a generic fallback should
+   accept any Python object, e.g.,
+
+   .. code-block:: cpp
+
+      m.def("func", [](MyClass &arg)) { ... });
+      m.def("func", [](nb::fallback arg)) { ... });
+
+   If :cpp:class:`handle` or :cpp:class:`object` were used instead on the
+   second line, they would always match and prevent potential implicit
+   conversion of arguments to `MyClass`.
+
 Parameterized wrapper classes
 -----------------------------
 

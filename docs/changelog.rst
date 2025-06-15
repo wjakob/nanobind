@@ -18,6 +18,12 @@ below inherit that of the preceding release.
 Version TBD (unreleased)
 ------------------------
 
+- Added :cpp:class:`nb::fallback <fallback>` wrapper type, which is a
+  :cpp:class:`nb::handle <handle>` that always requires implicit conversion
+  during casting. This is convenient when adding catch-all overloads that must
+  handle arbitrary Python objects, without interfering with implicit conversion
+  of arguments in other overloads.
+
 - The ``nanobind::literals`` namespace now includes ``_s`` to create a Python string
   from source code literals. (PR `#1051
   <https://github.com/wjakob/nanobind/pull/1051>`__).

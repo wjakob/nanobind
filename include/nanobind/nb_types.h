@@ -770,6 +770,15 @@ public:
     static bool check_(handle h) { return isinstance<T>(h); }
 };
 
+struct fallback : public handle {
+public:
+    static constexpr auto Name = detail::const_name("object");
+
+    using handle::handle;
+    using handle::operator=;
+    fallback(const handle &h) : handle(h) { }
+};
+
 template <typename T> class type_object_t : public type_object {
 public:
     static constexpr auto Name = detail::const_name(NB_TYPING_TYPE "[") +

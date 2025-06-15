@@ -776,3 +776,12 @@ def test52_frozenset():
     assert t.test_frozenset_contains(x, "123")
     assert not t.test_frozenset_contains(x, "1234")
     assert not t.test_frozenset_contains(x, 1234)
+
+def test53_fallback():
+    assert t.test_fallback_1(3.0) == 0
+    assert t.test_fallback_1(3) == 1
+    assert t.test_fallback_1('3') == 1
+
+    assert t.test_fallback_2(3.0) == 0
+    assert t.test_fallback_2(3) == 0
+    assert t.test_fallback_2('3') == 1

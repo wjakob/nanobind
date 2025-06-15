@@ -496,4 +496,10 @@ NB_MODULE(test_functions_ext, m) {
           });
 
     m.def("abi_tag", [](){ return nb::detail::abi_tag(); });
+
+    // Test the nb::fallback type
+    m.def("test_fallback_1", [](double){ return 0; });
+    m.def("test_fallback_1", [](nb::handle){ return 1; });
+    m.def("test_fallback_2", [](double) { return 0; });
+    m.def("test_fallback_2", [](nb::fallback){ return 1; });
 }

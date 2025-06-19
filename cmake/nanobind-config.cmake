@@ -460,8 +460,19 @@ function(nanobind_sanitizer_preload_env env_var)
             endif()
         endforeach()
     endif()
+
     foreach(tgt ${all_deps})
+      # Check target type
+      get_target_property(target_type ${tgt} TYPE)
+
       foreach(prop ${san_options_to_search})
+        # Skip non-interface properties for INTERFACE_LIBRARY targets
+        if(target_type STREQUAL "INTERFACE_LIBRARY")
+          if(NOT prop MATCHES "^INTERFACE_")
+            continue()
+          endif()
+        endif()
+
         get_target_property(options ${tgt} ${prop})
         if(options)
           foreach(opt ${options})

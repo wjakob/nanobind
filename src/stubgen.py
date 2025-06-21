@@ -818,7 +818,7 @@ class StubGen:
 
                         if not module_file or module_file.endswith('__init__.py'):
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
-                            dir_name.mkdir(parents=False, exist_ok=True)
+                            dir_name.mkdir(parents=True, exist_ok=True)
                             output_file = dir_name / '__init__.pyi'
                         else:
                             output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
@@ -1399,6 +1399,9 @@ def main(args: Optional[List[str]] = None) -> None:
 
         file.parents[0].mkdir(parents=True, exist_ok=True)
 
+        if opt.recursive:
+            file = file.with_suffix("") / "__init__.pyi"
+
         sg = StubGen(
             module=mod_imported,
             quiet=opt.quiet,
@@ -1433,6 +1436,20 @@ def main(args: Optional[List[str]] = None) -> None:
 
         with open(file, "w", encoding='utf-8') as f:
             f.write(sg.get())
+
+        # Simplify mod/__init__.pyi to mod.pyi if there are no other files in the folder
+        if opt.recursive:
+            for folder in file.parent.glob("**/"):
+                files = list(folder.iterdir())
+                if len(files) == 1:
+                    old_name = files[0]
+                    assert (old_name.suffix == ".pyi"), \
+                        "Tried to rename some files in the output folder that were not .pyi files, is this intended?"
+                    new_name = old_name.parent.with_suffix(".pyi")
+                    if not opt.quiet:
+                        print(f"  - renaming {old_name} to {new_name} ..")
+                    old_name.rename(new_name)
+                    folder.rmdir()
 
     if opt.marker_file:
         if not opt.quiet:

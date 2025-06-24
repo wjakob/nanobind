@@ -264,6 +264,8 @@ class StubGen:
             'MutableSequence|MutableSet|Sequence|ValuesView)'
         )
 
+        self.num_submodules = 0
+
     def write(self, s: str) -> None:
         """Append raw characters to the output"""
         self.output += s
@@ -823,6 +825,7 @@ class StubGen:
                         else:
                             output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
 
+                        self.num_submodules += 1
                         sg = StubGen(
                             module=value,
                             recursive=self.recursive,
@@ -837,6 +840,10 @@ class StubGen:
                         )
 
                         sg.put(value)
+
+                        if sg.num_submodules == 0:
+                            output_file.parent.rmdir()
+                            output_file = output_file.parent.with_suffix(".pyi")
 
                         if not self.quiet:
                             print(f'  - writing stub "{output_file}" ..')
@@ -1436,20 +1443,6 @@ def main(args: Optional[List[str]] = None) -> None:
 
         with open(file, "w", encoding='utf-8') as f:
             f.write(sg.get())
-
-        # Simplify mod/__init__.pyi to mod.pyi if there are no other files in the folder
-        if opt.recursive:
-            for folder in file.parent.glob("**/"):
-                files = list(folder.iterdir())
-                if len(files) == 1:
-                    old_name = files[0]
-                    assert (old_name.suffix == ".pyi"), \
-                        "Tried to rename some files in the output folder that were not .pyi files, is this intended?"
-                    new_name = old_name.parent.with_suffix(".pyi")
-                    if not opt.quiet:
-                        print(f"  - renaming {old_name} to {new_name} ..")
-                    old_name.rename(new_name)
-                    folder.rmdir()
 
     if opt.marker_file:
         if not opt.quiet:

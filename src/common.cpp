@@ -1115,15 +1115,24 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
         return true;
     }
 
-    if constexpr (Recurse) {
-        if ((flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
-            PyObject* temp = PyNumber_Long(o);
-            if (temp) {
-                bool result = load_int<T, false>(temp, 0, out);
-                Py_DECREF(temp);
-                return result;
-            } else {
-                PyErr_Clear();
+    if (flags & (uint8_t) cast_flags::convert) {
+        // Floating conversion option: symmetric with load_f32
+        if (PyFloat_Check(o)) {
+            float temp;
+            bool result = load_f32(o, flags, &temp);
+            if (result)
+                *out = static_cast<T>(temp);
+            return result;
+        } else {
+            if constexpr (Recurse) {
+                PyObject* temp = PyNumber_Long(o);
+                if (temp) {
+                    bool result = load_int<T, false>(temp, 0, out);
+                    Py_DECREF(temp);
+                    return result;
+                } else {
+                    PyErr_Clear();
+                }
             }
         }
     }

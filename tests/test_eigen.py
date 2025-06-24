@@ -310,7 +310,7 @@ def test09_sparse_failures():
     del scipy.sparse.csr_matrix
     with pytest.raises(
         AttributeError,
-        match=re.escape("module 'scipy.sparse' has no attribute 'csr_matrix'"),
+        match=re.compile("[mM]odule 'scipy\\.sparse' has no attribute 'csr_matrix'"),
     ):
         t.sparse_r()
 

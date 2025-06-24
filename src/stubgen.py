@@ -841,9 +841,6 @@ class StubGen:
 
                         sg.put(value)
 
-                        if sg.num_submodules == 0:
-                            sg.output_file.parent.rmdir()
-
                         sg.write_to_file()
 
                     return
@@ -1180,7 +1177,8 @@ class StubGen:
         return s.rstrip() + "\n"
 
     def write_to_file(self):
-        if self.num_submodules == 0:
+        if self.recursive and self.num_submodules == 0:
+            self.output_file.parent.rmdir()
             self.output_file = self.output_file.parent.with_suffix(".pyi")
 
         if not self.quiet:

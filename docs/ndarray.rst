@@ -238,19 +238,19 @@ into a ``Matrix4f`` instance.
 
 .. code-block:: cpp
 
-   struct Matrix4f { float m[4][4] { }; };
+   struct Matrix4f { float data[4][4] { }; };
 
    using Array = nb::ndarray<float, nb::numpy, nb::shape<4, 4>, nb::f_contig>;
 
    nb::class_<Matrix4f>(m, "Matrix4f")
        .def(nb::init<>())
        .def("view",
-            [](Matrix4f &m){ return Array(data); },
+            [](Matrix4f &m){ return Array(m.data); },
             nb::rv_policy::reference_internal);
 
 In this case:
 
-- step 1 is the ``Array(data)`` call in the lambda function.
+- step 1 is the ``Array(m.data)`` call in the lambda function.
 
 - step 2 occurs outside of the lambda function when the nd-array
   :cpp:class:`nb::ndarray\<...\> <ndarray>` :ref:`type caster <type_casters>`

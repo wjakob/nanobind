@@ -820,7 +820,6 @@ class StubGen:
 
                         if not module_file or module_file.endswith('__init__.py'):
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
-                            dir_name.mkdir(parents=True, exist_ok=True)
                             output_file = dir_name / '__init__.pyi'
                         else:
                             output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
@@ -1178,12 +1177,12 @@ class StubGen:
 
     def write_to_file(self):
         if self.recursive and self.num_submodules == 0:
-            self.output_file.parent.rmdir()
             self.output_file = self.output_file.parent.with_suffix(".pyi")
 
         if not self.quiet:
             print(f'  - writing stub "{self.output_file}" ..')
 
+        self.output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.output_file, "w", encoding='utf-8') as f:
             f.write(self.get())
 
@@ -1407,8 +1406,6 @@ def main(args: Optional[List[str]] = None) -> None:
 
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)
-
-        file.parents[0].mkdir(parents=True, exist_ok=True)
 
         if opt.recursive:
             file = file.with_suffix("") / "__init__.pyi"

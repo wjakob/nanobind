@@ -667,6 +667,7 @@ function (nanobind_add_stub name)
   if (NOT ARG_INSTALL_TIME)
     add_custom_command(
       OUTPUT ${NB_STUBGEN_OUTPUTS}
+      COMMAND ${CMAKE_COMMAND} -E rm -rf ${ARG_OUTPUT}  
       COMMAND ${NB_STUBGEN_CMD}
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
       DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" "${ARG_PATTERN_FILE}"

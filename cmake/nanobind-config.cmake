@@ -590,7 +590,7 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL;RECURSIVE" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -612,6 +612,10 @@ function (nanobind_add_stub name)
 
   if (ARG_EXCLUDE_DOCSTRINGS)
     list(APPEND NB_STUBGEN_ARGS -D)
+  endif()
+  
+  if (ARG_RECURSIVE)
+    list(APPEND NB_STUBGEN_ARGS --recursive)
   endif()
 
   foreach (TMP IN LISTS ARG_PYTHON_PATH)
@@ -636,7 +640,11 @@ function (nanobind_add_stub name)
   if (NOT ARG_OUTPUT)
     message(FATAL_ERROR "nanobind_add_stub(): an 'OUTPUT' argument must be specified!")
   else()
-    list(APPEND NB_STUBGEN_ARGS -o "${ARG_OUTPUT}")
+    if (ARG_RECURSIVE)
+      list(APPEND NB_STUBGEN_ARGS -O "${ARG_OUTPUT}")
+    else()
+      list(APPEND NB_STUBGEN_ARGS -o "${ARG_OUTPUT}")
+    endif()
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
   endif()
 

@@ -443,7 +443,7 @@ Nanobind's CMake tooling includes a convenience command to interface with the
       * - ``MODULE``
         - Specifies the name of the module that should be imported. Mandatory.
       * - ``OUTPUT``
-        - Specifies the name of the stub file that should be written. The path
+        - Specifies the name of the stub file (or directory if RECURSIVE option was specified) that should be written. The path
           is relative to ``CMAKE_CURRENT_BINARY_DIR`` for build-time stub
           generation and relative to ``CMAKE_INSTALL_PREFIX`` for install-time
           stub generation. Mandatory.
@@ -489,3 +489,7 @@ Nanobind's CMake tooling includes a convenience command to interface with the
           component-specific installation when ``INSTALL_TIME`` stub generation
           is used. This is analogous to ``install(..., EXCLUDE_FROM_ALL)`` in
           other install targets.
+       * - ``RECURSIVE``
+        - If specified, stubs will be generated recursively for all
+          submodules of the specified module.
+

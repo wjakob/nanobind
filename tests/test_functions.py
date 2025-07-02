@@ -785,3 +785,7 @@ def test53_fallback():
     assert t.test_fallback_2(3.0) == 0
     assert t.test_fallback_2(3) == 0
     assert t.test_fallback_2('3') == 1
+
+def test54_dict_default():
+    assert t.test_get_dict_default({'key': 100}) == 100
+    assert t.test_get_dict_default({'key2': 100}) == 123

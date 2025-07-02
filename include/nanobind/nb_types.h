@@ -556,6 +556,18 @@ class dict : public object {
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Keys)); }
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
+    object get(handle key, handle def) const {
+        PyObject *o = PyDict_GetItem(m_ptr, key.ptr());
+        if (!o)
+            o = def.ptr();
+        return borrow(o);
+    }
+    object get(const char *key, handle def) const {
+        PyObject *o = PyDict_GetItemString(m_ptr, key);
+        if (!o)
+            o = def.ptr();
+        return borrow(o);
+    }
     template <typename T> bool contains(T&& key) const;
     void clear() { PyDict_Clear(m_ptr); }
     void update(handle h) {

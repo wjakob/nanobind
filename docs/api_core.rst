@@ -834,6 +834,17 @@ Wrapper classes
 
       Analogous to the ``.update(h)`` method of ``dict`` in Python.
 
+   .. cpp:function:: object get(handle key, handle def)
+
+      Analogous to ``.get(key, def)`` method of ``dict`` in Python with a
+      fallback value ``def``. This is more efficient than checking the presence
+      of ``.contains(key)`` first, or using ``operator[]`` and catching a
+      potential exceptions.
+
+   .. cpp:function:: object get(const char * key, handle def)
+
+      Overload of the above method that takes a C-string as key.
+
 .. cpp:class:: set: public object
 
    Wrapper class representing Python ``set`` instances.

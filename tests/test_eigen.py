@@ -292,7 +292,7 @@ def test08_sparse():
 
 @needs_numpy_and_eigen
 def test09_sparse_failures():
-    scipy = pytest.importorskip("scipy")
+    sp = pytest.importorskip("scipy.sparse")
 
     with pytest.raises(
         ValueError,
@@ -302,15 +302,15 @@ def test09_sparse_failures():
     ):
         t.sparse_r_uncompressed()
 
-    csr_matrix = scipy.sparse.csr_matrix
-    scipy.sparse.csr_matrix = None
+    csr_matrix = sp.csr_matrix
+    sp.csr_matrix = None
     with pytest.raises(TypeError, match=re.escape("'NoneType' object is not callable")):
         t.sparse_r()
 
-    del scipy.sparse.csr_matrix
+    del sp.csr_matrix
     with pytest.raises(
         AttributeError,
-        match=re.escape("module 'scipy.sparse' has no attribute 'csr_matrix'"),
+        match=re.escape("'scipy.sparse' has no attribute 'csr_matrix'"),
     ):
         t.sparse_r()
 
@@ -322,7 +322,7 @@ def test09_sparse_failures():
 
     # undo sabotage of the module
     sys.path = sys_path
-    scipy.sparse.csr_matrix = csr_matrix
+    sp.csr_matrix = csr_matrix
 
 @needs_numpy_and_eigen
 def test10_eigen_scalar_default():

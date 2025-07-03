@@ -791,6 +791,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
                 case tensorflow::value: pkg_name = "tensorflow.experimental.dlpack"; break;
                 case jax::value: pkg_name = "jax.dlpack"; break;
                 case cupy::value: pkg_name = "cupy"; break;
+                case paddle::value: pkg_name = "paddle.utils.dlpack"; break;
                 default: pkg_name = nullptr;
             }
 
@@ -807,7 +808,8 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
 
     if (copy) {
         const char* copy_str = "copy";
-        if (framework == pytorch::value)
+        if (framework == pytorch::value ||
+            framework == paddle::value)
             copy_str = "clone";
 
         try {

@@ -452,7 +452,7 @@ class bytes : public object {
 };
 
 NAMESPACE_BEGIN(literals)
-inline str operator"" _s(const char *s, size_t n) {
+inline str operator""_s(const char *s, size_t n) {
     return str(s, n);
 }
 NAMESPACE_END(literals)

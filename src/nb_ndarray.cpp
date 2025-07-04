@@ -538,9 +538,9 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_config *c,
         try {
             if (strcmp(module_name, "numpy") == 0 || strcmp(module_name, "cupy") == 0) {
                 converted = handle(o).attr("astype")(dtype, order);
-            } else if (strcmp(module_name, "torch") == 0) {
+            } else if (strcmp(module_name, "torch") == 0 || strcmp(module_name, "paddle") == 0) {
                 converted = handle(o).attr("to")(
-                    arg("dtype") = module_::import_("torch").attr(dtype));
+                    arg("dtype") = module_::import_(module_name).attr(dtype));
                 if (c->order == 'C')
                     converted = converted.attr("contiguous")();
             } else if (strncmp(module_name, "tensorflow.", 11) == 0) {

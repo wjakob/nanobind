@@ -1067,7 +1067,7 @@ def test58_single_and_empty_dimension_paddle():
 # See PR #162
 @needs_paddle
 def test59_single_and_empty_dimension_fortran_order_paddle():
-    # This idiom creates a pytorch 2D tensor in column major (aka, 'F') ordering
+    # This idiom creates a paddle 2D tensor in column major (aka, 'F') ordering
     a = paddle.ones((0,100), dtype=paddle.float32).t().contiguous().t()
     t.noop_2d_f_contig(a)
     a = paddle.ones((100,0), dtype=paddle.float32).t().contiguous().t()

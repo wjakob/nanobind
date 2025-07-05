@@ -1006,8 +1006,7 @@ def test55_force_contig_paddle():
     assert b is a
     a = a.T
     b = t.make_contig(a)
-    # paddle and pytorch behave differently
-    assert b is a
+    assert b is not a
     assert paddle.all(b == a)
 
 @needs_paddle

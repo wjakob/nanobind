@@ -644,8 +644,8 @@ N-dimensional array type
 ------------------------
 
 The following type can be used to exchange n-dimension arrays with frameworks
-like NumPy, PyTorch, Tensorflow, JAX, CuPy, and others. It requires an
-additional include directive:
+like NumPy, PyTorch, Tensorflow, JAX, CuPy, PaddlePaddle, and others. It 
+requires an additional include directive:
 
 .. code-block:: cpp
 
@@ -1103,6 +1103,8 @@ convert into an equivalent representation in one of the following frameworks:
 .. cpp:class:: jax
 
 .. cpp:class:: cupy
+
+.. cpp:class:: paddle
 
 Eigen convenience type aliases
 ------------------------------

@@ -117,7 +117,8 @@ nanobind includes a number of quality-of-life improvements for developers:
   `buffer protocol <https://docs.python.org/3/c-api/buffer.html>`__ to achieve
   *zero-copy* CPU/GPU array exchange with frameworks like `NumPy
   <https://numpy.org>`__, `PyTorch <https://pytorch.org>`__, `TensorFlow
-  <https://www.tensorflow.org>`__, `JAX <https://jax.readthedocs.io>`__, etc. See
+  <https://www.tensorflow.org>`__, `JAX <https://jax.readthedocs.io>`__, 
+  `PaddlePaddle <https://www.paddlepaddle.org.cn/en>`__ etc. See
   the :ref:`section on n-dimensional arrays <ndarrays>` for details.
 
 - **Stable ABI**: nanobind can target Python's `stable ABI interface

@@ -371,7 +371,9 @@ bool ndarray_check(PyObject *o) noexcept {
         // Tensorflow
         strcmp(tp_name, "tensorflow.python.framework.ops.EagerTensor") == 0 ||
         // Cupy
-        strcmp(tp_name, "cupy.ndarray") == 0;
+        strcmp(tp_name, "cupy.ndarray") == 0 ||
+        // PaddlePaddle
+        strcmp(tp_name, "paddle.Tensor") == 0;
 
     Py_DECREF(name);
     return result;
@@ -402,6 +404,8 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_config *c,
                     package = module_::import_("torch.utils.dlpack");
                 else if (strncmp(module_name, "jaxlib", 6) == 0)
                     package = module_::import_("jax.dlpack");
+                else if (strcmp(module_name, "paddle") == 0)
+                    package = module_::import_("paddle.utils.dlpack");
 
                 if (package.is_valid())
                     capsule = package.attr("to_dlpack")(handle(o));
@@ -541,8 +545,13 @@ ndarray_handle *ndarray_import(PyObject *o, const ndarray_config *c,
             } else if (strcmp(module_name, "torch") == 0 || strcmp(module_name, "paddle") == 0) {
                 converted = handle(o).attr("to")(
                     arg("dtype") = module_::import_(module_name).attr(dtype));
-                if (c->order == 'C')
+                if (c->order == 'C') {
+                    // paddle.Tensor.contiguous will operate on self Tensor
+                    // so to have a similar behavior to pytorch, detach() should be called
+                    if (strcmp(module_name, "paddle") == 0)
+                        converted = converted.attr("detach")();
                     converted = converted.attr("contiguous")();
+                }
             } else if (strncmp(module_name, "tensorflow.", 11) == 0) {
                 converted = module_::import_("tensorflow")
                                 .attr("cast")(handle(o), dtype);

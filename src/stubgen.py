@@ -253,7 +253,7 @@ class StubGen:
 
         # Precompile RE to extract nanobind nd-arrays
         self.ndarray_re = re.compile(
-            sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor)\[([^\]]*)\]"
+            sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor|paddle\.Tensor)\[([^\]]*)\]"
         )
 
         # Types which moved from typing.* to collections.abc in Python 3.9

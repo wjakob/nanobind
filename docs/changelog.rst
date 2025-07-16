@@ -31,7 +31,7 @@ Version 2.8.0 (July 16, 2025)
 - Added :cpp:func:`nb::dict::empty() <dict::empty>`,
   :cpp:func:`nb::list::empty() <list::empty>`, :cpp:func:`nb::set::empty()
   <set::empty>`, and :cpp:func:`nb::tuple::empty() <tuple::empty>` convenience
-  methods.
+  methods. (PR `#1052 <https://github.com/wjakob/nanobind/pull/1052>`__)
 
 - Added a :cpp:func:`nb::dict::get() <dict::get>` function to perform
   dictionary lookups with a fallback value in case of failures. (commit `d38284
@@ -41,14 +41,15 @@ Version 2.8.0 (July 16, 2025)
   when registering modules. However, multi-interpreter extensions remain
   unsupported. (PR `#1059 <https://github.com/wjakob/nanobind/pull/1059>`__).
 
+- Added :cpp:class:`nb::frozenset` that wraps the Python ``frozenset`` type.
+  (PR `#1068 <https://github.com/wjakob/nanobind/pull/1068>`__)
+
 - Miscellaneous fixes and improvements (
   commits
   `d4b245 <https://github.com/wjakob/nanobind/commit/d4b245ad69f729c3d2095be4c1cb5b94810dae26>`__,
   `667451 <https://github.com/wjakob/nanobind/commit/667451fb4566dcd7151d64d81e118f9ba194a889>`__,
   `62fc99 <https://github.com/wjakob/nanobind/commit/62fc996018d9ea4d51af9c86cf008c2562b4eeab>`__,
   `8497f7 <https://github.com/wjakob/nanobind/commit/8497f778d006b60e44e99530f241e22f9603bb04>`__).
-
-- Added :cpp:class:`nb::frozenset` that wraps the Python ``frozenset`` type.
 
 Version 2.7.0 (Apr 18, 2025)
 ----------------------------

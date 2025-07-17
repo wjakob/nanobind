@@ -8,11 +8,11 @@
 */
 
 namespace nanobind::detail {
-template <typename... T> struct is_opaque {
+template <typename T> struct is_opaque {
   static constexpr bool value = false;
 };
 
-template <typename... T> constexpr bool is_opaque_v = is_opaque<T...>::value;
+template <typename T> constexpr bool is_opaque_v = is_opaque<T>::value;
 } // namespace nanobind::detail
 
 #define NB_TYPE_CASTER(Value_, descr)                                          \

@@ -7,6 +7,14 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+namespace nanobind::detail {
+template <typename... T> struct is_opaque {
+  static constexpr bool value = false;
+};
+
+template <typename... T> constexpr bool is_opaque_v = is_opaque<T...>::value;
+} // namespace nanobind::detail
+
 #define NB_TYPE_CASTER(Value_, descr)                                          \
     using Value = Value_;                                                      \
     static constexpr auto Name = descr;                                        \
@@ -26,6 +34,9 @@
 
 #define NB_MAKE_OPAQUE(...)                                                    \
     namespace nanobind::detail {                                               \
+    template <> struct is_opaque<__VA_ARGS__> {                                \
+      static constexpr bool value = true;                                      \
+    };                                                                         \
     template <> class type_caster<__VA_ARGS__>                                 \
         : public type_caster_base<__VA_ARGS__> { }; }
 

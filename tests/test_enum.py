@@ -184,3 +184,6 @@ def test09_enum_methods():
     assert t.Item1.get_value() == 0 and t.Item2.get_value() == 1
     assert t.Item1.foo() == t.Item1
     assert t.ClassicEnum.bar(t.Item1) == t.Item1
+
+def test10_enum_opaque():
+    assert t.OpaqueEnum.X == t.OpaqueEnum("X") and t.OpaqueEnum.Y == t.OpaqueEnum("Y")

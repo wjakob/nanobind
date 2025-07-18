@@ -357,10 +357,14 @@ An undocumented stub replaces the entire body with the Python ellipsis object
    def square(x: int) -> int: ...
 
 Complex default arguments are often also abbreviated with ``...`` to improve
-the readability of signatures. You can read more about stub files in the
-`typing documentation
-<https://typing.readthedocs.io/en/latest/source/stubs.html>`__ and the `MyPy
-documentation <https://mypy.readthedocs.io/en/stable/stubs.html>`__.
+the readability of signatures.
+
+You can read more about stub files in
+`Writing and Maintaining Stub Files
+<https://typing.python.org/en/latest/guides/writing_stubs.html>`__ and
+`Distributing type information
+<https://typing.python.org/en/latest/spec/distributing.html>`__ and in the
+`MyPy documentation <https://mypy.readthedocs.io/en/stable/stubs.html>`__.
 
 nanobind's ``stubgen`` tool automates the process of stub generation to turn
 modules containing a mixture of ordinary Python code and C++ bindings into an

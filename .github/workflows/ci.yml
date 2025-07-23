@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'windows-2022', 'macos-13']
-        python: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14.0-alpha.7', 'pypy3.9-v7.3.16', 'pypy3.10-v7.3.17']
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14-dev', 'pypy3.9-v7.3.16', 'pypy3.10-v7.3.17']
 
     name: "Python ${{ matrix.python }} / ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
@@ -49,9 +49,14 @@ jobs:
         python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions
 
     - name: Install NumPy
-      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'dev') }}
       run: |
         python -m pip install numpy scipy
+
+    - name: Install NumPy for dev version
+      if: contains(matrix.python, 'dev')
+      run: |
+        python -m pip install --pre --index-url https://pypi.anaconda.org/scientific-python-nightly-wheels/simple --upgrade --only-binary=:all: numpy scipy
 
     - name: Configure
       run: >
@@ -173,10 +178,9 @@ jobs:
       with:
         submodules: true
 
-    - uses: deadsnakes/action@v3.1.0
+    - uses: actions/setup-python@v5
       with:
-        python-version: 3.14-dev
-        nogil: true
+        python-version: "3.14t-dev"
 
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest

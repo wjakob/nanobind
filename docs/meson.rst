@@ -57,9 +57,9 @@ The ``meson.build`` definition in your project root should look like:
      default_options: ['cpp_std=c++17', 'b_ndebug=if-release'],
    )
 
-   py = import('python').find_installation()
+   python = import('python').find_installation()
    nanobind_dep = dependency('nanobind')
-   py.extension_module(
+   mod = python.extension_module(
      'my_module_name',
      sources: ['path_to_module.cpp'],
      dependencies: [nanobind_dep],
@@ -103,9 +103,9 @@ to build extensions against the CPython 3.12 stable ABI, use:
      default_options: ['cpp_std=c++17', 'b_ndebug=if-release'],
    )
 
-   py = import('python').find_installation()
+   python = import('python').find_installation()
    nanobind_dep = dependency('nanobind')
-   py.extension_module(
+   mod = python.extension_module(
      'my_module_name',
      sources: ['path_to_module.cpp'],
      dependencies: [nanobind_dep],
@@ -114,3 +114,22 @@ to build extensions against the CPython 3.12 stable ABI, use:
    )
 
 as your ``meson.build`` file.
+
+Stub generation
+---------------
+
+You can configure the build to write a stub file for your extension module
+by adding the following to ``meson.build``:
+
+.. code-block:: meson
+
+   stubgen = nanobind_dep.get_variable('stubgen')
+   custom_target(
+     output: 'my_module_name.pyi',
+     depends: mod,
+     command: [python, stubgen, '-m', 'my_module_name', '-M', 'py.typed'],
+     build_by_default: true
+   )
+
+Then, after building your module, the build system will use nanobind's command
+line interface for :ref:`stub generation <stubs>`.

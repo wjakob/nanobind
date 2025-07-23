@@ -487,9 +487,8 @@ NB_NOINLINE void fail_unspecified() noexcept {
     #if defined(NB_COMPACT_ASSERTION_MESSAGE)
         fail(NB_COMPACT_ASSERTION_MESSAGE);
     #else
-        fail("nanobind: encountered an unrecoverable error condition. Recompile "
-             "using the 'Debug' or 'RelWithDebInfo' modes to obtain further "
-             "information about this problem.");
+        fail("encountered an unrecoverable error condition. Recompile using the"
+             " 'Debug' mode to obtain further information about this problem.");
     #endif
 }
 #endif

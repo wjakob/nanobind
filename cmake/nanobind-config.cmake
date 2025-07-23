@@ -237,7 +237,7 @@ function (nanobind_build_library TARGET_NAME)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't
-  # included in Release/MinSizeRel modes
+  # included in Release/MinSizeRel/RelWithDebInfo modes
   target_compile_definitions(${TARGET_NAME} PRIVATE
     $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
 

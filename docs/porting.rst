@@ -348,8 +348,8 @@ Removed features include:
 - ○ The NumPy array class (``py::array``) was removed in exchange for a more
   powerful alternative (:cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>`)
   that additionally supports CPU/GPU tensors produced by various frameworks
-  (NumPy, PyTorch, TensorFlow, JAX, etc.). Its API is not compatible with
-  pybind11, however.
+  (NumPy, PyTorch, TensorFlow, JAX, PaddlePaddle, etc.). Its API is not compatible 
+  with pybind11, however.
 - ● Buffer protocol binding (``.def_buffer()``) was removed in favor of
   :cpp:class:`nb::ndarray\<..\> <nanobind::ndarray>`.
 - ● Support for evaluating Python files was removed.

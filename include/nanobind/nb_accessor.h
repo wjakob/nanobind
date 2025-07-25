@@ -10,6 +10,17 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+#define NB_DECL_ACCESSOR_OP_I(name)                                            \
+    template <typename T> accessor& name(const api<T> &o);
+
+#define NB_IMPL_ACCESSOR_OP_I(name, op)                                        \
+    template <typename Impl> template <typename T>                             \
+    accessor<Impl>& accessor<Impl>::name(const api<T> &o) {                    \
+        PyObject *res = obj_op_2(ptr(), o.derived().ptr(), op);                \
+        Impl::set(m_base, m_key, res);                                         \
+        return *this;                                                          \
+    }
+
 template <typename Impl> class accessor : public api<accessor<Impl>> {
     template <typename T> friend void nanobind::del(accessor<T> &);
     template <typename T> friend void nanobind::del(accessor<T> &&);
@@ -36,6 +47,17 @@ public:
     }
     NB_INLINE handle base() const { return m_base; }
     NB_INLINE object key() const { return steal(Impl::key(m_key)); }
+
+    NB_DECL_ACCESSOR_OP_I(operator+=)
+    NB_DECL_ACCESSOR_OP_I(operator-=)
+    NB_DECL_ACCESSOR_OP_I(operator*=)
+    NB_DECL_ACCESSOR_OP_I(operator/=)
+    NB_DECL_ACCESSOR_OP_I(operator%=)
+    NB_DECL_ACCESSOR_OP_I(operator|=)
+    NB_DECL_ACCESSOR_OP_I(operator&=)
+    NB_DECL_ACCESSOR_OP_I(operator^=)
+    NB_DECL_ACCESSOR_OP_I(operator<<=)
+    NB_DECL_ACCESSOR_OP_I(operator>>=)
 
 private:
     NB_INLINE void del () { Impl::del(m_base, m_key); }
@@ -204,6 +226,17 @@ template <typename T, enable_if_t<std::is_arithmetic_v<T>>>
 accessor<num_item> api<D>::operator[](T index) const {
     return { derived(), (Py_ssize_t) index };
 }
+
+NB_IMPL_ACCESSOR_OP_I(operator+=, PyNumber_InPlaceAdd)
+NB_IMPL_ACCESSOR_OP_I(operator%=, PyNumber_InPlaceRemainder)
+NB_IMPL_ACCESSOR_OP_I(operator-=, PyNumber_InPlaceSubtract)
+NB_IMPL_ACCESSOR_OP_I(operator*=, PyNumber_InPlaceMultiply)
+NB_IMPL_ACCESSOR_OP_I(operator/=, PyNumber_InPlaceTrueDivide)
+NB_IMPL_ACCESSOR_OP_I(operator|=, PyNumber_InPlaceOr)
+NB_IMPL_ACCESSOR_OP_I(operator&=, PyNumber_InPlaceAnd)
+NB_IMPL_ACCESSOR_OP_I(operator^=, PyNumber_InPlaceXor)
+NB_IMPL_ACCESSOR_OP_I(operator<<=,PyNumber_InPlaceLshift)
+NB_IMPL_ACCESSOR_OP_I(operator>>=,PyNumber_InPlaceRshift)
 
 NAMESPACE_END(detail)
 

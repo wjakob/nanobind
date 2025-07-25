@@ -61,6 +61,7 @@ if (NB_TEST_SANITIZERS)
 endif()
 
 set(TEST_NAMES
+  accessor
   functions
   callbacks
   classes
@@ -149,6 +150,7 @@ target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 set(TEST_FILES
   common.py
   conftest.py
+  test_accessor.py
   test_callbacks.py
   test_classes.py
   test_eigen.py

@@ -428,7 +428,17 @@ class StubGen:
                 overload = self.import_object("typing", "overload")
                 self.write_ln(f"@{overload}")
 
-            sig_str = f"{name}{self.signature_str(signature(fno))}"
+            try:
+                sig = signature(fno)
+            except ValueError:
+                sig = None
+
+            if sig is not None:
+                sig_str = f"{name}{self.signature_str(sig)}"
+            else:
+                # If inspect.signature fails, use a maximally permissive type.
+                any_type = self.import_object("typing", "Any")
+                sig_str = f"{name}(*args, **kwargs) -> {any_type}"
 
             # Potentially copy docstring from the implementation function
             docstr = fno.__doc__

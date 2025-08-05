@@ -526,8 +526,8 @@ overload of ``nanobind::detail::dtype_traits`` to inform nanobind about it.
 You are expressively allowed to create partial overloads of this class despite
 it being in the ``nanobind::detail`` namespace.
 
-For example, the following snippet makes ``__fp16`` (half-precision type on
-``aarch64``) available by  providing
+For example, the following snippet makes ``_Float16`` (half-precision type that
+is natively supported on some hardware) available by providing
 
 1. ``value``, a DLPack ``nanobind::dlpack::dtype`` type descriptor, and
 2. ``name``, a type name for use in docstrings and error messages.
@@ -535,7 +535,7 @@ For example, the following snippet makes ``__fp16`` (half-precision type on
 .. code-block:: cpp
 
    namespace nanobind::detail {
-       template <> struct dtype_traits<__fp16> {
+       template <> struct dtype_traits<_Float16> {
            static constexpr dlpack::dtype value {
                (uint8_t) dlpack::dtype_code::Float, // type code
                16, // size in bits

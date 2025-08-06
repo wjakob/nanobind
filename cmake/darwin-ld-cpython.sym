@@ -919,6 +919,8 @@
 -U _PyWeakref_GetRef
 -U _PyImport_AddModuleRef
 -U _PyUnstable_Module_SetGIL
+-U _PyUnstable_EnableTryIncRef
+-U _PyUnstable_TryIncRef
 -U _PyMutex_Unlock
 -U _PyMutex_Lock
 -U _PyObject_IS_GC

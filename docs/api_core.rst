@@ -1255,8 +1255,11 @@ Wrapper classes
 
    .. cpp:function:: detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const
 
-      Adjust the slice to the `size` value of a given container. Returns a tuple containing
-      ``(start, stop, step, slice_length)``.
+      Compute a slice adjusted to the `size` value of a given container.
+      Returns a tuple containing ``(start, stop, step, slice_length)``.
+      The elements of the tuple can be obtained using a structured binding or
+      by using the templated ``get`` member function of ``nb::detail::tuple``,
+      for example, ``std::size_t slice_length = tpl.get<3>()``.
 
 .. cpp:class:: ellipsis: public object
 

@@ -480,7 +480,6 @@ With reference counting
 
    .. code-block:: cpp
 
-
        PyObject* list = ...;
        Py_ssize_t index = ...;
        nb::object o = nb::borrow(PyList_GetItem(list, index));
@@ -1258,8 +1257,18 @@ Wrapper classes
       Compute a slice adjusted to the `size` value of a given container.
       Returns a tuple containing ``(start, stop, step, slice_length)``.
       The elements of the tuple can be obtained using a structured binding or
-      by using the templated ``get`` member function of ``nb::detail::tuple``,
-      for example, ``std::size_t slice_length = tpl.get<3>()``.
+      by using the templated ``get`` member function of ``nb::detail::tuple``.
+      For example:
+
+      .. code-block:: cpp
+
+          m.def("func", [](nb::slice slc) {
+              auto [start, stop, step, slice_length] = slc.compute(17);
+              // Or, if only the computed slice_length is needed:
+              auto tpl = slc.compute(42);
+              std::size_t adjusted_slice_length = tpl.get<3>();
+              // Now do something ...
+          });
 
 .. cpp:class:: ellipsis: public object
 
@@ -1316,8 +1325,8 @@ Wrapper classes
 
    .. code-block:: cpp
 
-      m.def("func", [](MyClass &arg)) { ... });
-      m.def("func", [](nb::fallback arg)) { ... });
+      m.def("func", [](MyClass &arg) { ... });
+      m.def("func", [](nb::fallback arg) { ... });
 
    If :cpp:class:`handle` or :cpp:class:`object` were used instead on the
    second line, they would always match and prevent potential implicit

@@ -318,7 +318,7 @@ def test27_slice():
     assert t.test_25(s) is s
     assert t.test_25.__doc__ == "test_25(arg: slice, /) -> slice"
     assert t.test_26() == slice(4)
-    assert t.test_27() == slice(1, 10)
+    assert t.test_27() == slice(2, 10)
     assert t.test_28() == slice(5, -5, -2)
 
 

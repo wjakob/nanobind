@@ -278,7 +278,17 @@ NB_MODULE(test_functions_ext, m) {
     // Test slice
     m.def("test_25", [](nb::slice s) { return s; });
     m.def("test_26", []() { return nb::slice(4); });
-    m.def("test_27", []() { return nb::slice(1, 10); });
+    m.def("test_27", []() {
+        nb::slice s(2, 10);
+        auto tpl = s.compute(7);
+        if (tpl.get<0>() != 2) return nb::slice(400);  // fail
+        auto [start, stop, step, slice_length] = tpl;
+        if (start != 2) return nb::slice(401);         // fail
+        if (stop != 7) return nb::slice(402);          // fail
+        if (step != 1) return nb::slice(403);          // fail
+        if (slice_length != 5) return nb::slice(404);  // fail
+        return s;
+    });
     m.def("test_28", []() { return nb::slice(5, -5, -2); });
 
     // Test ellipsis

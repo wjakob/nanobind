@@ -10,7 +10,7 @@ namespace nanobind {
 namespace detail {
 template <>
 struct type_caster<NestedClass> {
-    NB_TYPE_CASTER(NestedClass, const_name("py_stub_test.AClass.NestedClass"));
+    NB_TYPE_CASTER(NestedClass, const_name("py_stub_test.AClass.NestedClass"))
 
     bool from_python(handle /*src*/, uint8_t /*flags*/, cleanup_list*) noexcept {
         return true;

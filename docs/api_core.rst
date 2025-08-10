@@ -656,9 +656,8 @@ Wrapper classes
    Wrapper class representing Python ``tuple`` instances.
 
    Use the standard ``operator[]`` C++ operator with an integer argument to
-   read tuple elements (the bindings for this operator are provided by the
-   parent class and not listed here). Once created, the set is immutable and
-   its elements cannot be replaced.
+   read tuple elements.
+   Once created, the tuple is immutable and its elements cannot be replaced.
 
    Use the :py:func:`make_tuple` function to create new tuples.
 
@@ -704,8 +703,7 @@ Wrapper classes
    Wrapper class representing Python ``list`` instances.
 
    Use the standard ``operator[]`` C++ operator with an integer argument to
-   read and write list elements (the bindings for this operator are provided by
-   the parent class and not listed here).
+   read and write list elements.
 
    Use the :cpp:func:`nb::del <del>` function to remove elements.
 

@@ -415,7 +415,7 @@ namespace detail {
                 cpp_function_def(
                     [](handle type) {
                         if (!type_check(type))
-                            detail::raise_cast_error();
+                            detail::raise_python_or_cast_error();
                         return inst_alloc(type);
                     },
                     scope(cls), name("__new__"));

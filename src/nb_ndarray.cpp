@@ -800,9 +800,8 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
                 o = module_::import_(pkg_name).attr("from_dlpack")(o);
         }
     } catch (const std::exception &e) {
-        PyErr_Format(PyExc_RuntimeError,
-                     "nanobind::detail::ndarray_export(): could not "
-                     "import ndarray: %s",
+        PyErr_Format(PyExc_TypeError,
+                     "could not export nb::ndarray: %s",
                      e.what());
         return nullptr;
     }

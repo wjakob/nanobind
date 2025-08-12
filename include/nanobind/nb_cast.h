@@ -573,12 +573,12 @@ T cast_impl(handle h) {
                                 ((uint8_t) cast_flags::manual),
                                 &cleanup.list);
         if (!rv)
-            detail::raise_cast_error();
+            detail::raise_python_or_cast_error();
         return caster.operator cast_t<T>();
     } else {
         rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr);
         if (!rv)
-            detail::raise_cast_error();
+            detail::raise_python_or_cast_error();
         return caster.operator cast_t<T>();
     }
 }
@@ -647,7 +647,7 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
     handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
                                                 policy, nullptr);
     if (!h.is_valid())
-        detail::raise_cast_error();
+        detail::raise_python_or_cast_error();
 
     return steal(h);
 }
@@ -661,7 +661,7 @@ object cast(T &&value, rv_policy policy, handle parent) {
     cleanup.release();
 
     if (!h.is_valid())
-        detail::raise_cast_error();
+        detail::raise_python_or_cast_error();
 
     return steal(h);
 }

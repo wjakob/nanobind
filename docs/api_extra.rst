@@ -1412,12 +1412,18 @@ functions:
                   Py_INCREF(o);
               },
               [](PyObject * o) noexcept {
+                  if (!nb::is_alive())
+                      return;
                   nb::gil_scoped_acquire guard;
                   Py_DECREF(o);
               });
 
           // ...
       }
+
+   The liveness check in the destructor is necessary in a multi-threaded
+   environment because when the interpreter is shutting down, trying to
+   (re-) take the GIL will throw a cancellation exception.
 
 .. cpp:function:: inline void inc_ref(intrusive_base * o) noexcept
 

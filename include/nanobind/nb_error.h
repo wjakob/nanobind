@@ -125,7 +125,7 @@ NB_EXCEPTION(next_overload)
 
 inline void register_exception_translator(detail::exception_translator t,
                                           void *payload = nullptr) {
-    detail::register_exception_translator(t, payload);
+    detail::register_exception_translator(t, payload, /*at_end=*/false);
 }
 
 template <typename T>
@@ -142,7 +142,7 @@ class exception : public object {
                 } catch (T &e) {
                     PyErr_SetString((PyObject *) payload, e.what());
                 }
-            }, m_ptr);
+            }, m_ptr, /*at_end=*/false);
     }
 };
 

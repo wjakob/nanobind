@@ -94,6 +94,11 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         // Stash source python object
         src = src_;
 
+        // Don't accept foreign types; they can't relinquish ownership
+        if (!src.is_none() && !inst_check(src)) {
+            return false;
+        }
+
         /* Try casting to a pointer of the underlying type. We pass flags=0 and
            cleanup=nullptr to prevent implicit type conversions (they are
            problematic since the instance then wouldn't be owned by 'src') */

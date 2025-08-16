@@ -217,12 +217,28 @@ builtin_exception::~builtin_exception() { }
 
 NAMESPACE_BEGIN(detail)
 
-void register_exception_translator(exception_translator t, void *payload) {
-    nb_translator_seq *cur  = &internals->translators,
-                      *next = new nb_translator_seq(*cur);
-    cur->next = next;
-    cur->payload = payload;
-    cur->translator = t;
+void register_exception_translator(exception_translator t,
+                                   void *payload,
+                                   bool at_end) {
+    // We will insert the new translator so it is pointed to by `*insert_at`,
+    // i.e., so that it is executed just before the current `*insert_at`
+    nb_maybe_atomic<nb_translator_seq *> *insert_at = &internals->translators;
+    if (at_end) {
+        // Insert before the default exception translator (which is last in
+        // the list)
+        nb_translator_seq *next = insert_at->load_acquire();
+        while (next && next->next.load_relaxed()) {
+            insert_at = &next->next;
+            next = insert_at->load_acquire();
+        }
+    }
+    nb_translator_seq *new_head = new nb_translator_seq{};
+    nb_translator_seq *cur_head = insert_at->load_relaxed();
+    new_head->payload = payload;
+    new_head->translator = t;
+    do {
+        new_head->next.store_release(cur_head);
+    } while (!insert_at->compare_exchange_weak(cur_head, new_head));
 }
 
 NB_CORE PyObject *exception_new(PyObject *scope, const char *name,

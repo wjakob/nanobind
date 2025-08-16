@@ -91,9 +91,6 @@ enum class type_init_flags : uint32_t {
     all_init_flags           = (0x1f << 19)
 };
 
-// See internals.h
-struct nb_alias_chain;
-
 // Implicit conversions for C++ type bindings, used in type_data below
 struct implicit_t {
     const std::type_info **cpp;
@@ -114,7 +111,7 @@ struct type_data {
     const char *name;
     const std::type_info *type;
     PyTypeObject *type_py;
-    nb_alias_chain *alias_chain;
+    void *foreign_bindings;
 #if defined(Py_LIMITED_API)
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
 #endif
@@ -330,6 +327,19 @@ inline void *type_get_slot(handle h, int slot_id) {
 #else
     return PyType_GetSlot((PyTypeObject *) h.ptr(), slot_id);
 #endif
+}
+
+// nanobind interoperability with other binding frameworks
+inline void set_foreign_type_defaults(bool export_all, bool import_all) {
+    detail::nb_type_set_foreign_defaults(export_all, import_all);
+}
+template <class T = void>
+inline void import_foreign_type(handle type) {
+    detail::nb_type_import(type.ptr(),
+                           std::is_void_v<T> ? nullptr : &typeid(T));
+}
+inline void export_type_to_foreign(handle type) {
+    detail::nb_type_export(type.ptr());
 }
 
 template <typename Visitor> struct def_visitor {

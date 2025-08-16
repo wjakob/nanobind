@@ -32,6 +32,7 @@ option(NB_TEST_STABLE_ABI    "Test the stable ABI interface?" OFF)
 option(NB_TEST_SHARED_BUILD  "Build a shared nanobind library for the test suite?" OFF)
 option(NB_TEST_CUDA          "Force the use of the CUDA/NVCC compiler for testing purposes" OFF)
 option(NB_TEST_FREE_THREADED "Build free-threaded extensions for the test suite?" ON)
+option(NB_TEST_NO_INTEROP    "Build without framework interoperability support?" OFF)
 
 if (NOT MSVC)
   option(NB_TEST_SANITIZERS_ASAN  "Build tests with the address sanitizer?" OFF)

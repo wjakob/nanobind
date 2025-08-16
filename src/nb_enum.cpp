@@ -18,23 +18,6 @@ using enum_map = tsl::robin_map<int64_t, int64_t, int64_hash>;
 
 PyObject *enum_create(enum_init_data *ed) noexcept {
     // Update hash table that maps from std::type_info to Python type
-    nb_internals *internals_ = internals;
-    bool success;
-    nb_type_map_slow::iterator it;
-
-    {
-        lock_internals guard(internals_);
-        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(ed->type, nullptr);
-        if (!success) {
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: type '%s' was already registered!\n",
-                             ed->name);
-            PyObject *tp = (PyObject *) it->second->type_py;
-            Py_INCREF(tp);
-            return tp;
-        }
-    }
-
     handle scope(ed->scope);
 
     bool is_arithmetic = ed->flags & (uint32_t) enum_flags::is_arithmetic;
@@ -85,20 +68,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;
 
-    it.value() = t;
-
-    {
-        lock_internals guard(internals_);
-        internals_->type_c2p_slow[ed->type] = t;
-
-        #if !defined(NB_FREE_THREADED)
-            internals_->type_c2p_fast[ed->type] = t;
-        #endif
-    }
-
-    make_immortal(result.ptr());
-
-    result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
+    capsule tie_lifetimes(t, [](void *p) noexcept {
         type_init_data *t = (type_init_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
@@ -106,6 +76,19 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         free((char*) t->name);
         delete t;
     });
+
+    if (type_data *conflict; !nb_type_register(t, &conflict)) {
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                         "nanobind: type '%s' was already registered!\n",
+                         ed->name);
+        PyObject *tp = (PyObject *) conflict->type_py;
+        Py_INCREF(tp);
+        return tp;
+    }
+
+    result.attr("__nb_enum__") = tie_lifetimes;
+
+    make_immortal(result.ptr());
 
     return result.release().ptr();
 }

@@ -78,25 +78,26 @@ static int nb_foreign_keep_alive(PyObject *nurse,
             keep_alive(nurse, payload, (void (*)(void*) noexcept) cb);
         else
             keep_alive(nurse, (PyObject *) payload);
-        return true;
+        return 0;
     } catch (const std::runtime_error& err) {
         PyErr_SetString(PyExc_RuntimeError, err.what());
-        return false;
+        return -1;
     }
 }
 
 static void nb_foreign_translate_exception(const void *eptr) {
     std::exception_ptr e = *(const std::exception_ptr *) eptr;
+
+    // Skip the default translator (at the end of the list). It translates
+    // generic STL exceptions which other frameworks might want to translate
+    // differently than we do; they should get control over the behavior of
+    // their functions.
     for (nb_translator_seq* cur = internals->translators.load_acquire();
-         cur; cur = cur->next.load_acquire()) {
-        if (cur->translator == default_exception_translator ||
-            cur->translator == foreign_exception_translator) {
-            // The default translator translates generic STL exceptions which
-            // other frameworks might want to translate differently than we do;
-            // they should get control over the behavior of their functions.
-            // Don't call foreign translators to avoid mutual recursion.
-            // Both these are at the end of the list, so we can stop iterating
-            // when we see one.
+         cur->next.load_relaxed(); cur = cur->next.load_acquire()) {
+        if (cur->translator == internals->foreign_exception_translator) {
+            // Don't call foreign translators, to avoid mutual recursion.
+            // They are at the end of the list, just before the default
+            // translator, so we can stop iterating when we see one.
             break;
         }
         try {
@@ -187,8 +188,16 @@ static void nb_foreign_remove_foreign_binding(pymb_binding *binding) noexcept {
 
 static void nb_foreign_add_foreign_framework(pymb_framework *framework)
         noexcept {
-    register_exception_translator(foreign_exception_translator, framework,
-                                  /*at_end=*/true);
+    if (framework->translate_exception) {
+        {
+            lock_internals guard{internals};
+            if (!internals->foreign_exception_translator)
+                internals->foreign_exception_translator =
+                        foreign_exception_translator;
+        }
+        register_exception_translator(internals->foreign_exception_translator,
+                                      framework, /*at_end=*/true);
+    }
     internals->print_leak_warnings &= !framework->bindings_usable_forever;
 }
 
@@ -293,8 +302,8 @@ void nb_type_import_impl(PyObject *pytype, const std::type_info *cpptype) {
         raise("'%s' is already bound by this nanobind domain", name);
     if (!cpptype) {
         if (binding->framework->abi_lang != pymb_abi_lang_cpp)
-            raise("'%s' is not written in C++, so you must provide a C++ type",
-                  name);
+            raise("'%s' is not written in C++, so you must specify a C++ type "
+                  "to map it to", name);
         if (binding->framework->abi_extra != foreign_self->abi_extra)
             raise("'%s' has incompatible C++ ABI with this nanobind domain: "
                   "their '%s' vs our '%s'", name, binding->framework->abi_extra,
@@ -321,6 +330,8 @@ void nb_type_enable_import_all() {
     nb_internals *internals_ = internals;
     {
         lock_internals guard{internals_};
+        if (internals_->foreign_import_all)
+            return;
         internals_->foreign_import_all = true;
         if (!internals_->foreign_registry) {
             // pymb_add_framework tells us about every existing type when we
@@ -391,6 +402,8 @@ void nb_type_export_impl(type_data *td) {
 void nb_type_enable_export_all() {
     nb_internals *internals_ = internals;
     lock_internals guard{internals_};
+    if (internals_->foreign_export_all)
+        return;
     internals_->foreign_export_all = true;
     if (!internals_->foreign_registry)
         register_with_pymetabind(internals_);

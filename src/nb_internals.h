@@ -695,6 +695,13 @@ struct nb_internals {
     /// C++ types via nb::import_foreign_type()
     nb_ptr_map foreign_manual_imports;
 
+    /// Pointer to the canonical copy of `foreign_exception_translator()`
+    /// from nb_foreign.cpp. Each DSO may have a different copy, but all will
+    /// use the implementation from the first DSO to need it, so that
+    /// `nb_foreign_translate_exception()` (translating our exceptions for
+    /// a foreign framework's benefit) can skip foreign translators.
+    void (*foreign_exception_translator)(const std::exception_ptr&, void*);
+
     /// Pointer to a boolean that denotes if nanobind is fully initialized.
     bool *is_alive_ptr = nullptr;
 

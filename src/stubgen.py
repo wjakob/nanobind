@@ -171,6 +171,7 @@ class StubGen:
     def __init__(
         self,
         module: types.ModuleType,
+        output_file: Path,
         recursive: bool = False,
         include_docstrings: bool = True,
         include_private: bool = False,
@@ -179,7 +180,6 @@ class StubGen:
         max_expr_length: int = 50,
         patterns: List[ReplacePattern] = [],
         quiet: bool = True,
-        output_file: Optional[Path] = None
     ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
@@ -263,6 +263,8 @@ class StubGen:
             'Iterable|Iterator|KeysView|Mapping|MappingView|MutableMapping|'
             'MutableSequence|MutableSet|Sequence|ValuesView)'
         )
+
+        self.num_submodules = 0
 
     def write(self, s: str) -> None:
         """Append raw characters to the output"""
@@ -828,13 +830,14 @@ class StubGen:
 
                         if not module_file or module_file.endswith('__init__.py'):
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
-                            dir_name.mkdir(parents=False, exist_ok=True)
                             output_file = dir_name / '__init__.pyi'
                         else:
                             output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
 
+                        self.num_submodules += 1
                         sg = StubGen(
                             module=value,
+                            output_file=output_file,
                             recursive=self.recursive,
                             include_docstrings=self.include_docstrings,
                             include_private=self.include_private,
@@ -842,17 +845,13 @@ class StubGen:
                             include_internal_imports=self.include_internal_imports,
                             max_expr_length=self.max_expr_length,
                             patterns=self.patterns,
-                            output_file=output_file,
                             quiet=self.quiet
                         )
 
                         sg.put(value)
 
-                        if not self.quiet:
-                            print(f'  - writing stub "{output_file}" ..')
+                        sg.write_to_file()
 
-                        with open(output_file, "w", encoding='utf-8') as f:
-                            f.write(sg.get())
                     return
                 else:
                     self.apply_pattern(self.prefix + ".__prefix__", None)
@@ -1186,6 +1185,17 @@ class StubGen:
 
         return s.rstrip() + "\n"
 
+    def write_to_file(self):
+        if self.recursive and self.num_submodules == 0:
+            self.output_file = self.output_file.parent.with_suffix(".pyi")
+
+        if not self.quiet:
+            print(f'  - writing stub "{self.output_file}" ..')
+
+        self.output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.output_file, "w", encoding='utf-8') as f:
+            f.write(self.get())
+
 def parse_options(args: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m nanobind.stubgen",
@@ -1407,16 +1417,17 @@ def main(args: Optional[List[str]] = None) -> None:
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)
 
-        file.parents[0].mkdir(parents=True, exist_ok=True)
+        if opt.recursive:
+            file = file.with_suffix("") / "__init__.pyi"
 
         sg = StubGen(
             module=mod_imported,
+            output_file=file,
             quiet=opt.quiet,
             recursive=opt.recursive,
             include_docstrings=opt.include_docstrings,
             include_private=opt.include_private,
             patterns=patterns,
-            output_file=file
         )
 
         if not opt.quiet:
@@ -1438,11 +1449,7 @@ def main(args: Optional[List[str]] = None) -> None:
             if not opt.quiet:
                 print(f"  - applied {total_matches} patterns.")
 
-        if not opt.quiet:
-            print(f'  - writing stub "{file}" ..')
-
-        with open(file, "w", encoding='utf-8') as f:
-            f.write(sg.get())
+        sg.write_to_file()
 
     if opt.marker_file:
         if not opt.quiet:

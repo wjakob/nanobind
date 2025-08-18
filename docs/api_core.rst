@@ -3021,7 +3021,8 @@ The documentation below refers to two per-instance flags with the following mean
    set to ``true`` and ``false``.
 
    This is analogous to casting a C++ object with return value policy
-   :cpp:enumerator:`rv_policy::reference`.
+   :cpp:enumerator:`rv_policy::reference`, except that it will create a
+   new Python instance even if one wrapping this object already exists.
 
    If a `parent` object is specified, the instance keeps this parent alive
    while the newly created object exists. This is analogous to casting a C++
@@ -3038,7 +3039,8 @@ The documentation below refers to two per-instance flags with the following mean
    ``true``.
 
    This is analogous to casting a C++ object with return value policy
-   :cpp:enumerator:`rv_policy::take_ownership`.
+   :cpp:enumerator:`rv_policy::take_ownership`, except that it will create a
+   new Python instance even if one wrapping this object already exists.
 
 .. cpp:function:: void inst_zero(handle h)
 

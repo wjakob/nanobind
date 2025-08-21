@@ -216,8 +216,10 @@ static void register_with_pymetabind(nb_internals *internals_) {
     fw->name = "nanobind " NB_ABI_TAG;
 #if defined(NB_FREE_THREADED)
     fw->bindings_usable_forever = 1;
+    fw->leak_safe = 0;
 #else
     fw->bindings_usable_forever = 0;
+    fw->leak_safe = 1;
 #endif
     fw->abi_lang = pymb_abi_lang_cpp;
     fw->abi_extra = NB_PLATFORM_ABI_TAG;

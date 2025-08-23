@@ -9,7 +9,7 @@ Introduction
      :alt: nanobind logo
      :class: only-light
 
-   .. image:: https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark.png
+   .. image:: https://d38rqfq1h7iukm.cloudfront.net/media/uploads/wjakob/2023/03/28/nanobind_logo_dark.png
      :width: 800
      :align: center
      :alt: nanobind logo
@@ -85,9 +85,9 @@ discourse:
 
 The nanobind logo was designed by `AndoTwin Studio
 <https://andotwinstudio.com>`__. High-resolution version are available `here
-<https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/27/nanobind_logo.jpg>`__
+<https://d38rqfq1h7iukm.cloudfront.net/media/uploads/wjakob/2023/03/27/nanobind_logo.jpg>`__
 (light) and `here
-<https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark_1.png>`__
+<https://d38rqfq1h7iukm.cloudfront.net/media/uploads/wjakob/2023/03/28/nanobind_logo_dark_1.png>`__
 (dark).
 
 .. only:: not latex

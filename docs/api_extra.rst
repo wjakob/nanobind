@@ -1104,6 +1104,10 @@ convert into an equivalent representation in one of the following frameworks:
 
 .. cpp:class:: cupy
 
+.. cpp:class:: memview
+
+   Builtin Python ``memoryview`` for CPU-resident data.
+
 Eigen convenience type aliases
 ------------------------------
 

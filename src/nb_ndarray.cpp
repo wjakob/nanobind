@@ -765,7 +765,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     object o;
     if (copy && framework == no_framework::value && th->self) {
         o = borrow(th->self);
-    } else if (framework == numpy::value || framework == jax::value) {
+    } else if (framework == numpy::value || framework == jax::value || framework == memview::value) {
         nb_ndarray *h = PyObject_New(nb_ndarray, nd_ndarray_tp());
         if (!h)
             return nullptr;
@@ -784,6 +784,8 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
                 .attr("array")(o, arg("copy") = copy)
                 .release()
                 .ptr();
+        } else if (framework == memview::value) {
+            return PyMemoryView_FromObject(o.ptr());
         } else {
             const char *pkg_name;
             switch (framework) {

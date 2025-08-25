@@ -13,6 +13,10 @@ if (NB_TEST_SHARED_BUILD)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_SHARED)
 endif()
 
+if (NB_TEST_NO_INTEROP)
+  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NO_INTEROP)
+endif()
+
 # ---------------------------------------------------------------------------
 # Compile with a few more compiler warnings turned on
 # ---------------------------------------------------------------------------

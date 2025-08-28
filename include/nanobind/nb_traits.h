@@ -55,7 +55,7 @@ using forwarded_type = std::conditional_t<std::is_lvalue_reference_v<T>,
 
 /// Forwards a value U as rvalue or lvalue according to whether T is rvalue or lvalue; typically
 /// used for forwarding a container's elements.
-template <typename T, typename U> NB_INLINE forwarded_type<T, U> forward_like(U &&u) {
+template <typename T, typename U> NB_INLINE forwarded_type<T, U> forward_like_(U &&u) {
     return (forwarded_type<T, U>) u;
 }
 
@@ -100,6 +100,20 @@ struct analyze_method<Ret (Cls::*)(Args...) const noexcept> {
     using func = Ret(Args...);
     static constexpr size_t argc = sizeof...(Args);
 };
+
+template <typename F>
+struct strip_function_object {
+    using type = typename analyze_method<decltype(&F::operator())>::func;
+};
+
+// Extracts the function signature from a function, function pointer or lambda.
+template <typename Function, typename F = std::remove_reference_t<Function>>
+using function_signature_t = std::conditional_t<
+    std::is_function_v<F>, F,
+    typename std::conditional_t<
+        std::is_pointer_v<F> || std::is_member_pointer_v<F>,
+        std::remove_pointer<F>,
+        strip_function_object<F>>::type>;
 
 template <typename T>
 using forward_t = std::conditional_t<std::is_lvalue_reference_v<T>, T, T &&>;
@@ -158,6 +172,28 @@ template <typename T> using is_class_caster_test = std::enable_if_t<T::IsClass>;
 /// Generalized version of the is_base_caster_v test that also accepts unique_ptr/shared_ptr
 template <typename Caster>
 constexpr bool is_class_caster_v = detail::detector<void, is_class_caster_test, Caster>::value;
+
+// Primary template
+template<typename T, typename = int>
+struct is_complex : std::false_type {};
+
+// Specialization if `T` is complex, i.e., `T` has a member type `value_type`,
+// member functions `real()` and `imag()` that return such, and the size of
+// `T` is twice that of `value_type`.
+template<typename T>
+struct is_complex<T, enable_if_t<std::is_same_v<
+                                     decltype(std::declval<T>().real()),
+                                     typename T::value_type>
+                              && std::is_same_v<
+                                     decltype(std::declval<T>().imag()),
+                                     typename T::value_type>
+                              && (sizeof(T) ==
+                                  2 * sizeof(typename T::value_type))>>
+    : std::true_type {};
+
+/// True if the type `T` is a complete type representing a complex number.
+template<typename T>
+inline constexpr bool is_complex_v = is_complex<T>::value;
 
 NAMESPACE_END(detail)
 

@@ -9,7 +9,7 @@
 
 <p align="center">
     <picture>
-      <source media="(prefers-color-scheme: dark)" width="800" srcset="https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark.png">
+      <source media="(prefers-color-scheme: dark)" width="800" srcset="https://d38rqfq1h7iukm.cloudfront.net/media/uploads/wjakob/2023/03/28/nanobind_logo_dark.png">
       <source media="(prefers-color-scheme: light)" width="800" srcset="https://github.com/wjakob/nanobind/raw/master/docs/images/logo.jpg">
       <img alt="nanobind logo" width="800" src="https://github.com/wjakob/nanobind/raw/master/docs/images/logo.jpg">
     </picture>
@@ -55,5 +55,5 @@ discourse:
 
 The nanobind logo was designed by [AndoTwin Studio](https://andotwinstudio.com)
 (high-resolution download:
-[light](https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/27/nanobind_logo.jpg),
-[dark](https://rgl.s3.eu-central-1.amazonaws.com/media/uploads/wjakob/2023/03/28/nanobind_logo_dark_1.png)).
+[light](https://d38rqfq1h7iukm.cloudfront.net/media/uploads/wjakob/2023/03/27/nanobind_logo.jpg),
+[dark](https://d38rqfq1h7iukm.cloudfront.net/media/uploads/wjakob/2023/03/28/nanobind_logo_dark_1.png)).

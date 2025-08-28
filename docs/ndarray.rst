@@ -5,11 +5,11 @@
 The ``nb::ndarray<..>`` class
 =============================
 
-nanobind can exchange n-dimensional arrays (henceforth "**ndarrays**") with
-popular array programming frameworks including `NumPy
-<https://numpy.org>`__, `PyTorch <https://pytorch.org>`__, `TensorFlow
-<https://www.tensorflow.org>`__, and `JAX <https://jax.readthedocs.io>`__.
-It supports *zero-copy* exchange using two protocols:
+nanobind can exchange n-dimensional arrays (henceforth "**nd-arrays**") with
+popular array programming frameworks including `NumPy <https://numpy.org>`__,
+`PyTorch <https://pytorch.org>`__, `TensorFlow <https://www.tensorflow.org>`__,
+`JAX <https://jax.readthedocs.io>`__, and `CuPy <https://cupy.dev>`_. It
+supports *zero-copy* exchange using two protocols:
 
 -  The classic `buffer
    protocol <https://docs.python.org/3/c-api/buffer.html>`__.
@@ -17,8 +17,8 @@ It supports *zero-copy* exchange using two protocols:
 -  `DLPack <https://github.com/dmlc/dlpack>`__, a
    GPU-compatible generalization of the buffer protocol.
 
-nanobind knows how to talk to each framework and takes care
-of all the nitty-gritty details.
+nanobind knows how to talk to each framework and takes care of all the
+nitty-gritty details.
 
 To use this feature, you must add the include directive
 
@@ -29,18 +29,18 @@ To use this feature, you must add the include directive
 to your code. Following this, you can bind functions with
 :cpp:class:`nb::ndarray\<...\> <ndarray>`-typed parameters and return values.
 
-Binding functions that take arrays as input
--------------------------------------------
+Array input arguments
+---------------------
 
-A function that accepts a :cpp:class:`nb::ndarray\<\> <ndarray>`-typed parameter
-(i.e., *without* template parameters) can be called with *any* array
+A function that accepts an :cpp:class:`nb::ndarray\<\> <ndarray>`-typed parameter
+(i.e., *without* template parameters) can be called with *any* writable array
 from any framework regardless of the device on which it is stored. The
 following example binding declaration uses this functionality to inspect the
 properties of an arbitrary input array:
 
 .. code-block:: cpp
 
-   m.def("inspect", [](nb::ndarray<> a) {
+   m.def("inspect", [](const nb::ndarray<>& a) {
        printf("Array data pointer : %p\n", a.data());
        printf("Array dimension : %zu\n", a.ndim());
        for (size_t i = 0; i < a.ndim(); ++i) {
@@ -79,83 +79,471 @@ Array constraints
 In practice, it can often be useful to *constrain* what kinds of arrays
 constitute valid inputs to a function. For example, a function expecting CPU
 storage would likely crash if given a pointer to GPU memory, and nanobind
-should therefore prevent such undefined behavior.
-:cpp:class:`nb::ndarray\<...\> <ndarray>` accepts template arguments to
-specify such constraints. For example the function interface below
-guarantees that the implementation is only invoked when it is provided with
-a ``MxNx3`` array of 8-bit unsigned integers.
+should therefore prevent such undefined behavior. The
+:cpp:class:`nb::ndarray\<...\> <ndarray>` class accepts template arguments to
+specify such constraints. For example the binding below guarantees that the
+implementation can only be called with CPU-resident arrays with shape (·,·,3)
+containing 8-bit unsigned integers.
 
 .. code-block:: cpp
 
-   m.def("process", [](nb::ndarray<uint8_t, nb::shape<nb::any, nb::any, 3>,
-                                   nb::device::cpu> data) {
+   using RGBImage = nb::ndarray<uint8_t, nb::shape<-1, -1, 3>, nb::device::cpu>;
+
+   m.def("process", [](RGBImage data) {
        // Double brightness of the MxNx3 RGB image
        for (size_t y = 0; y < data.shape(0); ++y)
            for (size_t x = 0; x < data.shape(1); ++x)
                for (size_t ch = 0; ch < 3; ++ch)
                    data(y, x, ch) = (uint8_t) std::min(255, data(y, x, ch) * 2);
-
    });
 
-The above example also demonstrates the use of
-:cpp:func:`nb::ndarray\<...\>::operator() <ndarray::operator()>`, which
-provides direct read/write access to the array contents. Note that this
-function is only available when the underlying data type and ndarray dimension
-are specified via the :cpp:type:`ndarray\<..\> <ndarray>` template parameters.
-It should only be used when the array storage is accessible through the CPU's
-virtual memory address space.
+The above example also demonstrates the use of :cpp:func:`operator()
+<ndarray::operator()>`, which provides direct read/write access to the array
+contents assuming that they are reachable through the CPU's
+virtual address space.
 
 .. _ndarray-constraints-1:
 
-Constraint types
-----------------
+Overview
+^^^^^^^^
 
-The following constraints are available
+Overall, the following kinds of constraints are available:
 
-- A scalar type (``float``, ``uint8_t``, etc.) constrains the representation
-  of the ndarray.
+- **Data type**: a type annotation like ``float``, ``uint8_t``, etc., constrain the
+  numerical representation of the nd-array. Complex arrays (i.e.,
+  ``std::complex<float>`` or ``std::complex<double>``) are also supported.
 
-  Complex arrays (i.e., ones based on ``std::complex<float>`` or
-  ``std::complex<double>``) are supported but additionally require including
-  the header file ``<nanobind/stl/complex.h>``.
+- **Constant arrays**: further annotating the data type with ``const`` makes it possible to call
+  the function with constant arrays that do not permit write access. Without
+  the annotation, calling the binding would fail with a ``TypeError``.
 
-- This scalar type can be further annotated with ``const``, which is necessary
-  if you plan to call nanobind functions with arrays that do not permit write
-  access.
+  You can alternatively accept constant arrays of *any type* by not specifying
+  a data type at all and instead passing the :cpp:class:`nb::ro <ro>` annotation.
 
-- The :cpp:class:`nb::shape <shape>` annotation (as in ``nb::shape<nb::any,
-  3>``) simultaneously constrains the number of array dimensions and the size
-  per dimension. A value of :cpp:var:`nb::any <any>` leaves the corresponding
-  dimension unconstrained.
+- **Shape**: The :cpp:class:`nb::shape <shape>` annotation (as in ``nb::shape<-1, 3>``)
+  simultaneously constrains the number of array dimensions and the size per
+  dimension. A value of ``-1`` leaves the size of the associated dimension
+  unconstrained.
 
-  :cpp:class:`nb::ndim <ndim>` is shorter to write when only the dimension
-  should be constrained. For example, ``nb::ndim<2>`` is equivalent to
-  ``nb::shape<nb::any, nb::any>``.
+  :cpp:class:`nb::ndim\<N\> <ndim>` is shorter when only the dimension
+  should be constrained. For example, ``nb::ndim<3>`` is equivalent to
+  ``nb::shape<-1, -1, -1>``.
 
-- Device tags like :cpp:class:`nb::device::cpu <device::cpu>` or
-  :cpp:class:`nb::device::cuda <device::cuda>` constrain the source device
+- **Device tags**: annotations like :cpp:class:`nb::device::cpu <device::cpu>`
+  or :cpp:class:`nb::device::cuda <device::cuda>` constrain the source device
   and address space.
 
-- Two ordering tags :cpp:class:`nb::c_contig <c_contig>` and
+- **Memory order**: two ordering tags :cpp:class:`nb::c_contig <c_contig>` and
   :cpp:class:`nb::f_contig <f_contig>` enforce contiguous storage in either
-  C or Fortran style. In the case of matrices, C-contiguous corresponds to
-  row-major storage, and F-contiguous corresponds to column-major storage.
-  Without this tag, non-contiguous representations (e.g. produced by slicing
-  operations) and other unusual layouts are permitted.
+  C or Fortran style.
 
-  This tag is mainly useful when directly accessing the array contents via
-  :cpp:func:`nb::ndarray\<...\>::data() <ndarray::data>`.
+  In the case of matrices, C-contiguous implies row-major and F-contiguous
+  implies column-major storage. Without this tag, arbitrary non-contiguous
+  representations (e.g. produced by slicing operations) and other unusual
+  layouts are permitted.
 
-Passing arrays in C++ code
---------------------------
+  This tag is mainly useful when your code directly accesses the array contents
+  via :cpp:func:`nb::ndarray\<...\>::data() <ndarray::data>`, while assuming a
+  particular layout.
 
-:cpp:class:`nb::ndarray\<...\> <ndarray>` behaves like a shared pointer with
-builtin reference counting: it can be moved or copied within C++ code.
-Copies will point to the same underlying buffer and increase the reference
-count until they go out of scope. It is legal call
-:cpp:class:`nb::ndarray\<...\> <ndarray>` members from multithreaded code even
-when the `GIL <https://wiki.python.org/moin/GlobalInterpreterLock>`__ is not
-held.
+  A third order tag named :cpp:class:`nb::any_contig <any_contig>` accepts
+  *both* ``F``- and ``C``-contiguous arrays while rejecting non-contiguous
+  ones.
+
+Type signatures
+^^^^^^^^^^^^^^^
+
+nanobind displays array constraints in docstrings and error messages. For
+example, suppose that we now call the ``process()`` function with an invalid
+input. This produces the following error message:
+
+.. code-block:: pycon
+
+   >>> my_module.process(np.zeros(1))
+
+   TypeError: process(): incompatible function arguments. The following argument types are supported:
+   1. process(arg: ndarray[dtype=uint8, shape=(*, *, 3), device='cpu'], /) -> None
+
+   Invoked with types: numpy.ndarray
+
+Note that these type annotations are intended for humans–they will not
+currently work with automatic type checking tools like `MyPy
+<https://mypy.readthedocs.io/en/stable/>`__ (which at least for the time being
+don’t provide a portable or sufficiently flexible annotation of n-dimensional
+arrays).
+
+Overload resolution
+^^^^^^^^^^^^^^^^^^^
+
+A function binding can declare multiple overloads with different nd-array
+constraints (e.g., a CPU and a GPU implementation), in which case nanobind will
+call the first matching overload. When no perfect match can be found, nanobind
+will try each overload once more while performing basic implicit conversions:
+it will convert strided arrays into C- or F-contiguous arrays (if requested)
+and perform type conversion. This, e.g., makes it possible to call a function
+expecting a ``float32`` array with ``float64`` data. Implicit conversions
+create temporary nd-arrays containing a copy of the data, which can be
+undesirable. To suppress them, add an
+:cpp:func:`nb::arg("my_array_arg").noconvert() <arg::noconvert>` or
+:cpp:func:`"my_array_arg"_a.noconvert() <arg::noconvert>` argument annotation.
+
+Passing arrays within C++ code
+------------------------------
+
+You can think of the :cpp:class:`nb::ndarray <ndarray>` class as a
+reference-counted pointer resembling ``std::shared_ptr<T>`` that can be freely
+moved or copied. This means that there isn't a big difference between a
+function taking
+``ndarray`` by value versus taking a constant reference ``const ndarray &``
+(i.e., the former does not create an additional copy of the underlying data).
+
+Copies of the :cpp:class:`nb::ndarray <ndarray>` wrapper will point to the same
+underlying buffer and increase the reference count until they go out of scope.
+You may call freely call :cpp:class:`nb::ndarray\<...\> <ndarray>` methods from
+multithreaded code even when the `GIL
+<https://wiki.python.org/moin/GlobalInterpreterLock>`__ is not held, for
+example to examine the layout of an array and access the underlying storage.
+
+There are two exceptions to this: creating a *new* nd-array object from C++
+(discussed :ref:`later <returning-ndarrays>`) and casting it to Python via
+the :cpp:func:`ndarray::cast` function both involve Python API calls that require
+that the GIL is held.
+
+.. _returning-ndarrays:
+
+Returning arrays from C++ to Python
+-----------------------------------
+
+Passing an nd-array across the C++ → Python language barrier is a two-step
+process:
+
+1. Creating an :cpp:class:`nb::ndarray\<...\> <ndarray>` instance, which
+   only stores *metadata*, e.g.:
+
+   - Where is the data located in memory? (pointer address and device)
+   - What is its type and shape?
+   - Who owns this data?
+
+   An actual Python object is not yet constructed at this stage.
+
+2. Converting the :cpp:class:`nb::ndarray\<...\> <ndarray>` into a
+   Python object of the desired type (e.g. ``numpy.ndarray``).
+
+Normally, step 1 is your responsibility, while step 2 is taken care of by the
+binding layer. To understand this separation, let's look at an example. The
+``.view()`` function binding below creates a 4×4 column-major NumPy array view
+into a ``Matrix4f`` instance.
+
+.. _matrix4f-example:
+
+.. code-block:: cpp
+
+   struct Matrix4f { float data[4][4] { }; };
+
+   using Array = nb::ndarray<float, nb::numpy, nb::shape<4, 4>, nb::f_contig>;
+
+   nb::class_<Matrix4f>(m, "Matrix4f")
+       .def(nb::init<>())
+       .def("view",
+            [](Matrix4f &m){ return Array(m.data); },
+            nb::rv_policy::reference_internal);
+
+In this case:
+
+- step 1 is the ``Array(m.data)`` call in the lambda function.
+
+- step 2 occurs outside of the lambda function when the nd-array
+  :cpp:class:`nb::ndarray\<...\> <ndarray>` :ref:`type caster <type_casters>`
+  constructs a NumPy array from the metadata.
+
+Data *ownership* is an important aspect of this two-step process: because the
+NumPy array points directly into the storage of another object, nanobind must
+keep the ``Matrix4f`` instance alive as long as the NumPy array exists, which
+the :cpp:enumerator:`reference_internal <rv_policy::reference_internal>` return
+value policy signals to nanobind. More generally, wrapping an existing memory
+region without copying requires that that this memory region remains valid
+throughout the lifetime of the created array (more on this point :ref:`shortly
+<ndarray-ownership>`).
+
+Recall the discussion of the :ref:`nd-array constraint <ndarray-constraints-1>`
+template parameters. For the return path, you will generally want to add a
+*framework* template parameter to the nd-array parameters that indicates the
+desired Python type.
+
+- :cpp:class:`nb::numpy <numpy>`: create a ``numpy.ndarray``.
+- :cpp:class:`nb::pytorch <pytorch>`: create a ``torch.Tensor``.
+- :cpp:class:`nb::tensorflow <tensorflow>`: create a ``tensorflow.python.framework.ops.EagerTensor``.
+- :cpp:class:`nb::jax <jax>`: create a ``jaxlib.xla_extension.DeviceArray``.
+- :cpp:class:`nb::cupy <cupy>`: create a ``cupy.ndarray``.
+- No framework annotation. In this case, nanobind will create a raw Python
+  ``dltensor`` `capsule <https://docs.python.org/3/c-api/capsule.html>`__
+  representing the `DLPack <https://github.com/dmlc/dlpack>`__ metadata.
+
+This annotation also affects the auto-generated docstring of the function,
+which in this case becomes:
+
+.. code-block:: python
+
+   view(self) -> numpy.ndarray[float32, shape=(4, 4), order='F']
+
+Note that the framework annotation only plays a role when passing arrays from
+C++ to Python. It does not constrain the reverse direction (for example, a
+PyTorch array would still be accepted by a function taking the ``Array`` alias
+defined above as input. For this reason, you may want to add a
+:cpp:class:`nb::device::cpu <device::cpu>` device annotation).
+
+Dynamic array configurations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The previous example was rather simple because all the array configuration was fully known
+at compile time and specified via the :cpp:class:`nb::ndarray\<...\> <ndarray>`
+template parameters. In general, there are often dynamic aspects of the
+configuration that must be explicitly passed to the constructor. Its signature
+(with some simplifications) is given below. See the
+:ref:`ndarray::ndarray() <ndarray_dynamic_constructor>` documentation for a more detailed specification
+and another variant of the constructor.
+
+.. code-block:: cpp
+
+   ndarray(void *data,
+           std::initializer_list<size_t> shape = { },
+           handle owner = { },
+           std::initializer_list<int64_t> strides = { },
+           dlpack::dtype dtype = ...,
+           int device_type = ...,
+           int device_id = 0,
+           char order = ...) { .. }
+
+The parameters have the following role:
+
+- ``data``: CPU/GPU/.. memory address of the data.
+- ``shape``: number of dimensions and size along each axis.
+- ``owner``: a Python object owning the storage, which must be
+  kept alive while the array object exists.
+- ``strides``: specifies the data layout in memory. You only need to specify
+  this parameter if it has a non-standard ``order`` (e.g., if it is non-contiguous).
+  Note that the ``strides`` count elements, not bytes.
+- ``dtype`` data type (floating point, signed/unsigned integer), bit depth.
+- ``device_type`` and ``device_id``: device type and number, e.g., for multi-GPU setups.
+- ``order``: coefficient memory order. Default: ``'C'`` (C-style) ordering,
+  specify ``'F'`` for Fortran-style ordering.
+
+The parameters generally have inferred defaults based on the array's
+compile-time template parameters. Passing them explicitly overrides these
+defaults with information available at runtime.
+
+.. _ndarray-ownership:
+
+Data ownership
+^^^^^^^^^^^^^^
+
+Let's look at a fancier example that uses the constructor arguments explained
+above to return a dynamically sized 2D array. This example also shows another
+mechanism to express *data ownership*:
+
+.. code-block:: cpp
+
+   m.def("create_2d",
+         [](size_t rows, size_t cols) {
+             // Allocate a memory region an initialize it
+             float *data = new float[rows * cols];
+             for (size_t i = 0; i < rows * cols; ++i)
+                 data[i] = (float) i;
+
+             // Delete 'data' when the 'owner' capsule expires
+             nb::capsule owner(data, [](void *p) noexcept {
+                delete[] (float *) p;
+             });
+
+             return nb::ndarray<nb::numpy, float, nb::ndim<2>>(
+                 /* data = */ data,
+                 /* shape = */ { rows, cols },
+                 /* owner = */ owner
+             );
+   });
+
+The ``owner`` parameter should specify a Python object, whose continued
+existence keeps the underlying memory region alive. Nanobind will temporarily
+increase the ``owner`` reference count in the  :cpp:func:`ndarray::ndarray()`
+constructor and then decrease it again when the created NumPy array expires.
+
+The above example binding returns a *new* memory region that should be deleted
+when it is no longer in use. This is done by creating a
+:cpp:class:`nb::capsule`, an opaque pointer with a destructor callback that
+runs at this point and takes care of cleaning things up.
+
+If there is already an existing Python object, whose existence guarantees that
+it is safe to access the provided storage region, then you may alternatively
+pass this object as the ``owner``---nanobind will make sure that this object
+isn't deleted as long as the created array exists. If the owner is a C++ object
+with an associated Python instance, you may use :cpp:func:`nb::find() <find>`
+to look up the associated Python object. When binding methods, you can use the
+:cpp:enumerator:`reference_internal <rv_policy::reference_internal>` return
+value policy to specify the implicit ``self`` argument as the ``owner`` upon
+return, which was done in the earlier ``Matrix4f`` :ref:`example
+<matrix4f-example>`.
+
+.. warning::
+
+   If you do not specify an owner and use a return value policy like
+   :cpp:enumerator:`rv_policy::reference` (see also the the section on
+   :ref:`nd-array return value policies <ndarray_rvp>`), nanobind will assume
+   that the array storage **remains valid forever**.
+
+   This is one of the most frequent issues reported on the nanobind GitHub
+   repository: users forget to think about data ownership and run into data
+   corruption.
+
+   If there isn't anything keeping the array storage alive, it will likely be
+   released and reused at some point, while stale arrays still point to the
+   associated memory region (i.e., a classic "use-after-free" bug).
+
+In more advanced situations, it may be helpful to have a capsule that manages
+the lifetime of data structures containing *multiple* storage regions. The same
+capsule can be referenced from different nd-arrays and will call the deleter
+when all of them have expired:
+
+.. code-block:: cpp
+
+   m.def("return_multiple", []() {
+       struct Temp {
+           std::vector<float> vec_1;
+           std::vector<float> vec_2;
+       };
+
+       Temp *temp = new Temp();
+       temp->vec_1 = std::move(...);
+       temp->vec_2 = std::move(...);
+
+       nb::capsule deleter(temp, [](void *p) noexcept {
+           delete (Temp *) p;
+       });
+
+       size_t size_1 = temp->vec_1.size();
+       size_t size_2 = temp->vec_2.size();
+
+       return std::make_pair(
+           nb::ndarray<nb::pytorch, float>(temp->vec_1.data(), { size_1 }, deleter),
+           nb::ndarray<nb::pytorch, float>(temp->vec_2.data(), { size_2 }, deleter)
+       );
+   });
+
+.. _ndarray_rvp:
+
+Return value policies
+^^^^^^^^^^^^^^^^^^^^^
+
+Function bindings that return nd-arrays can specify return value policy
+annotations to determine whether or not a copy should be made. They are
+interpreted as follows:
+
+- The default :cpp:enumerator:`rv_policy::automatic` and
+  :cpp:enumerator:`rv_policy::automatic_reference` policies cause the array to
+  be copied when it has no owner and when it is not already associated with a
+  Python object.
+
+- The policy :cpp:enumerator:`rv_policy::reference` references an existing
+  memory region and never copies.
+
+- :cpp:enumerator:`rv_policy::copy` always copies.
+
+- :cpp:enumerator:`rv_policy::none` refuses the cast unless the array is
+  already associated with an existing Python object (e.g. a NumPy array), in
+  which case that object is returned.
+
+- :cpp:enumerator:`rv_policy::reference_internal` retroactively sets the
+  nd-array's ``owner`` field to a method's ``self`` argument. It fails with an
+  error if there is already a different owner.
+
+- :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
+  :cpp:enumerator:`rv_policy::copy`.
+
+.. _ndarray-temporaries:
+
+Returning temporaries
+^^^^^^^^^^^^^^^^^^^^^
+
+Returning nd-arrays from temporaries (e.g. stack-allocated memory) requires
+extra precautions.
+
+.. code-block:: cpp
+   :emphasize-lines: 4,5
+
+   using Vector3f = nb::ndarray<float, nb::numpy, nb::shape<3>>;
+   m.def("return_vec3", []{
+       float data[] { 1, 2, 3 };
+       // !!! BAD don't do this !!!
+       return Vector3f(data);
+   });
+
+Recall the discussion at the :ref:`beginning <returning-ndarrays>` of this
+subsection. The :cpp:class:`nb::ndarray\<...\> <ndarray>` constructor only
+creates *metadata* describing this array, with the actual array creation
+happening *after* of the function call. That isn't safe in this case because
+``data`` is a temporary on the stack that is no longer valid once the function
+has returned. To fix this, we could use the :cpp:func:`nb::cast() <cast>`
+method to *force* the array creation in the body of the function:
+
+.. code-block:: cpp
+   :emphasize-lines: 4,5
+
+   using Vector3f = nb::ndarray<float, nb::numpy, nb::shape<3>>;
+   m.def("return_vec3", []{
+       float data[] { 1, 2, 3 };
+       // OK.
+       return nb::cast(Vector3f(data));
+   });
+
+While safe, one unfortunate aspect of this change is that the function now has
+a rather non-informative docstring ``return_vec3() -> object``, which is a
+consequence of :cpp:func:`nb::cast() <cast>` returning a generic
+:cpp:class:`nb::object <object>`.
+
+To fix this, you can use the nd-array :cpp:func:`.cast() <ndarray::cast>`
+method, which is like :cpp:func:`nb::cast() <cast>` except that it preserves
+the type signature:
+
+.. code-block:: cpp
+   :emphasize-lines: 4,5
+
+   using Vector3f = nb::ndarray<float, nb::numpy, nb::shape<3>>;
+   m.def("return_vec3", []{
+       float data[] { 1, 2, 3 };
+       // Perfect.
+       return Vector3f(data).cast();
+   });
+
+.. _ndarray-nonstandard:
+
+Nonstandard arithmetic types
+----------------------------
+
+Low or extended-precision arithmetic types (e.g., ``int128``, ``float16``,
+``bfloat16``) are sometimes used but don't have standardized C++ equivalents.
+If you wish to exchange arrays based on such types, you must register a partial
+overload of ``nanobind::detail::dtype_traits`` to inform nanobind about it.
+
+You are expressively allowed to create partial overloads of this class despite
+it being in the ``nanobind::detail`` namespace.
+
+For example, the following snippet makes ``_Float16`` (half-precision type that
+is natively supported on some hardware) available by providing
+
+1. ``value``, a DLPack ``nanobind::dlpack::dtype`` type descriptor, and
+2. ``name``, a type name for use in docstrings and error messages.
+
+.. code-block:: cpp
+
+   namespace nanobind::detail {
+       template <> struct dtype_traits<_Float16> {
+           static constexpr dlpack::dtype value {
+               (uint8_t) dlpack::dtype_code::Float, // type code
+               16, // size in bits
+               1   // lanes (simd), usually set to 1
+           };
+           static constexpr auto name = const_name("float16");
+       };
+   }
 
 .. _ndarray-views:
 
@@ -194,7 +582,7 @@ An improved version of the example using such a view is shown below:
 .. code-block:: cpp
 
    void fill(nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu> arg) {
-       auto v = arg.view(); /// <-- new!
+       auto v = arg.view(); // <-- new!
 
        for (size_t i = 0; i < v.shape(0); ++i) // Important; use 'v' instead of 'arg' everywhere in loop
            for (size_t j = 0; j < v.shape(1); ++j)
@@ -217,7 +605,7 @@ view into its register file.
 .. _ndarray-runtime-specialization:
 
 Specializing views at runtime
------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As mentioned earlier, element access via ``operator()`` only works when both
 the array's scalar type and its dimension are specified within the type (i.e.,
@@ -245,246 +633,49 @@ this type.
         } else { /* ... */ }
    }
 
-Constraints in type signatures
-------------------------------
+Array libraries
+---------------
 
-nanobind displays array constraints in docstrings and error messages. For
-example, suppose that we now call the ``process()`` function with an invalid
-input. This produces the following error message:
+The Python `array API standard <https://data-apis.org/array-api/latest/purpose_and_scope.html>`__
+defines a common interface and interchange protocol for nd-array libraries. In particular, to
+support inter-framework data exchange, custom array types should implement the
 
-.. code-block:: pycon
+- `__dlpack__ <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack__.html#array_api.array.__dlpack__>`__ and
+- `__dlpack_device__ <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack_device__.html#array_api.array.__dlpack_device__>`__
 
-   >>> my_module.process(ndarray=np.zeros(1))
-
-   TypeError: process(): incompatible function arguments. The following argument types are supported:
-   1. process(arg: ndarray[dtype=uint8, shape=(*, *, 3), order='C', device='cpu'], /) -> None
-
-   Invoked with types: numpy.ndarray
-
-Note that these type annotations are intended for humans–they will not
-currently work with automatic type checking tools like `MyPy
-<https://mypy.readthedocs.io/en/stable/>`__ (which at least for the time being
-don’t provide a portable or sufficiently flexible annotation of n-dimensional
-arrays).
-
-Arrays and function overloads
------------------------------
-
-A bound function taking a ndarray argument can declare multiple overloads
-with different constraints (e.g. a CPU and GPU implementation), in which
-case the first first matching overload will be called. When no perfect
-match could be found, nanobind will try each overload once more while
-performing basic implicit conversions: it will convert strided arrays
-into C- or F-contiguous arrays (if requested) and perform type
-conversion. This, e.g., makes possible to call a function expecting a
-``float32`` array with ``float64`` data. Implicit conversions create
-temporary ndarrays containing a copy of the data, which can be
-undesirable. To suppress them, add a
-:cpp:func:`nb::arg("my_array_arg").noconvert() <arg::noconvert>`
-or
-:cpp:func:`"my_array_arg"_a.noconvert() <arg::noconvert>` or
-function binding annotation.
-
-Binding functions that return arrays
-------------------------------------
-
-To return a ndarray from C++ code, you must indicate its type, shape, a pointer
-to CPU/GPU memory, and what framework (NumPy/..) should be used to encapsulate
-the data.
-
-The following simple binding declaration shows how to return a ``2x4``
-NumPy floating point matrix that does not permit write access.
+methods. This is easy thanks to the nd-array integration in nanobind. An example is shown below:
 
 .. code-block:: cpp
 
-   // at top level
-   const float data[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+   nb::class_<MyArray>(m, "MyArray")
+      // ...
+      .def("__dlpack__", [](nb::kwargs kwargs) {
+          return nb::ndarray<>( /* ... */);
+      })
+      .def("__dlpack_device__", []() {
+          return std::make_pair(nb::device::cpu::value, 0);
+      });
 
-   NB_MODULE(my_ext, m) {
-       m.def("ret_numpy", []() {
-           size_t shape[2] = { 2, 4 };
-           return nb::ndarray<nb::numpy, const float, nb::shape<2, nb::any>>(
-               data, /* ndim = */ 2, shape);
-       });
-    }
+Returning a raw :cpp:class:`nb::ndarray <ndarray>` without framework annotation
+will produce a DLPack capsule, which is what the interface expects.
 
-The auto-generated docstring of this function is:
-
-.. code-block:: python
-
-   ret_pytorch() -> np.ndarray[float32, writable=False, shape=(2, *)]
-
-Calling it in Python yields
-
-.. code-block:: python
-
-   array([[1., 2., 3., 4.],
-          [5., 6., 7., 8.]], dtype=float32)
-
-The following additional ndarray declarations are possible for return
-values:
-
--  :cpp:class:`nb::numpy <numpy>`. Returns the ndarray as a ``numpy.ndarray``.
--  :cpp:class:`nb::pytorch <pytorch>`. Returns the ndarray as a ``torch.Tensor``.
--  :cpp:class:`nb::tensorflow <tensorflow>`. Returns the ndarray as a
-   ``tensorflow.python.framework.ops.EagerTensor``.
--  :cpp:class:`nb::jax <jax>`. Returns the ndarray as a
-   ``jaxlib.xla_extension.DeviceArray``.
--  No framework annotation. In this case, nanobind will return a raw
-   Python ``dltensor``
-   `capsule <https://docs.python.org/3/c-api/capsule.html>`__
-   representing the `DLPack <https://github.com/dmlc/dlpack>`__
-   metadata.
-
-When returning arrays, nanobind will not perform implicit conversions. Shape
-and order annotations like :cpp:class:`nb::shape <shape>`, :cpp:class:`nb::ndim
-<ndim>`, :cpp:class:`nb::c_contig <c_contig>`, and :cpp:class:`nb::f_contig
-<f_contig>`, are shown in the docstring, but nanobind won't check that they are
-actually satisfied. It will never convert an incompatible result into the right
-format.
-
-Furthermore, non-CPU ndarrays must be explicitly indicate the
-device type and device ID using special parameters of the :cpp:func:`ndarray()
-<ndarray::ndarray()>` constructor shown below. Device types indicated via
-template arguments, e.g., ``nb::ndarray<..., nb::device::cuda>``, are only used
-for decorative purposes to generate an informative function docstring.
-
-The full signature of the ndarray constructor is:
-
-.. code-block:: cpp
-
-   ndarray(void *value,
-           size_t ndim,
-           const size_t *shape,
-           handle owner = nb::handle(),
-           const int64_t *strides = nullptr,
-           dlpack::dtype dtype = nb::dtype<Scalar>(),
-           int32_t device_type = nb::device::cpu::value,
-           int32_t device_id = 0) { .. }
-
-If no ``strides`` parameter is provided, the implementation will assume a
-C-style ordering. Both ``strides`` and ``shape`` will be copied by the
-constructor, hence the targets of these pointers don't need to remain valid
-following the call.
-
-An alternative form of the constructor takes ``std::initializer_list`` instead
-of shape/stride arrays for brace-initialization and infers ``ndim``:
-
-.. code-block:: cpp
-
-   ndarray(void *value,
-           std::initializer_list<size_t> shape,
-           handle owner = nb::handle(),
-           st::initializer_list<int64_t> strides = { },
-           dlpack::dtype dtype = nb::dtype<Scalar>(),
-           int32_t device_type = nb::device::cpu::value,
-           int32_t device_id = 0) { .. }
-
-The ``owner`` parameter can be used to keep another Python object alive
-while the ndarray data is referenced by a consumer. This mechanism can be
-used to implement a data destructor as follows:
-
-.. code-block:: cpp
-
-   m.def("ret_pytorch", []() {
-       // Dynamically allocate 'data'
-       float *data = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
-
-       // Delete 'data' when the 'owner' capsule expires
-       nb::capsule owner(data, [](void *p) noexcept {
-          delete[] (float *) p;
-       });
-
-       return nb::ndarray<nb::pytorch, float>(data, { 2, 4 }, owner);
-   });
-
-In other situations, it may be helpful to have the capsule manage the lifetime
-of a custom data structure that contains one or multiple containers. The same
-capsule can be referenced from multiple ndarrays and will call the deleter
-when all of them have expired:
-
-.. code-block:: cpp
-
-   m.def("return_multiple", []() {
-       struct Temp {
-           std::vector<float> vec_1;
-           std::vector<float> vec_2;
-       };
-
-       Temp *temp = new Temp();
-       temp->vec_1 = std::move(...);
-       temp->vec_2 = std::move(...);
-
-       nb::capsule deleter(temp, [](void *p) noexcept {
-           delete (Temp *) p;
-       });
-
-       size_t size_1 = temp->vec_1.size();
-       size_t size_2 = temp->vec_2.size();
-
-       return std::make_pair(
-           nb::ndarray<nb::pytorch, float>(temp->vec_1.data(), { size_1 }, deleter),
-           nb::ndarray<nb::pytorch, float>(temp->vec_2.data(), { size_2 }, deleter)
-       );
-   });
-
-Return value policies
----------------------
-
-Function bindings that return ndarrays admit additional return value policy
-annotations to determine whether or not a copy should be made. They are
-interpreted as follows:
-
-- :cpp:enumerator:`rv_policy::automatic` causes the array to be copied when it
-  has no owner and when it is not already associated with a Python object.
-
-- :cpp:enumerator:`rv_policy::automatic_reference` and
-  :cpp:enumerator:`rv_policy::reference`
-  ``automatic_reference`` and ``reference`` never copy.
-
-- :cpp:enumerator:`rv_policy::copy` always copies.
-
-- :cpp:enumerator:`rv_policy::none` refuses the cast unless the array is
-  already associated with an existing Python object (e.g. a NumPy array), in
-  which case that object is returned.
-
-- :cpp:enumerator:`rv_policy::reference_internal` retroactively sets the
-  ndarray's ``owner`` field to a method's ``self`` argument. It fails with an
-  error if there is already a different owner.
-
-- :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
-  :cpp:enumerator:`rv_policy::copy`.
-
-.. _ndarray-nonstandard:
-
-Nonstandard arithmetic types
-----------------------------
-
-Low or extended-precision arithmetic types (e.g., ``int128``, ``float16``,
-``bfloat``) are sometimes used but don't have standardized C++ equivalents. If
-you wish to exchange arrays based on such types, you must register a partial
-overload of ``nanobind::ndarray_traits`` to inform nanobind about it.
-
-For example, the following snippet makes ``__fp16`` (half-precision type on
-``aarch64``) available:
-
-.. code-block:: cpp
-
-   namespace nanobind {
-       template <> struct ndarray_traits<__fp16> {
-           static constexpr bool is_complex = false;
-           static constexpr bool is_float   = true;
-           static constexpr bool is_bool    = false;
-           static constexpr bool is_int     = false;
-           static constexpr bool is_signed  = true;
-       };
-   };
+The ``kwargs`` argument can be used to provide additional parameters (for
+example to request a copy), please see the DLPack documentation for details.
+Note that nanobind does not yet implement the versioned DLPack protocol. The
+version number should be ignored for now.
 
 Frequently asked questions
 --------------------------
 
-nanobind does not accept my NumPy array
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Why does my returned nd-array contain corrupt data?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If your nd-array bindings lead to undefined behavior (data corruption or
+crashes), then this is usually an ownership issue. Please review the section on
+:ref:`data ownership <ndarray-ownership>` for details.
+
+Why does nanobind not accept my NumPy array?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When binding a function that takes an ``nb::ndarray<T, ...>`` as input, nanobind
 will by default require that array to be writable. This means that the function
@@ -514,9 +705,10 @@ internal representations (*dtypes*), including
 nanobind's :cpp:class:`nb::ndarray\<...\> <ndarray>` is based on the `DLPack
 <https://github.com/dmlc/dlpack>`__ array exchange protocol, which causes it to
 be more restrictive. Presently supported dtypes include signed/unsigned
-integers, floating point values, and boolean values. Some :ref:`nonstandard
-arithmetic types <ndarray-nonstandard>` can be supported as well.
+integers, floating point values, complex numbers, and boolean values. Some
+:ref:`nonstandard arithmetic types <ndarray-nonstandard>` can be supported as
+well.
 
-Nanobind can receive and return read-only arrays via the buffer protocol used
-to exchange data with NumPy. The DLPack interface currently ignores this
+Nanobind can receive and return *read-only* arrays via the buffer protocol when
+exhanging data with NumPy. The DLPack interface currently ignores this
 annotation.

@@ -58,12 +58,12 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     static handle from_cpp(T &&value, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
         object o1 = steal(
-            Caster1::from_cpp(forward_like<T>(value.first), policy, cleanup));
+            Caster1::from_cpp(forward_like_<T>(value.first), policy, cleanup));
         if (!o1.is_valid())
             return {};
 
         object o2 = steal(
-            Caster2::from_cpp(forward_like<T>(value.second), policy, cleanup));
+            Caster2::from_cpp(forward_like_<T>(value.second), policy, cleanup));
         if (!o2.is_valid())
             return {};
 
@@ -71,6 +71,11 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         NB_TUPLE_SET_ITEM(r, 0, o1.release().ptr());
         NB_TUPLE_SET_ITEM(r, 1, o2.release().ptr());
         return r;
+    }
+
+    template <typename T>
+    bool can_cast() const noexcept {
+        return caster1.template can_cast<T1>() && caster2.template can_cast<T2>();
     }
 
     /// Return the constructed tuple by copying from the sub-casters

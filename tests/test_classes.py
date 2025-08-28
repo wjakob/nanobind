@@ -285,7 +285,8 @@ def test13_implicitly_convertible():
     b = t.B(2)
     b2 = t.B2(3)
     c = t.C(4)
-    d = 5
+    i = 5
+
     with pytest.raises(TypeError) as excinfo:
         t.get_d(c)
     assert str(excinfo.value) == (
@@ -294,10 +295,26 @@ def test13_implicitly_convertible():
         "\n"
         "Invoked with types: test_classes_ext.C"
     )
-    assert t.get_d(a) == 11
-    assert t.get_d(b) == 102
-    assert t.get_d(b2) == 103
+    with pytest.raises(TypeError):
+        t.get_optional_d(c)
+
+    for obj, expected in ((a, 11), (b, 102), (b2, 103), (i, 10005)):
+        assert t.get_d(obj) == expected
+        assert t.get_optional_d(obj) == expected
+        # The -1's here are because nb::cast() won't implicit-convert to a
+        # pointer because it would dangle
+        assert t.get_d_via_cast(obj) == (expected, -1, expected, -1)
+        assert t.get_d_via_try_cast(obj) == (expected, -1, expected, -1)
+
+    d = t.D(5)
     assert t.get_d(d) == 10005
+    assert t.get_optional_d(d) == 10005
+    assert t.get_d_via_cast(d) == (10005, 10005, 10005, 10005)
+    assert t.get_d_via_try_cast(d) == (10005, 10005, 10005, 10005)
+
+    assert t.get_optional_d(None) == -1
+    assert t.get_d_via_cast(c) == (-1, -1, -1, -1)
+    assert t.get_d_via_try_cast(c) == (-1, -1, -1, -1)
 
 
 def test14_operators():
@@ -308,7 +325,9 @@ def test14_operators():
         assert repr(a - b) == "3"
     assert "unsupported operand type" in str(excinfo.value)
     assert repr(a - 2) == "-1"
+    a_before = id(a)
     a += b
+    assert id(a) == a_before
     assert repr(a) == "3"
     assert repr(b) == "2"
 
@@ -801,8 +820,6 @@ def test42_weak_references():
 
 
 def test43_union():
-    import struct
-
     u = t.Union()
     u.i = 42
     assert u.i == 42
@@ -810,8 +827,117 @@ def test43_union():
     u.f = 2.125
     assert u.f == 2.125
 
+
 def test44_dynamic_attr_has_dict():
     s = t.StructWithAttr(5)
     assert s.__dict__ == {}
     s.a_dynamic_attr = 101
     assert s.__dict__ == {"a_dynamic_attr": 101}
+
+
+def test45_hidden_base():
+    s = t.BoundDerived()
+    assert s.value == 10
+    s.value = 5
+    assert s.prop == 5
+    s.prop = 20
+    assert s.value == 20
+    assert s.get_answer() == 200
+    assert s.polymorphic() == 20
+
+
+def test46_custom_new():
+    import gc
+
+    u1 = t.UniqueInt(10)
+    assert u1.value() == 10 and u1.lookups() == 1
+
+    u2 = t.UniqueInt(10)
+    assert u1 is u2
+    assert u1.lookups() == 2
+
+    # test alternate constructor
+    assert t.UniqueInt("10") is u1
+    assert t.UniqueInt(s="10") is u1
+    assert u1.lookups() == 4
+
+    u3 = t.UniqueInt(20)
+    assert u1 is not u3
+    assert u3.value() == 20 and u3.lookups() == 1
+
+    del u1
+    assert u2.lookups() == 4
+    assert u2 is t.UniqueInt(10)
+    assert u2.lookups() == 5
+
+    del u2
+    gc.collect()
+    gc.collect()
+
+    u4 = t.UniqueInt(10)
+    assert u4.value() == 10 and u4.lookups() == 1
+
+    # As if unpickling:
+    empty = t.UniqueInt.__new__(t.UniqueInt)
+    with pytest.warns(RuntimeWarning, match="access an uninitialized instance"):
+        with pytest.raises(TypeError):
+            empty.value()
+
+    # Make sure pickle support doesn't allow no-args construction by mistake
+    with pytest.raises(TypeError):
+        t.UniqueInt()
+
+    with pytest.raises(RuntimeError):
+        t.UniqueInt.__new__(int)
+
+    # Make sure we do allow no-args construction for types that declare
+    # such a __new__
+    t.NewNone()
+    assert t.NewDflt().value == 42
+    assert t.NewDflt(10).value == 10
+    assert t.NewStar().value == 42
+    assert t.NewStar("hi").value == 43
+    assert t.NewStar(value=10).value == 10
+    assert t.NewStar("hi", "lo", value=10).value == 12
+    assert t.NewStar(value=10, other="blah").value == 20
+
+    # Make sure a Python class that derives from a C++ class that uses
+    # nb::new_() can be instantiated producing the correct Python type
+    class FancyInt(t.UniqueInt):
+        @staticmethod
+        def the_answer():
+            return 42
+
+        @property
+        def value_as_string(self):
+            return str(self.value())
+
+    f1 = FancyInt(10)
+    f2 = FancyInt(20)
+    # The derived-type wrapping doesn't preserve Python identity...
+    assert f1 is not FancyInt(10)
+    # ... but does preserve C++ identity
+    assert f1.lookups() == u4.lookups() == 3  # u4, f1, and anonymous
+    assert f1.the_answer() == f2.the_answer() == 42
+    assert f1.value_as_string == "10"
+    assert f2.value_as_string == "20"
+
+def test47_inconstructible():
+    with pytest.raises(TypeError, match="no constructor defined"):
+        t.Foo()
+
+def test48_monekypatchable():
+    # issue 750: how to monkeypatch __init__
+    q = t.MonkeyPatchable()
+    assert q.value == 123
+
+    def my_init(self):
+        t.MonkeyPatchable.custom_init(self)
+
+    t.MonkeyPatchable.__init__ = my_init
+    q = t.MonkeyPatchable()
+    assert q.value == 456
+
+def test49_static_property_override():
+    assert t.StaticPropertyOverride.x == 42
+    assert t.StaticPropertyOverride2.x == 43

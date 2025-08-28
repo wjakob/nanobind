@@ -32,13 +32,15 @@ template <typename T, typename... Ts> struct tuple<T, Ts...> : tuple<Ts...> {
 
     tuple() = default;
     tuple(const tuple &) = default;
-    tuple(tuple &&) noexcept = default;
-    tuple& operator=(tuple &&) noexcept = default;
+    tuple(tuple &&) = default;
+    tuple& operator=(tuple &&) = default;
     tuple& operator=(const tuple &) = default;
 
-    template <typename A, typename... As>
+    template <typename A,
+              std::enable_if_t<std::is_convertible_v<A, T>, bool> = true,
+              typename... As>
     NB_INLINE tuple(A &&a, As &&...as)
-        : Base((detail::forward_t<As>) as...), value((detail::forward_t<A>) a) {}
+        : Base((forward_t<As>) as...), value((forward_t<A>) a) {}
 
     template <size_t I> NB_INLINE auto& get() {
         if constexpr (I == 0)

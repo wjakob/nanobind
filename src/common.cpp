@@ -8,6 +8,7 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <complex>
 #include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -143,6 +144,7 @@ PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
     def->m_name = name;
     def->m_size = -1;
     PyObject *m = PyModule_Create(def);
+
     check(m, "nanobind::detail::module_new(): allocation failed!");
     return m;
 }
@@ -154,55 +156,55 @@ PyObject *module_import(const char *name) {
     return res;
 }
 
+PyObject *module_import(PyObject *o) {
+    PyObject *res = PyImport_Import(o);
+    if (!res)
+        throw python_error();
+    return res;
+}
+
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
-    PyObject *name_py, *res;
+    const char *base_name, *tmp_str;
+    Py_ssize_t tmp_size = 0;
+    object tmp, res;
 
-#if !defined(PYPY_VERSION)
-    PyObject *base_name = PyModule_GetNameObject(base);
+    base_name = PyModule_GetName(base);
     if (!base_name)
         goto fail;
 
-    name_py = PyUnicode_FromFormat("%U.%s", base_name, name);
-    Py_DECREF(base_name);
-#else
-    const char *base_name = PyModule_GetName(base);
-    if (!base_name)
+    tmp = steal(PyUnicode_FromFormat("%s.%s", base_name, name));
+    if (!tmp.is_valid())
         goto fail;
 
-    name_py = PyUnicode_FromFormat("%s.%s", base_name, name);
-#endif
-    if (!name_py)
+    tmp_str = PyUnicode_AsUTF8AndSize(tmp.ptr(), &tmp_size);
+    if (!tmp_str)
         goto fail;
 
-#if !defined(PYPY_VERSION)
-    res = PyImport_AddModuleObject(name_py);
+#if PY_VERSION_HEX < 0x030D00A0 || defined(Py_LIMITED_API)
+    res = borrow(PyImport_AddModule(tmp_str));
 #else
-    res = PyImport_AddModule(PyUnicode_AsUTF8(name_py));
+    res = steal(PyImport_AddModuleRef(tmp_str));
 #endif
-    Py_DECREF(name_py);
-    if (!res)
+
+    if (!res.is_valid())
         goto fail;
 
     if (doc) {
-        PyObject *doc_py = PyUnicode_FromString(doc);
-        if (!doc_py)
+        tmp = steal(PyUnicode_FromString(doc));
+        if (!tmp.is_valid())
             goto fail;
-        int rv = PyObject_SetAttrString(res, "__doc__", doc_py);
-        Py_DECREF(doc_py);
-        if (rv)
+        if (PyObject_SetAttrString(res.ptr(), "__doc__", tmp.ptr()))
             goto fail;
     }
 
-    Py_INCREF(res); // extra reference for PyModule_AddObject
-
-    if (PyModule_AddObject(base, name, res)) { // steals on success
-        Py_DECREF(res);
+    res.inc_ref(); // For PyModule_AddObject, which steals upon success
+    if (PyModule_AddObject(base, name, res.ptr())) {
+        res.dec_ref();
         goto fail;
     }
 
-    Py_INCREF(res); // turned borrowed into new reference
-    return res;
+    return res.release().ptr();
 
 fail:
     raise_python_error();
@@ -365,20 +367,59 @@ PyObject *getattr(PyObject *obj, PyObject *key) {
     return res;
 }
 
-PyObject *getattr(PyObject *obj, const char *key, PyObject *def) noexcept {
-    PyObject *res = PyObject_GetAttrString(obj, key);
-    if (res)
+PyObject *getattr(PyObject *obj, const char *key_, PyObject *def) noexcept {
+#if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
+    str key(key_);
+    if (PyObject_HasAttr(obj, key.ptr())) {
+        PyObject *res = PyObject_GetAttr(obj, key.ptr());
+        if (res)
+            return res;
+        PyErr_Clear();
+    }
+#else
+    PyObject *res;
+    int rv;
+
+    #if PY_VERSION_HEX < 0x030d0000
+        rv = _PyObject_LookupAttr(obj, str(key_).ptr(), &res);
+    #else
+        rv = PyObject_GetOptionalAttrString(obj, key_, &res);
+    #endif
+
+    if (rv == 1)
         return res;
-    PyErr_Clear();
+    else if (rv < 0)
+        PyErr_Clear();
+#endif
+
     Py_XINCREF(def);
     return def;
 }
 
 PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
-    PyObject *res = PyObject_GetAttr(obj, key);
-    if (res)
+#if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
+    if (PyObject_HasAttr(obj, key)) {
+        PyObject *res = PyObject_GetAttr(obj, key);
+        if (res)
+            return res;
+        PyErr_Clear();
+    }
+#else
+    PyObject *res;
+    int rv;
+
+    #if PY_VERSION_HEX < 0x030d0000
+        rv = _PyObject_LookupAttr(obj, key, &res);
+    #else
+        rv = PyObject_GetOptionalAttr(obj, key, &res);
+    #endif
+
+    if (rv == 1)
         return res;
-    PyErr_Clear();
+    else if (rv < 0)
+        PyErr_Clear();
+#endif
+
     Py_XINCREF(def);
     return def;
 }
@@ -561,16 +602,33 @@ PyObject *bytes_from_obj(PyObject *o) {
 PyObject *bytes_from_cstr(const char *str) {
     PyObject *result = PyBytes_FromString(str);
     if (!result)
-        raise("nanobind::detail::bytes_from_cstr(): conversion error!");
+        raise_python_error();
     return result;
 }
 
-PyObject *bytes_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyBytes_FromStringAndSize(str, (Py_ssize_t) size);
+PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
+    PyObject *result = PyBytes_FromStringAndSize((const char *) str, (Py_ssize_t) size);
     if (!result)
-        raise("nanobind::detail::bytes_from_cstr_and_size(): conversion error!");
+        raise_python_error();
     return result;
 }
+
+// ========================================================================
+
+PyObject *bytearray_from_obj(PyObject *o) {
+    PyObject *result = PyByteArray_FromObject(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
+    PyObject *result = PyByteArray_FromStringAndSize((const char *) str, (Py_ssize_t) size);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
 
 // ========================================================================
 
@@ -611,6 +669,20 @@ PyObject *list_from_obj(PyObject *o) {
     return result;
 }
 
+PyObject *set_from_obj(PyObject *o) {
+    PyObject *result = PySet_New(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
+PyObject *frozenset_from_obj(PyObject *o) {
+    PyObject *result = PyFrozenSet_New(o);
+    if (!result)
+        raise_python_error();
+    return result;
+}
+
 // ========================================================================
 
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {
@@ -638,13 +710,15 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
            still trigger a segfault if dereferenced. */
         if (size == 0)
             result = (PyObject **) 1;
+#  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
     } else if (PyList_CheckExact(seq)) {
         size = (size_t) PyList_GET_SIZE(seq);
         result = ((PyListObject *) seq)->ob_item;
         if (size == 0) // ditto
             result = (PyObject **) 1;
+#  endif
     } else if (PySequence_Check(seq)) {
-        temp = PySequence_Fast(seq, "");
+        temp = PySequence_Tuple(seq);
 
         if (temp)
             result = seq_get(temp, &size, temp_out);
@@ -658,8 +732,8 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
         Py_ssize_t size_seq = PySequence_Length(seq);
 
         if (size_seq >= 0) {
-            result = (PyObject **) PyObject_Malloc(sizeof(PyObject *) *
-                                                   (size_seq + 1));
+            result = (PyObject **) PyMem_Malloc(sizeof(PyObject *) *
+                                                (size_seq + 1));
 
             if (result) {
                 result[size_seq] = nullptr;
@@ -673,7 +747,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                         for (Py_ssize_t j = 0; j < i; ++j)
                             Py_DECREF(result[j]);
 
-                        PyObject_Free(result);
+                        PyMem_Free(result);
                         result = nullptr;
                         break;
                     }
@@ -685,7 +759,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                     PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
                     for (size_t i = 0; ptr[i] != nullptr; ++i)
                         Py_DECREF(ptr[i]);
-                    PyObject_Free(ptr);
+                    PyMem_Free(ptr);
                 });
 
                 if (temp) {
@@ -695,7 +769,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                     for (Py_ssize_t i = 0; i < size_seq; ++i)
                         Py_DECREF(result[i]);
 
-                    PyObject_Free(result);
+                    PyMem_Free(result);
                     result = nullptr;
                 }
             }
@@ -732,14 +806,16 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
             if (size == 0)
                 result = (PyObject **) 1;
         }
+#  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
     } else if (PyList_CheckExact(seq)) {
         if (size == (size_t) PyList_GET_SIZE(seq)) {
             result = ((PyListObject *) seq)->ob_item;
             if (size == 0) // ditto
                 result = (PyObject **) 1;
         }
+#  endif
     } else if (PySequence_Check(seq)) {
-        temp = PySequence_Fast(seq, "");
+        temp = PySequence_Tuple(seq);
 
         if (temp)
             result = seq_get_with_size(temp, size, temp_out);
@@ -754,7 +830,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
         if (size == (size_t) size_seq) {
             result =
-                (PyObject **) PyObject_Malloc(sizeof(PyObject *) * (size + 1));
+                (PyObject **) PyMem_Malloc(sizeof(PyObject *) * (size + 1));
 
             if (result) {
                 result[size] = nullptr;
@@ -768,7 +844,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                         for (Py_ssize_t j = 0; j < i; ++j)
                             Py_DECREF(result[j]);
 
-                        PyObject_Free(result);
+                        PyMem_Free(result);
                         result = nullptr;
                         break;
                     }
@@ -780,7 +856,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                     PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
                     for (size_t i = 0; ptr[i] != nullptr; ++i)
                         Py_DECREF(ptr[i]);
-                    PyObject_Free(ptr);
+                    PyMem_Free(ptr);
                 });
 
                 if (!temp) {
@@ -788,7 +864,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                     for (Py_ssize_t i = 0; i < size_seq; ++i)
                         Py_DECREF(result[i]);
 
-                    PyObject_Free(result);
+                    PyMem_Free(result);
                     result = nullptr;
                 }
             }
@@ -866,12 +942,63 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 
 // ========================================================================
 
+NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
+                        std::complex<double> *out) noexcept {
+    bool is_complex = PyComplex_CheckExact(ob),
+         convert = (flags & (uint8_t) cast_flags::convert);
+#if !defined(Py_LIMITED_API)
+    if (is_complex || convert) {
+        Py_complex result = PyComplex_AsCComplex(ob);
+        if (result.real != -1.0 || !PyErr_Occurred()) {
+            *out = std::complex<double>(result.real, result.imag);
+            return true;
+        } else {
+            PyErr_Clear();
+        }
+    }
+#else
+#if Py_LIMITED_API < 0x030D0000
+    // Before version 3.13, __complex__() was not called by the Stable ABI
+    // functions PyComplex_{Real,Imag}AsDouble(), so we do so ourselves.
+    if (!is_complex && convert
+            && !PyType_IsSubtype(Py_TYPE(ob), &PyComplex_Type)
+            && PyObject_HasAttrString(ob, "__complex__")) {
+        PyObject* tmp = PyObject_CallFunctionObjArgs(
+                (PyObject*) &PyComplex_Type, ob, NULL);
+        if (tmp) {
+            double re = PyComplex_RealAsDouble(tmp);
+            double im = PyComplex_ImagAsDouble(tmp);
+            Py_DECREF(tmp);
+            if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
+                *out = std::complex<double>(re, im);
+                return true;
+            }
+        }
+        PyErr_Clear();
+        return false;
+    }
+#endif
+    if (is_complex || convert) {
+        double re = PyComplex_RealAsDouble(ob);
+        double im = PyComplex_ImagAsDouble(ob);
+        if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
+            *out = std::complex<double>(re, im);
+            return true;
+        } else {
+            PyErr_Clear();
+        }
+    }
+#endif
+
+    return false;
+}
+
 bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (double) PyFloat_AS_DOUBLE(o);
+        *out = PyFloat_AS_DOUBLE(o);
         return true;
     }
 
@@ -882,7 +1009,7 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (double) result;
+            *out = result;
             return true;
         } else {
             PyErr_Clear();
@@ -894,22 +1021,31 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
 
 bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
+    bool convert = flags & (uint8_t) cast_flags::convert;
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
-        *out = (float) PyFloat_AS_DOUBLE(o);
-        return true;
+        double d = PyFloat_AS_DOUBLE(o);
+        float result = (float) d;
+        if (convert || (double) result == d || d != d) {
+            *out = result;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     is_float = false;
 #endif
 
-    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
-        double result = PyFloat_AsDouble(o);
-
-        if (result != -1.0 || !PyErr_Occurred()) {
-            *out = (float) result;
-            return true;
+    if (is_float || convert) {
+        double d = PyFloat_AsDouble(o);
+        if (d != -1.0 || !PyErr_Occurred()) {
+            float result = (float) d;
+            if (convert || (double) result == d || d != d) {
+                *out = result;
+                return true;
+            }
         } else {
             PyErr_Clear();
         }
@@ -1053,6 +1189,14 @@ void decref_checked(PyObject *o) noexcept {
 
 // ========================================================================
 
+bool leak_warnings() noexcept {
+    return internals->print_leak_warnings;
+}
+
+bool implicit_cast_warnings() noexcept {
+    return internals->print_implicit_cast_warnings;
+}
+
 void set_leak_warnings(bool value) noexcept {
     internals->print_leak_warnings = value;
 }
@@ -1115,6 +1259,34 @@ NB_CORE PyObject *repr_map(PyObject *o) {
     }
     s += str("})");
     return s.release().ptr();
+}
+
+// ========================================================================
+
+bool issubclass(PyObject *a, PyObject *b) {
+    int rv = PyObject_IsSubclass(a, b);
+    if (rv == -1)
+        raise_python_error();
+    return bool(rv);
+}
+
+// ========================================================================
+
+PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k) {
+    PyObject *value;
+    bool error = false;
+
+#if PY_VERSION_HEX < 0x030D00A1 || defined(Py_LIMITED_API)
+    value = PyDict_GetItemWithError(d, k);
+    if (value)
+        Py_INCREF(value);
+    else
+        error = PyErr_Occurred();
+#else
+    error = PyDict_GetItemRef(d, k, &value) == -1;
+#endif
+    check(!error, "nanobind::detail::dict_get_item_ref_or_fail(): dictionary lookup failed!");
+    return value;
 }
 
 NAMESPACE_END(detail)

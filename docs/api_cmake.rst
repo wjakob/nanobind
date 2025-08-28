@@ -8,6 +8,24 @@ modules. This is needed because quite a few steps are involved: nanobind must
 build the module, a library component, link the two together, and add a
 different set of compilation and linker flags depending on the target platform.
 
+If you prefer another build system, then you have the following options:
+
+- `Nicholas Junge <https://github.com/nicholasjng>`__ has created a `Bazel
+  interface <https://github.com/nicholasjng/nanobind-Bazel>`__ to nanobind.
+  Please report Bazel-specific issues there.
+
+- `Will Ayd <https://github.com/WillAyd/>`__ has created a `Meson WrapDB
+  package <https://mesonbuild.com/Wrapdb-projects.html>`__ for nanobind. Please
+  report Meson-specific issues on the `Meson WrapDB
+  <https://github.com/mesonbuild/wrapdb/issues>`__ repository.
+
+- You could create a new build system from scratch that takes care of these
+  steps. See `this file
+  <https://github.com/wjakob/nanobind/blob/master/src/nb_combined.cpp>`__ for
+  inspiration on how to do this on Linux. Note that you will be on your own if
+  you choose to go this route---I unfortunately do not have the time to respond
+  to GitHub tickets related to custom build systems.
+
 The section on :ref:`building extensions <building>` provided an introductory
 example of how to set up a basic build system via the
 :cmake:command:`nanobind_add_module` command, which is the :ref:`high level
@@ -48,9 +66,14 @@ The high-level interface consists of just one CMake command:
 
       * - ``STABLE_ABI``
         - Perform a `stable ABI
-          <https://docs.python.org/3/c-api/stable.html>`_ build, making it
+          <https://docs.python.org/3/c-api/stable.html>`__ build, making it
           possible to use a compiled extension across Python minor versions.
           The flag is ignored on Python versions older than < 3.12.
+      * - ``FREE_THREADED``
+        - Compile an Python extension that opts into free-threaded (i.e.,
+          GIL-less) Python behavior, which requires a special free-threaded
+          build of Python 3.13 or newer. The flag is ignored on unsupported
+          Python versions.
       * - ``NB_STATIC``
         - Compile the core nanobind library as a static library. This
           simplifies redistribution but can increase the combined binary
@@ -60,6 +83,13 @@ The high-level interface consists of just one CMake command:
         - The opposite of ``NB_STATIC``: compile the core nanobind library
           as a shared library for use in projects that consist of multiple
           extensions.
+      * - ``NB_SUPPRESS_WARNINGS``
+        - Mark the include directories of nanobind and Python as
+          `SYSTEM <https://cmake.org/cmake/help/latest/command/include_directories.html>`__
+          include directories, which suppresses any potential warning messages
+          originating there. This is mainly of relevance if your project artificially
+          raises the warning level via flags like ``-pedantic``, ``-Wcast-qual``,
+          ``-Wsign-conversion``.
       * - ``PROTECT_STACK``
         - Don't remove stack smashing-related protections.
       * - ``LTO``
@@ -252,6 +282,8 @@ The various commands are described below:
         - Perform a static library build (without this suffix, a shared build is used)
       * - ``-abi3``
         - Perform a stable ABI build targeting Python v3.12+.
+      * - ``-ft``
+        - Perform a build that opts into the Python 3.13+ free-threaded behavior.
 
    .. code-block:: cmake
 
@@ -452,8 +484,8 @@ Nanobind's CMake tooling includes a convenience command to interface with the
           empty file named ``py.typed`` in each module directory. When this
           parameter is specified, :cmake:command:`nanobind_add_stub` will
           automatically generate such an empty file as well.
-      * - ``PATCH_FILE``
-        - Specify a patch file used to replace declarations in the stub. The
+      * - ``PATTERN_FILE``
+        - Specify a pattern file used to replace declarations in the stub. The
           syntax is described in the section on :ref:`stub generation <stubs>`.
       * - ``COMPONENT``
         - Specify a component when ``INSTALL_TIME`` stub generation is used.

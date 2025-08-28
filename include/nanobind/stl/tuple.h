@@ -78,7 +78,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         bool success =
             (... &&
              ((o[Is] = steal(make_caster<Ts>::from_cpp(
-                   forward_like<T>(std::get<Is>(value)), policy, cleanup))),
+                   forward_like_<T>(std::get<Is>(value)), policy, cleanup))),
               o[Is].is_valid()));
 
         if (!success)
@@ -89,8 +89,15 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         return r;
     }
 
+    template <typename T>
+    bool can_cast() const noexcept { return can_cast_impl(Indices{}); }
+
     explicit operator Value() { return cast_impl(Indices{}); }
 
+    template <size_t... Is>
+    bool can_cast_impl(std::index_sequence<Is...>) const noexcept {
+        return (std::get<Is>(casters).template can_cast<Ts>() && ...);
+    }
     template <size_t... Is> Value cast_impl(std::index_sequence<Is...>) {
         return Value(std::get<Is>(casters).operator cast_t<Ts>()...);
     }

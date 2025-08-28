@@ -176,7 +176,7 @@ include directive:
 
    #include <nanobind/stl/bind_vector.h>
 
-.. cpp:function:: template <typename Vector, typename... Args> class_<Vector> bind_vector(handle scope, const char * name, Args &&...args)
+.. cpp:function:: template <typename Vector, rv_policy Policy = rv_policy::automatic_reference, typename... Args> class_<Vector> bind_vector(handle scope, const char * name, Args &&...args)
 
    Bind the STL vector-derived type `Vector` to the identifier `name` and
    place it in `scope` (e.g., a :cpp:class:`module_`). The variable argument
@@ -217,7 +217,7 @@ include directive:
         - Assign an element in the list (supports negative indexing)
       * - ``__delitem__(self, arg: int)``
         - Delete an item from the list (supports negative indexing)
-      * - ``__setitem__(self, arg: slice) -> Vector``
+      * - ``__getitem__(self, arg: slice) -> Vector``
         - Slice-based getter
       * - ``__setitem__(self, arg0: slice, arg1: Value)``
         - Slice-based assignment
@@ -276,16 +276,16 @@ include directive:
 
          va = VecA()
          va.append(A(123))
-         a[0].value = 456
-         assert a[0].value == 456 # <-- assertion fails!
+         va[0].value = 456
+         assert va[0].value == 456 # <-- assertion fails!
 
       To actually modify ``va``, another write is needed.
 
       .. code-block:: python
 
-         v = a[0]
+         v = va[0]
          v.value = 456
-         a[0] = v
+         va[0] = v
 
       This may seem like a strange design, so it is worth explaining why the
       implementation works in this way.
@@ -327,10 +327,54 @@ include directive:
          <intrusive>`, the added indirection and ownership tracking removes the
          need for extra copies.
 
-     You should **never** use this class to bind pointer-valued vectors
-     ``std::vector<T*>`` when ``T`` does not use intrusive reference counting.
-     Some kind of ownership tracking (points 2 and 3 of the above list) is
-     needed in this case.
+         (It is usually unsafe to use this class to bind pointer-valued
+         vectors ``std::vector<T*>`` when ``T`` does not use intrusive
+         reference counting, because then there is nothing to prevent the Python
+         objects returned by ``__getitem__`` from outliving the C++ ``T``
+         objects that they point to. But if you are able to guarantee through
+         other means that the ``T`` objects will live long enough, the intrusive
+         reference counting is not strictly required.)
+
+   .. note::
+
+      Previous versions of nanobind (before 2.0) and pybind11 return Python
+      objects from ``__getitem__`` that wrap *references* (i.e., views),
+      meaning that they are only safe to use until the next insertion or
+      deletion in the vector they were drawn from. As discussed above, any use
+      after that point could **corrupt memory or crash your program**, which is
+      why reference semantics are no longer the default.
+
+      If you truly need the unsafe reference semantics, and if you
+      can guarantee that all use of your bindings will respect
+      the memory layout and reference-invalidation rules of the
+      underlying C++ container type, you can request the old behavior
+      by passing a second template argument of
+      :cpp:enumerator:`rv_policy::reference_internal` to
+      :cpp:func:`bind_vector`. This will override nanobind's usual
+      choice of :cpp:enumerator:`rv_policy::copy` for ``__getitem__``.
+
+      .. code-block:: cpp
+
+         nb::bind_vector<std::vector<MyType>,
+                         nb::rv_policy::reference_internal>(m, "ExampleVec");
+
+      Again, please avoid this if at all possible.
+      It is *very* easy to cause problems if you're not careful, as the
+      following example demonstrates.
+
+      .. code-block:: python
+
+         def looks_fine_but_crashes(vec: ext.ExampleVec) -> None:
+             # Trying to remove all the elements too much older than the last:
+             last = vec[-1]
+             # Even being careful to iterate backwards so we visit each
+             # index only once...
+             for idx in range(len(vec) - 2, -1, -1):
+                 if last.timestamp - vec[idx].timestamp > 5:
+                     del vec[idx]
+                     # Oops! After the first deletion, 'last' now refers to
+                     # uninitialized memory.
+
 
 .. _map_bindings:
 
@@ -345,7 +389,7 @@ nanobind API and requires an additional include directive:
 
    #include <nanobind/stl/bind_map.h>
 
-.. cpp:function:: template <typename Map, typename... Args> class_<Map> bind_map(handle scope, const char * name, Args &&...args)
+.. cpp:function:: template <typename Map, rv_policy Policy = rv_policy::automatic_reference, typename... Args> class_<Map> bind_map(handle scope, const char * name, Args &&...args)
 
    Bind the STL map-derived type `Map` (ordered or unordered) to the identifier
    `name` and place it in `scope` (e.g., a :cpp:class:`module_`). The variable
@@ -420,6 +464,42 @@ nanobind API and requires an additional include directive:
       discussion of the problem and possible solutions. Everything applies
       equally to the map case.
 
+   .. note::
+
+      Unlike ``std::vector``, the ``std::map`` and ``std::unordered_map``
+      containers are *node-based*, meaning their elements do have a
+      consistent address for as long as they're stored in the map.
+      (Note that this is generally *not* true of third-party containers
+      with similar interfaces, such as ``absl::flat_hash_map``.)
+
+      If you are binding a node-based container type, and you want
+      ``__getitem__`` to return a reference to the accessed element
+      rather than copying it, it is *somewhat* safer than it would
+      be with :cpp:func:`bind_vector` to use the unsafe workaround
+      discussed there:
+
+      .. code-block:: cpp
+
+         nb::bind_map<std::map<std::string, SomeValue>,
+                      nb::rv_policy::reference_internal>(m, "ExampleMap");
+
+      With a node-based container, the only situation where a reference
+      returned from ``__getitem__`` would be invalidated is if the individual
+      element that it refers to were removed from the map. Unlike with
+      ``std::vector``, additions and removals of *other* elements would
+      not present a danger.
+
+      It is still easy to cause problems if you're not careful, though:
+
+      .. code-block:: python
+
+         def unsafe_pop(map: ext.ExampleMap, key: str) -> ext.SomeValue:
+             value = map[key]
+             del map[key]
+             # Oops! `value` now points to a dangling element. Anything you
+             # do with it now is liable to crash the interpreter.
+             return value  # uh-oh...
+
 
 Unique pointer deleter
 ----------------------
@@ -469,7 +549,7 @@ include directive:
 
    #include <nanobind/make_iterator.h>
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename Sentinel, typename... Extra> auto make_iterator(handle scope, const char * name, Iterator first, Sentinel last, Extra &&...extra)
 
    Create a Python iterator wrapping the C++ iterator represented by the range
    ``[first, last)``. The `Extra` parameter can be used to pass additional
@@ -497,14 +577,49 @@ include directive:
                                            v.begin(), v.end());
               }, nb::keep_alive<0, 1>());
 
+   .. note::
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Type, typename... Extra> auto make_iterator(handle scope, const char * name, Type &value, Extra &&...extra)
+      Pre-2.0 versions of nanobind and pybind11 return *references* (views)
+      into the underlying sequence.
 
-   This convenience wrapper calls the above `make_iterator` variant with
+      This is convenient when
+
+      1. Iterated elements are used to modify the underlying container.
+
+      2. Iterated elements should reflect separately made changes to
+         the underlying container.
+
+      But this strategy is *unsafe* if the allocated memory region or layout
+      of the container could change (e.g., through insertion of removal of
+      elements).
+
+      Because of this, iterators now copy by default. There are two
+      ways to still obtain references to the target elements:
+
+      1. If the iterator is over STL shared pointers, the added indirection and
+         ownership tracking removes the need for extra copies.
+
+      2. If the iterator is over reference-counted objects (e.g., ``ref<T>``
+         via the :cpp:class:`ref` wrapper) and ``T`` uses the intrusive
+         reference counting approach explained :ref:`here <intrusive>`,
+         the added indirection and ownership tracking removes the need
+         for extra copies.
+
+      If you truly need the unsafe reference semantics, and if you can
+      guarantee that all use of your bindings will respect the memory layout
+      and reference-invalidation rules of the underlying C++ container type,
+      you can request the old behavior by passing
+      :cpp:enumerator:`rv_policy::reference_internal` to the ``Policy``
+      template argument of this function.
+
+
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Type, typename... Extra> auto make_iterator(handle scope, const char * name, Type &value, Extra &&...extra)
+
+   This convenience wrapper calls the above :cpp:func:`make_iterator` variant with
    ``first`` and ``last`` set to ``std::begin(value)`` and ``std::end(value)``,
    respectively.
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_key_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename Sentinel, typename... Extra> iterator make_key_iterator(handle scope, const char * name, Iterator first, Sentinel last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_key_iterator` returns the first pair element to
@@ -515,7 +630,7 @@ include directive:
    ``(*first).first``.
 
 
-.. cpp:function:: template <rv_policy Policy = rv_policy::reference_internal, typename Iterator, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator &&first, Iterator &&last, Extra &&...extra)
+.. cpp:function:: template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator, typename Sentinel, typename... Extra> iterator make_value_iterator(handle scope, const char * name, Iterator first, Sentinel last, Extra &&...extra)
 
    :cpp:func:`make_iterator` specialization for C++ iterators that return
    key-value pairs. `make_value_iterator` returns the second pair element to
@@ -529,8 +644,8 @@ N-dimensional array type
 ------------------------
 
 The following type can be used to exchange n-dimension arrays with frameworks
-like NumPy, PyTorch, Tensorflow, JAX, and others. It requires an additional
-include directive:
+like NumPy, PyTorch, Tensorflow, JAX, CuPy, and others. It requires an
+additional include directive:
 
 .. code-block:: cpp
 
@@ -541,10 +656,44 @@ section <ndarrays>`.
 
 .. cpp:function:: bool ndarray_check(handle h) noexcept
 
-   Test whether the Python object represents an ndarray. Currently, the
-   function considers NumPy, PyTorch, TensorFlow, and XLA arrays.
+   Test whether the Python object represents an ndarray.
+
+   Objects with a ``__dlpack__`` attribute or objects that implement the buffer
+   protocol are considered as ndarray objects. In addition, arrays from NumPy,
+   PyTorch, TensorFlow and XLA are also regarded as ndarrays.
 
 .. cpp:class:: template <typename... Args> ndarray
+
+   .. cpp:type:: Scalar
+
+      The scalar type underlying the array (or ``void`` if not specified)
+
+   .. cpp:var:: static constexpr bool ReadOnly
+
+      A ``constexpr`` Boolean value that is ``true`` if the ndarray template
+      arguments (`Args... <Args>`) include the ``nb::ro`` annotation or a
+      ``const``-qualified scalar type.
+
+   .. cpp:var:: static constexpr char Order
+
+      A ``constexpr`` character value set based on the ndarray template
+      arguments (`Args... <Args>`). It equals
+
+      - ``'C'`` if :cpp:class:`c_contig` is specified,
+      - ``'F'`` if :cpp:class:`f_contig` is specified,
+      - ``'A'`` if :cpp:class:`any_contig` is specified,
+      - ``'\0'`` otherwise.
+
+   .. cpp:var:: static constexpr int DeviceType
+
+      A ``constexpr`` integer value set to the device type ID extracted from
+      the ndarray template arguments (`Args... <Args>`), or
+      :cpp:struct:`device::none::value <device::none>` when none was specified.
+
+   .. cpp:type:: VoidPtr = std::conditional_t<ReadOnly, const void *, void *>
+
+      A potentially ``const``-qualified ``void*`` pointer type used by some
+      of the ``ndarray`` constructors.
 
    .. cpp:function:: ndarray() = default
 
@@ -553,8 +702,8 @@ section <ndarrays>`.
    .. cpp:function:: template <typename... Args2> explicit ndarray(const ndarray<Args2...> &other)
 
       Reinterpreting constructor that wraps an existing nd-array (parameterized
-      by `Args`) into a new ndarray (parameterized by `Args2`).   No copy or
-      conversion is made.
+      by `Args... <Args>`) into a new ndarray (parameterized by `Args2...
+      <Args2>`). No copy or conversion is made.
 
       Dropping parameters is always safe. For example, a function that
       returns different array types could call it to convert ``ndarray<T>`` to
@@ -584,37 +733,87 @@ section <ndarrays>`.
       Move assignment operator. Steals the referenced array without changing reference counts.
       Decreases the reference count of the previously referenced array and potentially destroy it.
 
-   .. cpp:function:: ndarray(void * value, size_t ndim, const size_t * shape, handle owner = nanobind::handle(), const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+   .. _ndarray_dynamic_constructor:
 
-      Create an array wrapping an existing memory allocation. The following
-      parameters can be specified:
+   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape = { }, handle owner = { }, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = DeviceType, int32_t device_id = 0, char order = Order)
 
-      - `value`: pointer address of the memory region. When the ndarray is
-        parameterized by a constant scalar type to indicate read-only access, a
-        const pointer must be passed instead.
+      Create an array wrapping an existing memory allocation.
 
-      - `ndim`: the number of dimensions.
+      Only the `data` parameter is strictly required, while some other
+      parameters can be be inferred from static :cpp:class:`nb::ndarray\<...\>
+      <ndarray>` template parameters.
 
-      - `shape`: specifies the size along each axis. The referenced array must
-        must have `ndim` entries.
+      The parameters have the following meaning:
+
+      - `data`: a CPU/GPU/.. pointer to the memory region storing the array
+        data.
+
+        When the array is parameterized by a ``const`` scalar type, or when it
+        has a :cpp:class:`nb::ro <ro>` read-only annotation, a ``const``
+        pointer can be passed here.
+
+      - `shape`: an initializer list that simultaneously specifies the number
+        of dimensions and the size along each axis. If left at its default
+        ``{}``, the :cpp:class:`nb::shape <nanobind::shape>` template parameter
+        will take precedence (if present).
 
       - `owner`: if provided, the array will hold a reference to this object
-        until it is destructed.
+        until its destruction. This makes it possible to create zero-copy views
+        into other data structures, while guaranteeing the memory safety of
+        array accesses.
 
-      - `strides` is optional; a value of ``nullptr`` implies C-style strides.
+      - `strides`: an initializer list explaining the layout of the data in
+        memory. Each entry denotes the number of elements to jump over to
+        advance to the next item along the associated axis.
 
-      - `dtype` describes the data type (floating point, signed/unsigned
-        integer) and bit depth.
+        `strides` must either have the same size as `shape` or be empty. In the
+        latter case, strides are automatically computed according to the
+        `order` parameter.
 
-      - The `device_type` and `device_id` indicate the device and address
-        space associated with the pointer `value`.
+        Note that strides in nanobind express *element counts* rather than
+        *byte counts*. This convention differs from other frameworks (e.g.,
+        NumPy) and is a consequence of the underlying `DLPack
+        <https://github.com/dmlc/dlpack>`_ protocol.
 
-   .. cpp:function:: ndarray(void * value, const std::initializer_list<size_t> shape, handle owner = nanobind::handle(), std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = device::cpu::value, int32_t device_id = 0)
+      - `dtype` describes the numeric data type of array elements (e.g.,
+        floating point, signed/unsigned integer) and their bit depth.
 
-      Alternative form of the above constructor, which accepts the ``shape``
-      and ``strides`` arguments using a ``std::initializer_list``. It
-      automatically infers the value of ``ndim`` based on the size of
-      ``shape``.
+        You can use the :cpp:func:`nb::dtype\<T\>() <nanobind::dtype>` function to obtain the right
+        value for a given type.
+
+      - `device_type` and `device_id` specify where the array data is stored.
+        The `device_type` must be an enumerant like
+        :cpp:class:`nb::device::cuda::value <device::cuda>`, while the meaning
+        of the device ID is unspecified and platform-dependent.
+
+        Note that the `device_id` is set to ``0`` by default and cannot be
+        inferred by nanobind. If your extension creates arrays on multiple
+        different compute accelerators, you *must* provide this parameter.
+
+      - The `order` parameter denotes the coefficient order in memory and is only
+        relevant when `strides` is empty. Specify ``'C'`` for C-style or ``'F'``
+        for Fortran-style. When this parameter is not explicitly specified, the
+        implementation uses the order specified as an ndarray template
+        argument, or C-style order as a fallback.
+
+      Both ``strides`` and ``shape`` will be copied by the constructor, hence
+      the targets of these initializer lists do not need to remain valid
+      following the constructor call.
+
+      .. warning::
+
+         The Python *global interpreter lock* (GIL) must be held when calling
+         this function.
+
+   .. cpp:function:: ndarray(VoidPtr data, size_t ndim, const size_t * shape, handle owner, const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int device_type = DeviceType, int device_id = 0, char order = Order)
+
+      Alternative form of the above constructor, which accepts the `shape`
+      and `strides` arguments using pointers instead of initializer lists.
+      The number of dimensions must be specified via the `ndim` parameter
+      in this case.
+
+      See the previous constructor for details, the remaining behavior is
+      identical.
 
    .. cpp:function:: dlpack::dtype dtype() const
 
@@ -631,13 +830,13 @@ section <ndarrays>`.
    .. cpp:function:: size_t itemsize() const
 
       Return the size of a single array element in bytes. The returned value
-      is rounded to the next full byte in case of bit-level representations
+      is rounded up to the next full byte in case of bit-level representations
       (query :cpp:member:`dtype::bits` for bit-level granularity).
 
    .. cpp:function:: size_t nbytes() const
 
       Return the size of the entire array bytes. The returned value is rounded
-      to the next full byte in case of bit-level representations.
+      up to the next full byte in case of bit-level representations.
 
    .. cpp:function:: size_t shape(size_t i) const
 
@@ -645,7 +844,7 @@ section <ndarrays>`.
 
    .. cpp:function:: int64_t stride(size_t i) const
 
-      Return the stride of dimension `i`.
+      Return the stride (in number of elements) of dimension `i`.
 
    .. cpp:function:: const int64_t* shape_ptr() const
 
@@ -664,25 +863,33 @@ section <ndarrays>`.
 
       Check whether the array is in a valid state.
 
-   .. cpp:function:: int32_t device_type() const
+   .. cpp:function:: int device_type() const
 
       ID denoting the type of device hosting the array. This will match the
       ``value`` field of a device class, such as :cpp:class:`device::cpu::value
       <device::cpu>` or :cpp:class:`device::cuda::value <device::cuda>`.
 
-   .. cpp:function:: int32_t device_id() const
+   .. cpp:function:: int device_id() const
 
       In a multi-device/GPU setup, this function returns the ID of the device
       storing the array.
 
-   .. cpp:function:: const Scalar * data() const
+   .. cpp:function:: Scalar * data() const
 
-      Return a const pointer to the array data.
+      Return a pointer to the array data.
+      If :cpp:var:`ReadOnly` is true, a pointer-to-const is returned.
 
-   .. cpp:function:: Scalar * data()
+   .. cpp:function:: template <typename... Args2> auto& operator()(Args2... indices)
 
-      Return a mutable pointer to the array data. Only enabled when `Scalar` is
-      not itself ``const``.
+      Return a reference to the element stored at the provided index/indices.
+      If :cpp:var:`ReadOnly` is true, a reference-to-const is returned.
+      Note that ``sizeof...(Args2)`` must match :cpp:func:`ndim()`.
+
+      This accessor is only available when the scalar type and array dimension
+      were specified as template parameters.
+
+      This function should only be used when the array storage is accessible
+      through the CPU's virtual memory address space.
 
    .. cpp:function:: template <typename... Extra> auto view()
 
@@ -695,13 +902,17 @@ section <ndarrays>`.
       ``shape()``, ``stride()``, and ``operator()`` following the conventions
       of the `ndarray` type.
 
-   .. cpp:function:: template <typename... Ts> auto& operator()(Ts... indices)
+   .. cpp:function:: auto cast(rv_policy policy = rv_policy::automatic_reference, handle parent = {})
 
-      Return a mutable reference to the element at stored at the provided
-      index/indices. ``sizeof(Ts)`` must match :cpp:func:`ndim()`.
+      The expression ``array.cast(policy, parent)`` is almost equivalent to
+      :cpp:func:`nb::cast(array, policy, parent) <cast>`.
 
-      This accessor is only available when the scalar type and array dimension
-      were specified as template parameters.
+      The main difference is that the return type of :cpp:func:`nb::cast
+      <cast>` is :cpp:class:`nb::object <object>`, which renders as a rather
+      non-descriptive ``object`` in Python bindings. The ``.cast()`` method
+      returns a custom wrapper type that still derives from
+      :cpp:class:`nb::object <object>`, but whose type signature in bindings
+      reproduces that of the original nd-array.
 
 Data types
 ^^^^^^^^^^
@@ -826,7 +1037,10 @@ Contiguity
 
 .. cpp:class:: any_contig
 
-   Don't place any demands on array contiguity (the default).
+   Accept both C- and F-contiguous arrays.
+
+If you prefer not to require contiguity, simply do not provide any of the
+``*_contig`` template parameters listed above.
 
 Device type
 +++++++++++
@@ -887,6 +1101,12 @@ convert into an equivalent representation in one of the following frameworks:
 .. cpp:class:: pytorch
 
 .. cpp:class:: jax
+
+.. cpp:class:: cupy
+
+.. cpp:class:: memview
+
+   Builtin Python ``memoryview`` for CPU-resident data.
 
 Eigen convenience type aliases
 ------------------------------

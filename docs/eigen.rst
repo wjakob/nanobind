@@ -50,6 +50,50 @@ evaluated expression, nanobind will capture and wrap it in a NumPy array
 without making a copy. All other cases (returning by reference, returning an
 unevaluated expression template) either evaluate or copy the array.
 
+.. warning::
+
+   It can be tempting to bind functions that directly return Eigen expressions,
+   such as such the innocent-looking vector sum below:
+
+   .. code-block:: cpp
+
+      m.def("sum", [](Eigen::Vector3f a, Eigen::Vector3d b) { return a + b; });
+
+   However, note that this example triggers undefined behavior. The problem is
+   that the sum ``a + b`` is an *expression template*, which provides the means
+   to evaluate the expression at some later point. The expression references
+   variables on the stack that no longer exist when when the expression is
+   evaluated by the caller. The issue is not related to nanobind (i.e., this is
+   also a bug in pure Eigen code).
+
+   To fix this you can
+
+   1. Specify a return type, e.g.,
+
+      .. code-block:: cpp
+
+         m.def("sum", [](Eigen::Vector3f a, Eigen::Vector3d b) -> Eigen::Vector3d { return a + b; });
+
+      This forces an evaluation of the expression into a container that *owns*
+      the underlying storage.
+
+   2. Invoke ``Eigen::DenseBase::eval()``, which is equivalent and potentially
+      more compact and flexible.
+
+      .. code-block:: cpp
+
+         m.def("sum", [](Eigen::Vector3f a, Eigen::Vector3d b) { return (a + b).eval(); });
+
+   3. If the expression to be returned only references function arguments,
+      then you can turn the arguments themselves into references:
+
+      .. code-block:: cpp
+
+         m.def("sum", [](const Eigen::Vector3f &a, const Eigen::Vector3d &b) { return a + b; });
+
+      This is safe, because the nanobind type casters keep the referenced
+      objects alive until the expression has been evaluated.
+
 Python → C++
 ^^^^^^^^^^^^
 
@@ -101,6 +145,20 @@ apply:
 
      void f4(nb::DRef<Eigen::MatrixXf> x) { x *= 2; }
 
+Maps
+----
+
+Besides ``Eigen::Ref<...>``, nanobind also supports binding functions that take
+and return ``Eigen::Map<...>``. The underlying map type caster strictly
+prevents conversion of incompatible inputs into an ``Eigen::Map<...>`` when
+this would require implicit layout or type conversion. This restriction exists
+because the primary purpose of this interface is to efficiently access existing
+memory without conversion overhead. When binding functions that return
+``Eigen::Map<...>``, you must ensure that the mapped memory remains valid
+throughout the map's lifetime. This typically requires appropriate lifetime
+annotations (such as :cpp:enumerator:`rv_policy::reference_internal` or
+:cpp:struct:`keep_alive`) to prevent access to memory that has been deallocated
+on the C++ side.
 
 Sparse matrices
 ---------------
@@ -112,9 +170,11 @@ Eigen types:
 
    #include <nanobind/eigen/sparse.h>
 
-The ``Eigen::SparseMatrix<..>`` type maps to either ``scipy.sparse.csr_matrix``
-or ``scipy.sparse.csc_matrix`` depending on whether row- or column-major
-storage is used.
+The ``Eigen::SparseMatrix<..>`` and ``Eigen::Map<Eigen::SparseMatrix<..>>``
+types map to either ``scipy.sparse.csr_matrix`` or ``scipy.sparse.csc_matrix``
+depending on whether row- or column-major storage is used. The previously
+mentioned precautions related to returning dense maps also apply in the sparse
+case.
 
 There is no support for Eigen sparse vectors because an equivalent type does
 not exist as part of ``scipy.sparse``.

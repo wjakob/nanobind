@@ -2,7 +2,7 @@ import pytest
 import sys
 import platform
 
-import test_bind_map_ext as t
+import test_stl_bind_map_ext as t
 
 
 def test_map_string_double(capfd):
@@ -35,12 +35,12 @@ def test_map_string_double(capfd):
     assert len(mm2) == 1
     mm2.clear()
     assert len(mm2) == 0
-    assert repr(mm) == "test_bind_map_ext.MapStringDouble({'a': 1.0, 'b': 2.5})"
+    assert repr(mm) == "test_stl_bind_map_ext.MapStringDouble({'a': 1.0, 'b': 2.5})"
 
     with pytest.raises(TypeError):
         mm2.update({"a" : "b"})
     captured = capfd.readouterr().err.strip()
-    ref = "nanobind: implicit conversion from type 'dict' to type 'test_bind_map_ext.MapStringDouble' failed!"
+    ref = "nanobind: implicit conversion from type 'dict' to type 'test_stl_bind_map_ext.MapStringDouble' failed!"
 
     # Work around Pytest-related flakiness (https://github.com/pytest-dev/pytest/issues/10843)
     if platform.system() == 'Windows':
@@ -96,13 +96,13 @@ def test_map_string_double(capfd):
     assert type(items).__qualname__ == 'MapStringDouble.ItemView'
 
     if sys.version_info < (3, 9):
-        d = "Dict"
+        d = "typing.Dict"
     else:
         d = "dict"
 
     assert t.MapStringDouble.__init__.__doc__ == \
 """__init__(self) -> None
-__init__(self, arg: test_bind_map_ext.MapStringDouble) -> None
+__init__(self, arg: test_stl_bind_map_ext.MapStringDouble) -> None
 __init__(self, arg: %s[str, float], /) -> None
 
 Overloaded function.
@@ -111,7 +111,7 @@ Overloaded function.
 
 Default constructor
 
-2. ``__init__(self, arg: test_bind_map_ext.MapStringDouble) -> None``
+2. ``__init__(self, arg: test_stl_bind_map_ext.MapStringDouble) -> None``
 
 Copy constructor
 
@@ -130,6 +130,74 @@ def test_map_string_double_const():
     umc["b"] = 21.5
 
     str(umc)
+
+
+def test_maps_with_noncopyable_values():
+    if not hasattr(t, 'get_mnc'):
+        return
+
+    # std::map
+    mnc = t.get_mnc(5)
+    for i in range(1, 6):
+        assert mnc[i].value == 10 * i
+
+    vsum = 0
+    for k, v in mnc.items():
+        assert v.value == 10 * k
+        vsum += v.value
+
+    assert vsum == 150
+
+    # std::unordered_map
+    mnc = t.get_umnc(5)
+    for i in range(1, 6):
+        assert mnc[i].value == 10 * i
+
+    vsum = 0
+    for k, v in mnc.items():
+        assert v.value == 10 * k
+        vsum += v.value
+
+    assert vsum == 150
+
+    # nested std::map<std::vector>
+    nvnc = t.get_nvnc(5)
+    for i in range(1, 6):
+        for j in range(0, 5):
+            assert nvnc[i][j].value == j + 1
+
+    # Note: maps do not have .values()
+    for _, v in nvnc.items():
+        for i, j in enumerate(v, start=1):
+            assert j.value == i
+
+    # nested std::map<std::map>
+    nmnc = t.get_nmnc(5)
+    for i in range(1, 6):
+        for j in range(10, 60, 10):
+            assert nmnc[i][j].value == 10 * j
+
+    vsum = 0
+    for _, v_o in nmnc.items():
+        for k_i, v_i in v_o.items():
+            assert v_i.value == 10 * k_i
+            vsum += v_i.value
+
+    assert vsum == 7500
+
+    # nested std::unordered_map<std::unordered_map>
+    numnc = t.get_numnc(5)
+    for i in range(1, 6):
+        for j in range(10, 60, 10):
+            assert numnc[i][j].value == 10 * j
+
+    vsum = 0
+    for _, v_o in numnc.items():
+        for k_i, v_i in v_o.items():
+            assert v_i.value == 10 * k_i
+            vsum += v_i.value
+
+    assert vsum == 7500
 
 
 def test_map_delitem():

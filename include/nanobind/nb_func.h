@@ -11,14 +11,14 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Caster>
-bool from_python_keep_alive(Caster &c, PyObject **args, uint8_t *args_flags,
-                            cleanup_list *cleanup, size_t index) {
+bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t *args_flags,
+                               cleanup_list *cleanup, size_t index) {
     size_t size_before = cleanup->size();
     if (!c.from_python(args[index], args_flags[index], cleanup))
         return false;
 
     // If an implicit conversion took place, update the 'args' array so that
-    // the keep_alive annotation can later process this change
+    // any keep_alive annotation or postcall hook can be aware of this change
     size_t size_after = cleanup->size();
     if (size_after != size_before)
         args[index] = (*cleanup)[size_after - 1];
@@ -32,8 +32,39 @@ bool from_python_keep_alive(Caster &c, PyObject **args, uint8_t *args_flags,
 template <size_t I, typename... Ts, size_t... Is>
 constexpr size_t count_args_before_index(std::index_sequence<Is...>) {
     static_assert(sizeof...(Is) == sizeof...(Ts));
-    return ((Is < I && (std::is_same_v<arg, Ts> || std::is_same_v<arg_v, Ts>)) + ... + 0);
+    return ((Is < I && std::is_base_of_v<arg, Ts>) + ... + 0);
 }
+
+#if defined(NB_FREE_THREADED)
+struct ft_args_collector {
+    PyObject **args;
+    handle h1;
+    handle h2;
+    size_t index = 0;
+
+    NB_INLINE explicit ft_args_collector(PyObject **a) : args(a) {}
+    NB_INLINE void apply(arg_locked *) {
+        if (h1.ptr() == nullptr)
+            h1 = args[index];
+        h2 = args[index];
+        ++index;
+    }
+    NB_INLINE void apply(arg *) { ++index; }
+    NB_INLINE void apply(...) {}
+};
+
+struct ft_args_guard {
+    NB_INLINE void lock(const ft_args_collector& info) {
+        PyCriticalSection2_Begin(&cs, info.h1.ptr(), info.h2.ptr());
+    }
+    ~ft_args_guard() {
+        PyCriticalSection2_End(&cs);
+    }
+    PyCriticalSection2 cs;
+};
+#endif
+
+struct no_guard {};
 
 template <bool ReturnRef, bool CheckGuard, typename Func, typename Return,
           typename... Args, size_t... Is, typename... Extra>
@@ -66,12 +97,20 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
-        ((std::is_same_v<arg, Extra> + std::is_same_v<arg_v, Extra>) + ... + 0);
+        (std::is_base_of_v<arg, Extra> + ... + 0);
     constexpr bool is_method_det =
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
     constexpr bool has_arg_annotations = nargs_provided > 0 && !is_getter_det;
+
+    // Determine the number of potentially-locked function arguments
+    constexpr bool lock_self_det =
+        (std::is_same_v<lock_self, Extra> + ... + 0) != 0;
+    static_assert(Info::nargs_locked <= 2,
+        "At most two function arguments can be locked");
+    static_assert(!(lock_self_det && !is_method_det),
+        "The nb::lock_self() annotation only applies to methods");
 
     // Detect location of nb::kw_only annotation, if supplied. As with args/kwargs
     // we find the first and last location and later verify they match each other.
@@ -80,6 +119,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     constexpr size_t
         kwonly_pos_1 = index_1_v<std::is_same_v<kw_only, Extra>...>,
         kwonly_pos_n = index_n_v<std::is_same_v<kw_only, Extra>...>;
+
     // Arguments after nb::args are implicitly keyword-only even if there is no
     // nb::kw_only annotation
     constexpr bool explicit_kw_only = kwonly_pos_1 != sizeof...(Extra);
@@ -107,6 +147,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             ? is_method_det + count_args_before_index<kwonly_pos_1, Extra...>(
                   std::make_index_sequence<sizeof...(Extra)>())
             : nargs;
+
+    (void) kwonly_pos_n;
 
     if constexpr (explicit_kw_only) {
         static_assert(kwonly_pos_1 == kwonly_pos_n,
@@ -187,9 +229,26 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         tuple<make_caster<Args>...> in;
         (void) in;
 
-        if constexpr (Info::keep_alive) {
-            if ((!from_python_keep_alive(in.template get<Is>(), args,
-                                         args_flags, cleanup, Is) || ...))
+#if defined(NB_FREE_THREADED)
+        std::conditional_t<Info::nargs_locked != 0, ft_args_guard, no_guard> guard;
+        if constexpr (Info::nargs_locked) {
+            ft_args_collector collector{args};
+            if constexpr (is_method_det) {
+                if constexpr (lock_self_det)
+                    collector.apply((arg_locked *) nullptr);
+                else
+                    collector.apply((arg *) nullptr);
+            }
+            (collector.apply((Extra *) nullptr), ...);
+            guard.lock(collector);
+        }
+#endif
+
+        if constexpr (Info::pre_post_hooks) {
+            std::integral_constant<size_t, nargs> nargs_c;
+            (process_precall(args, nargs_c, cleanup, (Extra *) nullptr), ...);
+            if ((!from_python_remember_conv(in.template get<Is>(), args,
+                                            args_flags, cleanup, Is) || ...))
                 return NB_NEXT_OVERLOAD;
         } else {
             if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
@@ -199,18 +258,30 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
+#if defined(_WIN32) && !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
+            cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...);
+#else
             cap->func(in.template get<Is>().operator cast_t<Args>()...);
+#endif
             result = Py_None;
             Py_INCREF(result);
         } else {
+#if defined(_WIN32) && !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
+            result = cast_out::from_cpp(
+                       cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...),
+                       policy, cleanup).ptr();
+#else
             result = cast_out::from_cpp(
                        cap->func((in.template get<Is>())
                                      .operator cast_t<Args>()...),
                        policy, cleanup).ptr();
+#endif
         }
 
-        if constexpr (Info::keep_alive)
-            (process_keep_alive(args, result, (Extra *) nullptr), ...);
+        if constexpr (Info::pre_post_hooks) {
+            std::integral_constant<size_t, nargs> nargs_c;
+            (process_postcall(args, nargs_c, result, (Extra *) nullptr), ...);
+        }
 
         return result;
     };
@@ -236,21 +307,27 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Fill remaining fields of 'f'
     size_t arg_index = 0;
-    (void) arg_index;
     (func_extra_apply(f, extra, arg_index), ...);
+
+    (void) arg_index;
 
     return nb_func_new((const void *) &f);
 }
 
 NAMESPACE_END(detail)
 
-template <typename Return, typename... Args, typename... Extra>
+// The initial template parameter to cpp_function/cpp_function_def is
+// used by class_ to ensure that member pointers are treated as members
+// of the class being defined; other users can safely leave it at its
+// default of void.
+
+template <typename = void, typename Return, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (*f)(Args...), const Extra&... extra) {
     return steal(detail::func_create<true, true>(
         f, f, std::make_index_sequence<sizeof...(Args)>(), extra...));
 }
 
-template <typename Return, typename... Args, typename... Extra>
+template <typename = void, typename Return, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (*f)(Args...), const Extra&... extra) {
     detail::func_create<false, true>(
         f, f, std::make_index_sequence<sizeof...(Args)>(), extra...);
@@ -258,7 +335,7 @@ NB_INLINE void cpp_function_def(Return (*f)(Args...), const Extra&... extra) {
 
 /// Construct a cpp_function from a lambda function (pot. with internal state)
 template <
-    typename Func, typename... Extra,
+    typename = void, typename Func, typename... Extra,
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE object cpp_function(Func &&f, const Extra &...extra) {
     using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
@@ -268,7 +345,7 @@ NB_INLINE object cpp_function(Func &&f, const Extra &...extra) {
 }
 
 template <
-    typename Func, typename... Extra,
+    typename = void, typename Func, typename... Extra,
     detail::enable_if_t<detail::is_lambda_v<std::remove_reference_t<Func>>> = 0>
 NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
     using am = detail::analyze_method<decltype(&std::remove_reference_t<Func>::operator())>;
@@ -278,44 +355,52 @@ NB_INLINE void cpp_function_def(Func &&f, const Extra &...extra) {
 }
 
 /// Construct a cpp_function from a class method (non-const)
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...), const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     return steal(detail::func_create<true, true>(
-        [f](Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(Class *, Args...)) nullptr,
+        (Return(*)(T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...));
 }
 
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (Class::*f)(Args...), const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     detail::func_create<false, true>(
-        [f](Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(Class *, Args...)) nullptr,
+        (Return(*)(T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...);
 }
 
 /// Construct a cpp_function from a class method (const)
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE object cpp_function(Return (Class::*f)(Args...) const, const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     return steal(detail::func_create<true, true>(
-        [f](const Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](const T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(const Class *, Args...)) nullptr,
+        (Return(*)(const T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...));
 }
 
-template <typename Return, typename Class, typename... Args, typename... Extra>
+template <typename Target = void,
+          typename Return, typename Class, typename... Args, typename... Extra>
 NB_INLINE void cpp_function_def(Return (Class::*f)(Args...) const, const Extra &...extra) {
+    using T = std::conditional_t<std::is_void_v<Target>, Class, Target>;
     detail::func_create<false, true>(
-        [f](const Class *c, Args... args) NB_INLINE_LAMBDA -> Return {
+        [f](const T *c, Args... args) NB_INLINE_LAMBDA -> Return {
             return (c->*f)((detail::forward_t<Args>) args...);
         },
-        (Return(*)(const Class *, Args...)) nullptr,
+        (Return(*)(const T *, Args...)) nullptr,
         std::make_index_sequence<sizeof...(Args) + 1>(), extra...);
 }
 

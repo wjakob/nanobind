@@ -625,6 +625,7 @@
 -U _PyPyType_GenericNew
 -U _PyPyType_GetModule
 -U _PyPyType_GetModuleState
+-U _PyPyType_GetName
 -U _PyPyType_GetSlot
 -U _PyPyType_IsSubtype
 -U _PyPyType_Modified

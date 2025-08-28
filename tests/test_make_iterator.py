@@ -1,5 +1,5 @@
 import test_make_iterator_ext as t
-import pytest
+from common import parallelize
 
 data = [
     {},
@@ -27,6 +27,11 @@ def test03_items_iterator():
     for d in data:
         m = t.StringMap(d)
         assert sorted(list(m.items())) == sorted(list(d.items()))
+        assert sorted(list(m.items_l())) == sorted(list(d.items()))
+
+
+def test03_items_iterator_parallel(n_threads=8):
+    parallelize(test03_items_iterator, n_threads=n_threads)
 
 
 def test04_passthrough_iterator():
@@ -40,3 +45,4 @@ def test05_iterator_returning_temporary():
     assert list(im) == list(range(10))
     assert list(im.values()) == list(range(10))
     assert list(im.items()) == list(zip(range(10), range(10)))
+    assert list(im.items_l()) == list(zip(range(10), range(10)))

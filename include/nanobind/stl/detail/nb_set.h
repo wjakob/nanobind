@@ -24,7 +24,7 @@ template <typename Set, typename Key> struct set_caster {
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
-        PyObject* iter = obj_iter(src.ptr());
+        PyObject* iter = PyObject_GetIter(src.ptr());
         if (!iter) {
             PyErr_Clear();
             return false;
@@ -34,11 +34,11 @@ template <typename Set, typename Key> struct set_caster {
         Caster key_caster;
         PyObject *key;
 
-        if constexpr (is_base_caster_v<Caster> && !std::is_pointer_v<Key>)
-            flags |= (uint8_t) cast_flags::none_disallowed;
+        flags = flags_for_local_caster<Key>(flags);
 
         while ((key = PyIter_Next(iter)) != nullptr) {
-            success &= key_caster.from_python(key, flags, cleanup);
+            success &= (key_caster.from_python(key, flags, cleanup) &&
+                        key_caster.template can_cast<Key>());
             Py_DECREF(key);
 
             if (!success)
@@ -64,7 +64,7 @@ template <typename Set, typename Key> struct set_caster {
         if (ret.is_valid()) {
             for (auto& key : src) {
                 object k = steal(
-                    Caster::from_cpp(forward_like<T>(key), policy, cleanup));
+                    Caster::from_cpp(forward_like_<T>(key), policy, cleanup));
 
                 if (!k.is_valid() || PySet_Add(ret.ptr(), k.ptr()) != 0) {
                     ret.reset();

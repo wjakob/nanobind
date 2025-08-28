@@ -99,9 +99,9 @@ Instances expose fields and methods of both types as expected:
 Automatic downcasting
 ---------------------
 
-nanobind obeys type signature when returning regular non-polymorphic C++ objects:
-building on the :ref:`previous example <inheritance>`, consider the following
-function that returns a ``Dog`` object as a ``Pet`` base pointer.
+nanobind obeys signatures when returning regular non-polymorphic C++ objects
+from functions: building on the :ref:`previous example <inheritance>`, consider
+the following function that returns a ``Dog`` object as a ``Pet`` base pointer.
 
 .. code-block:: cpp
 
@@ -295,8 +295,15 @@ C++11-style strongly typed enumerations.
 
    When the annotation :cpp:class:`nb::is_arithmetic() <is_arithmetic>` is
    passed to :cpp:class:`nb::enum_\<T\> <enum_>`, the resulting Python type
-   will support arithmetic and bit-level operations like comparisons, and, or,
-   xor, negation, etc.
+   will support arithmetic and bit-level operations (and, or,
+   xor, negation).  The operands of these operations may be either enumerators.
+   When the annotation :cpp:class:`nb::is_flag() <is_flag>` is passed to
+   :cpp:class:`nb::enum_\<T\> <enum_>`, the resulting Python type will be a class
+   derived from ``enum.Flag``, meaning its enumerators can be combined using bit-wise
+   operators in a type-safe way: the result will have the same enumeration type
+   as the operands, and only enumerators of the same type can be combined.
+   When passing both ``is_arithmetic`` and ``is_flag``, the resulting Python type
+   will be ``enum.IntFlag``, supporting both arithmetic and bit-wise operations.
 
    .. code-block:: cpp
 
@@ -1012,4 +1019,125 @@ custom ``__init__``-style constructors.
           });
     }
 
+.. _custom_new:
 
+Customizing Python object creation
+----------------------------------
+
+Sometimes you might need to bind a class that can't be constructed in the
+usual way:
+
+.. code-block:: cpp
+
+   class Pet {
+     private:
+       Pet(/* ... */);
+     public:
+       static std::unique_ptr<Pet> make(std::string name, int age);
+       void speak();
+   };
+
+You can use :cpp:func:`.def_static() <class_::def_static>` to
+produce bindings that let you write ``Pet.make("Fido", 2)`` in Python,
+just like you would write ``Pet::make("Fido", 2)`` in C++. But sometimes it's
+nice to provide a more Pythonic interface than that, like ``Pet("Fido", 2)``.
+To do that, nanobind lets you override ``__new__``.
+
+Since this is a rarely-used feature in Python, let's recap. Object
+initialization in Python occurs in two phases:
+
+* the *constructor*, ``__new__``, allocates memory for the object;
+
+* the *initializer*, ``__init__``, sets up the object's initial state.
+
+So far, all the ways we've seen of binding C++ constructors
+(:cpp:struct:`nb::init\<..\>() <init>`, ``.def("__init__", ...)``)
+produce Python object *initializers*. nanobind augments these with its own
+Python object constructor, which allocates a Python object that has
+space in its memory layout for the C++ object to slot in.
+The ``__init__`` method then fills in that space by calling a C++ constructor.
+
+This split between ``__new__`` and ``__init__`` has a lot of benefits,
+including a reduction in unnecessary allocations, but it does mean that
+anything created from Python must be able to control where its
+C++ innards are stored. Sometimes, as with the example of ``Pet`` above,
+that's not feasible. In such cases, you can go down one level and override
+``__new__`` directly:
+
+.. code-block:: cpp
+
+   nb::class_<Pet>(m, "Pet")
+       .def(nb::new_(&Pet::make), "name"_a, "age"_a)
+       .def("speak", &Pet::speak);
+
+Passing :cpp:struct:`nb::new_ <new_>` to :cpp:func:`.def() <class_::def>`
+here creates two magic methods on ``Pet``:
+
+* A ``__new__`` that uses the given function to produce a new ``Pet``.
+  It is converted to a Python object in the same way as the return value
+  of any other function you might write bindings for. In particular,
+  you can pass a :cpp:enum:`nb::rv_policy <rv_policy>` as an additional
+  argument to :cpp:func:`.def() <class_::def>` to control how this conversion
+  occurs.
+
+* A ``__init__`` that takes the same arguments as ``__new__`` but
+  performs no operation.  This is necessary because Python automatically
+  calls ``__init__`` on the object returned by ``__new__`` in most cases.
+
+You can provide a lambda as the argument of :cpp:struct:`nb::new_ <new_>`.
+This is most useful when the lambda returns a pointer or smart pointer;
+if it's returning a value, then ``.def("__init__", ...)`` will have better
+performance. Additionally, you can chain multiple calls to
+``.def(nb::new_(...))`` in order to create an overload set.
+The following example demonstrates both of these capabilities:
+
+.. code-block:: cpp
+
+   nb::class_<Pet>(m, "Pet")
+       .def(nb::new_([]() { return Pet::make(getRandomName(), 0); }))
+       .def(nb::new_(&Pet::make), "name"_a, "age"_a)
+       .def("speak", &Pet::speak);
+
+If you need even more control, perhaps because you need to access the
+type object that Python passes as the first argument of ``__new__``
+(which :cpp:struct:`nb::new_ <new_>` discards), you can write a
+``.def_static("__new__", ...)`` and matching ``.def("__init__", ...)``
+yourself.
+
+Two limitations of :cpp:struct:`nb::new_ <new_>` are worth noting:
+
+* The possibilities for Python-side inheritance from C++ classes that
+  are bound using :cpp:struct:`nb::new_ <new_>` constructors are substantially
+  reduced. Simple inheritance situations (``class PyPet(Pet): ...``) should
+  work OK, but you can't :ref:`override virtual functions <trampolines>`
+  in Python (because the C++ object returned by :cpp:struct:`new_ <new_>`
+  doesn't contain the Python trampoline glue), and if :cpp:struct:`new_ <new_>`
+  is used to implement a polymorphic factory (like if ``Pet::make()`` could
+  return an instance of ``Cat``) then Python-side inheritance won't work at all.
+
+* A given C++ class must expose all of its constructors via ``__new__`` or
+  all via ``__init__``, rather than a mixture of the two.
+  The only case where a class should bind both of these methods is
+  if the ``__init__`` methods are all stubs that do nothing.
+  This is because nanobind internally optimizes object instantiation by
+  caching the method that should be used for constructing instances of each
+  given type, and that optimization doesn't support trying both methods.
+  If you really need to combine nontrivial ``__new__`` and nontrivial
+  ``__init__`` in the same type, you can disable the optimization by
+  defining a :ref:`custom type slot <typeslots>` of ``Py_tp_new`` or
+  ``Py_tp_init``.
+
+.. note::
+
+   Unpickling an object of type ``Foo`` normally requires that
+   ``Foo.__new__(Foo)`` produce something that ``__setstate__`` can be
+   called on. Any custom :cpp:struct:`nb::new_ <new_>` methods will
+   not satisfy this requirement, because they return a
+   fully-constructed object. In order to maintain pickle
+   compatibility, nanobind by default will add an additional
+   ``__new__`` overload that takes no extra arguments and calls the nanobind
+   built-in :cpp:func:`inst_alloc`. This won't make your class constructible
+   with no arguments, because there's no corresponding ``__init__``; it
+   just helps unpickling work. If your first :cpp:struct:`nb::new_ <new_>`
+   method is one that takes no arguments, then nanobind won't add its own,
+   and you'll have to deal with unpickling some other way.

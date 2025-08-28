@@ -4,6 +4,27 @@
 namespace nb = nanobind;
 using namespace nb::literals;
 
+class NestedClass {};
+
+namespace nanobind {
+namespace detail {
+template <>
+struct type_caster<NestedClass> {
+    NB_TYPE_CASTER(NestedClass, const_name("py_stub_test.AClass.NestedClass"))
+
+    bool from_python(handle /*src*/, uint8_t /*flags*/, cleanup_list*) noexcept {
+        return true;
+    }
+
+    static handle from_cpp(const NestedClass&, rv_policy, cleanup_list*) noexcept {
+        nanobind::object py_class =
+            nanobind::module_::import_("py_stub_test").attr("AClass").attr("NestedClass");
+        return py_class().release();
+    }
+};
+}
+}
+
 // Declarations of various advanced constructions to test the stub generator
 NB_MODULE(test_typing_ext, m) {
     // A submodule which won't be included, but we must be able to import it
@@ -34,9 +55,12 @@ NB_MODULE(test_typing_ext, m) {
 
     m.def("f", []{});
 
+    m.def("makeNestedClass", [] { return NestedClass(); });
+
     // Aliases to local functoins and types
     m.attr("FooAlias") = m.attr("Foo");
     m.attr("f_alias") = m.attr("f");
+    nb::type<Foo>().attr("lt_alias") = nb::type<Foo>().attr("__lt__");
 
     // Custom signature generation for classes and methods
     struct CustomSignature { int value; };
@@ -80,6 +104,13 @@ NB_MODULE(test_typing_ext, m) {
     struct WrapperFoo : Wrapper { };
     nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
 #endif
+
+    // Type parameter syntax for Python 3.12+
+    struct WrapperTypeParam { };
+    nb::class_<WrapperTypeParam>(m, "WrapperTypeParam",
+                                 nb::sig("class WrapperTypeParam[T]"));
+    m.def("list_front", [](nb::list l) { return l[0]; },
+          nb::sig("def list_front[T](arg: list[T], /) -> T"));
 
     // Some statements that will be modified by the pattern file
     m.def("remove_me", []{});

@@ -2,6 +2,7 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 #include <nanobind/trampoline.h>
+#include <iostream>
 
 namespace nb = nanobind;
 
@@ -166,13 +167,27 @@ NB_MODULE(test_eigen_ext, m) {
         assert(!m.isCompressed());
         return m.markAsRValue();
     });
-    m.def("sparse_complex", []() -> Eigen::SparseMatrix<std::complex<double>> { return {}; });
+    // This function doesn't appear to be called in tests/test_eigen.py
+    m.def("sparse_complex", [](Eigen::SparseMatrix<std::complex<double>> x) -> Eigen::SparseMatrix<std::complex<double>> { return x; });
+    m.def("sparse_complex_map_c", [](Eigen::Map<Eigen::SparseMatrix<std::complex<double>>> x) { return x; });
+
+    m.def("sparse_map_c", [](const Eigen::Map<const SparseMatrixC> &c) { return c; }, nb::rv_policy::reference);
+    m.def("sparse_map_r", [](const Eigen::Map<const SparseMatrixR> &r) { return r; }, nb::rv_policy::reference);
+
+    m.def("sparse_update_map_to_zero_c", [](nb::object obj) {
+        Eigen::Map<SparseMatrixC> c = nb::cast<Eigen::Map<SparseMatrixC>>(obj);
+        for (int i = 0; i < c.nonZeros(); ++i) { c.valuePtr()[i] = 0; }
+    });
+    m.def("sparse_update_map_to_zero_r", [](nb::object obj) {
+        Eigen::Map<SparseMatrixR> r = nb::cast<Eigen::Map<SparseMatrixR>>(obj);
+        for (int i = 0; i < r.nonZeros(); ++i) { r.valuePtr()[i] = 0; }
+    });
 
     /// issue #166
     using Matrix1d = Eigen::Matrix<double,1,1>;
     try {
         m.def(
-            "default_arg", [](Matrix1d a, Matrix1d b) { return a + b; },
+            "default_arg", [](Matrix1d a, Matrix1d b) -> Matrix1d { return a + b; },
             "a"_a = Matrix1d::Zero(), "b"_a = Matrix1d::Zero());
     } catch (...) {
         // Ignore (NumPy not installed, etc.)
@@ -196,10 +211,14 @@ NB_MODULE(test_eigen_ext, m) {
 
     struct ClassWithEigenMember {
         Eigen::MatrixXd member = Eigen::Matrix2d::Ones();
+        const Eigen::MatrixXd &get_member_ref() { return member; }
+        const Eigen::MatrixXd get_member_copy() { return member; }
     };
 
     nb::class_<ClassWithEigenMember>(m, "ClassWithEigenMember")
         .def(nb::init<>())
+        .def_prop_ro("member_ro_ref", &ClassWithEigenMember::get_member_ref)
+        .def_prop_ro("member_ro_copy", &ClassWithEigenMember::get_member_copy)
         .def_rw("member", &ClassWithEigenMember::member);
 
     m.def("castToMapVXi", [](nb::object obj) {
@@ -223,17 +242,21 @@ NB_MODULE(test_eigen_ext, m) {
 
     struct Base {
         virtual ~Base() = default;
-        virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) { };
-        virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd>) { };
+        virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) {}
+        virtual void modRefDataConst(Eigen::Ref<const Eigen::VectorXd>) {}
+        virtual Eigen::VectorXd returnVecXd() { return { 1, 2 }; }
     };
 
     struct PyBase : Base {
-        NB_TRAMPOLINE(Base, 2);
+        NB_TRAMPOLINE(Base, 3);
         void modRefData(Eigen::Ref<Eigen::VectorXd> a) override {
             NB_OVERRIDE_PURE(modRefData, a);
         }
         void modRefDataConst(Eigen::Ref<const Eigen::VectorXd> a) override {
             NB_OVERRIDE_PURE(modRefDataConst, a);
+        }
+        Eigen::VectorXd returnVecXd() override {
+            NB_OVERRIDE_PURE(returnVecXd);
         }
     };
 
@@ -251,5 +274,8 @@ NB_MODULE(test_eigen_ext, m) {
         Eigen::Vector2d input(1.0, 2.0);
         base->modRefDataConst(input);
         return input;
+    });
+    m.def("returnVecXd", [](Base* base) {
+        return base->returnVecXd();
     });
 }

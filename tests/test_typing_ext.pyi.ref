@@ -1,9 +1,31 @@
+from collections.abc import Iterable
+import py_stub_test
+from typing import Generic, Optional, Self, TypeAlias, TypeVar
+
 from . import submodule as submodule
 from .submodule import F as F, f as f2
-from collections.abc import Iterable
-from typing import Self, Optional, TypeAlias, TypeVar, Generic
+
 
 # a prefix
+
+class Foo:
+    def __lt__(self, arg: int, /) -> bool: ...
+
+    def __gt__(self, arg: int, /) -> bool: ...
+
+    def __le__(self, arg: Foo, /) -> bool: ...
+
+    def __ge__(self, arg: Foo, /) -> bool: ...
+
+    lt_alias = __lt__
+
+def f() -> None: ...
+
+def makeNestedClass() -> py_stub_test.AClass.NestedClass: ...
+
+FooAlias: TypeAlias = Foo
+
+f_alias = f
 
 @my_decorator
 class CustomSignature(Iterable[int]):
@@ -20,16 +42,7 @@ class CustomSignature(Iterable[int]):
     def value(self, value: Optional[int], /) -> None:
         """docstring for setter"""
 
-class Foo:
-    def __lt__(self, arg: int, /) -> bool: ...
-
-    def __gt__(self, arg: int, /) -> bool: ...
-
-    def __le__(self, arg: Foo, /) -> bool: ...
-
-    def __ge__(self, arg: Foo, /) -> bool: ...
-
-FooAlias: TypeAlias = Foo
+pytree: dict = {'a' : ('b', [123])}
 
 T = TypeVar("T", contravariant=True)
 
@@ -43,11 +56,10 @@ class Wrapper(Generic[T]):
 class WrapperFoo(Wrapper[Foo]):
     pass
 
-def f() -> None: ...
+class WrapperTypeParam[T]:
+    pass
 
-f_alias = f
-
-pytree: dict = {'a' : ('b', [123])}
+def list_front[T](arg: list[T], /) -> T: ...
 
 def tweak_me(arg: int):
     """

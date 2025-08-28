@@ -1,7 +1,7 @@
 import pytest
 import platform
 
-import test_bind_vector_ext as t
+import test_stl_bind_vector_ext as t
 
 def test01_vector_int(capfd):
     v_int = t.VectorInt([0, 0])
@@ -11,7 +11,7 @@ def test01_vector_int(capfd):
     # test construction from a generator
     v_int1 = t.VectorInt(x for x in range(5))
     assert t.VectorInt(v_int1) == t.VectorInt([0, 1, 2, 3, 4])
-    assert repr(v_int1) == "test_bind_vector_ext.VectorInt([0, 1, 2, 3, 4])"
+    assert repr(v_int1) == "test_stl_bind_vector_ext.VectorInt([0, 1, 2, 3, 4])"
 
     v_int2 = t.VectorInt([0, 0])
     assert v_int == v_int2
@@ -47,7 +47,7 @@ def test01_vector_int(capfd):
         v_int2.extend([8, "a"])
 
     captured = capfd.readouterr().err.strip()
-    ref = "nanobind: implicit conversion from type 'list' to type 'test_bind_vector_ext.VectorInt' failed!"
+    ref = "nanobind: implicit conversion from type 'list' to type 'test_stl_bind_vector_ext.VectorInt' failed!"
 
     # Work around Pytest-related flakiness (https://github.com/pytest-dev/pytest/issues/10843)
     if platform.system() == 'Windows':
@@ -152,6 +152,11 @@ def test05_vector_non_shared():
     assert v[0].a == 1
     assert v[1].a == 2
 
+    # Check that elements accessed through the iterator *cannot* be modified
+    q = next(iter(v))
+    q.a = 5
+    assert v[0].a == 1
+
 def test06_vector_shared():
     v = t.VectorElShared()
     v.append(t.El(1))
@@ -162,3 +167,22 @@ def test06_vector_shared():
 
     assert v[0].a == 100
     assert v[1].a == 200
+
+    # Check that elements accessed through the iterator *can* be modified
+    q = next(iter(v))
+    q.a = 5
+    assert v[0].a == 5
+
+
+def test07_vector_noncopyable():
+    vnc = t.get_vnc(5)
+    for i in range(0, 5):
+        assert vnc[i].value == i + 1
+
+    for i, j in enumerate(vnc, start=1):
+        assert j.value == i
+
+    # Check that elements accessed through the iterator *can* be modified
+    q = next(iter(vnc))
+    q.value = 5
+    assert vnc[0].value == 5

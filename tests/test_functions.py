@@ -9,6 +9,8 @@ if sys.version_info < (3, 9):
 else:
     TYPING_TUPLE = "tuple"
 
+# Reference counting behavior changed on 3.14a7+
+py_3_14a7_or_newer = sys.version_info >= (3, 14, 0, 'alpha', 7)
 
 def fail_fn():  # used in test_30
     raise RuntimeError("Foo")
@@ -31,8 +33,18 @@ def test02_default_args():
 def test03_kwargs():
     # Basic use of keyword arguments
     assert t.test_02(3, 5) == -2
-    assert t.test_02(3, k=5) == -2
-    assert t.test_02(k=5, j=3) == -2
+    assert t.test_02(3, down=5) == -2
+    assert t.test_02(down=5, up=3) == -2
+
+    # Make sure non-interned keyword names work also
+    i_cant_believe_its_not_down = "".join("down")
+    assert i_cant_believe_its_not_down is not "down"
+    assert t.test_02(**{i_cant_believe_its_not_down: 5, "up": 3}) == -2
+    assert t.test_02(**{i_cant_believe_its_not_down: 5}) == 3
+    with pytest.raises(TypeError):
+        t.test_02(unexpected=27)
+    with pytest.raises(TypeError):
+        t.test_02(**{i_cant_believe_its_not_down: None})
 
 
 def test04_overloads():
@@ -42,7 +54,7 @@ def test04_overloads():
 
 def test05_signature():
     assert t.test_01.__doc__ == "test_01() -> None"
-    assert t.test_02.__doc__ == "test_02(j: int = 8, k: int = 1) -> int"
+    assert t.test_02.__doc__ == "test_02(up: int = 8, down: int = 1) -> int"
     assert t.test_05.__doc__ == (
         "test_05(arg: int, /) -> int\n"
         "test_05(arg: float, /) -> int\n"
@@ -56,6 +68,26 @@ def test05_signature():
         "2. ``test_05(arg: float, /) -> int``\n"
         "\n"
         "doc_2"
+    )
+
+    assert t.test_05b.__doc__ == (
+        "test_05b(arg: int, /) -> int\n"
+        "test_05b(arg: float, /) -> int\n"
+        "\n"
+        "doc_1"
+    )
+
+    assert t.test_05c.__doc__ == (
+        "test_05c(arg: int, /) -> int\n"
+        "test_05c(arg: float, /) -> int\n"
+        "\n"
+        "Overloaded function.\n"
+        "\n"
+        "1. ``test_05c(arg: int, /) -> int``\n"
+        "\n"
+        "doc_1\n"
+        "\n"
+        "2. ``test_05c(arg: float, /) -> int``\n"
     )
 
     assert t.test_07.__doc__ == (
@@ -223,6 +255,18 @@ def test21_numpy_overloads():
     assert t.test_11_sll(np.int32(5)) == 5
     assert t.test_11_ull(np.int32(5)) == 5
 
+    with pytest.raises(TypeError) as excinfo:
+        t.test_21_dnc(np.float64(21.0))  # Python type is not exactly float
+    assert "incompatible function arguments" in str(excinfo.value)
+    assert t.test_21_dnc(float(np.float64(21.0))) == 22.0
+    assert t.test_21_dnc(float(np.float32(21.0))) == 22.0
+
+    assert t.test_21_fnc(float(np.float32(21.0))) == 22.0
+    with pytest.raises(TypeError) as excinfo:
+        t.test_21_fnc(float(np.float64(21.1)))  # Inexact narrowing to float32
+    assert "incompatible function arguments" in str(excinfo.value)
+    assert t.test_21_fnc(float(np.float32(21.1))) == np.float32(22.1)
+
 
 def test22_string_return():
     assert t.test_12("hello") == "hello"
@@ -232,6 +276,7 @@ def test22_string_return():
 
 def test23_byte_return():
     assert t.test_15(b"abc") == "abc"
+    assert t.test_15_d(b"abc\x00def\x00ghi") == b"abc\x00def\x00ghi"
     assert t.test_16("hello") == b"hello"
     assert t.test_17(b"four") == 4
     assert t.test_17(b"\x00\x00\x00\x00") == 4
@@ -249,6 +294,13 @@ def test25_int():
     assert t.test_19(5) == 128
     assert t.test_20("5") == 128
     assert t.test_21(5) == 5
+    assert t.test_21_f(5.1) == int(5.1)
+    assert t.test_21_f(1e50) == int(1e50)
+    assert type(t.test_21_f(0.5)) is int
+    assert t.test_21_g() == int(1.5)
+    assert type(t.test_21_g()) is int
+    assert t.test_21_h() == int(1e50)
+    assert type(t.test_21_h()) is int
     assert t.test_19.__doc__ == "test_19(arg: int, /) -> object"
 
 
@@ -266,7 +318,7 @@ def test27_slice():
     assert t.test_25(s) is s
     assert t.test_25.__doc__ == "test_25(arg: slice, /) -> slice"
     assert t.test_26() == slice(4)
-    assert t.test_27() == slice(1, 10)
+    assert t.test_27() == slice(2, 10)
     assert t.test_28() == slice(5, -5, -2)
 
 
@@ -279,7 +331,6 @@ def test28_ellipsis():
 
 def test29_traceback():
     result = t.test_30(fail_fn)
-    print(result)
     regexp = r'Traceback \(most recent call last\):\n.*\n  File "[^"]*", line [0-9]*, in fail_fn\n.*RuntimeError: Foo'
     matches = re.findall(regexp, result, re.MULTILINE | re.DOTALL)
     assert len(matches) == 1
@@ -377,8 +428,11 @@ def test35_return_capture():
 
 def test36_test_char():
     assert t.test_cast_char("c") == "c"
+    assert t.test_cast_char("\x00") == "\x00"
     with pytest.raises(TypeError):
         assert t.test_cast_char("abc")
+    with pytest.raises(TypeError):
+        assert t.test_cast_char("")
     with pytest.raises(RuntimeError):
         assert t.test_cast_char(123)
 
@@ -420,7 +474,7 @@ def test39_del():
 def test40_nb_signature():
     assert t.test_01.__nb_signature__ == ((r"def test_01() -> None", None, None),)
     assert t.test_02.__nb_signature__ == (
-        (r"def test_02(j: int = \0, k: int = \1) -> int", None, (8, 1)),
+        (r"def test_02(up: int = \0, down: int = \1) -> int", None, (8, 1)),
     )
     assert t.test_05.__nb_signature__ == (
         (r"def test_05(arg: int, /) -> int", "doc_1", None),
@@ -571,3 +625,167 @@ def test41_any():
     s = "hello"
     assert t.test_any(s) is s
     assert t.test_any.__doc__ == "test_any(arg: typing.Any, /) -> typing.Any"
+
+def test42_wrappers_list():
+    assert t.test_wrappers_list()
+
+def test43_wrappers_dict():
+    assert t.test_wrappers_dict()
+
+def test43_wrappers_set():
+    assert t.test_wrappers_set()
+
+def test44_hash():
+    value = (1, 2, 3)
+    assert t.hash_it(value) == hash(value);
+
+
+def test45_new():
+    assert t.test_bytearray_new() == bytearray()
+    assert t.test_bytearray_new("\x00\x01\x02\x03", 4) == bytearray(
+        b"\x00\x01\x02\x03"
+    )
+    assert t.test_bytearray_new("", 0) == bytearray()
+
+
+def test46_copy():
+    o = bytearray(b"\x00\x01\x02\x03")
+    c = t.test_bytearray_copy(o)
+    assert c == o
+    o.clear()
+    assert c != o
+
+
+def test47_c_str():
+    o = bytearray(b"Hello, world!")
+    assert t.test_bytearray_c_str(o) == "Hello, world!"
+
+
+def test48_size():
+    o = bytearray(b"Hello, world!")
+    assert t.test_bytearray_size(o) == len(o)
+
+
+def test49_resize():
+    o = bytearray(b"\x00\x01\x02\x03")
+    assert len(o) == 4
+    t.test_bytearray_resize(o, 8)
+    assert len(o) == 8
+
+
+def test50_call_policy():
+    def case(arg1, arg2, expect_ret):  # type: (str, str, str | None) -> str
+        if hasattr(sys, "getrefcount"):
+            refs_before = (sys.getrefcount(arg1), sys.getrefcount(arg2))
+
+        ret = None
+        try:
+            ret = t.test_call_policy(arg1, arg2)
+            assert ret == expect_ret
+            return ret
+        finally:
+            if expect_ret is None:
+                assert t.call_policy_record() == []
+            else:
+                (((arg1r, arg2r), recorded_ret),) = t.call_policy_record()
+                assert recorded_ret == expect_ret
+                assert ret is None or ret is recorded_ret
+                assert recorded_ret is not expect_ret
+
+                if hasattr(sys, "getrefcount"):
+                    # Make sure no reference leak occurred: should be
+                    # one in getrefcount args, one or two in locals,
+                    # zero or one in the pending-return-value slot.
+                    # We have to decompose this to avoid getting confused
+                    # by transient additional references added by pytest's
+                    # assertion rewriting.
+                    ret_refs = sys.getrefcount(recorded_ret)
+                    expected_refs = 2 + 2 * (ret is not None)
+
+                    # On Python 3.14a7, an optimization was introduced where
+                    # stack-based function calling no longer acquires a reference
+                    if py_3_14a7_or_newer:
+                        assert ret_refs == expected_refs - 1 or ret_refs == expected_refs
+                    else:
+                        assert ret_refs == expected_refs
+
+                for (passed, recorded) in ((arg1, arg1r), (arg2, arg2r)):
+                    if passed == "swapfrom":
+                        assert recorded == "swapto"
+                        if hasattr(sys, "getrefcount"):
+                            recorded_refs = sys.getrefcount(recorded)
+
+                            # recorded, arg1r, unnamed tuple, getrefcount arg
+                            if py_3_14a7_or_newer:
+                                assert recorded_refs == 3 or recorded_refs == 4
+                            else:
+                                assert recorded_refs == 4
+                    else:
+                        assert passed is recorded
+
+                del passed, recorded, arg1r, arg2r
+                if hasattr(sys, "getrefcount"):
+                    refs_after = (sys.getrefcount(arg1), sys.getrefcount(arg2))
+
+                    if not py_3_14a7_or_newer or ret is not None:
+                        assert refs_before == refs_after
+
+    # precall throws exception
+    with pytest.raises(RuntimeError, match="expected only strings"):
+        case(12345, "0", None)
+
+    # conversion of args fails
+    with pytest.raises(TypeError):
+        case("string", "xxx", "<unfinished>")
+
+    # function throws exception
+    with pytest.raises(RuntimeError, match="offset too large"):
+        case("abc", "4", "<unfinished>")
+
+    # conversion of return value fails
+    with pytest.raises(UnicodeDecodeError):
+        case("returnfail", "4", "<return conversion failed>")
+
+    # postcall throws exception
+    with pytest.raises(RuntimeError, match="postcall exception"):
+        case("postthrow", "4", "throw")
+
+    # normal call
+    case("example", "1", "xample")
+
+    # precall modifies args
+    case("swapfrom", "0", "swapto")
+    with pytest.raises(TypeError):
+        case("swapfrom", "xxx", "<unfinished>")
+    with pytest.raises(RuntimeError, match="offset too large"):
+        case("swapfrom", "10", "<unfinished>")
+
+def test51_isinstance():
+    assert t.isinstance_(3, int)
+    assert not t.isinstance_(3, bool)
+    with pytest.raises(TypeError):
+        t.isinstance_(3, 7)
+
+
+def test52_frozenset():
+    x = t.test_frozenset()
+    assert isinstance(x, frozenset)
+    assert len(x) == 2
+    assert 123 in x and "123" in x
+    assert t.test_frozenset_contains(x, 123)
+    assert t.test_frozenset_contains(x, "123")
+    assert not t.test_frozenset_contains(x, "1234")
+    assert not t.test_frozenset_contains(x, 1234)
+
+def test53_fallback():
+    assert t.test_fallback_1(3.0) == 0
+    assert t.test_fallback_1(3) == 1
+    assert t.test_fallback_1('3') == 1
+
+    assert t.test_fallback_2(3.0) == 0
+    assert t.test_fallback_2(3) == 0
+    assert t.test_fallback_2('3') == 1
+
+def test54_dict_default():
+    assert t.test_get_dict_default({'key': 100}) == 100
+    assert t.test_get_dict_default({'key2': 100}) == 123

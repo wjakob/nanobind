@@ -56,7 +56,7 @@ constexpr bool is_contiguous_v =
      stride_t<T>::InnerStrideAtCompileTime == 1) &&
     (ndim_v<T> == 1 || stride_t<T>::OuterStrideAtCompileTime == 0 ||
      (stride_t<T>::OuterStrideAtCompileTime != Eigen::Dynamic &&
-      stride_t<T>::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime));
+      int(stride_t<T>::OuterStrideAtCompileTime) == int(T::InnerSizeAtCompileTime)));
 
 /// Identify types with a static or dynamic layout that support contiguous storage
 template <typename T>
@@ -66,7 +66,7 @@ constexpr bool can_map_contiguous_memory_v =
      stride_t<T>::InnerStrideAtCompileTime == Eigen::Dynamic) &&
     (ndim_v<T> == 1 || stride_t<T>::OuterStrideAtCompileTime == 0 ||
      stride_t<T>::OuterStrideAtCompileTime == Eigen::Dynamic ||
-     stride_t<T>::OuterStrideAtCompileTime == T::InnerSizeAtCompileTime);
+     int(stride_t<T>::OuterStrideAtCompileTime) == int(T::InnerSizeAtCompileTime));
 
 /* This type alias builds the most suitable 'ndarray' for the given Eigen type.
    In particular, it
@@ -104,7 +104,7 @@ using array_for_eigen_t = ndarray<
             ndim_v<T> == 1 || T::IsRowMajor,
             c_contig,
             f_contig>,
-        any_contig>>;
+        unused>>;
 
 /// Any kind of Eigen class
 template <typename T> constexpr bool is_eigen_v = is_base_of_template_v<T, Eigen::EigenBase>;
@@ -133,7 +133,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
         // We're in any case making a copy, so non-writable inputs area also okay
         using NDArrayConst = array_for_eigen_t<T, const typename T::Scalar>;
         make_caster<NDArrayConst> caster;
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
             return false;
 
         const NDArrayConst &array = caster.value;
@@ -148,15 +148,16 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
         return true;
     }
 
-    static handle from_cpp(T &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
-        if (policy == rv_policy::automatic ||
-            policy == rv_policy::automatic_reference)
-            policy = rv_policy::move;
-
-        return from_cpp((const T &) v, policy, cleanup);
+    template <typename T2>
+    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        policy = infer_policy<T2>(policy);
+        if constexpr (std::is_pointer_v<T2>)
+            return from_cpp_internal((const T &) *v, policy, cleanup);
+        else
+            return from_cpp_internal((const T &) v, policy, cleanup);
     }
 
-    static handle from_cpp(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp_internal(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -172,24 +173,11 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
 
         void *ptr = (void *) v.data();
 
-        switch (policy) {
-            case rv_policy::automatic:
+        if (policy == rv_policy::move) {
+            // Don't bother moving when the data is static or occupies <1KB
+            if ((T::SizeAtCompileTime != Eigen::Dynamic ||
+                 (size_t) v.size() < (1024 / sizeof(Scalar))))
                 policy = rv_policy::copy;
-                break;
-
-            case rv_policy::automatic_reference:
-                policy = rv_policy::reference;
-                break;
-
-            case rv_policy::move:
-                // Don't bother moving when the data is static or occupies <1KB
-                if ((T::SizeAtCompileTime != Eigen::Dynamic ||
-                     (size_t) v.size() < (1024 / sizeof(Scalar))))
-                    policy = rv_policy::copy;
-                break;
-
-            default: // leave policy unchanged
-                break;
         }
 
         object owner;
@@ -198,7 +186,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
             owner = capsule(temp, [](void *p) noexcept { delete (T *) p; });
             ptr = temp->data();
             policy = rv_policy::reference;
-        } else if (policy == rv_policy::reference_internal) {
+        } else if (policy == rv_policy::reference_internal && cleanup->self()) {
             owner = borrow(cleanup->self());
             policy = rv_policy::reference;
         }
@@ -220,6 +208,7 @@ struct type_caster<T, enable_if_t<is_eigen_xpr_v<T> &&
     using Caster = make_caster<Array>;
     static constexpr auto Name = Caster::Name;
     template <typename T_> using Cast = T;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     /// Generating an expression template from a Python object is, of course, not possible
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
@@ -250,6 +239,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     using NDArrayCaster = type_caster<NDArray>;
     static constexpr auto Name = NDArrayCaster::Name;
     template <typename T_> using Cast = Map;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     NDArrayCaster caster;
 
@@ -259,7 +249,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     }
 
     bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
             return false;
 
         // Check for memory layout compatibility of non-contiguous 'Map' types
@@ -291,7 +281,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -307,7 +297,11 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
-            rv_policy::reference, cleanup);
+            (policy == rv_policy::automatic ||
+             policy == rv_policy::automatic_reference)
+                ? rv_policy::reference
+                : policy,
+            cleanup);
     }
 
     StrideType strides() const {
@@ -316,11 +310,13 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
         int64_t inner = caster.value.stride(0),
                 outer;
+
         if constexpr (ndim_v<T> == 1)
             outer = caster.value.shape(0);
         else
             outer = caster.value.stride(1);
 
+        (void) inner; (void) outer;
         if constexpr (ndim_v<T> == 2 && T::IsRowMajor)
             std::swap(inner, outer);
 
@@ -403,6 +399,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         const_name<MaybeConvert>(DMapCaster::Name, MapCaster::Name);
 
     template <typename T_> using Cast = Ref;
+    template <typename T_> static constexpr bool can_cast() { return true; }
 
     MapCaster caster;
     struct Empty { };
@@ -417,15 +414,17 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         if constexpr (MaybeConvert) {
             /* Generating an implicit copy requires some object to assume
                ownership. During a function call, ``dcaster`` can serve that
-               role (this case is detected by checking whether ``cleanup`` is
-               defined). When used in other situatons (e.g. ``nb::cast()``),
-               the created ``Eigen::Ref<..>`` must take ownership of the copy.
-               This is only guranteed to work if DMapConstructorOwnsData.
+               role (this case is detected by checking whether ``flags`` has
+               the ``manual`` flag set). When used in other situations (e.g.
+               ``nb::cast()``), the created ``Eigen::Ref<..>`` must take
+               ownership of the copy. This is only guranteed to work if
+               DMapConstructorOwnsData.
 
                If neither of these is possible, we disable implicit
                conversions. */
 
-            if (!cleanup && !DMapConstructorOwnsData)
+            if ((flags & (uint8_t) cast_flags::manual) &&
+                !DMapConstructorOwnsData)
                 flags &= ~(uint8_t) cast_flags::convert;
 
             if (dcaster.from_python_(src, flags, cleanup))
@@ -435,7 +434,7 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         return false;
     }
 
-    static handle from_cpp(const Ref &v, rv_policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const Ref &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         // Copied from the Eigen::Map caster
 
         size_t shape[ndim_v<T>];
@@ -453,7 +452,11 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
 
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
-            rv_policy::reference, cleanup);
+            (policy == rv_policy::automatic ||
+             policy == rv_policy::automatic_reference)
+                ? rv_policy::reference
+                : policy,
+            cleanup);
     }
 
     operator Ref() {

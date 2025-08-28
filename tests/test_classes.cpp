@@ -1,10 +1,13 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/operators.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/tuple.h>
+#include <nanobind/stl/unique_ptr.h>
+#include <map>
 #include <memory>
 #include <cstring>
 #include <vector>
@@ -94,11 +97,46 @@ struct StructWithWeakrefs : Struct { };
 
 struct StructWithWeakrefsAndDynamicAttrs : Struct { };
 
+struct UniqueInt {
+    static std::map<int, std::weak_ptr<UniqueInt>> instances;
+
+    static std::shared_ptr<UniqueInt> make(int val) {
+        std::weak_ptr<UniqueInt>& entry = instances[val];
+        std::shared_ptr<UniqueInt> ret = entry.lock();
+        if (!ret) {
+            entry = ret = std::shared_ptr<UniqueInt>(new UniqueInt(val));
+        }
+        ++ret->nlook;
+        return ret;
+    }
+    int value() const { return val; }
+    int lookups() const { return nlook; }
+
+  private:
+    UniqueInt(int v) : val(v) {}
+    int val;
+    int nlook = 0;
+};
+std::map<int, std::weak_ptr<UniqueInt>> UniqueInt::instances;
+
 int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+    // On Python 3.9+, we must traverse the implicit dependency
+    // of an object on its associated type object.
+    #if PY_VERSION_HEX >= 0x03090000
+        Py_VISIT(Py_TYPE(self));
+    #endif
+
+    // The tp_traverse method may be called after __new__ but before or during
+    // __init__, before the C++ constructor has been called. We must not inspect
+    // the C++ state before the constructor completes.
+    if (!nb::inst_ready(self)) {
+        return 0;
+    }
+
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
 
     // If c->value corresponds to an associated CPython object, return it
-    nb::object value = nb::find(w->value);
+    nb::handle value = nb::find(w->value);
 
     // Inform the Python GC about it
     Py_VISIT(value.ptr());
@@ -236,6 +274,8 @@ NB_MODULE(test_classes_ext, m) {
         std::string s;
     };
 
+    struct SiameseCat : Cat { };
+
     struct Foo { };
 
     auto animal = nb::class_<Animal, PyAnimal>(m, "Animal")
@@ -248,6 +288,9 @@ NB_MODULE(test_classes_ext, m) {
 
     nb::class_<Cat>(m, "Cat", animal)
         .def(nb::init<const std::string &>());
+
+    nb::class_<SiameseCat, Cat> sc(m, "SiameseCat");
+    (void) sc;
 
     m.def("go", [](Animal *a) {
         return a->name() + " says " + a->what();
@@ -283,6 +326,9 @@ NB_MODULE(test_classes_ext, m) {
         D(C c) : value(c.c + 1000) { }
         D(int d) : value(d + 10000) { }
         D(float) : value(0) { throw std::runtime_error("Fail!"); }
+        D(std::nullptr_t) : value(0) {}
+        // notice dangling access:
+        ~D() { static_cast<volatile int&>(value) = -100; }
         int value;
     };
 
@@ -306,6 +352,37 @@ NB_MODULE(test_classes_ext, m) {
         .def_rw("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });
+    m.def("get_optional_d", [](std::optional<const D*> arg) {
+        return arg ? arg.value()->value : -1;
+    }, nb::arg().none());
+    m.def("get_d_via_cast", [](nb::object obj) {
+        int by_val = -1, by_ptr = -1, by_opt_val = -1, by_opt_ptr = -1;
+        try {
+            by_val = nb::cast<D>(obj).value;
+        } catch (const nb::cast_error&) {}
+        try {
+            by_ptr = nb::cast<D*>(obj)->value;
+        } catch (const nb::cast_error&) {}
+        try {
+            by_opt_val = nb::cast<std::optional<D>>(obj)->value;
+        } catch (const nb::cast_error&) {}
+        try {
+            by_opt_ptr = nb::cast<std::optional<D*>>(obj).value()->value;
+        } catch (const nb::cast_error&) {}
+        return nb::make_tuple(by_val, by_ptr, by_opt_val, by_opt_ptr);
+    });
+    m.def("get_d_via_try_cast", [](nb::object obj) {
+        int by_val = -1, by_ptr = -1, by_opt_val = -1, by_opt_ptr = -1;
+        if (D val(nullptr); nb::try_cast(obj, val))
+            by_val = val.value;
+        if (D* ptr; nb::try_cast(obj, ptr))
+            by_ptr = ptr->value;
+        if (std::optional<D> opt_val; nb::try_cast(obj, opt_val))
+            by_opt_val = opt_val->value;
+        if (std::optional<D*> opt_ptr; nb::try_cast(obj, opt_ptr))
+            by_opt_ptr = opt_ptr.value()->value;
+        return nb::make_tuple(by_val, by_ptr, by_opt_val, by_opt_ptr);
+    });
 
     struct Int {
         int i;
@@ -446,7 +523,7 @@ NB_MODULE(test_classes_ext, m) {
     m.def("test_handle_t", [](nb::handle_t<Struct> h) { return borrow(h); });
 
     // test23_type_object_t
-    m.def("test_type_object_t", [](nb::type_object_t<Struct> h) -> nb::object { return std::move(h); });
+    m.def("test_type_object_t", [](nb::type_object_t<Struct> h) -> nb::object { return h; });
 
     // test24_none_arg
     m.def("none_0", [](Struct *s) { return s == nullptr; });
@@ -575,4 +652,83 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>())
         .def_rw("i", &Union::i)
         .def_rw("f", &Union::f);
+
+    struct HiddenBase {
+        int value = 10;
+        int vget() const { return value; }
+        void vset(int v) { value = v; }
+        int get_answer() const { return value * 10; }
+    };
+    struct BoundDerived : HiddenBase {
+        virtual int polymorphic() { return value; }
+    };
+    nb::class_<BoundDerived>(m, "BoundDerived")
+        .def(nb::init<>())
+        .def_rw("value", &BoundDerived::value)
+        .def_prop_rw("prop", &BoundDerived::vget, &BoundDerived::vset)
+        .def("get_answer", &BoundDerived::get_answer)
+        .def("polymorphic", &BoundDerived::polymorphic);
+
+    nb::class_<UniqueInt>(m, "UniqueInt")
+        .def(nb::new_(&UniqueInt::make))
+        .def(nb::new_([](std::string s) {
+            return UniqueInt::make(std::atoi(s.c_str()));
+        }), "s"_a)
+        .def("value", &UniqueInt::value)
+        .def("lookups", &UniqueInt::lookups);
+
+    // issue #786
+    struct NewNone {};
+    struct NewDflt { int value; };
+    struct NewStar { size_t value; };
+    nb::class_<NewNone>(m, "NewNone")
+        .def(nb::new_([]() { return NewNone(); }));
+    nb::class_<NewDflt>(m, "NewDflt")
+        .def(nb::new_([](int value) { return NewDflt{value}; }),
+             "value"_a = 42)
+        .def_ro("value", &NewDflt::value);
+    nb::class_<NewStar>(m, "NewStar")
+        .def(nb::new_([](nb::args a, int value, nb::kwargs k) {
+            return NewStar{nb::len(a) + value + 10 * nb::len(k)};
+        }),
+            "args"_a, "value"_a = 42, "kwargs"_a)
+        .def_ro("value", &NewStar::value);
+
+    // issue #750
+    PyCFunctionWithKeywords dummy_init = [](PyObject *, PyObject *,
+                                            PyObject *) -> PyObject * {
+        PyErr_SetString(PyExc_RuntimeError, "This should never be called!");
+        return nullptr;
+    };
+
+    PyType_Slot init_slots[] {
+        // the presence of this slot enables normal object construction via __init__ and __new__
+        // instead of an optimized codepath within nanobind that skips these. That in turn
+        // makes it possible to intercept calls and implement custom logic.
+        { Py_tp_init, (void *) dummy_init },
+        { 0, nullptr }
+    };
+
+    struct MonkeyPatchable {
+        int value = 123;
+    };
+
+    nb::class_<MonkeyPatchable>(m, "MonkeyPatchable", nb::type_slots(init_slots))
+        .def(nb::init<>())
+        .def_static("custom_init", [](nb::handle_t<MonkeyPatchable> h) {
+            if (nb::inst_ready(h))
+                nb::raise_type_error("Input is already initialized!");
+            MonkeyPatchable *p = nb::inst_ptr<MonkeyPatchable>(h);
+            new (p) MonkeyPatchable{456};
+            nb::inst_mark_ready(h);
+        })
+        .def_rw("value", &MonkeyPatchable::value);
+
+    struct StaticPropertyOverride {};
+    struct StaticPropertyOverride2 : public StaticPropertyOverride {};
+
+    nb::class_<StaticPropertyOverride>(m, "StaticPropertyOverride")
+        .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 42; });
+    nb::class_<StaticPropertyOverride2, StaticPropertyOverride>(m, "StaticPropertyOverride2")
+        .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 43; });
 }

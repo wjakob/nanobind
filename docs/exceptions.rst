@@ -234,7 +234,7 @@ exceptions:
     except Exception as exc:
         raise RuntimeError("could not divide by zero") from exc
 
-To do a similar thing in pybind11, you can use the :cpp:func:`nb::raise_from
+To do a similar thing in nanobind, you can use the :cpp:func:`nb::raise_from
 <raise_from>` function, which requires a :cpp:class:`nb::python_error
 <python_error>` and re-raises it with a chained exception object.
 

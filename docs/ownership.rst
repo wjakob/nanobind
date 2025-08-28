@@ -56,7 +56,7 @@ To avoid this problem, we can
 
 1. **Provide more information**: the problem was that nanobind *incorrectly*
    transferred ownership of a C++ instance to the Python side. To fix this, we
-   can add add a :ref:`return value policy <rvp>` annotation that clarifies
+   can add a :ref:`return value policy <rvp>` annotation that clarifies
    what to do with the return value.
 
 2. **Make ownership transfer explicit**: C++ types passed via :ref:`unique
@@ -182,7 +182,7 @@ options below. In particular, the following policies are available:
      m.def("get_data", []{ return &data; }, nb::rv_policy::reference)
 
 - :cpp:enumerator:`rv_policy::reference_internal`: A policy for *methods* that
-  expose an internal field. The lifetime of the field must matches that of the
+  expose an internal field. The lifetime of the field must match that of the
   parent object.
 
   The policy resembles :cpp:enumerator:`reference <rv_policy::reference>` in

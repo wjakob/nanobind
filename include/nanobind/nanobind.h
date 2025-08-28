@@ -21,11 +21,13 @@
 #  pragma warning(disable: 4251) // [..] needs to have a dll-interface to be used by clients of class [..]
 #endif
 
-#define NB_VERSION_MAJOR 1
-#define NB_VERSION_MINOR 9
-#define NB_VERSION_PATCH 2
+#define NB_VERSION_MAJOR 2
+#define NB_VERSION_MINOR 8
+#define NB_VERSION_PATCH 1
+#define NB_VERSION_DEV   1 // A value > 0 indicates a development release
 
 // Core C++ headers that nanobind depends on
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <stdexcept>
@@ -35,6 +37,7 @@
 #include <new>
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
+// IWYU pragma: begin_exports
 #include "nb_python.h"
 #include "nb_defs.h"
 #include "nb_enums.h"
@@ -47,10 +50,11 @@
 #include "nb_error.h"
 #include "nb_attr.h"
 #include "nb_cast.h"
+#include "nb_misc.h"
 #include "nb_call.h"
 #include "nb_func.h"
 #include "nb_class.h"
-#include "nb_misc.h"
+// IWYU pragma: end_exports
 
 #if defined(_MSC_VER)
 #  pragma warning(pop)

@@ -25,6 +25,7 @@ struct descr {
     constexpr descr(char c, Cs... cs) : text{c, static_cast<char>(cs)..., '\0'} { }
 
     constexpr size_t type_count() const { return sizeof...(Ts); }
+    constexpr size_t size() const { return N; }
 
     NB_INLINE void put_types(const std::type_info **out) const {
         size_t ctr = 0;
@@ -126,15 +127,23 @@ constexpr auto concat(const descr<N, Ts...> &d, const Args &...args)
     return d + const_name(", ") + concat(args...);
 }
 
+template <typename... Args>
+constexpr auto concat_maybe(const descr<0> &, const descr<0> &, const Args &...args)
+    -> decltype(concat_maybe(args...)) { return concat_maybe(args...); }
+
 template <size_t N, typename... Ts, typename... Args>
-constexpr auto concat_maybe(const descr<N, Ts...> &d, const Args &... args)
-    -> decltype(
-        std::declval<descr<N + sizeof...(Ts) == 0 ? 0 : (N + 2), Ts...>>() +
-        concat_maybe(args...)) {
-    if constexpr (N + sizeof...(Ts) == 0)
-        return concat_maybe(args...);
-    else
-        return d + const_name(", ") + concat_maybe(args...);
+constexpr auto concat_maybe(const descr<0> &, const descr<N, Ts...> &arg, const Args &...args)
+    -> decltype(concat_maybe(arg, args...)) { return concat_maybe(arg, args...); }
+
+template <size_t N, typename... Ts, typename... Args>
+constexpr auto concat_maybe(const descr<N, Ts...> &arg, const descr<0> &, const Args &...args)
+    -> decltype(concat_maybe(arg, args...)) { return concat_maybe(arg, args...); }
+
+template <size_t N, size_t N2, typename... Ts, typename... Ts2, typename... Args,
+          enable_if_t<N != 0 && N2 != 0> = 0>
+constexpr auto concat_maybe(const descr<N, Ts...> &arg0, const descr<N2, Ts2...> &arg1, const Args &...args)
+    -> decltype(concat(arg0, concat_maybe(arg1, args...))) {
+    return concat(arg0, concat_maybe(arg1, args...));
 }
 
 template <size_t N, typename... Ts>

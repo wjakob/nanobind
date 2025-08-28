@@ -32,15 +32,13 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
             return false;
         }
 
+        // 'items' is safe to access without locking and reference counting, it
+        // is unique to this thread
         Py_ssize_t size = NB_LIST_GET_SIZE(items);
         bool success = size >= 0;
 
-        uint8_t flags_key = flags, flags_val = flags;
-
-        if constexpr (is_base_caster_v<KeyCaster> && !std::is_pointer_v<Key>)
-            flags_key |= (uint8_t) cast_flags::none_disallowed;
-        if constexpr (is_base_caster_v<ValCaster> && !std::is_pointer_v<Val>)
-            flags_val |= (uint8_t) cast_flags::none_disallowed;
+        uint8_t flags_key = flags_for_local_caster<Key>(flags),
+                flags_val = flags_for_local_caster<Val>(flags);
 
         KeyCaster key_caster;
         ValCaster val_caster;
@@ -49,12 +47,14 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
             PyObject *key = NB_TUPLE_GET_ITEM(item, 0);
             PyObject *val = NB_TUPLE_GET_ITEM(item, 1);
 
-            if (!key_caster.from_python(key, flags_key, cleanup)) {
+            if (!key_caster.from_python(key, flags_key, cleanup) ||
+                !key_caster.template can_cast<Key>()) {
                 success = false;
                 break;
             }
 
-            if (!val_caster.from_python(val, flags_val, cleanup)) {
+            if (!val_caster.from_python(val, flags_val, cleanup) ||
+                !val_caster.template can_cast<Val>()) {
                 success = false;
                 break;
             }
@@ -75,9 +75,9 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
         if (ret.is_valid()) {
             for (auto &item : src) {
                 object k = steal(KeyCaster::from_cpp(
-                    forward_like<T>(item.first), policy, cleanup));
+                    forward_like_<T>(item.first), policy, cleanup));
                 object e = steal(ValCaster::from_cpp(
-                    forward_like<T>(item.second), policy, cleanup));
+                    forward_like_<T>(item.second), policy, cleanup));
 
                 if (!k.is_valid() || !e.is_valid() ||
                     PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {

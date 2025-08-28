@@ -1,10 +1,15 @@
 libnanobind-static.a
-libnanobind.dylib
+libnanobind-static-abi3.a
+libnanobind-static-ft.a
 libnanobind.so
-libnanobind-abi3.dylib
 libnanobind-abi3.so
+libnanobind-ft.so
+libnanobind.dylib
+libnanobind-abi3.dylib
+libnanobind-ft.dylib
 nanobind.dll
 nanobind-abi3.dll
+nanobind-ft.dll
 
 libinter_module.dylib
 libinter_module.so
@@ -12,6 +17,7 @@ inter_module.dll
 
 /.ninja_deps
 /.ninja_log
+/.cache
 /build.ninja
 /build
 /src/nanobind/cmake
@@ -20,12 +26,18 @@ inter_module.dll
 /src/nanobind/src
 /dist
 /bench
+compile_commands.json
 
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake
+nanobind-config-version.cmake
 \.DS_Store
+\.cmake
 __pycache__
 nanobind.egg-info
-test_*_ext*
+test_*_ext*.so
+test_*_ext*.pyd
+test_*.pyi
 py\.typed
+.mypy_cache

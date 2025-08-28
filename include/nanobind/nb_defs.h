@@ -22,7 +22,7 @@
 #  define NAMESPACE_END(name) }
 #endif
 
-#if defined(_WIN32) && !defined(__GNUC__)
+#if defined(_WIN32)
 #  define NB_EXPORT          __declspec(dllexport)
 #  define NB_IMPORT          __declspec(dllimport)
 #  define NB_INLINE          __forceinline
@@ -40,7 +40,7 @@
 #  endif
 #endif
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(_WIN32)
 #  define NB_NAMESPACE nanobind __attribute__((visibility("hidden")))
 #else
 #  define NB_NAMESPACE nanobind
@@ -64,7 +64,7 @@
 #  define NB_CORE
 #endif
 
-#if !defined(NB_SHARED) && defined(__GNUC__)
+#if !defined(NB_SHARED) && defined(__GNUC__) && !defined(_WIN32)
 #  define NB_EXPORT_SHARED __attribute__ ((visibility("hidden")))
 #else
 #  define NB_EXPORT_SHARED
@@ -108,6 +108,12 @@
 #  define NB_TYPING_TYPE  "type"
 #endif
 
+#if PY_VERSION_HEX < 0x030D0000
+#  define NB_TYPING_CAPSULE "typing_extensions.CapsuleType"
+#else
+#  define NB_TYPING_CAPSULE "types.CapsuleType"
+#endif
+
 #define NB_TYPING_SEQUENCE     NB_TYPING_ABC "Sequence"
 #define NB_TYPING_MAPPING      NB_TYPING_ABC "Mapping"
 #define NB_TYPING_CALLABLE     NB_TYPING_ABC "Callable"
@@ -147,6 +153,10 @@
 #    error "nanobind requires a newer PyPy version (>= 7.3.10)"
 #endif
 
+#if defined(NB_FREE_THREADED) && !defined(Py_GIL_DISABLED)
+#    error "Free-threaded extensions require a free-threaded version of Python"
+#endif
+
 #if defined(NB_DOMAIN)
 #  define NB_DOMAIN_STR NB_TOSTRING(NB_DOMAIN)
 #else
@@ -169,26 +179,61 @@
 #  define NB_TYPE_GET_SLOT_IMPL 1
 #endif
 
-#define NB_MODULE_IMPL(name)                                                   \
-    extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name();           \
-    extern "C" NB_EXPORT PyObject *PyInit_##name()
+#define NB_MODULE_SLOTS_0 { 0, nullptr }
 
-#define NB_MODULE(name, variable)                                              \
-    static PyModuleDef NB_CONCAT(nanobind_module_def_, name);                  \
-    [[maybe_unused]] static void NB_CONCAT(nanobind_init_,                     \
-                                           name)(::nanobind::module_ &);       \
-    NB_MODULE_IMPL(name) {                                                     \
+#if PY_VERSION_HEX < 0x030C0000
+#  define NB_MODULE_SLOTS_1 NB_MODULE_SLOTS_0
+#else
+#  define NB_MODULE_SLOTS_1                                                    \
+    { Py_mod_multiple_interpreters,                                            \
+      Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED },                            \
+    NB_MODULE_SLOTS_0
+#endif
+
+#if !defined(NB_FREE_THREADED)
+#  define NB_MODULE_SLOTS_2 NB_MODULE_SLOTS_1
+#else
+#  define NB_MODULE_SLOTS_2                                                    \
+   { Py_mod_gil, Py_MOD_GIL_NOT_USED },                                        \
+   NB_MODULE_SLOTS_1
+#endif
+
+#define NB_NONCOPYABLE(X)                                                      \
+    X(const X &) = delete;                                                     \
+    X &operator=(const X &) = delete;
+
+// Helper macros to ensure macro arguments are expanded before token pasting/stringification
+#define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)
+#define NB_MODULE_IMPL2(name, variable)                                        \
+    static void nanobind_##name##_exec_impl(nanobind::module_);                \
+    static int nanobind_##name##_exec(PyObject *m) {                           \
         nanobind::detail::init(NB_DOMAIN_STR);                                 \
-        nanobind::module_ m =                                                  \
-            nanobind::steal<nanobind::module_>(nanobind::detail::module_new(   \
-                NB_TOSTRING(name), &NB_CONCAT(nanobind_module_def_, name)));   \
         try {                                                                  \
-            NB_CONCAT(nanobind_init_, name)(m);                                \
-            return m.release().ptr();                                          \
+            nanobind_##name##_exec_impl(                                       \
+                nanobind::borrow<nanobind::module_>(m));                       \
+            return 0;                                                          \
+        } catch (nanobind::python_error &e) {                                  \
+            e.restore();                                                       \
+            nanobind::chain_error(                                             \
+                PyExc_ImportError,                                             \
+                "Encountered an error while initializing the extension.");     \
         } catch (const std::exception &e) {                                    \
             PyErr_SetString(PyExc_ImportError, e.what());                      \
-            return nullptr;                                                    \
         }                                                                      \
+        return -1;                                                             \
     }                                                                          \
-    void NB_CONCAT(nanobind_init_, name)(::nanobind::module_ & (variable))
+    static PyModuleDef_Slot nanobind_##name##_slots[] = {                      \
+        { Py_mod_exec, (void *) nanobind_##name##_exec },                      \
+        NB_MODULE_SLOTS_2                                                      \
+    };                                                                         \
+    static struct PyModuleDef nanobind_##name##_module = {                     \
+        PyModuleDef_HEAD_INIT, #name, nullptr, 0, nullptr,                     \
+        nanobind_##name##_slots, nullptr, nullptr, nullptr                     \
+    };                                                                         \
+    extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
+    extern "C" PyObject *PyInit_##name(void) {                                 \
+        return PyModuleDef_Init(&nanobind_##name##_module);                    \
+    }                                                                          \
+    void nanobind_##name##_exec_impl(nanobind::module_ variable)
 
+#define NB_MODULE(name, variable) NB_MODULE_IMPL(name, variable)

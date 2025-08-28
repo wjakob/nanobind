@@ -284,9 +284,9 @@ changes are needed:
 
 Note that the cleanup list is only available when ``from_python()`` or
 ``from_cpp()`` are called as part of function dispatch, while usage by
-:cpp:func:`nb::cast() <cast>` sets ``cleanup`` to ``nullptr``. This case should
-be handled gracefully by refusing the conversion if the cleanup list is
-absolutely required.
+:cpp:func:`nb::cast() <cast>` may set ``cleanup`` to ``nullptr`` if implicit
+conversions are not enabled. This case should be handled gracefully by refusing
+the conversion if the cleanup list is absolutely required.
 
 Type casters may not raise C++ exceptions. Both ``from_python()`` and
 ``from_cpp()`` must be annotated with ``noexcept``. Exceptions or failure

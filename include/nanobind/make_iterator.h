@@ -59,31 +59,42 @@ template <typename Iterator> struct iterator_value_access {
 template <typename Access, rv_policy Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
 typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
-                                              Iterator &&first, Sentinel &&last,
+                                              Iterator first, Sentinel last,
                                               Extra &&...extra) {
     using State = iterator_state<Access, Policy, Iterator, Sentinel, ValueType, Extra...>;
 
-    if (!type<State>().is_valid()) {
-        class_<State>(scope, name)
-            .def("__iter__", [](handle h) { return h; })
-            .def("__next__",
-                 [](State &s) -> ValueType {
-                     if (!s.first_or_done)
-                         ++s.it;
-                     else
-                         s.first_or_done = false;
+    static_assert(
+        !detail::is_base_caster_v<detail::make_caster<ValueType>> ||
+        detail::is_copy_constructible_v<ValueType> ||
+        (Policy != rv_policy::automatic_reference &&
+         Policy != rv_policy::copy),
+        "make_iterator_impl(): the generated __next__ would copy elements, so the "
+        "element type must be copy-constructible");
 
-                     if (s.it == s.end) {
-                         s.first_or_done = true;
-                         throw stop_iteration();
-                     }
+    {
+        static ft_mutex mu;
+        ft_lock_guard lock(mu);
+        if (!type<State>().is_valid()) {
+            class_<State>(scope, name)
+                .def("__iter__", [](handle h) { return h; })
+                .def("__next__",
+                    [](State &s) -> ValueType {
+                        if (!s.first_or_done)
+                            ++s.it;
+                        else
+                            s.first_or_done = false;
 
-                     return Access()(s.it);
-                 },
-                 std::forward<Extra>(extra)...,
-                 Policy);
+                        if (s.it == s.end) {
+                            s.first_or_done = true;
+                            throw stop_iteration();
+                        }
+
+                        return Access()(s.it);
+                    },
+                    std::forward<Extra>(extra)...,
+                    Policy);
+        }
     }
-
     return borrow<typed<iterator, ValueType>>(cast(State{
         std::forward<Iterator>(first), std::forward<Sentinel>(last), true }));
 }
@@ -91,12 +102,13 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
 NAMESPACE_END(detail)
 
 /// Makes a python iterator from a first and past-the-end C++ InputIterator.
-template <rv_policy Policy = rv_policy::reference_internal,
+template <rv_policy Policy = rv_policy::automatic_reference,
           typename Iterator,
           typename Sentinel,
           typename ValueType = typename detail::iterator_access<Iterator>::result_type,
-          typename... Extra>
-auto make_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&last, Extra &&...extra) {
+          typename... Extra,
+          typename = decltype(std::declval<Iterator>() == std::declval<Sentinel>())>
+auto make_iterator(handle scope, const char *name, Iterator first, Sentinel last, Extra &&...extra) {
     return detail::make_iterator_impl<detail::iterator_access<Iterator>, Policy,
                                       Iterator, Sentinel, ValueType, Extra...>(
         scope, name, std::forward<Iterator>(first),
@@ -105,13 +117,13 @@ auto make_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&
 
 /// Makes an iterator over the keys (`.first`) of a iterator over pairs from a
 /// first and past-the-end InputIterator.
-template <rv_policy Policy = rv_policy::reference_internal, typename Iterator,
+template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator,
           typename Sentinel,
           typename KeyType =
               typename detail::iterator_key_access<Iterator>::result_type,
           typename... Extra>
-auto make_key_iterator(handle scope, const char *name, Iterator &&first,
-                       Sentinel &&last, Extra &&...extra) {
+auto make_key_iterator(handle scope, const char *name, Iterator first,
+                       Sentinel last, Extra &&...extra) {
     return detail::make_iterator_impl<detail::iterator_key_access<Iterator>,
                                       Policy, Iterator, Sentinel, KeyType,
                                       Extra...>(
@@ -121,12 +133,12 @@ auto make_key_iterator(handle scope, const char *name, Iterator &&first,
 
 /// Makes an iterator over the values (`.second`) of a iterator over pairs from a
 /// first and past-the-end InputIterator.
-template <rv_policy Policy = rv_policy::reference_internal,
+template <rv_policy Policy = rv_policy::automatic_reference,
           typename Iterator,
           typename Sentinel,
           typename ValueType = typename detail::iterator_value_access<Iterator>::result_type,
           typename... Extra>
-auto make_value_iterator(handle scope, const char *name, Iterator &&first, Sentinel &&last, Extra &&...extra) {
+auto make_value_iterator(handle scope, const char *name, Iterator first, Sentinel last, Extra &&...extra) {
     return detail::make_iterator_impl<detail::iterator_value_access<Iterator>,
                                       Policy, Iterator, Sentinel, ValueType,
                                       Extra...>(
@@ -135,9 +147,10 @@ auto make_value_iterator(handle scope, const char *name, Iterator &&first, Senti
 }
 
 /// Makes an iterator over values of a container supporting `std::begin()`/`std::end()`
-template <rv_policy Policy = rv_policy::reference_internal,
+template <rv_policy Policy = rv_policy::automatic_reference,
           typename Type,
-          typename... Extra>
+          typename... Extra,
+          typename = decltype(std::begin(std::declval<Type&>()))>
 auto make_iterator(handle scope, const char *name, Type &value, Extra &&...extra) {
     return make_iterator<Policy>(scope, name, std::begin(value),
                                  std::end(value),

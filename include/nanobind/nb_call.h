@@ -35,6 +35,9 @@ args_proxy api<Derived>::operator*() const {
 template <typename T>
 NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
     using D = std::decay_t<T>;
+    static_assert(!std::is_base_of_v<arg_locked, D>,
+                  "nb::arg().lock() may be used only when defining functions, "
+                  "not when calling them");
 
     if constexpr (std::is_same_v<D, arg_v>)
         nkwargs++;
@@ -65,7 +68,9 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
     } else if constexpr (std::is_same_v<D, kwargs_proxy>) {
         PyObject *key, *entry;
         Py_ssize_t pos = 0;
-
+#if defined(NB_FREE_THREADED)
+        ft_object_guard guard(value);
+#endif
         while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {
             Py_INCREF(key); Py_INCREF(entry);
             args[kwargs_offset + nkwargs] = entry;

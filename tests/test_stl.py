@@ -234,6 +234,10 @@ def test24_vec_movable_in_value(clean):
     t.vec_movable_in_value([t.Movable(i) for i in range(10)])
     assert_stats(value_constructed=10, copy_constructed=10, destructed=20)
 
+    # Test that None values don't cause a crash
+    with pytest.raises(TypeError):
+        t.vec_movable_in_value([None])
+
 
 def test25_vec_movable_in_value(clean):
     t.vec_copyable_in_value([t.Copyable(i) for i in range(10)])
@@ -248,6 +252,11 @@ def test26_vec_movable_in_lvalue_ref(clean):
 def test27_vec_movable_in_ptr_2(clean):
     t.vec_movable_in_ptr_2([t.Movable(i) for i in range(10)])
     assert_stats(value_constructed=10, destructed=10)
+
+    # Test that None values are permitted when casting to pointer;
+    # instead we reach 'if (x.size() != 10) fail();' in the bound function
+    with pytest.raises(RuntimeError):
+        t.vec_movable_in_ptr_2([None])
 
 
 def test28_vec_movable_in_rvalue_ref(clean):
@@ -297,6 +306,7 @@ def test31_std_function_roundtrip():
 # cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849
 @skip_on_pypy
 def test32_std_function_gc():
+    # Test class -> function -> class cyclic reference
     class A(t.FuncWrapper):
         pass
 
@@ -307,18 +317,29 @@ def test32_std_function_gc():
     collect()
     assert t.FuncWrapper.alive == 0
 
-    # A class -> function -> class cyclic reference
-    class B(t.FuncWrapper):
+    # t.FuncWrapper is a C extension type with a custom property 'f', which
+    # can store Python function objects It implements the tp_traverse
+    # callback so that reference cycles arising from this function object
+    # can be detected.
+
+    class Test(t.FuncWrapper):
         def __init__(self):
             super().__init__()
 
+            # The constructor creates a closure, which references 'self'
+            # and assigns it to the 'self.f' member.
+            # This creates a cycle self -> self.f -> self
             def f():
                 print(self.f)
 
             self.f = f
 
+
+    # The Test class declared above inherits from 'FuncWrapper'.
+    # This class keeps track of how many references are alive at
+    # any point to help track down leak issues.
     assert t.FuncWrapper.alive == 0
-    b = B()
+    b = Test()
     assert t.FuncWrapper.alive == 1
     del b
     collect()
@@ -373,6 +394,8 @@ def test37_std_optional_copyable_ptr(clean):
 
 def test38_std_optional_none():
     t.optional_none(None)
+    assert t.optional_cstr(None) == "none"
+    assert t.optional_cstr("hi") == "hi"
 
 
 def test39_std_optional_ret_opt_movable(clean):
@@ -464,7 +487,6 @@ def test48_std_variant_ret_var_none():
     assert t.variant_ret_var_none() is None
 
     rv_t = union("None", "test_stl_ext.Copyable", "int")
-    print(t.variant_ret_var_none.__doc__)
     assert t.variant_ret_var_none.__doc__ == (f"variant_ret_var_none() -> {rv_t}")
 
 
@@ -480,6 +502,15 @@ def test49_std_variant_unbound_type():
         f"variant_unbound_type(x: {arg_t} = None) -> {rv_t}"
     )
 
+def test49b_std_variant_nondefault(clean):
+    assert t.variant_nondefault(t.NonDefaultConstructible(10)) == 10
+    assert t.variant_nondefault(20) == -20
+    assert_stats(
+        value_constructed=1, # constructed in NonDefaultConstructible pyobject
+        copy_constructed=1, # copied into type_caster variant member
+        move_constructed=1, # moved into function argument value
+        destructed=3,
+    )
 
 def test50_map_return_movable_value():
     for i, (k, v) in enumerate(sorted(t.map_return_movable_value().items())):
@@ -664,25 +695,90 @@ def test67_vector_bool():
 
 def test68_complex_value():
     # double: 64bits
-    assert t.complex_value_double(1.0) == 1.0
+    assert t.complex_value_double(1.0) == complex(1.0)
     assert t.complex_value_double(1.0j) == 1.0j
-    assert t.complex_value_double(0.0) == 0.0
+    assert t.complex_value_double(0.0) == complex(0.0)
     assert t.complex_value_double(0.0j) == 0.0j
-    assert t.complex_value_double(0) == 0
-    assert t.complex_value_float(1.0) == 1.0
+    assert t.complex_value_double(0) == complex(0.0)
+    assert t.complex_value_double_nc(1.0 + 2.0j) == 1.0 + 2.0j
+    assert t.complex_value_double_nc(1.0j) == 1.0j
+    assert t.complex_value_double_nc(0.0 + 0.0j) == complex(0.0)
+    assert t.complex_value_double_nc(0.0j) == 0.0j
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(0.0)
+
+    # float: 32bits
+    assert t.complex_value_float(1.0) == complex(1.0)
     assert t.complex_value_float(1.0j) == 1.0j
-    assert t.complex_value_float(0.0) == 0.0
+    assert t.complex_value_float(0.0) == complex(0.0)
     assert t.complex_value_float(0.0j) == 0.0j
-    assert t.complex_value_float(0) == 0
+    assert t.complex_value_float(0) == complex(0.0)
+    assert t.complex_value_float_nc(1.0 + 2.0j) == 1.0 + 2.0j
+    assert t.complex_value_float_nc(1.0j) == 1.0j
+    assert t.complex_value_float_nc(0.0 + 0.0j) == complex(0.0)
+    assert t.complex_value_float_nc(0.0j) == 0.0j
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(0.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(1.1 + 2.0j)  # Inexact narrowing conversion
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(1.0 + 2.1j)  # Inexact narrowing conversion
 
     val_64 = 2.7 - 3.2j
     val_32 = 2.700000047683716 - 3.200000047683716j
     assert val_64 != val_32
 
-    assert t.complex_value_float(val_32) == val_32
-    assert t.complex_value_float(val_64) == val_32
     assert t.complex_value_double(val_32) == val_32
     assert t.complex_value_double(val_64) == val_64
+    assert t.complex_value_double_nc(val_32) == val_32
+    assert t.complex_value_double_nc(val_64) == val_64
+
+    assert t.complex_value_float(val_32) == val_32
+    assert t.complex_value_float(val_64) == val_32
+    assert t.complex_value_float_nc(val_32) == val_32
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(val_64)  # Inexact narrowing conversion
+
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float([])
+
+    class MyInt(int):
+        def __new__(cls, value):
+            return super().__new__(cls, value)
+
+    assert t.complex_value_double(MyInt(7)) == complex(7.0)
+    assert t.complex_value_float(MyInt(7)) == complex(7.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(MyInt(7))
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(MyInt(7))
+
+    class MyComplex:
+        def __init__(self, real, imag):
+            self.re = real
+            self.im = imag
+        def __complex__(self):
+            return complex(self.re, self.im)
+
+    assert t.complex_value_double(MyComplex(1, 2)) == complex(1.0, 2.0)
+    assert t.complex_value_float(MyComplex(1, 2)) == complex(1.0, 2.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(MyComplex(1, 2))
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(MyComplex(1, 2))
+
+    class MyComplexSubclass(complex): ...
+
+    assert t.complex_value_double(MyComplexSubclass(1, 2)) == complex(1.0, 2.0)
+    assert t.complex_value_float(MyComplexSubclass(1, 2)) == complex(1.0, 2.0)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_double_nc(MyComplexSubclass(1, 2))
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_value_float_nc(MyComplexSubclass(1, 2))
 
     try:
         import numpy as np
@@ -691,10 +787,17 @@ def test68_complex_value():
         assert t.complex_value_float(np.complex64(val_64)) == val_32
         assert t.complex_value_double(np.complex64(val_32)) == val_32
         assert t.complex_value_double(np.complex64(val_64)) == val_32
+
         assert t.complex_value_float(np.complex128(val_32)) == val_32
         assert t.complex_value_float(np.complex128(val_64)) == val_32
         assert t.complex_value_double(np.complex128(val_32)) == val_32
         assert t.complex_value_double(np.complex128(val_64)) == val_64
+
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.complex_value_double_nc(np.complex128(val_64))
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.complex_value_float_nc(np.complex64(val_32))
+
     except ImportError:
         pass
 
@@ -718,6 +821,9 @@ def test69_complex_array():
         (-0 - 1j),
         val2_32,
     ]
+
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.complex_array_float([[]])
 
     try:
         import numpy as np
@@ -754,6 +860,7 @@ def test69_complex_array():
 def test70_vec_char():
     assert isinstance(t.vector_str("123"), str)
     assert isinstance(t.vector_str(["123", "345"]), list)
+    assert t.vector_optional_str(["abc", None]) == ["abc", None]
 
 
 def test71_null_input():
@@ -761,3 +868,17 @@ def test71_null_input():
         t.vec_movable_in_value([None])
     with pytest.raises(TypeError):
         t.map_copyable_in_value({"a": None})
+
+@skip_on_pypy # PyPy fails this test on Windows :-(
+def test72_wstr():
+    assert t.pass_wstr('🎈') == '🎈'
+
+def test73_bad_input_to_set():
+    with pytest.raises(TypeError):
+        t.set_in_value(None)
+
+def test74_variant_implicit_conversions():
+    event = t.IDHavingEvent()
+    assert event.id is None
+    event.id = t.BasicID1(78)
+    assert type(event.id) is t.BasicID1

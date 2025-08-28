@@ -84,92 +84,10 @@ other types when they are handled using :ref:`type casters <type_casters>`.
 Please read the full section on :ref:`information exchange between C++ and
 Python <exchange>` to understand the issue and alternatives.
 
+Why am I getting errors about leaked instances/functions/types?
+---------------------------------------------------------------
 
-Why am I getting errors about leaked functions and types?
----------------------------------------------------------
-
-When the Python interpreter shuts down, it informs nanobind about this using a
-``Py_AtExit()`` callback. If any nanobind-created instances, functions, or
-types are still alive at this point, then *something went wrong* because they
-should have been deleted by the garbage collector. Although this does not
-always indicate a serious problem, the decision was made to have nanobind
-complain rather noisily about the presence of such leaks.
-
-Other binding tools (e.g., pybind11) are on the opposite of the spectrum:
-because they never report leaks, it is quite easy to accidentally introduce
-many of them until a developer eventually realizes that something is very
-wrong.
-
-Leaks mainly occur for four reasons:
-
-- **Reference counting bugs**.  If you write raw Python C API code or use the
-  nanobind wrappers including functions like ``Py_[X]INCREF()``,
-  ``Py_[X]DECREF()``, :cpp:func:`nb::steal() <steal>`, :cpp:func:`nb::borrow()
-  <borrow>`, :cpp:func:`.dec_ref() <detail::api::dec_ref>`,
-  :cpp:func:`.inc_ref() <detail::api::inc_ref>`
-  , etc., then incorrect
-  use of such calls can cause a reference to leak that prevents the associated
-  object from being deleted.
-
-- **Reference cycles**. Python's garbage collector frees unused objects that are
-  part of a circular reference chains (e.g., ``A->B->C->A``). This requires all
-  types in the cycle to implement the ``tp_traverse`` *type slot*, and at least
-  one of them to implement the ``tp_clear`` type slot. See the section on
-  :ref:`cyclic garbage collection <cyclic_gc>` for details on how to do this with
-  nanobind.
-
-- **Interactions with other tools that leak references**. Python extension
-  libraries---especially *huge* ones with C library components like PyTorch,
-  Tensorflow, etc., have been observed to leak references to nanobind
-  objects.
-
-  Some of these frameworks cache JIT-compiled functions based on the arguments
-  with which they were called, and such caching schemes could leak references
-  to nanobind types if they aren't cleaned up by the responsible extensions
-  (this is a hypothesis). In this case, the leak would be benign---even so, it
-  should be fixed in the responsible framework so that leak warnings aren't
-  cluttered with flukes and can be more broadly useful.
-
-- **Older Python versions**: Very old Python versions (e.g., 3.8) don't
-  do a good job cleaning up global references when the interpreter shuts down.
-  The following code may leak a reference if it is a top-level statement in a
-  Python file or the REPL.
-
-  .. code-block:: python
-
-     a = my_ext.MyObject()
-
-  Such a warning is benign and does not indicate an actual leak. It simply
-  highlights a flaws in the interpreter shutdown logic of old Python versions.
-  Wrap your code into a function to address this issue even on such versions:
-
-  .. code-block:: python
-
-     def run():
-         a = my_ext.MyObject()
-         # ...
-
-     if __name__ == '__main__':
-         run()
-
-- **Exceptions**. Some exceptions such as ``AttributeError`` have been observed
-  to hold references, e.g. to the object which lacked the desired attribute. If
-  the last exception raised by the program references a nanobind instance, then
-  this may be reported as a leak since Python finalization appears not to
-  release the exception object. See `issue #376
-  <https://github.com/wjakob/nanobind/issues/376>`__ for a discussion.
-
-If you find leak warnings to be a nuisance, then you can disable them in the
-C++ binding code via the :cpp:func:`nb::set_leak_warnings() <set_leak_warnings>`
-function.
-
-.. code-block:: python
-
-   nb::set_leak_warnings(false);
-
-This is a *global flag* shared by all nanobind extension libraries in the same
-ABI domain. If you do so, then please isolate your extension from others by
-passing the ``NB_DOMAIN`` parameter to :cmake:command:`nanobind_add_module()`.
+Please see the dedicated documentation section on :ref:`reference leaks <refleaks>`.
 
 Compilation fails with a static assertion mentioning ``NB_MAKE_OPAQUE()``
 -------------------------------------------------------------------------
@@ -353,6 +271,60 @@ named domain to avoid conflicts with other extensions. To do so, specify the
 In this case, inter-extension type visibility is furthermore restricted to
 extensions in the ``"my_project"`` domain.
 
+Can I use nanobind without RTTI or C++ exceptions?
+--------------------------------------------------
+
+Certain environments (e.g., `Google-internal development
+<https://google.github.io/styleguide/cppguide.html>`__, embedded devices, etc.)
+require compilation without C++ runtime type information (``-fno-rtti``) and
+exceptions (``-fno-exceptions``).
+
+nanobind requires both of these features and cannot be used when they are not
+available. RTTI provides the central index to look up types of bindings.
+Exceptions are needed because Python relies on exceptions that must be
+converted into something equivalent on the C++ side. PRs that refactor nanobind
+to work without RTTI or exceptions will not be accepted.
+
+For Googlers: there is already an exemption from the internal rules that
+specifically permits the use of RTTI/exceptions when a project relies on
+pybind11. Likely, this exemption could be extended to include nanobind as well.
+
+Can I make stable ABI extensions for pre-3.12 Python?
+-----------------------------------------------------
+
+Stable ABI extensions are convenient because they can be reused across Python
+versions, but this unfortunately only works on Python 3.12 and newer. Nanobind
+crucially depends on several `features
+<https://docs.python.org/3/whatsnew/3.12.html#c-api-changes>`__ that were added
+in version 3.12 (specifically, ``PyType_FromMetaclass()`` and limited API
+bindings of the vector call protocol).
+
+Policy on Clang-Tidy, ``-Wpedantic``, etc.
+------------------------------------------
+
+nanobind regularly receives requests from users who run it through Clang-Tidy,
+or who compile with increased warnings levels, like ``-Wpedantic``,
+``-Wcast-qual``, ``-Wsign-conversion``, etc. (i.e., beyond the increased
+``-Wall``, ``-Wextra`` and ``/W4`` warning levels that are already enabled)
+
+Their next step is to open a big pull request needed to silence all of the
+resulting messages.
+
+My policy on this is as follows: I am always happy to fix issues in the
+codebase. However, many of the resulting change requests are in the "ritual
+purification" category: things that cause churn, decrease readability, and
+which don't fix actual problems. It's a never-ending cycle because each new
+revision of such tooling adds further warnings and purification rites.
+
+So just to have a clear policy: I do not wish to pepper this codebase with
+``const_cast`` and ``#pragmas`` or pragma-like comments to avoid warnings in
+various kinds of external tooling just so those users can have a "silent"
+build. I don't think it is reasonable for them to impose their own style on
+this project.
+
+As a workaround it is likely possible to restrict the scope of style checks to
+particular C++ namespaces or source code locations.
+
 I'd like to use this project, but with $BUILD_SYSTEM instead of CMake
 ---------------------------------------------------------------------
 
@@ -397,6 +369,19 @@ build system compatible with another tool that is sufficiently
 feature-complete, then please file an issue and I am happy to reference it in
 the documentation.
 
+Are there tools to generate nanobind bindings automatically?
+------------------------------------------------------------
+
+`litgen <https://pthom.github.io/litgen>`__ is an automatic Python bindings
+generator compatible with both pybind11 and nanobind, designed to create
+documented and easily discoverable bindings.
+It reproduces header documentation directly in the bindings, making the
+generated API intuitive and well-documented for Python users.
+Powered by srcML (srcml.org), a high-performance, multi-language parsing tool,
+litgen takes a developer-centric approach.
+The C++ API to be exposed to Python must be C++14 compatible, although the
+implementation can leverage more modern C++ features.
+
 How to cite this project?
 -------------------------
 
@@ -409,5 +394,5 @@ discourse:
        author = {Wenzel Jakob},
        year = {2022},
        note = {https://github.com/wjakob/nanobind},
-       title = {nanobind---Seamless operability between C++17 and Python}
+       title = {nanobind: tiny and efficient C++/Python bindings}
     }

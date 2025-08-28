@@ -30,6 +30,9 @@ def f4() -> typing.Callable[[T], T]:
 class AClass:
     STATIC_VAR: int = 5
 
+    class NestedClass:
+        pass
+
     def __init__(self, x):
         pass
 
@@ -41,7 +44,7 @@ class AClass:
         pass
 
     @classmethod
-    def class_method(x):
+    def class_method(cls, x):
         pass
 
     @typing.overload
@@ -63,5 +66,3 @@ class AClass:
 
     def overloaded_2(self, x):
         "docstr 3"
-
-del typing

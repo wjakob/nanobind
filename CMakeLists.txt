@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.15...3.27)
-project(nanobind LANGUAGES NONE)
+
+# ---------------------------------------------------------------------------
+# Read the project version from nanobind.h
+# ---------------------------------------------------------------------------
+
+file(STRINGS "include/nanobind/nanobind.h" _nanobind_h_version REGEX "^#define NB_VERSION_.*$")
+string(REGEX MATCH "#define NB_VERSION_MAJOR ([0-9]+)" _ "${_nanobind_h_version}")
+set(_major ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define NB_VERSION_MINOR ([0-9]+)" _ "${_nanobind_h_version}")
+set(_minor ${CMAKE_MATCH_1})
+string(REGEX MATCH "#define NB_VERSION_PATCH ([0-9]+)" _ "${_nanobind_h_version}")
+set(_patch ${CMAKE_MATCH_1})
+
+project(nanobind LANGUAGES NONE VERSION "${_major}.${_minor}.${_patch}")
 
 # ---------------------------------------------------------------------------
 # Only build tests by default if this is the top-level CMake project
@@ -14,12 +27,16 @@ endif()
 option(NB_CREATE_INSTALL_RULES "Create installation rules" ${NB_MASTER_PROJECT})
 option(NB_USE_SUBMODULE_DEPS   "Use the nanobind dependencies shipped as a git submodule of this repository" ON)
 
-option(NB_TEST              "Compile nanobind tests?" ${NB_MASTER_PROJECT})
-option(NB_TEST_STABLE_ABI   "Test the stable ABI interface?" OFF)
-option(NB_TEST_SHARED_BUILD "Build a shared nanobind library for the test suite?" OFF)
+option(NB_TEST               "Compile nanobind tests?" ${NB_MASTER_PROJECT})
+option(NB_TEST_STABLE_ABI    "Test the stable ABI interface?" OFF)
+option(NB_TEST_SHARED_BUILD  "Build a shared nanobind library for the test suite?" OFF)
+option(NB_TEST_CUDA          "Force the use of the CUDA/NVCC compiler for testing purposes" OFF)
+option(NB_TEST_FREE_THREADED "Build free-threaded extensions for the test suite?" ON)
 
 if (NOT MSVC)
-  option(NB_TEST_SANITZE    "Build tests with address and undefined behavior sanitizers?" OFF)
+  option(NB_TEST_SANITIZERS_ASAN  "Build tests with the address sanitizer?" OFF)
+  option(NB_TEST_SANITIZERS_UBSAN "Build tests with the address undefined behavior sanitizer?" OFF)
+  option(NB_TEST_SANITIZERS_TSAN  "Build tests with the thread sanitizer?" OFF)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -46,12 +63,11 @@ endif()
 # ---------------------------------------------------------------------------
 # Installation rules
 # ---------------------------------------------------------------------------
-
 if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
   # Silence warning in GNUInstallDirs due to no enabled languages
   set(CMAKE_INSTALL_LIBDIR "")
   include(GNUInstallDirs)
-  set(NB_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/nanobind"
+  set(NB_INSTALL_DATADIR "nanobind"
     CACHE PATH "Installation path for read-only architecture-independent nanobind data files")
 
   # Normally these would be configurable by the user, but we can't allow that
@@ -77,21 +93,33 @@ if(NB_CREATE_INSTALL_RULES AND NOT CMAKE_SKIP_INSTALL_RULES)
     DIRECTORY src/
     DESTINATION "${NB_INSTALL_MODULE_DIR}"
     FILES_MATCHING PATTERN "*\.py"
+    PATTERN "version.py" EXCLUDE
   )
 
   if(NB_USE_SUBMODULE_DEPS)
     install(
-      DIRECTORY ext/robin_map/include/
-      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include"
-    )
-    install(
-      FILES ext/robin_map/CMakeLists.txt
-      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map"
+      FILES ext/robin_map/include/tsl/robin_map.h
+            ext/robin_map/include/tsl/robin_hash.h
+            ext/robin_map/include/tsl/robin_growth_policy.h
+      DESTINATION "${NB_INSTALL_EXT_DIR}/robin_map/include/tsl"
     )
   endif()
 
   install(
-    DIRECTORY cmake/
+    FILES cmake/nanobind-config.cmake
+          cmake/darwin-python-path.py
+          cmake/darwin-ld-cpython.sym
+          cmake/darwin-ld-pypy.sym
+    DESTINATION "${NB_INSTALL_CMAKE_DIR}"
+  )
+
+  include(CMakePackageConfigHelpers)
+  write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+    COMPATIBILITY SameMajorVersion
+  )
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
     DESTINATION "${NB_INSTALL_CMAKE_DIR}"
   )
 endif()
@@ -102,20 +130,6 @@ if (NB_MASTER_PROJECT AND NOT NB_TEST)
   return()
 else()
   enable_language(CXX)
-endif()
-
-# ---------------------------------------------------------------------------
-# Compile with a few more compiler warnings turned on
-# ---------------------------------------------------------------------------
-
-if (MSVC)
-  if (CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
-    string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  else()
-    add_compile_options(/W4)
-  endif()
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-  add_compile_options(-Wall -Wextra -Wno-unused-local-typedefs)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -139,10 +153,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Include nanobind cmake functionality
 # ---------------------------------------------------------------------------
-
-find_package(nanobind
-  PATHS ${CMAKE_CURRENT_SOURCE_DIR}/cmake
-  NO_DEFAULT_PATH)
+include(cmake/nanobind-config.cmake)
 
 if (NB_TEST)
   add_subdirectory(tests)

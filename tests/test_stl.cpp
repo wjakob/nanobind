@@ -13,6 +13,7 @@
 #include <nanobind/stl/set.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/complex.h>
+#include <nanobind/stl/wstring.h>
 
 NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
@@ -52,6 +53,10 @@ struct NonAssignable {
   NonAssignable &operator=(const NonAssignable &) = delete;
 };
 
+struct NonDefaultConstructible : Movable {
+    NonDefaultConstructible(int v) : Movable(v) {}
+};
+
 struct StructWithReadonlyMap {
     std::map<std::string, uint64_t> map;
 };
@@ -64,14 +69,21 @@ struct FuncWrapper {
 };
 
 int funcwrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+    #if PY_VERSION_HEX >= 0x03090000
+        Py_VISIT(Py_TYPE(self));
+    #endif
+
+    if (!nb::inst_ready(self)) {
+        return 0;
+    }
+
     FuncWrapper *w = nb::inst_ptr<FuncWrapper>(self);
 
-    nb::object f = nb::cast(w->f, nb::rv_policy::none);
+    nb::handle f = nb::cast(w->f, nb::rv_policy::none);
     Py_VISIT(f.ptr());
 
     return 0;
-};
-
+}
 
 int FuncWrapper::alive = 0;
 
@@ -113,6 +125,10 @@ NB_MODULE(test_stl_ext, m) {
     nb::class_<NonAssignable>(m, "NonAssignable")
         .def(nb::init<>())
         .def_rw("value", &NonAssignable::value);
+
+    nb::class_<NonDefaultConstructible>(m, "NonDefaultConstructible")
+        .def(nb::init<int>())
+        .def_rw("value", &NonDefaultConstructible::value);
 
     nb::class_<StructWithReadonlyMap>(m, "StructWithReadonlyMap")
         .def(nb::init<>())
@@ -277,6 +293,10 @@ NB_MODULE(test_stl_ext, m) {
     m.def("variant_ret_var_none", []() { return std::variant<std::monostate, Copyable, int>(); });
     m.def("variant_unbound_type", [](std::variant<std::monostate, nb::list, nb::tuple, int> &x) { return x; },
           nb::arg("x") = nb::none());
+    m.def("variant_nondefault",
+          [](std::variant<NonDefaultConstructible, int> v) {
+              return v.index() == 0 ? std::get<0>(v).value : -std::get<1>(v);
+          });
 
     // ----- test50-test57 ------
     m.def("map_return_movable_value", [](){
@@ -439,17 +459,23 @@ NB_MODULE(test_stl_ext, m) {
     });
 
 
-    m.def("complex_value_float", [](const std::complex<float>& x){
+    m.def("complex_value_float", [](const std::complex<float>& x) {
         return x;
     });
-    m.def("complex_value_double", [](const std::complex<double>& x){
+    m.def("complex_value_float_nc", [](const std::complex<float>& x) {
+        return x;
+    }, nb::arg().noconvert());
+    m.def("complex_value_double", [](const std::complex<double>& x) {
         return x;
     });
+    m.def("complex_value_double_nc", [](const std::complex<double>& x) {
+        return x;
+    }, nb::arg().noconvert());
 
-    m.def("complex_array_float", [](const std::vector<std::complex<float>>& x){
+    m.def("complex_array_float", [](const std::vector<std::complex<float>>& x) {
         return x;
     });
-    m.def("complex_array_double", [](const std::vector<std::complex<double>>& x){
+    m.def("complex_array_double", [](const std::vector<std::complex<double>>& x) {
         return x;
     });
 
@@ -459,4 +485,47 @@ NB_MODULE(test_stl_ext, m) {
     m.def("vector_str", [](std::string& x){
         return x;
     });
+
+    m.def("vector_optional_str", [](const std::vector<std::optional<std::string>>& x) {
+        return x;
+    });
+
+    m.def("pass_wstr", [](std::wstring ws) { return ws; });
+
+    // uncomment to see compiler error:
+    // m.def("optional_intptr", [](std::optional<int*>) {});
+    m.def("optional_cstr", [](std::optional<const char*> arg) {
+        return arg.value_or("none");
+    }, nb::arg().none());
+
+
+    // test74
+    struct BasicID1 {
+        uint64_t id;
+        BasicID1(uint64_t id) : id(id) {}
+    };
+
+    struct BasicID2 {
+        uint64_t id;
+        BasicID2(uint64_t id) : id(id) {}
+    };
+
+    nb::class_<BasicID1>(m, "BasicID1")
+        .def(nb::init<uint64_t>())
+        .def("__int__", [](const BasicID1& x) { return x.id; })
+        ;
+
+    nb::class_<BasicID2>(m, "BasicID2")
+        .def(nb::init_implicit<uint64_t>());
+
+    using IDVariants = std::variant<std::monostate, BasicID2, BasicID1>;
+
+    struct IDHavingEvent {
+        IDVariants id;
+        IDHavingEvent() = default;
+    };
+
+    nb::class_<IDHavingEvent>(m, "IDHavingEvent")
+        .def(nb::init<>())
+        .def_rw("id", &IDHavingEvent::id);
 }

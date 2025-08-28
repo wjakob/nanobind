@@ -79,6 +79,8 @@ session:
    cd build
    python3
 
+(The default build output directory is different on Windows: use ``cd build\Debug`` and ``python`` instead of the above.)
+
 You should be able to import the extension and call the newly defined function ``my_ext.add()``.
 
 .. code-block:: pycon
@@ -310,7 +312,7 @@ Let's look at selected lines of this example, starting with the added include di
 
 .. code-block:: cpp
 
-   #include <nanobind/nanobind.h>
+   #include <nanobind/stl/string.h>
 
 nanobind has a minimal core and initially doesn't know how to deal with STL
 types like ``std::string``. This line imports a *type caster* that realizes a

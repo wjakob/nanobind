@@ -5,20 +5,20 @@
 Why another binding library?
 ============================
 
-I started the `pybind11 <http://github.com/pybind/pybind11>`_ project back in
+I started the `pybind11 <http://github.com/pybind/pybind11>`__ project back in
 2015 to generate better C++/Python bindings for a project I had been working
 on. Thanks to many amazing contributions by others, pybind11 has since become a
 core dependency of software used across the world including flagship projects
-like `PyTorch <https://pytorch.org>`_ and `Tensorflow
-<https://www.tensorflow.org>`_. Every day, it is downloaded over 400'000 times.
+like `PyTorch <https://pytorch.org>`__ and `Tensorflow
+<https://www.tensorflow.org>`__. Every day, it is downloaded over 400'000 times.
 Hundreds of contributed extensions and generalizations address use cases of
 this diverse audience. However, all of this success also came with costs: the
 complexity of the library grew tremendously, which had a negative impact on
 efficiency.
 
 Curiously, the situation now is reminiscent of 2015: binding generation with
-existing tools (`Boost.Python <https://github.com/boostorg/python>`_, `pybind11
-<http://github.com/pybind/pybind11>`_) is slow and produces enormous binaries
+existing tools (`Boost.Python <https://github.com/boostorg/python>`__, `pybind11
+<http://github.com/pybind/pybind11>`__) is slow and produces enormous binaries
 with overheads on runtime performance. At the same time, key improvements in
 C++17 and Python 3.8 provide opportunities for drastic simplifications.
 Therefore, I am starting *another* binding project. This time, the scope is
@@ -38,7 +38,7 @@ welcomed in pybind11, but they will likely be rejected in this project.
 An overview of removed features is provided in a :ref:`separate section
 <removed>`. Besides feature removal, the rewrite was also an opportunity to
 address :ref:`long-standing performance issues <perf_improvements>` and add a
-number of :ref:`major quality-of-live improvements <major_additions>` and
+number of :ref:`major quality-of-life improvements <major_additions>` and
 :ref:`smaller features <minor_additions>`.
 
 .. _perf_improvements:
@@ -63,11 +63,11 @@ performance improvements:
 - **Fast hash table**: nanobind upgrades several important internal
   associative data structures that previously used ``std::unordered_map`` to a
   more efficient alternative (`tsl::robin_map
-  <https://github.com/Tessil/robin-map>`_, which is included as a git
+  <https://github.com/Tessil/robin-map>`__, which is included as a git
   submodule).
 
 - **Vector calls**: function calls from/to Python are realized using `PEP 590
-  vector calls <https://www.python.org/dev/peps/pep-0590>`_, which gives a nice
+  vector calls <https://www.python.org/dev/peps/pep-0590>`__, which gives a nice
   speed boost. The main function dispatch loop no longer allocates heap memory.
 
 - **Library component**: pybind11 was designed as a header-only library, which
@@ -91,6 +91,13 @@ performance improvements:
   bottleneck. With nanobind's split into a precompiled library and minimal
   metatemplating, LTO is no longer crucial and can be skipped.
 
+- **Free-threading**: Python 3.13+ supports a free-threaded mode that removes
+  the *Global Interpreter Lock* (GIL). Both pybind11 and nanobind support
+  free-threading as of recently. When comparing the two, nanobind provides
+  better multi-core scaling using a localized locking scheme. In pybind11, lock
+  contention on a central ``internals`` data structure used in every binding
+  operation becomes a bottleneck in practice.
+
 - **Lifetime management**: nanobind maintains efficient internal data
   structures for lifetime management (needed for :cpp:class:`nb::keep_alive
   <keep_alive>`, :cpp:enumerator:`nb::rv_policy::reference_internal
@@ -103,18 +110,18 @@ performance improvements:
 Major additions
 ---------------
 
-nanobind includes a number of quality-of-live improvements for developers:
+nanobind includes a number of quality-of-life improvements for developers:
 
 - **N-dimensional arrays**: nanobind can exchange data with modern array programming
-  frameworks. It uses either `DLPack <https://github.com/dmlc/dlpack>`_ or the
-  `buffer protocol <https://docs.python.org/3/c-api/buffer.html>`_ to achieve
+  frameworks. It uses either `DLPack <https://github.com/dmlc/dlpack>`__ or the
+  `buffer protocol <https://docs.python.org/3/c-api/buffer.html>`__ to achieve
   *zero-copy* CPU/GPU array exchange with frameworks like `NumPy
-  <https://numpy.org>`_, `PyTorch <https://pytorch.org>`_, `TensorFlow
-  <https://www.tensorflow.org>`_, `JAX <https://jax.readthedocs.io>`_, etc. See
+  <https://numpy.org>`__, `PyTorch <https://pytorch.org>`__, `TensorFlow
+  <https://www.tensorflow.org>`__, `JAX <https://jax.readthedocs.io>`__, etc. See
   the :ref:`section on n-dimensional arrays <ndarrays>` for details.
 
 - **Stable ABI**: nanobind can target Python's `stable ABI interface
-  <https://docs.python.org/3/c-api/stable.html>`_ starting with Python 3.12.
+  <https://docs.python.org/3/c-api/stable.html>`__ starting with Python 3.12.
   This means that extension modules will be compatible with future version of
   Python without having to compile separate binaries per interpreter. That
   vision is still relatively far out, however: it will require Python 3.12+ to
@@ -129,6 +136,13 @@ nanobind includes a number of quality-of-live improvements for developers:
   `MyPy <https://github.com/python/mypy>`__, `PyRight
   <https://github.com/microsoft/pyright>`__ and `PyType
   <https://github.com/google/pytype>`__.
+
+- **Smart pointers, ownership, etc.**: corner cases in pybind11 related to
+  smart/unique pointers and callbacks could lead to undefined behavior. A later
+  pybind11 redesign (``smart_holder``) was able to address these problems, but
+  this came at the cost of further increased runtime overheads. The object
+  ownership model of nanobind avoids this undefined behavior without penalizing
+  runtime performance.
 
 - **Leak warnings**: When the Python interpreter shuts down, nanobind reports
   instance, type, and function leaks related to bindings, which is useful for
@@ -178,7 +192,7 @@ The following lists minor-but-useful additions relative to pybind11.
   <cast>` will create that Python object if it doesn't yet exist,
   :cpp:func:`nb::find() <find>` will return a ``nullptr`` object. This function
   is useful to interface with Python's :ref:`cyclic garbage collector
-  <cyclic_gc>`.
+  <fixing_refleaks>`.
 
 - **Parameterized wrappers**: The :cpp:class:`nb::handle_t\<T\> <handle_t>` type
   behaves just like the :cpp:class:`nb::handle <handle>` class and wraps a
@@ -225,3 +239,14 @@ The following lists minor-but-useful additions relative to pybind11.
   Please see the section on :ref:`customizing function signatures
   <typing_signature_functions>` and :ref:`class signatures
   <typing_signature_classes>` for further details.
+
+TLDR
+----
+
+My recommendation is that current pybind11 users look into migrating to
+nanobind. Fixing all the long-standing issues in pybind11 (see above list)
+would require a substantial redesign and years of careful work by a team of C++
+metaprogramming experts. At the same time, changing anything in pybind11 is
+extremely hard because of the large number of downstream users and their
+requirements on API/ABI stability. I personally don't have the time and
+energy to fix pybind11 and have moved my focus to this project.

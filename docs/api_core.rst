@@ -12,7 +12,7 @@ Macros
 
    This macro creates the entry point that will be invoked when the Python
    interpreter imports an extension module. The module name is given as the
-   fist argument and it should not be in quotes. It **must** match the module
+   first argument and it should not be in quotes. It **must** match the module
    name given to the :cmake:command:`nanobind_add_module()` function in the
    CMake build system.
 
@@ -359,7 +359,7 @@ Without reference counting
       Increases the reference count and returns a reference to the Python object.
       Never raises an exception.
 
-   .. cpp:function:: handle ref_ref() const noexcept
+   .. cpp:function:: handle dec_ref() const noexcept
 
       Decreases the reference count and returns a reference to the Python object.
       Never raises an exception.
@@ -480,10 +480,9 @@ With reference counting
 
    .. code-block:: cpp
 
-
        PyObject* list = ...;
        Py_ssize_t index = ...;
-       nb::object o = nb::borrow(PyList_GetItem(obj, index));
+       nb::object o = nb::borrow(PyList_GetItem(list, index));
 
    Using :cpp:func:`steal()` in this setting is incorrect and would lead to a
    reference underflow.
@@ -635,6 +634,10 @@ Type queries
    to convert the object to C++. It may be more efficient to just perform the
    conversion using :cpp:func:`cast` and catch potential raised exceptions.
 
+.. cpp:function:: isinstance(handle inst, handle cls)
+
+   Checks if the Python object `inst` is an instance of the Python type `cls`.
+
 .. cpp:function:: template <typename T> handle type() noexcept
 
    Returns the Python type object associated with the C++ type `T`. When the
@@ -653,9 +656,8 @@ Wrapper classes
    Wrapper class representing Python ``tuple`` instances.
 
    Use the standard ``operator[]`` C++ operator with an integer argument to
-   read tuple elements (the bindings for this operator are provided by the
-   parent class and not listed here). Once created, the set is immutable and
-   its elements cannot be replaced.
+   read tuple elements.
+   Once created, the tuple is immutable and its elements cannot be replaced.
 
    Use the :py:func:`make_tuple` function to create new tuples.
 
@@ -671,6 +673,10 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the number of tuple elements.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the tuple is empty.
 
    .. cpp:function:: detail::fast_iterator begin() const
 
@@ -697,8 +703,7 @@ Wrapper classes
    Wrapper class representing Python ``list`` instances.
 
    Use the standard ``operator[]`` C++ operator with an integer argument to
-   read and write list elements (the bindings for this operator are provided by
-   the parent class and not listed here).
+   read and write list elements.
 
    Use the :cpp:func:`nb::del <del>` function to remove elements.
 
@@ -715,6 +720,10 @@ Wrapper classes
 
       Return the number of list elements.
 
+   .. cpp:function:: bool empty() const
+
+      Check whether the list is empty.
+
    .. cpp:function:: template <typename T> void append(T&& value)
 
       Append an element to the list. When `T` does not already represent a
@@ -725,6 +734,22 @@ Wrapper classes
       Insert an element to the list (at index ``index``, which may also be
       negative). When `T` does not already represent a wrapped Python object,
       the function performs a cast.
+
+   .. cpp:function:: void clear()
+
+      Clear the list entries.
+
+   .. cpp:function:: void extend(handle h)
+
+      Analogous to the ``.extend(h)`` method of ``list`` in Python.
+
+   .. cpp:function:: void sort()
+
+      Analogous to the ``.sort()`` method of ``list`` in Python.
+
+   .. cpp:function:: void reverse()
+
+      Analogous to the ``.reverse()`` method of ``list`` in Python.
 
    .. cpp:function:: template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1> detail::accessor<num_item_list> operator[](T key) const
 
@@ -764,6 +789,10 @@ Wrapper classes
 
       Return the number of dictionary elements.
 
+   .. cpp:function:: bool empty() const
+
+      Check whether the dictionary is empty.
+
    .. cpp:function:: template <typename T> bool contains(T&& key) const
 
       Check whether the dictionary contains a particular key. When `T` does not
@@ -773,6 +802,10 @@ Wrapper classes
 
       Return an item iterator that returns ``std::pair<handle, handle>``
       key-value pairs analogous to ``iter(dict.items())`` in Python.
+
+      In free-threaded Python, the :cpp:class:``detail::dict_iterator`` class
+      acquires a lock to the underlying dictionary to enable the use of the
+      efficient but thread-unsafe ``PyDict_Next()`` Python C traversal routine.
 
    .. cpp:function:: detail::dict_iterator end() const
 
@@ -794,6 +827,21 @@ Wrapper classes
 
       Clear the contents of the dictionary.
 
+   .. cpp:function:: void update(handle h)
+
+      Analogous to the ``.update(h)`` method of ``dict`` in Python.
+
+   .. cpp:function:: object get(handle key, handle def)
+
+      Analogous to ``.get(key, def)`` method of ``dict`` in Python with a
+      fallback value ``def``. This is more efficient than checking the presence
+      of ``.contains(key)`` first, or using ``operator[]`` and catching a
+      potential exceptions.
+
+   .. cpp:function:: object get(const char * key, handle def)
+
+      Overload of the above method that takes a C-string as key.
+
 .. cpp:class:: set: public object
 
    Wrapper class representing Python ``set`` instances.
@@ -802,9 +850,18 @@ Wrapper classes
 
       Create an empty set
 
+   .. cpp:function:: set(handle h)
+
+      Attempt to convert a given Python object into a set. Analogous to the
+      expression ``set(h)`` in Python.
+
    .. cpp:function:: size_t size() const
 
       Return the number of set elements.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the set is empty.
 
    .. cpp:function:: template <typename T> void add(T&& key)
 
@@ -818,7 +875,40 @@ Wrapper classes
 
    .. cpp:function:: void clear()
 
-      Clear the contents of the set
+      Clear the contents of the set.
+
+   .. cpp:function:: template <typename T> bool discard(T&& key)
+
+      Analogous to the ``.discard(h)`` method of the ``set`` type in Python.
+      Returns ``true`` if the item was deleted successfully, and ``false`` if
+      the value was not present. When `T` does not already represent a wrapped
+      Python object, the function performs a cast.
+
+.. cpp:class:: frozenset: public object
+
+   Wrapper class representing Python ``frozenset`` instances.
+
+   .. cpp:function:: frozenset()
+
+      Create an empty frozenset.
+
+   .. cpp:function:: frozenset(handle h)
+
+      Attempt to convert a given Python object into a ``frozenset``. Analogous
+      to the expression ``frozenset(h)`` in Python.
+
+   .. cpp:function:: size_t size() const
+
+      Return the number of set elements.
+
+   .. cpp:function:: bool empty() const
+
+      Check whether the set is empty.
+
+   .. cpp:function:: template <typename T> bool contains(T&& key) const
+
+      Check whether the set contains a particular key. When `T` does not
+      already represent a wrapped Python object, the function performs a cast.
 
 .. cpp:class:: module_: public object
 
@@ -859,6 +949,12 @@ Wrapper classes
          nb::module_ np = nb::module_::import_("numpy");
          nb::object np_array = np.attr("array");
 
+   .. cpp:function:: module_ import_(handle name)
+
+      Import the Python module with the specified name and return a reference
+      to it. In contrast to the version above, this function expects a Python
+      object as key.
+
    .. cpp:function:: module_ def_submodule(const char * name, const char * doc = nullptr)
 
       Create a Python submodule within an existing module and return a
@@ -897,12 +993,17 @@ Wrapper classes
 
       Return the pointer wrapped by the capsule.
 
+   .. cpp:function:: void * data(const char *name) const
+
+      Return the pointer wrapped by the capsule. Check that the
+      capsule name matches the specified value, or raise an exception.
+
 
 .. cpp:class:: bool_: public object
 
    This wrapper class represents Python ``bool`` instances.
 
-   .. cpp:function:: int_(handle h)
+   .. cpp:function:: bool_(handle h)
 
       Performs a boolean cast within Python. This is equivalent to the Python
       expression ``bool(h)``.
@@ -970,6 +1071,12 @@ Wrapper classes
 
       Convert a C-style string in UTF-8 encoding of length ``n`` bytes into a Python string.
 
+      There is a user-defined string literal ``_s`` accessible in the
+      ``nanobind::literals`` namespace::
+
+            using namespace nanobind::literals;
+            auto s = "Hello world!"_s; // equivalent to str("Hello world!")
+
    .. cpp:function:: const char * c_str() const
 
       Convert a Python string into a null-terminated C-style string with UTF-8
@@ -990,16 +1097,16 @@ Wrapper classes
 
    .. cpp:function:: bytes(handle h)
 
-      Performs a cast within Python. This is equivalent equivalent to
+      Performs a cast within Python. This is equivalent to
       the Python expression ``bytes(h)``.
 
    .. cpp:function:: bytes(const char * s)
 
       Convert a null-terminated C-style string encoding into a Python ``bytes`` object.
 
-   .. cpp:function:: bytes(const char * s, size_t n)
+   .. cpp:function:: bytes(const void * buf, size_t n)
 
-      Convert a null-terminated C-style string encoding of length ``n`` bytes into a Python ``bytes`` object.
+      Convert a byte buffer ``buf`` of length ``n`` bytes into a Python ``bytes`` object.  The buffer can contain embedded null bytes.
 
    .. cpp:function:: const char * c_str() const
 
@@ -1008,6 +1115,51 @@ Wrapper classes
    .. cpp:function:: size_t size() const
 
       Return the size in bytes.
+
+   .. cpp:function:: const void * data() const
+
+      Convert a Python ``bytes`` object into a byte buffer of length :cpp:func:`bytes::size()` bytes.
+
+
+.. cpp:class:: bytearray: public object
+
+   This wrapper class represents Python ``bytearray`` instances.
+
+   .. cpp:function:: bytearray()
+
+      Create an empty ``bytearray``.
+
+   .. cpp:function:: bytearray(handle h)
+
+      Performs a cast within Python. This is equivalent to
+      the Python expression ``bytearray(h)``.
+
+   .. cpp:function:: bytearray(const void * buf, size_t n)
+
+      Convert a byte buffer ``buf`` of length ``n`` bytes into a Python ``bytearray`` object.  The buffer can contain embedded null bytes.
+
+   .. cpp:function:: const char * c_str() const
+
+      Convert a Python ``bytearray`` object into a null-terminated C-style string.
+
+   .. cpp:function:: size_t size() const
+
+      Return the size in bytes.
+
+   .. cpp:function:: void * data()
+
+      Convert a Python ``bytearray`` object into a byte buffer of length :cpp:func:`bytearray::size()` bytes.
+
+   .. cpp:function:: const void * data() const
+
+      Convert a Python ``bytearray`` object into a byte buffer of length :cpp:func:`bytearray::size()` bytes.
+
+   .. cpp:function:: void resize(size_t n)
+
+      Resize the internal buffer of a Python ``bytearray`` object to ``n``. Any
+      space added by this method, which calls `PyByteArray_Resize`, will not be
+      initialized and may contain random data.
+
 
 .. cpp:class:: type_object: public object
 
@@ -1100,8 +1252,21 @@ Wrapper classes
 
    .. cpp:function:: detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const
 
-      Adjust the slice to the `size` value of a given container. Returns a tuple containing
-      ``(start, stop, step, slice_length)``.
+      Compute a slice adjusted to the `size` value of a given container.
+      Returns a tuple containing ``(start, stop, step, slice_length)``.
+      The elements of the tuple can be obtained using a structured binding or
+      by using the templated ``get`` member function of ``nb::detail::tuple``.
+      For example:
+
+      .. code-block:: cpp
+
+          m.def("func", [](nb::slice slc) {
+              auto [start, stop, step, slice_length] = slc.compute(17);
+              // Or, if only the computed slice_length is needed:
+              auto tpl = slc.compute(42);
+              std::size_t adjusted_slice_length = tpl.get<3>();
+              // Now do something ...
+          });
 
 .. cpp:class:: ellipsis: public object
 
@@ -1146,6 +1311,24 @@ Wrapper classes
    end, this type is interchangeable with :py:class:`object`. The only
    difference is the type signature when used in function arguments and return
    values.
+
+.. cpp:class:: fallback : public object
+
+   Instances of this wrapper class behave just like :cpp:class:`handle`. When
+   used to pass arguments in function bindings, the associated arguments
+   *require* implicit conversion (which, however, adds no runtime cost).
+
+   The type is convenient in overload chains where a generic fallback should
+   accept any Python object, e.g.,
+
+   .. code-block:: cpp
+
+      m.def("func", [](MyClass &arg) { ... });
+      m.def("func", [](nb::fallback arg) { ... });
+
+   If :cpp:class:`handle` or :cpp:class:`object` were used instead on the
+   second line, they would always match and prevent potential implicit
+   conversion of arguments to `MyClass`.
 
 Parameterized wrapper classes
 -----------------------------
@@ -1288,12 +1471,12 @@ the reference section on :ref:`class binding <class_binding>`.
    overlapping or identical input types (e.g. :cpp:class:`object`) and must run
    code at runtime to select the right overload.
 
-   You should probably write a thorough docstring explicing the expected inputs
-   in this case, since the behavior won't be obvious from the auto-generated
-   function signature list in the docstring. It can be frustrating when a
-   function call fails with an error message stating that the provided
-   arguments aren't compatible with any overload, when the associated error
-   message suggests otherwise.
+   You should probably write a thorough docstring that explicitly mentions the
+   expected inputs in this case, since the behavior won't be obvious from the
+   auto-generated function signature. It can be frustrating when a function
+   call fails with an error message stating that the provided arguments aren't
+   compatible with any overload, when the associated error message suggests
+   otherwise.
 
    .. cpp:function:: next_overload()
 
@@ -1308,49 +1491,49 @@ the reference section on :ref:`class binding <class_binding>`.
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``StopIteration`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception index_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``IndexError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception key_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``KeyError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception value_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``ValueError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception type_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``TypeError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception buffer_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``BufferError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception import_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``ImportError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: builtin_exception attribute_error(const char * what = nullptr)
 
    Convenience wrapper to create a :cpp:class:`builtin_exception` C++ exception
    instance that nanobind will re-raise as a Python ``AttributeError`` exception
-   boundary. when it crosses the C++ ↔ Python interface.
+   when it crosses the C++ ↔ Python interface.
 
 .. cpp:function:: void register_exception_translator(void (* exception_translator)(const std::exception_ptr &, void*), void * payload = nullptr)
 
@@ -1451,6 +1634,15 @@ Casting
 
    The function raises a :cpp:type:`cast_error` when the conversion fails.
 
+.. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy, handle parent)
+
+   Convert the C++ object ``value`` into a Python object. The return value
+   policy `policy` is used to handle ownership-related questions when a new
+   Python object must be created. A valid `parent` object is required when
+   specifying a `reference_internal` return value policy.
+
+   The function raises a :cpp:type:`cast_error` when the conversion fails.
+
 .. cpp:function:: template <typename T> object find(const T &value) noexcept
 
    Return the Python object associated with the C++ instance `value`. When no
@@ -1501,7 +1693,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    Function argument annotation to enable keyword-based calling, default
    arguments, passing ``None``, and implicit conversion hints. Note that when a
-   function argument should be annotated, you *must* specify annotations for
+   function argument should be annotated, you *must* specify annotations for all
    arguments of that function.
 
    Example use:
@@ -1528,7 +1720,9 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    .. cpp:function:: template <typename T> arg_v operator=(T &&value) const
 
-      Assign a default value to the argument.
+      Return an argument annotation that is like this one but also assigns a
+      default value to the argument. The default will be converted into a Python
+      object immediately, so its bindings must have already been defined.
 
    .. cpp:function:: arg &none(bool value = true)
 
@@ -1550,6 +1744,12 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       explain it in docstrings and stubs (``str(value)``) does not produce
       acceptable output.
 
+   .. cpp:function:: arg_locked lock()
+
+      Return an argument annotation that is like this one but also requests that
+      this argument be locked when dispatching a function call in free-threaded
+      Python extensions. It does nothing in regular GIL-protected extensions.
+
 .. cpp:struct:: is_method
 
    Indicate that the bound function is a method.
@@ -1567,6 +1767,12 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 .. cpp:struct:: is_implicit
 
    Indicate that the bound constructor can be used to perform implicit conversions.
+
+.. cpp:struct:: lock_self
+
+   Indicate that the implicit ``self`` argument of a method should be locked
+   when dispatching a call in a free-threaded extension. This annotation does
+   nothing in regular GIL-protected extensions.
 
 .. cpp:struct:: template <typename... Ts> call_guard
 
@@ -1588,11 +1794,11 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
    The annotation has the following runtime characteristics:
 
-    - It does nothing when the nurse or patient object are ``None``.
+   - It does nothing when the nurse or patient object are ``None``.
 
-    - It raises an exception when the nurse object is neither
-      weak-referenceable nor an instance of a binding created via
-      :cpp:class:`nb::class_\<..\> <class_>`.
+   - It raises an exception when the nurse object is neither
+     weak-referenceable nor an instance of a binding created via
+     :cpp:class:`nb::class_\<..\> <class_>`.
 
    Two additional caveats regarding :cpp:class:`keep_alive <keep_alive>` are
    noteworthy:
@@ -1779,7 +1985,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
    .. code-block:: cpp
 
       nb::class_<MyClass>(m, "MyClass")
-        .def_rw("value", &MyClass::value,
+        .def_prop_rw("value", &MyClass::value,
                 nb::for_getter(nb::sig("def value(self, /) -> int")),
                 nb::for_setter(nb::sig("def value(self, value: int, /) -> None")),
                 nb::for_getter("docstring for getter"),
@@ -1787,9 +1993,118 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
 .. cpp:struct:: template <typename T> for_setter
 
-
    Analogous to :cpp:struct:`for_getter`, but for setters.
 
+.. cpp:struct:: template <typename Policy> call_policy
+
+   Request that custom logic be inserted around each call to the
+   bound function, by calling ``Policy::precall(args, nargs, cleanup)`` before
+   Python-to-C++ argument conversion, and ``Policy::postcall(args, nargs, ret)``
+   after C++-to-Python return value conversion.
+
+   If multiple call policy annotations are provided for the same function, then
+   their precall and postcall hooks will both execute left-to-right according
+   to the order in which the annotations were specified when binding the
+   function.
+
+   The :cpp:struct:`nb::call_guard\<T\>() <call_guard>` annotation
+   should be preferred over ``call_policy`` unless the wrapper logic
+   depends on the function arguments or return value.
+   If both annotations are combined, then
+   :cpp:struct:`nb::call_guard\<T\>() <call_guard>` always executes on
+   the "inside" (closest to the bound function, after argument
+   conversions and before return value conversion) regardless of its
+   position in the function annotations list.
+
+   Your ``Policy`` class must define two static member functions:
+
+   .. cpp:function:: static void precall(PyObject **args, size_t nargs, detail::cleanup_list *cleanup);
+
+      A hook that will be invoked before calling the bound function. More
+      precisely, it is called after any :ref:`argument locks <argument-locks>`
+      have been obtained, but before the Python arguments are converted to C++
+      objects for the function call.
+
+      This hook may access or modify the function arguments using the
+      *args* array, which holds borrowed references in one-to-one
+      correspondence with the C++ arguments of the bound function.  If
+      the bound function is a method, then ``args[0]`` is its *self*
+      argument. *nargs* is the number of function arguments. It is actually
+      passed as ``std::integral_constant<size_t, N>()``, so you can
+      match on that type if you want to do compile-time checks with it.
+
+      The *cleanup* list may be used as it is used in type casters,
+      to cause some Python object references to be released at some point
+      after the bound function completes. (If the bound function is part
+      of an overload set, the cleanup list isn't released until all overloads
+      have been tried.)
+
+      ``precall()`` may choose to throw a C++ exception. If it does,
+      it will preempt execution of the bound function, and the
+      exception will be treated as if the bound function had thrown it.
+
+   .. cpp:function:: static void postcall(PyObject **args, size_t nargs, handle ret);
+
+      A hook that will be invoked after calling the bound function and
+      converting its return value to a Python object, but only if the
+      bound function returned normally.
+
+      *args* stores the Python object arguments, with the same semantics
+      as in ``precall()``, except that arguments that participated in
+      implicit conversions will have had their ``args[i]`` pointer updated
+      to reflect the new Python object that the implicit conversion produced.
+      *nargs* is the number of arguments, passed as a ``std::integral_constant``
+      in the same way as for ``precall()``.
+
+      *ret* is the bound function's return value. If the bound function returned
+      normally but its C++ return value could not be converted to a Python
+      object, then ``postcall()`` will execute with *ret* set to null,
+      and the Python error indicator might or might not be set to explain why.
+
+      If the bound function did not return normally -- either because its
+      Python object arguments couldn't be converted to the appropriate C++
+      types, or because the C++ function threw an exception -- then
+      ``postcall()`` **will not execute**. If you need some cleanup logic to
+      run even in such cases, your ``precall()`` can add a capsule object to the
+      cleanup list; its destructor will run eventually, but with no promises
+      as to when. A :cpp:struct:`nb::call_guard <call_guard>` might be a
+      better choice.
+
+      ``postcall()`` may choose to throw a C++ exception. If it does,
+      the result of the wrapped function will be destroyed,
+      and the exception will be raised in its place, as if the bound function
+      had thrown it just before returning.
+
+   Here is an example policy to demonstrate.
+   ``nb::call_policy<returns_references_to<I>>()`` behaves like
+   :cpp:class:`nb::keep_alive\<0, I\>() <keep_alive>`, except that the
+   return value is a treated as a list of objects rather than a single one.
+
+   .. code-block:: cpp
+
+      template <size_t I>
+      struct returns_references_to {
+          static void precall(PyObject **, size_t, nb::detail::cleanup_list *) {}
+
+          template <size_t N>
+          static void postcall(PyObject **args,
+                               std::integral_constant<size_t, N>,
+                               nb::handle ret) {
+              static_assert(I > 0 && I <= N,
+                            "I in returns_references_to<I> must be in the "
+                            "range [1, number of C++ function arguments]");
+              if (!nb::isinstance<nb::sequence>(ret)) {
+                  throw std::runtime_error("return value should be a sequence");
+              }
+              for (nb::handle nurse : ret) {
+                  nb::detail::keep_alive(nurse.ptr(), args[I - 1]);
+              }
+          }
+      };
+
+   For a more complex example (binding an object that uses trivially-copyable
+   callbacks), see ``tests/test_callbacks.cpp`` in the nanobind source
+   distribution.
 
 .. _class_binding_annotations:
 
@@ -1851,24 +2166,6 @@ declarations in generated :ref:`stubs <stubs>`,
    zero-initialized ``PyType_Slot`` element. See :ref:`Customizing type creation
    <typeslots>` for more information about this feature.
 
-.. cpp:struct:: type_slots_callback
-
-   .. cpp:function:: type_slots_callback(void (* callback)(detail::type_init_data * , PyType_Slot * &slots, size_t max_slots) noexcept)
-
-   This is an alternative to `type_slots` that provides a callback
-   which will be invoked during type creation to populate the type's
-   list of slots. It is used by `enum_`. It can be used in addition to
-   the `type_slots` annotation; if both are provided,
-   `type_slots_callback` runs first (so `type_slots` can override its choices).
-
-   The callback should execute ``*slots++ = {Py_tp_foo, (void *) handle_foo};``
-   at most *max_slots* times.
-
-   Information about the type under construction is available via the first
-   parameter received by the callback, but be aware that this is an internal
-   type which is not subject to nanobind's usual semantic versioning guarantees.
-   See ``include/nanobind/nb_class.h`` for more details.
-
 .. cpp:struct:: template <typename T> intrusive_ptr
 
    nanobind provides a custom interface for intrusive reference-counted C++
@@ -1889,20 +2186,36 @@ Enum binding annotations
 
 The following annotations can be specified using the variable-length
 ``Extra`` parameter of the constructor :cpp:func:`enum_::enum_`.
-Enums also support the :cpp:struct:`dynamic_attr` and
-:cpp:struct:`type_slots` annotations
-documented for :ref:`classes <class_binding_annotations>`.
 
 .. cpp:struct:: is_arithmetic
 
-   Indicate that the enumeration may be used with arithmetic
-   operations.  This enables the binary operators ``+ - * // & | ^ <<
-   >>`` and unary ``- ~ abs()``, with operands of either enumeration
-   or numeric type; the result will be as if the enumeration operands
-   were first converted to integers. (So ``Shape(2) + Shape(1) == 3`` and
-   ``Shape(2) * 1.5 == 3.0``.) It is unspecified whether operations on
-   mixed enum types (such as ``Shape.Circle + Color.Red``) are
-   permissible.
+   Indicate that the enumeration supports arithmetic operations.  This enables
+   both unary (``-``, ``~``, ``abs()``) and binary (``+``, ``-``, ``*``,
+   ``//``, ``&``, ``|``, ``^``, ``<<``, ``>>``) operations with operands of
+   either enumeration or numeric types.
+
+   The result will be as if the operands were first converted to integers. (So
+   ``Shape(2) + Shape(1) == 3`` and ``Shape(2) * 1.5 == 3.0``.) It is
+   unspecified whether operations on mixed enum types (such as ``Shape.Circle +
+   Color.Red``) are permissible.
+
+   Passing this annotation changes the Python enumeration parent class to
+   either :py:class:`enum.IntEnum` or :py:class:`enum.IntFlag`, depending on
+   whether or not the flag enumeration attribute is also specified (see
+   :cpp:class:`is_flag`).
+
+.. cpp:struct:: is_flag
+
+   Indicate that the enumeration supports bit-wise operations.  This enables the
+   operators (``|``, ``&``, ``^``, and ``~``) with two enumerators as operands.
+
+   The result has the same type as the operands, i.e., ``Shape(2) | Shape(1)``
+   will be equivalent to ``Shape(3)``.
+
+   Passing this annotation changes the Python enumeration parent class to
+   either :py:class:`enum.IntFlag` or :py:class:`enum.Flag`, depending on
+   whether or not the enumeration is also marked to support arithmetic
+   operations (see :cpp:class:`is_arithmetic`).
 
 Function binding
 ----------------
@@ -1931,7 +2244,7 @@ Class binding
    classes <trampolines>`.
 
    When the type ``T`` was previously already registered (either within the
-   same extension or another extension), the the ``class_<..>`` declaration is
+   same extension or another extension), the ``class_<..>`` declaration is
    redundant. nanobind will print a warning message in this case:
 
    .. code-block:: text
@@ -1968,13 +2281,13 @@ Class binding
              .def(nb::init<>()) // Bind the default constructor
              .def("f", &A::f);  // Bind the method A::f
 
-   .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> init, const Extra &... extra)
+   .. cpp:function:: template <typename... Args, typename... Extra> class_ &def(init<Args...> arg, const Extra &... extra)
 
       Bind a constructor. The variable length `extra` parameter can be used to
       pass a docstring and other :ref:`function binding annotations
       <function_binding_annotations>`.
 
-   .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> init, const Extra &... extra)
+   .. cpp:function:: template <typename Arg, typename... Extra> class_ &def(init_implicit<Arg> arg, const Extra &... extra)
 
       Bind a constructor that may be used for implicit type conversions. The
       constructor must take a single argument of an unspecified type `Arg`.
@@ -1988,6 +2301,20 @@ Class binding
 
       This constructor generates more compact code than a separate call to
       :cpp:func:`implicitly_convertible`, but is otherwise equivalent.
+
+   .. cpp:function:: template <typename Func, typename... Extra> class_ &def(new_<Func> arg, const Extra &... extra)
+
+      Bind a C++ factory function as a Python object constructor (``__new__``).
+      This is an advanced feature; prefer :cpp:struct:`nb::init\<..\> <init>`
+      where possible. See the discussion of :ref:`customizing object creation
+      <custom_new>` for more details.
+
+   .. cpp:function:: template <typename Visitor, typename... Extra> class_ &def(def_visitor<Visitor> arg, const Extra &... extra)
+
+      Dispatch to custom user-provided binding logic implemented by the type
+      ``Visitor``, passing it the binding annotations ``extra...``.
+      See the documentation of :cpp:struct:`nb::def_visitor\<..\> <def_visitor>`
+      for details.
 
    .. cpp:function:: template <typename C, typename D, typename... Extra> class_ &def_rw(const char * name, D C::* p, const Extra &...extra)
 
@@ -2257,7 +2584,7 @@ Class binding
    .. cpp:function:: template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra> class_ &def(const detail::op_<id, ot, L, R> &op, const Extra&... extra)
 
       This interface provides convenient syntax sugar to replace relatively
-      length method bindings with shorter operator bindings. To use it, you
+      lengthy method bindings with shorter operator bindings. To use it, you
       will need an extra include directive:
 
       .. code-block:: cpp
@@ -2303,7 +2630,7 @@ Class binding
       Bind the enumeration of type `T` to the identifier `name` within the
       scope `scope`. The variable length `extra` parameter can be used to pass
       a docstring and other :ref:`enum binding annotations
-      <enum_binding_annotations>` such as :cpp:class:`is_arithmetic`.
+      <enum_binding_annotations>` (currently, only :cpp:class:`is_arithmetic` is supported).
 
    .. cpp:function:: enum_ &value(const char * name, T value, const char * doc = nullptr)
 
@@ -2362,7 +2689,7 @@ Class binding
 
 .. cpp:struct:: template <typename Arg> init_implicit
 
-   See :cpp:class:`init` for detail on binding constructorts. The main
+   See :cpp:class:`init` for detail on binding constructors. The main
    difference between :cpp:class:`init`  and `init_implicit` is that the latter
    only supports constructors taking a single argument `Arg`, and that it marks
    the constructor as usable for implicit conversions from `Arg`.
@@ -2374,7 +2701,7 @@ Class binding
    .. code-block:: cpp
 
       nb::class_<MyType>(m, "MyType")
-          .def(nb::init_implicit<const char*, int>());
+          .def(nb::init_implicit<const char*>());
 
    can be replaced by the lower-level code
 
@@ -2387,6 +2714,79 @@ Class binding
                 });
 
        nb::implicitly_convertible<const char*, MyType>();
+
+.. cpp:struct:: template <typename Func> new_
+
+   This is a small helper class that indicates to :cpp:func:`class_::def()`
+   that a particular lambda or static method provides a Python object
+   constructor (``__new__``) for the class being bound. Normally, you would
+   use :cpp:class:`init` instead if possible, in order to cooperate with
+   nanobind's usual object creation process. Using :cpp:class:`new_`
+   replaces that process entirely. This is principally useful when some
+   C++ type of interest can only provide pointers to its instances,
+   rather than allowing them to be constructed directly.
+
+   Like :cpp:class:`init`, the only use of a :cpp:class:`new_` object is
+   as an argument to :cpp:func:`class_::def()`.
+
+   Example use:
+
+   .. code-block:: cpp
+
+      class MyType {
+      private:
+          MyType();
+      public:
+          static std::shared_ptr<MyType> create();
+          int value = 0;
+      };
+
+      nb::class_<MyType>(m, "MyType")
+          .def(nb::new_(&MyType::create));
+
+   Given this example code, writing ``MyType()`` in Python would
+   produce a Python object wrapping the result of ``MyType::create()``
+   in C++. If multiple calls to ``create()`` return pointers to the
+   same C++ object, these will turn into references to the same Python
+   object as well.
+
+   See the discussion of :ref:`customizing Python object creation <custom_new>`
+   for more information.
+
+.. cpp:struct:: template <typename Visitor> def_visitor
+
+   An empty base object which serves as a tag to allow :cpp:func:`class_::def()`
+   to dispatch to custom logic implemented by the type ``Visitor``. This is the
+   same mechanism used by :cpp:class:`init`, :cpp:class:`init_implicit`, and
+   :cpp:class:`new_`; it's exposed publicly so that you can create your own
+   reusable abstractions for binding logic.
+
+   To define a ``def_visitor``, you would write something like:
+
+   .. code-block:: cpp
+
+      struct my_ops : nb::def_visitor<my_ops> {
+          template <typename Class, typename... Extra>
+          void execute(Class &cl, const Extra&... extra) {
+              /* series of def() statements on `cl`, which is a nb::class_ */
+          }
+      };
+
+   Then use it like:
+
+   .. code-block:: cpp
+
+      nb::class_<MyType>(m, "MyType")
+          .def("some_method", &MyType::some_method)
+          .def(my_ops())
+          ... ;
+
+   Any arguments to :cpp:func:`class_::def()` after the ``def_visitor`` object
+   get passed through as the ``Extra...`` parameters to ``execute()``.
+   As with any other C++ object, data needed by the ``def_visitor`` can be passed
+   through template arguments or ordinary constructor arguments.
+   The ``execute()`` method may be static if it doesn't need to access anything
+   in ``*this``.
 
 
 GIL Management
@@ -2421,16 +2821,109 @@ running it in parallel from multiple Python threads.
 
       Release the GIL (**must** be currently held)
 
+      In :ref:`free-threaded extensions <free-threaded>`, this operation also
+      temporarily releases all :ref:`argument locks <argument-locks>` held by
+      the current thread.
+
    .. cpp:function:: ~gil_scoped_release()
 
       Reacquire the GIL
+
+Free-threading
+--------------
+
+Nanobind provides abstractions to implement *additional* locking that is
+needed to ensure the correctness of free-threaded Python extensions.
+
+.. cpp:struct:: ft_mutex
+
+   Object-oriented wrapper representing a `PyMutex
+   <https://docs.python.org/3.13/c-api/init.html#c.PyMutex>`__. It can be
+   slightly more efficient than OS/language-provided primitives (e.g.,
+   ``std::thread``, ``pthread_mutex_t``) and should generally be preferred when
+   adding critical sections to Python bindings.
+
+   In Python builds *without* free-threading, this class does nothing. It has
+   no attributes and the :cpp:func:`lock` and :cpp:func:`unlock` functions
+   return immediately.
+
+   .. cpp:function:: ft_mutex()
+
+      Create a new (unlocked) mutex.
+
+   .. cpp:function:: void lock()
+
+      Acquire the mutex.
+
+   .. cpp:function:: void unlock()
+
+      Release the mutex.
+
+.. cpp:struct:: ft_lock_guard
+
+   This class provides a RAII lock guard analogous to ``std::lock_guard`` and
+   ``std::unique_lock``.
+
+   .. cpp:function:: ft_lock_guard(ft_mutex &mutex)
+
+      Call :cpp:func:`mutex.lock() <ft_mutex::lock>` (no-op in non-free-threaded builds).
+
+   .. cpp:function:: ~ft_lock_guard()
+
+      Call :cpp:func:`mutex.unlock() <ft_mutex::unlock>` (no-op in non-free-threaded builds).
+
+.. cpp:struct:: ft_object_guard
+
+   This class provides a RAII guard that locks a single Python object within a
+   local scope (in contrast to :cpp:class:`ft_lock_guard`, which locks a
+   mutex).
+
+   It is a thin wrapper around the Python `critical section API
+   <https://docs.python.org/3.13/c-api/init.html#c.Py_BEGIN_CRITICAL_SECTION>`__.
+   Please refer to the Python documentation for details on the semantics of
+   this relaxed form of critical section (in particular, Python critical sections
+   may release previously held locks).
+
+   In Python builds *without* free-threading, this class does nothing---the
+   constructor and destructor return immediately.
+
+   .. cpp:function:: ft_object_guard(handle h)
+
+      Lock the object ``h`` (no-op in non-free-threaded builds)
+
+   .. cpp:function:: ~ft_object_guard()
+
+      Unlock the object ``h`` (no-op in non-free-threaded builds)
+
+.. cpp:struct:: ft_object2_guard
+
+   This class provides a RAII guard that locks *two* Python object within a
+   local scope (in contrast to :cpp:class:`ft_lock_guard`, which locks a
+   mutex).
+
+   It is a thin wrapper around the Python `critical section API
+   <https://docs.python.org/3.13/c-api/init.html#c.Py_BEGIN_CRITICAL_SECTION2>`__.
+   Please refer to the Python documentation for details on the semantics of
+   this relaxed form of critical section (in particular, Python critical sections
+   may release previously held locks).
+
+   In Python builds *without* free-threading, this class does nothing---the
+   constructor and destructor return immediately.
+
+   .. cpp:function:: ft_object2_guard(handle h1, handle h2)
+
+      Lock the objects ``h1`` and ``h2`` (no-op in non-free-threaded builds)
+
+   .. cpp:function:: ~ft_object2_guard()
+
+      Unlock the objects ``h1`` and ``h2`` (no-op in non-free-threaded builds)
 
 Low-level type and instance access
 ----------------------------------
 
 nanobind exposes a low-level interface to provide fine-grained control over
 the sequence of steps that instantiates a Python object wrapping a C++
-instance. An thorough explanation of these features is provided in a
+instance. A thorough explanation of these features is provided in a
 :ref:`separate section <lowlevel>`.
 
 Type objects
@@ -2586,17 +3079,13 @@ The documentation below refers to two per-instance flags with the following mean
    :cpp:func:`inst_set_state` to disable the flag following the call to
    :cpp:func:`inst_copy`.
 
+   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
+   refer to the same object.
+
 .. cpp:function:: void inst_move(handle dst, handle src)
 
-   Move-construct the contents of `src` into `dst` and set the *ready* and
-   *destruct* flags of `dst` to ``true``.
-
-   `dst` should be an uninitialized instance of the same type. Note that
-   setting the *destruct* flag may be problematic if `dst` is an offset into an
-   existing object created using :cpp:func:`inst_reference` (the destructor
-   will be called multiple times in this case). If so, you must use
-   :cpp:func:`inst_set_state` to disable the flag following the call to
-   :cpp:func:`inst_move`.
+   Analogous to :cpp:func:`inst_copy`, except that the move constructor
+   is used instead of the copy constructor.
 
 .. cpp:function:: void inst_replace_copy(handle dst, handle src)
 
@@ -2610,10 +3099,13 @@ The documentation below refers to two per-instance flags with the following mean
    :cpp:func:`inst_alloc`, :cpp:func:`inst_reference`, or
    :cpp:func:`inst_take_ownership`.
 
+   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
+   refer to the same object.
+
 .. cpp:function:: void inst_replace_move(handle dst, handle src)
 
-   Analogous to :cpp:func:`inst_replace_copy`, except that a move constructor
-   is used here.
+   Analogous to :cpp:func:`inst_replace_copy`, except that the move constructor
+   is used instead of the copy constructor.
 
 .. cpp:function:: str inst_name(handle h)
 
@@ -2622,6 +3114,15 @@ The documentation below refers to two per-instance flags with the following mean
 
 Global flags
 ------------
+
+.. cpp:function:: bool leak_warnings() noexcept
+
+   Returns whether nanobind warns if any nanobind instances, types, or
+   functions are still alive when the Python interpreter shuts down.
+
+.. cpp:function:: bool implicit_cast_warnings() noexcept
+
+   Returns whether nanobind warns if an implicit conversion was not successful.
 
 .. cpp:function:: void set_leak_warnings(bool value) noexcept
 
@@ -2678,6 +3179,12 @@ Miscellaneous
 
    Return the ``globals()`` dictionary.
 
+.. cpp:function:: Py_hash_t hash(handle h)
+
+   Hash the given argument like ``hash()`` in pure Python. The type of the
+   return value (``Py_hash_t``) is an implementation-specific signed integer
+   type.
+
 .. cpp:function:: template <typename Source, typename Target> void implicitly_convertible()
 
    Indicate that the type `Source` is implicitly convertible into `Target`
@@ -2699,7 +3206,7 @@ Miscellaneous
       nb::class_<Target>(m, "Target")
           .def(nb::init<Source>());
 
-      nb::implicitly_convertible<Target, Source>();
+      nb::implicitly_convertible<Source, Target>();
 
    The function is provided for reasons of compatibility with pybind11, and as
    an escape hatch to enable use cases where :cpp:struct:`init_implicit`
@@ -2708,7 +3215,7 @@ Miscellaneous
 
 .. cpp:class:: template <typename T, typename... Ts> typed
 
-    This helper class provides an an interface to parameterize generic types to
+    This helper class provides an interface to parameterize generic types to
     improve generated Python function signatures (e.g., to turn ``list`` into
     ``list[MyType]``).
 
@@ -2726,7 +3233,8 @@ Miscellaneous
     from the signature. To make this explicit, use the ``nb::typed<T, Ts...>``
     wrapper to pass additional type parameters. This has no effect besides
     clarifying the signature---in particular, nanobind does *not* insert
-    additional runtime checks!
+    additional runtime checks! At runtime, a ``nb::typed<T, Ts...>`` behaves
+    exactly like a ``T``.
 
     .. code-block:: cpp
 
@@ -2735,3 +3243,21 @@ Miscellaneous
                // ...
            }
        });
+
+    ``nb::typed<nb::object, T>`` and ``nb::typed<nb::handle, T>`` are
+    treated specially: they generate a signature that refers just to ``T``,
+    rather than to the nonsensical ``object[T]`` that would otherwise
+    be produced. This can be useful if you want to replace the type of
+    a parameter instead of augmenting it. Note that at runtime these
+    perform no checks at all, since ``nb::object`` and ``nb::handle``
+    can refer to any Python object.
+
+    To support callable types, you can specify a C++ function signature in
+    ``nb::typed<nb::callable, Sig>`` and nanobind will attempt to convert
+    it to a Python callable signature.
+    ``nb::typed<nb::callable, int(float, std::string)>`` becomes
+    ``Callable[[float, str], int]``, while
+    ``nb::typed<nb::callable, int(...)>`` becomes ``Callable[..., int]``.
+    Type checkers will verify that any callable passed for such an argument
+    has a compatible signature. (At runtime, any sort of callable object
+    will be accepted.)

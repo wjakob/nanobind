@@ -9,14 +9,14 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-// Forward declarations for types in dlpack.h (1)
+// Forward declarations for types in ndarray.h (1)
 namespace dlpack { struct dltensor; struct dtype; }
 
 NAMESPACE_BEGIN(detail)
 
-// Forward declarations for types in dlpack.h (2)
+// Forward declarations for types in ndarray.h (2)
 struct ndarray_handle;
-struct ndarray_req;
+struct ndarray_config;
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -128,8 +128,16 @@ NB_CORE PyObject *bytes_from_obj(PyObject *o);
 /// Convert an UTF8 null-terminated C string into a Python byte string
 NB_CORE PyObject *bytes_from_cstr(const char *c);
 
-/// Convert an UTF8 C string + size into a Python byte string
-NB_CORE PyObject *bytes_from_cstr_and_size(const char *c, size_t n);
+/// Convert a memory region into a Python byte string
+NB_CORE PyObject *bytes_from_cstr_and_size(const void *c, size_t n);
+
+// ========================================================================
+
+/// Convert a Python object into a Python byte array
+NB_CORE PyObject *bytearray_from_obj(PyObject *o);
+
+/// Convert a memory region into a Python byte array
+NB_CORE PyObject *bytearray_from_cstr_and_size(const void *c, size_t n);
 
 // ========================================================================
 
@@ -149,6 +157,12 @@ NB_CORE PyObject *list_from_obj(PyObject *o);
 
 /// Convert a Python object into a Python tuple
 NB_CORE PyObject *tuple_from_obj(PyObject *o);
+
+/// Convert a Python object into a Python set
+NB_CORE PyObject *set_from_obj(PyObject *o);
+
+/// Convert a Python object into a Python frozenset
+NB_CORE PyObject *frozenset_from_obj(PyObject *o);
 
 // ========================================================================
 
@@ -294,8 +308,13 @@ NB_CORE PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
                                        void *value, cleanup_list *cleanup,
                                        bool cpp_delete) noexcept;
 
-/// Try to reliquish ownership from Python object to a unique_ptr
-NB_CORE void nb_type_relinquish_ownership(PyObject *o, bool cpp_delete);
+/// Try to relinquish ownership from Python object to a unique_ptr;
+/// return true if successful, false if not. (Failure is only
+/// possible if `cpp_delete` is true.)
+NB_CORE bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept;
+
+/// Reverse the effects of nb_type_relinquish_ownership().
+NB_CORE void nb_type_restore_ownership(PyObject *o, bool cpp_delete) noexcept;
 
 /// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
 NB_CORE void *nb_type_supplement(PyObject *t) noexcept;
@@ -406,21 +425,32 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
 
 // ========================================================================
 
-/// Fill in slots for an enum type being built
-NB_CORE void nb_enum_prepare(const type_init_data *t,
-                             PyType_Slot *&slots, size_t max_slots) noexcept;
+struct enum_init_data;
 
-/// Add an entry to an enumeration
-NB_CORE void nb_enum_put(PyObject *type, const char *name, const void *value,
-                         const char *doc) noexcept;
+/// Create a new enumeration type
+NB_CORE PyObject *enum_create(enum_init_data *) noexcept;
+
+/// Append an entry to an enumeration
+NB_CORE void enum_append(PyObject *tp, const char *name,
+                         int64_t value, const char *doc) noexcept;
+
+// Query an enumeration's Python object -> integer value map
+NB_CORE bool enum_from_python(const std::type_info *, PyObject *, int64_t *,
+                              uint8_t flags) noexcept;
+
+// Query an enumeration's integer value -> Python object map
+NB_CORE PyObject *enum_from_cpp(const std::type_info *, int64_t) noexcept;
 
 /// Export enum entries to the parent scope
-NB_CORE void nb_enum_export(PyObject *type);
+NB_CORE void enum_export(PyObject *tp);
 
 // ========================================================================
 
 /// Try to import a Python extension module, raises an exception upon failure
 NB_CORE PyObject *module_import(const char *name);
+
+/// Try to import a Python extension module, raises an exception upon failure
+NB_CORE PyObject *module_import(PyObject *name);
 
 /// Create a new extension module with the given name
 NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
@@ -433,7 +463,8 @@ NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
 // ========================================================================
 
 // Try to import a reference-counted ndarray object via DLPack
-NB_CORE ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
+NB_CORE ndarray_handle *ndarray_import(PyObject *o,
+                                       const ndarray_config *c,
                                        bool convert,
                                        cleanup_list *cleanup) noexcept;
 
@@ -441,8 +472,9 @@ NB_CORE ndarray_handle *ndarray_import(PyObject *o, const ndarray_req *req,
 NB_CORE ndarray_handle *ndarray_create(void *value, size_t ndim,
                                        const size_t *shape, PyObject *owner,
                                        const int64_t *strides,
-                                       dlpack::dtype *dtype, bool ro,
-                                       int32_t device, int32_t device_id);
+                                       dlpack::dtype dtype, bool ro,
+                                       int device, int device_id,
+                                       char order);
 
 /// Increase the reference count of the given ndarray object; returns a pointer
 /// to the underlying DLTensor
@@ -452,10 +484,10 @@ NB_CORE dlpack::dltensor *ndarray_inc_ref(ndarray_handle *) noexcept;
 NB_CORE void ndarray_dec_ref(ndarray_handle *) noexcept;
 
 /// Wrap a ndarray_handle* into a PyCapsule
-NB_CORE PyObject *ndarray_wrap(ndarray_handle *, int framework,
-                               rv_policy policy, cleanup_list *cleanup) noexcept;
+NB_CORE PyObject *ndarray_export(ndarray_handle *, int framework,
+                                 rv_policy policy, cleanup_list *cleanup) noexcept;
 
-/// Check if an object is a known ndarray type (NumPy, PyTorch, Tensorflow, JAX)
+/// Check if an object represents an ndarray
 NB_CORE bool ndarray_check(PyObject *o) noexcept;
 
 // ========================================================================
@@ -496,6 +528,8 @@ NB_CORE void decref_checked(PyObject *o) noexcept;
 
 // ========================================================================
 
+NB_CORE bool leak_warnings() noexcept;
+NB_CORE bool implicit_cast_warnings() noexcept;
 NB_CORE void set_leak_warnings(bool value) noexcept;
 NB_CORE void set_implicit_cast_warnings(bool value) noexcept;
 
@@ -511,6 +545,10 @@ NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,
 
 // ========================================================================
 
+NB_CORE bool issubclass(PyObject *a, PyObject *b);
+
+// ========================================================================
+
 NB_CORE PyObject *repr_list(PyObject *o);
 NB_CORE PyObject *repr_map(PyObject *o);
 
@@ -519,6 +557,10 @@ NB_CORE bool is_alive() noexcept;
 #if NB_TYPE_GET_SLOT_IMPL
 NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 #endif
+
+NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
+
+NB_CORE const char *abi_tag();
 
 NAMESPACE_END(detail)
 

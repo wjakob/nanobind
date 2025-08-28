@@ -105,7 +105,8 @@ foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iter
       MARKER_FILE py.typed
       PATTERN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pattern_file.nb"
     )
-    set(EXTRA_DEPENDS "${OUT_DIR}/py_stub_test.py")
+    set(
+      EXTRA_DEPENDS "${OUT_DIR}/py_stub_test.py" "${OUT_DIR}/py_stub_submodule_test.py")
   else()
     set(EXTRA "")
     set(EXTRA_DEPENDS "")
@@ -128,7 +129,9 @@ endforeach()
 nanobind_add_stub(
   py_stub
   MODULE py_stub_test
-  OUTPUT ${PYI_PREFIX}py_stub_test.pyi
+  OUTPUT_DIR ${PYI_PREFIX}
+  RECURSIVE
+  VERBOSE
   PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PYI_PREFIX}py_stub_test.py
 )
@@ -192,6 +195,7 @@ set(TEST_FILES
   test_enum_ext.pyi.ref
   test_typing_ext.pyi.ref
   py_stub_test.py
+  py_stub_submodule_test.py
   py_stub_test.pyi.ref
 )
 
@@ -209,11 +213,3 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
   set(PY_STUB_TEST ${OUT_DIR}/py_stub_test.py)
 endif()
-
-nanobind_add_stub(
-  py_stub
-  MODULE py_stub_test
-  OUTPUT ${PYI_PREFIX}py_stub_test.pyi
-  PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
-  DEPENDS ${PY_STUB_TEST}
-)

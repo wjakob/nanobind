@@ -640,6 +640,7 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
   elseif (ARG_OUTPUT_DIR)
     list(APPEND NB_STUBGEN_ARGS -O "${ARG_OUTPUT_DIR}")
+    list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT_DIR}")
   endif()
 
   if (ARG_RECURSIVE)
@@ -663,16 +664,19 @@ function (nanobind_add_stub name)
   endif()
 
   if (NOT ARG_INSTALL_TIME)
-    set(STUB_FAKE_FILE ${CMAKE_BINARY_DIR}/${name}_stub.tmp)
-    set(NB_STUBGEN_CMD ${NB_STUBGEN_CMD} "-M" ${STUB_FAKE_FILE})
+    # NB_STUBGEN_OUTPUTS might be empty, causing OUTPUT to be empty
+    # STUB_STAMP_FILE to allow add_custom_command without OUTPUT
+    # For more info: https://stackoverflow.com/questions/43347087/cmake-add-custom-command-without-output
+    set(STUB_STAMP_FILE ${CMAKE_BINARY_DIR}/${name}_stub.stamp)
     add_custom_command(
-      OUTPUT ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE}
+      OUTPUT ${NB_STUBGEN_OUTPUTS} ${STUB_STAMP_FILE}
       COMMAND ${NB_STUBGEN_CMD}
+      COMMAND ${CMAKE_COMMAND} -E touch ${STUB_STAMP_FILE}
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
       DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" "${ARG_PATTERN_FILE}"
       ${NB_STUBGEN_EXTRA}
     )
-    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS} ${STUB_FAKE_FILE})
+    add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS} ${STUB_STAMP_FILE})
     file(GLOB STUB_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/*.pyi" )
     set_target_properties(${name} PROPERTIES ADDITIONAL_CLEAN_FILES "${STUB_FILES}")
   else()

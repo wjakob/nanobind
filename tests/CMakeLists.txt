@@ -106,7 +106,7 @@ foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iter
       PATTERN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pattern_file.nb"
     )
     set(
-      EXTRA_DEPENDS "${OUT_DIR}/py_stub_test.py" "${OUT_DIR}/py_stub_submodule_test.py")
+      EXTRA_DEPENDS "${OUT_DIR}/py_stub_test.py")
   else()
     set(EXTRA "")
     set(EXTRA_DEPENDS "")
@@ -185,11 +185,20 @@ set(TEST_FILES
   test_enum_ext.pyi.ref
   test_typing_ext.pyi.ref
   py_stub_test.py
-  py_stub_submodule_test.py
+  py_stub_submodule_test/__init__.py
+  py_stub_submodule_test/__init__.pyi.ref
+  py_stub_submodule_test/py_stub_submodule1_test.py
+  py_stub_submodule_test/submodule/__init__.py
+  py_stub_submodule_test/submodule/__init__.pyi.ref
+  py_stub_submodule_test/submodule/py_stub_submodule2_test.py
   py_stub_test.pyi.ref
 )
 
 set (PY_STUB_TEST py_stub_test.py)
+set (PY_STUB_SUBMODULE_TEST py_stub_submodule_test/__init__.py
+  py_stub_submodule_test/py_stub_submodule1_test.py
+  py_stub_submodule_test/submodule/__init__.py
+  py_stub_submodule_test/submodule/py_stub_submodule2_test.py)
 if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
   foreach(TEST_FILE IN LISTS TEST_FILES)
     set(IN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE})
@@ -197,19 +206,31 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
     set(TEST_FILES_OUT ${TEST_FILES_OUT} ${OUT_FILE})
     add_custom_command(
       DEPENDS ${IN_FILE} OUTPUT ${OUT_FILE}
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IN_FILE} ${OUT_DIR})
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IN_FILE} ${OUT_FILE})
   endforeach()
 
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
   set(PY_STUB_TEST ${OUT_DIR}/py_stub_test.py)
+  set(PY_STUB_SUBMODULE_TEST ${OUT_DIR}/py_stub_submodule_test/submodule/__init__.py
+    ${OUT_DIR}/py_stub_submodule_test/py_stub_submodule1_test.py
+    ${OUT_DIR}/py_stub_submodule_test/submodule/__init__.py
+    ${OUT_DIR}/py_stub_submodule_test/submodule/py_stub_submodule2_test.py)
 endif()
 
 nanobind_add_stub(
   py_stub
   MODULE py_stub_test
+  OUTPUT ${PYI_PREFIX}py_stub_test.pyi
+  PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
+  DEPENDS ${PY_STUB_TEST}
+)
+
+nanobind_add_stub(
+  py_stub_submodule_test
+  MODULE py_stub_submodule_test
   OUTPUT_DIR ${PYI_PREFIX}
   RECURSIVE
   VERBOSE
   PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
-  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${PYI_PREFIX}py_stub_test.py
+  DEPENDS ${PY_STUB_SUBMODULE_TEST}
 )

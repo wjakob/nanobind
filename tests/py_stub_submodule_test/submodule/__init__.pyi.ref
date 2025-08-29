@@ -1,0 +1,1 @@
+from . import py_stub_submodule2_test as py_stub_submodule2_test

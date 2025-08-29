@@ -1389,6 +1389,7 @@ def main(args: Optional[List[str]] = None) -> None:
         else:
             file_s = getattr(mod_imported, "__file__", None)
             if file_s is None:
+                print(mod_imported)
                 raise Exception(
                     'the module lacks a "__file__" attribute, hence '
                     "stubgen cannot infer where to place the generated "

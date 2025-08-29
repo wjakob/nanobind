@@ -211,7 +211,7 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
 
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
   set(PY_STUB_TEST ${OUT_DIR}/py_stub_test.py)
-  set(PY_STUB_SUBMODULE_TEST ${OUT_DIR}/py_stub_submodule_test/submodule/__init__.py
+  set(PY_STUB_SUBMODULE_TEST ${OUT_DIR}/py_stub_submodule_test/__init__.py
     ${OUT_DIR}/py_stub_submodule_test/py_stub_submodule1_test.py
     ${OUT_DIR}/py_stub_submodule_test/submodule/__init__.py
     ${OUT_DIR}/py_stub_submodule_test/submodule/py_stub_submodule2_test.py)
@@ -227,7 +227,7 @@ nanobind_add_stub(
 
 nanobind_add_stub(
   py_stub_submodule_test
-  MODULE py_stub_submodule_test.__init__
+  MODULE py_stub_submodule_test
   OUTPUT_DIR ${PYI_PREFIX}
   RECURSIVE
   VERBOSE

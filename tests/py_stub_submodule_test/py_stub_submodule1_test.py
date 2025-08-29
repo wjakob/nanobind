@@ -1,7 +1,7 @@
 import typing
-import py_stub_submodule_test.submodule.py_stub_submodule2_test
+import submodule.py_stub_submodule2_test
 
-class AClass(py_stub_submodule_test.submodule.py_stub_submodule2_test.BClass):
+class AClass(submodule.py_stub_submodule2_test.BClass):
     STATIC_VAR: int = 5
 
     class NestedClass:

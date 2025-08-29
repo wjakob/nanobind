@@ -227,7 +227,7 @@ nanobind_add_stub(
 
 nanobind_add_stub(
   py_stub_submodule_test
-  MODULE py_stub_submodule_test
+  MODULE py_stub_submodule_test.__init__
   OUTPUT_DIR ${PYI_PREFIX}
   RECURSIVE
   VERBOSE

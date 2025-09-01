@@ -1085,7 +1085,7 @@ Wrapper classes
       *Note*: The C string will be deleted when the `str` instance is garbage
       collected.
 
-   .. cpp:function:: template <typename... Args> str format(Args&&... args)
+   .. cpp:function:: template <typename... Args> str format(Args&&... args) const
 
       C++ analog of the Python routine ``str.format``. Can be called with
       positional and keyword arguments.

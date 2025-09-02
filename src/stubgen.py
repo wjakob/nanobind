@@ -771,6 +771,22 @@ class StubGen:
         # Success, pattern was applied
         return True
 
+    def create_subdirectory_for_module(self, module: types.ModuleType) -> bool:
+        """
+        When creating stubs recursively, prefer putting information directly
+        into a ``submodule.pyi`` file unless the submodule has sub-submodules,
+        or is defined in a nested directory (e.g. ``submodule/__init__.py``).
+        In those two cases, put the stubs into ``submodule/__init__.pyi``
+        """
+        for child in module.__dict__.values():
+            if ismodule(child):
+                return True
+
+        return hasattr(module, '__file__') \
+            and module.__file__ \
+            and module.__file__.endswith('__init__.py')
+
+
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
         old_prefix = self.prefix
 
@@ -822,16 +838,15 @@ class StubGen:
                     # Do not include submodules in the same stub, but include a directive to import them
                     self.import_object(value.__name__, name=None, as_name=name)
 
-                    # If the user requested this, generate a separate stub recursively
+                    # If the user requested this, generate recursive stub files as well
                     if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
-                        module_file = getattr(value, '__file__', None)
-
-                        if not module_file or module_file.endswith('__init__.py'):
+                        if self.create_subdirectory_for_module(value):
+                            # Create a new subdirectory and start with an __init__.pyi file there
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
                             dir_name.mkdir(parents=False, exist_ok=True)
                             output_file = dir_name / '__init__.pyi'
                         else:
-                            output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
+                            output_file = self.output_file.parents[0] / (value_name_s[-1] + '.pyi')
 
                         sg = StubGen(
                             module=value,
@@ -1075,7 +1090,7 @@ class StubGen:
             result += " = " if has_type else "="
             p_default_str = self.expr_str(p.default)
             if p_default_str is None:
-                # self.expr_str(p.default) could return None in some rare cases, 
+                # self.expr_str(p.default) could return None in some rare cases,
                 # e.g. p.default is a nanobind object. If so, use ellipsis as a placeholder.
                 p_default_str = "..."
             assert p_default_str

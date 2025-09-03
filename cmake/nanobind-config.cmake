@@ -590,7 +590,7 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS;MARKER_FILE")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -623,8 +623,10 @@ function (nanobind_add_stub name)
   endif()
 
   if (ARG_MARKER_FILE)
-    list(APPEND NB_STUBGEN_ARGS -M "${ARG_MARKER_FILE}")
-    list(APPEND NB_STUBGEN_OUTPUTS "${ARG_MARKER_FILE}")
+    foreach (MARKER_FILE IN LISTS ARG_MARKER_FILE)
+      list(APPEND NB_STUBGEN_ARGS -M "${MARKER_FILE}")
+      list(APPEND NB_STUBGEN_OUTPUTS "${MARKER_FILE}")
+    endforeach()
   endif()
 
   if (NOT ARG_MODULE)

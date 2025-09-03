@@ -1257,10 +1257,11 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "-M",
         "--marker-file",
+        action="append",
         metavar="FILE",
         dest="marker_file",
-        default=None,
-        help="generate a marker file (usually named 'py.typed')",
+        default=[],
+        help="generate a marker file (usually named 'py.typed', can specify multiple times)",
     )
 
     parser.add_argument(
@@ -1463,10 +1464,10 @@ def main(args: Optional[List[str]] = None) -> None:
         with open(file, "w", encoding='utf-8') as f:
             f.write(sg.get())
 
-    if opt.marker_file:
+    for marker_file in opt.marker_file:
         if not opt.quiet:
-            print(f'  - writing marker file "{opt.marker_file}" ..')
-        Path(opt.marker_file).touch()
+            print(f'  - writing marker file "{marker_file}" ..')
+        Path(marker_file).touch()
 
 
 if __name__ == "__main__":

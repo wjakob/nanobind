@@ -185,6 +185,8 @@ set(TEST_FILES
   test_typing_ext.pyi.ref
   py_stub_test.py
   py_stub_test.pyi.ref
+  py_recursive_stub_test/__init__.pyi.ref
+  py_recursive_stub_test/bar.pyi.ref
 )
 
 set (PY_STUB_TEST py_stub_test.py)
@@ -195,7 +197,7 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
     set(TEST_FILES_OUT ${TEST_FILES_OUT} ${OUT_FILE})
     add_custom_command(
       DEPENDS ${IN_FILE} OUTPUT ${OUT_FILE}
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IN_FILE} ${OUT_DIR})
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IN_FILE} ${OUT_FILE})
   endforeach()
 
   add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
@@ -208,4 +210,16 @@ nanobind_add_stub(
   OUTPUT ${PYI_PREFIX}py_stub_test.pyi
   PYTHON_PATH $<TARGET_FILE_DIR:test_stl_ext>
   DEPENDS ${PY_STUB_TEST}
+)
+
+nanobind_add_stub(
+  py_recursive_stub
+  RECURSIVE
+  MODULE py_recursive_stub_test
+  OUTPUT_PATH
+    ${PYI_PREFIX}py_recursive_stub_test
+  OUTPUT
+    ${PYI_PREFIX}py_recursive_stub_test/__init__.pyi
+    ${PYI_PREFIX}py_recursive_stub_test/bar.pyi
+  PYTHON_PATH ${CMAKE_CURRENT_SOURCE_DIR}
 )

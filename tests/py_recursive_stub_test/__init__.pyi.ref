@@ -1,0 +1,4 @@
+from . import bar as bar
+
+
+FOO: int = 123

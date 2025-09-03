@@ -15,7 +15,9 @@ def remove_platform_dependent(s):
     i = 0
     while i < len(s):
         v = s[i]
-        if v.startswith('def ret_numpy_half()') or \
+        if v.strip().startswith('float16'):
+            i += 1
+        elif v.startswith('def ret_numpy_half()') or \
            v.startswith('def test_slots()') or \
            v.startswith('TypeAlias'):
             i += 2

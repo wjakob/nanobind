@@ -167,6 +167,22 @@ class ReplacePattern:
     matches: int
 
 
+def create_subdirectory_for_module(module: types.ModuleType) -> bool:
+    """
+    When creating stubs recursively, prefer putting information directly
+    into a ``submodule.pyi`` file unless the submodule has sub-submodules,
+    or is defined in a nested directory (e.g. ``submodule/__init__.py``).
+    In those two cases, put the stubs into ``submodule/__init__.pyi``
+    """
+    for child in module.__dict__.values():
+        if ismodule(child):
+            return True
+
+    return hasattr(module, '__file__') \
+        and module.__file__ is not None \
+        and module.__file__.endswith('__init__.py')
+
+
 class StubGen:
     def __init__(
         self,
@@ -771,22 +787,6 @@ class StubGen:
         # Success, pattern was applied
         return True
 
-    def create_subdirectory_for_module(self, module: types.ModuleType) -> bool:
-        """
-        When creating stubs recursively, prefer putting information directly
-        into a ``submodule.pyi`` file unless the submodule has sub-submodules,
-        or is defined in a nested directory (e.g. ``submodule/__init__.py``).
-        In those two cases, put the stubs into ``submodule/__init__.pyi``
-        """
-        for child in module.__dict__.values():
-            if ismodule(child):
-                return True
-
-        return hasattr(module, '__file__') \
-            and module.__file__ \
-            and module.__file__.endswith('__init__.py')
-
-
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
         old_prefix = self.prefix
 
@@ -840,7 +840,7 @@ class StubGen:
 
                     # If the user requested this, generate recursive stub files as well
                     if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
-                        if self.create_subdirectory_for_module(value):
+                        if create_subdirectory_for_module(value):
                             # Create a new subdirectory and start with an __init__.pyi file there
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
                             dir_name.mkdir(parents=False, exist_ok=True)
@@ -1421,6 +1421,10 @@ def main(args: Optional[List[str]] = None) -> None:
 
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)
+
+            if opt.recursive and create_subdirectory_for_module(mod_imported) \
+                and file.name != '__init__.pyi':
+                    file = file.with_suffix('') / "__init__.pyi"
 
         file.parents[0].mkdir(parents=True, exist_ok=True)
 

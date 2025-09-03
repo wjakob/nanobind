@@ -474,6 +474,7 @@ This requires several changes:
 The :cmake:command:`nanobind_add_stub` command has a few other options, please
 refer to its documentation for details.
 
+.. _stubgen_recursive_cmake:
 
 Recursive stub generation
 _________________________

@@ -862,6 +862,7 @@ class StubGen:
                         )
 
                         sg.put(value)
+                        output_file = output_file.resolve()
 
                         if not self.quiet:
                             print(f'  - writing stub "{output_file}" ..')
@@ -1458,6 +1459,8 @@ def main(args: Optional[List[str]] = None) -> None:
             if not opt.quiet:
                 print(f"  - applied {total_matches} patterns.")
 
+        file = file.resolve()
+
         if not opt.quiet:
             print(f'  - writing stub "{file}" ..')
 
@@ -1465,9 +1468,10 @@ def main(args: Optional[List[str]] = None) -> None:
             f.write(sg.get())
 
     for marker_file in opt.marker_file:
+        marker_file = Path(marker_file).resolve()
         if not opt.quiet:
             print(f'  - writing marker file "{marker_file}" ..')
-        Path(marker_file).touch()
+        marker_file.touch()
 
 
 if __name__ == "__main__":

@@ -638,14 +638,14 @@ class StubGen:
 
         - "local_module.X" -> "X"
 
-        - "other_module.X" -> "other_module.XX"
+        - "other_module.X" -> "other_module.X"
           (with "import other_module" added at top)
 
         - "builtins.X" -> "X"
 
         - "NoneType" -> "None"
 
-        - "ndarray[...]" -> "Annotated[NDArray, dict(...)]"
+        - "ndarray[...]" -> "Annotated[NDArray[dtype], dict(..extras..)]"
 
         - "collections.abc.X" -> "X"
           (with "from collections.abc import X" added at top)
@@ -710,19 +710,18 @@ class StubGen:
 
     def _format_ndarray(self, annotation: str) -> str:
         """Improve NumPy type annotations for static type checking"""
-        ndarray = self.import_object("numpy.typing", "NDArray")
-
-        # Extract and remove dtype if present
         dtype = None
         m = re.search(r"dtype=(\w+)", annotation)
+
         if m:
-            dtype = self.import_object("numpy", m.group(1))
+            dtype = "numpy."+ m.group(1)
             annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
 
         # Turn shape notation into a valid Python type expression
         annotation = annotation.replace("*", "None").replace("(None)", "(None,)")
 
         # Build type while potentially preserving extra information as an annotation
+        ndarray = self.import_object("numpy.typing", "NDArray")
         result = f"{ndarray}[{dtype}]" if dtype else ndarray
         if annotation:
             annotated = self.import_object("typing", "Annotated")

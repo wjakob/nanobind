@@ -645,7 +645,7 @@ class StubGen:
 
         - "NoneType" -> "None"
 
-        - "ndarray[...]" -> "Annotated[ArrayLike, dict(...)]"
+        - "ndarray[...]" -> "Annotated[NDArray, dict(...)]"
 
         - "collections.abc.X" -> "X"
           (with "from collections.abc import X" added at top)
@@ -656,21 +656,7 @@ class StubGen:
         """
 
         # Process nd-array type annotations so that MyPy accepts them
-        def process_ndarray(m: Match[str]) -> str:
-            s = m.group(2)
-
-            ndarray = self.import_object("numpy.typing", "ArrayLike")
-            assert ndarray
-            s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
-            s = s.replace("*", "None")
-
-            if s:
-                annotated = self.import_object("typing", "Annotated")
-                return f"{annotated}[{ndarray}, dict({s})]"
-            else:
-                return ndarray
-
-        s = self.ndarray_re.sub(process_ndarray, s)
+        s = self.ndarray_re.sub(lambda m: self._format_ndarray(m.group(2)), s)
 
         if sys.version_info >= (3, 9, 0):
             s = self.abc_re.sub(r'collections.abc.\1', s)
@@ -721,6 +707,28 @@ class StubGen:
         s = self.id_seq.sub(process_general, s)
 
         return s
+
+    def _format_ndarray(self, annotation: str) -> str:
+        """Improve NumPy type annotations for static type checking"""
+        ndarray = self.import_object("numpy.typing", "NDArray")
+
+        # Extract and remove dtype if present
+        dtype = None
+        m = re.search(r"dtype=(\w+)", annotation)
+        if m:
+            dtype = self.import_object("numpy", m.group(1))
+            annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
+
+        # Turn shape notation into a valid Python type expression
+        annotation = annotation.replace("*", "None").replace("(None)", "(None,)")
+
+        # Build type while potentially preserving extra information as an annotation
+        result = f"{ndarray}[{dtype}]" if dtype else ndarray
+        if annotation:
+            annotated = self.import_object("typing", "Annotated")
+            result = f"{annotated}[{result}, dict({annotation})]"
+
+        return result
 
     def apply_pattern(self, query: str, value: object) -> bool:
         """

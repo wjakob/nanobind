@@ -185,22 +185,11 @@ static void inst_register(PyObject *inst, void *value) noexcept {
     auto [it, success] = shard.inst_c2p.try_emplace(value, inst);
 
     if (NB_UNLIKELY(!success)) {
-        void *entry = it->second;
-
         // Potentially convert the map value into linked list format
-        if (!nb_is_seq(entry)) {
-            nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-            check(first, "nanobind::detail::inst_new_ext(): list element "
-                         "allocation failed!");
-            first->inst = (PyObject *) entry;
-            first->next = nullptr;
-            entry = it.value() = nb_mark_seq(first);
-        }
-
-        nb_inst_seq *seq = nb_get_seq(entry);
+        nb_inst_seq *seq = nb_ensure_seq<PyObject>(&it.value());
         while (true) {
             // The following should never happen
-            check(inst != seq->inst, "nanobind::detail::inst_new_ext(): duplicate instance!");
+            check(inst != seq->value, "nanobind::detail::inst_new_ext(): duplicate instance!");
 
             if (!seq->next)
                 break;
@@ -211,7 +200,7 @@ static void inst_register(PyObject *inst, void *value) noexcept {
         check(next,
               "nanobind::detail::inst_new_ext(): list element allocation failed!");
 
-        next->inst = (PyObject *) inst;
+        next->value = inst;
         next->next = nullptr;
         seq->next = next;
     }
@@ -295,11 +284,11 @@ static void inst_dealloc(PyObject *self) {
                 inst_c2p.erase_fast(it);
             } else if (nb_is_seq(entry)) {
                 // Multiple objects are associated with this address. Find the right one!
-                nb_inst_seq *seq = nb_get_seq(entry),
+                nb_inst_seq *seq = nb_get_seq<PyObject>(entry),
                             *pred = nullptr;
 
                 do {
-                    if ((nb_inst *) seq->inst == inst) {
+                    if ((nb_inst *) seq->value == inst) {
                         found = true;
 
                         if (pred) {
@@ -346,42 +335,183 @@ static void inst_dealloc(PyObject *self) {
     Py_DECREF(tp);
 }
 
+#if defined(NB_FREE_THREADED)
+nb_type_map_per_thread::guard nb_type_lock_c2p_fast(nb_internals *internals_)
+    noexcept {
+    thread_local nb_type_map_per_thread type_c2p_per_thread{*internals_};
+    return type_c2p_per_thread.lock();
+}
+#endif
+
+static void nb_type_c2p_fill_from_slow(nb_internals *internals_,
+                                       void *&fast_value,
+                                       const std::type_info *type) {
+    // Cache miss. Fetch the true value from the slow map.
+    nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
+    nb_type_map_slow::iterator it_slow = type_c2p_slow.find(type);
+    fast_value = (it_slow != type_c2p_slow.end() ? it_slow->second : nullptr);
+
+    // Maintain a linked list to clean up 'type_c2p_fast' when the type
+    // expires (see nb_type_unregister).
+    auto [it_alias, inserted] =
+        internals_->types_in_c2p_fast.try_emplace(type, nullptr);
+    if (!inserted) {
+        // Check whether `type` is an alias we haven't seen yet.
+        bool seen = (type == it_alias->first);
+        nb_alias_seq *prev = nullptr;
+        nb_alias_seq *node = (nb_alias_seq *) it_alias->second;
+        while (node && !seen) {
+            seen |= (type == node->value);
+            prev = node;
+            node = node->next;
+        }
+        if (!seen) {
+            // Got a new one -- add it. NB: use non-Python allocator for these
+            // since we won't free them until internals_cleanup(), which is
+            // after interpreter finalization
+            node = (nb_alias_seq *) malloc(sizeof(nb_alias_seq));
+            check(node, "Could not allocate alias chain entry!");
+            node->value = type;
+            node->next = nullptr;
+            if (prev)
+                prev->next = node;
+            else
+                it_alias.value() = node;
+        }
+    }
+}
 
 type_data *nb_type_c2p(nb_internals *internals_,
-                       const std::type_info *type) {
+                       const std::type_info *type,
+                       bool *has_foreign) {
 #if defined(NB_FREE_THREADED)
-    thread_local nb_type_map_fast type_c2p_fast;
+    auto per_thread_guard = nb_type_lock_c2p_fast(internals_);
+    nb_type_map_fast &type_c2p_fast = *per_thread_guard;
 #else
     nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
 #endif
+    void *const sentinel = (void *) (uintptr_t) 1;
+    void *&slot = type_c2p_fast.lookup_or_set(type, sentinel);
+    void *result = slot;
 
-    nb_type_map_fast::iterator it_fast = type_c2p_fast.find(type);
-    if (it_fast != type_c2p_fast.end())
-        return it_fast->second;
+    if (NB_UNLIKELY(result == sentinel)) {
+        // Cache miss. Fetch the true value from the slow map.
+#if defined(NB_FREE_THREADED)
+        // Accessing the slow map requires locking internals. We must first
+        // unlock the local mutex in order to maintain consistent lock ordering
+        // against concurrent updates from `nb_type_update_c2p_fast`. Since all
+        // operations on the fast type map from other threads are in-place value
+        // updates (insertions only come from our thread and deletions never
+        // occur), `slot` won't be invalidated during the brief period where
+        // we hold no locks.
+        per_thread_guard = {};
 
-    lock_internals guard(internals_);
-    nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
-    nb_type_map_slow::iterator it_slow = type_c2p_slow.find(type);
-    if (it_slow != type_c2p_slow.end()) {
-        type_data *d = it_slow->second;
+        // While `slot` still will point to the correct place, it's possible
+        // that its value changes here if another thread modifies the c2p_slow
+        // mapping for this type. If it does so, then `type` must have already
+        // been in the alias map, so there's nothing further to do.
 
-#if !defined(NB_FREE_THREADED)
-        // Maintain a linked list to clean up 'type_c2p_fast' when the type
-        // expires (see nb_type_unregister). In free-threaded mode, we leak
-        // these entries until the thread destructs.
-        nb_alias_chain *chain =
-            (nb_alias_chain *) PyMem_Malloc(sizeof(nb_alias_chain));
-        check(chain, "Could not allocate nb_alias_chain entry!");
-        chain->next = d->alias_chain;
-        chain->value = type;
-        d->alias_chain = chain;
+        lock_internals guard(internals_);
+        if (NB_LIKELY(slot == sentinel))
 #endif
+            nb_type_c2p_fill_from_slow(internals_, slot, type);
+        result = slot;
 
-        type_c2p_fast[type] = d;
-        return d;
+        // NB: after we drop `guard` at the end of this block, we'll hold no
+        // locks, so the type_data we're looking up could be concurrently
+        // deleted on free-threaded builds if nanobind didn't immortalize types.
+        // (Since we return it without locking regardless, extending the
+        // locking here wouldn't help on its own.)
     }
 
-    return nullptr;
+    auto *t = (type_data *) result;
+
+#if !defined(NB_DISABLE_FOREIGN)
+    if (nb_is_foreign(result)) {
+        if (has_foreign)
+            *has_foreign = true;
+        return nullptr;
+    }
+
+    if (has_foreign) {
+        // t->foreign_bindings is the list of registered bindings for this C++
+        // type, including potentially one that we exported. Report has_foreign
+        // only if there's more than one or the single one isn't ours.
+        void *foreign_bindings = t ? nb_load_acquire(t->foreign_bindings)
+                                   : nullptr;
+        *has_foreign = t && foreign_bindings &&
+                       (nb_is_seq(foreign_bindings) ||
+                        ((pymb_binding *) foreign_bindings)->framework !=
+                            internals_->foreign_self);
+    }
+#else
+    (void) has_foreign;
+#endif
+
+    return t;
+}
+
+static bool nb_type_update_cache(nb_type_map_fast &cache,
+                                 const std::type_info *type,
+                                 nb_alias_seq *more_types,
+                                 void *value) {
+    bool found = cache.update(type, value);
+    while (more_types) {
+        found |= cache.update(more_types->value, value);
+        more_types = more_types->next;
+    }
+    return found;
+}
+
+void nb_type_update_c2p_fast(const std::type_info *type, void *value) noexcept {
+    // internals must be locked by the caller
+    nb_internals *internals_ = internals;
+    auto it_alias = internals_->types_in_c2p_fast.find(type);
+    if (it_alias != internals_->types_in_c2p_fast.end()) {
+        bool found = false;
+#if defined(NB_FREE_THREADED)
+        for (nb_type_map_per_thread *cache =
+                 internals_->type_c2p_per_thread_head;
+             cache; cache = cache->next) {
+            found |= nb_type_update_cache(*cache->lock(), it_alias->first,
+                                          (nb_alias_seq *) it_alias->second,
+                                          value);
+        }
+#else
+        found = nb_type_update_cache(internals_->type_c2p_fast, it_alias->first,
+                                     (nb_alias_seq *) it_alias->second, value);
+#endif
+        check(found, "nanobind::detail::nb_type_update_c2p_fast(\"%s\"): "
+                     "types_in_c2p_fast and type_c2p_fast are inconsistent",
+              type_name(type));
+    }
+}
+
+bool nb_type_register(type_data *t, type_data **conflict) noexcept {
+    nb_internals *internals_ = internals;
+    nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
+
+    lock_internals guard(internals_);
+    auto [it_slow, inserted] = type_c2p_slow.try_emplace(t->type, t);
+    if (!inserted) {
+#if !defined(NB_DISABLE_FOREIGN)
+        if (nb_is_foreign(it_slow->second)) {
+            nb_store_release(t->foreign_bindings,
+                             nb_get_foreign(it_slow->second));
+            it_slow.value() = t;
+        } else
+#endif
+        {
+            *conflict = (type_data *) it_slow->second;
+            return false; // already registered
+        }
+    }
+    nb_type_update_c2p_fast(t->type, t);
+#if !defined(NB_DISABLE_FOREIGN)
+    if (internals_->foreign_export_all)
+        nb_type_export_impl(t);
+#endif
+    return true;
 }
 
 void nb_type_unregister(type_data *t) noexcept {
@@ -389,51 +519,51 @@ void nb_type_unregister(type_data *t) noexcept {
     nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
 
     lock_internals guard(internals_);
-    size_t n_del_slow = type_c2p_slow.erase(t->type);
-
-#if defined(NB_FREE_THREADED)
-    // In free-threaded mode, stale type information remains in the
-    // 'type_c2p_fast' TLS. This data structure is eventually deallocated
-    // when the thread terminates.
-    //
-    // In principle, this is dangerous because the user could delete a type
-    // binding from a module at runtime, causing the associated
-    // Python type object to be freed. If a function then attempts to return
-    // a value with such a de-registered type, nanobind should raise an
-    // exception, which requires knowing that the entry in 'type_c2p_fast'
-    // has become invalid in the meantime.
-    //
-    // Right now, this problem is avoided because we immortalize type objects in
-    // ``nb_type_new()`` and ``enum_create()``. However, we may not always
-    // want to stick with immortalization, which is just a workaround.
-    //
-    // In the future, a global version counter modified with acquire/release
-    // semantics (see https://github.com/wjakob/nanobind/pull/695#discussion_r1761600010)
-    // might prove to be a similarly efficient but more general solution.
-    bool fail = n_del_slow != 1;
-#else
-    nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
-    size_t n_del_fast = type_c2p_fast.erase(t->type);
-
-    bool fail = n_del_fast != 1 || n_del_slow != 1;
-    if (!fail) {
-        nb_alias_chain *cur = t->alias_chain;
-        while (cur) {
-            nb_alias_chain *next = cur->next;
-            n_del_fast = type_c2p_fast.erase(cur->value);
-            if (n_del_fast != 1) {
-                fail = true;
-                break;
-            }
-            PyMem_Free(cur);
-            cur = next;
-        }
-    }
-#endif
-
-    check(!fail,
+    auto it_slow = type_c2p_slow.find(t->type);
+    check(it_slow != type_c2p_slow.end() && it_slow->second == t,
           "nanobind::detail::nb_type_unregister(\"%s\"): could not "
           "find type!", t->name);
+#if defined(NB_DISABLE_FOREIGN)
+    type_c2p_slow.erase(it_slow);
+    nb_type_update_c2p_fast(t->type, nullptr);
+#else
+    void *foreign_bindings = nb_load_acquire(t->foreign_bindings);
+    pymb_binding *binding_to_free = nullptr;
+    nb_foreign_seq *node_to_free = nullptr;
+
+    if (nb_is_seq(foreign_bindings)) {
+        nb_foreign_seq *node = nb_get_seq<pymb_binding>(foreign_bindings);
+        if (node->value->framework == internals_->foreign_self) {
+            binding_to_free = node->value;
+            node_to_free = node;
+            foreign_bindings = nb_mark_seq(node->next);
+        }
+    } else if (auto *binding = (pymb_binding *) foreign_bindings;
+               binding && binding->framework == internals_->foreign_self) {
+        binding_to_free = binding;
+        foreign_bindings = nullptr;
+    }
+
+    void *new_value;
+    if (foreign_bindings) {
+        new_value = nb_mark_foreign(foreign_bindings);
+        it_slow.value() = new_value;
+    } else {
+        new_value = nullptr;
+        type_c2p_slow.erase(it_slow);
+    }
+    nb_type_update_c2p_fast(t->type, new_value);
+
+    // Don't actually free the binding until we've updated the c2p fast map.
+    // Other threads may concurrently be in nb_type_try_foreign(); see
+    // comments there for more details on the synchronization here.
+    if (binding_to_free) {
+        pymb_remove_binding(internals_->foreign_registry, binding_to_free);
+        free((char *) binding_to_free->source_name);
+        PyMem_Free(binding_to_free);
+        PyMem_Free(node_to_free);
+    }
+#endif
 }
 
 static void nb_type_dealloc(PyObject *o) {
@@ -495,7 +625,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->type_py = (PyTypeObject *) self;
     t->implicit.cpp = nullptr;
     t->implicit.py = nullptr;
-    t->alias_chain = nullptr;
+    t->foreign_bindings = nullptr;
 
 #if defined(Py_LIMITED_API)
     t->vectorcall = nullptr;
@@ -1073,25 +1203,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     object modname;
     PyObject *mod = nullptr;
 
-    // Update hash table that maps from std::type_info to Python type
-    nb_type_map_slow::iterator it;
-    bool success;
     nb_internals *internals_ = internals;
-
-    {
-        lock_internals guard(internals_);
-        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(t->type, nullptr);
-        if (!success) {
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: type '%s' was already registered!\n",
-                             t_name);
-            PyObject *tp = (PyObject *) it->second->type_py;
-            Py_INCREF(tp);
-            if (has_signature)
-                free((char *) t_name);
-            return tp;
-        }
-    }
 
     if (t->scope != nullptr) {
         if (PyModule_Check(t->scope)) {
@@ -1144,10 +1256,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     } else if (has_base) {
         lock_internals guard(internals_);
         nb_type_map_slow::iterator it2 = internals_->type_c2p_slow.find(t->base);
-        check(it2 != internals_->type_c2p_slow.end(),
+        check(it2 != internals_->type_c2p_slow.end() &&
+              !nb_is_foreign(it2->second),
                   "nanobind::detail::nb_type_new(\"%s\"): base type \"%s\" not "
                   "known to nanobind!", t_name, type_name(t->base));
-        base = (PyObject *) it2->second->type_py;
+        base = (PyObject *) ((type_data *) it2->second)->type_py;
     }
 
     type_data *tb = nullptr;
@@ -1328,8 +1441,6 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     Py_DECREF(metaclass);
 
-    make_immortal(result);
-
     type_data *to = nb_type_data((PyTypeObject *) result);
 
     *to = *t; // note: slices off _init parts
@@ -1354,7 +1465,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;
-    to->alias_chain = nullptr;
+    to->foreign_bindings = nullptr;
     to->init = nullptr;
 
     if (has_dynamic_attr)
@@ -1378,15 +1489,6 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (modname.is_valid())
         setattr(result, "__module__", modname.ptr());
 
-    {
-        lock_internals guard(internals_);
-        internals_->type_c2p_slow[t->type] = to;
-
-        #if !defined(NB_FREE_THREADED)
-            internals_->type_c2p_fast[t->type] = to;
-        #endif
-    }
-
     if (has_signature) {
         setattr(result, "__nb_signature__", str(t->name));
         free((char *) t_name);
@@ -1396,6 +1498,19 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (generic_base)
         setattr(result, "__orig_bases__", make_tuple(handle(t->base_py)));
 #endif
+
+    // Update hash table that maps from std::type_info to Python type
+    if (type_data *conflict; !nb_type_register(to, &conflict)) {
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                         "nanobind: type '%s' was already registered!\n",
+                         to->name);
+        PyObject *tp = (PyObject *) conflict->type_py;
+        Py_INCREF(tp);
+        Py_DECREF(result);
+        return tp;
+    }
+
+    make_immortal(result);
 
     return result;
 }
@@ -1501,6 +1616,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
     type_data *dst_type = nullptr;
     nb_internals *internals_ = internals;
+    bool has_foreign = false;
 
     // If 'src' is a nanobind-bound type
     if (NB_LIKELY(src_is_nb_type)) {
@@ -1512,9 +1628,20 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
         // If not, look up the Python type and check the inheritance chain
         if (NB_UNLIKELY(!valid)) {
-            dst_type = nb_type_c2p(internals_, cpp_type);
+            dst_type = nb_type_c2p(internals_, cpp_type, &has_foreign);
             if (dst_type)
                 valid = PyType_IsSubtype(src_type, dst_type->type_py);
+        } else {
+            dst_type = t;
+#if !defined(NB_DISABLE_FOREIGN)
+            // See comment at the end of nb_type_c2p
+            void *foreign_bindings = t ? nb_load_acquire(t->foreign_bindings)
+                                       : nullptr;
+            has_foreign = t && foreign_bindings &&
+                          (nb_is_seq(foreign_bindings) ||
+                           ((pymb_binding *) foreign_bindings)->framework !=
+                               internals_->foreign_self);
+#endif
         }
 
         // Success, return the pointer if the instance is correctly initialized
@@ -1553,16 +1680,52 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         }
     }
 
-    // Try an implicit conversion as last resort (if possible & requested)
-    if ((flags & (uint16_t) cast_flags::convert) && cleanup) {
+    // Try an implicit conversion (if possible & requested)
+    if ((flags & (uint8_t) cast_flags::convert) && cleanup) {
         if (!src_is_nb_type)
-            dst_type = nb_type_c2p(internals_, cpp_type);
+            dst_type = nb_type_c2p(internals_, cpp_type, &has_foreign);
 
         if (dst_type &&
-            (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions))
-            return nb_type_get_implicit(src, cpp_type_src, dst_type, internals_,
-                                        cleanup, out);
+            (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions) &&
+            nb_type_get_implicit(src, cpp_type_src, dst_type, internals_,
+                                 cleanup, out))
+            return true;
+    } else if (!src_is_nb_type && internals_->foreign_imported_any) {
+        // If we never determined the dst type and it might be foreign,
+        // check for that now.
+        (void) nb_type_c2p(internals_, cpp_type, &has_foreign);
     }
+
+#if !defined(NB_DISABLE_FOREIGN)
+    // Try a foreign type
+    if (has_foreign) {
+        struct capture {
+            PyObject *src;
+            uint8_t flags;
+            cleanup_list *cleanup;
+        } cap{src, flags, cleanup};
+
+        auto attempt = +[](void *closure, pymb_binding *binding) -> void* {
+            capture &cap = *(capture *) closure;
+            auto keep_referenced = [](void *ctx, PyObject* item) {
+                Py_INCREF(item);
+                ((cleanup_list *) ctx)->append(item);
+            };
+            return binding->framework->from_python(
+                    binding,
+                    cap.src,
+                    bool(cap.flags & (uint16_t) cast_flags::convert),
+                    cap.cleanup ? +keep_referenced : nullptr,
+                    cap.cleanup);
+        };
+
+        void *result = nb_type_try_foreign(internals_, cpp_type, attempt, &cap);
+        if (result) {
+            *out = result;
+            return true;
+        }
+    }
+#endif
 
     return false;
 }
@@ -1623,6 +1786,15 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
         if (!weakref) {
             Py_DECREF(callback);
             PyErr_Clear();
+#if !defined(NB_DISABLE_FOREIGN)
+            if (pymb_binding *binding = pymb_get_binding(nurse)) {
+                // Try a foreign framework's keep_alive as a last resort
+                if (binding->framework->keep_alive(nurse, patient,
+                                                   nullptr) == 0)
+                    return;
+                raise_python_error();
+            }
+#endif
             raise("nanobind::detail::keep_alive(): could not create a weak "
                   "reference! Likely, the 'nurse' argument you specified is not "
                   "a weak-referenceable type!");
@@ -1757,6 +1929,48 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     return (PyObject *) inst;
 }
 
+#if !defined(NB_DISABLE_FOREIGN)
+static PyObject *nb_type_put_foreign(nb_internals *internals_,
+                                     const std::type_info *cpp_type,
+                                     const std::type_info *cpp_type_p,
+                                     void *value, rv_policy rvp,
+                                     cleanup_list *cleanup,
+                                     bool *is_new) noexcept {
+    struct capture {
+        void *value;
+        rv_policy rvp;
+        PyObject *parent;
+        bool check_new;
+        bool is_new = false;
+    } cap{value, rvp, cleanup ? cleanup->self() : nullptr, bool(is_new)};
+
+    auto attempt = +[](void *closure, pymb_binding *binding) -> void* {
+        capture &cap = *(capture *) closure;
+        if (cap.check_new || cap.rvp == rv_policy::none) {
+            PyObject* existing = binding->framework->to_python(
+                    binding, cap.value, pymb_rv_policy_none, nullptr);
+            if (existing || cap.rvp == rv_policy::none) {
+                cap.is_new = false;
+                return existing;
+            }
+            cap.is_new = true;
+        }
+        return binding->framework->to_python(
+                binding, cap.value, (pymb_rv_policy) (uint8_t) cap.rvp,
+                cap.parent);
+    };
+
+    void *result = nullptr;
+    if (cpp_type_p && cpp_type_p != cpp_type)
+        result = nb_type_try_foreign(internals_, cpp_type_p, attempt, &cap);
+    if (!result)
+        result = nb_type_try_foreign(internals_, cpp_type, attempt, &cap);
+    if (is_new)
+        *is_new = cap.is_new;
+    return (PyObject *) result;
+}
+#endif
+
 PyObject *nb_type_put(const std::type_info *cpp_type,
                       void *value, rv_policy rvp,
                       cleanup_list *cleanup,
@@ -1769,16 +1983,28 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
 
     nb_internals *internals_ = internals;
     type_data *td = nullptr;
+    bool has_foreign = false;
 
-    auto lookup_type = [cpp_type, internals_, &td]() -> bool {
+    auto lookup_type = [cpp_type, internals_, &td, &has_foreign]() -> bool {
         if (!td) {
-            type_data *d = nb_type_c2p(internals_, cpp_type);
+            type_data *d = nb_type_c2p(internals_, cpp_type, &has_foreign);
             if (!d)
                 return false;
             td = d;
         }
         return true;
     };
+
+#if !defined(NB_DISABLE_FOREIGN)
+    auto try_foreign = [=, &has_foreign]() -> PyObject* {
+        if (has_foreign)
+            return nb_type_put_foreign(internals_, cpp_type, nullptr, value,
+                                       rvp, cleanup, is_new);
+        return nullptr;
+    };
+#else
+    auto try_foreign = []() { return nullptr; };
+#endif
 
     if (rvp != rv_policy::copy) {
         nb_shard &shard = internals_->shard(value);
@@ -1793,26 +2019,26 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
             nb_inst_seq seq;
 
             if (NB_UNLIKELY(nb_is_seq(entry))) {
-                seq = *nb_get_seq(entry);
+                seq = *nb_get_seq<PyObject>(entry);
             } else {
-                seq.inst = (PyObject *) entry;
+                seq.value = (PyObject *) entry;
                 seq.next = nullptr;
             }
 
             while (true) {
-                PyTypeObject *tp = Py_TYPE(seq.inst);
+                PyTypeObject *tp = Py_TYPE(seq.value);
 
                 if (nb_type_data(tp)->type == cpp_type) {
-                    if (nb_try_inc_ref(seq.inst))
-                        return seq.inst;
+                    if (nb_try_inc_ref(seq.value))
+                        return seq.value;
                 }
 
                 if (!lookup_type())
-                    return nullptr;
+                    return try_foreign();
 
                 if (PyType_IsSubtype(tp, td->type_py)) {
-                    if (nb_try_inc_ref(seq.inst))
-                        return seq.inst;
+                    if (nb_try_inc_ref(seq.value))
+                        return seq.value;
                 }
 
                 if (seq.next == nullptr)
@@ -1821,13 +2047,19 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                 seq = *seq.next;
             }
         } else if (rvp == rv_policy::none) {
+#if !defined(NB_DISABLE_FOREIGN)
+            if (internals_->foreign_imported_any) {
+                (void) lookup_type();
+                return try_foreign();
+            }
+#endif
             return nullptr;
         }
     }
 
     // Look up the corresponding Python type if not already done
     if (!lookup_type())
-        return nullptr;
+        return try_foreign();
 
     return nb_type_put_common(value, td, rvp, cleanup, is_new);
 }
@@ -1849,10 +2081,10 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
     // Look up the corresponding Python type
     type_data *td = nullptr,
               *td_p = nullptr;
-
-    auto lookup_type = [cpp_type, cpp_type_p, internals_, &td, &td_p]() -> bool {
+    bool has_foreign = false;
+    auto lookup_type = [cpp_type, cpp_type_p, internals_, &td, &td_p, &has_foreign]() -> bool {
         if (!td) {
-            type_data *d = nb_type_c2p(internals_, cpp_type);
+            type_data *d = nb_type_c2p(internals_, cpp_type, &has_foreign);
             if (!d)
                 return false;
             td = d;
@@ -1863,6 +2095,24 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
         return true;
     };
+
+#if !defined(NB_DISABLE_FOREIGN)
+    auto try_foreign = [=, &has_foreign]() -> PyObject* {
+        if (has_foreign) {
+            if (cpp_type_p && cpp_type_p != cpp_type) {
+                // To get here, lookup_type() must have returned false, meaning
+                // we never tried looking up cpp_type_p. Do so now since it's
+                // required before nb_type_try_foreign.
+                (void) nb_type_c2p(internals_, cpp_type_p);
+            }
+            return nb_type_put_foreign(internals_, cpp_type, cpp_type_p, value,
+                                       rvp, cleanup, is_new);
+        }
+        return nullptr;
+    };
+#else
+    auto try_foreign = []() { return nullptr; };
+#endif
 
     if (rvp != rv_policy::copy) {
         nb_shard &shard = internals_->shard(value);
@@ -1877,29 +2127,29 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
             nb_inst_seq seq;
 
             if (NB_UNLIKELY(nb_is_seq(entry))) {
-                seq = *nb_get_seq(entry);
+                seq = *nb_get_seq<PyObject>(entry);
             } else {
-                seq.inst = (PyObject *) entry;
+                seq.value = (PyObject *) entry;
                 seq.next = nullptr;
             }
 
             while (true) {
-                PyTypeObject *tp = Py_TYPE(seq.inst);
+                PyTypeObject *tp = Py_TYPE(seq.value);
 
                 const std::type_info *p = nb_type_data(tp)->type;
 
                 if (p == cpp_type || p == cpp_type_p) {
-                    if (nb_try_inc_ref(seq.inst))
-                        return seq.inst;
+                    if (nb_try_inc_ref(seq.value))
+                        return seq.value;
                 }
 
                 if (!lookup_type())
-                    return nullptr;
+                    return try_foreign();
 
                 if (PyType_IsSubtype(tp, td->type_py) ||
                     (td_p && PyType_IsSubtype(tp, td_p->type_py))) {
-                    if (nb_try_inc_ref(seq.inst))
-                        return seq.inst;
+                    if (nb_try_inc_ref(seq.value))
+                        return seq.value;
                 }
 
                 if (seq.next == nullptr)
@@ -1908,18 +2158,24 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                 seq = *seq.next;
             }
         } else if (rvp == rv_policy::none) {
+#if !defined(NB_DISABLE_FOREIGN)
+            if (internals_->foreign_imported_any) {
+                (void) lookup_type();
+                return try_foreign();
+            }
+#endif
             return nullptr;
         }
     }
 
     // Look up the corresponding Python type if not already done
     if (!lookup_type())
-        return nullptr;
+        return try_foreign();
 
     return nb_type_put_common(value, td_p ? td_p : td, rvp, cleanup, is_new);
 }
 
-static void nb_type_put_unique_finalize(PyObject *o,
+static bool nb_type_put_unique_finalize(PyObject *o,
                                         const std::type_info *cpp_type,
                                         bool cpp_delete, bool is_new) {
     (void) cpp_type;
@@ -1927,6 +2183,25 @@ static void nb_type_put_unique_finalize(PyObject *o,
           "nanobind::detail::nb_type_put_unique(type='%s', cpp_delete=%i): "
           "ownership status has become corrupted.",
           type_name(cpp_type), cpp_delete);
+
+#if !defined(NB_DISABLE_FOREIGN)
+    if (!nb_type_check((PyObject *)Py_TYPE(o))) {
+        if (!is_new) {
+            // Object already exists on the Python side. Maybe someone
+            // previously returned T& with rvp::reference, and now
+            // is returning unique_ptr<T> of the same object.
+            // Supporting that would require being able to "upgrade"
+            // a foreign instance from non-owning to owning. We don't try.
+            PyErr_SetString(PyExc_TypeError,
+                            "Can't return foreign unique_ptr<T> to Python if "
+                            "a Python object already exists for that object");
+            return false;
+        }
+        // Otherwise no further action is needed; we successfully did
+        // a cast with rvp::take_ownership, so Python now owns the object.
+        return true;
+    }
+#endif
 
     nb_inst *inst = (nb_inst *) o;
 
@@ -1949,6 +2224,7 @@ static void nb_type_put_unique_finalize(PyObject *o,
 
         inst->state = nb_inst::state_ready;
     }
+    return true;
 }
 
 PyObject *nb_type_put_unique(const std::type_info *cpp_type,
@@ -1959,8 +2235,8 @@ PyObject *nb_type_put_unique(const std::type_info *cpp_type,
     bool is_new = false;
     PyObject *o = nb_type_put(cpp_type, value, policy, cleanup, &is_new);
 
-    if (o)
-        nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new);
+    if (o && !nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new))
+        Py_CLEAR(o);
 
     return o;
 }
@@ -1975,8 +2251,8 @@ PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
     PyObject *o =
         nb_type_put_p(cpp_type, cpp_type_p, value, policy, cleanup, &is_new);
 
-    if (o)
-        nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new);
+    if (o && !nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new))
+        Py_CLEAR(o);
 
     return o;
 }
@@ -2044,20 +2320,45 @@ void nb_type_restore_ownership(PyObject *o, bool cpp_delete) noexcept {
     }
 }
 
-bool nb_type_isinstance(PyObject *o, const std::type_info *t) noexcept {
-    type_data *d = nb_type_c2p(internals, t);
-    if (d)
-        return PyType_IsSubtype(Py_TYPE(o), d->type_py);
-    else
-        return false;
+bool nb_type_isinstance(PyObject *o, const std::type_info *t,
+                        bool foreign_ok) noexcept {
+    bool has_foreign = false;
+    type_data *d = nb_type_c2p(internals, t, &has_foreign);
+    if (d && PyType_IsSubtype(Py_TYPE(o), d->type_py))
+        return true;
+#if !defined(NB_DISABLE_FOREIGN)
+    if (has_foreign && foreign_ok)
+        return nullptr != nb_type_try_foreign(
+                internals, t,
+                +[](void *closure, pymb_binding *binding) -> void* {
+                    return PyType_IsSubtype((PyTypeObject *) closure,
+                                            binding->pytype)
+                        ? binding : nullptr;
+                },
+                Py_TYPE(o));
+#else
+    (void) foreign_ok;
+#endif
+    return false;
 }
 
-PyObject *nb_type_lookup(const std::type_info *t) noexcept {
-    type_data *d = nb_type_c2p(internals, t);
+PyObject *nb_type_lookup(const std::type_info *t, bool foreign_ok) noexcept {
+    bool has_foreign = false;
+    type_data *d = nb_type_c2p(internals, t, &has_foreign);
     if (d)
         return (PyObject *) d->type_py;
-    else
-        return nullptr;
+#if !defined(NB_DISABLE_FOREIGN)
+    if (has_foreign && foreign_ok)
+        return (PyObject *) nb_type_try_foreign(
+                internals, t,
+                +[](void *, pymb_binding *binding) -> void* {
+                    return binding->pytype;
+                },
+                nullptr);
+#else
+    (void) foreign_ok;
+#endif
+    return nullptr;
 }
 
 bool nb_type_check(PyObject *t) noexcept {
@@ -2277,6 +2578,41 @@ PyObject *nb_inst_name(PyObject *o) noexcept {
 bool nb_inst_python_derived(PyObject *o) noexcept {
     return nb_type_data(Py_TYPE(o))->flags &
            (uint32_t) type_flags::is_python_type;
+}
+
+void nb_type_set_foreign_defaults(bool export_all, bool import_all) {
+#if !defined(NB_DISABLE_FOREIGN)
+    if (import_all && !internals->foreign_import_all)
+        nb_type_enable_import_all();
+    if (export_all && !internals->foreign_export_all)
+        nb_type_enable_export_all();
+#else
+    if (export_all || import_all)
+        raise("This libnanobind was built without foreign type support");
+#endif
+}
+
+void nb_type_import(PyObject *pytype, const std::type_info *cpptype) {
+#if !defined(NB_DISABLE_FOREIGN)
+    lock_internals guard{internals};
+    check(PyType_Check(pytype), "not a type object");
+    nb_type_import_impl(pytype, cpptype);
+#else
+    (void) pytype;
+    (void) cpptype;
+    raise("This libnanobind was built without foreign type support");
+#endif
+}
+
+void nb_type_export(PyObject *pytype) {
+#if !defined(NB_DISABLE_FOREIGN)
+    lock_internals guard{internals};
+    check(nb_type_check(pytype), "not a nanobind type");
+    nb_type_export_impl(nb_type_data((PyTypeObject *) pytype));
+#else
+    (void) pytype;
+    raise("This libnanobind was built without foreign type support");
+#endif
 }
 
 NAMESPACE_END(detail)

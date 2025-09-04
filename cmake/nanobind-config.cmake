@@ -190,6 +190,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/src/nb_static_property.cpp
     ${NB_DIR}/src/nb_ft.h
     ${NB_DIR}/src/nb_ft.cpp
+    ${NB_DIR}/src/nb_foreign.cpp
     ${NB_DIR}/src/common.cpp
     ${NB_DIR}/src/error.cpp
     ${NB_DIR}/src/trampoline.cpp
@@ -234,6 +235,10 @@ function (nanobind_build_library TARGET_NAME)
 
   if (TARGET_NAME MATCHES "-ft")
     target_compile_definitions(${TARGET_NAME} PUBLIC NB_FREE_THREADED)
+  endif()
+
+  if (TARGET_NAME MATCHES "-local")
+    target_compile_definitions(${TARGET_NAME} PRIVATE NB_DISABLE_FOREIGN)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't
@@ -330,7 +335,7 @@ endfunction()
 
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP;NB_SUPPRESS_WARNINGS"
+    "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP;NB_SUPPRESS_WARNINGS;NO_INTEROP"
     "NB_DOMAIN" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
@@ -373,6 +378,10 @@ function(nanobind_add_module name)
 
   if (ARG_FREE_THREADED)
     set(libname "${libname}-ft")
+  endif()
+
+  if (ARG_NO_INTEROP)
+    set(libname "${libname}-local")
   endif()
 
   if (ARG_NB_DOMAIN AND ARG_NB_SHARED)

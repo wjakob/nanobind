@@ -341,10 +341,12 @@ NB_CORE const std::type_info *nb_type_info(PyObject *t) noexcept;
 NB_CORE void *nb_inst_ptr(PyObject *o) noexcept;
 
 /// Check if a Python type object wraps an instance of a specific C++ type
-NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept;
+NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t,
+                                bool foreign_ok) noexcept;
 
-/// Search for the Python type object associated with a C++ type
-NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
+/// Search for a Python type object associated with a C++ type
+NB_CORE PyObject *nb_type_lookup(const std::type_info *t,
+                                 bool foreign_ok) noexcept;
 
 /// Allocate an instance of type 't'
 NB_CORE PyObject *nb_inst_alloc(PyTypeObject *t);
@@ -385,6 +387,15 @@ NB_CORE void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept;
 
 /// Query the 'ready' and 'destruct' flags of an instance
 NB_CORE std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept;
+
+// Set whether types will be shared with other binding frameworks by default
+NB_CORE void nb_type_set_foreign_defaults(bool export_all, bool import_all);
+
+// Teach nanobind about a type bound by another binding framework
+NB_CORE void nb_type_import(PyObject *pytype, const std::type_info *cpptype);
+
+// Teach other binding frameworks about a type bound by nanobind
+NB_CORE void nb_type_export(PyObject *pytype);
 
 // ========================================================================
 
@@ -500,7 +511,8 @@ NB_CORE void print(PyObject *file, PyObject *str, PyObject *end);
 typedef void (*exception_translator)(const std::exception_ptr &, void *);
 
 NB_CORE void register_exception_translator(exception_translator translator,
-                                           void *payload);
+                                           void *payload,
+                                           bool at_end);
 
 NB_CORE PyObject *exception_new(PyObject *mod, const char *name,
                                 PyObject *base);

@@ -54,7 +54,7 @@ Version 2.9.0 (Sep 4, 2025)
   conversion. (PR `#1137 <https://github.com/wjakob/nanobind/pull/1137>`__).
 
 - Miscellaneous minor fixes and improvements. (PRs
-  `#1092 <https://github.com/wjakob/nanobind/pull/1092>`__
+  `#1092 <https://github.com/wjakob/nanobind/pull/1092>`__,
   `#1107 <https://github.com/wjakob/nanobind/pull/1107>`__,
   `#1120 <https://github.com/wjakob/nanobind/pull/1120>`__,
   `#1124 <https://github.com/wjakob/nanobind/pull/1124>`__.

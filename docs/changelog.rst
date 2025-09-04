@@ -15,6 +15,17 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.9.1 (Sep 4, 2025)
+---------------------------
+
+This is a patch release to fix a regression in the CMake build system:
+
+- nanobind 2.9.0 internally adopted the CMake command ``cmake_path()`` to
+  normalize paths. This was done for cosmetic reasons, since it improves the
+  readability of generated commands. However, ``cmake_path()`` is only
+  available on CMake 3.20+, while nanobind officially supports CMake 3.15+.
+  Version 2.9.1 removes the full path normalization.
+
 Version 2.9.0 (Sep 4, 2025)
 ---------------------------
 

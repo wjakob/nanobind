@@ -683,7 +683,7 @@ class StubGen:
             if mod_name == "builtins":
                 # Simplify builtins
                 return cls_name if cls_name != "NoneType" else "None"
-            if full_name.startswith(self.module.__name__):
+            if full_name.startswith(self.module.__name__ + "."):
                 # Strip away the module prefix for local classes
                 return full_name[len(self.module.__name__) + 1 :]
             elif mod_name == "typing" or mod_name == "collections.abc":

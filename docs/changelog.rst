@@ -26,6 +26,8 @@ This is a patch release to fix an issue in the new recursive stub generation fea
   submodules. However, the implemented submodule test was far too conservative
   and interpreted any imported module (e.g. ``import os``) as a submodule. The
   patch release fixes this.
+  (commit `a65e1b
+  <https://github.com/wjakob/nanobind/commit/a65e1b36ec0670e7c8d7a3bacfa5cff425fe92fe>`__).
 
 Version 2.9.1 (Sep 4, 2025)
 ---------------------------

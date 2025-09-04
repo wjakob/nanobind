@@ -174,9 +174,12 @@ def create_subdirectory_for_module(module: types.ModuleType) -> bool:
     or is defined in a nested directory (e.g. ``submodule/__init__.py``).
     In those two cases, put the stubs into ``submodule/__init__.pyi``
     """
+
     for child in module.__dict__.values():
         if ismodule(child):
-            return True
+            parent_name, _, _ = child.__name__.rpartition(".")
+            if parent_name == module.__name__:
+                return True
 
     return hasattr(module, '__file__') \
         and module.__file__ is not None \

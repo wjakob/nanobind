@@ -15,6 +15,18 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.9.2 (Sep 4, 2025)
+---------------------------
+
+This is a patch release to fix an issue in the new recursive stub generation feature:
+
+- When creating stubs for a module, the generator must decide whether to store
+  declarations locally (e.g., in ``foo.pyi``) or in a subdirectory (e.g., in
+  ``foo/__init__.pyi``). The latter is necessary, e.g., when ``foo`` contains
+  submodules. However, the implemented submodule test was far too conservative
+  and interpreted any imported module (e.g. ``import os``) as a submodule. The
+  patch release fixes this.
+
 Version 2.9.1 (Sep 4, 2025)
 ---------------------------
 

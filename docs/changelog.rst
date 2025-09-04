@@ -25,6 +25,9 @@ This is a patch release to fix a regression in the CMake build system:
   readability of generated commands. However, ``cmake_path()`` is only
   available on CMake 3.20+, while nanobind officially supports CMake 3.15+.
   Version 2.9.1 removes the full path normalization.
+  (commit `f703fd
+  <https://github.com/wjakob/nanobind/commit/f703fd403aed32cd903f5cfdff414bdfd13f6430>`__).
+
 
 Version 2.9.0 (Sep 4, 2025)
 ---------------------------

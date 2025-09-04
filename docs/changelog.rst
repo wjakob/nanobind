@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.9.0 (TBA)
--------------------
+Version 2.9.0 (Sep 4, 2025)
+---------------------------
 
 - Nanobind's CMake stub generation command :cmake:command:`nanobind_add_stub`
   can now automatically traverse submodule hierarchies and generate :ref:`many
@@ -47,11 +47,11 @@ Version 2.9.0 (TBA)
   original key. (PR `#1119 <https://github.com/wjakob/nanobind/pull/1119>`__).
 
 - When cast operations like :cpp:func:`nb::cast() <cast>` fail to convert a
-  value, they raise a generic ``std::bad_cast`` exception that loses the
-  context of why the cast failed. When a Python error status is available, they
-  now preferentially raise :cpp:class:`nb::python_error <python_error>`. This
-  helps to track down issues with default argument conversion. (PR `#1137
-  <https://github.com/wjakob/nanobind/pull/1137>`__).
+  value, they previously raised a generic ``std::bad_cast`` exception that
+  loses the context of why the cast failed. When a Python error status is
+  available, they now preferentially raise :cpp:class:`nb::python_error
+  <python_error>`. This helps to track down issues with default argument
+  conversion. (PR `#1137 <https://github.com/wjakob/nanobind/pull/1137>`__).
 
 - Miscellaneous minor fixes and improvements. (PRs
   `#1092 <https://github.com/wjakob/nanobind/pull/1092>`__

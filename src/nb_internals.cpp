@@ -300,7 +300,7 @@ static void internals_cleanup() {
         }
 
         if (p->foreign_self) {
-            pymb_list_unlink(&p->foreign_self->hook);
+            pymb_list_unlink(&p->foreign_self->link);
             delete p->foreign_self;
         }
 

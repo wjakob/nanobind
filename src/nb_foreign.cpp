@@ -20,7 +20,10 @@ NAMESPACE_BEGIN(detail)
 // nanobind exception translator that wraps a foreign one
 static void foreign_exception_translator(const std::exception_ptr &p,
                                          void *payload) {
-    ((pymb_framework *) payload)->translate_exception(&p);
+    std::exception_ptr e = p;
+    int translated = ((pymb_framework *) payload)->translate_exception(&e);
+    if (!translated)
+        std::rethrow_exception(e);
 }
 
 // When learning about a new foreign type, should we automatically use it?
@@ -50,6 +53,8 @@ static void *nb_foreign_from_python(pymb_binding *binding,
                           convert ? uint8_t(cast_flags::convert) : 0,
                           keep_referenced ? &cleanup : nullptr, &result);
     if (keep_referenced) {
+        // Move temporary references from our `cleanup_list` to our caller's
+        // equivalent.
         for (uint32_t idx = 1; idx < cleanup.size(); ++idx)
             keep_referenced(keep_referenced_ctx, cleanup[idx]);
         if (cleanup.size() > 1)
@@ -65,8 +70,12 @@ static PyObject *nb_foreign_to_python(pymb_binding *binding,
     cleanup_list cleanup{parent};
     auto *td = (type_data *) binding->context;
     rv_policy rvp = (rv_policy) rvp_;
-    if (rvp > rv_policy::none)
+    if (rvp < rv_policy::take_ownership || rvp > rv_policy::none) {
+        // Future-proofing in case additional pymb_rv_policies are defined
+        // later: if we don't recognize this policy, then refuse the cast
+        // unless a pyobject wrapper already exists.
         rvp = rv_policy::none;
+    }
     return nb_type_put(td->type, cobj, rvp, &cleanup, nullptr);
 }
 
@@ -85,8 +94,8 @@ static int nb_foreign_keep_alive(PyObject *nurse,
     }
 }
 
-static void nb_foreign_translate_exception(const void *eptr) {
-    std::exception_ptr e = *(const std::exception_ptr *) eptr;
+static int nb_foreign_translate_exception(void *eptr) noexcept {
+    std::exception_ptr &e = *(std::exception_ptr *) eptr;
 
     // Skip the default translator (at the end of the list). It translates
     // generic STL exceptions which other frameworks might want to translate
@@ -102,7 +111,7 @@ static void nb_foreign_translate_exception(const void *eptr) {
         }
         try {
             cur->translator(e, cur->payload);
-            return;
+            return 1;
         } catch (...) { e = std::current_exception(); }
     }
 
@@ -115,8 +124,8 @@ static void nb_foreign_translate_exception(const void *eptr) {
         if (!set_builtin_exception_status(e))
             PyErr_SetString(PyExc_SystemError, "foreign function threw "
                             "nanobind::next_overload()");
-    }
-    // Anything not caught by the above bubbles out.
+    } catch (...) { e = std::current_exception(); }
+    return 0;
 }
 
 static void nb_foreign_add_foreign_binding(pymb_binding *binding) noexcept {
@@ -188,17 +197,21 @@ static void nb_foreign_remove_foreign_binding(pymb_binding *binding) noexcept {
 
 static void nb_foreign_add_foreign_framework(pymb_framework *framework)
         noexcept {
-    if (framework->translate_exception) {
+    if (framework->translate_exception &&
+        framework->abi_lang == pymb_abi_lang_cpp) {
+        decltype(&foreign_exception_translator) translator_to_use;
         {
             lock_internals guard{internals};
             if (!internals->foreign_exception_translator)
                 internals->foreign_exception_translator =
                         foreign_exception_translator;
+            translator_to_use = internals->foreign_exception_translator;
         }
-        register_exception_translator(internals->foreign_exception_translator,
+        register_exception_translator(translator_to_use,
                                       framework, /*at_end=*/true);
     }
-    internals->print_leak_warnings &= !framework->bindings_usable_forever;
+    if (!(framework->flags & pymb_framework_leak_safe))
+        internals->print_leak_warnings = false;
 }
 
 // (end of callbacks)
@@ -215,11 +228,9 @@ static void register_with_pymetabind(nb_internals *internals_) {
     auto *fw = new pymb_framework{};
     fw->name = "nanobind " NB_ABI_TAG;
 #if defined(NB_FREE_THREADED)
-    fw->bindings_usable_forever = 1;
-    fw->leak_safe = 0;
+    fw->flags = pymb_framework_bindings_usable_forever;
 #else
-    fw->bindings_usable_forever = 0;
-    fw->leak_safe = 1;
+    fw->flags = pymb_framework_leak_safe;
 #endif
     fw->abi_lang = pymb_abi_lang_cpp;
     fw->abi_extra = NB_PLATFORM_ABI_TAG;
@@ -248,9 +259,8 @@ static void nb_type_import_binding(pymb_binding *binding,
     internals->foreign_imported_any = true;
 
     auto add_to_list = [binding](void *list_head) -> void* {
-        if (!list_head) {
+        if (!list_head)
             return binding;
-        }
         nb_foreign_seq *seq = nb_ensure_seq<pymb_binding>(&list_head);
         while (true) {
             if (seq->value == binding)

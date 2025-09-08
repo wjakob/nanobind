@@ -111,6 +111,9 @@ struct type_data {
     const char *name;
     const std::type_info *type;
     PyTypeObject *type_py;
+    // If not null, then nanobind is aware of other frameworks' bindings for
+    // this C++ type. Discriminated pointer: pymb_binding* if the low bit is
+    // zero, or nb_seq<pymb_binding>* if the low bit is one.
     void *foreign_bindings;
 #if defined(Py_LIMITED_API)
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);

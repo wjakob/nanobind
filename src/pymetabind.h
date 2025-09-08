@@ -8,8 +8,11 @@
  *
  * This is version 0.1+dev of pymetabind. Changelog:
  *
- *      Unreleased: Fix typo in Py_GIL_DISABLED. Add pymb_framework::leak_safe.
+ *      Unreleased: Use a bitmask for `pymb_framework::flags` and add leak_safe
+ *                  flag. Change `translate_exception` to be non-throwing.
  *                  Add casts from PyTypeObject* to PyObject* where needed.
+ *                  Fix typo in Py_GIL_DISABLED. Add noexcept to callback types.
+ *                  Rename `hook` -> `link` in linked list nodes.
  *
  *     Version 0.1: Initial draft. ABI may change without warning while we
  *      2025-08-16  prove out the concept. Please wait for a 1.0 release
@@ -66,7 +69,10 @@
 #endif
 
 #if defined(__cplusplus)
+#define PYMB_NOEXCEPT noexcept
 extern "C" {
+#else
+#define PYMB_NOEXCEPT
 #endif
 
 /*
@@ -160,7 +166,7 @@ inline void pymb_list_append(struct pymb_list* list,
 #define PYMB_LIST_FOREACH(type, name, list)      \
     for (type name = (type) (list).head.next;    \
          name != (type) &(list).head;            \
-         name = (type) name->hook.next)
+         name = (type) name->link.next)
 
 /*
  * The registry holds information about all the interoperable binding
@@ -212,6 +218,24 @@ inline void pymb_unlock_registry(struct pymb_registry*) {}
 
 struct pymb_binding;
 
+/* Flags for a `pymb_framework` */
+enum pymb_framework_flags {
+    // Does this framework guarantee that its `pymb_binding` structures remain
+    // valid to use for the lifetime of the Python interpreter process once
+    // they have been linked into the lists in `pymb_registry`? Setting this
+    // flag reduces the number of atomic operations needed to work with
+    // this framework's bindings in free-threaded builds.
+    pymb_framework_bindings_usable_forever = 0x0001,
+
+    // Does this framework reliably deallocate all of its type and function
+    // objects by the time the Python interpreter is finalized, in the absence
+    // of bugs in user code? If not, it might cause leaks of other frameworks'
+    // types or functions, via attributes or default argument values for
+    // this framework's leaked objects. Other frameworks can suppress their
+    // leak warnings (if so equipped) when a non-`leak_safe` framework is added.
+    pymb_framework_leak_safe = 0x0002,
+};
+
 /*
  * Information about one framework that has registered itself with pymetabind.
  * "Framework" here refers to a set of bindings that are natively mutually
@@ -229,7 +253,7 @@ struct pymb_binding;
  * and unmodified (except as documented below) until the Python interpreter
  * is finalized. After finalization, such as in a `Py_AtExit` handler, if
  * all bindings have been removed already, you may optionally clean up by
- * calling `pymb_list_unlink(&framework->hook)` and then deallocating the
+ * calling `pymb_list_unlink(&framework->link)` and then deallocating the
  * `pymb_framework` structure.
  *
  * All fields of this structure are set before it is made visible to other
@@ -238,27 +262,18 @@ struct pymb_binding;
  * individual documentation.
  */
 struct pymb_framework {
-    // Hook by which this structure is linked into the list of
+    // Links to the previous and next framework in the list of
     // `pymb_registry::frameworks`. May be modified as other frameworks are
     // added; protected by the `pymb_registry::mutex` in free-threaded builds.
-    struct pymb_list_node hook;
+    struct pymb_list_node link;
 
     // Human-readable description of this framework, as a NUL-terminated string
     const char* name;
 
-    // Does this framework guarantee that its `pymb_binding` structures remain
-    // valid to use for the lifetime of the Python interpreter process once
-    // they have been linked into the lists in `pymb_registry`? Setting this
-    // to true reduces the number of atomic operations needed to work with
-    // this framework's bindings in free-threaded builds.
-    uint8_t bindings_usable_forever;
-
-    // Does this framework reliably deallocate all of its type and function
-    // objects by the time the Python interpreter is finalized, in the absence
-    // of bugs in user code? If not, it might cause leaks of other frameworks'
-    // types or functions, via attributes or default argument values for
-    // this framework's leaked objects.
-    uint8_t leak_safe;
+    // Flags for this framework, a combination of `enum pymb_framework_flags`.
+    // Undefined flags must be set to zero to allow for future
+    // backward-compatible extensions.
+    uint16_t flags;
 
     // Reserved for future extensions. Set to 0.
     uint8_t reserved[2];
@@ -291,8 +306,8 @@ struct pymb_framework {
 
     // The function pointers below allow other frameworks to interact with
     // bindings provided by this framework. They are constant after construction
-    // and, except for `translate_exception()`, must not throw C++ exceptions.
-    // Unless otherwise documented, they must not be NULL.
+    // and must not throw C++ exceptions. Unless otherwise documented,
+    // they must not be NULL.
 
     // Extract a C/C++/etc object from `pyobj`. The desired type is specified by
     // providing a `pymb_binding*` for some binding that belongs to this
@@ -312,7 +327,13 @@ struct pymb_framework {
     // `keep_referenced` should incref its `obj` immediately and remember
     // that it should be decref'ed later, for no net change in refcount.
     // This is an abstraction around something like the cleanup_list in
-    // nanobind or loader_life_support in pybind11.
+    // nanobind or loader_life_support in pybind11. The pointer returned by
+    // `from_python` may be invalidated once the `keep_referenced` references
+    // are dropped. If you're converting a function argument, you should keep
+    // any `keep_referenced` references alive until the function returns.
+    // If you're converting for some other purpose, you probably want to make
+    // a copy of the object to which `from_python`'s return value points before
+    // you drop the references.
     //
     // On free-threaded builds, callers must ensure that the `binding` is not
     // destroyed during a call to `from_python`. The requirements for this are
@@ -321,7 +342,7 @@ struct pymb_framework {
                          PyObject* pyobj,
                          uint8_t convert,
                          void (*keep_referenced)(void* ctx, PyObject* obj),
-                         void* keep_referenced_ctx);
+                         void* keep_referenced_ctx) PYMB_NOEXCEPT;
 
     // Wrap the C/C++/etc object `cobj` into a Python object using the given
     // return value policy. The type is specified by providing a `pymb_binding*`
@@ -341,7 +362,7 @@ struct pymb_framework {
     PyObject* (*to_python)(struct pymb_binding* binding,
                            void* cobj,
                            enum pymb_rv_policy rvp,
-                           PyObject* parent);
+                           PyObject* parent) PYMB_NOEXCEPT;
 
     // Request that a PyObject reference be dropped, or that a callback
     // be invoked, when `nurse` is destroyed. `nurse` should be an object
@@ -351,40 +372,44 @@ struct pymb_framework {
     // or -1 and sets the Python error indicator on error.
     //
     // No synchronization is required to call this method.
-    int (*keep_alive)(PyObject* nurse, void* payload, void (*cb)(void*));
+    int (*keep_alive)(PyObject* nurse,
+                      void* payload,
+                      void (*cb)(void*)) PYMB_NOEXCEPT;
 
-    // Attempt to translate a C++ exception known to this framework to Python.
-    // This should translate only framework-specific exceptions or user-defined
-    // exceptions that were registered with the framework, not generic
-    // ones such as `std::exception`. If successful, return normally with the
-    // Python error indicator set; otherwise, reraise the provided exception.
-    // `eptr` should be cast to `const std::exception_ptr* eptr` before use.
-    // This function pointer may be NULL if this framework does not provide
-    // C++ exception translation.
+    // Attempt to translate the native exception `eptr` into a Python exception.
+    // If `abi_lang` is C++, then `eptr` should be cast to `std::exception_ptr*`
+    // before use; semantics for other languages have not been defined yet. This
+    // should translate only framework-specific exceptions or user-defined
+    // exceptions that were registered with the framework, not generic ones
+    // such as `std::exception`. If translation succeeds, return 1 with the
+    // Python error indicator set; otherwise, return 0. An exception may be
+    // converted into a different exception by modifying `*eptr` and returning
+    // zero. This function pointer may be NULL if this framework does not
+    // provide exception translation.
     //
     // No synchronization is required to call this method.
-    void (*translate_exception)(const void* eptr);
+    int (*translate_exception)(void* eptr) PYMB_NOEXCEPT;
 
     // Notify this framework that some other framework published a new binding.
     // This call will be made after the new binding has been linked into the
     // `pymb_registry::bindings` list.
     //
     // The `pymb_registry::mutex` or GIL will be held when calling this method.
-    void (*add_foreign_binding)(struct pymb_binding* binding);
+    void (*add_foreign_binding)(struct pymb_binding* binding) PYMB_NOEXCEPT;
 
     // Notify this framework that some other framework is about to remove
     // a binding. This call will be made after the binding has been removed
     // from the `pymb_registry::bindings` list.
     //
     // The `pymb_registry::mutex` or GIL will be held when calling this method.
-    void (*remove_foreign_binding)(struct pymb_binding* binding);
+    void (*remove_foreign_binding)(struct pymb_binding* binding) PYMB_NOEXCEPT;
 
     // Notify this framework that some other framework came into existence.
     // This call will be made after the new framework has been linked into the
     // `pymb_registry::frameworks` list and before it adds any bindings.
     //
     // The `pymb_registry::mutex` or GIL will be held when calling this method.
-    void (*add_foreign_framework)(struct pymb_framework* framework);
+    void (*add_foreign_framework)(struct pymb_framework* framework) PYMB_NOEXCEPT;
 
     // There is no remove_foreign_framework(); the interpreter has
     // already been finalized at that point, so there's nothing for the
@@ -482,9 +507,9 @@ struct pymb_framework {
  * common than using them.
  */
 struct pymb_binding {
-    // Hook by which this structure is linked into the list of
+    // Links to the previous and next bindings in the list of
     // `pymb_registry::bindings`
-    struct pymb_list_node hook;
+    struct pymb_list_node link;
 
     // The framework that provides this binding
     struct pymb_framework* framework;
@@ -500,6 +525,9 @@ struct pymb_binding {
 
     // The way that this type would be written in `framework->abi_lang` source
     // code, as a NUL-terminated byte string without struct/class/enum words.
+    // If `framework->abi_lang` uses name mangling, this is the demangled,
+    // human-readable name. C++ users should note that the result of
+    // `typeid(x).name()` will need platform-specific alteration to produce one.
     // Examples: "Foo", "Bar::Baz", "std::vector<int, std::allocator<int> >"
     const char* source_name;
 
@@ -582,7 +610,7 @@ PYMB_FUNC struct pymb_registry* pymb_get_registry() {
 PYMB_FUNC void pymb_add_framework(struct pymb_registry* registry,
                                   struct pymb_framework* framework) {
 #if defined(Py_GIL_DISABLED) && PY_VERSION_HEX < 0x030e0000
-    assert(framework->bindings_usable_forever &&
+    assert((framework->flags & pymb_framework_bindings_usable_forever) &&
            "Free-threaded removal of bindings requires PyUnstable_TryIncRef(), "
            "which was added in CPython 3.14");
 #endif
@@ -595,7 +623,7 @@ PYMB_FUNC void pymb_add_framework(struct pymb_registry* registry,
             break;
         }
     }
-    pymb_list_append(&registry->frameworks, &framework->hook);
+    pymb_list_append(&registry->frameworks, &framework->link);
     PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
         if (other != framework) {
             other->add_foreign_framework(framework);
@@ -628,7 +656,7 @@ PYMB_FUNC void pymb_add_binding(struct pymb_registry* registry,
         PyErr_WriteUnraisable((PyObject *) binding->pytype);
     }
     pymb_lock_registry(registry);
-    pymb_list_append(&registry->bindings, &binding->hook);
+    pymb_list_append(&registry->bindings, &binding->link);
     PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
         if (other != binding->framework) {
             other->add_foreign_binding(binding);
@@ -646,7 +674,7 @@ PYMB_FUNC void pymb_add_binding(struct pymb_registry* registry,
 PYMB_FUNC void pymb_remove_binding(struct pymb_registry* registry,
                                    struct pymb_binding* binding) {
     pymb_lock_registry(registry);
-    pymb_list_unlink(&binding->hook);
+    pymb_list_unlink(&binding->link);
     PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
         if (other != binding->framework) {
             other->remove_foreign_binding(binding);
@@ -662,7 +690,7 @@ PYMB_FUNC void pymb_remove_binding(struct pymb_registry* registry,
  */
 PYMB_FUNC int pymb_try_ref_binding(struct pymb_binding* binding) {
 #if defined(Py_GIL_DISABLED)
-    if (!binding->framework->bindings_usable_forever) {
+    if (!(binding->framework->flags & pymb_framework_bindings_usable_forever)) {
 #if PY_VERSION_HEX >= 0x030e0000
         return PyUnstable_TryIncRef((PyObject *) binding->pytype);
 #else
@@ -680,7 +708,7 @@ PYMB_FUNC int pymb_try_ref_binding(struct pymb_binding* binding) {
 /* Decrease the reference count of a binding. */
 PYMB_FUNC void pymb_unref_binding(struct pymb_binding* binding) {
 #if defined(Py_GIL_DISABLED)
-    if (!binding->framework->bindings_usable_forever) {
+    if (!(binding->framework->flags & pymb_framework_bindings_usable_forever)) {
 #if PY_VERSION_HEX >= 0x030e0000
         Py_DECREF((PyObject *) binding->pytype);
 #else

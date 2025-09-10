@@ -32,6 +32,16 @@
 #  define NB_THREAD_LOCAL __thread
 #endif
 
+#if defined(PY_BIG_ENDIAN)
+#  define NB_BIG_ENDIAN PY_BIG_ENDIAN
+#else // pypy doesn't define PY_BIG_ENDIAN
+#  if defined(_MSC_VER)
+#    define NB_BIG_ENDIAN 0 // All Windows platforms are little-endian
+#  else // GCC and Clang define the following macros
+#    define NB_BIG_ENDIAN (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#  endif
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

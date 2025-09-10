@@ -167,6 +167,25 @@ class ReplacePattern:
     matches: int
 
 
+def create_subdirectory_for_module(module: types.ModuleType) -> bool:
+    """
+    When creating stubs recursively, prefer putting information directly
+    into a ``submodule.pyi`` file unless the submodule has sub-submodules,
+    or is defined in a nested directory (e.g. ``submodule/__init__.py``).
+    In those two cases, put the stubs into ``submodule/__init__.pyi``
+    """
+
+    for child in module.__dict__.values():
+        if ismodule(child):
+            parent_name, _, _ = child.__name__.rpartition(".")
+            if parent_name == module.__name__:
+                return True
+
+    return hasattr(module, '__file__') \
+        and module.__file__ is not None \
+        and module.__file__.endswith('__init__.py')
+
+
 class StubGen:
     def __init__(
         self,
@@ -428,7 +447,17 @@ class StubGen:
                 overload = self.import_object("typing", "overload")
                 self.write_ln(f"@{overload}")
 
-            sig_str = f"{name}{self.signature_str(signature(fno))}"
+            try:
+                sig = signature(fno)
+            except ValueError:
+                sig = None
+
+            if sig is not None:
+                sig_str = f"{name}{self.signature_str(sig)}"
+            else:
+                # If inspect.signature fails, use a maximally permissive type.
+                any_type = self.import_object("typing", "Any")
+                sig_str = f"{name}(*args, **kwargs) -> {any_type}"
 
             # Potentially copy docstring from the implementation function
             docstr = fno.__doc__
@@ -612,14 +641,14 @@ class StubGen:
 
         - "local_module.X" -> "X"
 
-        - "other_module.X" -> "other_module.XX"
+        - "other_module.X" -> "other_module.X"
           (with "import other_module" added at top)
 
         - "builtins.X" -> "X"
 
         - "NoneType" -> "None"
 
-        - "ndarray[...]" -> "Annotated[ArrayLike, dict(...)]"
+        - "ndarray[...]" -> "Annotated[NDArray[dtype], dict(..extras..)]"
 
         - "collections.abc.X" -> "X"
           (with "from collections.abc import X" added at top)
@@ -630,21 +659,7 @@ class StubGen:
         """
 
         # Process nd-array type annotations so that MyPy accepts them
-        def process_ndarray(m: Match[str]) -> str:
-            s = m.group(2)
-
-            ndarray = self.import_object("numpy.typing", "ArrayLike")
-            assert ndarray
-            s = re.sub(r"dtype=([\w]*)\b", r"dtype='\g<1>'", s)
-            s = s.replace("*", "None")
-
-            if s:
-                annotated = self.import_object("typing", "Annotated")
-                return f"{annotated}[{ndarray}, dict({s})]"
-            else:
-                return ndarray
-
-        s = self.ndarray_re.sub(process_ndarray, s)
+        s = self.ndarray_re.sub(lambda m: self._format_ndarray(m.group(2)), s)
 
         if sys.version_info >= (3, 9, 0):
             s = self.abc_re.sub(r'collections.abc.\1', s)
@@ -695,6 +710,27 @@ class StubGen:
         s = self.id_seq.sub(process_general, s)
 
         return s
+
+    def _format_ndarray(self, annotation: str) -> str:
+        """Improve NumPy type annotations for static type checking"""
+        dtype = None
+        m = re.search(r"dtype=(\w+)", annotation)
+
+        if m:
+            dtype = "numpy."+ m.group(1)
+            annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
+
+        # Turn shape notation into a valid Python type expression
+        annotation = annotation.replace("*", "None").replace("(None)", "(None,)")
+
+        # Build type while potentially preserving extra information as an annotation
+        ndarray = self.import_object("numpy.typing", "NDArray")
+        result = f"{ndarray}[{dtype}]" if dtype else ndarray
+        if annotation:
+            annotated = self.import_object("typing", "Annotated")
+            result = f"{annotated}[{result}, dict({annotation})]"
+
+        return result
 
     def apply_pattern(self, query: str, value: object) -> bool:
         """
@@ -812,16 +848,15 @@ class StubGen:
                     # Do not include submodules in the same stub, but include a directive to import them
                     self.import_object(value.__name__, name=None, as_name=name)
 
-                    # If the user requested this, generate a separate stub recursively
+                    # If the user requested this, generate recursive stub files as well
                     if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
-                        module_file = getattr(value, '__file__', None)
-
-                        if not module_file or module_file.endswith('__init__.py'):
+                        if create_subdirectory_for_module(value):
+                            # Create a new subdirectory and start with an __init__.pyi file there
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
                             dir_name.mkdir(parents=False, exist_ok=True)
                             output_file = dir_name / '__init__.pyi'
                         else:
-                            output_file = self.output_file.parents[0] / (value_name_s[-1] + '.py')
+                            output_file = self.output_file.parents[0] / (value_name_s[-1] + '.pyi')
 
                         sg = StubGen(
                             module=value,
@@ -837,6 +872,7 @@ class StubGen:
                         )
 
                         sg.put(value)
+                        output_file = output_file.resolve()
 
                         if not self.quiet:
                             print(f'  - writing stub "{output_file}" ..')
@@ -1065,7 +1101,7 @@ class StubGen:
             result += " = " if has_type else "="
             p_default_str = self.expr_str(p.default)
             if p_default_str is None:
-                # self.expr_str(p.default) could return None in some rare cases, 
+                # self.expr_str(p.default) could return None in some rare cases,
                 # e.g. p.default is a nanobind object. If so, use ellipsis as a placeholder.
                 p_default_str = "..."
             assert p_default_str
@@ -1232,10 +1268,11 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "-M",
         "--marker-file",
+        action="append",
         metavar="FILE",
         dest="marker_file",
-        default=None,
-        help="generate a marker file (usually named 'py.typed')",
+        default=[],
+        help="generate a marker file (usually named 'py.typed', can specify multiple times)",
     )
 
     parser.add_argument(
@@ -1397,6 +1434,10 @@ def main(args: Optional[List[str]] = None) -> None:
             if opt.output_dir:
                 file = Path(opt.output_dir, file.name)
 
+            if opt.recursive and create_subdirectory_for_module(mod_imported) \
+                and file.name != '__init__.pyi':
+                    file = file.with_suffix('') / "__init__.pyi"
+
         file.parents[0].mkdir(parents=True, exist_ok=True)
 
         sg = StubGen(
@@ -1428,16 +1469,19 @@ def main(args: Optional[List[str]] = None) -> None:
             if not opt.quiet:
                 print(f"  - applied {total_matches} patterns.")
 
+        file = file.resolve()
+
         if not opt.quiet:
             print(f'  - writing stub "{file}" ..')
 
         with open(file, "w", encoding='utf-8') as f:
             f.write(sg.get())
 
-    if opt.marker_file:
+    for marker_file in opt.marker_file:
+        marker_file = Path(marker_file).resolve()
         if not opt.quiet:
-            print(f'  - writing marker file "{opt.marker_file}" ..')
-        Path(opt.marker_file).touch()
+            print(f'  - writing marker file "{marker_file}" ..')
+        marker_file.touch()
 
 
 if __name__ == "__main__":

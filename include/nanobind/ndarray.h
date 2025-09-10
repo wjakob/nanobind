@@ -85,6 +85,7 @@ NB_FRAMEWORK(pytorch, 2, "torch.Tensor");
 NB_FRAMEWORK(tensorflow, 3, "tensorflow.python.framework.ops.EagerTensor");
 NB_FRAMEWORK(jax, 4, "jaxlib.xla_extension.DeviceArray");
 NB_FRAMEWORK(cupy, 5, "cupy.ndarray");
+NB_FRAMEWORK(memview, 6, "memoryview");
 
 NAMESPACE_BEGIN(device)
 NB_DEVICE(none, 0); NB_DEVICE(cpu, 1); NB_DEVICE(cuda, 2);

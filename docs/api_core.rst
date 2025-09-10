@@ -1085,7 +1085,7 @@ Wrapper classes
       *Note*: The C string will be deleted when the `str` instance is garbage
       collected.
 
-   .. cpp:function:: template <typename... Args> str format(Args&&... args)
+   .. cpp:function:: template <typename... Args> str format(Args&&... args) const
 
       C++ analog of the Python routine ``str.format``. Can be called with
       positional and keyword arguments.
@@ -1610,7 +1610,10 @@ Casting
    When the `convert` argument is set to ``true`` (the default), the
    implementation may also attempt *implicit conversions* to perform the cast.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
    See :cpp:func:`try_cast()` for an alternative that never raises.
 
 .. cpp:function:: template <typename T, typename Derived> bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept
@@ -1632,7 +1635,10 @@ Casting
    policy `policy` is used to handle ownership-related questions when a new
    Python object must be created.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
 
 .. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy, handle parent)
 
@@ -1641,7 +1647,10 @@ Casting
    Python object must be created. A valid `parent` object is required when
    specifying a `reference_internal` return value policy.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
 
 .. cpp:function:: template <typename T> object find(const T &value) noexcept
 
@@ -1655,7 +1664,10 @@ Casting
    value policy `policy` is used to handle ownership-related questions when a
    new Python objects must be created.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
 
 Common binding annotations
 --------------------------

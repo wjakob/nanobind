@@ -54,7 +54,7 @@ static void *nb_foreign_from_python(pymb_binding *binding,
             enum_from_python(td->type, pyobj, &value, td->size,
                              convert ? uint8_t(cast_flags::convert) : 0,
                              nullptr)) {
-            bytes holder{(uint8_t *) &value + PY_BIG_ENDIAN * (8 - td->size),
+            bytes holder{(uint8_t *) &value + NB_BIG_ENDIAN * (8 - td->size),
                          td->size};
             keep_referenced(keep_referenced_ctx, holder.ptr());
             return (void *) holder.data();

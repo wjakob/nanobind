@@ -279,7 +279,7 @@ PyObject *enum_from_cpp(const std::type_info *tp,
     if (!t) {
 #if !defined(NB_DISABLE_INTEROP)
         if (has_foreign) {
-#if PY_BIG_ENDIAN
+#if NB_BIG_ENDIAN
             // Adjust key so it can be safely reinterpreted as a smaller integer
             key >>= 8 * (8 - enum_width);
 #else

@@ -15,7 +15,9 @@ def remove_platform_dependent(s):
     i = 0
     while i < len(s):
         v = s[i]
-        if v.startswith('def ret_numpy_half()') or \
+        if v.strip().startswith('float16'):
+            i += 1
+        elif v.startswith('def ret_numpy_half()') or \
            v.startswith('def test_slots()') or \
            v.startswith('TypeAlias'):
             i += 2
@@ -25,7 +27,7 @@ def remove_platform_dependent(s):
     return s2
 
 
-ref_paths = list(pathlib.Path(__file__).parent.glob('*.pyi.ref'))
+ref_paths = list(pathlib.Path(__file__).parent.rglob('*.pyi.ref'))
 ref_path_ids = [p.name[:-len('.pyi.ref')] for p in ref_paths]
 assert len(ref_paths) > 0, "Stub reference files not found!"
 

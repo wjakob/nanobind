@@ -103,7 +103,7 @@ NB_CORE void fail(const char *fmt, ...) noexcept;
 NB_CORE void raise_next_overload_if_null(void *p);
 
 /// Raise nanobind::cast_error
-[[noreturn]] NB_CORE void raise_cast_error();
+[[noreturn]] NB_CORE void raise_python_or_cast_error();
 
 // ========================================================================
 

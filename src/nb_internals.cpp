@@ -273,8 +273,8 @@ static void internals_cleanup() {
             for (auto [f, p2] : p->funcs) {
                 fprintf(stderr, " - leaked function \"%s\"\n",
                         nb_func_data(f)->name);
+                INC_CTR;
                 if (ctr == 10) {
-                    INC_CTR;
                     fprintf(stderr, " - ... skipped remainder\n");
                     break;
                 }

@@ -167,10 +167,44 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     rev->emplace((int64_t) (uintptr_t) el.ptr(), value_);
 }
 
-bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8_t flags) noexcept {
-    type_data *t = nb_type_c2p(internals, tp);
-    if (!t)
+bool enum_from_python(const std::type_info *tp,
+                      PyObject *o,
+                      int64_t *out,
+                      uint32_t enum_width,
+                      uint8_t flags,
+                      cleanup_list *cleanup) noexcept {
+    bool has_foreign = false;
+
+#if !defined(NB_DISABLE_INTEROP)
+    auto try_foreign = [=, &has_foreign]() -> bool {
+        if (has_foreign) {
+            void *ptr = nb_type_get_foreign(internals, tp, o, flags, cleanup);
+            if (ptr) {
+                // Copy from the C++ enum object to our output integer.
+                // We don't bother sign-extending because the enum type caster
+                // is just going to truncate back down to `out_width`
+                // immediately. (For a signed destination type, the behavior
+                // was formally implementation-defined before C++20, but all
+                // known implementations behaved as described.)
+                switch (enum_width) {
+                    case 1: *out = *(uint8_t *) ptr; return true;
+                    case 2: *out = *(uint16_t *) ptr; return true;
+                    case 4: *out = *(uint32_t *) ptr; return true;
+                    case 8: *out = *(uint64_t *) ptr; return true;
+                    default: return false;
+                }
+                return true;
+            }
+        }
         return false;
+    };
+#else
+    auto try_foreign = []() { return nullptr; };
+#endif
+
+    type_data *t = nb_type_c2p(internals, tp, &has_foreign);
+    if (!t)
+        return try_foreign();
 
     if ((t->flags & (uint32_t) enum_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
         PyObject *value_o = PyObject_GetAttrString(o, "value");
@@ -212,7 +246,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
             long long value = PyLong_AsLongLong(o);
             if (value == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
-                return false;
+                return try_foreign();
             }
             enum_map::iterator it2 = fwd->find((int64_t) value);
             if (it2 != fwd->end()) {
@@ -223,7 +257,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
             unsigned long long value = PyLong_AsUnsignedLongLong(o);
             if (value == (unsigned long long) -1 && PyErr_Occurred()) {
                 PyErr_Clear();
-                return false;
+                return try_foreign();
             }
             enum_map::iterator it2 = fwd->find((int64_t) value);
             if (it2 != fwd->end()) {
@@ -234,13 +268,29 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
 
     }
 
-    return false;
+    return try_foreign();
 }
 
-PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
-    type_data *t = nb_type_c2p(internals, tp);
-    if (!t)
+PyObject *enum_from_cpp(const std::type_info *tp,
+                        int64_t key,
+                        uint32_t enum_width) noexcept {
+    bool has_foreign = false;
+    type_data *t = nb_type_c2p(internals, tp, &has_foreign);
+    if (!t) {
+#if !defined(NB_DISABLE_INTEROP)
+        if (has_foreign) {
+#if PY_BIG_ENDIAN
+            // Adjust key so it can be safely reinterpreted as a smaller integer
+            key >>= 8 * (8 - enum_width);
+#else
+            (void) enum_width;
+#endif
+            return nb_type_put_foreign(internals, tp, nullptr, &key,
+                                       rv_policy::copy, nullptr, nullptr);
+        }
+#endif
         return nullptr;
+    }
 
     enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
 

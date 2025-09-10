@@ -15,6 +15,24 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (unreleased)
+------------------------
+
+.. TODO: update the pybind11 version number below before releasing
+
+- nanobind has adopted the new `pymetabind
+  <https://github.com/hudson-trading/pymetabind>`__ standard for interoperating
+  with other Python binding libraries (including other ABI versions of
+  nanobind). When the interoperability feature is activated, which in most cases
+  is as simple as writing :cpp:func:`nb::interoperate_by_default()
+  <interoperate_by_default>`, a function or method that is bound using nanobind
+  can accept and return values of types that were bound using other binding
+  libraries that support pymetabind, notably including pybind11 versions !TBD!
+  and later. This feature is likely to be of **great utility** to anyone who
+  is working on porting large or interconnected extension modules from pybind11
+  to nanobind. See the extensive :ref:`interoperability documentation <interop>`
+  for more details.
+
 Version 2.8.0 (July 16, 2025)
 -----------------------------
 
@@ -295,7 +313,7 @@ Version 2.3.0
 
 There is no version 2.3.0 due to a deployment mishap.
 
-- Added casters for `Eigen::Map<Eigen::SparseMatrix<...>` types from the `Eigen library
+- Added casters for ``Eigen::Map<Eigen::SparseMatrix<...>`` types from the `Eigen library
   <https://eigen.tuxfamily.org/index.php?title=Main_Page>`__. (PR `#782
   <https://github.com/wjakob/nanobind/pull/782>`_).
 

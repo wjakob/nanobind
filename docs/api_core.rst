@@ -3130,11 +3130,23 @@ Global flags
    functions are still alive when the Python interpreter shuts down. Call this
    function to disable or re-enable leak warnings.
 
+   The configuration affected by this function is global to a :ref:`nanobind
+   domain <type-visibility>`. If you use it, you are encouraged to isolate your
+   extension from others by passing the ``NB_DOMAIN`` parameter to the
+   :cmake:command:`nanobind_add_module()` CMake command, so that your choices
+   don't need to impact unrelated extensions.
+
 .. cpp:function:: void set_implicit_cast_warnings(bool value) noexcept
 
    By default, nanobind loudly complains when it attempts to perform an
    implicit conversion, and when that conversion is not successful. Call this
    function to disable or re-enable the warnings.
+
+   The configuration affected by this function is global to a :ref:`nanobind
+   domain <type-visibility>`. If you use it, you are encouraged to isolate your
+   extension from others by passing the ``NB_DOMAIN`` parameter to the
+   :cmake:command:`nanobind_add_module()` CMake command, so that your choices
+   don't need to impact unrelated extensions.
 
 .. cpp:function:: inline bool is_alive() noexcept
 
@@ -3143,6 +3155,85 @@ Global flags
    the destruction various nanobind-internal data structures. Having access to
    this liveness status can be useful to avoid operations that are illegal in
    the latter context.
+
+Interoperability
+----------------
+
+See the :ref:`separate interoperability documentation <interop>` for important
+additional information and caveats about this feature.
+
+.. cpp:function:: void interoperate_by_default(bool export_all = true, bool import_all = true)
+
+   Configure whether this :ref:`nanobind domain <type-visibility>` should exchange
+   type information with other binding libraries (and other nanobind domains)
+   so that functions bound in one can accept and return objects whose types are
+   bound in another. The default, if :cpp:func:`interoperate_by_default` is not
+   called, is to exchange such information only when requested on a per-type
+   basis via calls to :cpp:func:`import_for_interop` or
+   :cpp:func:`export_for_interop`.
+
+   By specifying arguments to :cpp:func:`interoperate_by_default`, it is
+   possible to separately configure whether to enable automatic sharing of
+   our types with others (*export_all*) or automatic use of types shared by
+   others (*import_all*). Once either type of automatic sharing is enabled,
+   it remains enabled for the lifetime of the Python interpreter.
+
+   Automatic export is equivalent to calling :cpp:func:`export_for_interop` on
+   each type produced by a :cpp:class:`nb::class_` or :cpp:struct:`nb::enum_`
+   binding statement in this nanobind domain.
+
+   Automatic import is equivalent to calling :cpp:func:`import_for_interop` on
+   each type exported by a different binding library or nanobind domain, as
+   long as that library is written in C++ and uses a compatible platform ABI.
+   In order to interoperate with a type binding that was created in another
+   language, including pure C, you must still make an explicit call to
+   :cpp:func:`import_for_interop`, providing a template argument so that
+   nanobind can tell which C++ type should be associated with it.
+
+   Enabling automatic export or import affects both types that have already been
+   bound and types that are yet to be bound.
+
+   The configuration affected by this function is global to a nanobind
+   domain. If you use it, you are encouraged to isolate your extension from
+   others by passing the ``NB_DOMAIN`` parameter to the
+   :cmake:command:`nanobind_add_module()` CMake command, so that your choices
+   don't need to impact unrelated extensions.
+
+.. cpp:function:: template <typename T = void> void import_for_interop(handle type)
+
+   Make the Python type object *type*, which was bound using a different binding
+   framework (or different nanobind domain) and then exported using a facility
+   like our :cpp:func:`export_for_interop`, be available so that functions bound
+   in this nanobind domain can accept and return its instances using the
+   C++ type ``T``, or the C++ type that was specified when *type* was bound.
+
+   If no template argument is specified, then *type* must have been bound by
+   another C++ binding library that uses the same :ref:`platform ABI
+   <type-visibility>` as us; the C++ type will be determined by inspecting its
+   binding.
+
+   If a template argument is specified, then nanobind associates that C++ type
+   with the given Python type, trusting rather than verifying that they match.
+   The C++ type ``T`` must perfectly match the memory layout and ABI of the
+   structure used by whoever bound the Python *type*.
+   This is the only way to import types written in other languages than C++
+   (including those in plain C), since nanobind needs a ``std::type_info`` for
+   its type lookups and non-C++ bindings don't provide those directly.
+
+   Repeatedly importing the same Python type as the same C++ type is idempotent.
+   Importing the same Python type as multiple different C++ types will fail.
+
+   A descriptive C++ exception will be thrown if the import fails.
+
+.. cpp:function:: void export_for_interop(handle type)
+
+   Make the Python type object *type*, which was bound in this nanobind domain,
+   be available for import by other binding libraries and other nanobind
+   domains. If they do so, then their bound functions will be able to accept
+   and return instances of *type*.
+
+   Repeatedly exporting the same type is idempotent.
+
 
 Miscellaneous
 -------------

@@ -8,7 +8,7 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
-#if !defined(NB_DISABLE_FOREIGN)
+#if !defined(NB_DISABLE_INTEROP)
 
 #include "nb_internals.h"
 #include "nb_ft.h"
@@ -48,6 +48,20 @@ static void *nb_foreign_from_python(pymb_binding *binding,
                                     void *keep_referenced_ctx) noexcept {
     cleanup_list cleanup{nullptr};
     auto *td = (type_data *) binding->context;
+    if (td->align == 0) { // enum
+        int64_t value;
+        if (keep_referenced &&
+            enum_from_python(td->type, pyobj, &value, td->size,
+                             convert ? uint8_t(cast_flags::convert) : 0,
+                             nullptr)) {
+            bytes holder{(uint8_t *) &value + PY_BIG_ENDIAN * (8 - td->size),
+                         td->size};
+            keep_referenced(keep_referenced_ctx, holder.ptr());
+            return (void *) holder.data();
+        }
+        return nullptr;
+    }
+
     void *result = nullptr;
     bool ok = nb_type_get(td->type, pyobj,
                           convert ? uint8_t(cast_flags::convert) : 0,
@@ -69,6 +83,25 @@ static PyObject *nb_foreign_to_python(pymb_binding *binding,
                                       PyObject *parent) noexcept {
     cleanup_list cleanup{parent};
     auto *td = (type_data *) binding->context;
+    if (td->align == 0) { // enum
+        int64_t key;
+        switch (td->size) {
+            case 1: key = *(uint8_t *) cobj; break;
+            case 2: key = *(uint16_t *) cobj; break;
+            case 4: key = *(uint32_t *) cobj; break;
+            case 8: key = *(uint64_t *) cobj; break;
+            default: return nullptr;
+        }
+        if (rvp_ == pymb_rv_policy_take_ownership)
+            ::operator delete(cobj);
+        if ((td->flags & (uint32_t) enum_flags::is_signed) && td->size < 8) {
+            // sign extend
+            key <<= (64 - (td->size * 8));
+            key >>= (64 - (td->size * 8));
+        }
+        return enum_from_cpp(td->type, key, td->size);
+    }
+
     rv_policy rvp = (rv_policy) rvp_;
     if (rvp < rv_policy::take_ownership || rvp > rv_policy::none) {
         // Future-proofing in case additional pymb_rv_policies are defined
@@ -434,7 +467,7 @@ void *nb_type_try_foreign(nb_internals *internals_,
                           const std::type_info *type,
                           void* (*attempt)(void *closure,
                                            pymb_binding *binding),
-                          void *closure) {
+                          void *closure) noexcept {
     // It is not valid to reuse the lookup made by a previous nb_type_c2p(),
     // because some bindings could have been removed between then and now.
 #if defined(NB_FREE_THREADED)
@@ -548,4 +581,4 @@ void *nb_type_try_foreign(nb_internals *internals_,
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 
-#endif /* !defined(NB_DISABLE_FOREIGN) */
+#endif /* !defined(NB_DISABLE_INTEROP) */

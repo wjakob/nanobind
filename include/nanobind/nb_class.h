@@ -106,8 +106,8 @@ struct enum_tbl_t {
 /// Information about a type that persists throughout its lifetime
 struct type_data {
     uint32_t size;
-    uint32_t align : 8;
-    uint32_t flags : 24;
+    uint32_t align : 8; // always zero for an enum
+    uint32_t flags : 24; // type_flags or enum_flags
     const char *name;
     const std::type_info *type;
     PyTypeObject *type_py;
@@ -212,6 +212,7 @@ struct enum_init_data {
     PyObject *scope;
     const char *name;
     const char *docstr;
+    uint32_t size;
     uint32_t flags;
 };
 
@@ -333,15 +334,16 @@ inline void *type_get_slot(handle h, int slot_id) {
 }
 
 // nanobind interoperability with other binding frameworks
-inline void set_foreign_type_defaults(bool export_all, bool import_all) {
-    detail::nb_type_set_foreign_defaults(export_all, import_all);
+inline void interoperate_by_default(bool export_all = true,
+                                    bool import_all = true) {
+    detail::nb_type_set_interop_defaults(export_all, import_all);
 }
 template <class T = void>
-inline void import_foreign_type(handle type) {
+inline void import_for_interop(handle type) {
     detail::nb_type_import(type.ptr(),
                            std::is_void_v<T> ? nullptr : &typeid(T));
 }
-inline void export_type_to_foreign(handle type) {
+inline void export_for_interop(handle type) {
     detail::nb_type_export(type.ptr());
 }
 
@@ -787,6 +789,7 @@ public:
     NB_INLINE enum_(handle scope, const char *name, const Extra &... extra) {
         detail::enum_init_data ed { };
         ed.type = &typeid(T);
+        ed.size = sizeof(T);
         ed.scope = scope.ptr();
         ed.name = name;
         ed.flags = std::is_signed_v<Underlying>

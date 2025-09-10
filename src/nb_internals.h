@@ -194,7 +194,7 @@ nb_seq<T>* nb_ensure_seq(void **p) {
 /// or (pymb_binding*) nb_get_foreign(p) depending on the value of
 /// nb_is_seq(nb_get_foreign(p)).
 
-#if defined(NB_DISABLE_FOREIGN)
+#if defined(NB_DISABLE_INTEROP)
 NB_INLINE bool nb_is_foreign(void *) { return false; }
 #else
 NB_INLINE bool nb_is_foreign(void *p) { return ((uintptr_t) p) & 2; }
@@ -752,12 +752,24 @@ extern nb_type_map_per_thread::guard nb_type_lock_c2p_fast(
 extern void nb_type_update_c2p_fast(const std::type_info *type,
                                     void *value) noexcept;
 
-#if !defined(NB_DISABLE_FOREIGN)
+#if !defined(NB_DISABLE_INTEROP)
 extern void *nb_type_try_foreign(nb_internals *internals_,
                                  const std::type_info *type,
                                  void* (*attempt)(void *closure,
                                                   pymb_binding *binding),
-                                 void *closure);
+                                 void *closure) noexcept;
+extern void *nb_type_get_foreign(nb_internals *internals_,
+                                 const std::type_info *cpp_type,
+                                 PyObject *src,
+                                 uint8_t flags,
+                                 cleanup_list *cleanup) noexcept;
+extern PyObject *nb_type_put_foreign(nb_internals *internals_,
+                                     const std::type_info *cpp_type,
+                                     const std::type_info *cpp_type_p,
+                                     void *value,
+                                     rv_policy rvp,
+                                     cleanup_list *cleanup,
+                                     bool *is_new) noexcept;
 extern void nb_type_import_impl(PyObject *pytype,
                                 const std::type_info *cpptype);
 extern void nb_type_export_impl(type_data *td);

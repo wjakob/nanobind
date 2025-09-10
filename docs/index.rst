@@ -128,6 +128,7 @@ The nanobind logo was designed by `AndoTwin Studio
    packaging
    typing
    utilities
+   interop
 
 .. toctree::
    :caption: Advanced

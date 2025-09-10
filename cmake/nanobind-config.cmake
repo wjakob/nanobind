@@ -238,7 +238,7 @@ function (nanobind_build_library TARGET_NAME)
   endif()
 
   if (TARGET_NAME MATCHES "-local")
-    target_compile_definitions(${TARGET_NAME} PRIVATE NB_DISABLE_FOREIGN)
+    target_compile_definitions(${TARGET_NAME} PRIVATE NB_DISABLE_INTEROP)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't

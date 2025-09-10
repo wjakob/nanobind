@@ -1308,7 +1308,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     auto it = internals_->type_c2p_slow.find(*descr_type);
                     if (it != internals_->type_c2p_slow.end()) {
                         object ty;
-#if !defined(NB_DISABLE_FOREIGN)
+#if !defined(NB_DISABLE_INTEROP)
                         if (nb_is_foreign(it->second)) {
                             void *bindings = nb_get_foreign(it->second);
                             pymb_binding *binding =

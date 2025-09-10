@@ -389,7 +389,7 @@ NB_CORE void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept;
 NB_CORE std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept;
 
 // Set whether types will be shared with other binding frameworks by default
-NB_CORE void nb_type_set_foreign_defaults(bool export_all, bool import_all);
+NB_CORE void nb_type_set_interop_defaults(bool export_all, bool import_all);
 
 // Teach nanobind about a type bound by another binding framework
 NB_CORE void nb_type_import(PyObject *pytype, const std::type_info *cpptype);
@@ -446,11 +446,13 @@ NB_CORE void enum_append(PyObject *tp, const char *name,
                          int64_t value, const char *doc) noexcept;
 
 // Query an enumeration's Python object -> integer value map
-NB_CORE bool enum_from_python(const std::type_info *, PyObject *, int64_t *,
-                              uint8_t flags) noexcept;
+NB_CORE bool enum_from_python(const std::type_info *tp, PyObject *obj,
+                              int64_t *out, uint32_t enum_width,
+                              uint8_t flags, cleanup_list *cleanup) noexcept;
 
 // Query an enumeration's integer value -> Python object map
-NB_CORE PyObject *enum_from_cpp(const std::type_info *, int64_t) noexcept;
+NB_CORE PyObject *enum_from_cpp(const std::type_info *tp,
+                                int64_t key, uint32_t enum_width) noexcept;
 
 /// Export enum entries to the parent scope
 NB_CORE void enum_export(PyObject *tp);

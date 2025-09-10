@@ -377,6 +377,8 @@ struct nb_type_map_per_thread {
     explicit nb_type_map_per_thread(nb_internals &internals_);
     ~nb_type_map_per_thread();
 
+    struct guard;
+
     struct guard {
         guard() = default;
         guard(guard&& other) noexcept : parent(other.parent) {
@@ -394,6 +396,9 @@ struct nb_type_map_per_thread {
         nb_type_map_fast& operator*() const { return parent->map; }
         nb_type_map_fast* operator->() const { return &parent->map; }
 
+        uint32_t updates_count() const { return parent->updates; }
+        void note_updated() { ++parent->updates; }
+
       private:
         friend nb_type_map_per_thread;
         explicit guard(nb_type_map_per_thread &parent_) : parent(&parent_) {
@@ -403,10 +408,14 @@ struct nb_type_map_per_thread {
     };
     guard lock() { return guard{*this}; }
 
-    // Mutex protecting accesses to `map`
+    // Mutex protecting accesses to `updates` and `map`
     PyMutex mutex{};
-    nb_type_map_fast map;
+
+    // The number of times `map` has been modified
+    uint32_t updates = 0;
+
     nb_internals &internals;
+    nb_type_map_fast map;
 
     // In order to access or modify `next`, you must hold the nb_internals mutex
     // (this->mutex is not needed for iteration)
@@ -574,10 +583,6 @@ struct nb_translator_seq {
  * - `types_in_c2p_fast`: Used only when accessing or updating `type_c2p_slow`, so
  *   protecting it with the global `mutex` adds no additional overhead.
  *
- * - `foreign_registry`, `foreign_self`: created only once on demand,
- *   protected by `mutex`; often OK to read without locking since they never
- *   change once set
- *
  * - `type_c2p_fast`: this data structure is *hot* and mostly read. It serves
  *   as a cache of `type_c2p_slow`, mapping `std::type_info` to type data using
  *   pointer-based comparisons. On free-threaded builds, each thread gets its
@@ -594,6 +599,13 @@ struct nb_translator_seq {
  *
  * - `funcs`: data structure for function leak tracking. Not used in
  *   free-threaded mode.
+ *
+ * - `foreign_self`, `foreign_exception_translator`: created only once on
+ *   demand, protected by `mutex`; often OK to read without locking since
+ *   they never change once set
+ *
+ * - `foreign_manual_imports`: accessed and modified only during binding import
+ *   and removal, which are rare; protected by internals lock
  *
  * - `print_leak_warnings`, `print_implicit_cast_warnings`,
  *   `foreign_export`, `foreign_import`: simple configuration flags.
@@ -694,9 +706,6 @@ struct nb_internals {
     /// we can skip some logic in nb_type_get/put.
     bool foreign_imported_any = false;
 
-    /// Pointer to pymetabind registry, if enabled
-    pymb_registry *foreign_registry = nullptr;
-
     /// Pointer to our own framework object in pymetabind, if enabled
     pymb_framework *foreign_self = nullptr;
 
@@ -732,6 +741,9 @@ struct nb_internals {
 
     // Size of the 'shards' data structure. Only rarely accessed, hence at the end
     size_t shard_count = 1;
+
+    // NB_DOMAIN string used to initialize this nanobind domain
+    const char *domain;
 };
 
 /// Convenience macro to potentially access cached functions
@@ -809,6 +821,9 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
         return nb_type_data_static(o);
     #endif
 }
+
+// Fetch the type record from an enum created by nanobind
+extern type_init_data *enum_get_type_data(handle tp);
 
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);

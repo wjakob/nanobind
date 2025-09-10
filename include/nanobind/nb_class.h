@@ -204,7 +204,10 @@ enum class enum_flags : uint32_t {
     is_signed                = (1 << 2),
 
     /// Is the underlying enumeration type Flag?
-    is_flag                = (1 << 3)
+    is_flag                  = (1 << 3),
+
+    /// Was the enum successfully registered with nanobind?
+    is_registered            = (1 << 4),
 };
 
 struct enum_init_data {
@@ -340,6 +343,12 @@ inline void interoperate_by_default(bool export_all = true,
 }
 template <class T = void>
 inline void import_for_interop(handle type) {
+    if constexpr (!std::is_void_v<T>) {
+        static_assert(
+            detail::is_base_caster_v<detail::make_caster<T>>,
+            "Types that are intercepted by a type caster cannot use the "
+            "interoperability feature");
+    }
     detail::nb_type_import(type.ptr(),
                            std::is_void_v<T> ? nullptr : &typeid(T));
 }

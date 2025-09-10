@@ -6,13 +6,26 @@
  * This functionality is intended to be used by the framework itself,
  * rather than by users of the framework.
  *
- * This is version 0.1+dev of pymetabind. Changelog:
+ * This is version 0.2+dev of pymetabind. Changelog:
  *
- *      Unreleased: Use a bitmask for `pymb_framework::flags` and add leak_safe
- *                  flag. Change `translate_exception` to be non-throwing.
+ *      Unreleased: Don't do a Py_DECREF in `pymb_remove_framework` since the
+ *                  interpreter might already be finalized at that point.
+ *                  Revamp binding lifetime logic. Add `remove_local_binding`
+ *                  and `free_local_binding` callbacks.
+ *                  Add `pymb_framework::registry` and use it to simplify
+ *                  the signatures of `pymb_remove_framework`,
+ *                  `pymb_add_binding`, and `pymb_remove_binding`.
+ *
+ *     Version 0.2: Use a bitmask for `pymb_framework::flags` and add leak_safe
+ *      2025-09-11  flag. Change `translate_exception` to be non-throwing.
  *                  Add casts from PyTypeObject* to PyObject* where needed.
  *                  Fix typo in Py_GIL_DISABLED. Add noexcept to callback types.
  *                  Rename `hook` -> `link` in linked list nodes.
+ *                  Use `static inline` linkage in C. Free registry on exit.
+ *                  Clear list hooks when adding frameworks/bindings in case
+ *                  the user didn't zero-initialize. Avoid abi_extra string
+ *                  comparisons if the strings are already pointer-equal.
+ *                  Add `remove_foreign_framework` callback.
  *
  *     Version 0.1: Initial draft. ABI may change without warning while we
  *      2025-08-16  prove out the concept. Please wait for a 1.0 release
@@ -46,16 +59,25 @@
 
 #include <stddef.h>
 #include <assert.h>
+#include <string.h>
 
 #if !defined(PY_VERSION_HEX)
 #  error You must include Python.h before this header
 #endif
 
+// `inline` in C implies a promise to provide an out-of-line definition
+// elsewhere; in C++ it does not.
+#ifdef __cplusplus
+#  define PYMB_INLINE inline
+#else
+#  define PYMB_INLINE static inline
+#endif
+
 /*
  * There are two ways to use this header file. The default is header-only style,
- * where all functions are defined as `inline`. If you want to emit functions
- * as non-inline, perhaps so you can link against them from non-C/C++ code,
- * then do the following:
+ * where all functions are defined as `inline` (C++) / `static inline` (C).
+ * If you want to emit functions as non-inline, perhaps so you can link against
+ * them from non-C/C++ code, then do the following:
  * - In every compilation unit that includes this header, `#define PYMB_FUNC`
  *   first. (The `PYMB_FUNC` macro will be expanded in place of the "inline"
  *   keyword, so you can also use it to add any other declaration attributes
@@ -65,7 +87,7 @@
  *   compilation unit that doesn't request `PYMB_DECLS_ONLY`.
  */
 #if !defined(PYMB_FUNC)
-#define PYMB_FUNC inline
+#define PYMB_FUNC PYMB_INLINE
 #endif
 
 #if defined(__cplusplus)
@@ -141,11 +163,11 @@ struct pymb_list {
     struct pymb_list_node head;
 };
 
-inline void pymb_list_init(struct pymb_list* list) {
+PYMB_INLINE void pymb_list_init(struct pymb_list* list) {
     list->head.prev = list->head.next = &list->head;
 }
 
-inline void pymb_list_unlink(struct pymb_list_node* node) {
+PYMB_INLINE void pymb_list_unlink(struct pymb_list_node* node) {
     if (node->next) {
         node->next->prev = node->prev;
         node->prev->next = node->next;
@@ -153,14 +175,18 @@ inline void pymb_list_unlink(struct pymb_list_node* node) {
     }
 }
 
-inline void pymb_list_append(struct pymb_list* list,
-                             struct pymb_list_node* node) {
+PYMB_INLINE void pymb_list_append(struct pymb_list* list,
+                                  struct pymb_list_node* node) {
     pymb_list_unlink(node);
     struct pymb_list_node* tail = list->head.prev;
     tail->next = node;
     list->head.prev = node;
     node->prev = tail;
     node->next = &list->head;
+}
+
+PYMB_INLINE int pymb_list_is_empty(struct pymb_list* list) {
+    return list->head.next == &list->head;
 }
 
 #define PYMB_LIST_FOREACH(type, name, list)      \
@@ -194,8 +220,14 @@ struct pymb_registry {
     // Linked list of registered `pymb_binding` structures
     struct pymb_list bindings;
 
+    // Heap-allocated PyMethodDef for bound type weakref callback
+    PyMethodDef* weakref_callback_def;
+
     // Reserved for future extensions; currently set to 0
-    uint32_t reserved;
+    uint16_t reserved;
+
+    // Set to true when the capsule that points to this registry is destroyed
+    uint8_t deallocate_when_empty;
 
 #if defined(Py_GIL_DISABLED)
     // Mutex guarding accesses to `frameworks` and `bindings`.
@@ -205,15 +237,19 @@ struct pymb_registry {
 };
 
 #if defined(Py_GIL_DISABLED)
-inline void pymb_lock_registry(struct pymb_registry* registry) {
+PYMB_INLINE void pymb_lock_registry(struct pymb_registry* registry) {
     PyMutex_Lock(&registry->mutex);
 }
-inline void pymb_unlock_registry(struct pymb_registry* registry) {
+PYMB_INLINE void pymb_unlock_registry(struct pymb_registry* registry) {
     PyMutex_Unlock(&registry->mutex);
 }
 #else
-inline void pymb_lock_registry(struct pymb_registry*) {}
-inline void pymb_unlock_registry(struct pymb_registry*) {}
+PYMB_INLINE void pymb_lock_registry(struct pymb_registry* registry) {
+    (void) registry;
+}
+PYMB_INLINE void pymb_unlock_registry(struct pymb_registry* registry) {
+    (void) registry;
+}
 #endif
 
 struct pymb_binding;
@@ -253,7 +289,7 @@ enum pymb_framework_flags {
  * and unmodified (except as documented below) until the Python interpreter
  * is finalized. After finalization, such as in a `Py_AtExit` handler, if
  * all bindings have been removed already, you may optionally clean up by
- * calling `pymb_list_unlink(&framework->link)` and then deallocating the
+ * calling `pymb_remove_framework()` and then deallocating the
  * `pymb_framework` structure.
  *
  * All fields of this structure are set before it is made visible to other
@@ -266,6 +302,10 @@ struct pymb_framework {
     // `pymb_registry::frameworks`. May be modified as other frameworks are
     // added; protected by the `pymb_registry::mutex` in free-threaded builds.
     struct pymb_list_node link;
+
+    // Link to the `pymb_registry` that this framework is registered with.
+    // Filled in by `pymb_add_framework()`.
+    struct pymb_registry* registry;
 
     // Human-readable description of this framework, as a NUL-terminated string
     const char* name;
@@ -390,6 +430,22 @@ struct pymb_framework {
     // No synchronization is required to call this method.
     int (*translate_exception)(void* eptr) PYMB_NOEXCEPT;
 
+    // Notify this framework that one of its own bindings is being removed.
+    // This will occur synchronously from within a call to
+    // `pymb_remove_binding()`. Don't free the binding yet; wait for a later
+    // call to `free_local_binding`.
+    //
+    // The `pymb_registry::mutex` or GIL will be held when calling this method.
+    void (*remove_local_binding)(struct pymb_binding* binding) PYMB_NOEXCEPT;
+
+    // Request this framework to free one of its own binding structures.
+    // A call to `pymb_remove_binding()` will eventually result in a call to
+    // this method, once pymetabind can prove no one is concurrently using the
+    // binding anymore.
+    //
+    // No synchronization is required to call this method.
+    void (*free_local_binding)(struct pymb_binding* binding) PYMB_NOEXCEPT;
+
     // Notify this framework that some other framework published a new binding.
     // This call will be made after the new binding has been linked into the
     // `pymb_registry::bindings` list.
@@ -411,90 +467,117 @@ struct pymb_framework {
     // The `pymb_registry::mutex` or GIL will be held when calling this method.
     void (*add_foreign_framework)(struct pymb_framework* framework) PYMB_NOEXCEPT;
 
-    // There is no remove_foreign_framework(); the interpreter has
-    // already been finalized at that point, so there's nothing for the
-    // callback to do.
+    // Notify this framework that some other framework is being destroyed.
+    // This call will be made after the framework has been removed from the
+    // `pymb_registry::frameworks` list.
+    //
+    // This can only occur during interpreter finalization, so no
+    // synchronization is required. It might occur very late in interpreter
+    // finalization, such as from a Py_AtExit handler, so it shouldn't
+    // execute Python code.
+    void (*remove_foreign_framework)(struct pymb_framework* framework) PYMB_NOEXCEPT;
 };
 
 /*
  * Information about one type binding that belongs to a registered framework.
  *
+ * ### Creating bindings
+ *
  * A framework that binds some type and wants to allow other frameworks to
  * work with objects of that type must create a `pymb_binding` structure for
  * the type. This can be allocated in any way that the framework prefers (e.g.,
- * on the heap or within the type object). Once filled out, the binding
- * structure should be passed to `pymb_add_binding()`. If the Python type object
- * underlying the binding is to be deallocated, a `pymb_remove_binding()` call
- * must be made, and the `pymb_binding` structure cannot be deallocated until
- * `pymb_remove_binding()` returns. The call to `pymb_remove_binding()`
- * must occur *during* deallocation of the binding's Python type object, i.e.,
- * at a time when `Py_REFCNT(pytype) == 0` but the storage for `pytype` is not
- * yet eligible to be reused for another object. Many frameworks use a custom
- * metaclass, and can add the call to `pymb_remove_binding()` from the metaclass
- * `tp_dealloc`; those that don't can use a weakref callback on the type object
- * instead. The constraint on destruction timing allows `pymb_try_ref_binding()`
- * to temporarily prevent the binding's destruction by incrementing the type
- * object's reference count.
+ * on the heap or within the type object). Any fields without a meaningful
+ * value must be zero-filled. Once filled out, the binding structure should be
+ * passed to `pymb_add_binding()`. This will advertise the binding to other
+ * frameworks' `add_foreign_binding` hooks. It also creates a capsule object
+ * that points to the `pymb_binding` structure, and stores this capsule in the
+ * bound type's dict as the attribute "__pymetabind_binding__".
+ * The intended use of both of these is discussed later on in this comment.
  *
- * Each Python type object for which a `pymb_binding` exists will have an
- * attribute "__pymetabind_binding__" whose value is a capsule object
- * that contains the `pymb_binding` pointer under the name "pymetabind_binding".
- * The attribute is set during `pymb_add_binding()`. This is provided to allow:
- * - Determining which framework to call for a foreign `keep_alive` operation
- * - Locating `pymb_binding` objects for types written in a different language
- *   than yours (where you can't look up by the `pymb_binding::native_type`),
- *   so that you can work with their contents using non-Python-specific
- *   cross-language support
- * - Extracting the native object from a Python object without being too picky
- *   about what type it is (risky, but maybe you have out-of-band information
- *   that shows it's safe)
- * The preferred mechanism for same-language object access is to maintain a
- * hashtable keyed on `pymb_binding::native_type` and look up the binding for
- * the type you want/have. Compared to reading the capsule, this better
- * supports inheritance, to-Python conversions, and implicit conversions, and
- * it's probably also faster depending on how it's implemented.
+ * ### Removing bindings
  *
- * It is valid for multiple frameworks to claim (in separate bindings) the
- * same C/C++ type, or even the same Python type. (A case where multiple
- * frameworks would bind the same Python type is if one is acting as an
- * extension to the other, such as to support extracting pointers to
- * non-primary base classes when the base framework doesn't think about
- * such things.) If multiple frameworks claim the same Python type, then each
- * new registrant will replace the "__pymetabind_binding__" capsule and there
- * is no way to locate the other bindings from the type object.
+ * From a user perspective, a binding can be removed for either of two reasons:
  *
- * All fields of this structure are set before it is made visible to other
- * threads and then never changed, so they don't need locking to access.
- * However, on free-threaded builds it is necessary to validate that the type
- * object is not partway through being destroyed before you use the binding,
- * and prevent such destruction from beginning until you're done. To do so,
- * call `pymb_try_ref_binding()`; if it returns false, don't use the binding,
- * else use it and then call `pymb_unref_binding()` when done.
- * (On non-free-threaded builds, these do incref/decref to prevent destruction
- * of the type from starting, but can't fail because there's no *concurrent*
- * destruction hazard.)
+ * - its capsule was destroyed, such as by `del MyType.__pymetabind_binding__`
+ * - its type object is being finalized
  *
- * In order to work with one framework's Python objects of a certain type, other
- * frameworks must be able to locate a `pymb_binding` structure for that type.
- * It is expected that they will maintain their own type-to-binding maps, which
- * they can keep up-to-date via their `pymb_framework::add_foreign_binding` and
- * `pymb_framework::remove_foreign_binding` hooks. It is important to think very
- * carefully about how to design the synchronization for these maps so that
- * lookups do not return pointers to bindings that have been deallocated.
- * The remainder of this comment provides some suggestions.
+ * These both result in a call to `pymb_remove_binding()` that begins the
+ * removal process, but you should not call that function yourself, except
+ * from a metatype `tp_finalize` as described below. Some time after the call
+ * to `pymb_remove_binding()`, pymetabind will call the binding's framework's
+ * `free_local_binding` hook to indicate that it's safe to actually free the
+ * `pymb_binding` structure.
+ *
+ * By default, pymetabind detects the finalization of a binding's type object
+ * by creating a weakref to the type object with an appropriate callback. This
+ * works fine, but requires several objects to be allocated, so it is not ideal
+ * from a memory overhead perspective. If you control the bound type's metatype,
+ * you can reduce this overhead by modifying the metatype's `tp_finalize` slot
+ * to call `pymb_remove_binding()`. If you tell pymetabind that you have done
+ * so, using the `tp_finalize_will_remove` argument to `pymb_add_binding()`,
+ * then pymetabind won't need to create the weakref and its callback.
+ *
+ * ### Removing bindings: the gory details
+ *
+ * The implementation of the removal process is somewhat complex in order to
+ * protect other threads that might be concurrently using a binding in
+ * free-threaded builds. `pymb_remove_binding()` stops new uses of the binding
+ * from beginning, by notifying other frameworks' `remove_foreign_binding`
+ * hooks and changing the binding capsule so `pymb_get_binding()` won't work.
+ * Existing uses might be ongoing though, so we must wait for them to complete
+ * before freeing the binding structure. The technique we choose is to wait for
+ * the next (or current) garbage collection to finish. GC stops all threads
+ * before it scans the heap. An attached thread state (one that can call
+ * CPython API functions) can't be stopped without its consent, so GC will
+ * wait for it to detach. A thread state can only become detached explicitly
+ * (e.g. Py_BEGIN_ALLOW_THREADS) or in the bytecode interpreter. As long as
+ * foreign frameworks don't hold `pymb_binding` pointers across calls into
+ * the bytecode interpreter in places their `remove_foreign_binding` hook
+ * can't see, this technique avoids use-after-free without introducing any
+ * contention on a shared atomic in the binding object.
+ *
+ * One pleasant aspect of this scheme: due to their use of deferred reference
+ * counting, type objects in free-threaded Python can only be freed during a
+ * GC pass. There is even a stop-all-threads (to check for resurrected objects)
+ * in between when GC executes finalizers and when it actually destroys the
+ * garbage. This winds up letting us obtain the "wait for next GC pause before
+ * freeing the binding" behavior very cheaply when the binding is being removed
+ * due to the deletion of its type.
+ *
+ * On non-free-threaded Python builds, none of the above is a concern, and
+ * `pymb_remove_binding()` can synchronously free the `pymb_binding` structure.
+ *
+ * ### Keeping track of other frameworks' bindings
+ *
+ * In order to work with Python objects bound by another framework, yours
+ * must be able to locate a `pymb_binding` structure for that type. It is
+ * anticipated that most frameworks will maintain their own private
+ * type-to-binding maps, which they can keep up-to-date via their
+ * `add_foreign_binding` and `remove_foreign_binding` hooks. It is important
+ * to think carefully about how to design the synchronization for these maps
+ * so that lookups do not return pointers to bindings that may have been
+ * deallocated. The remainder of this section provides some suggestions.
  *
  * The recommended way to handle synchronization is to protect your type lookup
  * map with a readers/writer lock. In your `remove_foreign_binding` hook,
  * obtain a write lock, and hold it while removing the corresponding entry from
  * the map. Before performing a type lookup, obtain a read lock. If the lookup
- * succeeds, call `pymb_try_ref_binding()` on the resulting binding before
- * you release your read lock. Since the binding structure can't be deallocated
- * until all `remove_foreign_binding` hooks have returned, this scheme provides
- * effective protection. It is important not to hold the read lock while
- * executing arbitrary Python code, since a deadlock would result if the type
- * object is deallocated (requiring a write lock) while the read lock were held.
- * Note that `pymb_framework::from_python` for many popular frameworks is
- * capable of executing arbitrary Python code to perform implicit conversions.
+ * succeeds, you can release the read lock and (due to the two-phase removal
+ * process described above) continue to safely use the binding for as long as
+ * your Python thread state remains attached. It is important not to hold the
+ * read lock while executing arbitrary Python code, since a deadlock would
+ * result if the binding were removed (requiring a write lock) while the read
+ * lock were held. Note that `pymb_framework::from_python` for many popular
+ * frameworks can execute arbitrary Python code to perform implicit conversions.
+ *
+ * If you're trying multiple bindings for an operation, one option is to copy
+ * all their pointers to temporary storage before releasing the read lock.
+ * (While concurrent updates may modify the data structure, the pymb_binding
+ * structures it points to will remain valid for long enough.) If you prefer
+ * to avoid the copy by unlocking for each attempt and then relocking to
+ * advance to the next binding, be sure to consider the possibility that your
+ * iterator might have been invalidated due to a concurrent update while you
+ * weren't holding the lock.
  *
  * The lock on a single shared type lookup map is a contention bottleneck,
  * especially if you don't have a readers/writer lock and wish to get by with
@@ -502,9 +585,57 @@ struct pymb_framework {
  * own lookup map, and require `remove_foreign_binding` to update all of them.
  * As long as the per-thread maps are always visited in a consistent order
  * when removing a binding, the splitting shouldn't introduce new deadlocks.
- * Since each thread has a separate mutex for its separate map, contention
+ * Since each thread can have a separate mutex for its separate map, contention
  * occurs only when bindings are being added or removed, which is much less
  * common than using them.
+ *
+ * ### Using the binding capsule
+ *
+ * Each Python type object for which a `pymb_binding` exists will have an
+ * attribute "__pymetabind_binding__" whose value is a capsule object
+ * that contains the `pymb_binding` pointer under the name "pymetabind_binding".
+ * The attribute is set during `pymb_add_binding()`, and is used by
+ * `pymb_get_binding()` to map a type object to a binding. The capsule allows:
+ *
+ * - Determining which framework to call for a foreign `keep_alive` operation
+ *
+ * - Locating `pymb_binding` objects for types written in a different language
+ *   than yours (where you can't look up by the `pymb_binding::native_type`),
+ *   so that you can work with their contents using non-Python-specific
+ *   cross-language support
+ *
+ * - Extracting the native object from a Python object without being too picky
+ *   about what type it is (risky, but maybe you have out-of-band information
+ *   that shows it's safe)
+ *
+ * The preferred mechanism for same-language object access is to maintain a
+ * hashtable keyed on `pymb_binding::native_type` and look up the binding for
+ * the type you want/have. Compared to reading the capsule, this better
+ * supports inheritance, to-Python conversions, and implicit conversions, and
+ * it's probably also faster depending on how it's implemented.
+ *
+ * ### Types with multiple bindings
+ *
+ * It is valid for multiple frameworks to claim (in separate bindings) the
+ * same C/C++ type. This supports cases where a common vocabulary type is
+ * bound separately in mulitple extensions in the same process. Frameworks
+ * are encouraged to try all registered bindings for the target type when
+ * they perform from-Python conversions.
+ *
+ * If multiple frameworks claim the same Python type, the last one will
+ * typically win, since there is only one "__pymetabind_binding__" attribute
+ * on the type object and a binding is removed when its capsule is no longer
+ * referenced. If you're trying to do something unusual like wrapping another
+ * framework's binding to provide additional features, you can stash the
+ * extra binding(s) under a different attribute name. pymetabind never uses
+ * the "__pymetabind_binding__" attribute to locate the binding for its own
+ * purposes; it's used only to fulfill calls to `pymb_get_binding()`.
+ *
+ * ### Synchronization
+ *
+ * Most fields of this structure are set before it is made visible to other
+ * threads and then never changed, so they don't need locking to access. The
+ * `link` and `capsule` are protected by the registry lock.
  */
 struct pymb_binding {
     // Links to the previous and next bindings in the list of
@@ -514,9 +645,18 @@ struct pymb_binding {
     // The framework that provides this binding
     struct pymb_framework* framework;
 
+    // Borrowed reference to the capsule object that refers to this binding.
+    // Becomes NULL in pymb_remove_binding().
+    PyObject* capsule;
+
     // Python type: you will get an instance of this type from a successful
     // call to `framework::from_python()` that passes this binding
     PyTypeObject* pytype;
+
+    // Strong reference to a weakref to `pytype`; its callback will prompt
+    // us to remove the binding. May be NULL if Py_TYPE(pytype)->tp_finalize
+    // will take care of that.
+    PyObject* pytype_wr;
 
     // The native identifier for this type in `framework->abi_lang`, if that is
     // a concept that exists in that language. See the documentation of
@@ -537,26 +677,55 @@ struct pymb_binding {
     void* context;
 };
 
-/*
- * Users of non-C/C++ languages are welcome to replicate the logic of these
- * inline functions rather than calling them. Their implementations are
- * considered part of the ABI.
- */
-
 PYMB_FUNC struct pymb_registry* pymb_get_registry();
 PYMB_FUNC void pymb_add_framework(struct pymb_registry* registry,
                                   struct pymb_framework* framework);
-PYMB_FUNC void pymb_remove_framework(struct pymb_registry* registry,
-                                     struct pymb_framework* framework);
-PYMB_FUNC void pymb_add_binding(struct pymb_registry* registry,
-                                struct pymb_binding* binding);
-PYMB_FUNC void pymb_remove_binding(struct pymb_registry* registry,
-                                   struct pymb_binding* binding);
-PYMB_FUNC int pymb_try_ref_binding(struct pymb_binding* binding);
-PYMB_FUNC void pymb_unref_binding(struct pymb_binding* binding);
+PYMB_FUNC void pymb_remove_framework(struct pymb_framework* framework);
+PYMB_FUNC void pymb_add_binding(struct pymb_binding* binding,
+                                int tp_finalize_will_remove);
+PYMB_FUNC void pymb_remove_binding(struct pymb_binding* binding);
 PYMB_FUNC struct pymb_binding* pymb_get_binding(PyObject* type);
 
 #if !defined(PYMB_DECLS_ONLY)
+
+PYMB_INLINE void pymb_registry_free(struct pymb_registry* registry) {
+    assert(pymb_list_is_empty(&registry->bindings) &&
+           "some framework was removed before its bindings");
+    free(registry->weakref_callback_def);
+    free(registry);
+}
+
+PYMB_FUNC void pymb_registry_capsule_destructor(PyObject* capsule) {
+    struct pymb_registry* registry =
+            (struct pymb_registry*) PyCapsule_GetPointer(
+                    capsule, "pymetabind_registry");
+    if (!registry) {
+        PyErr_WriteUnraisable(capsule);
+        return;
+    }
+    registry->deallocate_when_empty = 1;
+    if (pymb_list_is_empty(&registry->frameworks)) {
+        pymb_registry_free(registry);
+    }
+}
+
+PYMB_FUNC PyObject* pymb_weakref_callback(PyObject* self, PyObject* weakref) {
+    // self is bound using PyCFunction_New to refer to a capsule that contains
+    // the binding pointer (not the binding->capsule; this one has no dtor).
+    // `weakref` is the weakref (to the bound type) that expired.
+    if (!PyWeakref_CheckRefExact(weakref) || !PyCapsule_CheckExact(self)) {
+        PyErr_BadArgument();
+        return NULL;
+    }
+    struct pymb_binding* binding =
+            (struct pymb_binding*) PyCapsule_GetPointer(
+                    self, "pymetabind_binding");
+    if (!binding) {
+        return NULL;
+    }
+    pymb_remove_binding(binding);
+    Py_RETURN_NONE;
+}
 
 /*
  * Locate an existing `pymb_registry`, or create a new one if necessary.
@@ -588,13 +757,32 @@ PYMB_FUNC struct pymb_registry* pymb_get_registry() {
     if (registry) {
         pymb_list_init(&registry->frameworks);
         pymb_list_init(&registry->bindings);
-        capsule = PyCapsule_New(registry, "pymetabind_registry", NULL);
-        int rv = capsule ? PyDict_SetItem(dict, key, capsule) : -1;
-        Py_XDECREF(capsule);
-        if (rv != 0) {
+        registry->deallocate_when_empty = 0;
+
+        // C doesn't allow inline functions to declare static variables,
+        // so allocate this on the heap
+        PyMethodDef* def = (PyMethodDef*) calloc(1, sizeof(PyMethodDef));
+        if (!def) {
             free(registry);
-            registry = NULL;
+            PyErr_NoMemory();
+            Py_DECREF(key);
+            return NULL;
         }
+        def->ml_name = "pymetabind_weakref_callback";
+        def->ml_meth = pymb_weakref_callback;
+        def->ml_flags = METH_O;
+        def->ml_doc = NULL;
+        registry->weakref_callback_def = def;
+
+        // Attach a destructor so the registry memory is released at teardown
+        capsule = PyCapsule_New(registry, "pymetabind_registry",
+                                pymb_registry_capsule_destructor);
+        if (!capsule) {
+            free(registry);
+        } else if (PyDict_SetItem(dict, key, capsule) == -1) {
+            registry = NULL; // will be deallocated by capsule destructor
+        }
+        Py_XDECREF(capsule);
     } else {
         PyErr_NoMemory();
     }
@@ -609,16 +797,16 @@ PYMB_FUNC struct pymb_registry* pymb_get_registry() {
  */
 PYMB_FUNC void pymb_add_framework(struct pymb_registry* registry,
                                   struct pymb_framework* framework) {
-#if defined(Py_GIL_DISABLED) && PY_VERSION_HEX < 0x030e0000
-    assert((framework->flags & pymb_framework_bindings_usable_forever) &&
-           "Free-threaded removal of bindings requires PyUnstable_TryIncRef(), "
-           "which was added in CPython 3.14");
-#endif
+    // Defensive: ensure hook is clean before first list insertion to avoid UB
+    framework->link.next = NULL;
+    framework->link.prev = NULL;
+    framework->registry = registry;
     pymb_lock_registry(registry);
     PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
         // Intern `abi_extra` strings so they can be compared by pointer
         if (other->abi_extra && framework->abi_extra &&
-            0 == strcmp(other->abi_extra, framework->abi_extra)) {
+            (other->abi_extra == framework->abi_extra ||
+             strcmp(other->abi_extra, framework->abi_extra) == 0)) {
             framework->abi_extra = other->abi_extra;
             break;
         }
@@ -631,30 +819,116 @@ PYMB_FUNC void pymb_add_framework(struct pymb_registry* registry,
         }
     }
     PYMB_LIST_FOREACH(struct pymb_binding*, binding, registry->bindings) {
-        if (binding->framework != framework && pymb_try_ref_binding(binding)) {
+        if (binding->framework != framework) {
             framework->add_foreign_binding(binding);
-            pymb_unref_binding(binding);
         }
     }
     pymb_unlock_registry(registry);
 }
 
-/* Add a new binding to the given registry */
-PYMB_FUNC void pymb_add_binding(struct pymb_registry* registry,
-                                struct pymb_binding* binding) {
-#if defined(Py_GIL_DISABLED) && PY_VERSION_HEX >= 0x030e0000
-    PyUnstable_EnableTryIncRef((PyObject *) binding->pytype);
+/*
+ * Remove a framework from the registry it was added to.
+ *
+ * This may only be called during Python interpreter finalization. Rationale:
+ * other frameworks might be maintaining an entry for the removed one in their
+ * exception translator lists, and supporting concurrent removal of exception
+ * translators would add undesirable synchronization overhead to the handling
+ * of every exception. At finalization time there are no more threads.
+ *
+ * Once this function returns, you can free the framework structure.
+ *
+ * If a framework never removes itself, it must not claim to be `leak_safe`.
+ */
+PYMB_FUNC void pymb_remove_framework(struct pymb_framework* framework) {
+    struct pymb_registry* registry = framework->registry;
+
+    // No need for registry lock/unlock since there are no more threads
+    pymb_list_unlink(&framework->link);
+    PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
+        other->remove_foreign_framework(framework);
+    }
+
+    // Destroy registry if capsule is gone and this was the last framework
+    if (registry->deallocate_when_empty &&
+        pymb_list_is_empty(&registry->frameworks)) {
+        pymb_registry_free(registry);
+    }
+}
+
+PYMB_FUNC void pymb_binding_capsule_remove(PyObject* capsule) {
+    struct pymb_binding* binding =
+            (struct pymb_binding*) PyCapsule_GetPointer(
+                    capsule, "pymetabind_binding");
+    if (!binding) {
+        PyErr_WriteUnraisable(capsule);
+        return;
+    }
+    pymb_remove_binding(binding);
+}
+
+/*
+ * Add a new binding for `binding->framework`. If `tp_finalize_will_remove` is
+ * nonzero, the caller guarantees that `Py_TYPE(binding->pytype).tp_finalize`
+ * will call `pymb_remove_binding()`; this saves some allocations compared
+ * to pymetabind needing to figure out when the type is destroyed on its own.
+ * See the comment on `pymb_binding` for more details.
+ */
+PYMB_FUNC void pymb_add_binding(struct pymb_binding* binding,
+                                int tp_finalize_will_remove) {
+    // Defensive: ensure hook is clean before first list insertion to avoid UB
+    binding->link.next = NULL;
+    binding->link.prev = NULL;
+
+    binding->pytype_wr = NULL;
+    binding->capsule = NULL;
+
+    struct pymb_registry* registry = binding->framework->registry;
+    if (!tp_finalize_will_remove) {
+        // Different capsule than the binding->capsule, so that the callback
+        // doesn't keep the binding alive
+        PyObject* sub_capsule = PyCapsule_New(binding, "pymetabind_binding",
+                                              NULL);
+        if (!sub_capsule) {
+            goto error;
+        }
+        PyObject* callback = PyCFunction_New(registry->weakref_callback_def,
+                                             sub_capsule);
+        Py_DECREF(sub_capsule); // ownership transferred to callback
+        if (!callback) {
+            goto error;
+        }
+        binding->pytype_wr = PyWeakref_NewRef((PyObject *) binding->pytype,
+                                              callback);
+        Py_DECREF(callback); // ownership transferred to weakref
+        if (!binding->pytype_wr) {
+            goto error;
+        }
+    } else {
+#if defined(Py_GIL_DISABLED)
+        // No callback needed in this case, but we still do need the weakref
+        // so that pymb_remove_binding() can tell if the type is being
+        // finalized or not.
+        binding->pytype_wr = PyWeakref_NewRef((PyObject *) binding->pytype,
+                                              NULL);
+        if (!binding->pytype_wr) {
+            goto error;
+        }
 #endif
-    PyObject* capsule = PyCapsule_New(binding, "pymetabind_binding", NULL);
-    int rv = -1;
-    if (capsule) {
-        rv = PyObject_SetAttrString((PyObject *) binding->pytype,
-                                    "__pymetabind_binding__", capsule);
-        Py_DECREF(capsule);
     }
-    if (rv != 0) {
-        PyErr_WriteUnraisable((PyObject *) binding->pytype);
+
+    binding->capsule = PyCapsule_New(binding, "pymetabind_binding",
+                                     pymb_binding_capsule_remove);
+    if (!binding->capsule) {
+        goto error;
     }
+    if (PyObject_SetAttrString((PyObject *) binding->pytype,
+                               "__pymetabind_binding__",
+                               binding->capsule) != 0) {
+        Py_CLEAR(binding->capsule);
+        goto error;
+    }
+    Py_DECREF(binding->capsule); // keep only a borrowed reference
+
     pymb_lock_registry(registry);
     pymb_list_append(&registry->bindings, &binding->link);
     PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
@@ -663,62 +937,134 @@ PYMB_FUNC void pymb_add_binding(struct pymb_registry* registry,
         }
     }
     pymb_unlock_registry(registry);
+    return;
+
+  error:
+    PyErr_WriteUnraisable((PyObject *) binding->pytype);
+    Py_XDECREF(binding->pytype_wr);
+    binding->framework->free_local_binding(binding);
 }
 
+#if defined(Py_GIL_DISABLED)
+PYMB_FUNC void pymb_binding_capsule_destroy(PyObject* capsule) {
+    struct pymb_binding* binding =
+            (struct pymb_binding*) PyCapsule_GetPointer(
+                    capsule, "pymetabind_binding");
+    if (!binding) {
+        PyErr_WriteUnraisable(capsule);
+        return;
+    }
+    Py_CLEAR(binding->pytype_wr);
+    binding->framework->free_local_binding(binding);
+}
+#endif
+
 /*
- * Remove a binding from the given registry. This must be called during
- * deallocation of the `binding->pytype`, such that its reference count is
- * zero but still accessible. Once this function returns, you can free the
- * binding structure.
+ * Remove a binding from the registry it was added to. Don't call this yourself,
+ * except from the tp_finalize slot of a binding's type's metatype.
+ * The user-servicable way to remove a binding from a still-alive type is to
+ * delete the capsule. The binding structure will eventually be freed by calling
+ * `binding->framework->free_local_binding(binding)`.
  */
-PYMB_FUNC void pymb_remove_binding(struct pymb_registry* registry,
-                                   struct pymb_binding* binding) {
+PYMB_FUNC void pymb_remove_binding(struct pymb_binding* binding) {
+    struct pymb_registry* registry = binding->framework->registry;
+
+    // Since we need to obtain it anyway, use the registry lock to serialize
+    // concurrent attempts to remove the same binding
     pymb_lock_registry(registry);
+    if (!binding->capsule) {
+        // Binding was concurrently removed from multiple places; the first
+        // one to get the registry lock wins.
+        pymb_unlock_registry(registry);
+        return;
+    }
+
+#if defined(Py_GIL_DISABLED)
+    // Determine if binding->pytype is still fully alive (not yet started
+    // finalizing). If so, it can't die until the next GC cycle, so freeing
+    // the binding at the next GC is safe.
+    PyObject* pytype_strong = NULL;
+    if (PyWeakref_GetRef(binding->pytype_wr, &pytype_strong) == -1) {
+        // If something's wrong with the weakref, leave pytype_strong set to
+        // NULL in order to conservatively assume the type is finalizing.
+        // This will leak the binding struct until the type object is destroyed.
+        PyErr_WriteUnraisable((PyObject *) binding->pytype);
+    }
+#endif
+
+    // Clear the existing capsule's destructor so we don't have to worry about
+    // it firing after the pymb_binding struct has actually been freed.
+    // Note we can safely assume the capsule hasn't been freed yet, even
+    // though it might be mid-destruction. (Proof: Its destructor calls
+    // this function, which cannot complete until it acquires the lock we
+    // currently hold. If the destructor completed already, we would have bailed
+    // out above upon noticing capsule was already NULL.)
+    if (PyCapsule_SetDestructor(binding->capsule, NULL) != 0) {
+        PyErr_WriteUnraisable((PyObject *) binding->pytype);
+    }
+
+    // Mark this binding as being in the process of being destroyed.
+    binding->capsule = NULL;
+
+    // If weakref hasn't fired yet, we don't need it anymore. Destroying it
+    // ensures it won't fire after the binding struct has been freed.
+    Py_CLEAR(binding->pytype_wr);
+
     pymb_list_unlink(&binding->link);
+    binding->framework->remove_local_binding(binding);
     PYMB_LIST_FOREACH(struct pymb_framework*, other, registry->frameworks) {
         if (other != binding->framework) {
             other->remove_foreign_binding(binding);
         }
     }
     pymb_unlock_registry(registry);
-}
 
-/*
- * Increase the reference count of a binding. Return 1 if successful (you can
- * use the binding and must call pymb_unref_binding() when done) or 0 if the
- * binding is being removed and shouldn't be used.
- */
-PYMB_FUNC int pymb_try_ref_binding(struct pymb_binding* binding) {
-#if defined(Py_GIL_DISABLED)
-    if (!(binding->framework->flags & pymb_framework_bindings_usable_forever)) {
-#if PY_VERSION_HEX >= 0x030e0000
-        return PyUnstable_TryIncRef((PyObject *) binding->pytype);
+#if !defined(Py_GIL_DISABLED)
+    // On GIL builds, there's no need to delay deallocation
+    binding->framework->free_local_binding(binding);
 #else
-        // bindings_usable_forever is required on this Python version, and
-        // was checked in pymb_add_framework()
-        assert(false);
-#endif
+    // Create a new capsule to manage the actual freeing
+    PyObject* capsule_destroy = PyCapsule_New(binding,
+                                              "pymetabind_binding",
+                                              pymb_binding_capsule_destroy);
+    if (!capsule_destroy) {
+        // Just leak the binding if we can't set up the capsule
+        PyErr_WriteUnraisable((PyObject *) binding->pytype);
+    } else if (pytype_strong) {
+        // Type still alive -> embed the capsule in a cycle so it lasts until
+        // next GC. (The type will live at least that long.)
+        PyObject* list = PyList_New(2);
+        if (!list) {
+            PyErr_WriteUnraisable((PyObject *) binding->pytype);
+            // leak the capsule and therefore the binding
+        } else {
+            PyList_SetItem(list, 0, capsule_destroy);
+            PyList_SetItem(list, 1, list);
+            // list is now referenced only by itself and will be GCable
+        }
+    } else {
+        // Type is dying -> destroy the capsule when the type is destroyed.
+        // Since the type's weakrefs were already cleared, any weakref we add
+        // now won't fire until the type's tp_dealloc. We reuse our existing
+        // weakref callback for convenience; the call that it makes to
+        // pymb_remove_binding() will be a no-op, but after it fires,
+        // the capsule destructor will do the freeing we desire.
+        PyObject* callback = PyCFunction_New(registry->weakref_callback_def,
+                                             capsule_destroy);
+        if (!callback) {
+            PyErr_WriteUnraisable((PyObject *) binding->pytype);
+            // leak the capsule and therefore the binding
+        } else {
+            Py_DECREF(capsule_destroy); // ownership transferred to callback
+            binding->pytype_wr = PyWeakref_NewRef((PyObject *) binding->pytype,
+                                                  callback);
+            Py_DECREF(callback); // ownership transferred to weakref
+            if (!binding->pytype_wr) {
+                PyErr_WriteUnraisable((PyObject *) binding->pytype);
+            }
+        }
     }
-#else
-    Py_INCREF((PyObject *) binding->pytype);
-#endif
-    return 1;
-}
-
-/* Decrease the reference count of a binding. */
-PYMB_FUNC void pymb_unref_binding(struct pymb_binding* binding) {
-#if defined(Py_GIL_DISABLED)
-    if (!(binding->framework->flags & pymb_framework_bindings_usable_forever)) {
-#if PY_VERSION_HEX >= 0x030e0000
-        Py_DECREF((PyObject *) binding->pytype);
-#else
-        // bindings_usable_forever is required on this Python version, and
-        // was checked in pymb_add_framework()
-        assert(false);
-#endif
-    }
-#else
-    Py_DECREF((PyObject *) binding->pytype);
+    Py_XDECREF(pytype_strong);
 #endif
 }
 

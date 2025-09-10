@@ -468,22 +468,27 @@ void nb_type_update_c2p_fast(const std::type_info *type, void *value) noexcept {
     nb_internals *internals_ = internals;
     auto it_alias = internals_->types_in_c2p_fast.find(type);
     if (it_alias != internals_->types_in_c2p_fast.end()) {
-        bool found = false;
 #if defined(NB_FREE_THREADED)
         for (nb_type_map_per_thread *cache =
                  internals_->type_c2p_per_thread_head;
              cache; cache = cache->next) {
-            found |= nb_type_update_cache(*cache->lock(), it_alias->first,
-                                          (nb_alias_seq *) it_alias->second,
-                                          value);
+            auto guard = cache->lock();
+            bool found = nb_type_update_cache(*guard, it_alias->first,
+                                              (nb_alias_seq *) it_alias->second,
+                                              value);
+            if (found)
+                guard.note_updated();
         }
+        // We can't require that we found a match, because the type might
+        // have been cached only by a thread that has since exited.
 #else
-        found = nb_type_update_cache(internals_->type_c2p_fast, it_alias->first,
-                                     (nb_alias_seq *) it_alias->second, value);
-#endif
+        bool found = nb_type_update_cache(
+            internals_->type_c2p_fast, it_alias->first,
+            (nb_alias_seq *) it_alias->second, value);
         check(found, "nanobind::detail::nb_type_update_c2p_fast(\"%s\"): "
                      "types_in_c2p_fast and type_c2p_fast are inconsistent",
               type_name(type));
+#endif
     }
 }
 
@@ -516,61 +521,51 @@ bool nb_type_register(type_data *t, type_data **conflict) noexcept {
 
 void nb_type_unregister(type_data *t) noexcept {
     nb_internals *internals_ = internals;
-    nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
+#if !defined(NB_DISABLE_INTEROP)
+    void *foreign_bindings = nb_load_acquire(t->foreign_bindings);
+    pymb_binding *binding_to_remove = nullptr;
+
+    if (nb_is_seq(foreign_bindings)) {
+        nb_foreign_seq *node = nb_get_seq<pymb_binding>(foreign_bindings);
+        if (node->value->framework == internals_->foreign_self)
+            binding_to_remove = node->value;
+    } else if (auto *binding = (pymb_binding *) foreign_bindings;
+               binding && binding->framework == internals_->foreign_self) {
+        binding_to_remove = binding;
+    }
+    if (binding_to_remove)
+        pymb_remove_binding(binding_to_remove);
+#endif
 
     lock_internals guard(internals_);
+    nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
     auto it_slow = type_c2p_slow.find(t->type);
     check(it_slow != type_c2p_slow.end() && it_slow->second == t,
           "nanobind::detail::nb_type_unregister(\"%s\"): could not "
           "find type!", t->name);
-#if defined(NB_DISABLE_INTEROP)
-    type_c2p_slow.erase(it_slow);
-    nb_type_update_c2p_fast(t->type, nullptr);
-#else
-    void *foreign_bindings = nb_load_acquire(t->foreign_bindings);
-    pymb_binding *binding_to_free = nullptr;
-    nb_foreign_seq *node_to_free = nullptr;
 
-    if (nb_is_seq(foreign_bindings)) {
-        nb_foreign_seq *node = nb_get_seq<pymb_binding>(foreign_bindings);
-        if (node->value->framework == internals_->foreign_self) {
-            binding_to_free = node->value;
-            node_to_free = node;
-            foreign_bindings = nb_mark_seq(node->next);
-        }
-    } else if (auto *binding = (pymb_binding *) foreign_bindings;
-               binding && binding->framework == internals_->foreign_self) {
-        binding_to_free = binding;
-        foreign_bindings = nullptr;
-    }
-
-    void *new_value;
+#if !defined(NB_DISABLE_INTEROP)
+    foreign_bindings = nb_load_acquire(t->foreign_bindings);
     if (foreign_bindings) {
-        new_value = nb_mark_foreign(foreign_bindings);
+        void *new_value = nb_mark_foreign(foreign_bindings);
         it_slow.value() = new_value;
-    } else {
-        new_value = nullptr;
-        type_c2p_slow.erase(it_slow);
-    }
-    nb_type_update_c2p_fast(t->type, new_value);
-
-    // Don't actually free the binding until we've updated the c2p fast map.
-    // Other threads may concurrently be in nb_type_try_foreign(); see
-    // comments there for more details on the synchronization here.
-    if (binding_to_free) {
-        pymb_remove_binding(internals_->foreign_registry, binding_to_free);
-        free((char *) binding_to_free->source_name);
-        PyMem_Free(binding_to_free);
-        PyMem_Free(node_to_free);
+        nb_type_update_c2p_fast(t->type, new_value);
+        return;
     }
 #endif
+    type_c2p_slow.erase(it_slow);
+    nb_type_update_c2p_fast(t->type, nullptr);
 }
 
-static void nb_type_dealloc(PyObject *o) {
+static void nb_type_finalize(PyObject *o) {
     type_data *t = nb_type_data((PyTypeObject *) o);
 
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0)
         nb_type_unregister(t);
+}
+
+static void nb_type_dealloc(PyObject *o) {
+    type_data *t = nb_type_data((PyTypeObject *) o);
 
     if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
         PyMem_Free(t->implicit.cpp);
@@ -900,7 +895,7 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
         if (slot == 0) {
             break;
-        } else if (slot * sizeof(nb_slot) < (int) sizeof(type_slots)) {
+        } else if (slot * sizeof(nb_slot) <= (int) sizeof(type_slots)) {
             *(((void **) ht) + type_slots[slot - 1].direct) = ts->pfunc;
         } else {
             PyErr_Format(PyExc_RuntimeError,
@@ -996,6 +991,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
 
         PyType_Slot slots[] = {
             { Py_tp_base, &PyType_Type },
+            { Py_tp_finalize, (void *) nb_type_finalize },
             { Py_tp_dealloc, (void *) nb_type_dealloc },
             { Py_tp_setattro, (void *) nb_type_setattro },
             { Py_tp_init, (void *) nb_type_init },
@@ -1538,23 +1534,39 @@ PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
 static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
                                              const std::type_info *cpp_type_src,
                                              const type_data *dst_type,
+                                             nb_internals *internals_,
                                              cleanup_list *cleanup,
                                              void **out) noexcept {
-    if (dst_type->implicit.cpp && cpp_type_src) {
+    if (dst_type->implicit.cpp &&
+        (cpp_type_src || internals_->foreign_imported_any)) {
         const std::type_info **it = dst_type->implicit.cpp;
         const std::type_info *v;
 
-        while ((v = *it++)) {
-            if (v == cpp_type_src || *v == *cpp_type_src)
-                goto found;
+        if (cpp_type_src) {
+            while ((v = *it++)) {
+                if (v == cpp_type_src || *v == *cpp_type_src)
+                    goto found;
+            }
+            it = dst_type->implicit.cpp;
         }
 
-        it = dst_type->implicit.cpp;
         while ((v = *it++)) {
-            PyTypeObject *pytype =
-                (PyTypeObject *) nb_type_lookup(v, /* foreign_ok */ true);
-            if (pytype && PyType_IsSubtype(Py_TYPE(src), pytype))
+            bool has_foreign = false;
+            type_data *td = nb_type_c2p(internals_, v, &has_foreign);
+            if (td && PyType_IsSubtype(Py_TYPE(src), td->type_py))
                 goto found;
+#if !defined(NB_DISABLE_INTEROP)
+            if (has_foreign && nb_type_try_foreign(
+                    internals_, v,
+                    +[](void *src_, pymb_binding *binding) -> void* {
+                        PyObject *src = (PyObject *) src_;
+                        if (PyType_IsSubtype(Py_TYPE(src), binding->pytype))
+                            return binding;
+                        return nullptr;
+                    },
+                    src))
+                goto found;
+#endif
         }
     }
 
@@ -1713,7 +1725,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
         if (dst_type &&
             (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions) &&
-            nb_type_get_implicit(src, cpp_type_src, dst_type, cleanup, out))
+            nb_type_get_implicit(src, cpp_type_src, dst_type, internals_, cleanup, out))
             return true;
     } else if (!src_is_nb_type && internals_->foreign_imported_any) {
         // If we never determined the dst type and it might be foreign,
@@ -2615,8 +2627,24 @@ void nb_type_import(PyObject *pytype, const std::type_info *cpptype) {
 void nb_type_export(PyObject *pytype) {
 #if !defined(NB_DISABLE_INTEROP)
     lock_internals guard{internals};
-    check(nb_type_check(pytype), "not a nanobind type");
-    nb_type_export_impl(nb_type_data((PyTypeObject *) pytype));
+    if (nb_type_check(pytype)) {
+        nb_type_export_impl(nb_type_data((PyTypeObject *) pytype));
+        return;
+    }
+    if (hasattr(pytype, "__nb_enum__")) {
+        static_assert(offsetof(type_data, type) == 8 + sizeof(void*),
+                      "Don't change the offset of type_data::type in future "
+                      "ABI versions; it must be consistent for the following "
+                      "logic to work");
+        type_data *td = enum_get_type_data(pytype);
+        if (auto it = internals->type_c2p_slow.find(td->type);
+            it != internals->type_c2p_slow.end() && it->second == td) {
+            nb_type_export_impl(td);
+            return;
+        }
+    }
+    raise("Can't export %s: not a nanobind class or enum bound in this "
+          "domain", repr(pytype).c_str());
 #else
     (void) pytype;
     raise("This libnanobind was built without interoperability support");

@@ -161,6 +161,11 @@ static int nb_foreign_translate_exception(void *eptr) noexcept {
     return 0;
 }
 
+static void nb_foreign_free_local_binding(pymb_binding *binding) noexcept {
+    free((char *) binding->source_name);
+    PyMem_Free(binding);
+}
+
 static void nb_foreign_add_foreign_binding(pymb_binding *binding) noexcept {
     nb_internals *internals_ = internals;
     lock_internals guard{internals_};
@@ -169,10 +174,11 @@ static void nb_foreign_add_foreign_binding(pymb_binding *binding) noexcept {
                                (const std::type_info *) binding->native_type);
 }
 
-static void nb_foreign_remove_foreign_binding(pymb_binding *binding) noexcept {
-    nb_internals *internals_ = internals;
-    lock_internals guard{internals_};
-
+// Common logic for removing imported & exported bindings from our type map.
+// Caller must hold the internals lock.
+static void nb_foreign_remove_binding_from_type(nb_internals *internals_,
+                                                const std::type_info *type,
+                                                pymb_binding *binding) noexcept {
     auto remove_from_list = [binding](void *list_head,
                                       nb_foreign_seq **to_free) -> void* {
         if (!nb_is_seq(list_head))
@@ -193,39 +199,52 @@ static void nb_foreign_remove_foreign_binding(pymb_binding *binding) noexcept {
         return list_head;
     };
 
-    auto remove_from_type = [=](const std::type_info *type) {
-        nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
-        auto it = type_c2p_slow.find(type);
-        check(it != type_c2p_slow.end(),
-              "foreign binding not registered upon removal");
-        void *new_value = it->second;
-        nb_foreign_seq *to_free = nullptr;
-        if (nb_is_foreign(it->second)) {
-            new_value = remove_from_list(nb_get_foreign(it->second), &to_free);
-            if (new_value)
-                it.value() = new_value = nb_mark_foreign(new_value);
-            else
-                type_c2p_slow.erase(it);
-        } else {
-            auto *t = (type_data *) it->second;
-            nb_store_release(t->foreign_bindings,
-                             remove_from_list(
-                                     nb_load_acquire(t->foreign_bindings),
-                                     &to_free));
-        }
-        nb_type_update_c2p_fast(type, new_value);
-        PyMem_Free(to_free);
-    };
+    nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
+    auto it = type_c2p_slow.find(type);
+    check(it != type_c2p_slow.end(),
+          "foreign binding not registered upon removal");
+    void *new_value = it->second;
+    nb_foreign_seq *to_free = nullptr;
+    if (nb_is_foreign(it->second)) {
+        new_value = remove_from_list(nb_get_foreign(it->second), &to_free);
+        if (new_value)
+            it.value() = new_value = nb_mark_foreign(new_value);
+        else
+            type_c2p_slow.erase(it);
+    } else {
+        auto *t = (type_data *) it->second;
+        nb_store_release(t->foreign_bindings,
+                         remove_from_list(
+                                 nb_load_acquire(t->foreign_bindings),
+                                 &to_free));
+    }
+    nb_type_update_c2p_fast(type, new_value);
+    PyMem_Free(to_free);
+}
 
+static void nb_foreign_remove_local_binding(pymb_binding *binding) noexcept {
+    nb_internals *internals_ = internals;
+    lock_internals guard{internals_};
+    nb_foreign_remove_binding_from_type(
+            internals_, (const std::type_info *) binding->native_type,
+            binding);
+}
+
+static void nb_foreign_remove_foreign_binding(pymb_binding *binding) noexcept {
+    nb_internals *internals_ = internals;
+    lock_internals guard{internals_};
     bool should_remove_auto = should_autoimport_foreign(internals_, binding);
     if (auto it = internals_->foreign_manual_imports.find(binding);
         it != internals_->foreign_manual_imports.end()) {
-        remove_from_type((const std::type_info *) it->second);
+        nb_foreign_remove_binding_from_type(
+                internals_, (const std::type_info *) it->second, binding);
         should_remove_auto &= (it->second != binding->native_type);
         internals_->foreign_manual_imports.erase(it);
     }
     if (should_remove_auto)
-        remove_from_type((const std::type_info *) binding->native_type);
+        nb_foreign_remove_binding_from_type(
+                internals_, (const std::type_info *) binding->native_type,
+                binding);
 }
 
 static void nb_foreign_add_foreign_framework(pymb_framework *framework)
@@ -247,19 +266,48 @@ static void nb_foreign_add_foreign_framework(pymb_framework *framework)
         internals->print_leak_warnings = false;
 }
 
+static void nb_foreign_remove_foreign_framework(pymb_framework *framework)
+        noexcept {
+    if (is_alive() && framework->translate_exception &&
+        framework->abi_lang == pymb_abi_lang_cpp) {
+        // Remove the exception translator we added for this framework.
+        // The interpreter is already finalizing, so we don't need to worry
+        // about locking.
+        nb_maybe_atomic<nb_translator_seq *> *pcurr = &internals->translators;
+        while (auto *seq = pcurr->load_relaxed()) {
+            if (seq->translator == internals->foreign_exception_translator &&
+                seq->payload == framework) {
+                pcurr->store_release(seq->next.load_relaxed());
+                delete seq;
+                continue;
+            }
+            pcurr = &seq->next;
+        }
+    }
+}
+
 // (end of callbacks)
 
 // Advertise our existence, and the above callbacks, to other frameworks
 static void register_with_pymetabind(nb_internals *internals_) {
     // caller must hold the internals lock
-    if (internals_->foreign_registry)
+    if (internals_->foreign_self)
         return;
-    internals_->foreign_registry = pymb_get_registry();
-    if (!internals_->foreign_registry)
+    pymb_registry *registry = pymb_get_registry();
+    if (!registry)
         raise_python_error();
 
+    const char *name_const = "nanobind " NB_ABI_TAG;
+    char *name_buf = (char *) alloca(strlen(name_const) + 1 +
+                                     (internals_->domain ?
+                                          8 + strlen(internals_->domain) : 0));
+    strcpy(name_buf, name_const);
+    if (internals_->domain) {
+        strcat(name_buf, " domain ");
+        strcat(name_buf, internals_->domain);
+    }
     auto *fw = new pymb_framework{};
-    fw->name = "nanobind " NB_ABI_TAG;
+    fw->name = strdup_check(name_buf);
 #if defined(NB_FREE_THREADED)
     fw->flags = pymb_framework_bindings_usable_forever;
 #else
@@ -271,12 +319,14 @@ static void register_with_pymetabind(nb_internals *internals_) {
     fw->to_python = nb_foreign_to_python;
     fw->keep_alive = nb_foreign_keep_alive;
     fw->translate_exception = nb_foreign_translate_exception;
+    fw->remove_local_binding = nb_foreign_remove_local_binding;
+    fw->free_local_binding = nb_foreign_free_local_binding;
     fw->add_foreign_binding = nb_foreign_add_foreign_binding;
     fw->remove_foreign_binding = nb_foreign_remove_foreign_binding;
     fw->add_foreign_framework = nb_foreign_add_foreign_framework;
+    fw->remove_foreign_framework = nb_foreign_remove_foreign_framework;
     internals_->foreign_self = fw;
 
-    auto *registry = internals_->foreign_registry;
     // pymb_add_framework() will call our add_foreign_framework and
     // add_foreign_binding method for each existing other framework/binding;
     // those need to lock internals, so unlock here
@@ -331,7 +381,7 @@ static void nb_type_import_binding(pymb_binding *binding,
 // the C++ type by looking at the binding, and require that its ABI match ours.
 // Throws an exception on failure. Caller must hold the internals lock.
 void nb_type_import_impl(PyObject *pytype, const std::type_info *cpptype) {
-    if (!internals->foreign_registry)
+    if (!internals->foreign_self)
         register_with_pymetabind(internals);
     pymb_framework* foreign_self = internals->foreign_self;
     pymb_binding* binding = pymb_get_binding(pytype);
@@ -378,7 +428,7 @@ void nb_type_enable_import_all() {
         if (internals_->foreign_import_all)
             return;
         internals_->foreign_import_all = true;
-        if (!internals_->foreign_registry) {
+        if (!internals_->foreign_self) {
             // pymb_add_framework tells us about every existing type when we
             // register, so if we register with import enabled, we're done
             register_with_pymetabind(internals_);
@@ -390,22 +440,19 @@ void nb_type_enable_import_all() {
     // we can reuse the pymb callback functions. foreign_registry and
     // foreign_self never change once they're non-null, so we can accesss them
     // without locking here.
-    pymb_lock_registry(internals_->foreign_registry);
-    PYMB_LIST_FOREACH(struct pymb_binding*, binding,
-                      internals_->foreign_registry->bindings) {
-        if (binding->framework != internals_->foreign_self &&
-            pymb_try_ref_binding(binding)) {
+    struct pymb_registry *registry = internals_->foreign_self->registry;
+    pymb_lock_registry(registry);
+    PYMB_LIST_FOREACH(struct pymb_binding*, binding, registry->bindings) {
+        if (binding->framework != internals_->foreign_self)
             nb_foreign_add_foreign_binding(binding);
-            pymb_unref_binding(binding);
-        }
     }
-    pymb_unlock_registry(internals_->foreign_registry);
+    pymb_unlock_registry(registry);
 }
 
 // Expose hooks for other frameworks to use to work with the given nanobind
 // type object. Caller must hold the internals lock.
 void nb_type_export_impl(type_data *td) {
-    if (!internals->foreign_registry)
+    if (!internals->foreign_self)
         register_with_pymetabind(internals);
 
     void *foreign_bindings = nb_load_acquire(td->foreign_bindings);
@@ -436,7 +483,7 @@ void nb_type_export_impl(type_data *td) {
         foreign_bindings = binding;
     }
     nb_store_release(td->foreign_bindings, foreign_bindings);
-    pymb_add_binding(internals->foreign_registry, binding);
+    pymb_add_binding(binding, /* tp_finalize_will_remove */ 1);
     // No need to call nb_type_update_c2p_fast: the map value (`td`) hasn't
     // changed, and a potential concurrent lookup that picked up the old value
     // of `td->foreign_bindings` is safe.
@@ -450,7 +497,7 @@ void nb_type_enable_export_all() {
     if (internals_->foreign_export_all)
         return;
     internals_->foreign_export_all = true;
-    if (!internals_->foreign_registry)
+    if (!internals_->foreign_self)
         register_with_pymetabind(internals_);
     for (const auto& [type, value] : internals_->type_c2p_slow) {
         if (nb_is_foreign(value))
@@ -462,6 +509,7 @@ void nb_type_enable_export_all() {
 // Invoke `attempt(closure, binding)` for each foreign binding `binding`
 // that claims `type` and was not supplied by us, until one of them returns
 // non-null. Return that first non-null value, or null if all attempts failed.
+// Failed attempts might be repeated if types are removed concurrently.
 // Requires that a previous call to nb_type_c2p() have been made for `type`.
 void *nb_type_try_foreign(nb_internals *internals_,
                           const std::type_info *type,
@@ -473,109 +521,68 @@ void *nb_type_try_foreign(nb_internals *internals_,
 #if defined(NB_FREE_THREADED)
     auto per_thread_guard = nb_type_lock_c2p_fast(internals_);
     nb_type_map_fast &type_c2p_fast = *per_thread_guard;
+    uint32_t updates_count = per_thread_guard.updates_count();
 #else
     nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
 #endif
+    do {
+        // We assume nb_type_c2p already ran for this type, so that there's
+        // no need to handle a cache miss here.
+        void *foreign_bindings = nullptr;
+        if (void *result = type_c2p_fast.lookup(type); nb_is_foreign(result))
+            foreign_bindings = nb_get_foreign(result);
+        else if (auto *t = (type_data *) result)
+            foreign_bindings = nb_load_acquire(t->foreign_bindings);
+        if (!foreign_bindings)
+            return nullptr;
 
-    // We assume nb_type_c2p already ran for this type, so that there's
-    // no need to handle a cache miss here.
-    void *foreign_bindings = nullptr;
-    if (void *result = type_c2p_fast.lookup(type); nb_is_foreign(result))
-        foreign_bindings = nb_get_foreign(result);
-    else if (auto *t = (type_data *) result)
-        foreign_bindings = nb_load_acquire(t->foreign_bindings);
-    if (!foreign_bindings)
-        return nullptr;
-
-    if (NB_LIKELY(!nb_is_seq(foreign_bindings))) {
-        // Single foreign binding - check that it's not our own
-        auto *binding = (pymb_binding *) foreign_bindings;
-        if (binding->framework != internals_->foreign_self &&
-            pymb_try_ref_binding(binding)) {
+        if (NB_LIKELY(!nb_is_seq(foreign_bindings))) {
+            // Single foreign binding - check that it's not our own
+            auto *binding = (pymb_binding *) foreign_bindings;
+            if (binding->framework != internals_->foreign_self) {
 #if defined(NB_FREE_THREADED)
-            // attempt() might execute Python code; drop the map mutex
-            // to avoid a deadlock
-            per_thread_guard = {};
+                // attempt() might execute Python code; drop the map mutex
+                // to avoid a deadlock
+                per_thread_guard = {};
 #endif
-            void *result = attempt(closure, binding);
-            pymb_unref_binding(binding);
-            return result;
+                return attempt(closure, binding);
+            }
+            return nullptr;
+        }
+
+        // Multiple foreign bindings - try all except our own.
+        nb_foreign_seq *current = nb_get_seq<pymb_binding>(foreign_bindings);
+        while (current) {
+            auto *binding = current->value;
+            if (binding->framework != internals_->foreign_self) {
+#if defined(NB_FREE_THREADED)
+                per_thread_guard = {};
+#endif
+                void *result = attempt(closure, binding);
+                if (result)
+                    return result;
+
+#if defined(NB_FREE_THREADED)
+                // Re-acquire lock to continue iteration. If we missed an
+                // update while the lock was released, start our lookup over
+                // in case the update removed the node we're on.
+                per_thread_guard = nb_type_lock_c2p_fast(internals_);
+                if (per_thread_guard.updates_count() != updates_count) {
+                    // Concurrent update occurred; retry
+                    updates_count = per_thread_guard.updates_count();
+                    break;
+                }
+#endif
+            }
+            current = current->next;
+        }
+        if (current) {
+            // We broke out early due to a concurrent update. Retry
+            // from the top.
+            continue;
         }
         return nullptr;
-    }
-
-    // Multiple foreign bindings - try all except our own.
-#if !defined(NB_FREE_THREADED)
-    nb_foreign_seq *current = nb_get_seq<pymb_binding>(foreign_bindings);
-    while (current) {
-        auto *binding = current->value;
-        if (binding->framework != internals_->foreign_self &&
-            pymb_try_ref_binding(binding)) {
-            void *result = attempt(closure, binding);
-            pymb_unref_binding(binding);
-            if (result)
-                return result;
-        }
-        current = current->next;
-    }
-    return nullptr;
-#else
-    // In free-threaded mode, this is tricky: we need to drop the
-    // per_thread_guard before calling attempt(), but once we do so,
-    // any of these bindings that might be in the middle of getting deleted
-    // can be concurrently removed from the linked list, which would interfere
-    // with our iteration. Copy the binding pointers out of the list to avoid
-    // this problem.
-
-    // Count the number of foreign bindings we might see
-    size_t len = 0;
-    nb_foreign_seq *current = nb_get_seq<pymb_binding>(foreign_bindings);
-    while (current) {
-        ++len;
-        current = nb_load_acquire(current->next);
-    }
-
-    // Allocate temporary storage for that many pointers
-    pymb_binding **scratch =
-        (pymb_binding **) alloca(len * sizeof(pymb_binding*));
-    pymb_binding **scratch_tail = scratch;
-
-    // Iterate again, taking out strong references and saving pointers to
-    // our scratch storage. Concurrency notes:
-    // - If bindings are removed while we iterate, we may either visit them
-    //   (and do nothing since try_ref returns false) or skip them. Binding
-    //   removal will lock all c2p_fast maps in between when it modifies the
-    //   linked list and when it deallocates the removed node, so we're safe
-    //   from concurrent deallocation as long as we hold the lock.
-    // - If bindings are added at the front of the list while we iterate,
-    //   they don't impact us since we're working with a local copy of the
-    //   head ptr `foreign_bindings`.
-    // - If bindings are added at the rear of the list while we iterate,
-    //   we may either include them (if we didn't use some of the scratch
-    //   slots we allocated previously) or not, but we'll always decref
-    //   everything we incref.
-    current = nb_get_seq<pymb_binding>(foreign_bindings);
-    while (current && scratch != scratch_tail + len) {
-        auto *binding = current->value;
-        if (binding->framework != internals_->foreign_self &&
-            pymb_try_ref_binding(binding))
-            *scratch_tail++ = binding;
-        current = nb_load_acquire(current->next);
-    }
-
-    // Drop the lock and proceed using only our saved binding pointers.
-    // Since we obtained strong references to them, there is no remaining
-    // concurrent-destruction hazard.
-    per_thread_guard = {};
-    void *result = nullptr;
-    while (scratch != scratch_tail) {
-        if (!result)
-            result = attempt(closure, *scratch);
-        pymb_unref_binding(*scratch);
-        ++scratch;
-    }
-    return result;
-#endif
+    } while (true);
 }
 
 NAMESPACE_END(detail)

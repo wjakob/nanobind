@@ -64,6 +64,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     t->type = ed->type;
     t->type_py = (PyTypeObject *) result.ptr();
     t->flags = ed->flags;
+    t->size = ed->size;
     t->enum_tbl.fwd = new enum_map();
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;
@@ -72,7 +73,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         type_init_data *t = (type_init_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
-        nb_type_unregister(t);
+        if (t->flags & (uint32_t) enum_flags::is_registered)
+            nb_type_unregister(t);
         free((char*) t->name);
         delete t;
     });
@@ -86,6 +88,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         return tp;
     }
 
+    t->flags |= (uint32_t) enum_flags::is_registered;
     result.attr("__nb_enum__") = tie_lifetimes;
 
     make_immortal(result.ptr());
@@ -93,7 +96,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     return result.release().ptr();
 }
 
-static type_init_data *enum_get_type_data(handle tp) {
+type_init_data *enum_get_type_data(handle tp) {
     return (type_init_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
 }
 

@@ -3239,10 +3239,11 @@ additional information and caveats about this feature.
 
 .. cpp:function:: void export_for_interop(handle type)
 
-   Make the Python type object *type*, which was bound in this nanobind domain,
-   be available for import by other binding libraries and other nanobind
-   domains. If they do so, then their bound functions will be able to accept
-   and return instances of *type*.
+   Make the Python type object *type*, which was created by a
+   :cpp:class:`nb::class_` or :cpp:class:`nb::enum_` binding statement in this
+   nanobind domain be available for import by other binding libraries and other
+   nanobind domains. If they do so, then their bound functions will be able to
+   accept and return instances of *type*.
 
    Repeatedly exporting the same type is idempotent.
 

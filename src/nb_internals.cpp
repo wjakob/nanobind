@@ -251,8 +251,20 @@ static void internals_cleanup() {
     if (!p->type_c2p_slow.empty()) {
         size_t type_leaks = 0;
         for (const auto &kv : p->type_c2p_slow) {
-            if (!nb_is_foreign(kv.second))
-                ++type_leaks;
+#if !defined(NB_DISABLE_INTEROP)
+            if (nb_is_foreign(kv.second)) {
+                if (nb_is_seq(kv.second)) {
+                    auto *seq = nb_get_seq<pymb_binding>(kv.second);
+                    while (seq) {
+                        auto *next = seq->next;
+                        PyMem_Free(seq);
+                        seq = next;
+                    }
+                }
+                continue;
+            }
+#endif
+            ++type_leaks;
         }
 
         if (type_leaks && print_leak_warnings) {
@@ -299,10 +311,13 @@ static void internals_cleanup() {
             t = next;
         }
 
+#if !defined(NB_DISABLE_INTEROP)
         if (p->foreign_self) {
-            pymb_list_unlink(&p->foreign_self->link);
+            pymb_remove_framework(p->foreign_self);
+            free((void *) p->foreign_self->name);
             delete p->foreign_self;
         }
+#endif
 
         for (auto &kv : p->types_in_c2p_fast) {
             if (!kv.second)
@@ -382,6 +397,7 @@ NB_NOINLINE void init(const char *name) {
     p->shard_mask = shard_count - 1;
 #endif
     p->shard_count = shard_count;
+    p->domain = name;
 
     str nb_name("nanobind");
     p->nb_module = PyModule_NewObject(nb_name.ptr());

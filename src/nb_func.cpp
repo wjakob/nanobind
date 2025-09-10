@@ -1307,25 +1307,21 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     bool found = false;
                     auto it = internals_->type_c2p_slow.find(*descr_type);
                     if (it != internals_->type_c2p_slow.end()) {
-                        object ty;
+                        handle th;
 #if !defined(NB_DISABLE_INTEROP)
                         if (nb_is_foreign(it->second)) {
                             void *bindings = nb_get_foreign(it->second);
-                            pymb_binding *binding =
-                                nb_is_seq(bindings) ?
-                                    nb_get_seq<pymb_binding>(bindings)->value :
-                                    (pymb_binding *) bindings;
-                            if (pymb_try_ref_binding(binding)) {
-                                ty = borrow(binding->pytype);
-                                pymb_unref_binding(binding);
-                            }
+                            if (!nb_is_seq(bindings))
+                                th = ((pymb_binding *) bindings)->pytype;
+                            else
+                                th = nb_get_seq<pymb_binding>(bindings)->value->pytype;
                         } else
 #endif
-                            ty = borrow(((type_data *) it->second)->type_py);
-                        if (ty) {
-                            buf.put_dstr((borrow<str>(ty.attr("__module__"))).c_str());
+                            th = ((type_data *) it->second)->type_py;
+                        if (th) {
+                            buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                             buf.put('.');
-                            buf.put_dstr((borrow<str>(ty.attr("__qualname__"))).c_str());
+                            buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
                             found = true;
                         }
                     }

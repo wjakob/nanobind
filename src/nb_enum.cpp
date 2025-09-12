@@ -141,11 +141,11 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     // In Python 3.11+, update the flag and bit masks by hand,
     // since enum._proto_member.__set_name__ is not called in this code path.
     if (t->flags & (uint32_t) enum_flags::is_flag) {
-        setattr(tp, "_flag_mask_", tp.attr("_flag_mask_") | val);
+        tp.attr("_flag_mask_") |= val;
 
         bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
         if (is_single_bit && hasattr(tp, "_singles_mask_"))
-            setattr(tp, "_singles_mask_", tp.attr("_singles_mask_") | val);
+            tp.attr("_singles_mask_") |= val;
 
         int_ bit_length = int_(tp.attr("_flag_mask_").attr("bit_length")());
         setattr(tp, "_all_bits_", (int_(2) << bit_length) - int_(1));

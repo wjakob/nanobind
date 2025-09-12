@@ -480,7 +480,6 @@ With reference counting
 
    .. code-block:: cpp
 
-
        PyObject* list = ...;
        Py_ssize_t index = ...;
        nb::object o = nb::borrow(PyList_GetItem(list, index));
@@ -657,9 +656,8 @@ Wrapper classes
    Wrapper class representing Python ``tuple`` instances.
 
    Use the standard ``operator[]`` C++ operator with an integer argument to
-   read tuple elements (the bindings for this operator are provided by the
-   parent class and not listed here). Once created, the set is immutable and
-   its elements cannot be replaced.
+   read tuple elements.
+   Once created, the tuple is immutable and its elements cannot be replaced.
 
    Use the :py:func:`make_tuple` function to create new tuples.
 
@@ -705,8 +703,7 @@ Wrapper classes
    Wrapper class representing Python ``list`` instances.
 
    Use the standard ``operator[]`` C++ operator with an integer argument to
-   read and write list elements (the bindings for this operator are provided by
-   the parent class and not listed here).
+   read and write list elements.
 
    Use the :cpp:func:`nb::del <del>` function to remove elements.
 
@@ -1088,7 +1085,7 @@ Wrapper classes
       *Note*: The C string will be deleted when the `str` instance is garbage
       collected.
 
-   .. cpp:function:: template <typename... Args> str format(Args&&... args)
+   .. cpp:function:: template <typename... Args> str format(Args&&... args) const
 
       C++ analog of the Python routine ``str.format``. Can be called with
       positional and keyword arguments.
@@ -1255,8 +1252,21 @@ Wrapper classes
 
    .. cpp:function:: detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const
 
-      Adjust the slice to the `size` value of a given container. Returns a tuple containing
-      ``(start, stop, step, slice_length)``.
+      Compute a slice adjusted to the `size` value of a given container.
+      Returns a tuple containing ``(start, stop, step, slice_length)``.
+      The elements of the tuple can be obtained using a structured binding or
+      by using the templated ``get`` member function of ``nb::detail::tuple``.
+      For example:
+
+      .. code-block:: cpp
+
+          m.def("func", [](nb::slice slc) {
+              auto [start, stop, step, slice_length] = slc.compute(17);
+              // Or, if only the computed slice_length is needed:
+              auto tpl = slc.compute(42);
+              std::size_t adjusted_slice_length = tpl.get<3>();
+              // Now do something ...
+          });
 
 .. cpp:class:: ellipsis: public object
 
@@ -1313,8 +1323,8 @@ Wrapper classes
 
    .. code-block:: cpp
 
-      m.def("func", [](MyClass &arg)) { ... });
-      m.def("func", [](nb::fallback arg)) { ... });
+      m.def("func", [](MyClass &arg) { ... });
+      m.def("func", [](nb::fallback arg) { ... });
 
    If :cpp:class:`handle` or :cpp:class:`object` were used instead on the
    second line, they would always match and prevent potential implicit
@@ -1600,7 +1610,10 @@ Casting
    When the `convert` argument is set to ``true`` (the default), the
    implementation may also attempt *implicit conversions* to perform the cast.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
    See :cpp:func:`try_cast()` for an alternative that never raises.
 
 .. cpp:function:: template <typename T, typename Derived> bool try_cast(const detail::api<Derived> &value, T &out, bool convert = true) noexcept
@@ -1622,7 +1635,10 @@ Casting
    policy `policy` is used to handle ownership-related questions when a new
    Python object must be created.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
 
 .. cpp:function:: template <typename T> object cast(T &&value, rv_policy policy, handle parent)
 
@@ -1631,7 +1647,10 @@ Casting
    Python object must be created. A valid `parent` object is required when
    specifying a `reference_internal` return value policy.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
 
 .. cpp:function:: template <typename T> object find(const T &value) noexcept
 
@@ -1645,7 +1664,10 @@ Casting
    value policy `policy` is used to handle ownership-related questions when a
    new Python objects must be created.
 
-   The function raises a :cpp:type:`cast_error` when the conversion fails.
+   The function raises an exception when the conversion fails.
+   If the type caster uses the CPython error API (e.g., ``PyErr_SetString()``
+   or ``PyErr_Format()``) to report a failure, then :cpp:class:`python_error`
+   is raised.  Otherwise, :cpp:type:`cast_error` is raised.
 
 Common binding annotations
 --------------------------

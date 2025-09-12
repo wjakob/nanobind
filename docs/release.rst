@@ -22,4 +22,4 @@ How to make a new release?
 
 9. Upload: ``twine upload --repository nanobind <filename>``
 
-10. Run ``python src/version.py -w X.Y.Zdev1``
+10. Run ``python src/version.py -w X.Y.Z-dev1``

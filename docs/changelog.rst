@@ -15,8 +15,97 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version TBD (unreleased)
-------------------------
+Version 2.9.2 (Sep 4, 2025)
+---------------------------
+
+This is a patch release to fix an issue in the new recursive stub generation feature:
+
+- When creating stubs for a module, the generator must decide whether to store
+  declarations locally (e.g., in ``foo.pyi``) or in a subdirectory (e.g., in
+  ``foo/__init__.pyi``). The latter is necessary, e.g., when ``foo`` contains
+  submodules. However, the implemented submodule test was far too conservative
+  and interpreted any imported module (e.g. ``import os``) as a submodule. The
+  patch release fixes this.
+  (commit `a65e1b
+  <https://github.com/wjakob/nanobind/commit/a65e1b36ec0670e7c8d7a3bacfa5cff425fe92fe>`__).
+
+Version 2.9.1 (Sep 4, 2025)
+---------------------------
+
+This is a patch release to fix a regression in the CMake build system:
+
+- nanobind 2.9.0 internally adopted the CMake command ``cmake_path()`` to
+  normalize paths. This was done for cosmetic reasons, since it improves the
+  readability of generated commands. However, ``cmake_path()`` is only
+  available on CMake 3.20+, while nanobind officially supports CMake 3.15+.
+  Version 2.9.1 removes the full path normalization.
+  (commit `f703fd
+  <https://github.com/wjakob/nanobind/commit/f703fd403aed32cd903f5cfdff414bdfd13f6430>`__).
+
+
+Version 2.9.0 (Sep 4, 2025)
+---------------------------
+
+- Nanobind's CMake stub generation command :cmake:command:`nanobind_add_stub`
+  can now automatically traverse submodule hierarchies and generate :ref:`many
+  stub files at once <stubgen_recursive_cmake>`. (PR `#1148
+  <https://github.com/wjakob/nanobind/pull/1148>`__).
+
+- Recursive stub generation now correctly organizes stub files hierarchically (e.g.
+  ``my_ext.pyi`` versus ``my_ext/__init__.pyi``). (commits `ad9d3fe
+  <https://github.com/wjakob/nanobind/commit/ad9d3fe4a631b25dbef0eca54a4ac5f96f064596>`__,
+  `620c1c1
+  <https://github.com/wjakob/nanobind/commit/620c1c13430bed882d76d2c12efadaa4e9f3f37d>`__).
+
+- The stub generator now exposes NumPy array types as ``NDArray[np.float32]``
+  (or similar) instead of ``Annotated[ArrayLike, dict(...)]`` to simplify
+  type-checking. (PR `#1149 <https://github.com/wjakob/nanobind/pull/1149>`__,
+  commit `37dd2c
+  <https://github.com/wjakob/nanobind/commit/37dd2c6d6a44f9657fb08c46b2d5e5c1623a1048>`__).
+
+- Nanobind (finally!) correctly implements in-place updates to dicts, lists,
+  etc. Previously, a C++ operation like
+
+  .. code-block:: cpp
+
+     nb::dict my_dict = ...;
+     my_dict["key"] += 1;
+
+  performed an addition but failed to reassign the updated value to the
+  original key. (PR `#1119 <https://github.com/wjakob/nanobind/pull/1119>`__).
+
+- When cast operations like :cpp:func:`nb::cast() <cast>` fail to convert a
+  value, they previously raised a generic ``std::bad_cast`` exception that
+  loses the context of why the cast failed. When a Python error status is
+  available, they now preferentially raise :cpp:class:`nb::python_error
+  <python_error>`. This helps to track down issues with default argument
+  conversion. (PR `#1137 <https://github.com/wjakob/nanobind/pull/1137>`__).
+
+- Miscellaneous minor fixes and improvements. (PRs
+  `#1092 <https://github.com/wjakob/nanobind/pull/1092>`__,
+  `#1107 <https://github.com/wjakob/nanobind/pull/1107>`__,
+  `#1120 <https://github.com/wjakob/nanobind/pull/1120>`__,
+  `#1124 <https://github.com/wjakob/nanobind/pull/1124>`__.
+  `#1128 <https://github.com/wjakob/nanobind/pull/1128>`__,
+  `#1135 <https://github.com/wjakob/nanobind/pull/1135>`__,
+  `#1138 <https://github.com/wjakob/nanobind/pull/1138>`__,
+  `#1142 <https://github.com/wjakob/nanobind/pull/1142>`__,
+  commits
+  `d99b3f3 <https://github.com/wjakob/nanobind/commit/d99b3f3580b6c956f04851e8ed91e7eb5f259557>`__,
+  `0147904 <https://github.com/wjakob/nanobind/commit/0147904cee4baaa597780b22920f8cf0577af4d6>`__).
+
+- Minor documentation tweaks. (PRs
+  `#1109 <https://github.com/wjakob/nanobind/pull/1109>`__,
+  `#1108 <https://github.com/wjakob/nanobind/pull/1108>`__,
+  `#1114 <https://github.com/wjakob/nanobind/pull/1114>`__,
+  `#1117 <https://github.com/wjakob/nanobind/pull/1117>`__,
+  `#1134 <https://github.com/wjakob/nanobind/pull/1134>`__,
+  `#1132 <https://github.com/wjakob/nanobind/pull/1132>`__,
+  `#1090 <https://github.com/wjakob/nanobind/pull/1090>`__).
+
+
+Version 2.8.0 (July 16, 2025)
+-----------------------------
 
 - Added :cpp:class:`nb::fallback <fallback>` wrapper type, which is a
   :cpp:class:`nb::handle <handle>` that always requires implicit conversion
@@ -28,27 +117,27 @@ Version TBD (unreleased)
   from source code literals. (PR `#1051
   <https://github.com/wjakob/nanobind/pull/1051>`__).
 
-- Nanobind now uses multi-phase (as opposed to single-phase) initialization API
-  when registering modules. However, multi-interpreter extensions remain
-  unsupported. (PR `#1059 <https://github.com/wjakob/nanobind/pull/1059>`__).
-
-- Added :cpp:func:`nb::dict::empty() <dict::empty>`,
+- Added the convenience methods :cpp:func:`nb::dict::empty() <dict::empty>`,
   :cpp:func:`nb::list::empty() <list::empty>`, :cpp:func:`nb::set::empty()
-  <set::empty>`, and :cpp:func:`nb::tuple::empty() <tuple::empty>` convenience
-  methods.
+  <set::empty>`, and :cpp:func:`nb::tuple::empty() <tuple::empty>`. (PR `#1052
+  <https://github.com/wjakob/nanobind/pull/1052>`__)
+
+- Added a :cpp:func:`nb::dict::get() <dict::get>` function to perform
+  dictionary lookups with a fallback value in case of failures. (commit `d38284
+  <https://github.com/wjakob/nanobind/commit/d38284e573e404503862a550804e4c2413e11e01>`__).
 
 - Nanobind now uses multi-phase (as opposed to single-phase) initialization API
   when registering modules. However, multi-interpreter extensions remain
   unsupported. (PR `#1059 <https://github.com/wjakob/nanobind/pull/1059>`__).
 
-- Miscellaneous fixes and improvements (
-  commits
+- Added :cpp:class:`nb::frozenset <frozenset>` that wraps the Python ``frozenset`` type.
+  (PR `#1068 <https://github.com/wjakob/nanobind/pull/1068>`__)
+
+- Miscellaneous fixes and improvements (commits
   `d4b245 <https://github.com/wjakob/nanobind/commit/d4b245ad69f729c3d2095be4c1cb5b94810dae26>`__,
   `667451 <https://github.com/wjakob/nanobind/commit/667451fb4566dcd7151d64d81e118f9ba194a889>`__,
-  `62fc99 <https://github.com/wjakob/nanobind/commit/62fc996018d9ea4d51af9c86cf008c2562b4eeab>`__).
-
-
-- Added :cpp:class:`nb::frozenset` that wraps the Python ``frozenset`` type.
+  `62fc99 <https://github.com/wjakob/nanobind/commit/62fc996018d9ea4d51af9c86cf008c2562b4eeab>`__,
+  `8497f7 <https://github.com/wjakob/nanobind/commit/8497f778d006b60e44e99530f241e22f9603bb04>`__).
 
 Version 2.7.0 (Apr 18, 2025)
 ----------------------------

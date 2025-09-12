@@ -357,10 +357,14 @@ An undocumented stub replaces the entire body with the Python ellipsis object
    def square(x: int) -> int: ...
 
 Complex default arguments are often also abbreviated with ``...`` to improve
-the readability of signatures. You can read more about stub files in the
-`typing documentation
-<https://typing.readthedocs.io/en/latest/source/stubs.html>`__ and the `MyPy
-documentation <https://mypy.readthedocs.io/en/stable/stubs.html>`__.
+the readability of signatures.
+
+You can read more about stub files in
+`Writing and Maintaining Stub Files
+<https://typing.python.org/en/latest/guides/writing_stubs.html>`__ and
+`Distributing type information
+<https://typing.python.org/en/latest/spec/distributing.html>`__ and in the
+`MyPy documentation <https://mypy.readthedocs.io/en/stable/stubs.html>`__.
 
 nanobind's ``stubgen`` tool automates the process of stub generation to turn
 modules containing a mixture of ordinary Python code and C++ bindings into an
@@ -469,6 +473,46 @@ This requires several changes:
 
 The :cmake:command:`nanobind_add_stub` command has a few other options, please
 refer to its documentation for details.
+
+.. _stubgen_recursive_cmake:
+
+Recursive stub generation
+_________________________
+
+Specify the ``RECURSIVE`` parameter to have the stub generator automatically
+traverse a module's hierarchy and generate a stub for each discovered
+submodule.
+
+In this mode, pass the ``OUTPUT_PATH`` parameter to specify a base directory.
+The ``OUTPUT`` parameter now accepts multiple values that should list each
+generated ``.pyi`` file.
+
+Note that these are not actually passed to the stub generator and purely used
+for dependency management within CMake (e.g., to remove files when executing
+the ``clean`` target, or to track dependencies when stub files are subsequently
+consumed by other targets). This is necessary because CMake is not able to
+automatically discover the generated stub paths at configuration time.
+
+Here is an example:
+
+.. code-block:: cmake
+
+   nanobind_add_stub(
+     my_ext_stub
+     MODULE my_ext
+
+     PYTHON_PATH $<TARGET_FILE_DIR:my_ext>
+     DEPENDS my_ext
+
+     RECURSIVE
+
+     OUTPUT_PATH my_ext
+     OUTPUT
+         my_ext/__init__.pyi
+         my_ext/submodule_1.pyi
+         my_ext/submodule_2/__init__.pyi
+         my_ext/submodule_2/nested.pyi
+   )
 
 Command line interface
 ^^^^^^^^^^^^^^^^^^^^^^

@@ -273,8 +273,8 @@ static void internals_cleanup() {
             for (auto [f, p2] : p->funcs) {
                 fprintf(stderr, " - leaked function \"%s\"\n",
                         nb_func_data(f)->name);
+                INC_CTR;
                 if (ctr == 10) {
-                    INC_CTR;
                     fprintf(stderr, " - ... skipped remainder\n");
                     break;
                 }
@@ -487,9 +487,8 @@ NB_NOINLINE void fail_unspecified() noexcept {
     #if defined(NB_COMPACT_ASSERTION_MESSAGE)
         fail(NB_COMPACT_ASSERTION_MESSAGE);
     #else
-        fail("nanobind: encountered an unrecoverable error condition. Recompile "
-             "using the 'Debug' or 'RelWithDebInfo' modes to obtain further "
-             "information about this problem.");
+        fail("encountered an unrecoverable error condition. Recompile using the"
+             " 'Debug' mode to obtain further information about this problem.");
     #endif
 }
 #endif

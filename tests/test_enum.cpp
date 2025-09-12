@@ -1,4 +1,6 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/operators.h>
+#include <nanobind/stl/string.h>
 
 namespace nb = nanobind;
 
@@ -13,6 +15,9 @@ enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
 enum ClassicEnum { Item1, Item2 };
 
 struct EnumProperty { Enum get_enum() { return Enum::A; } };
+
+enum class OpaqueEnum { X, Y };
+NB_MAKE_OPAQUE(OpaqueEnum)
 
 NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum", "enum-level docstring")
@@ -67,4 +72,17 @@ NB_MODULE(test_enum_ext, m) {
     nb::class_<EnumProperty>(m, "EnumProperty")
         .def(nb::init<>())
         .def_prop_ro("read_enum", &EnumProperty::get_enum);
+
+
+    auto oe = nb::class_<OpaqueEnum>(m, "OpaqueEnum")
+        .def_prop_ro_static("X", [](nb::object&){return OpaqueEnum::X;})
+        .def_prop_ro_static("Y", [](nb::object&){return OpaqueEnum::Y;})
+        .def(nb::init<>())
+        .def("__init__", [](OpaqueEnum* p, std::string v){
+            if (v == "X") new (p) OpaqueEnum{OpaqueEnum::X};
+            else if (v == "Y") new (p) OpaqueEnum{OpaqueEnum::Y};
+            else throw std::runtime_error(v);
+        })
+        .def(nb::self == nb::self);
+    nb::implicitly_convertible<std::string, OpaqueEnum>();
 }

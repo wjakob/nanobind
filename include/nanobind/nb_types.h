@@ -427,7 +427,7 @@ class str : public object {
     explicit str(const char *s, size_t n)
         : object(detail::str_from_cstr_and_size(s, n), detail::steal_t{}) { }
 
-    template <typename... Args> str format(Args&&... args);
+    template <typename... Args> str format(Args&&... args) const;
 
     const char *c_str() const { return PyUnicode_AsUTF8AndSize(m_ptr, nullptr); }
 };
@@ -452,7 +452,7 @@ class bytes : public object {
 };
 
 NAMESPACE_BEGIN(literals)
-inline str operator"" _s(const char *s, size_t n) {
+inline str operator""_s(const char *s, size_t n) {
     return str(s, n);
 }
 NAMESPACE_END(literals)

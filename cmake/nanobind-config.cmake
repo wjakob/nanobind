@@ -237,7 +237,7 @@ function (nanobind_build_library TARGET_NAME)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't
-  # included in Release/MinSizeRel modes
+  # included in Release/MinSizeRel/RelWithDebInfo modes
   target_compile_definitions(${TARGET_NAME} PRIVATE
     $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
 
@@ -459,7 +459,7 @@ function(nanobind_sanitizer_preload_env env_var)
     get_target_property(deps ${target} LINK_LIBRARIES)
     if(deps AND NOT deps STREQUAL "deps-NOTFOUND")
         foreach(dep ${deps})
-            if(NOT "${dep}" IN_LIST all_deps)
+            if(NOT "${dep}" IN_LIST all_deps AND TARGET "${dep}")
                 list(APPEND all_deps "${dep}")
             endif()
         endforeach()
@@ -590,7 +590,7 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;EXCLUDE_FROM_ALL" "MODULE;OUTPUT;MARKER_FILE;COMPONENT;PATTERN_FILE" "PYTHON_PATH;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL" "MODULE;COMPONENT;PATTERN_FILE;OUTPUT_PATH" "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -614,8 +614,12 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_ARGS -D)
   endif()
 
-  foreach (TMP IN LISTS ARG_PYTHON_PATH)
-    list(APPEND NB_STUBGEN_ARGS -i "${TMP}")
+  if (ARG_RECURSIVE)
+    list(APPEND NB_STUBGEN_ARGS -r)
+  endif()
+
+  foreach (PYTHON_PATH IN LISTS ARG_PYTHON_PATH)
+    list(APPEND NB_STUBGEN_ARGS -i "${PYTHON_PATH}")
   endforeach()
 
   if (ARG_PATTERN_FILE)
@@ -623,8 +627,10 @@ function (nanobind_add_stub name)
   endif()
 
   if (ARG_MARKER_FILE)
-    list(APPEND NB_STUBGEN_ARGS -M "${ARG_MARKER_FILE}")
-    list(APPEND NB_STUBGEN_OUTPUTS "${ARG_MARKER_FILE}")
+    foreach (MARKER_FILE IN LISTS ARG_MARKER_FILE)
+      list(APPEND NB_STUBGEN_ARGS -M "${MARKER_FILE}")
+      list(APPEND NB_STUBGEN_OUTPUTS "${MARKER_FILE}")
+    endforeach()
   endif()
 
   if (NOT ARG_MODULE)
@@ -633,12 +639,37 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_ARGS -m "${ARG_MODULE}")
   endif()
 
-  if (NOT ARG_OUTPUT)
-    message(FATAL_ERROR "nanobind_add_stub(): an 'OUTPUT' argument must be specified!")
+  list(LENGTH ARG_OUTPUT OUTPUT_LEN)
+
+  # Some sanity hecks
+  if (ARG_RECURSIVE)
+    if (NOT ARG_INSTALL_TIME)
+      if ((OUTPUT_LEN EQUAL 0) AND NOT ARG_OUTPUT_PATH)
+        message(FATAL_ERROR "nanobind_add_stub(): either 'OUTPUT' or 'OUTPUT_PATH' must be specified when 'RECURSIVE' is set!")
+      endif()
+    endif()
   else()
-    list(APPEND NB_STUBGEN_ARGS -o "${ARG_OUTPUT}")
-    list(APPEND NB_STUBGEN_OUTPUTS "${ARG_OUTPUT}")
+    if ((OUTPUT_LEN EQUAL 0) AND NOT ARG_INSTALL_TIME)
+      message(FATAL_ERROR "nanobind_add_stub(): an 'OUTPUT' argument must be specified.")
+    endif()
+    if ((OUTPUT_LEN GREATER 0) AND ARG_OUTPUT_PATH)
+      message(FATAL_ERROR "nanobind_add_stub(): 'OUTPUT' and 'OUTPUT_PATH' can only be specified together when 'RECURSIVE' is set!")
+    endif()
+    if (OUTPUT_LEN GREATER 1)
+      message(FATAL_ERROR "nanobind_add_stub(): specifying more than one 'OUTPUT' requires that 'RECURSIVE' is set!")
+    endif()
   endif()
+
+  if (ARG_OUTPUT_PATH)
+    list(APPEND NB_STUBGEN_ARGS -O "${ARG_OUTPUT_PATH}")
+  endif()
+
+  foreach (OUTPUT IN LISTS ARG_OUTPUT)
+    if (NOT ARG_RECURSIVE)
+      list(APPEND NB_STUBGEN_ARGS -o "${OUTPUT}")
+    endif()
+    list(APPEND NB_STUBGEN_OUTPUTS "${OUTPUT}")
+  endforeach()
 
   file(TO_CMAKE_PATH ${Python_EXECUTABLE} NB_Python_EXECUTABLE)
 

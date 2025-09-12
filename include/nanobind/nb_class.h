@@ -415,7 +415,7 @@ namespace detail {
                 cpp_function_def(
                     [](handle type) {
                         if (!type_check(type))
-                            detail::raise_cast_error();
+                            throw cast_error();
                         return inst_alloc(type);
                     },
                     scope(cls), name("__new__"));
@@ -836,19 +836,24 @@ public:
 };
 
 template <typename Source, typename Target> void implicitly_convertible() {
-    using Caster = detail::make_caster<Source>;
-    static_assert(!std::is_enum_v<Target>, "implicitly_convertible(): 'Target' cannot be an enumeration.");
+    if constexpr (!std::is_same_v<Source, Target>) {
+        using Caster = detail::make_caster<Source>;
+        static_assert(
+            !std::is_enum_v<Target> || !detail::is_base_caster_v<Target>,
+            "implicitly_convertible(): 'Target' cannot be an enumeration "
+            "unless it is opaque.");
 
-    if constexpr (detail::is_base_caster_v<Caster>) {
-        detail::implicitly_convertible(&typeid(Source), &typeid(Target));
-    } else {
-        detail::implicitly_convertible(
-            [](PyTypeObject *, PyObject *src,
-               detail::cleanup_list *cleanup) noexcept -> bool {
-                return Caster().from_python(src, detail::cast_flags::convert,
-                                            cleanup);
-            },
-            &typeid(Target));
+        if constexpr (detail::is_base_caster_v<Caster>) {
+            detail::implicitly_convertible(&typeid(Source), &typeid(Target));
+        } else {
+            detail::implicitly_convertible(
+                [](PyTypeObject *, PyObject *src,
+                   detail::cleanup_list *cleanup) noexcept -> bool {
+                    return Caster().from_python(src, detail::cast_flags::convert,
+                                                cleanup);
+                },
+                &typeid(Target));
+        }
     }
 }
 

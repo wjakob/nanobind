@@ -718,6 +718,7 @@ class StubGen:
 
         if m:
             dtype = "numpy."+ m.group(1)
+            dtype = dtype.replace('bool', 'bool_')
             annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
 
         # Turn shape notation into a valid Python type expression

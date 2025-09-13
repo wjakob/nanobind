@@ -110,6 +110,10 @@ The high-level interface consists of just one CMake command:
           an optimization that nanobind does by default in this specific case).
           If this explanation sounds confusing, then you can ignore it. See the
           detailed description below for more information on this step.
+      * - ``NO_INTEROP``
+        - Remove support for :ref:`interoperability with other Python binding
+          frameworks <interop>`. If you don't need it in your environment, this
+          offers a minor performance and code size benefit.
 
    :cmake:command:`nanobind_add_module` performs the following
    steps to produce bindings.

@@ -311,7 +311,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     (void) arg_index;
 
-    return nb_func_new((const void *) &f);
+    return nb_func_new(&f);
 }
 
 NAMESPACE_END(detail)

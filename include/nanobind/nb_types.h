@@ -162,6 +162,33 @@ public:
 
 NAMESPACE_END(detail)
 
+// *WARNING*: nanobind regularly receives requests from users who run it
+// through Clang-Tidy, or who compile with increased warnings levels, like
+//
+//     -Wcast-qual, -Wsign-conversion, etc.
+//
+// (i.e., beyond -Wall -Wextra and /W4 that are currently already used)
+//
+// Their next step is to open a big pull request needed to silence all of
+// the resulting messages.  This comment is strategically placed here
+// because the (PyObject *) casts below cast away the const qualifier and
+// will almost certainly be flagged in this process.
+//
+// My policy on this is as follows: I am always happy to fix issues in the
+// codebase.  However, many of the resulting change requests are in the
+// "ritual purification" category: things that cause churn, decrease
+// readability, and which don't fix actual problems.  It's a never-ending
+// cycle because each new revision of such tooling adds further warnings
+// and purification rites.
+//
+// So just to be clear: I do not wish to pepper this codebase with
+// "const_cast" and #pragmas/comments to avoid warnings in external
+// tooling just so those users can have a "silent" build.  I don't think it
+// is reasonable for them to impose their own style on this project.
+//
+// As a workaround it is likely possible to restrict the scope of style
+// checks to particular C++ namespaces or source code locations.
+
 class handle : public detail::api<handle> {
     friend class python_error;
     friend struct detail::str_attr;

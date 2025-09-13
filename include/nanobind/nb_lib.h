@@ -273,8 +273,11 @@ NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
 
 // ========================================================================
 
+// Forward declaration for type in nb_attr.h
+struct func_data_prelim_base;
+
 /// Create a Python function object for the given function record
-NB_CORE PyObject *nb_func_new(const void *data) noexcept;
+NB_CORE PyObject *nb_func_new(const func_data_prelim_base *data) noexcept;
 
 // ========================================================================
 

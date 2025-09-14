@@ -331,6 +331,7 @@ struct nb_type_map_fast {
     /// then return a reference to the stored value, which the caller may
     /// modify.
     void*& lookup_or_set(const std::type_info *ti, void *dflt) {
+        ++update_count;
         return data.try_emplace((void *) ti, dflt).first.value();
     }
 
@@ -348,10 +349,22 @@ struct nb_type_map_fast {
         auto it = data.find((void *) ti);
         if (it != data.end()) {
             it.value() = value;
+            ++update_count;
             return true;
         }
         return false;
     }
+
+    /// Number of times the map has been modified. Used in nb_type_try_foreign()
+    /// to detect cases where attempting to use one foreign binding for a type
+    /// may have invalidated the iterator needed to advance to the next one.
+    uint32_t update_count = 0;
+
+#if defined(NB_FREE_THREADED)
+    /// Mutex used by `nb_type_map_per_thread`, stored here because it fits
+    /// in padding this way.
+    PyMutex mutex{};
+#endif
 
   private:
     // Use a generic ptr->ptr map to avoid needing another instantiation of
@@ -390,35 +403,30 @@ struct nb_type_map_per_thread {
         }
         ~guard() {
             if (parent)
-                PyMutex_Unlock(&parent->mutex);
+                PyMutex_Unlock(&parent->map.mutex);
         }
 
         nb_type_map_fast& operator*() const { return parent->map; }
         nb_type_map_fast* operator->() const { return &parent->map; }
 
-        uint32_t updates_count() const { return parent->updates; }
-        void note_updated() { ++parent->updates; }
-
       private:
         friend nb_type_map_per_thread;
         explicit guard(nb_type_map_per_thread &parent_) : parent(&parent_) {
-            PyMutex_Lock(&parent->mutex);
+            PyMutex_Lock(&parent->map.mutex);
         }
         nb_type_map_per_thread *parent = nullptr;
     };
     guard lock() { return guard{*this}; }
 
-    // Mutex protecting accesses to `updates` and `map`
-    PyMutex mutex{};
-
-    // The number of times `map` has been modified
-    uint32_t updates = 0;
-
     nb_internals &internals;
+
+  private:
+    // Access to the map is only possible via `guard`, which holds a lock
     nb_type_map_fast map;
 
+  public:
     // In order to access or modify `next`, you must hold the nb_internals mutex
-    // (this->mutex is not needed for iteration)
+    // (this->map.mutex is not needed for iteration)
     nb_type_map_per_thread *next = nullptr;
 };
 #endif

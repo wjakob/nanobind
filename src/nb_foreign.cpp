@@ -47,13 +47,14 @@ static void *nb_foreign_from_python(pymb_binding *binding,
                                                             PyObject *obj),
                                     void *keep_referenced_ctx) noexcept {
     cleanup_list cleanup{nullptr};
+    uint8_t flags = (uint8_t) cast_flags::not_foreign;
+    if (convert)
+        flags |= (uint8_t) cast_flags::convert;
     auto *td = (type_data *) binding->context;
     if (td->align == 0) { // enum
         int64_t value;
         if (keep_referenced &&
-            enum_from_python(td->type, pyobj, &value, td->size,
-                             convert ? uint8_t(cast_flags::convert) : 0,
-                             nullptr)) {
+            enum_from_python(td->type, pyobj, &value, td->size, flags, nullptr)) {
             bytes holder{(uint8_t *) &value + NB_BIG_ENDIAN * (8 - td->size),
                          td->size};
             keep_referenced(keep_referenced_ctx, holder.ptr());
@@ -63,8 +64,7 @@ static void *nb_foreign_from_python(pymb_binding *binding,
     }
 
     void *result = nullptr;
-    bool ok = nb_type_get(td->type, pyobj,
-                          convert ? uint8_t(cast_flags::convert) : 0,
+    bool ok = nb_type_get(td->type, pyobj, flags,
                           keep_referenced ? &cleanup : nullptr, &result);
     if (keep_referenced) {
         // Move temporary references from our `cleanup_list` to our caller's
@@ -109,7 +109,8 @@ static PyObject *nb_foreign_to_python(pymb_binding *binding,
         // unless a pyobject wrapper already exists.
         rvp = rv_policy::none;
     }
-    return nb_type_put(td->type, cobj, rvp, &cleanup, nullptr);
+    return nb_type_put(td->type, cobj, rvp, &cleanup,
+                       /* is_new */ nullptr, /* allow_foreign */ false);
 }
 
 static int nb_foreign_keep_alive(PyObject *nurse,
@@ -153,10 +154,12 @@ static int nb_foreign_translate_exception(void *eptr) noexcept {
         std::rethrow_exception(e);
     } catch (python_error &e) {
         e.restore();
+        return 1;
     } catch (builtin_exception &e) {
         if (!set_builtin_exception_status(e))
             PyErr_SetString(PyExc_SystemError, "foreign function threw "
                             "nanobind::next_overload()");
+        return 1;
     } catch (...) { e = std::current_exception(); }
     return 0;
 }
@@ -521,10 +524,10 @@ void *nb_type_try_foreign(nb_internals *internals_,
 #if defined(NB_FREE_THREADED)
     auto per_thread_guard = nb_type_lock_c2p_fast(internals_);
     nb_type_map_fast &type_c2p_fast = *per_thread_guard;
-    uint32_t updates_count = per_thread_guard.updates_count();
 #else
     nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
 #endif
+    uint32_t update_count = type_c2p_fast.update_count;
     do {
         // We assume nb_type_c2p already ran for this type, so that there's
         // no need to handle a cache miss here.
@@ -563,16 +566,16 @@ void *nb_type_try_foreign(nb_internals *internals_,
                     return result;
 
 #if defined(NB_FREE_THREADED)
-                // Re-acquire lock to continue iteration. If we missed an
-                // update while the lock was released, start our lookup over
-                // in case the update removed the node we're on.
+                // Re-acquire lock to continue iteration
                 per_thread_guard = nb_type_lock_c2p_fast(internals_);
-                if (per_thread_guard.updates_count() != updates_count) {
+#endif
+                // If we missed an update during attempt(), start our lookup
+                // over in case the update removed the node we're on.
+                if (type_c2p_fast.update_count != update_count) {
                     // Concurrent update occurred; retry
-                    updates_count = per_thread_guard.updates_count();
+                    update_count = type_c2p_fast.update_count;
                     break;
                 }
-#endif
             }
             current = current->next;
         }

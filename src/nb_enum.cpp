@@ -73,8 +73,6 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         type_init_data *t = (type_init_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
-        if (t->flags & (uint32_t) enum_flags::is_registered)
-            nb_type_unregister(t);
         free((char*) t->name);
         delete t;
     });
@@ -88,7 +86,12 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         return tp;
     }
 
-    t->flags |= (uint32_t) enum_flags::is_registered;
+    // Unregister the enum type when it begins being finalized
+    keep_alive(result.ptr(), t, [](void *p) noexcept {
+        nb_type_unregister((type_init_data *) p);
+    });
+
+    // Delete typeinfo only when the type's dict is cleared
     result.attr("__nb_enum__") = tie_lifetimes;
 
     make_immortal(result.ptr());
@@ -180,7 +183,7 @@ bool enum_from_python(const std::type_info *tp,
 
 #if !defined(NB_DISABLE_INTEROP)
     auto try_foreign = [=, &has_foreign]() -> bool {
-        if (has_foreign) {
+        if (has_foreign && !(flags & (uint8_t) cast_flags::not_foreign)) {
             void *ptr = nb_type_get_foreign(internals, tp, o, flags, cleanup);
             if (ptr) {
                 // Copy from the C++ enum object to our output integer.

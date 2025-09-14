@@ -205,9 +205,6 @@ enum class enum_flags : uint32_t {
 
     /// Is the underlying enumeration type Flag?
     is_flag                  = (1 << 3),
-
-    /// Was the enum successfully registered with nanobind?
-    is_registered            = (1 << 4),
 };
 
 struct enum_init_data {

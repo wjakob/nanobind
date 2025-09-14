@@ -347,11 +347,12 @@ def test11_remove_binding_concurrently(clean, multi):
         transitions = limit
         thread.join()
 
-    # typical numbers from my machine: with limit=100, the test takes 6sec,
-    # and num_failed and num_successful are each several 10k's
+    # typical numbers from my machine: with limit=5000, the test takes a
+    # decent fraction of a second, and num_failed and num_successful are each
+    # several 10k's
     print(num_failed, num_successful)
     assert num_successful > 0
-    assert num_failed > 0 or not free_threaded
+    assert num_failed > 0
 
 
 def test12_multi_and_implicit(clean):
@@ -386,8 +387,10 @@ def test12_multi_and_implicit(clean):
     # Now add the other direction
     t1.import_all()
     tf.export_all()
-    assert t2.check_shared(sf_raw)
     assert t2.check_shared(sf_nb)
+    # Still need an explicit import for non-C++ type
+    t2.import_for_interop_explicit(tf.RawShared)
+    assert t2.check_shared(sf_raw)
 
     # Test normally passing these various objects
     for mod in (t2, tf):

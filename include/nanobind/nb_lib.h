@@ -289,7 +289,8 @@ NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
 /// Cast a C++ type instance into a Python object
 NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
                               rv_policy rvp, cleanup_list *cleanup,
-                              bool *is_new = nullptr) noexcept;
+                              bool *is_new = nullptr,
+                              bool allow_foreign = true) noexcept;
 
 // Special version of nb_type_put for polymorphic classes
 NB_CORE PyObject *nb_type_put_p(const std::type_info *cpp_type,

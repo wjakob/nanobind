@@ -472,12 +472,9 @@ void nb_type_update_c2p_fast(const std::type_info *type, void *value) noexcept {
         for (nb_type_map_per_thread *cache =
                  internals_->type_c2p_per_thread_head;
              cache; cache = cache->next) {
-            auto guard = cache->lock();
-            bool found = nb_type_update_cache(*guard, it_alias->first,
-                                              (nb_alias_seq *) it_alias->second,
-                                              value);
-            if (found)
-                guard.note_updated();
+            nb_type_update_cache(*cache->lock(), it_alias->first,
+                                 (nb_alias_seq *) it_alias->second,
+                                 value);
         }
         // We can't require that we found a match, because the type might
         // have been cached only by a thread that has since exited.
@@ -1621,6 +1618,9 @@ void *nb_type_get_foreign(nb_internals *internals_,
                           PyObject *src,
                           uint8_t flags,
                           cleanup_list *cleanup) noexcept {
+    if (flags & (uint8_t) cast_flags::not_foreign)
+        return nullptr;
+
     struct capture {
         PyObject *src;
         uint8_t flags;
@@ -1993,7 +1993,8 @@ PyObject *nb_type_put_foreign(nb_internals *internals_,
 PyObject *nb_type_put(const std::type_info *cpp_type,
                       void *value, rv_policy rvp,
                       cleanup_list *cleanup,
-                      bool *is_new) noexcept {
+                      bool *is_new,
+                      bool allow_foreign) noexcept {
     // Convert nullptr -> None
     if (!value) {
         Py_INCREF(Py_None);
@@ -2016,7 +2017,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
 
 #if !defined(NB_DISABLE_INTEROP)
     auto try_foreign = [=, &has_foreign]() -> PyObject* {
-        if (has_foreign)
+        if (has_foreign && allow_foreign)
             return nb_type_put_foreign(internals_, cpp_type, nullptr, value,
                                        rvp, cleanup, is_new);
         return nullptr;

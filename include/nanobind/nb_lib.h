@@ -286,7 +286,13 @@ NB_CORE PyObject *nb_type_new(const type_init_data *c) noexcept;
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
                          cleanup_list *cleanup, void **out) noexcept;
 
-/// Cast a C++ type instance into a Python object
+/// Cast a C++ type instance into a Python object.
+///
+/// Note: If you call this as if casting a shared_ptr (non-null `is_new`, true
+/// `allow_foreign`, and `rv_policy::reference`) and you obtain a result with
+/// `*is_new == true`, you must call `keep_alive` on the new instance after
+/// you get it back. This allows for better interoperability with other
+/// frameworks that store a smart pointer inside the instance.
 NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
                               rv_policy rvp, cleanup_list *cleanup,
                               bool *is_new = nullptr,

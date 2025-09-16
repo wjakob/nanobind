@@ -80,8 +80,10 @@ static void *nb_foreign_from_python(pymb_binding *binding,
 static PyObject *nb_foreign_to_python(pymb_binding *binding,
                                       void *cobj,
                                       enum pymb_rv_policy rvp_,
-                                      PyObject *parent) noexcept {
-    cleanup_list cleanup{parent};
+                                      pymb_to_python_feedback *feedback) noexcept {
+    feedback->relocate = 0; // we don't support relocation
+    feedback->is_new = 0; // unless overridden below
+
     auto *td = (type_data *) binding->context;
     if (td->align == 0) { // enum
         int64_t key;
@@ -102,15 +104,25 @@ static PyObject *nb_foreign_to_python(pymb_binding *binding,
         return enum_from_cpp(td->type, key, td->size);
     }
 
-    rv_policy rvp = (rv_policy) rvp_;
-    if (rvp < rv_policy::take_ownership || rvp > rv_policy::none) {
-        // Future-proofing in case additional pymb_rv_policies are defined
-        // later: if we don't recognize this policy, then refuse the cast
-        // unless a pyobject wrapper already exists.
-        rvp = rv_policy::none;
+    rv_policy rvp = rv_policy::none; // conservative default if rvp unrecognized
+    switch (rvp_) {
+        case pymb_rv_policy_take_ownership:
+        case pymb_rv_policy_copy:
+        case pymb_rv_policy_move:
+        case pymb_rv_policy_reference:
+        case pymb_rv_policy_none:
+            // These have the same values and semantics as our own policies
+            rvp = (rv_policy) rvp_;
+            break;
+        case pymb_rv_policy_share_ownership:
+            // Shared ownership is always held by keep_alive in nanobind,
+            // so there's nothing special to do here.
+            rvp = rv_policy::reference;
+            break;
     }
-    return nb_type_put(td->type, cobj, rvp, &cleanup,
-                       /* is_new */ nullptr, /* allow_foreign */ false);
+    return nb_type_put(td->type, cobj, rvp, /* cleanup */ nullptr,
+                       /* is_new */ (bool *) &feedback->is_new,
+                       /* allow_foreign */ false);
 }
 
 static int nb_foreign_keep_alive(PyObject *nurse,
@@ -121,10 +133,10 @@ static int nb_foreign_keep_alive(PyObject *nurse,
             keep_alive(nurse, payload, (void (*)(void*) noexcept) cb);
         else
             keep_alive(nurse, (PyObject *) payload);
-        return 0;
+        return 1;
     } catch (const std::runtime_error& err) {
-        PyErr_SetString(PyExc_RuntimeError, err.what());
-        return -1;
+        PyErr_WriteUnraisable(nurse);
+        return 0;
     }
 }
 
@@ -388,14 +400,14 @@ void nb_type_import_impl(PyObject *pytype, const std::type_info *cpptype) {
         register_with_pymetabind(internals);
     pymb_framework* foreign_self = internals->foreign_self;
     pymb_binding* binding = pymb_get_binding(pytype);
-#if defined(Py_LIMITED_API)
-    str name_py = steal<str>(PyType_GetName((PyTypeObject *) pytype));
+    str name_py = steal<str>(nb_type_name(pytype));
     const char *name = name_py.c_str();
-#else
-    const char *name = ((PyTypeObject *) pytype)->tp_name;
-#endif
     if (!binding)
         raise("'%s' does not define a __pymetabind_binding__", name);
+    if (binding->pytype != (PyTypeObject *) pytype)
+        raise("The binding defined by '%s' is for a different type '%s', "
+              "likely a superclass; import that type instead",
+              name, steal<str>(nb_type_name((PyObject *) binding->pytype)).c_str());
     if (binding->framework == foreign_self)
         raise("'%s' is already bound by this nanobind domain", name);
     if (!cpptype) {

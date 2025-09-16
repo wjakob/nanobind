@@ -53,7 +53,7 @@ static PyObject *Shared_new(PyTypeObject *type, Shared *value, pymb_rv_policy rv
                 self->deallocate = false;
                 break;
             case pymb_rv_policy_reference:
-            case pymb_rv_policy_reference_internal:
+            case pymb_rv_policy_share_ownership:
                 self->ptr = value;
                 self->deallocate = false;
                 break;
@@ -86,15 +86,12 @@ static void *hook_from_python(pymb_binding *binding,
 static PyObject *hook_to_python(pymb_binding *binding,
                                 void *cobj,
                                 enum pymb_rv_policy rvp,
-                                PyObject *) noexcept {
+                                pymb_to_python_feedback *feedback) noexcept {
+    feedback->relocate = 0;
     if (rvp == pymb_rv_policy_none)
         return nullptr;
+    feedback->is_new = 1;
     return Shared_new(binding->pytype, (Shared *) cobj, rvp);
-}
-
-static int hook_keep_alive(PyObject *, void *, void (*)(void*)) noexcept {
-    PyErr_SetString(PyExc_RuntimeError, "keep_alive not supported");
-    return -1;
 }
 
 static void hook_ignore_foreign_binding(pymb_binding *) noexcept {}
@@ -131,7 +128,9 @@ NB_MODULE(test_inter_module_foreign_ext, m) {
     fw->abi_lang = pymb_abi_lang_c;
     fw->from_python = hook_from_python;
     fw->to_python = hook_to_python;
-    fw->keep_alive = hook_keep_alive;
+    fw->keep_alive = [](PyObject *, void *, void (*)(void *)) noexcept {
+        return 0;
+    };
     fw->remove_local_binding = [](pymb_binding *) noexcept {};
     fw->free_local_binding = [](pymb_binding *binding) noexcept {
         delete binding;

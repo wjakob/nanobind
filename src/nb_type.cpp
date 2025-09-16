@@ -1767,7 +1767,8 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     if (!patient || !nurse || nurse == Py_None || patient == Py_None)
         return;
 
-    if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
+    PyObject *nurse_ty = (PyObject *) Py_TYPE(nurse);
+    if (nb_type_check(nurse_ty)) {
 #if defined(NB_FREE_THREADED)
         nb_shard &shard = internals->shard(inst_ptr((nb_inst *) nurse));
         lock_shard guard(shard);
@@ -1797,6 +1798,11 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
         Py_INCREF(patient);
         ((nb_inst *) nurse)->clear_keep_alive = true;
     } else {
+#if !defined(NB_DISABLE_INTEROP)
+        if (pymb_binding *binding = pymb_get_binding(nurse_ty);
+            binding && binding->framework->keep_alive(nurse, patient, nullptr))
+            return;
+#endif
         PyObject *callback =
             PyCFunction_New(&keep_alive_callback_def, patient);
 
@@ -1804,15 +1810,6 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
         if (!weakref) {
             Py_DECREF(callback);
             PyErr_Clear();
-#if !defined(NB_DISABLE_INTEROP)
-            if (pymb_binding *binding = pymb_get_binding(nurse)) {
-                // Try a foreign framework's keep_alive as a last resort
-                if (binding->framework->keep_alive(nurse, patient,
-                                                   nullptr) == 0)
-                    return;
-                raise_python_error();
-            }
-#endif
             raise("nanobind::detail::keep_alive(): could not create a weak "
                   "reference! Likely, the 'nurse' argument you specified is not "
                   "a weak-referenceable type!");
@@ -1830,7 +1827,8 @@ void keep_alive(PyObject *nurse, void *payload,
                 void (*callback)(void *) noexcept) noexcept {
     check(nurse, "nanobind::detail::keep_alive(): 'nurse' is undefined!");
 
-    if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
+    PyObject *nurse_ty = (PyObject *) Py_TYPE(nurse);
+    if (nb_type_check(nurse_ty)) {
 #if defined(NB_FREE_THREADED)
         nb_shard &shard = internals->shard(inst_ptr((nb_inst *) nurse));
         lock_shard guard(shard);
@@ -1850,6 +1848,11 @@ void keep_alive(PyObject *nurse, void *payload,
 
         ((nb_inst *) nurse)->clear_keep_alive = true;
     } else {
+#if !defined(NB_DISABLE_INTEROP)
+        if (pymb_binding *binding = pymb_get_binding(nurse_ty);
+            binding && binding->framework->keep_alive(nurse, payload, callback))
+            return;
+#endif
         PyObject *patient = capsule_new(payload, nullptr, callback);
         keep_alive(nurse, patient);
         Py_DECREF(patient);
@@ -1957,36 +1960,64 @@ PyObject *nb_type_put_foreign(nb_internals *internals_,
                               bool *is_new) noexcept {
     struct capture {
         void *value;
-        rv_policy rvp;
-        PyObject *parent;
-        bool check_new;
-        bool is_new = false;
-    } cap{value, rvp, cleanup ? cleanup->self() : nullptr, bool(is_new)};
+        pymb_rv_policy rvp = pymb_rv_policy_none; // conservative default
+        struct pymb_to_python_feedback feedback{};
+        struct pymb_framework *used_framework = nullptr;
+    } cap{value};
+
+    switch (rvp) {
+        case rv_policy::reference_internal:
+            if (!cleanup || !cleanup->self())
+                return nullptr;
+            cap.rvp = pymb_rv_policy_share_ownership;
+            break;
+        case rv_policy::reference:
+            if (is_new) {
+                cap.rvp = pymb_rv_policy_share_ownership;
+                break;
+            }
+            [[fallthrough]];
+        case rv_policy::take_ownership:
+        case rv_policy::copy:
+        case rv_policy::move:
+        case rv_policy::none:
+            cap.rvp = (pymb_rv_policy) rvp;
+            break;
+        case rv_policy::automatic:
+        case rv_policy::automatic_reference:
+            check(false,
+                  "nb_type_put_foreign(): automatic rvp should have been "
+                  "converted to a different one before reaching here!");
+            break;
+    }
 
     auto attempt = +[](void *closure, pymb_binding *binding) -> void* {
         capture &cap = *(capture *) closure;
-        if (cap.check_new || cap.rvp == rv_policy::none) {
-            PyObject* existing = binding->framework->to_python(
-                    binding, cap.value, pymb_rv_policy_none, nullptr);
-            if (existing || cap.rvp == rv_policy::none) {
-                cap.is_new = false;
-                return existing;
-            }
-            cap.is_new = true;
-        }
+        cap.used_framework = binding->framework;
         return binding->framework->to_python(
-                binding, cap.value, (pymb_rv_policy) (uint8_t) cap.rvp,
-                cap.parent);
+                binding, cap.value, cap.rvp, &cap.feedback);
     };
 
-    void *result = nullptr;
+    void *result_v = nullptr;
     if (cpp_type_p && cpp_type_p != cpp_type)
-        result = nb_type_try_foreign(internals_, cpp_type_p, attempt, &cap);
-    if (!result)
-        result = nb_type_try_foreign(internals_, cpp_type, attempt, &cap);
+        result_v = nb_type_try_foreign(internals_, cpp_type_p, attempt, &cap);
+    if (!result_v)
+        result_v = nb_type_try_foreign(internals_, cpp_type, attempt, &cap);
+
+    PyObject *result = (PyObject *) result_v;
     if (is_new)
-        *is_new = cap.is_new;
-    return (PyObject *) result;
+        *is_new = cap.feedback.is_new;
+    if (result && rvp == rv_policy::reference_internal && cap.feedback.is_new &&
+        !cap.used_framework->keep_alive(result, cleanup->self(), nullptr)) {
+        try {
+            keep_alive(result, cleanup->self());
+        } catch (python_error& exc) {
+            exc.restore();
+            Py_DECREF(result);
+            return nullptr;
+        }
+    }
+    return result;
 }
 #endif
 

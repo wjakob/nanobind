@@ -31,7 +31,8 @@ def get_version(root):
     else:
         print(version_core)
 
-# Write the semantic version to nanobind.h, pyproject.toml, and __init__.py.
+# Write the semantic version to nanobind.h, pyproject.toml, __init__.py,
+# and docs/bazel.rst.
 # The semver string must be either 'X.Y.Z' or 'X.Y.Z-devN', where X, Y, Z are
 # non-negative integers and N is a positive integer.
 def write_version(root, semver):
@@ -92,6 +93,27 @@ def write_version(root, semver):
         f.truncate()
         f.write(contents)
 
+    # write to docs/bazel.rst, but only if `semver` is not a dev release.
+    # This is because documentation is scoped only to the latest stable release.
+    if "dev" not in semver:
+        with open(os.path.join(root, "docs/bazel.rst"), "r+") as f:
+            contents = f.read()
+            contents = re.sub(
+                r"nanobind\s+v\d+(\.\d+)+",
+                r"nanobind v" + semver,
+                contents,
+                count=1,
+            )
+            contents = re.sub(
+                r'"nanobind_bazel", version = "\d+(\.\d+)+"',
+                r'"nanobind_bazel", version = "' + semver + '"',
+                contents,
+                count=1,
+            )
+            f.seek(0)
+            f.truncate()
+            f.write(contents)
+
 
 def main():
     root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -107,4 +129,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

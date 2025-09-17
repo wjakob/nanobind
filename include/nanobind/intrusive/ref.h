@@ -119,7 +119,7 @@ private:
     T *m_ptr = nullptr;
 };
 
-// Registar a type caster for ``ref<T>`` if nanobind was previously #included
+// Register a type caster for ``ref<T>`` if nanobind was previously #included
 #if defined(NB_VERSION_MAJOR)
 NAMESPACE_BEGIN(detail)
 template <typename T> struct type_caster<nanobind::ref<T>> {

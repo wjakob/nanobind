@@ -33,9 +33,9 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
 
                 value[i] = caster.operator cast_t<Entry>();
             }
-
-            Py_XDECREF(temp);
         }
+
+        Py_XDECREF(temp);
 
         return success;
     }

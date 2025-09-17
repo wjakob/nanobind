@@ -817,8 +817,14 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
         }
 #  endif
     } else if (PySequence_Check(seq)) {
-        temp = PySequence_Tuple(seq);
+        Py_ssize_t size_seq = PySequence_Size(seq);
+        if (size_seq != (Py_ssize_t) size) {
+            if (size_seq == -1)
+                PyErr_Clear();
+            return nullptr;
+        }
 
+        temp = PySequence_Tuple(seq);
         if (temp)
             result = seq_get_with_size(temp, size, temp_out);
         else

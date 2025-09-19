@@ -38,6 +38,8 @@ that convert to specific Python exceptions as shown below:
     - ``ValueError``
   * - ``std::overflow_error``
     - ``OverflowError``
+  * - ``std::runtime_error``
+    - ``RuntimeError``
   * - :cpp:func:`nb::stop_iteration <stop_iteration>`
     - ``StopIteration`` (used to implement custom iterator) 
   * - :cpp:func:`nb::index_error <index_error>`

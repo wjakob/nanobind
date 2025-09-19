@@ -189,15 +189,16 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_enum_v<T>>> {
-    NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         int64_t result;
-        bool rv = enum_from_python(&typeid(T), src.ptr(), &result, flags);
+        bool rv = enum_from_python(&typeid(T), src.ptr(), &result, sizeof(T),
+                                   flags, cleanup);
         value = (T) result;
         return rv;
     }
 
     NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
-        return enum_from_cpp(&typeid(T), (int64_t) src);
+        return enum_from_cpp(&typeid(T), (int64_t) src, sizeof(T));
     }
 
     NB_TYPE_CASTER(T, const_name<T>())
@@ -504,6 +505,8 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         } else {
             const std::type_info *type_p =
                 (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
+            if (type_p && (void *) ptr != dynamic_cast<void *>(ptr))
+                type_p = nullptr; // don't try to downcast from a non-primary base
             return nb_type_put_p(type, type_p, ptr, policy, cleanup);
         }
     }

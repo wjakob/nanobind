@@ -233,33 +233,35 @@ will:
 
 .. _type-visibility:
 
-How can I avoid conflicts with other projects using nanobind?
--------------------------------------------------------------
+How can I control whether two extension modules see each other's types?
+-----------------------------------------------------------------------
 
-Suppose that a type binding in your project conflicts with another extension, for
-example because both expose a common type (e.g., ``std::latch``). nanobind will
-warn whenever it detects such a conflict:
+nanobind creates a variety of internal data structures to support the bindings
+you ask it to make. These are not isolated to a single extension module,
+because it's useful for large binding projects to be able to split related
+bindings into multiple extensions without losing their ability to work with
+one another's types. Instead, extension modules are divided into nanobind
+*domains* based on two attributes: an automatically determined string (the
+nanobind "ABI tag") that captures compatibility-relevant aspects of their
+build environments and nanobind versions, and an ``NB_DOMAIN`` string that
+may be provided at build time (as shown below).
+If multiple extension modules share the same ABI tag and the same ``NB_DOMAIN``
+string, they will wind up in the same nanobind domain, which allows them to
+work together exactly as if they were one big extension.
+
+Sometimes, this causes problems. For example, you might expose a binding
+for a commonly used type (such as ``std::latch``) that some other nanobind
+extension in your Python interpreter also happens to provide a binding for.
+nanobind will warn whenever it detects such a conflict:
 
 .. code-block:: text
 
   RuntimeWarning: nanobind: type 'latch' was already registered!
 
 In the worst case, this could actually break both packages (especially if the
-bindings of the two packages expose an inconsistent/incompatible API).
-
-The higher-level issue here is that nanobind will by default try to make type
-bindings visible across extensions because this is helpful to partition large
-binding projects into smaller parts. Such information exchange requires that
-the extensions:
-
-- use the same nanobind *ABI version* (see the :ref:`Changelog <changelog>` for details).
-- use the same compiler (extensions built with GCC and Clang are isolated from each other).
-- use ABI-compatible versions of the C++ library.
-- use the stable ABI interface consistently (stable and unstable builds are isolated from each other).
-- use debug/release mode consistently (debug and release builds are isolated from each other).
-
-In addition, nanobind provides a feature to intentionally scope extensions to a
-named domain to avoid conflicts with other extensions. To do so, specify the
+bindings of the two packages expose an inconsistent/incompatible API). So it's
+useful to be able to enforce a boundary between extensions sometimes, even if
+they would otherwise be ABI-compatible. To do so, you can specify the
 ``NB_DOMAIN`` parameter in CMake:
 
 .. code-block:: cmake
@@ -268,8 +270,54 @@ named domain to avoid conflicts with other extensions. To do so, specify the
                        NB_DOMAIN my_project
                        my_ext.cpp)
 
-In this case, inter-extension type visibility is furthermore restricted to
-extensions in the ``"my_project"`` domain.
+Two extensions can only be in the same nanobind domain if either they both
+specify the same value for that parameter (``"my_project"`` in this case) or
+neither one specifies the parameter.
+
+As mentioned above, two extensions can also only be in the same nanobind domain
+if they share the same ABI tag. This is determined in two parts, as follows:
+
+- They must use compatible *platform ABI*, so that (for example) a
+  ``std::vector<int>`` created in one can be safely used in the other.
+  That means:
+
+  - They must use the same C++ standard library (MSVC, libc++, or libstdc++),
+    and the same ABI version of it. For example, extensions that use libstdc++
+    must match in terms of whether they use the pre- or post-C++11 ABI, and
+    extensions that use libc++ must use the same `libc++ ABI version
+    <https://libcxx.llvm.org/DesignDocs/ABIVersioning.html>`__.
+
+  - On Windows, they must use the same compiler (MSVC, mingw, or cygwin).
+
+  - If compiled using MSVC, they must use the same major version of the
+    compiler, the same multi-threading style (dynamic ``/MD``,
+    static ``/MT``, or single-threaded), and they must match in terms of
+    whether or not they are built in debugging mode.
+
+- They must use compatible *nanobind ABI*, so that the nanobind internal data
+  structures created in one can be safely used in the other. That means:
+
+  - They must use the same nanobind *ABI version*; see the
+    :ref:`Changelog <changelog>` for details.
+
+  - They must be consistent in their use of Python's stable ABI: either
+    both built against the stable ABI (cmake ``STABLE_ABI`` flag) or both not.
+
+  - They must be consistent in their use of free-threading: either both
+    built with free-threading support (cmake ``FREE_THREADED`` flag) or both not.
+
+  - They must either both use released versions of nanobind or both be built
+    from Git development snapshots, rather than a mix of the two.
+
+If you want to share some types between two extensions that have the same
+platform ABI (the first category in the above list), but are in different
+nanobind domains due to using different nanobind ABI or different specified
+``NB_DOMAIN`` strings, all is not lost! The :ref:`interoperability support
+<interop>` between nanobind and other binding libraries also provides
+interoperability between different nanobind domains, as long as the platform
+ABI matches. It must be specifically enabled, and there are a few things it
+can't do, but for most purposes it's hard to tell the difference from operating
+within the same domain. See the linked documentation for more details.
 
 Can I use nanobind without RTTI or C++ exceptions?
 --------------------------------------------------

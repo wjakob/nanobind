@@ -197,10 +197,7 @@ char *strdup_check(const char *s) {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *nb_func_new(const void *in_) noexcept {
-    func_data_prelim<0> *f = (func_data_prelim<0> *) in_;
-    arg_data *args_in = std::launder((arg_data *) f->args);
-
+PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     bool has_scope       = f->flags & (uint32_t) func_flags::has_scope,
          has_name        = f->flags & (uint32_t) func_flags::has_name,
          has_args        = f->flags & (uint32_t) func_flags::has_args,
@@ -216,6 +213,10 @@ PyObject *nb_func_new(const void *in_) noexcept {
          is_init         = false,
          is_new          = false,
          is_setstate     = false;
+
+    arg_data *args_in = nullptr;
+    if (has_args)
+        args_in = std::launder((arg_data*) ((func_data_prelim<1>*) f)->args);
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -274,12 +275,12 @@ PyObject *nb_func_new(const void *in_) noexcept {
         //   f->nargs = C++ argument count.
         //   f->descr_types = zero-terminated array of bound types among them.
         //     Hence of size >= 2 for constructors, where f->descr_types[1] my be null.
-        //   f->args = array of Python arguments (nb::arg). Non-empty if has_args.
+        //   args_in = array of Python arguments (nb::arg). Non-empty if has_args.
         //   By contrast, fc->args below has size f->nargs.
         if (is_constructor && f->nargs == 2 && f->descr_types[0] &&
             f->descr_types[0] == f->descr_types[1]) {
             if (has_args) {
-                f->args[0].flag &= ~(uint8_t) cast_flags::convert;
+                args_in[0].flag &= ~(uint8_t) cast_flags::convert;
             } else {
                 args_in = method_args + 1;
                 has_args = true;
@@ -362,7 +363,7 @@ PyObject *nb_func_new(const void *in_) noexcept {
 #endif
 
     func_data *fc = nb_func_data(func) + prev_overloads;
-    memcpy(fc, f, sizeof(func_data_prelim<0>));
+    memcpy(fc, f, sizeof(func_data_prelim_base));
     if (has_doc) {
         if (fc->doc[0] == '\n')
             fc->doc++;

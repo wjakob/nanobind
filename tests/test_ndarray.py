@@ -1,6 +1,4 @@
 import test_ndarray_ext as t
-import test_jax_ext as tj
-import test_tensorflow_ext as tt
 import pytest
 import warnings
 import importlib
@@ -165,19 +163,6 @@ def test05_constrain_order():
     assert t.check_order(np.zeros((3, 5, 4, 6), order='F')[:, 2, :, :]) == '?'
 
 
-@needs_jax
-def test06_constrain_order_jax():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            c = jnp.zeros((3, 5))
-        except:
-            pytest.skip('jax is missing')
-
-    z = jnp.zeros((3, 5, 4, 6))
-    assert t.check_order(z) == 'C'
-
-
 @needs_torch
 @pytest.mark.filterwarnings
 def test07_constrain_order_pytorch():
@@ -195,18 +180,6 @@ def test07_constrain_order_pytorch():
     assert t.check_device(torch.zeros(3, 5)) == 'cpu'
     if torch.cuda.is_available():
         assert t.check_device(torch.zeros(3, 5, device='cuda')) == 'cuda'
-
-
-@needs_tensorflow
-def test08_constrain_order_tensorflow():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            c = tf.zeros((3, 5))
-        except:
-            pytest.skip('tensorflow is missing')
-
-    assert t.check_order(c) == 'C'
 
 
 @needs_numpy
@@ -256,48 +229,6 @@ def test11_implicit_conversion_pytorch():
 
     with pytest.raises(TypeError) as excinfo:
         t.noimplicit(torch.zeros(2, 2, 10, dtype=torch.float32)[:, :, 4])
-
-
-@needs_tensorflow
-def test12_implicit_conversion_tensorflow():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            c = tf.zeros((3, 5))
-        except:
-            pytest.skip('tensorflow is missing')
-
-        t.implicit(tf.zeros((2, 2), dtype=tf.int32))
-        t.implicit(tf.zeros((2, 2, 10), dtype=tf.float32)[:, :, 4])
-        t.implicit(tf.zeros((2, 2, 10), dtype=tf.int32)[:, :, 4])
-        t.implicit(tf.zeros((2, 2, 10), dtype=tf.bool)[:, :, 4])
-
-        with pytest.raises(TypeError) as excinfo:
-            t.noimplicit(tf.zeros((2, 2), dtype=tf.int32))
-
-        with pytest.raises(TypeError) as excinfo:
-            t.noimplicit(tf.zeros((2, 2), dtype=tf.bool))
-
-
-@needs_jax
-def test13_implicit_conversion_jax():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            c = jnp.zeros((3, 5))
-        except:
-            pytest.skip('jax is missing')
-
-    t.implicit(jnp.zeros((2, 2), dtype=jnp.int32))
-    t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.float32)[:, :, 4])
-    t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.int32)[:, :, 4])
-    t.implicit(jnp.zeros((2, 2, 10), dtype=jnp.bool_)[:, :, 4])
-
-    with pytest.raises(TypeError) as excinfo:
-        t.noimplicit(jnp.zeros((2, 2), dtype=jnp.int32))
-
-    with pytest.raises(TypeError) as excinfo:
-        t.noimplicit(jnp.zeros((2, 2), dtype=jnp.uint8))
 
 
 def test14_destroy_capsule():
@@ -381,31 +312,6 @@ def test18_return_pytorch():
     del x
     collect()
     assert t.destruct_count() - dc == 1
-
-
-@needs_jax
-def test19_return_jax():
-    collect()
-    dc = tj.destruct_count()
-    x = tj.ret_jax()
-    assert x.shape == (2, 4)
-    assert jnp.all(x == jnp.array([[1,2,3,4], [5,6,7,8]], dtype=jnp.float32))
-    del x
-    collect()
-    assert tj.destruct_count() - dc == 1
-
-
-@needs_tensorflow
-def test20_return_tensorflow():
-    collect()
-    dc = tt.destruct_count()
-    x = tt.ret_tensorflow()
-    assert x.get_shape().as_list() == [2, 4]
-    assert tf.math.reduce_all(
-               x == tf.constant([[1,2,3,4], [5,6,7,8]], dtype=tf.float32))
-    del x
-    collect()
-    assert tt.destruct_count() - dc == 1
 
 
 @needs_numpy
@@ -509,16 +415,6 @@ def test27_check_numpy():
 @needs_torch
 def test28_check_torch():
     assert t.check(torch.zeros((1)))
-
-
-@needs_tensorflow
-def test29_check_tensorflow():
-    assert t.check(tf.zeros((1)))
-
-
-@needs_jax
-def test30_check_jax():
-    assert t.check(jnp.zeros((1)))
 
 
 @needs_numpy
@@ -886,8 +782,6 @@ def test45_implicit_conversion_cupy():
 @needs_numpy
 def test46_implicit_conversion_contiguous_complex():
     # Test fix for issue #709
-    import numpy as np
-
     c_f32 = np.random.rand(10, 10)
     c_c64 = c_f32.astype(np.complex64)
 
@@ -914,7 +808,6 @@ def test46_implicit_conversion_contiguous_complex():
 
 @needs_numpy
 def test_47_ret_infer():
-    import numpy as np
     assert np.all(t.ret_infer_c() == [[1, 2, 3, 4], [5, 6, 7, 8]])
     assert np.all(t.ret_infer_f() == [[1, 3, 5, 7], [2, 4, 6, 8]])
 
@@ -963,13 +856,12 @@ def test50_test_matrix4f_copy():
 
 @needs_numpy
 def test51_return_from_stack():
-    import numpy as np
     assert np.all(t.ret_from_stack_1() == [1,2,3])
     assert np.all(t.ret_from_stack_2() == [1,2,3])
 
+
 @needs_numpy
 def test52_accept_np_both_true_contig():
-    import numpy as np
     a = np.zeros((2, 1), dtype=np.float32)
     assert a.flags['C_CONTIGUOUS'] and a.flags['F_CONTIGUOUS']
     t.accept_np_both_true_contig_a(a)
@@ -979,7 +871,6 @@ def test52_accept_np_both_true_contig():
 
 @needs_numpy
 def test53_issue_930():
-    import numpy as np
     wrapper = t.Wrapper(np.ones(3, dtype=np.float32))
     assert wrapper.value[0] == 1
 

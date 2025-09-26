@@ -895,6 +895,10 @@ def test46_custom_new():
     t.NewNone()
     assert t.NewDflt().value == 42
     assert t.NewDflt(10).value == 10
+    assert t.NewStarPosOnly().value == 42
+    assert t.NewStarPosOnly("hi").value == 43
+    assert t.NewStarPosOnly(value=10).value == 10
+    assert t.NewStarPosOnly("hi", "lo", value=10).value == 12
     assert t.NewStar().value == 42
     assert t.NewStar("hi").value == 43
     assert t.NewStar(value=10).value == 10

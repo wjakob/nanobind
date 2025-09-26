@@ -51,7 +51,10 @@ struct func_data : func_data_prelim<0> {
 struct nb_inst { // usually: 24 bytes
     PyObject_HEAD
 
-    /// Offset to the actual instance data
+    /// Offset to the actual C++ object. A value of zero here is special;
+    /// it means this instance was "detached" (assumed dangling) because its
+    /// C++ object address collided with a newly allocated internal instance.
+    /// Detached instances are not stored in the inst_c2p map.
     int32_t offset;
 
     /// State of the C++ object this instance points to: is it constructed?
@@ -87,8 +90,11 @@ struct nb_inst { // usually: 24 bytes
     /// Does this instance use intrusive reference counting?
     uint32_t intrusive : 1;
 
+    /// Does this instance hold partial/shared ownership of its C++ object?
+    uint32_t shared_ownership : 1;
+
     // That's a lot of unused space. I wonder if there is a good use for it..
-    uint32_t unused : 24;
+    uint32_t unused : 23;
 };
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);

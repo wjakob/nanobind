@@ -133,8 +133,21 @@ def test04_constrain_shape():
         t.pass_float32_shaped(np.zeros((3, 5, 4, 6), dtype=np.float32))
 
 
+def test05_bytes():
+    a = bytearray(range(10))
+    assert t.get_is_valid(a)
+    assert t.get_shape(a) == [10]
+    assert t.get_size(a) == 10
+    assert t.get_nbytes(a) == 10
+    assert t.get_itemsize(a) == 1
+    assert t.check_order(a) == 'C'
+    b = b'hello'  # immutable
+    assert t.get_is_valid(b)
+    assert t.get_shape(b) == [5]
+
+
 @needs_numpy
-def test05_constrain_order():
+def test06_constrain_order_numpy():
     assert t.check_order(np.zeros((3, 5, 4, 6), order='C')) == 'C'
     assert t.check_order(np.zeros((3, 5, 4, 6), order='F')) == 'F'
     assert t.check_order(np.zeros((3, 5, 4, 6), order='C')[:, 2, :, :]) == '?'
@@ -160,8 +173,18 @@ def test07_constrain_order_pytorch():
         assert t.check_device(torch.zeros(3, 5, device='cuda')) == 'cuda'
 
 
+def test08_write_bytes_from_cpp():
+    a = bytearray(10)
+    t.initialize(a)
+    assert a == bytearray(range(10))
+    b = b'helloHello'  # ten immutable bytes
+    with pytest.raises(TypeError) as excinfo:
+        t.initialize(b)
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+
 @needs_numpy
-def test09_write_from_cpp():
+def test09_write_numpy_from_cpp():
     x = np.zeros(10, dtype=np.float32)
     t.initialize(x)
     assert np.all(x == np.arange(10, dtype=np.float32))
@@ -209,18 +232,27 @@ def test11_implicit_conversion_pytorch():
         t.noimplicit(torch.zeros(2, 2, 10, dtype=torch.float32)[:, :, 4])
 
 
-def test14_destroy_capsule():
+@needs_numpy
+def test12_process_image():
+    x = np.arange(120, dtype=np.ubyte).reshape(8, 5, 3)
+    t.process(x)
+    assert np.all(x == np.arange(0, 240, 2, dtype=np.ubyte).reshape(8, 5, 3))
+
+
+def test13_destroy_capsule():
     collect()
     dc = t.destruct_count()
-    a = t.return_dlpack()
-    assert dc == t.destruct_count()
-    del a
+    capsule = t.return_no_framework()
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    assert t.destruct_count() == dc
+    del capsule
     collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
-def test15_consume_numpy():
+def test14_consume_numpy():
     collect()
     class wrapper:
         def __init__(self, value):
@@ -228,31 +260,48 @@ def test15_consume_numpy():
         def __dlpack__(self):
             return self.value
     dc = t.destruct_count()
-    a = t.return_dlpack()
+    capsule = t.return_no_framework()
     if hasattr(np, '_from_dlpack'):
-        x = np._from_dlpack(wrapper(a))
+        x = np._from_dlpack(wrapper(capsule))
     elif hasattr(np, 'from_dlpack'):
-        x = np.from_dlpack(wrapper(a))
+        x = np.from_dlpack(wrapper(capsule))
     else:
         pytest.skip('your version of numpy is too old')
-
-    del a
+    del capsule
     collect()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
-    assert dc == t.destruct_count()
+    assert t.destruct_count() == dc
     del x
     collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
-def test16_passthrough():
+def test15_passthrough_numpy():
     a = t.ret_numpy()
     b = t.passthrough(a)
     assert a is b
 
-    a = np.array([1,2,3])
+    a = np.array([1, 2, 3])
+    b = t.passthrough(a)
+    assert a is b
+
+    a = None
+    with pytest.raises(TypeError) as excinfo:
+        b = t.passthrough(a)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    b = t.passthrough_arg_none(a)
+    assert a is b
+
+
+@needs_torch
+def test16_passthrough_torch():
+    a = t.ret_pytorch()
+    b = t.passthrough(a)
+    assert a is b
+
+    a = torch.tensor([1, 2, 3])
     b = t.passthrough(a)
     assert a is b
 
@@ -270,6 +319,7 @@ def test17_return_numpy():
     dc = t.destruct_count()
     x = t.ret_numpy()
     assert x.shape == (2, 4)
+    assert x.flags.writeable
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     del x
     collect()
@@ -290,6 +340,75 @@ def test18_return_pytorch():
     del x
     collect()
     assert t.destruct_count() - dc == 1
+
+
+def test19_return_memview():
+    collect()
+    dc = t.destruct_count()
+    x = t.ret_memview()
+    assert isinstance(x, memoryview)
+    assert x.itemsize == 8
+    assert x.ndim == 2
+    assert x.shape == (2, 4)
+    assert x.strides == (32, 8)  # in bytes
+    assert x.tolist() == [[1, 2, 3, 4], [5, 6, 7, 8]]
+    del x
+    collect()
+    assert t.destruct_count() - dc == 1
+
+
+@needs_numpy
+def test20_return_arrayapi():
+    collect()
+    dc = t.destruct_count()
+    obj = t.ret_arrayapi()
+    assert obj.__dlpack_device__() == (1, 0);  # (type == CPU, id == 0)
+    capsule = obj.__dlpack__()
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    capsule = obj.__dlpack__(max_version=None)
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    capsule = obj.__dlpack__(max_version=(0, 0))  # (major == 0, minor == 0)
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    capsule = obj.__dlpack__(max_version=(1, 0))  # (major == 1, minor == 0)
+    assert 'dltensor_versioned' in repr(capsule)
+    with pytest.raises(TypeError) as excinfo:
+        capsule = obj.__dlpack__(0)
+    assert 'does not accept positional arguments' in str(excinfo.value)
+    del obj
+    collect()
+    assert t.destruct_count() == dc
+    del capsule
+    collect()
+    assert t.destruct_count() - dc == 1
+    dc += 1
+
+    obj = t.ret_arrayapi()  # obj also supports the buffer protocol
+    mv = memoryview(obj)
+    assert mv.tolist() == [[1, 2, 3, 4], [5, 6, 7, 8]]
+    del obj
+    collect()
+    assert t.destruct_count() == dc
+    del mv
+    collect()
+    assert t.destruct_count() - dc == 1
+    dc += 1
+
+    if (hasattr(np, '__array_api_version__') and
+        np.__array_api_version__ >= '2024'):
+        obj = t.ret_arrayapi()
+        x = np.from_dlpack(obj)
+        del obj
+        collect()
+        assert t.destruct_count() == dc
+        assert x.shape == (2, 4)
+        assert x.flags.writeable
+        assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+        del x
+        collect()
+        assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
@@ -375,6 +494,8 @@ def test26_return_ro():
     assert t.ret_numpy_const_ref_f.__doc__  == 'ret_numpy_const_ref_f() -> numpy.ndarray[dtype=float32, shape=(2, 4), order=\'F\', writable=False]'
     assert x.shape == (2, 4)
     assert y.shape == (2, 4)
+    assert not x.flags.writeable
+    assert not y.flags.writeable
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     assert np.all(y == [[1, 3, 5, 7], [2, 4, 6, 8]])
     with pytest.raises(ValueError) as excinfo:
@@ -385,13 +506,49 @@ def test26_return_ro():
     assert 'read-only' in str(excinfo.value)
 
 
+def test27_python_array():
+    import array
+    a = array.array('d', [0, 0, 0, 3.14159, 0])
+    assert t.check(a)
+    assert t.check_rw_by_value(a);
+    assert a[1] == 1.414214;
+    assert t.check_rw_by_value_float64(a);
+    assert a[2] == 2.718282;
+    assert a[4] == 16.0;
+    assert t.check_ro_by_value_ro(a);
+    assert t.check_ro_by_value_const_float64(a);
+
+    a[1] = 0.1
+    a[2] = 0.2
+    a[4] = 0.4
+    mv = memoryview(a)
+    assert t.check(mv)
+    assert t.check_rw_by_value(mv);
+    assert a[1] == 1.414214;
+    assert t.check_rw_by_value_float64(mv);
+    assert a[2] == 2.718282;
+    assert a[4] == 16.0;
+    assert t.check_ro_by_value_ro(mv);
+    assert t.check_ro_by_value_const_float64(mv);
+
+    x = t.passthrough(a)
+    assert x is a
+
+
+def test28_check_bytearray():
+    a = bytearray(b'xyz')
+    assert t.check(a)
+    mv = memoryview(a)
+    assert t.check(mv)
+
+
 @needs_numpy
-def test27_check_numpy():
+def test29_check_numpy():
     assert t.check(np.zeros(1))
 
 
 @needs_torch
-def test28_check_torch():
+def test30_check_torch():
     assert t.check(torch.zeros((1)))
 
 
@@ -510,6 +667,7 @@ def test33_force_contig_numpy():
     assert b is not a
     assert np.all(b == a)
 
+
 @needs_torch
 @pytest.mark.filterwarnings
 def test34_force_contig_pytorch():
@@ -566,6 +724,7 @@ def test36_half():
     assert x.dtype == np.float16
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+
 
 @needs_numpy
 def test37_cast():

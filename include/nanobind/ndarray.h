@@ -18,11 +18,16 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
-/// dlpack API/ABI data structures are part of a separate namespace
+/// DLPack API/ABI data structures are part of a separate namespace.
 NAMESPACE_BEGIN(dlpack)
 
 enum class dtype_code : uint8_t {
-    Int = 0, UInt = 1, Float = 2, Bfloat = 4, Complex = 5, Bool = 6
+    Int = 0, UInt = 1, Float = 2, Bfloat = 4, Complex = 5, Bool = 6,
+    Float8_e3m4 = 7, Float8_e4m3 = 8, Float8_e4m3b11fnuz = 9,
+    Float8_e4m3fn = 10, Float8_e4m3fnuz = 11, Float8_e5m2 = 12,
+    Float8_e5m2fnuz = 13, Float8_e8m0fnu = 14,
+    Float6_e2m3fn = 15, Float6_e3m2fn = 16,
+    Float4_e2m1fn = 17
 };
 
 struct device {
@@ -86,6 +91,7 @@ NB_FRAMEWORK(tensorflow, 3, "tensorflow.python.framework.ops.EagerTensor");
 NB_FRAMEWORK(jax, 4, "jaxlib.xla_extension.DeviceArray");
 NB_FRAMEWORK(cupy, 5, "cupy.ndarray");
 NB_FRAMEWORK(memview, 6, "memoryview");
+NB_FRAMEWORK(arrayapi, 7, "object");
 
 NAMESPACE_BEGIN(device)
 NB_DEVICE(none, 0); NB_DEVICE(cpu, 1); NB_DEVICE(cuda, 2);

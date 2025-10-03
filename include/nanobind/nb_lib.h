@@ -277,7 +277,7 @@ NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
 struct func_data_prelim_base;
 
 /// Create a Python function object for the given function record
-NB_CORE PyObject *nb_func_new(const func_data_prelim_base *data) noexcept;
+NB_CORE PyObject *nb_func_new(const func_data_prelim_base *f) noexcept;
 
 // ========================================================================
 
@@ -472,7 +472,7 @@ NB_CORE ndarray_handle *ndarray_import(PyObject *o,
                                        cleanup_list *cleanup) noexcept;
 
 // Describe a local ndarray object using a DLPack capsule
-NB_CORE ndarray_handle *ndarray_create(void *value, size_t ndim,
+NB_CORE ndarray_handle *ndarray_create(void *data, size_t ndim,
                                        const size_t *shape, PyObject *owner,
                                        const int64_t *strides,
                                        dlpack::dtype dtype, bool ro,

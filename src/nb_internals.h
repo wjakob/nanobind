@@ -466,10 +466,11 @@ inline void *inst_ptr(nb_inst *self) {
 }
 
 template <typename T> struct scoped_pymalloc {
-    scoped_pymalloc(size_t size = 1) {
-        ptr = (T *) PyMem_Malloc(size * sizeof(T));
+    scoped_pymalloc(size_t size = 1, size_t extra_bytes = 0) {
+        ptr = (T *) PyMem_Malloc(size * sizeof(T) + extra_bytes);
         if (!ptr)
-            fail("scoped_pymalloc(): could not allocate %zu bytes of memory!", size);
+            fail("scoped_pymalloc(): could not allocate %zu bytes of memory!",
+                 size * sizeof(T) + extra_bytes);
     }
     ~scoped_pymalloc() { PyMem_Free(ptr); }
     T *release() {

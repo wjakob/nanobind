@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 import py_stub_test
-from typing import Generic, Optional, Self, TypeAlias, TypeVar
+from typing import Any, Generic, Optional, Self, TypeAlias, TypeVar
 
 from . import submodule as submodule
 from .submodule import F as F, f as f2
@@ -22,6 +22,8 @@ class Foo:
 def f() -> None: ...
 
 def makeNestedClass() -> py_stub_test.AClass.NestedClass: ...
+
+AnyTuple: TypeAlias = tuple[Any, ...]
 
 FooAlias: TypeAlias = Foo
 

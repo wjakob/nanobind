@@ -57,7 +57,9 @@ NB_MODULE(test_typing_ext, m) {
 
     m.def("makeNestedClass", [] { return NestedClass(); });
 
-    // Aliases to local functoins and types
+    m.attr("AnyTuple") = nb::typing().attr("Tuple")[nb::make_tuple(nb::any_type(), nb::ellipsis())];
+
+    // Aliases to local functions and types
     m.attr("FooAlias") = m.attr("Foo");
     m.attr("f_alias") = m.attr("f");
     nb::type<Foo>().attr("lt_alias") = nb::type<Foo>().attr("__lt__");

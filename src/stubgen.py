@@ -93,6 +93,16 @@ SKIP_LIST = [
     "__firstlineno__", "__static_attributes__", "__annotations__", "__annotate__",
     "__annotate_func__"
 ]
+
+# Interpreter-internal types.
+TYPES_TYPES = {
+    getattr(types, name): name for name in [
+        "MethodDescriptorType",
+        "MemberDescriptorType",
+        "ModuleType",
+    ]
+}
+
 # fmt: on
 
 # This type is used to track per-module imports (``import name as desired_name``)
@@ -988,10 +998,9 @@ class StubGen:
         complicated.
         """
         tp = type(e)
-        for t in [bool, int, type(None), type(builtins.Ellipsis)]:
-            if issubclass(tp, t):
-                return repr(e)
-        if issubclass(tp, float):
+        if issubclass(tp, (bool, int, type(None), type(builtins.Ellipsis))):
+            return repr(e)
+        elif issubclass(tp, float):
             s = repr(e)
             if "inf" in s or "nan" in s:
                 return f"float('{s}')"
@@ -1140,8 +1149,10 @@ class StubGen:
                 + ", ".join(args_gen)
                 + "]"
             )
-        elif tp is types.ModuleType:
-            result = "types.ModuleType"
+        elif tp in TYPES_TYPES:
+            result = f"types.{TYPES_TYPES[tp]}"
+        elif tp is Ellipsis:
+            result = "..."
         elif isinstance(tp, type):
             result = tp.__module__ + "." + tp.__qualname__
         else:

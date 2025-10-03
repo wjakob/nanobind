@@ -19,6 +19,28 @@ except:
     needs_torch = pytest.mark.skip(reason="PyTorch is required")
 
 try:
+    import paddle
+    def needs_paddle(x):
+        return x
+except:
+    needs_paddle = pytest.mark.skip(reason="paddle is required")
+
+try:
+    import tensorflow as tf
+    import tensorflow.config
+    def needs_tensorflow(x):
+        return x
+except:
+    needs_tensorflow = pytest.mark.skip(reason="TensorFlow is required")
+
+try:
+    import jax.numpy as jnp
+    def needs_jax(x):
+        return x
+except:
+    needs_jax = pytest.mark.skip(reason="JAX is required")
+
+try:
     import cupy as cp
     def needs_cupy(x):
         return x
@@ -553,7 +575,7 @@ def test35_view():
     x2 = x1 * (-1+2j)
     t.fill_view_5(x1)
     assert np.allclose(x1, x2)
-    x2 = -x2;
+    x2 = -x2
     t.fill_view_6(x1)
     assert np.allclose(x1, x2)
 
@@ -614,109 +636,109 @@ def test41_noninteger_stride():
     a = np.array([[1, 2, 3, 4, 0, 0], [5, 6, 7, 8, 0, 0]], dtype=np.float32)
     s = a[:, 0:4]  # slice
     t.pass_float32(s)
-    assert t.get_stride(s, 0) == 6;
-    assert t.get_stride(s, 1) == 1;
+    assert t.get_stride(s, 0) == 6
+    assert t.get_stride(s, 1) == 1
     try:
         v = s.view(np.complex64)
     except:
         pytest.skip('your version of numpy is too old')
     t.pass_complex64(v)
-    assert t.get_stride(v, 0) == 3;
-    assert t.get_stride(v, 1) == 1;
+    assert t.get_stride(v, 0) == 3
+    assert t.get_stride(v, 1) == 1
 
     a = np.array([[1, 2, 3, 4, 0], [5, 6, 7, 8, 0]], dtype=np.float32)
     s = a[:, 0:4]  # slice
     t.pass_float32(s)
-    assert t.get_stride(s, 0) == 5;
-    assert t.get_stride(s, 1) == 1;
+    assert t.get_stride(s, 0) == 5
+    assert t.get_stride(s, 1) == 1
     v = s.view(np.complex64)
     with pytest.raises(TypeError) as excinfo:
         t.pass_complex64(v)
     assert 'incompatible function arguments' in str(excinfo.value)
     with pytest.raises(TypeError) as excinfo:
-        t.get_stride(v, 0);
+        t.get_stride(v, 0)
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
 @needs_numpy
 def test42_const_qualifiers_numpy():
     a = np.array([0, 0, 0, 3.14159, 0], dtype=np.float64)
-    assert t.check_rw_by_value(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_value_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_value_ro(a);
-    assert t.check_ro_by_value_const_float64(a);
+    assert t.check_rw_by_value(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
     a.setflags(write=False)
-    assert t.check_ro_by_value_ro(a);
-    assert t.check_ro_by_value_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = np.array([0, 0, 0, 3.14159, 0], dtype=np.float64)
-    assert t.check_rw_by_const_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_const_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_const_ref_ro(a);
-    assert t.check_ro_by_const_ref_const_float64(a);
+    assert t.check_rw_by_const_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_const_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
     a.setflags(write=False)
-    assert t.check_ro_by_const_ref_ro(a);
-    assert t.check_ro_by_const_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = np.array([0, 0, 0, 3.14159, 0], dtype=np.float64)
-    assert t.check_rw_by_rvalue_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_rvalue_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_rvalue_ref_ro(a);
-    assert t.check_ro_by_rvalue_ref_const_float64(a);
+    assert t.check_rw_by_rvalue_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_rvalue_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
     a.setflags(write=False)
-    assert t.check_ro_by_rvalue_ref_ro(a);
-    assert t.check_ro_by_rvalue_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
 
 @needs_torch
 def test43_const_qualifiers_pytorch():
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
-    assert t.check_rw_by_value(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_value_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_value_ro(a);
-    assert t.check_ro_by_value_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_rw_by_value(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
-    assert t.check_rw_by_const_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_const_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_const_ref_ro(a);
-    assert t.check_ro_by_const_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_rw_by_const_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_const_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
-    assert t.check_rw_by_rvalue_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_rvalue_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_rvalue_ref_ro(a);
-    assert t.check_ro_by_rvalue_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_rw_by_rvalue_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_rvalue_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
 
 @needs_cupy
@@ -851,3 +873,136 @@ def test52_accept_np_both_true_contig():
 def test53_issue_930():
     wrapper = t.Wrapper(np.ones(3, dtype=np.float32))
     assert wrapper.value[0] == 1
+
+@needs_paddle
+def test54_return_paddle():
+    try:
+        c = paddle.zeros([3, 5]).cpu()
+    except:
+        pytest.skip('paddle is missing')
+    collect()
+    dc = t.destruct_count()
+    x = t.ret_paddle()
+    assert x.shape == [2, 4]
+    assert paddle.all(x == paddle.to_tensor([[1, 2, 3, 4], [5, 6, 7, 8]], place='cpu', dtype='float32'))
+    del x
+    collect()
+    assert t.destruct_count() - dc == 1
+
+@needs_paddle
+@pytest.mark.filterwarnings
+def test55_force_contig_paddle():
+    a = paddle.to_tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], place='cpu', dtype='float32')
+    b = t.make_contig(a)
+    assert b is a
+    a = a.T
+    b = t.make_contig(a)
+    assert b is not a
+    assert paddle.all(b == a)
+
+@needs_paddle
+@pytest.mark.filterwarnings
+def test56_constrain_order_paddle():
+    try:
+        c = paddle.zeros([3, 5]).cpu()
+        c.__dlpack__()
+    except:
+        pytest.skip('paddle is missing')
+
+    f = c.t().contiguous().t()
+    assert t.check_order(c) == 'C'
+    assert t.check_order(f) == 'F'
+    assert t.check_order(c[:, 2:5]) == '?'
+    assert t.check_order(f[1:3, :]) == '?'
+    assert t.check_device(c) == 'cpu'
+    if paddle.device.cuda.device_count() >= 1:
+        assert t.check_device(paddle.zeros([3, 5])) == 'cuda'
+
+@needs_paddle
+def test57_implicit_conversion_paddle():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            c = paddle.zeros([3, 5]).cpu()
+            c.__dlpack__()
+        except:
+            pytest.skip('paddle is missing')
+
+    t.implicit(paddle.zeros([2, 2], dtype=paddle.int32))
+    t.implicit(paddle.zeros([2, 2, 10], dtype=paddle.float32)[:, :, 4])
+    t.implicit(paddle.zeros([2, 2, 10], dtype=paddle.int32)[:, :, 4])
+
+    with pytest.raises(TypeError) as excinfo:
+        t.noimplicit(paddle.zeros([2, 2], dtype=paddle.int32))
+
+    with pytest.raises(TypeError) as excinfo:
+        t.noimplicit(paddle.zeros([2, 2, 10], dtype=paddle.float32)[:, :, 4])
+
+@needs_paddle
+def test58_single_and_empty_dimension_paddle():
+    a = paddle.ones((1,100,1025), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+    a = paddle.ones((100,1,1025), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+    a = paddle.ones((0,100,1025), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+    a = paddle.ones((100,0,1025), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+    a = paddle.ones((100,1025,0), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+    a = paddle.ones((100,0,0), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+    a = paddle.ones((0,0,0), dtype=paddle.float32)
+    t.noop_3d_c_contig(a)
+
+# See PR #162
+@needs_paddle
+def test59_single_and_empty_dimension_fortran_order_paddle():
+    # This idiom creates a paddle 2D tensor in column major (aka, 'F') ordering
+    a = paddle.ones((0,100), dtype=paddle.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+    a = paddle.ones((100,0), dtype=paddle.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+    a = paddle.ones((1,100), dtype=paddle.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+    a = paddle.ones((100,1), dtype=paddle.float32).t().contiguous().t()
+    t.noop_2d_f_contig(a)
+
+@needs_paddle
+def test60_check_paddle():
+    assert t.check(paddle.zeros((1)).cpu())
+
+@needs_paddle
+def test61_const_qualifiers_paddle():
+    a = paddle.to_tensor([0, 0, 0, 3.14159, 0], dtype=paddle.float64, place='cpu')
+    assert t.check_rw_by_value(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
+
+    a = paddle.to_tensor([0, 0, 0, 3.14159, 0], dtype=paddle.float64, place='cpu')
+    assert t.check_rw_by_const_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_const_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
+
+    a = paddle.to_tensor([0, 0, 0, 3.14159, 0], dtype=paddle.float64, place='cpu')
+    assert t.check_rw_by_rvalue_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_rvalue_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159

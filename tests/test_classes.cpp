@@ -680,6 +680,7 @@ NB_MODULE(test_classes_ext, m) {
     // issue #786
     struct NewNone {};
     struct NewDflt { int value; };
+    struct NewStarPosOnly { size_t value; };
     struct NewStar { size_t value; };
     nb::class_<NewNone>(m, "NewNone")
         .def(nb::new_([]() { return NewNone(); }));
@@ -687,6 +688,12 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::new_([](int value) { return NewDflt{value}; }),
              "value"_a = 42)
         .def_ro("value", &NewDflt::value);
+    nb::class_<NewStarPosOnly>(m, "NewStarPosOnly")
+        .def(nb::new_([](nb::args a, int value) {
+            return NewStarPosOnly{nb::len(a) + value};
+        }),
+            "args"_a, "value"_a = 42)
+        .def_ro("value", &NewStarPosOnly::value);
     nb::class_<NewStar>(m, "NewStar")
         .def(nb::new_([](nb::args a, int value, nb::kwargs k) {
             return NewStar{nb::len(a) + value + 10 * nb::len(k)};

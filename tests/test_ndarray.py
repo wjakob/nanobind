@@ -2,7 +2,7 @@ import test_ndarray_ext as t
 import pytest
 import warnings
 import importlib
-from common import collect
+from common import collect, skip_on_pypy
 
 try:
     import numpy as np
@@ -209,18 +209,27 @@ def test11_implicit_conversion_pytorch():
         t.noimplicit(torch.zeros(2, 2, 10, dtype=torch.float32)[:, :, 4])
 
 
-def test14_destroy_capsule():
+@needs_numpy
+def test12_process_image():
+    x = np.arange(120, dtype=np.ubyte).reshape(8, 5, 3)
+    t.process(x)
+    assert np.all(x == np.arange(0, 240, 2, dtype=np.ubyte).reshape(8, 5, 3))
+
+
+def test13_destroy_capsule():
     collect()
     dc = t.destruct_count()
-    a = t.return_dlpack()
-    assert dc == t.destruct_count()
-    del a
+    capsule = t.return_no_framework()
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    assert t.destruct_count() == dc
+    del capsule
     collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
-def test15_consume_numpy():
+def test14_consume_numpy():
     collect()
     class wrapper:
         def __init__(self, value):
@@ -228,31 +237,49 @@ def test15_consume_numpy():
         def __dlpack__(self):
             return self.value
     dc = t.destruct_count()
-    a = t.return_dlpack()
+    capsule = t.return_no_framework()
     if hasattr(np, '_from_dlpack'):
-        x = np._from_dlpack(wrapper(a))
+        x = np._from_dlpack(wrapper(capsule))
     elif hasattr(np, 'from_dlpack'):
-        x = np.from_dlpack(wrapper(a))
+        x = np.from_dlpack(wrapper(capsule))
     else:
         pytest.skip('your version of numpy is too old')
 
-    del a
+    del capsule
     collect()
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
-    assert dc == t.destruct_count()
+    assert t.destruct_count() == dc
     del x
     collect()
     assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
-def test16_passthrough():
+def test15_passthrough_numpy():
     a = t.ret_numpy()
     b = t.passthrough(a)
     assert a is b
 
-    a = np.array([1,2,3])
+    a = np.array([1, 2, 3])
+    b = t.passthrough(a)
+    assert a is b
+
+    a = None
+    with pytest.raises(TypeError) as excinfo:
+        b = t.passthrough(a)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    b = t.passthrough_arg_none(a)
+    assert a is b
+
+
+@needs_torch
+def test16_passthrough_torch():
+    a = t.ret_pytorch()
+    b = t.passthrough(a)
+    assert a is b
+
+    a = torch.tensor([1, 2, 3])
     b = t.passthrough(a)
     assert a is b
 
@@ -287,6 +314,22 @@ def test18_return_pytorch():
     x = t.ret_pytorch()
     assert x.shape == (2, 4)
     assert torch.all(x == torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]]))
+    del x
+    collect()
+    assert t.destruct_count() - dc == 1
+
+
+@skip_on_pypy
+def test19_return_memview():
+    collect()
+    dc = t.destruct_count()
+    x = t.ret_memview()
+    assert isinstance(x, memoryview)
+    assert x.itemsize == 8
+    assert x.ndim == 2
+    assert x.shape == (2, 4)
+    assert x.strides == (32, 8)  # in bytes
+    assert x.tolist() == [[1, 2, 3, 4], [5, 6, 7, 8]]
     del x
     collect()
     assert t.destruct_count() - dc == 1
@@ -510,6 +553,7 @@ def test33_force_contig_numpy():
     assert b is not a
     assert np.all(b == a)
 
+
 @needs_torch
 @pytest.mark.filterwarnings
 def test34_force_contig_pytorch():
@@ -566,6 +610,7 @@ def test36_half():
     assert x.dtype == np.float16
     assert x.shape == (2, 4)
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+
 
 @needs_numpy
 def test37_cast():

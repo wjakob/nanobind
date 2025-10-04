@@ -240,7 +240,8 @@ NB_MODULE(test_ndarray_ext, m) {
     });
 
     m.def("destruct_count", []() { return destruct_count; });
-    m.def("return_dlpack", []() {
+
+    m.def("return_no_framework", []() {
         float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };
 
@@ -299,16 +300,28 @@ NB_MODULE(test_ndarray_ext, m) {
                                                                 deleter);
     });
 
+    m.def("ret_memview", []() {
+        double *d = new double[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+
+        nb::capsule deleter(d, [](void *data) noexcept {
+           destruct_count++;
+           delete[] (double *) data;
+        });
+
+        return nb::ndarray<nb::memview, double, nb::shape<2, 4>>(d, 2, shape,
+                                                                 deleter);
+    });
+
     m.def("ret_array_scalar", []() {
-            float* f = new float[1] { 1 };
-            size_t shape[1] = {};
+            float* f = new float{ 1.0f };
 
             nb::capsule deleter(f, [](void* data) noexcept {
                 destruct_count++;
-                delete[] (float *) data;
+                delete (float *) data;
             });
 
-            return nb::ndarray<nb::numpy, float>(f, 0, shape, deleter);
+            return nb::ndarray<nb::numpy, float>(f, 0, nullptr, deleter);
     });
 
     m.def("noop_3d_c_contig",

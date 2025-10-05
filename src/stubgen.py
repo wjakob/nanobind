@@ -84,14 +84,19 @@ if sys.version_info < (3, 11):
 else:
     typing_extensions = None
 
-# Exclude various standard elements found in modules, classes, etc.
 SKIP_LIST = [
+    # Various standard attributes found in modules, classes, etc.
     "__doc__", "__module__", "__name__", "__new__", "__builtins__",
     "__cached__", "__path__", "__version__", "__spec__", "__loader__",
     "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
     "__file__", "__dict__", "__weakref__", "__format__", "__nb_enum__",
     "__firstlineno__", "__static_attributes__", "__annotations__", "__annotate__",
-    "__annotate_func__"
+    "__annotate_func__",
+
+    # Auto-generated enum attributes. Type checkers synthesize these, so they
+    # shouldn't appear in the stubs.
+    "_new_member_", "_use_args_", "_member_names_", "_member_map_",
+    "_value2member_map_", "_unhashable_values_", "_value_repr_",
 ]
 
 # Interpreter-internal types.

@@ -1264,6 +1264,16 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-L",
+        "--lib-path",
+        action="append",
+        metavar="PATH",
+        dest="lib_paths",
+        default=[],
+        help="add directory to shared library search path (can specify multiple times)"
+    )
+
+    parser.add_argument(
         "-m",
         "--module",
         action="append",
@@ -1396,6 +1406,7 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
 def main(args: Optional[List[str]] = None) -> None:
     import sys
+    import os
 
     # Ensure that the current directory is on the path
     if "" not in sys.path and "." not in sys.path:
@@ -1415,6 +1426,16 @@ def main(args: Optional[List[str]] = None) -> None:
 
     for i in opt.imports:
         sys.path.insert(0, i)
+
+    if os.name == 'nt':
+        for lib_path in opt.lib_paths:
+            os.add_dll_directory(lib_path)
+    else:
+        lib_env = "DYLD_LIBRARY_PATH" if sys.platform == "darwin" else "LD_LIBRARY_PATH"
+        old_value = os.environ.get(lib_env, "")
+        paths_str = ":".join(opt.lib_paths)
+        if paths_str:
+            os.environ[lib_env] = f"{paths_str}:{old_value}" if old_value else paths_str
 
     for i, mod in enumerate(opt.modules):
         if not opt.quiet:

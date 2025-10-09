@@ -539,8 +539,9 @@ The program has the following command line options:
 
 .. code-block:: text
 
-   usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH] [-m MODULE]
-                                     [-r] [-M FILE] [-P] [-D] [-q]
+   usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH]
+                                     [-L PATH] [-m MODULE] [-r] [-M FILE] [-P]
+                                     [-D] [-q]
 
    Generate stubs for nanobind-based extensions.
 
@@ -549,6 +550,8 @@ The program has the following command line options:
      -o FILE, --output-file FILE   write generated stubs to the specified file
      -O PATH, --output-dir PATH    write generated stubs to the specified directory
      -i PATH, --import PATH        add the directory to the Python import path (can
+                                   specify multiple times)
+     -L PATH, --lib-path PATH      add directory to shared library search path (can
                                    specify multiple times)
      -m MODULE, --module MODULE    generate a stub for the specified module (can
                                    specify multiple times)

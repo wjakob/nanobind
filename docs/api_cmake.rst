@@ -492,6 +492,14 @@ Nanobind's CMake tooling includes a convenience command to interface with the
           generation. Otherwise, generator expressions should not be used.
           Optional.
 
+      * - ``LIB_PATH``
+        - List of search paths that should be considered when searching for
+          shared libraries. This can be useful when the python module being
+          imported depends on shared libraries that are not in the default
+          search path. The paths are relative to ``CMAKE_CURRENT_BINARY_DIR``
+          for build-time stub generation and relative to
+          ``CMAKE_INSTALL_PREFIX`` for install-time stub generation. Optional.
+
       * - ``DEPENDS``
         - Any targets listed here will be marked as a dependencies. This should
           generally be used to list the target names of one or more prior

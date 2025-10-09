@@ -1004,12 +1004,14 @@ class StubGen:
         """
         tp = type(e)
         if issubclass(tp, (bool, int, type(None), type(builtins.Ellipsis))):
-            return repr(e)
+            s = repr(e)
+            if len(s) < self.max_expr_length or not abbrev:
+                return s
         elif issubclass(tp, float):
             s = repr(e)
             if "inf" in s or "nan" in s:
-                return f"float('{s}')"
-            else:
+                s = f"float('{s}')"
+            if len(s) < self.max_expr_length or not abbrev:
                 return s
         elif issubclass(tp, type) or typing.get_origin(e):
             return self.type_str(e)
@@ -1320,6 +1322,14 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--exclude-values",
+        dest="exclude_values",
+        default=False,
+        action="store_true",
+        help="force the use of ... for values",
+    )
+
+    parser.add_argument(
         "-q",
         "--quiet",
         default=False,
@@ -1463,6 +1473,7 @@ def main(args: Optional[List[str]] = None) -> None:
             recursive=opt.recursive,
             include_docstrings=opt.include_docstrings,
             include_private=opt.include_private,
+            max_expr_length=0 if opt.exclude_values else 50,
             patterns=patterns,
             output_file=file
         )

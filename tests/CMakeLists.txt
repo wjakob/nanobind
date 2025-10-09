@@ -104,6 +104,7 @@ foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iter
     set(EXTRA
       MARKER_FILE py.typed
       PATTERN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pattern_file.nb"
+      EXCLUDE_VALUES
     )
     set(EXTRA_DEPENDS "${OUT_DIR}/py_stub_test.py")
   else()

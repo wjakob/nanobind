@@ -118,9 +118,6 @@ NB_MODULE(test_typing_ext, m) {
     m.attr("T2") = nb::type_var("T2", "bound"_a = nb::type<Foo>());
     m.attr("T3") = nb::type_var("T3", *nb::make_tuple(nb::type<Foo>(), nb::type<Wrapper>()));
 
-    // Parameter specification variable.
-    m.attr("P") = nb::param_spec("P");
-
     // Some statements that will be modified by the pattern file
     m.def("remove_me", []{});
     m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");

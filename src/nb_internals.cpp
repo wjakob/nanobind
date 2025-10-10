@@ -164,6 +164,39 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
 nb_internals *internals = nullptr;
 PyTypeObject *nb_meta_cache = nullptr;
 
+PyObject* static_pyobjects[static_name::total_count];
+
+static const char* interned_c_str[static_name::string_count] {
+    "value",
+    "copy",
+    "from_dlpack",
+    "__dlpack__",
+    "dl_device",
+    "max_version",
+};
+
+// Initialize members of the global structure `static_pyobjects`.
+static void init_static_pyobjects() {
+    #pragma nounroll
+    for (int i = 0; i < static_name::string_count; ++i)
+        static_pyobjects[i] = PyUnicode_InternFromString(interned_c_str[i]);
+
+    static_pyobjects[static_name::copy_tpl] =
+        PyTuple_Pack(1, static_pyobjects[static_name::copy_str]);
+    static_pyobjects[static_name::max_version_tpl] =
+        PyTuple_Pack(1, static_pyobjects[static_name::max_version_str]);
+}
+
+// Release each member of the global structure `static_pyobjects`.
+// This is set in the PyModuleDef for the nanobind module.
+void m_free(void*) {
+    #pragma nounroll
+    for (int i = 0; i < static_name::total_count; ++i) {
+        Py_DECREF(static_pyobjects[i]);
+        static_pyobjects[i] = nullptr;
+    }
+}
+
 static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
@@ -320,6 +353,8 @@ static void internals_cleanup() {
 NB_NOINLINE void init(const char *name) {
     if (internals)
         return;
+
+    init_static_pyobjects();
 
 #if defined(PYPY_VERSION)
     PyObject *dict = PyEval_GetBuiltins();

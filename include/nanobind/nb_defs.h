@@ -228,7 +228,7 @@
     };                                                                         \
     static struct PyModuleDef nanobind_##name##_module = {                     \
         PyModuleDef_HEAD_INIT, #name, nullptr, 0, nullptr,                     \
-        nanobind_##name##_slots, nullptr, nullptr, nullptr                     \
+        nanobind_##name##_slots, nullptr, nullptr, nanobind::detail::m_free    \
     };                                                                         \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \

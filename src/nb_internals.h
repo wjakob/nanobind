@@ -420,6 +420,24 @@ struct nb_internals {
     size_t shard_count = 1;
 };
 
+struct static_name {
+    enum : int {
+        value_str = 0,
+        copy_str,
+        from_dlpack_str,
+        dunder_dlpack_str,
+        dl_device_str,
+        max_version_str,
+        string_count,
+
+        copy_tpl = string_count,
+        max_version_tpl,
+        total_count
+    };
+};
+
+extern PyObject* static_pyobjects[static_name::total_count];
+
 /// Convenience macro to potentially access cached functions
 #if defined(Py_LIMITED_API)
 #  define NB_SLOT(type, name) internals->type##_##name

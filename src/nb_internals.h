@@ -42,7 +42,7 @@ NAMESPACE_BEGIN(detail)
 #endif
 
 /// Nanobind function metadata (overloads, etc.)
-struct func_data : func_data_prelim<0> {
+struct func_data : func_data_prelim_base {
     arg_data *args;
     char *signature;
 };

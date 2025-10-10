@@ -455,9 +455,6 @@ NB_CORE PyObject *module_import(const char *name);
 /// Try to import a Python extension module, raises an exception upon failure
 NB_CORE PyObject *module_import(PyObject *name);
 
-/// Create a new extension module with the given name
-NB_CORE PyObject *module_new(const char *name, PyModuleDef *def) noexcept;
-
 /// Create a submodule of an existing module
 NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
                                        const char *doc) noexcept;

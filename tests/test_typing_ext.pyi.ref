@@ -44,7 +44,7 @@ class CustomSignature(Iterable[int]):
     def value(self, value: Optional[int], /) -> None:
         """docstring for setter"""
 
-pytree: dict = {'a' : ('b', [123])}
+pytree: dict = ...
 
 T = TypeVar("T", contravariant=True)
 
@@ -62,6 +62,10 @@ class WrapperTypeParam[T]:
     pass
 
 def list_front[T](arg: list[T], /) -> T: ...
+
+T2 = TypeVar("T2", bound=Foo)
+
+T3 = TypeVar("T3", Foo, Wrapper)
 
 def tweak_me(arg: int):
     """

@@ -114,6 +114,10 @@ NB_MODULE(test_typing_ext, m) {
     m.def("list_front", [](nb::list l) { return l[0]; },
           nb::sig("def list_front[T](arg: list[T], /) -> T"));
 
+    // Type variables with constraints and a bound.
+    m.attr("T2") = nb::type_var("T2", "bound"_a = nb::type<Foo>());
+    m.attr("T3") = nb::type_var("T3", *nb::make_tuple(nb::type<Foo>(), nb::type<Wrapper>()));
+
     // Some statements that will be modified by the pattern file
     m.def("remove_me", []{});
     m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");

@@ -141,16 +141,6 @@ void cleanup_list::expand() noexcept {
 
 // ========================================================================
 
-PyObject *module_new(const char *name, PyModuleDef *def) noexcept {
-    memset(def, 0, sizeof(PyModuleDef));
-    def->m_name = name;
-    def->m_size = -1;
-    PyObject *m = PyModule_Create(def);
-
-    check(m, "nanobind::detail::module_new(): allocation failed!");
-    return m;
-}
-
 PyObject *module_import(const char *name) {
     PyObject *res = PyImport_ImportModule(name);
     if (!res)

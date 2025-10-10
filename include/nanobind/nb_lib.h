@@ -108,6 +108,7 @@ NB_CORE void raise_next_overload_if_null(void *p);
 // ========================================================================
 
 NB_CORE void init(const char *domain);
+NB_CORE void m_free(void*);
 
 // ========================================================================
 

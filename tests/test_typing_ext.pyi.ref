@@ -1,6 +1,14 @@
 from collections.abc import Iterable
 import py_stub_test
-from typing import Any, Generic, Optional, Self, TypeAlias, TypeVar
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    ParamSpec,
+    Self,
+    TypeAlias,
+    TypeVar
+)
 
 from . import submodule as submodule
 from .submodule import F as F, f as f2
@@ -44,7 +52,7 @@ class CustomSignature(Iterable[int]):
     def value(self, value: Optional[int], /) -> None:
         """docstring for setter"""
 
-pytree: dict = {'a' : ('b', [123])}
+pytree: dict = ...
 
 T = TypeVar("T", contravariant=True)
 
@@ -62,6 +70,12 @@ class WrapperTypeParam[T]:
     pass
 
 def list_front[T](arg: list[T], /) -> T: ...
+
+T2 = TypeVar("T2", bound=Foo)
+
+T3 = TypeVar("T3", Foo, Wrapper)
+
+P = ParamSpec("P")
 
 def tweak_me(arg: int):
     """

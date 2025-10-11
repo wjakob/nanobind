@@ -219,9 +219,9 @@ static void internals_cleanup() {
         for (size_t i = 0; i < p->shard_count && ctr < 20; ++i) {
             for (auto [k, v]: p->shards[i].inst_c2p) {
                 if (NB_UNLIKELY(nb_is_seq(v))) {
-                    nb_inst_seq* seq = nb_get_seq(v);
+                    nb_inst_seq* seq = nb_get_seq<PyObject>(v);
                     for(; seq != nullptr && ctr < 20; seq = seq->next) {
-                        print_leak(k, seq->inst);
+                        print_leak(k, seq->value);
                         INC_CTR;
                     }
                 } else {
@@ -249,12 +249,32 @@ static void internals_cleanup() {
 #endif
 
     if (!p->type_c2p_slow.empty()) {
-        if (print_leak_warnings) {
-            fprintf(stderr, "nanobind: leaked %zu types!\n",
-                    p->type_c2p_slow.size());
+        size_t type_leaks = 0;
+        for (const auto &kv : p->type_c2p_slow) {
+#if !defined(NB_DISABLE_INTEROP)
+            if (nb_is_foreign(kv.second)) {
+                if (nb_is_seq(kv.second)) {
+                    auto *seq = nb_get_seq<pymb_binding>(kv.second);
+                    while (seq) {
+                        auto *next = seq->next;
+                        PyMem_Free(seq);
+                        seq = next;
+                    }
+                }
+                continue;
+            }
+#endif
+            ++type_leaks;
+        }
+
+        if (type_leaks && print_leak_warnings) {
+            fprintf(stderr, "nanobind: leaked %zu types!\n", type_leaks);
             int ctr = 0;
             for (const auto &kv : p->type_c2p_slow) {
-                fprintf(stderr, " - leaked type \"%s\"\n", kv.second->name);
+                if (nb_is_foreign(kv.second))
+                    continue;
+                fprintf(stderr, " - leaked type \"%s\"\n",
+                        ((type_data *) kv.second)->name);
                 INC_CTR;
                 if (ctr == 10) {
                     fprintf(stderr, " - ... skipped remainder\n");
@@ -262,7 +282,7 @@ static void internals_cleanup() {
                 }
             }
         }
-        leak = true;
+        leak |= (type_leaks > 0);
     }
 
     if (!p->funcs.empty()) {
@@ -284,11 +304,30 @@ static void internals_cleanup() {
     }
 
     if (!leak) {
-        nb_translator_seq* t = p->translators.next;
+        nb_translator_seq* t = p->translators.load_acquire();
         while (t) {
-            nb_translator_seq *next = t->next;
+            nb_translator_seq *next = t->next.load_acquire();
             delete t;
             t = next;
+        }
+
+#if !defined(NB_DISABLE_INTEROP)
+        if (p->foreign_self) {
+            pymb_remove_framework(p->foreign_self);
+            free((void *) p->foreign_self->name);
+            delete p->foreign_self;
+        }
+#endif
+
+        for (auto &kv : p->types_in_c2p_fast) {
+            if (!kv.second)
+                continue;
+            nb_alias_seq *node = (nb_alias_seq *) kv.second;
+            while (node) {
+                nb_alias_seq *next = node->next;
+                delete node;
+                node = next;
+            }
         }
 
 #if defined(NB_FREE_THREADED)
@@ -358,6 +397,7 @@ NB_NOINLINE void init(const char *name) {
     p->shard_mask = shard_count - 1;
 #endif
     p->shard_count = shard_count;
+    p->domain = name;
 
     str nb_name("nanobind");
     p->nb_module = PyModule_NewObject(nb_name.ptr());
@@ -426,7 +466,6 @@ NB_NOINLINE void init(const char *name) {
     Py_DECREF(dummy);
 #endif
 
-    p->translators = { default_exception_translator, nullptr, nullptr };
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;
     p->is_alive_ptr = is_alive_ptr;
@@ -480,6 +519,7 @@ NB_NOINLINE void init(const char *name) {
     Py_DECREF(capsule);
     Py_DECREF(key);
     internals = p;
+    register_exception_translator(default_exception_translator, nullptr, false);
 }
 
 #if defined(NB_COMPACT_ASSERTIONS)
@@ -490,6 +530,25 @@ NB_NOINLINE void fail_unspecified() noexcept {
         fail("encountered an unrecoverable error condition. Recompile using the"
              " 'Debug' mode to obtain further information about this problem.");
     #endif
+}
+#endif
+
+#if defined(NB_FREE_THREADED)
+nb_type_map_per_thread::nb_type_map_per_thread(nb_internals &internals_)
+  : internals(internals_) {
+    lock_internals l{&internals};
+    next = internals.type_c2p_per_thread_head;
+    internals.type_c2p_per_thread_head = this;
+}
+nb_type_map_per_thread::~nb_type_map_per_thread() {
+    lock_internals l{&internals};
+    nb_type_map_per_thread** pcurr = &internals.type_c2p_per_thread_head;
+    while (*pcurr) {
+        if (*pcurr == this)
+            *pcurr = next;
+        else
+            pcurr = &((*pcurr)->next);
+    }
 }
 #endif
 

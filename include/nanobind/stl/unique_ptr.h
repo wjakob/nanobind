@@ -94,10 +94,12 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         // Stash source python object
         src = src_;
 
-        /* Try casting to a pointer of the underlying type. We pass flags=0 and
-           cleanup=nullptr to prevent implicit type conversions (they are
-           problematic since the instance then wouldn't be owned by 'src') */
-        return caster.from_python(src_, 0, nullptr);
+        /* Try casting to a pointer of the underlying type. We pass
+           cleanup=nullptr and !(flags & convert) to prevent implicit type
+           conversions, which are problematic since the instance then wouldn't
+           be owned by 'src'. Also disable casting from a foreign type since it
+           wouldn't be able to relinquish ownership. */
+        return caster.from_python(src_, (uint8_t) cast_flags::not_foreign, nullptr);
     }
 
     template <typename T2>

@@ -20,6 +20,7 @@
 #include <string_view>
 #include <functional>
 #include "hash.h"
+#include "pymetabind.h"
 
 #if TSL_RH_VERSION_MAJOR != 1 || TSL_RH_VERSION_MINOR < 3
 #  error nanobind depends on tsl::robin_map, in particular version >= 1.3.0, <2.0.0
@@ -29,6 +30,16 @@
 #  define NB_THREAD_LOCAL __declspec(thread)
 #else
 #  define NB_THREAD_LOCAL __thread
+#endif
+
+#if defined(PY_BIG_ENDIAN)
+#  define NB_BIG_ENDIAN PY_BIG_ENDIAN
+#else // pypy doesn't define PY_BIG_ENDIAN
+#  if defined(_MSC_VER)
+#    define NB_BIG_ENDIAN 0 // All Windows platforms are little-endian
+#  else // GCC and Clang define the following macros
+#    define NB_BIG_ENDIAN (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#  endif
 #endif
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -149,19 +160,64 @@ public:
     void deallocate(T *p, size_type /*n*/) noexcept { PyMem_Free(p); }
 };
 
-// Linked list of instances with the same pointer address. Usually just 1.
-struct nb_inst_seq {
-    PyObject *inst;
-    nb_inst_seq *next;
+/// nanobind maintains several maps where there is usually a single entry,
+/// but sometimes a list of them. To avoid allocating linked list nodes in
+/// the common case, the map value is a pointer whose lowest bit is a type
+/// discriminant: 0 if pointing to a single T, and 1 if pointing to a nb_seq<T>.
+template <class T>
+struct nb_seq {
+    T *value;
+    nb_seq *next;
 };
+using nb_inst_seq = nb_seq<PyObject>;
+using nb_alias_seq = nb_seq<const std::type_info>;
+using nb_foreign_seq = nb_seq<pymb_binding>;
 
-// Linked list of type aliases when there are multiple shared libraries with duplicate RTTI data
-struct nb_alias_chain {
-    const std::type_info *value;
-    nb_alias_chain *next;
-};
+/// Convenience functions to deal with such encoded pointers
 
-// Weak reference list. Usually, there is just one entry
+/// Does this entry store a linked list of instances?
+NB_INLINE bool nb_is_seq(void *p) { return ((uintptr_t) p) & 1; }
+
+/// Tag a nb_seq* pointer as such
+template <class T>
+NB_INLINE void* nb_mark_seq(nb_seq<T> *p) { return (void *) (((uintptr_t) p) | 1); }
+
+/// Retrieve the nb_seq* pointer from an 'inst_c2p' value, assuming nb_is_seq(p)
+template <class T>
+NB_INLINE nb_seq<T>* nb_get_seq(void *p) { return (nb_seq<T> *) (((uintptr_t) p) ^ 1); }
+
+template <class T>
+nb_seq<T>* nb_ensure_seq(void **p) {
+    if (nb_is_seq(*p))
+        return nb_get_seq<T>(*p);
+    nb_seq<T> *node = (nb_seq<T> *) PyMem_Malloc(sizeof(nb_seq<T>));
+    node->value = (T *) *p;
+    node->next = nullptr;
+    *p = nb_mark_seq(node);
+    return node;
+}
+
+/// Analogous convenience functions for nanobind vs foreign type disambiguation
+/// in type_c2p_* map values. These store one of type_data*, pymb_binding* | 2,
+/// or nb_foreign_seq* | 3. So, if !nb_is_foreign(p), cast to type_data*
+/// directly; otherwise use either nb_get_seq<pymb_binding>(nb_get_foreign(p))
+/// or (pymb_binding*) nb_get_foreign(p) depending on the value of
+/// nb_is_seq(nb_get_foreign(p)).
+
+#if defined(NB_DISABLE_INTEROP)
+NB_INLINE bool nb_is_foreign(void *) { return false; }
+#else
+NB_INLINE bool nb_is_foreign(void *p) { return ((uintptr_t) p) & 2; }
+NB_INLINE void* nb_mark_foreign(void *p) { return (void *) (((uintptr_t) p) | 2); }
+NB_INLINE void* nb_get_foreign(void *p) { return (void *) (((uintptr_t) p) ^ 2); }
+static_assert(alignof(type_data) >= 4 && alignof(pymb_binding) >= 4 &&
+              alignof(nb_foreign_seq) >= 4,
+              "not enough alignment bits for discriminant scheme");
+#endif
+
+// Entry in a list of keep_alive weak references. This does not use the
+// low-order bit discriminator because the payload is not pointer-sized;
+// even if an object has a single weak reference, it will use the seq.
 struct nb_weakref_seq {
     void (*callback)(void *) noexcept;
     void *payload;
@@ -181,30 +237,199 @@ struct std_typeinfo_eq {
     }
 };
 
-using nb_type_map_fast = tsl::robin_map<const std::type_info *, type_data *, ptr_hash>;
-using nb_type_map_slow = tsl::robin_map<const std::type_info *, type_data *,
+/*
+ * TYPE MAPPING
+ *
+ * nanobind has two primary maps indexed by C++ type, `type_c2p_slow` and
+ * `type_c2p_fast`. The values in these maps point to information that
+ * nanobind needs to convert Python objects to/from the C++ type represented
+ * by the key. In both maps, the two lowest-order bits of the pointer value
+ * indicate the type of the pointee, with associated semantics:
+ *
+ * - 0b00: type_data*: This C++ type is bound in the current nanobind domain.
+ *                     Any foreign bindings that it has (whether provided by
+ *                     this nanobind domain or provided by other frameworks)
+ *                     are accessible via type_data::foreign_bindings, with the
+ *                     discriminant semantics of the output of nb_get_foreign()
+ *                     (low 0b00 for a single binding or 0b01 for a list).
+ *
+ * - 0b10: pymb_binding*: This C++ type is not bound in the current nanobind
+ *                        domain but is bound by a single other framework.
+ *
+ * - 0b11: nb_foreign_seq*: This C++ type is not bound in the current nanobind
+ *                          domain but is bound by one or more other frameworks.
+ *                          (Once we have a list, we don't switch back to a
+ *                          singleton; see nb_type_try_foreign() for why.)
+ *
+ * The `slow` map is the source of truth. Its lookups perform string comparisons
+ * on the type name, so `std::type_info` objects for the same type from
+ * different shared libraries will use the same map entry. Every known
+ * type is in this map, and types that are not known have no entry.
+ * The entries in this map correspond to C++ types, considered abstractly.
+ *
+ * The `fast` map is a cache of the `slow` map. Its lookups perform pointer
+ * comparisons, so equivalent but distinct `std::type_info` objects have
+ * different entries. Only type_info pointers that have been looked up are
+ * in this map, and if the lookup failed, an entry will be stored mapping the
+ * type_info pointer to null (so we don't keep checking the slow map every
+ * time). If lookup of a given type_info pointer succeeds in the fast map,
+ * it is guaranteed to produce the same value as it would in the slow map
+ * (or if it produces a value of nullptr, the lookup in the slow map would
+ * have failed). The entries in this map correspond to `std::type_info`
+ * pointers, which have a many-to-one relationship with C++ types.
+ *
+ * In free-threaded builds, each thread gets its own fast map, encapsulated
+ * in `nb_type_map_per_thread`. All the fast maps are linked together in a
+ * singly linked list so that they can be updated as needed when changes
+ * are made to the slow map. Accesses to each fast map are protected by a mutex
+ * in order to deconflict lookups from updates; since most of the time
+ * there are no updates to already-cached types, the mutex is effectively
+ * thread-local and uncontended.
+ *
+ * The `nb_internals::types_in_c2p_fast` map keeps a record of which type_info
+ * pointers are stored in the fast map for each C++ type. If a type is not in
+ * the fast map at all, it has no entry in `types_in_c2p_fast`. If it is in the
+ * fast map under a single `type_info` pointer, its entry in `types_in_c2p_fast`
+ * has that `type_info` pointer as its key and null as its value. If it is in
+ * the fast map under multiple `type_info` pointers, its entry in
+ * `types_in_c2p_fast` has one of them as its key, and the corresponding value
+ * is a `nb_alias_seq*` containing all the others (but not the key). When a type
+ * is added or removed from the slow map, we check the `types_in_c2p_fast`
+ * map to see which keys in the fast map might need to be updated.
+ *
+ * Note that despite this scheme, nanobind stil immortalizes all of its
+ * bound types when running in free-threaded mode, because we don't yet
+ * handle the possibility of thread A destroying a pytype while thread B is
+ * trying to convert an object to it. Fixing this would probably require
+ * holding a strong reference to a binding's type object while doing anything
+ * with the binding, and obtaining the strong reference before dropping the
+ * thread-local fast type map mutex. We're doing something similar for foreign
+ * types already, but those aren't as performance-critical, so further research
+ * is needed here.
+ */
+
+/// A map from std::type_info to pointer-sized data, where lookups use string
+/// comparisons. This is instantiated as both `type_c2p_slow` where the value
+/// is a pointer to type-specific data as explained in TYPE MAPPING above, and
+/// `types_in_c2p_fast` where the value is an `nb_alias_seq` or null.
+/// (String comparison is needed because the same type may have multiple
+/// std::type_info objects in our address space: one per shared library
+/// in which it is used.)
+using nb_type_map_slow = tsl::robin_map<const std::type_info *, void *,
                                         std_typeinfo_hash, std_typeinfo_eq>;
 
 /// A simple pointer-to-pointer map that is reused a few times below (even if
 /// not 100% ideal) to avoid template code generation bloat.
-using nb_ptr_map  = tsl::robin_map<void *, void*, ptr_hash>;
+using nb_ptr_map = tsl::robin_map<void *, void*, ptr_hash>;
 
-/// Convenience functions to deal with the pointer encoding in 'internals.inst_c2p'
+/// A map from std::type_info to type data pointer, where lookups use
+/// pointer comparisons. The values stored here can be NULL (if a negative
+/// lookup has been cached) or else point to any of three types, discriminated
+/// using the two lowest-order bits of the pointer; see TYPE MAPPING above.
+struct nb_type_map_fast {
+    /// Look up a type. If not present in the map, add it with value `dflt`;
+    /// then return a reference to the stored value, which the caller may
+    /// modify.
+    void*& lookup_or_set(const std::type_info *ti, void *dflt) {
+        ++update_count;
+        return data.try_emplace((void *) ti, dflt).first.value();
+    }
 
-/// Does this entry store a linked list of instances?
-NB_INLINE bool         nb_is_seq(void *p)   { return ((uintptr_t) p) & 1; }
+    /// Look up a type. Return its associated value, or nullptr if not present.
+    /// This method can't distinguish cached negative lookups from entries
+    /// that aren't in the map.
+    void* lookup(const std::type_info *ti) {
+        auto it = data.find((void *) ti);
+        return it == data.end() ? nullptr : it->second;
+    }
 
-/// Tag a nb_inst_seq* pointer as such
-NB_INLINE void*        nb_mark_seq(void *p) { return (void *) (((uintptr_t) p) | 1); }
+    /// Override the stored value for a type, if present. Return true if
+    /// anything was changed.
+    bool update(const std::type_info* ti, void *value) {
+        auto it = data.find((void *) ti);
+        if (it != data.end()) {
+            it.value() = value;
+            ++update_count;
+            return true;
+        }
+        return false;
+    }
 
-/// Retrieve the nb_inst_seq* pointer from an 'inst_c2p' value
-NB_INLINE nb_inst_seq* nb_get_seq(void *p)  { return (nb_inst_seq *) (((uintptr_t) p) ^ 1); }
+    /// Number of times the map has been modified. Used in nb_type_try_foreign()
+    /// to detect cases where attempting to use one foreign binding for a type
+    /// may have invalidated the iterator needed to advance to the next one.
+    uint32_t update_count = 0;
 
-struct nb_translator_seq {
-    exception_translator translator;
-    void *payload;
-    nb_translator_seq *next = nullptr;
+#if defined(NB_FREE_THREADED)
+    /// Mutex used by `nb_type_map_per_thread`, stored here because it fits
+    /// in padding this way.
+    PyMutex mutex{};
+#endif
+
+  private:
+    // Use a generic ptr->ptr map to avoid needing another instantiation of
+    // robin_map. Keys are const std::type_info*. See TYPE MAPPING above for
+    // the interpretation of the values.
+    nb_ptr_map data;
 };
+
+#if defined(NB_FREE_THREADED)
+struct nb_internals;
+
+/**
+ * Wrapper for nb_type_map_fast in free-threaded mode. Each extension module
+ * in a nanobind domain has its own instance of this in thread-local storage
+ * for each thread that has used nanobind bindings exposed by that extension
+ * module. When the slow map is modified in a way that would invalidate the
+ * fast map (removing a cached entry or adding an entry for which a negative
+ * lookup has been cached), the linked list is used to update all the caches.
+ * Outside of such actions, which occur infrequently, this is a thread-local
+ * structure so the mutex accesses are never contended.
+ */
+struct nb_type_map_per_thread {
+    explicit nb_type_map_per_thread(nb_internals &internals_);
+    ~nb_type_map_per_thread();
+
+    struct guard;
+
+    struct guard {
+        guard() = default;
+        guard(guard&& other) noexcept : parent(other.parent) {
+            other.parent = nullptr;
+        }
+        guard& operator=(guard other) noexcept {
+            std::swap(parent, other.parent);
+            return *this;
+        }
+        ~guard() {
+            if (parent)
+                PyMutex_Unlock(&parent->map.mutex);
+        }
+
+        nb_type_map_fast& operator*() const { return parent->map; }
+        nb_type_map_fast* operator->() const { return &parent->map; }
+
+      private:
+        friend nb_type_map_per_thread;
+        explicit guard(nb_type_map_per_thread &parent_) : parent(&parent_) {
+            PyMutex_Lock(&parent->map.mutex);
+        }
+        nb_type_map_per_thread *parent = nullptr;
+    };
+    guard lock() { return guard{*this}; }
+
+    nb_internals &internals;
+
+  private:
+    // Access to the map is only possible via `guard`, which holds a lock
+    nb_type_map_fast map;
+
+  public:
+    // In order to access or modify `next`, you must hold the nb_internals mutex
+    // (this->map.mutex is not needed for iteration)
+    nb_type_map_per_thread *next = nullptr;
+};
+#endif
 
 #if defined(NB_FREE_THREADED)
 #  define NB_SHARD_ALIGNMENT alignas(64)
@@ -223,8 +448,8 @@ struct NB_SHARD_ALIGNMENT nb_shard {
      *
      * This associative data structure maps a C++ instance pointer onto its
      * associated PyObject* (if bit 0 of the map value is zero) or a linked
-     * list of type `nb_inst_seq*` (if bit 0 is set---it must be cleared before
-     * interpreting the pointer in this case).
+     * list of type `nb_inst_seq*` (if bit 0 is set---it must be cleared
+     * before interpreting the pointer in this case).
      *
      * The latter case occurs when several distinct Python objects reference
      * the same memory address (e.g. a struct and its first member).
@@ -239,7 +464,6 @@ struct NB_SHARD_ALIGNMENT nb_shard {
 #endif
 };
 
-
 /**
  * Wraps a std::atomic if free-threading is enabled, otherwise a raw value.
  */
@@ -249,9 +473,12 @@ struct nb_maybe_atomic {
   nb_maybe_atomic(T v) : value(v) {}
 
   std::atomic<T> value;
-  T load_acquire() { return value.load(std::memory_order_acquire); }
-  T load_relaxed() { return value.load(std::memory_order_relaxed); }
-  void store_release(T w) { value.store(w, std::memory_order_release); }
+  NB_INLINE T load_acquire() { return value.load(std::memory_order_acquire); }
+  NB_INLINE T load_relaxed() { return value.load(std::memory_order_relaxed); }
+  NB_INLINE void store_release(T w) { value.store(w, std::memory_order_release); }
+  NB_INLINE bool compare_exchange_weak(T& expected, T desired) {
+    return value.compare_exchange_weak(expected, desired);
+  }
 };
 #else
 template<typename T>
@@ -259,11 +486,55 @@ struct nb_maybe_atomic {
   nb_maybe_atomic(T v) : value(v) {}
 
   T value;
-  T load_acquire() { return value; }
-  T load_relaxed() { return value; }
-  void store_release(T w) { value = w; }
+  NB_INLINE T load_acquire() { return value; }
+  NB_INLINE T load_relaxed() { return value; }
+  NB_INLINE void store_release(T w) { value = w; }
+  NB_INLINE bool compare_exchange_weak(T& expected, T desired) {
+    check(value == expected, "compare-exchange would deadlock");
+    value = desired;
+    return true;
+  }
 };
 #endif
+
+/**
+ * Access a non-std::atomic using atomics if we're free-threading --
+ * for type_data::foreign_bindings (so we don't have to #include <atomic>
+ * in nanobind.h) and nb_foreign_seq::next (so that nb_seq<T> can be generic)
+ */
+#if !defined(NB_FREE_THREADED)
+template <typename T> NB_INLINE T nb_load_acquire(T& loc) { return loc; }
+template <typename T> NB_INLINE void nb_store_release(T& loc, T val) { loc = val; }
+#elif __cplusplus >= 202002L
+// Use std::atomic_ref if available
+template <typename T>
+NB_INLINE T nb_load_acquire(T& loc) {
+    return std::atomic_ref(loc).load(std::memory_order_acquire);
+}
+template <typename T>
+NB_INLINE void nb_store_release(T& loc, T val) {
+    return std::atomic_ref(loc).store(val, std::memory_order_release);
+}
+#else
+// Fallback to type punning if not
+template <typename T>
+NB_INLINE T nb_load_acquire(T& loc) {
+    return std::atomic_load_explicit((std::atomic<T> *) &loc,
+                                     std::memory_order_acquire);
+}
+template <typename T>
+NB_INLINE void nb_store_release(T& loc, T val) {
+    return std::atomic_store_explicit((std::atomic<T> *) &loc, val,
+                                      std::memory_order_release);
+}
+#endif
+
+// Entry in a list of exception translators
+struct nb_translator_seq {
+    exception_translator translator;
+    void *payload;
+    nb_maybe_atomic<nb_translator_seq *> next = nullptr;
+};
 
 /**
  * `nb_internals` is the central data structure storing information related to
@@ -312,27 +583,42 @@ struct nb_maybe_atomic {
  *   potentially hot and shares the sharding scheme of `inst_c2p`.
  *
  * - `type_c2p_slow`: This is the ground-truth source of the `std::type_info`
- *   to `type_info *` mapping. Unrelated to free-threading, lookups into this
+ *   to type data mapping. Unrelated to free-threading, lookups into this
  *   data struture are generally costly because they use a string comparison on
  *   some platforms. Because it is only used as a fallback for 'type_c2p_fast',
  *   protecting this member via the global `mutex` is sufficient.
  *
- * - `type_c2p_fast`: this data structure is *hot* and mostly read. It maps
- *   `std::type_info` to `type_info *` but uses pointer-based comparisons.
- *   The implementation depends on the Python build.
+ * - `types_in_c2p_fast`: Used only when accessing or updating `type_c2p_slow`, so
+ *   protecting it with the global `mutex` adds no additional overhead.
  *
- * - `translators`: This is an append-to-front-only singly linked list traversed
- *    while raising exceptions. The main concern is losing elements during
- *    concurrent append operations. We assume that this data structure is only
- *    written during module initialization and don't use locking.
+ * - `type_c2p_fast`: this data structure is *hot* and mostly read. It serves
+ *   as a cache of `type_c2p_slow`, mapping `std::type_info` to type data using
+ *   pointer-based comparisons. On free-threaded builds, each thread gets its
+ *   own mostly-local instance inside `nb_type_data_per_thread`, which is
+ *   protected by an internal mutex in order to safely handle the rare need for
+ *   cache invalidations. The head of the linked list of these instances,
+ *   `type_c2p_per_thread_head`, is protected by `mutex`; it is only accessed
+ *   rarely (when a new thread first uses nanobind, when a thread exits, and
+ *   when a type is created or destroyed that has previously been cached).
+ *
+ * - `translators`: This is a singly linked list traversed while raising
+ *   exceptions, from which no element is ever removed. The rare insertions use
+ *   compare-and-swap on the head or prev->next pointer.
  *
  * - `funcs`: data structure for function leak tracking. Not used in
- *   free-threaded mode .
+ *   free-threaded mode.
  *
- * - `print_leak_warnings`, `print_implicit_cast_warnings`: simple boolean
- *   flags. No protection against concurrent conflicting updates.
+ * - `foreign_self`, `foreign_exception_translator`: created only once on
+ *   demand, protected by `mutex`; often OK to read without locking since
+ *   they never change once set
+ *
+ * - `foreign_manual_imports`: accessed and modified only during binding import
+ *   and removal, which are rare; protected by internals lock
+ *
+ * - `print_leak_warnings`, `print_implicit_cast_warnings`,
+ *   `foreign_export`, `foreign_import`: simple configuration flags.
+ *   No protection against concurrent conflicting updates.
  */
-
 struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
@@ -375,13 +661,26 @@ struct nb_internals {
     inline nb_shard &shard(void *) { return shards[0]; }
 #endif
 
+    /* See TYPE MAPPING above for much more detail on the interplay of
+       type_c2p_fast, type_c2p_slow, and types_in_c2p_fast */
+
 #if !defined(NB_FREE_THREADED)
     /// C++ -> Python type map -- fast version based on std::type_info pointer equality
     nb_type_map_fast type_c2p_fast;
+#else
+    /// Head of the list of per-thread fast C++ -> Python type maps
+    nb_type_map_per_thread *type_c2p_per_thread_head = nullptr;
 #endif
 
     /// C++ -> Python type map -- slow fallback version based on hashed strings
     nb_type_map_slow type_c2p_slow;
+
+    /// Each std::type_info that is a key in any `nb_type_map_fast` is
+    /// equivalent to some key in this map. If (by pointer equality) there is
+    /// only one such std::type_info, the value is null; otherwise, the value
+    /// is a `nb_alias_seq*` that heads a list of types that are
+    /// equivalent to the key but have distinct `std::type_info` pointers.
+    nb_type_map_slow types_in_c2p_fast;
 
 #if !defined(NB_FREE_THREADED)
     /// nb_func/meth instance map for leak reporting (used as set, the value is unused)
@@ -389,14 +688,46 @@ struct nb_internals {
     nb_ptr_map funcs;
 #endif
 
-    /// Registered C++ -> Python exception translators
-    nb_translator_seq translators;
+    /// Registered C++ -> Python exception translators. The default exception
+    /// translator is the last one in this list.
+    nb_maybe_atomic<nb_translator_seq *> translators = nullptr;
 
     /// Should nanobind print leak warnings on exit?
     bool print_leak_warnings = true;
 
     /// Should nanobind print warnings after implicit cast failures?
     bool print_implicit_cast_warnings = true;
+
+    /// Should this nanobind domain advertise all of its own types to other
+    /// binding frameworks (including other nanobind domains) for use by other
+    /// extension modules loaded in this interpreter? Even if this is disabled,
+    /// you can export individual types using nb::export_type_to_foreign().
+    bool foreign_export_all = false;
+
+    /// Should this nanobind domain make use of all C++ types advertised by
+    /// other binding frameworks (including other nanobind domains) from other
+    /// extension modules loaded in this interpreter? Even if this is disabled,
+    /// you can import individual types using nb::import_foreign_type().
+    bool foreign_import_all = false;
+
+    /// Have there ever been any foreign types in `type_c2p_slow`? If not,
+    /// we can skip some logic in nb_type_get/put.
+    bool foreign_imported_any = false;
+
+    /// Pointer to our own framework object in pymetabind, if enabled
+    pymb_framework *foreign_self = nullptr;
+
+    /// Map from pymb_binding* to std::type_info*, reflecting types exported by
+    /// (typically) non-C++ extension modules that have been associated with
+    /// C++ types via nb::import_foreign_type()
+    nb_ptr_map foreign_manual_imports;
+
+    /// Pointer to the canonical copy of `foreign_exception_translator()`
+    /// from nb_foreign.cpp. Each DSO may have a different copy, but all will
+    /// use the implementation from the first DSO to need it, so that
+    /// `nb_foreign_translate_exception()` (translating our exceptions for
+    /// a foreign framework's benefit) can skip foreign translators.
+    void (*foreign_exception_translator)(const std::exception_ptr&, void*);
 
     /// Pointer to a boolean that denotes if nanobind is fully initialized.
     bool *is_alive_ptr = nullptr;
@@ -418,6 +749,9 @@ struct nb_internals {
 
     // Size of the 'shards' data structure. Only rarely accessed, hence at the end
     size_t shard_count = 1;
+
+    // NB_DOMAIN string used to initialize this nanobind domain
+    const char *domain;
 };
 
 /// Convenience macro to potentially access cached functions
@@ -437,8 +771,44 @@ extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
 extern PyObject *inst_new_int(PyTypeObject *tp, PyObject *args, PyObject *kwds);
 extern PyTypeObject *nb_static_property_tp() noexcept;
 extern type_data *nb_type_c2p(nb_internals *internals,
-                              const std::type_info *type);
+                              const std::type_info *type,
+                              bool *has_foreign = nullptr);
+extern bool nb_type_register(type_data *t, type_data **conflict) noexcept;
 extern void nb_type_unregister(type_data *t) noexcept;
+#if defined(NB_FREE_THREADED)
+extern nb_type_map_per_thread::guard nb_type_lock_c2p_fast(
+    nb_internals *internals_) noexcept;
+#endif
+extern void nb_type_update_c2p_fast(const std::type_info *type,
+                                    void *value) noexcept;
+
+#if !defined(NB_DISABLE_INTEROP)
+extern void *nb_type_try_foreign(nb_internals *internals_,
+                                 const std::type_info *type,
+                                 void* (*attempt)(void *closure,
+                                                  pymb_binding *binding),
+                                 void *closure) noexcept;
+extern void *nb_type_get_foreign(nb_internals *internals_,
+                                 const std::type_info *cpp_type,
+                                 PyObject *src,
+                                 uint8_t flags,
+                                 cleanup_list *cleanup) noexcept;
+extern PyObject *nb_type_put_foreign(nb_internals *internals_,
+                                     const std::type_info *cpp_type,
+                                     const std::type_info *cpp_type_p,
+                                     void *value,
+                                     rv_policy rvp,
+                                     cleanup_list *cleanup,
+                                     bool *is_new) noexcept;
+extern void nb_type_import_impl(PyObject *pytype,
+                                const std::type_info *cpptype);
+extern void nb_type_export_impl(type_data *td);
+extern void nb_type_enable_import_all();
+extern void nb_type_enable_export_all();
+#endif
+
+extern bool set_builtin_exception_status(builtin_exception &e);
+extern void default_exception_translator(const std::exception_ptr &, void *);
 
 extern PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept;
 
@@ -459,6 +829,9 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
         return nb_type_data_static(o);
     #endif
 }
+
+// Fetch the type record from an enum created by nanobind
+extern type_init_data *enum_get_type_data(handle tp);
 
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);

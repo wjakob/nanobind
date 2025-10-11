@@ -91,9 +91,6 @@ enum class type_init_flags : uint32_t {
     all_init_flags           = (0x1f << 19)
 };
 
-// See internals.h
-struct nb_alias_chain;
-
 // Implicit conversions for C++ type bindings, used in type_data below
 struct implicit_t {
     const std::type_info **cpp;
@@ -109,12 +106,15 @@ struct enum_tbl_t {
 /// Information about a type that persists throughout its lifetime
 struct type_data {
     uint32_t size;
-    uint32_t align : 8;
-    uint32_t flags : 24;
+    uint32_t align : 8; // always zero for an enum
+    uint32_t flags : 24; // type_flags or enum_flags
     const char *name;
     const std::type_info *type;
     PyTypeObject *type_py;
-    nb_alias_chain *alias_chain;
+    // If not null, then nanobind is aware of other frameworks' bindings for
+    // this C++ type. Discriminated pointer: pymb_binding* if the low bit is
+    // zero, or nb_seq<pymb_binding>* if the low bit is one.
+    void *foreign_bindings;
 #if defined(Py_LIMITED_API)
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
 #endif
@@ -204,7 +204,7 @@ enum class enum_flags : uint32_t {
     is_signed                = (1 << 2),
 
     /// Is the underlying enumeration type Flag?
-    is_flag                = (1 << 3)
+    is_flag                  = (1 << 3),
 };
 
 struct enum_init_data {
@@ -212,6 +212,7 @@ struct enum_init_data {
     PyObject *scope;
     const char *name;
     const char *docstr;
+    uint32_t size;
     uint32_t flags;
 };
 
@@ -330,6 +331,26 @@ inline void *type_get_slot(handle h, int slot_id) {
 #else
     return PyType_GetSlot((PyTypeObject *) h.ptr(), slot_id);
 #endif
+}
+
+// nanobind interoperability with other binding frameworks
+inline void interoperate_by_default(bool export_all = true,
+                                    bool import_all = true) {
+    detail::nb_type_set_interop_defaults(export_all, import_all);
+}
+template <class T = void>
+inline void import_for_interop(handle type) {
+    if constexpr (!std::is_void_v<T>) {
+        static_assert(
+            detail::is_base_caster_v<detail::make_caster<T>>,
+            "Types that are intercepted by a type caster cannot use the "
+            "interoperability feature");
+    }
+    detail::nb_type_import(type.ptr(),
+                           std::is_void_v<T> ? nullptr : &typeid(T));
+}
+inline void export_for_interop(handle type) {
+    detail::nb_type_export(type.ptr());
 }
 
 template <typename Visitor> struct def_visitor {
@@ -774,6 +795,7 @@ public:
     NB_INLINE enum_(handle scope, const char *name, const Extra &... extra) {
         detail::enum_init_data ed { };
         ed.type = &typeid(T);
+        ed.size = sizeof(T);
         ed.scope = scope.ptr();
         ed.name = name;
         ed.flags = std::is_signed_v<Underlying>

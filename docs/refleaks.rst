@@ -58,8 +58,8 @@ easily disable them by calling :cpp:func:`nb::set_leak_warnings()
     }
 
 Note that is a *global flag* shared by all nanobind extension libraries in the
-same ABI domain. When changing global flags, please isolate your extension from
-others by passing the ``NB_DOMAIN`` parameter to the
+same `nanobind domain <type-visibility>`. When changing global flags, please
+isolate your extension from others by passing the ``NB_DOMAIN`` parameter to the
 :cmake:command:`nanobind_add_module()` CMake command:
 
 .. code-block:: cmake

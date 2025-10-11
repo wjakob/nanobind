@@ -207,7 +207,10 @@ enum cast_flags : uint8_t {
     // This implies that objects added to the cleanup list may be
     // released immediately after the caster's final output value is
     // obtained, i.e., before it is used.
-    manual = (1 << 3)
+    manual = (1 << 3),
+
+    // Disallow satisfying this cast with a foreign framework's binding
+    not_foreign = (1 << 4),
 };
 
 

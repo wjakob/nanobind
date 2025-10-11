@@ -150,7 +150,7 @@ static arg_data method_args[2] = {
     { nullptr, nullptr, nullptr, nullptr, 0 }
 };
 
-static bool set_builtin_exception_status(builtin_exception &e) {
+bool set_builtin_exception_status(builtin_exception &e) {
     PyObject *o;
 
     switch (e.type()) {
@@ -584,8 +584,8 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
 static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
     std::exception_ptr e = std::current_exception();
 
-    for (nb_translator_seq *cur = &internals->translators; cur;
-         cur = cur->next) {
+    for (nb_translator_seq *cur = internals->translators.load_acquire();
+         cur; cur = cur->next.load_acquire()) {
         try {
             // Try exception translator & forward payload
             cur->translator(e, cur->payload);
@@ -1307,13 +1307,24 @@ static uint32_t nb_func_render_signature(const func_data *f,
                 if (!(is_method && arg_index == 0)) {
                     bool found = false;
                     auto it = internals_->type_c2p_slow.find(*descr_type);
-
                     if (it != internals_->type_c2p_slow.end()) {
-                        handle th((PyObject *) it->second->type_py);
-                        buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
-                        buf.put('.');
-                        buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
-                        found = true;
+                        handle th;
+#if !defined(NB_DISABLE_INTEROP)
+                        if (nb_is_foreign(it->second)) {
+                            void *bindings = nb_get_foreign(it->second);
+                            if (!nb_is_seq(bindings))
+                                th = ((pymb_binding *) bindings)->pytype;
+                            else
+                                th = nb_get_seq<pymb_binding>(bindings)->value->pytype;
+                        } else
+#endif
+                            th = ((type_data *) it->second)->type_py;
+                        if (th) {
+                            buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
+                            buf.put('.');
+                            buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
+                            found = true;
+                        }
                     }
                     if (!found) {
                         if (nb_signature_mode)

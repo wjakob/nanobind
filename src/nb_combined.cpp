@@ -79,6 +79,7 @@
 #include "nb_ndarray.cpp"
 #include "nb_static_property.cpp"
 #include "nb_ft.cpp"
+#include "nb_foreign.cpp"
 #include "error.cpp"
 #include "common.cpp"
 #include "implicit.cpp"

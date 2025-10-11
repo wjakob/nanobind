@@ -13,6 +13,10 @@ if (NB_TEST_SHARED_BUILD)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_SHARED)
 endif()
 
+if (NB_TEST_NO_INTEROP)
+  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NO_INTEROP)
+endif()
+
 # ---------------------------------------------------------------------------
 # Compile with a few more compiler warnings turned on
 # ---------------------------------------------------------------------------
@@ -144,8 +148,10 @@ target_include_directories(inter_module PRIVATE ${NB_DIR}/include)
 
 nanobind_add_module(test_inter_module_1_ext NB_DOMAIN mydomain test_inter_module_1.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module_2.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_foreign_ext NB_DOMAIN otherdomain test_inter_module_foreign.cpp ${NB_EXTRA_ARGS})
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
+target_link_libraries(test_inter_module_foreign_ext PRIVATE inter_module)
 
 set(TEST_FILES
   common.py

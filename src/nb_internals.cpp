@@ -164,6 +164,71 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
 nb_internals *internals = nullptr;
 PyTypeObject *nb_meta_cache = nullptr;
 
+
+static const char* interned_c_strs[pyobj_name::string_count] {
+    "value",
+    "copy",
+    "from_dlpack",
+    "__dlpack__",
+    "max_version",
+    "dl_device",
+};
+
+PyObject **static_pyobjects = nullptr;
+
+static bool init_pyobjects(PyObject* m) {
+    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
+    if (!pyobjects)
+        return false;
+
+    NB_NOUNROLL
+    for (int i = 0; i < pyobj_name::string_count; ++i)
+        pyobjects[i] = PyUnicode_InternFromString(interned_c_strs[i]);
+
+    pyobjects[pyobj_name::copy_tpl] =
+            PyTuple_Pack(1, pyobjects[pyobj_name::copy_str]);
+    pyobjects[pyobj_name::max_version_tpl] =
+            PyTuple_Pack(1, pyobjects[pyobj_name::max_version_str]);
+
+    PyObject* one = PyLong_FromLong(1);
+    PyObject* zero = PyLong_FromLong(0);
+    pyobjects[pyobj_name::dl_cpu_tpl] = PyTuple_Pack(2, one, zero);
+    Py_DECREF(zero);
+    Py_DECREF(one);
+
+    PyObject* major = PyLong_FromLong(dlpack::major_version);
+    PyObject* minor = PyLong_FromLong(dlpack::minor_version);
+    pyobjects[pyobj_name::dl_version_tpl] = PyTuple_Pack(2, major, minor);
+    Py_DECREF(minor);
+    Py_DECREF(major);
+
+    static_pyobjects = pyobjects;
+
+    return true;
+}
+
+NB_NOINLINE int nb_module_traverse(PyObject *m, visitproc visit, void *arg) {
+    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
+    NB_NOUNROLL
+    for (int i = 0; i < pyobj_name::total_count; ++i)
+        Py_VISIT(pyobjects[i]);
+    return 0;
+}
+
+NB_NOINLINE int nb_module_clear(PyObject *m) {
+    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
+    NB_NOUNROLL
+    for (int i = 0; i < pyobj_name::total_count; ++i)
+        Py_CLEAR(pyobjects[i]);
+    return 0;
+}
+
+void nb_module_free(void *m) {
+    // Allow nanobind_##name##_exec to omit calling nb_module_clear on error.
+    (void) nb_module_clear((PyObject *) m);
+}
+
+
 static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
@@ -317,9 +382,12 @@ static void internals_cleanup() {
 #endif
 }
 
-NB_NOINLINE void init(const char *name) {
+NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
     if (internals)
         return;
+
+    check(init_pyobjects(m), "nanobind::detail::nb_module_exec(): "
+                             "could not initialize module state!");
 
 #if defined(PYPY_VERSION)
     PyObject *dict = PyEval_GetBuiltins();
@@ -328,18 +396,20 @@ NB_NOINLINE void init(const char *name) {
 #else
     PyObject *dict = PyInterpreterState_GetDict(PyInterpreterState_Get());
 #endif
-    check(dict, "nanobind::detail::init(): could not access internals dictionary!");
+    check(dict, "nanobind::detail::nb_module_exec(): "
+                "could not access internals dictionary!");
 
     PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s__",
                                          abi_tag(), name ? name : "");
-    check(key, "nanobind::detail::init(): could not create dictionary key!");
+    check(key, "nanobind::detail::nb_module_exec(): "
+               "could not create dictionary key!");
 
     PyObject *capsule = dict_get_item_ref_or_fail(dict, key);
     if (capsule) {
         Py_DECREF(key);
         internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
-        check(internals,
-              "nanobind::detail::internals_fetch(): capsule pointer is NULL!");
+        check(internals, "nanobind::detail::nb_module_exec(): "
+                         "capsule pointer is NULL!");
         nb_meta_cache = internals->nb_meta;
         is_alive_ptr = internals->is_alive_ptr;
         Py_DECREF(capsule);
@@ -381,7 +451,7 @@ NB_NOINLINE void init(const char *name) {
 
     check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
               p->nb_method && p->nb_bound_method,
-          "nanobind::detail::init(): initialization failed!");
+          "nanobind::detail::nb_module_exec(): initialization failed!");
 
 #if PY_VERSION_HEX < 0x03090000
     p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
@@ -476,7 +546,7 @@ NB_NOINLINE void init(const char *name) {
     capsule = PyCapsule_New(p, "nb_internals", nullptr);
     int rv = PyDict_SetItem(dict, key, capsule);
     check(!rv && capsule,
-          "nanobind::detail::init(): capsule creation failed!");
+          "nanobind::detail::nb_module_exec(): capsule creation failed!");
     Py_DECREF(capsule);
     Py_DECREF(key);
     internals = p;

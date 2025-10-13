@@ -28,6 +28,7 @@
 #  define NB_INLINE          __forceinline
 #  define NB_NOINLINE        __declspec(noinline)
 #  define NB_INLINE_LAMBDA
+#  define NB_NOUNROLL
 #else
 #  define NB_EXPORT          __attribute__ ((visibility("default")))
 #  define NB_IMPORT          NB_EXPORT
@@ -35,8 +36,14 @@
 #  define NB_NOINLINE        __attribute__((noinline))
 #  if defined(__clang__)
 #    define NB_INLINE_LAMBDA __attribute__((always_inline))
+#    define NB_NOUNROLL      _Pragma("nounroll")
 #  else
 #    define NB_INLINE_LAMBDA
+#    if defined(__GNUC__)
+#      define NB_NOUNROLL    _Pragma("GCC unroll 0")
+#    else
+#      define NB_NOUNROLL
+#    endif
 #  endif
 #endif
 
@@ -202,12 +209,14 @@
     X(const X &) = delete;                                                     \
     X &operator=(const X &) = delete;
 
+#define NB_MOD_STATE_SIZE 80
+
 // Helper macros to ensure macro arguments are expanded before token pasting/stringification
 #define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)
 #define NB_MODULE_IMPL2(name, variable)                                        \
     static void nanobind_##name##_exec_impl(nanobind::module_);                \
     static int nanobind_##name##_exec(PyObject *m) {                           \
-        nanobind::detail::init(NB_DOMAIN_STR);                                 \
+        nanobind::detail::nb_module_exec(NB_DOMAIN_STR, m);                    \
         try {                                                                  \
             nanobind_##name##_exec_impl(                                       \
                 nanobind::borrow<nanobind::module_>(m));                       \
@@ -227,8 +236,9 @@
         NB_MODULE_SLOTS_2                                                      \
     };                                                                         \
     static struct PyModuleDef nanobind_##name##_module = {                     \
-        PyModuleDef_HEAD_INIT, #name, nullptr, 0, nullptr,                     \
-        nanobind_##name##_slots, nullptr, nullptr, nullptr                     \
+        PyModuleDef_HEAD_INIT, #name, nullptr, NB_MOD_STATE_SIZE, nullptr,     \
+        nanobind_##name##_slots, nanobind::detail::nb_module_traverse,         \
+        nanobind::detail::nb_module_clear, nanobind::detail::nb_module_free    \
     };                                                                         \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \

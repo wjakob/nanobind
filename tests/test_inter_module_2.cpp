@@ -6,4 +6,5 @@ namespace nb = nanobind;
 NB_MODULE(test_inter_module_2_ext, m) {
     nb::class_<Shared>(m, "Shared");
     m.def("check_shared", &check_shared);
+    m.def("increment_shared", &increment_shared);
 }

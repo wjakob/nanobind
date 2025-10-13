@@ -9,8 +9,17 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
+NAMESPACE_BEGIN(dlpack)
+
+// The version of DLPack that is supported by libnanobind
+static constexpr uint32_t major_version = 0;
+static constexpr uint32_t minor_version = 0;
+
 // Forward declarations for types in ndarray.h (1)
-namespace dlpack { struct dltensor; struct dtype; }
+struct dltensor;
+struct dtype;
+
+NAMESPACE_END(dlpack)
 
 NAMESPACE_BEGIN(detail)
 
@@ -107,7 +116,10 @@ NB_CORE void raise_next_overload_if_null(void *p);
 
 // ========================================================================
 
-NB_CORE void init(const char *domain);
+NB_CORE void nb_module_exec(const char *domain, PyObject *m);
+NB_CORE int  nb_module_traverse(PyObject *m, visitproc visit, void *arg);
+NB_CORE int  nb_module_clear(PyObject *m);
+NB_CORE void nb_module_free(void *m);
 
 // ========================================================================
 

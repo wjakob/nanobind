@@ -11,4 +11,5 @@ struct EXPORT_SHARED Shared {
 };
 
 extern EXPORT_SHARED Shared create_shared();
-extern EXPORT_SHARED bool check_shared(const Shared &shared);
+extern EXPORT_SHARED bool check_shared(const Shared &shared, int expected);
+extern EXPORT_SHARED void increment_shared(Shared &shared);

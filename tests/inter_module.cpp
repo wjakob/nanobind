@@ -4,6 +4,10 @@ Shared create_shared() {
     return { 123 };
 }
 
-bool check_shared(const Shared &shared) {
-    return shared.value == 123;
+bool check_shared(const Shared &shared, int expected) {
+    return shared.value == expected;
+}
+
+void increment_shared(Shared &shared) {
+    ++shared.value;
 }

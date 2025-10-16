@@ -15,6 +15,13 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (not yet released)
+------------------------------
+
+- Nanobind now officially supports **MinGW-w64** and **Intel ICX** (the modern
+  Clang-based Intel compiler). Continuous integration tests have been added to
+  ensure compatibility with these compilers on an ongoing basis.
+
 Version 2.9.2 (Sep 4, 2025)
 ---------------------------
 

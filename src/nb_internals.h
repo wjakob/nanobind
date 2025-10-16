@@ -493,7 +493,8 @@ template <typename T> struct scoped_pymalloc {
     scoped_pymalloc(size_t size = 1) {
         ptr = (T *) PyMem_Malloc(size * sizeof(T));
         if (!ptr)
-            fail("scoped_pymalloc(): could not allocate %zu bytes of memory!", size);
+            fail("scoped_pymalloc(): could not allocate %llu bytes of memory!",
+                 (unsigned long long) size);
     }
     ~scoped_pymalloc() { PyMem_Free(ptr); }
     T *release() {

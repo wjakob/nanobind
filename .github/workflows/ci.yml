@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'windows-2022', 'macos-13']
-        python: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14.0-rc.2', 'pypy3.9-v7.3.16', 'pypy3.10-v7.3.17']
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', 'pypy3.9-v7.3.16', 'pypy3.10-v7.3.17']
 
     name: "Python ${{ matrix.python }} / ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
@@ -107,63 +107,6 @@ jobs:
         cd build;
         python3 -m pytest
 
-  old-compilers:
-    if: false # Disable for now, the CI is glitchy
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - cc: gcc-8
-            cxx: g++-8
-            apt: gcc-8 g++-8
-          - cc: gcc-9
-            cxx: g++-9
-            apt: gcc-9
-          - cc: clang-8
-            cxx: clang++-8
-            apt: clang-8
-          - cc: clang-9
-            cxx: clang++-9
-            apt: clang-9
-          - cc: clang-10
-            cxx: clang++-10
-            apt: clang-10
-
-    runs-on: ubuntu-latest
-    container: ubuntu:20.04
-    name: "${{matrix.cc}} on Ubuntu 20.04"
-    env:
-      CC: ${{matrix.cc}}
-      CXX: ${{matrix.cxx}}
-      DEBIAN_FRONTEND: noninteractive
-
-    steps:
-    - name: Install dependencies
-      run: |
-        apt-get update
-        apt-get install -y python3-numpy python3-pip python3-pytest libeigen3-dev cmake git ${{matrix.apt}}
-        python3 -m pip install typing_extensions
-
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-
-    - name: Configure
-      run: cmake -S . -B build
-
-    - name: Build C++
-      run: cmake --build build -j 2
-
-    - name: Check ABI tag
-      run: >
-        cd build/tests;
-        python3 -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
-
-    - name: Run tests
-      run: >
-        cd build;
-        python3 -m pytest
-
   free-threaded:
     name: "Python 3.14-dev / ubuntu.latest [free-threaded]"
     runs-on: ubuntu-latest
@@ -201,4 +144,143 @@ jobs:
     - name: Run tests
       run: >
         cd build;
+        python -m pytest
+
+  mingw:
+    runs-on: windows-2022
+    name: "Python ${{ matrix.python }} / MinGW-w64"
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python ${{ matrix.python }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        cache: 'pip'
+
+    - name: Setup MSYS2 (MINGW64)
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-python
+          mingw-w64-x86_64-python-pip
+          mingw-w64-x86_64-python-pytest
+
+    - name: Install Python packages
+      shell: msys2 {0}
+      run: |
+        python -m pip install pytest-github-actions-annotate-failures typing_extensions
+
+    - name: Configure
+      shell: msys2 {0}
+      run: |
+        export PATH=/mingw64/bin:$PATH
+        export CC=gcc
+        export CXX=g++
+        PYEXE=/mingw64/bin/python3.exe
+        cmake -S . -B build -G Ninja \
+          -DPython_EXECUTABLE="$(cygpath -w "$PYEXE")" \
+          -DNB_TEST_FREE_THREADED=OFF
+
+    - name: Build C++
+      shell: msys2 {0}
+      run: cmake --build build -j 2
+
+    - name: Check ABI tag
+      shell: msys2 {0}
+      run: |
+        cd build/tests
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{t.abi_tag()}\"")'
+
+    - name: Run tests
+      shell: msys2 {0}
+      run: |
+        cd build
+        python -m pytest
+
+  intel:
+    runs-on: ubuntu-22.04
+    name: "Python ${{ matrix.python }} / Intel ICX"
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python ${{ matrix.python }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        cache: 'pip'
+
+    - name: Cache Intel oneAPI
+      id: cache-oneapi
+      uses: actions/cache@v4
+      with:
+        path: /opt/intel/oneapi
+        key: install-${{ runner.os }}-intel-oneapi-compiler-2025.2
+
+    - name: Add Intel repository
+      if: steps.cache-oneapi.outputs.cache-hit != 'true'
+      run: |
+        wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+        sudo apt-get update
+
+    - name: Install Intel oneAPI compilers
+      if: steps.cache-oneapi.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp
+
+    - name: Cleanup Intel oneAPI cache
+      if: steps.cache-oneapi.outputs.cache-hit != 'true'
+      run: |
+        sudo rm -rf /opt/intel/oneapi/compiler/*/linux/lib/ia32
+        sudo rm -rf /opt/intel/oneapi/compiler/*/linux/lib/emu
+        sudo rm -rf /opt/intel/oneapi/compiler/*/linux/lib/oclfpga
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install PyTest
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions
+
+    - name: Configure
+      run: |
+        source /opt/intel/oneapi/setvars.sh
+        export CC=icx
+        export CXX=icpx
+        cmake -S . -B build
+
+    - name: Build C++
+      run: |
+        source /opt/intel/oneapi/setvars.sh
+        cmake --build build -j 2
+
+    - name: Check ABI tag
+      run: |
+        source /opt/intel/oneapi/setvars.sh
+        cd build/tests
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
+
+    - name: Run tests
+      run: |
+        source /opt/intel/oneapi/setvars.sh
+        cd build
         python -m pytest

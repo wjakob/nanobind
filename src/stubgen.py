@@ -642,12 +642,24 @@ class StubGen:
             self.write_ln(f"{name}{types} = {value_str}\n")
 
     def is_type_var(self, tp: type) -> bool:
-        return (issubclass(tp, typing.TypeVar)
-            or (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple))
-            or (typing_extensions is not None
-            and (
-                issubclass(tp, typing_extensions.TypeVar)
-                or issubclass(tp, typing_extensions.TypeVarTuple))))
+        if issubclass(tp, typing.TypeVar):
+            return True
+        if sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec):
+            return True
+        if sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple):
+            return True
+        if typing_extensions is not None:
+            if issubclass(
+                tp,
+                (
+                    typing_extensions.TypeVar,
+                    typing_extensions.ParamSpec,
+                    typing_extensions.TypeVarTuple
+                )
+            ):
+                return True
+        return False
+
 
     def simplify_types(self, s: str) -> str:
         """
@@ -1004,12 +1016,14 @@ class StubGen:
         """
         tp = type(e)
         if issubclass(tp, (bool, int, type(None), type(builtins.Ellipsis))):
-            return repr(e)
+            s = repr(e)
+            if len(s) < self.max_expr_length or not abbrev:
+                return s
         elif issubclass(tp, float):
             s = repr(e)
             if "inf" in s or "nan" in s:
-                return f"float('{s}')"
-            else:
+                s = f"float('{s}')"
+            if len(s) < self.max_expr_length or not abbrev:
                 return s
         elif issubclass(tp, type) or typing.get_origin(e):
             return self.type_str(e)
@@ -1017,6 +1031,10 @@ class StubGen:
             return f'"{e.__forward_arg__}"'
         elif issubclass(tp, enum.Enum):
             return self.type_str(tp) + '.' + e.name
+        elif (sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec)) \
+            or (typing_extensions is not None and issubclass(tp, typing_extensions.ParamSpec)):
+            tv = self.import_object(tp.__module__, "ParamSpec")
+            return f'{tv}("{e.__name__}")'
         elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
             tv = self.import_object(tp.__module__, "TypeVarTuple")
@@ -1025,13 +1043,17 @@ class StubGen:
             tv = self.import_object("typing", "TypeVar")
             s = f'{tv}("{e.__name__}"'
             for v in getattr(e, "__constraints__", ()):
-                v = self.expr_str(v)
+                v = self.type_str(v)
                 assert v
                 s += ", " + v
-            for k in ["contravariant", "covariant", "bound", "infer_variance"]:
+            if v := getattr(e, "__bound__", None):
+                v = self.type_str(v)
+                assert v
+                s += ", bound=" + v
+            for k in ["contravariant", "covariant", "infer_variance"]:
                 v = getattr(e, f"__{k}__", None)
                 if v:
-                    v = self.expr_str(v)
+                    v = self.expr_str(v, abbrev=False)
                     if v is None:
                         return None
                     s += f", {k}=" + v
@@ -1320,6 +1342,14 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--exclude-values",
+        dest="exclude_values",
+        default=False,
+        action="store_true",
+        help="force the use of ... for values",
+    )
+
+    parser.add_argument(
         "-q",
         "--quiet",
         default=False,
@@ -1463,6 +1493,7 @@ def main(args: Optional[List[str]] = None) -> None:
             recursive=opt.recursive,
             include_docstrings=opt.include_docstrings,
             include_private=opt.include_private,
+            max_expr_length=0 if opt.exclude_values else 50,
             patterns=patterns,
             output_file=file
         )

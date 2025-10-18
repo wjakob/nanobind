@@ -1,3 +1,6 @@
+import random
+import threading
+
 import test_thread_ext as t
 from test_thread_ext import Counter, GlobalData, ClassWithProperty, ClassWithClassProperty
 from common import parallelize
@@ -100,3 +103,16 @@ def test07_access_attributes(n_threads=8):
             _ = c2.prop1.prop2
 
     parallelize(f, n_threads=n_threads)
+
+
+def test08_shared_ptr_threaded_access(n_threads=8):
+    # Test for keep_alive racing with other fields.
+    def f(barrier):
+        i = random.randint(0, 4)
+        barrier.wait()
+        p = t.fetch_shared_int(i)
+        assert t.consume_an_int(p) == i
+
+    for _ in range(100):
+        barrier = threading.Barrier(n_threads)
+        parallelize(lambda: f(barrier), n_threads=n_threads)

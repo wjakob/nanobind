@@ -1,4 +1,8 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/shared_ptr.h>
+
+#include <memory>
+#include <vector>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -30,6 +34,11 @@ public:
     const ClassWithProperty& get_prop() const { return value_; }
 private:
     ClassWithProperty value_;
+};
+
+struct AnInt {
+    int value;
+    AnInt(int v) : value(v) {}
 };
 
 
@@ -68,4 +77,17 @@ NB_MODULE(test_thread_ext, m) {
             new (self) ClassWithClassProperty(std::move(value));
           }, nb::arg("value"))
         .def_prop_ro("prop1", &ClassWithClassProperty::get_prop);
+
+    nb::class_<AnInt>(m, "AnInt")
+        .def(nb::init<int>())
+        .def_rw("value", &AnInt::value);
+
+    std::vector<std::shared_ptr<AnInt>> shared_ints;
+    for (int i = 0; i < 5; ++i) {
+        shared_ints.push_back(std::make_shared<AnInt>(i));
+    }
+    m.def("fetch_shared_int", [shared_ints](int i) {
+        return shared_ints.at(i);
+    });
+    m.def("consume_an_int", [](AnInt* p) { return p->value; });
 }

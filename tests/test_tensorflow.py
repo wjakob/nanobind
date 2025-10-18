@@ -15,7 +15,7 @@ except:
 
 
 @needs_tensorflow
-def test01_constrain_order_tensorflow():
+def test01_constrain_order():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
@@ -27,7 +27,7 @@ def test01_constrain_order_tensorflow():
 
 
 @needs_tensorflow
-def test02_implicit_conversion_tensorflow():
+def test02_implicit_conversion():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
@@ -61,5 +61,37 @@ def test03_return_tensorflow():
 
 
 @needs_tensorflow
-def test04_check_tensorflow():
+def test04_check():
     assert t.check(tf.zeros((1)))
+
+
+@needs_tensorflow
+def test05_passthrough():
+    a = ttf.ret_tensorflow()
+    b = t.passthrough(a)
+    assert a is b
+
+    a = tf.constant([1, 2, 3])
+    b = t.passthrough(a)
+    assert a is b
+
+    a = None
+    with pytest.raises(TypeError) as excinfo:
+        b = t.passthrough(a)
+    assert 'incompatible function arguments' in str(excinfo.value)
+    b = t.passthrough_arg_none(a)
+    assert a is b
+
+
+@needs_tensorflow
+def test06_ro_array():
+    if tf.__version__ < '2.19':
+        pytest.skip('tensorflow version is too old')
+    a = tf.constant([1, 2], dtype=tf.float32)  # immutable
+    assert t.accept_ro(a) == 1
+    # If the next line fails, delete it, update the version above,
+    # and uncomment the three lines below.
+    assert t.accept_rw(a) == 1
+    # with pytest.raises(TypeError) as excinfo:
+    #     t.accept_rw(a)
+    # assert 'incompatible function arguments' in str(excinfo.value)

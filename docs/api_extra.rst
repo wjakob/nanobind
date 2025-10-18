@@ -1108,6 +1108,11 @@ convert into an equivalent representation in one of the following frameworks:
 
    Builtin Python ``memoryview`` for CPU-resident data.
 
+.. cpp:class:: arrayapi
+
+   An object that both implements the buffer protocol and also has the
+   ``__dlpack__`` and ``_dlpack_device__`` attributes.
+
 Eigen convenience type aliases
 ------------------------------
 

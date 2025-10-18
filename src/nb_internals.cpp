@@ -168,6 +168,8 @@ PyTypeObject *nb_meta_cache = nullptr;
 static const char* interned_c_strs[pyobj_name::string_count] {
     "value",
     "copy",
+    "clone",
+    "array",
     "from_dlpack",
     "__dlpack__",
     "max_version",

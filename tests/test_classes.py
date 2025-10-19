@@ -59,6 +59,7 @@ def test02_static_overload():
 def test03_instantiate(clean):
     s1: t.Struct = t.Struct()
     assert s1.value() == 5
+    assert s1.value_plus(1, 2, 3, 4, 5, 6, 7) == 33
     s2 = t.Struct(10)
     assert s2.value() == 10
     del s1

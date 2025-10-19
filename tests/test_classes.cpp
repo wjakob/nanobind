@@ -37,6 +37,9 @@ struct Struct {
     ~Struct() { destructed++; if (nb::is_alive()) struct_destructed.push_back(i); }
 
     int value() const { return i; }
+    int value_plus(int j, int k, int l, int m, int n, int o, int p) const {
+        return i + j + k + l + m + n + o + p;
+    }
     int getstate() const { ++pickled; return i; }
     void set_value(int value) { i = value; }
     void setstate(int value) { unpickled++; i = value; }
@@ -163,6 +166,7 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>())
         .def(nb::init<int>())
         .def("value", &Struct::value)
+        .def("value_plus", &Struct::value_plus)
         .def("set_value", &Struct::set_value, "value"_a)
         .def("self", &Struct::self, nb::rv_policy::none)
         .def("none", [](Struct &) -> const Struct * { return nullptr; })

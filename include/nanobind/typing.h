@@ -28,4 +28,9 @@ object type_var_tuple(Args&&... args) {
     return typing().attr("TypeVarTuple")((detail::forward_t<Args>) args...);
 }
 
+template <typename... Args>
+object param_spec(Args&&... args) {
+    return typing().attr("ParamSpec")((detail::forward_t<Args>) args...);
+}
+
 NAMESPACE_END(NB_NAMESPACE)

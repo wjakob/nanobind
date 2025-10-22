@@ -1573,8 +1573,7 @@ static PyObject *keep_alive_callback(PyObject *self, PyObject *const *args,
           "nanobind::detail::keep_alive_callback(): invalid input!");
     Py_DECREF(args[0]); // self
     Py_DECREF(self); // patient
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef keep_alive_callback_def = {
@@ -1763,8 +1762,7 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                       bool *is_new) noexcept {
     // Convert nullptr -> None
     if (!value) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     nb_internals *internals_ = internals;
@@ -1839,8 +1837,7 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                         bool *is_new) noexcept {
     // Convert nullptr -> None
     if (!value) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     // Check if the instance is already registered with nanobind

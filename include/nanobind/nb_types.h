@@ -387,10 +387,14 @@ class bool_ : public object {
     NB_OBJECT_DEFAULT(bool_, object, "bool", PyBool_Check)
 
     explicit bool_(handle h)
-        : object(detail::bool_from_obj(h.ptr()), detail::borrow_t{}) { }
+        : object(detail::bool_from_obj(h.ptr()), detail::steal_t{}) { }
 
     explicit bool_(bool value)
+#if PY_VERSION_HEX < 0x030C0000
         : object(value ? Py_True : Py_False, detail::borrow_t{}) { }
+#else
+        : object(value ? Py_True : Py_False, detail::steal_t{}) { }
+#endif
 
     explicit operator bool() const {
         return m_ptr == Py_True;
@@ -727,7 +731,12 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
+#if PY_VERSION_HEX < 0x030C0000
 inline object none() { return borrow(Py_None); }
+#else
+inline object none() { return steal(Py_None); }
+#endif
+
 inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 
 inline iterator iter(handle h) {

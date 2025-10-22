@@ -626,9 +626,13 @@ PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
 
 PyObject *bool_from_obj(PyObject *o) {
     int rv = PyObject_IsTrue(o);
-    if (rv == -1)
+    if (rv == 1) {
+        Py_RETURN_TRUE;
+    } else if (rv == 0) {
+        Py_RETURN_FALSE;
+    } else {
         raise_python_error();
-    return rv == 1 ? Py_True : Py_False;
+    }
 }
 
 PyObject *int_from_obj(PyObject *o) {

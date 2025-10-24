@@ -1097,8 +1097,8 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
         }
 
         // Per C standard 7.24.1 para 2, memcpy requires valid (non-NULL) pointers
-        // even when count=0. Only call memcpy when there's actual data to copy.
-        if (size > 1 && args_in) {
+        // even when count=0. Only call memcpy when count > 0.
+        if (size > 1) {
             memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
         }
     }

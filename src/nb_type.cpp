@@ -98,6 +98,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self->cpp_delete = 0;
         self->clear_keep_alive = 0;
         self->intrusive = intrusive;
+        self->shared_ownership = 0;
         self->unused = 0;
 
         // Make the object compatible with nb_try_inc_ref (free-threaded builds only)
@@ -107,7 +108,45 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         nb_shard &shard = internals->shard((void *) payload);
         lock_shard guard(shard);
         auto [it, success] = shard.inst_c2p.try_emplace((void *) payload, self);
-        check(success, "nanobind::detail::inst_new_int(): unexpected collision!");
+        if (NB_UNLIKELY(!success)) {
+            // Collision: multiple Python instances wrap the same C++ address.
+            // Since the C++ address that we're trying to insert is from a
+            // fresh heap allocation, all instances that collide with it
+            // must be dangling.
+            void *entry = it.value();
+            nb_inst_seq single_seq;
+            nb_inst_seq *seq;
+            if (nb_is_seq(entry)) {
+                seq = nb_get_seq(entry);
+            } else {
+                single_seq.inst = (PyObject *) entry;
+                single_seq.next = nullptr;
+                seq = &single_seq;
+            }
+            while (seq) {
+                nb_inst *inst = (nb_inst *) seq->inst;
+                check(!inst->internal && !inst->destruct && !inst->cpp_delete,
+                      "nanobind::detail::inst_new_int(): newly "
+                      "created Python instance would destroy a C++ object "
+                      "already owned by an existing Python instance");
+                inst->state = nb_inst::state_relinquished;
+
+                // Make this instance pretend its C++ object starts at
+                // the same byte as the Python instance. That's not
+                // possible, so we can use it as a sentinel for "this
+                // instance is not registered". We don't bother
+                // actually adding {inst, inst} to the inst_c2p map.
+                inst->direct = 1;
+                inst->offset = 0;
+
+                nb_inst_seq *prev = seq;
+                seq = seq->next;
+                if (single_seq.inst == nullptr) {
+                    PyMem_Free(prev);
+                }
+            }
+            it.value() = self;
+        }
     }
 
     return (PyObject *) self;
@@ -168,6 +207,7 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
     self->cpp_delete = 0;
     self->clear_keep_alive = 0;
     self->intrusive = intrusive;
+    self->shared_ownership = 0;
     self->unused = 0;
 
     // Make the object compatible with nb_try_inc_ref (free-threaded builds only)
@@ -185,35 +225,48 @@ static void inst_register(PyObject *inst, void *value) noexcept {
     auto [it, success] = shard.inst_c2p.try_emplace(value, inst);
 
     if (NB_UNLIKELY(!success)) {
-        void *entry = it->second;
+        // Collision: multiple Python instances wrap the same C++ address.
+        // This is rare; nb_type_put() and friends try to locate an existing
+        // Python instance wrapping the returned C++ object's address before
+        // creating a new one. It can happen anyway under a few circumstances:
+        // - Subobjects: one instance wraps an object, and another wraps its
+        //   offset-zero subobject (first member of a structure, etc).
+        // - Dangling: an existing instance refers to an object that has been
+        //   deallocated, and now we're wrapping a new object that was created
+        //   at that address.
+        // - Different return value policies: previously only a reference
+        //   to the C++ object was passed to Python, but now we're passing
+        //   exclusive or shared ownership.
+        // - Low-level interface: inst_reference() and inst_take_ownership()
+        //   don't check for existing instances before they create a new one.
 
-        // Potentially convert the map value into linked list format
-        if (!nb_is_seq(entry)) {
-            nb_inst_seq *first = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-            check(first, "nanobind::detail::inst_new_ext(): list element "
-                         "allocation failed!");
-            first->inst = (PyObject *) entry;
-            first->next = nullptr;
-            entry = it.value() = nb_mark_seq(first);
-        }
-
-        nb_inst_seq *seq = nb_get_seq(entry);
-        while (true) {
-            // The following should never happen
-            check(inst != seq->inst, "nanobind::detail::inst_new_ext(): duplicate instance!");
-
-            if (!seq->next)
-                break;
-            seq = seq->next;
-        }
-
-        nb_inst_seq *next = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
-        check(next,
+        nb_inst_seq *inst_node = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
+        check(inst_node,
               "nanobind::detail::inst_new_ext(): list element allocation failed!");
+        inst_node->inst = (PyObject *) inst;
 
-        next->inst = (PyObject *) inst;
-        next->next = nullptr;
-        seq->next = next;
+        void *prev_entry = it->second;
+        nb_inst_seq *prev_node;
+        if (!nb_is_seq(prev_entry)) {
+            // Convert the map value into linked list format
+            prev_node = (nb_inst_seq *) PyMem_Malloc(sizeof(nb_inst_seq));
+            check(prev_node, "nanobind::detail::inst_new_ext(): list element "
+                             "allocation failed!");
+            prev_node->inst = (PyObject *) prev_entry;
+            prev_node->next = nullptr;
+        } else {
+            // The map value is already in linked list format
+            prev_node = nb_get_seq(prev_entry);
+        }
+
+        // Insert the new instance at the head of the linked list of instances
+        // for this C++ object address. This choice is relevant in the
+        // "dangling" and "different return value policies" cases described
+        // above; we want future lookups in inst_c2p to prefer the more
+        // recently allocated/wrapped instance or the one that carries more
+        // ownership, so that they don't return a dangling one.
+        inst_node->next = prev_node;
+        it.value() = nb_mark_seq(inst_node);
     }
 }
 
@@ -321,7 +374,10 @@ static void inst_dealloc(PyObject *self) {
             }
         }
 
-        check(found,
+        // A detached dangling instance will have offset == 0 and will not be
+        // recorded in the map. We expect these to be rare, so we check for them
+        // only at the last minute before we would assert-fail.
+        check(found || inst->offset == 0,
               "nanobind::detail::inst_dealloc(\"%s\"): attempted to delete an "
               "unknown instance (%p)!", t->name, p);
     }
@@ -1673,11 +1729,21 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     if (rvp == rv_policy::reference_internal && (!cleanup || !cleanup->self()))
         return nullptr;
 
-    const bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
-    if (intrusive)
-        rvp = rv_policy::take_ownership;
-
     const bool create_new = rvp == rv_policy::copy || rvp == rv_policy::move;
+    const bool intrusive = !create_new && (t->flags & (uint32_t) type_flags::intrusive_ptr);
+    if (intrusive) {
+        rvp = rv_policy::take_ownership;
+    } else {
+        /* Shared ownership must be maintained either externally, in which case
+           our caller would need to know if this is a new instance or not, or
+           intrusively. If it's neither of those, then it was probably intended
+           as intrusive but the annotation was inadvertently omitted. */
+        check(rvp != rv_policy::_shared_ownership || is_new != nullptr,
+              "nanobind::detail::nb_type_put(\"%s\"): attempted to cast an "
+              "intrusive nanobind::ref<> to Python, but the intrusive_ptr() "
+              "class binding annotation was not specified!", t->name);
+    }
+
 
     nb_inst *inst;
     if (create_new)
@@ -1737,12 +1803,13 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     // returning shared_ptr<T> to Python explicitly.
     if ((t->flags & (uint32_t) type_flags::has_shared_from_this) &&
         !create_new && t->keep_shared_from_this_alive((PyObject *) inst))
-        rvp = rv_policy::reference;
+        rvp = rv_policy::_shared_ownership;
     else if (is_new)
         *is_new = true;
 
-    inst->destruct = rvp != rv_policy::reference && rvp != rv_policy::reference_internal;
+    inst->destruct = create_new || rvp == rv_policy::take_ownership;
     inst->cpp_delete = rvp == rv_policy::take_ownership;
+    inst->shared_ownership = rvp == rv_policy::_shared_ownership;
     inst->state = nb_inst::state_ready;
 
     if (rvp == rv_policy::reference_internal)
@@ -1755,6 +1822,72 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
         inst_register((PyObject *) inst, value);
 
     return (PyObject *) inst;
+}
+
+/* Returns whether `existing`, which shares a type and address with a C++
+   object that's being cast to Python, is suitable to use as the result
+   of that cast. Assumes rvp != rv_policy::copy, since if we're making a
+   copy, we wouldn't have even checked for existing instances. */
+static bool nb_type_put_can_reuse(PyObject *existing_obj, rv_policy rvp,
+                                  cleanup_list *cleanup) {
+    nb_inst *existing = (nb_inst *) existing_obj;
+    if (rvp == rv_policy::take_ownership) {
+        /* If we want to transfer ownership to Python, don't use an existing
+           object that only holds a reference, because then no one would be left
+           holding the C++ ownership, i.e., the returned object would be leaked.
+           This handles the case where an object was exposed via
+           rv_policy::reference before it participated in an ownership transfer,
+           as well as the case where the "existing" object is actually a
+           dangling non-owning reference to a different object that previously
+           existed (and was freed) at the same address we're now trying to cast.
+
+           Any object that was initialized with rv_policy::take_ownership will
+           have destruct set to true, unless it transferred its ownership to a
+           a C++ unique_ptr, in which case its state will be `relinquished`.
+           Testing destruct instead of cpp_delete avoids issues if a pointer
+           from a Python-constructed instance is cast using nb::cast(p) rather
+           than nb::find(p), as some users porting from pybind11 might do.
+
+           We allow reuse of a shared_ownership instance also, in case the
+           type supports enable_shared_from_this which might "downgrade"
+           take_ownership to shared_ownership when creating a new object.
+           The reuse-existing path skips that logic, but it remains true
+           that an instance with shared_ownership set doesn't dangle. */
+        return existing->shared_ownership || existing->destruct ||
+               existing->state == nb_inst::state_relinquished;
+    }
+    if (rvp == rv_policy::_shared_ownership) {
+        /* If we're transferring shared ownership, don't use an existing object
+           that only holds a reference, because if the cast completes without
+           creating a new instance, our caller will assume the shared ownership
+           is already set up. (See the shared_ptr type caster.) This also avoids
+           reusing dangling instances, as in the take_ownership case.
+           A Python instance with `shared_ownership` or `destruct` set
+           can't dangle. Note that intrusive implies destruct. */
+        return existing->shared_ownership || existing->destruct;
+    }
+    if (rvp == rv_policy::move) {
+        /* Don't move from an address that is already owned by a Python
+           instance; just return a new reference to that same Python instance.
+           There's no potential lifetime issue in that case.
+           But if the moved-from address is only referenced by the existing
+           Python instance, we should create a new instance, since the user
+           might have requested rv_policy::move to avoid a lifetime issue. */
+        return existing->destruct;
+    }
+    if (rvp == rv_policy::reference_internal) {
+        /* Make sure the returned object is keeping the requested parent
+           alive. If there's no parent available, then don't reuse, so
+           that we eventually fail in nb_type_put_common(). */
+        if (cleanup && cleanup->self() && nb_try_inc_ref(existing_obj)) {
+            // This is a no-op if the keep_alive relationship already exists:
+            keep_alive(existing_obj, cleanup->self());
+            Py_DECREF(existing_obj);
+        } else {
+            return false;
+        }
+    }
+    return true;
 }
 
 PyObject *nb_type_put(const std::type_info *cpp_type,
@@ -1803,7 +1936,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                 PyTypeObject *tp = Py_TYPE(seq.inst);
 
                 if (nb_type_data(tp)->type == cpp_type) {
-                    if (nb_try_inc_ref(seq.inst))
+                    if (nb_type_put_can_reuse(seq.inst, rvp, cleanup) &&
+                        nb_try_inc_ref(seq.inst))
                         return seq.inst;
                 }
 
@@ -1811,7 +1945,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                     return nullptr;
 
                 if (PyType_IsSubtype(tp, td->type_py)) {
-                    if (nb_try_inc_ref(seq.inst))
+                    if (nb_type_put_can_reuse(seq.inst, rvp, cleanup) &&
+                        nb_try_inc_ref(seq.inst))
                         return seq.inst;
                 }
 
@@ -1820,7 +1955,9 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
 
                 seq = *seq.next;
             }
-        } else if (rvp == rv_policy::none) {
+        }
+
+        if (rvp == rv_policy::none) {
             return nullptr;
         }
     }
@@ -1885,11 +2022,11 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
             while (true) {
                 PyTypeObject *tp = Py_TYPE(seq.inst);
-
                 const std::type_info *p = nb_type_data(tp)->type;
 
                 if (p == cpp_type || p == cpp_type_p) {
-                    if (nb_try_inc_ref(seq.inst))
+                    if (nb_type_put_can_reuse(seq.inst, rvp, cleanup) &&
+                        nb_try_inc_ref(seq.inst))
                         return seq.inst;
                 }
 
@@ -1898,7 +2035,8 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
                 if (PyType_IsSubtype(tp, td->type_py) ||
                     (td_p && PyType_IsSubtype(tp, td_p->type_py))) {
-                    if (nb_try_inc_ref(seq.inst))
+                    if (nb_type_put_can_reuse(seq.inst, rvp, cleanup) &&
+                        nb_try_inc_ref(seq.inst))
                         return seq.inst;
                 }
 
@@ -1907,7 +2045,9 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
 
                 seq = *seq.next;
             }
-        } else if (rvp == rv_policy::none) {
+        }
+
+        if (rvp == rv_policy::none) {
             return nullptr;
         }
     }

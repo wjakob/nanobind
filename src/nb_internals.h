@@ -56,7 +56,7 @@ struct nb_inst { // usually: 24 bytes
 
     /// State of the C++ object this instance points to: is it constructed?
     /// can we use it?
-    uint32_t state : 2;
+    uint8_t state : 2;
 
     // Values for `state`. Note that the numeric values of these are relied upon
     // for an optimization in `nb_type_get()`.
@@ -70,25 +70,27 @@ struct nb_inst { // usually: 24 bytes
      * relative offset to a pointer that must be dereferenced to get to the
      * instance data. 'direct' is 'true' in the former case.
      */
-    uint32_t direct : 1;
+    uint8_t direct : 1;
 
     /// Is the instance data co-located with the Python object?
-    uint32_t internal : 1;
+    uint8_t internal : 1;
 
     /// Should the destructor be called when this instance is GCed?
-    uint32_t destruct : 1;
+    uint8_t destruct : 1;
 
     /// Should nanobind call 'operator delete' when this instance is GCed?
-    uint32_t cpp_delete : 1;
-
-    /// Does this instance hold references to others? (via internals.keep_alive)
-    uint32_t clear_keep_alive : 1;
+    uint8_t cpp_delete : 1;
 
     /// Does this instance use intrusive reference counting?
-    uint32_t intrusive : 1;
+    uint8_t intrusive : 1;
+
+    /// Does this instance hold references to others? (via internals.keep_alive)
+    /// This may be accessed concurrently to 'state', so it must not be in
+    /// the same bitfield as 'state'.
+    uint8_t clear_keep_alive;
 
     // That's a lot of unused space. I wonder if there is a good use for it..
-    uint32_t unused : 24;
+    uint16_t unused;
 };
 
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);

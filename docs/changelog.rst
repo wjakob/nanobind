@@ -18,6 +18,10 @@ below inherit that of the preceding release.
 Version TBD (not yet released)
 ------------------------------
 
+- ABI version 17. The layout of the `nb_inst` class was changed to fix a data race
+  between `clear_keep_alive` and other bitfields in the same struct (PR `#1191
+  <https://github.com/wjakob/nanobind/pull/1191>`__)
+
 - Nanobind now officially supports **MinGW-w64** and **Intel ICX** (the modern
   Clang-based Intel compiler). Continuous integration tests have been added to
   ensure compatibility with these compilers on an ongoing basis.

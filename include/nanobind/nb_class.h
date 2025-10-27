@@ -128,10 +128,8 @@ struct type_data {
     };
     void (*set_self_py)(void *, PyObject *) noexcept;
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
-#if defined(Py_LIMITED_API)
     uint32_t dictoffset;
     uint32_t weaklistoffset;
-#endif
 };
 
 /// Information about a type that is only relevant when it is being created

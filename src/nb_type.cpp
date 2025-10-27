@@ -21,23 +21,13 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-static PyObject **nb_dict_ptr(PyObject *self) {
-    PyTypeObject *tp = Py_TYPE(self);
-#if defined(Py_LIMITED_API)
+static PyObject **nb_dict_ptr(PyObject *self, PyTypeObject *tp) {
     Py_ssize_t dictoffset = nb_type_data(tp)->dictoffset;
-#else
-    Py_ssize_t dictoffset = tp->tp_dictoffset;
-#endif
     return dictoffset ? (PyObject **) ((uint8_t *) self + dictoffset) : nullptr;
 }
 
-static PyObject **nb_weaklist_ptr(PyObject *self) {
-    PyTypeObject *tp = Py_TYPE(self);
-#if defined(Py_LIMITED_API)
+static PyObject **nb_weaklist_ptr(PyObject *self, PyTypeObject *tp) {
     Py_ssize_t weaklistoffset = nb_type_data(tp)->weaklistoffset;
-#else
-    Py_ssize_t weaklistoffset = tp->tp_weaklistoffset;
-#endif
     return weaklistoffset ? (PyObject **) ((uint8_t *) self + weaklistoffset) : nullptr;
 }
 
@@ -47,18 +37,20 @@ static PyGetSetDef inst_getset[] = {
 };
 
 static int inst_clear(PyObject *self) {
-    PyObject **dict = nb_dict_ptr(self);
+    PyTypeObject *tp = Py_TYPE(self);
+    PyObject **dict = nb_dict_ptr(self, tp);
     if (dict)
         Py_CLEAR(*dict);
     return 0;
 }
 
 static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
-    PyObject **dict = nb_dict_ptr(self);
+    PyTypeObject *tp = Py_TYPE(self);
+    PyObject **dict = nb_dict_ptr(self, tp);
     if (dict)
         Py_VISIT(*dict);
 #if PY_VERSION_HEX >= 0x03090000
-    Py_VISIT(Py_TYPE(self));
+    Py_VISIT(tp);
 #endif
     return 0;
 }
@@ -227,16 +219,16 @@ static void inst_dealloc(PyObject *self) {
         PyObject_GC_UnTrack(self);
 
         if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
-            PyObject **dict = nb_dict_ptr(self);
+            PyObject **dict = nb_dict_ptr(self, tp);
             if (dict)
                 Py_CLEAR(*dict);
         }
     }
 
     if (t->flags & (uint32_t) type_flags::is_weak_referenceable &&
-        nb_weaklist_ptr(self) != nullptr) {
+        nb_weaklist_ptr(self, tp) != nullptr) {
 #if defined(PYPY_VERSION)
-        PyObject **weaklist = nb_weaklist_ptr(self);
+        PyObject **weaklist = nb_weaklist_ptr(self, tp);
         if (weaklist)
             Py_CLEAR(*weaklist);
 #else
@@ -1362,13 +1354,10 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (is_weak_referenceable)
         to->flags |= (uint32_t) type_flags::is_weak_referenceable;
 
-    #if defined(Py_LIMITED_API)
-        /* These must be set unconditionally so that nb_dict_ptr() /
-           nb_weaklist_ptr() return null (rather than garbage) on
-           objects whose types don't use the corresponding feature. */
-        to->dictoffset = (uint32_t) dictoffset;
-        to->weaklistoffset = (uint32_t) weaklistoffset;
-    #endif
+    // Always cache dictoffset/weaklistoffset so nb_dict_ptr()/nb_weaklist_ptr()
+    // only access dicts/weaklists created by nanobind, not those added by Python
+    to->dictoffset = (uint32_t) dictoffset;
+    to->weaklistoffset = (uint32_t) weaklistoffset;
 
     if (t->scope != nullptr)
         setattr(t->scope, t_name, result);

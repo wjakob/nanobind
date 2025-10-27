@@ -540,7 +540,7 @@ The program has the following command line options:
 .. code-block:: text
 
    usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH] [-m MODULE]
-                                     [-r] [-M FILE] [-P] [-D] [-q]
+                                     [-r] [-M FILE] [-P] [-D] [--exclude-values] [-q]
 
    Generate stubs for nanobind-based extensions.
 
@@ -559,6 +559,7 @@ The program has the following command line options:
      -P, --include-private         include private members (with single leading or
                                    trailing underscore)
      -D, --exclude-docstrings      exclude docstrings from the generated stub
+     --exclude-values              force the use of ... for values
      -q, --quiet                   do not generate any output in the absence of failures
 
 

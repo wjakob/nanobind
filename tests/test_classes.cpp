@@ -644,6 +644,11 @@ NB_MODULE(test_classes_ext, m) {
                nb::is_weak_referenceable(), nb::dynamic_attr())
         .def(nb::init<int>());
 
+    // test50_weakref_with_slots_subclass
+    struct StructWithWeakrefsOnly : Struct { };
+    nb::class_<StructWithWeakrefsOnly, Struct>(m, "StructWithWeakrefsOnly", nb::is_weak_referenceable())
+        .def(nb::init<int>());
+
     union Union {
         int i;
         float f;

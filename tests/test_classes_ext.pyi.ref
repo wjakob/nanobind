@@ -281,6 +281,9 @@ class StructWithWeakrefs(Struct):
 class StructWithWeakrefsAndDynamicAttrs(Struct):
     def __init__(self, arg: int, /) -> None: ...
 
+class StructWithWeakrefsOnly(Struct):
+    def __init__(self, arg: int, /) -> None: ...
+
 class Union:
     def __init__(self) -> None: ...
 

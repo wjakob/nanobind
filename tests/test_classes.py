@@ -945,3 +945,38 @@ def test48_monekypatchable():
 def test49_static_property_override():
     assert t.StaticPropertyOverride.x == 42
     assert t.StaticPropertyOverride2.x == 43
+
+def test50_weakref_with_slots_subclass():
+    """
+    Test that Python subclasses work correctly with nb::is_weak_referenceable()
+    base classes. The nb::is_weak_referenceable() flag causes nanobind to
+    install tp_traverse/tp_clear callbacks. When Python subclasses add their
+    own instance dictionaries (e.g., via managed dicts on Python 3.12+),
+    subtype_traverse calls our tp_traverse. We must only traverse dicts/weaklists
+    created by nanobind, not those added by Python.
+
+    Regression test for issue #1201.
+    """
+    import gc
+
+    # Create a Python subclass with __slots__
+    class SubClass(t.StructWithWeakrefsOnly):
+        __slots__ = 'hello',
+
+    # Create a sub-subclass without __slots__ (which should get a __dict__)
+    class SubSubClass(SubClass):
+        pass
+
+    # This should not crash
+    x = SubSubClass(42)
+    x.bye = 'blah'
+    assert x.value() == 42
+    assert x.bye == 'blah'
+
+    # Trigger GC to ensure inst_traverse doesn't crash
+    gc.collect()
+    gc.collect()
+
+    # Clean up
+    del x
+    gc.collect()

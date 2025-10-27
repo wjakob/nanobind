@@ -138,6 +138,12 @@ NB_MODULE(test_functions_ext, m) {
         return std::make_pair(args.size(), kwargs.size());
     }, "a"_a, "b"_a, "myargs"_a, "mykwargs"_a);
 
+    /// Function with eight arguments
+    m.def("test_simple",
+        [](int i0, int i1, int i2, int i3, int i4, int i5, int i6, int i7) {
+            return i0 + i1 + i2 + i3 + i4 + i5 + i6 - i7;
+        });
+
     /// Test successful/unsuccessful tuple conversion, with rich output types
     m.def("test_tuple", []() -> nb::typed<nb::tuple, std::string, int> {
         return nb::make_tuple("Hello", 123); });

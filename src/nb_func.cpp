@@ -299,7 +299,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     // Check if the complex dispatch loop is needed
     bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||
-                        f->nargs >= NB_MAXARGS_SIMPLE;
+                        f->nargs > NB_MAXARGS_SIMPLE;
 
     if (has_args) {
         for (size_t i = is_method; i < f->nargs; ++i) {
@@ -690,16 +690,16 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
            entries using keyword arguments or default argument values provided
            in the bindings, if available.
 
-        3. Ensure that either all keyword arguments were "consumed", or that
+        2. Ensure that either all keyword arguments were "consumed", or that
            the function takes a kwargs argument to accept unconsumed kwargs.
 
-        4. Any positional arguments still left get put into a tuple (for args),
+        3. Any positional arguments still left get put into a tuple (for args),
            and any leftover kwargs get put into a dict.
 
-        5. Pack everything into a vector; if we have nb::args or nb::kwargs, they are an
-           extra tuple or dict at the end of the positional arguments.
+        4. Pack everything into a vector; if we have nb::args or nb::kwargs,
+           they become a tuple or dict at the end of the positional arguments.
 
-        6. Call the function call dispatcher (func_data::impl)
+        5. Call the function call dispatcher (func_data::impl)
 
         If one of these fail, move on to the next overload and keep trying
         until we get a result other than NB_NEXT_OVERLOAD.
@@ -878,7 +878,8 @@ done:
     return result;
 }
 
-/// Simplified nb_func_vectorcall variant for functions w/o keyword arguments
+/// Simplified nb_func_vectorcall variant for functions w/o keyword arguments,
+/// w/o default arguments, with no more than NB_MAXARGS_SIMPLE arguments, etc.
 static PyObject *nb_func_vectorcall_simple(PyObject *self,
                                            PyObject *const *args_in,
                                            size_t nargsf,

@@ -22,6 +22,7 @@ def test01_capture():
     assert t.test_02(5, 3) == 2
     assert t.test_03(5, 3) == 44
     assert t.test_04() == 60
+    assert t.test_simple(0, 1, 2, 3, 4, 5, 6, 7) == 14
 
 
 def test02_default_args():

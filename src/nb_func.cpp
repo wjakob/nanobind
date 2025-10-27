@@ -1096,7 +1096,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
             alloc = true;
         }
 
-        if (size)
+        if (size > 1)
             memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
     }
 

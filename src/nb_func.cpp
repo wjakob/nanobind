@@ -1096,7 +1096,8 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
             alloc = true;
         }
 
-        memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
+        if (size)
+            memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
     }
 
     args[0] = mb->self;

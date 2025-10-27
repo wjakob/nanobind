@@ -1561,6 +1561,16 @@ include directive:
    <https://docs.python.org/3/library/typing.html#typing.TypeVarTuple>`__
    (i.e., an instance of ``typing.TypeVarTuple``).
 
+.. cpp:function:: template <typename... Args> object param_spec(Args&&... args)
+
+   Analogous to :cpp:func:`type_var`, create a `parameter specification variable
+   <https://docs.python.org/3/library/typing.html#typing.ParamSpec>`__
+   (i.e., an instance of ``typing.ParamSpec``).
+
+   .. code-block:: cpp
+
+        m.attr("P") = nb::param_spec("P");
+
 .. cpp:function:: object any_type()
 
    Convenience wrapper, which returns ``typing.Any``.

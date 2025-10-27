@@ -642,12 +642,24 @@ class StubGen:
             self.write_ln(f"{name}{types} = {value_str}\n")
 
     def is_type_var(self, tp: type) -> bool:
-        return (issubclass(tp, typing.TypeVar)
-            or (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple))
-            or (typing_extensions is not None
-            and (
-                issubclass(tp, typing_extensions.TypeVar)
-                or issubclass(tp, typing_extensions.TypeVarTuple))))
+        if issubclass(tp, typing.TypeVar):
+            return True
+        if sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec):
+            return True
+        if sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple):
+            return True
+        if typing_extensions is not None:
+            if issubclass(
+                tp,
+                (
+                    typing_extensions.TypeVar,
+                    typing_extensions.ParamSpec,
+                    typing_extensions.TypeVarTuple
+                )
+            ):
+                return True
+        return False
+
 
     def simplify_types(self, s: str) -> str:
         """
@@ -1017,6 +1029,10 @@ class StubGen:
             return f'"{e.__forward_arg__}"'
         elif issubclass(tp, enum.Enum):
             return self.type_str(tp) + '.' + e.name
+        elif (sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec)) \
+            or (typing_extensions is not None and issubclass(tp, typing_extensions.ParamSpec)):
+            tv = self.import_object(tp.__module__, "ParamSpec")
+            return f'{tv}("{e.__name__}")'
         elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
             tv = self.import_object(tp.__module__, "TypeVarTuple")

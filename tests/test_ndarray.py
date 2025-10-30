@@ -133,8 +133,21 @@ def test04_constrain_shape():
         t.pass_float32_shaped(np.zeros((3, 5, 4, 6), dtype=np.float32))
 
 
+def test05_bytes():
+    a = bytearray(range(10))
+    assert t.get_is_valid(a)
+    assert t.get_shape(a) == [10]
+    assert t.get_size(a) == 10
+    assert t.get_nbytes(a) == 10
+    assert t.get_itemsize(a) == 1
+    assert t.check_order(a) == 'C'
+    b = b'hello'  # immutable
+    assert t.get_is_valid(b)
+    assert t.get_shape(b) == [5]
+
+
 @needs_numpy
-def test05_constrain_order():
+def test06_constrain_order_numpy():
     assert t.check_order(np.zeros((3, 5, 4, 6), order='C')) == 'C'
     assert t.check_order(np.zeros((3, 5, 4, 6), order='F')) == 'F'
     assert t.check_order(np.zeros((3, 5, 4, 6), order='C')[:, 2, :, :]) == '?'
@@ -160,8 +173,18 @@ def test07_constrain_order_pytorch():
         assert t.check_device(torch.zeros(3, 5, device='cuda')) == 'cuda'
 
 
+def test08_write_bytes_from_cpp():
+    a = bytearray(10)
+    t.initialize(a)
+    assert a == bytearray(range(10))
+    b = b'helloHello'  # ten immutable bytes
+    with pytest.raises(TypeError) as excinfo:
+        t.initialize(b)
+    assert 'incompatible function arguments' in str(excinfo.value)
+
+
 @needs_numpy
-def test09_write_from_cpp():
+def test09_write_numpy_from_cpp():
     x = np.zeros(10, dtype=np.float32)
     t.initialize(x)
     assert np.all(x == np.arange(10, dtype=np.float32))
@@ -244,7 +267,6 @@ def test14_consume_numpy():
         x = np.from_dlpack(wrapper(capsule))
     else:
         pytest.skip('your version of numpy is too old')
-
     del capsule
     collect()
     assert x.shape == (2, 4)
@@ -297,6 +319,7 @@ def test17_return_numpy():
     dc = t.destruct_count()
     x = t.ret_numpy()
     assert x.shape == (2, 4)
+    assert x.flags.writeable
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     del x
     collect()
@@ -333,6 +356,60 @@ def test19_return_memview():
     del x
     collect()
     assert t.destruct_count() - dc == 1
+
+
+@needs_numpy
+def test20_return_array_api():
+    collect()
+    dc = t.destruct_count()
+    obj = t.ret_array_api()
+    assert obj.__dlpack_device__() == (1, 0)  # (type == CPU, id == 0)
+    capsule = obj.__dlpack__()
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    capsule = obj.__dlpack__(max_version=None)
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    capsule = obj.__dlpack__(max_version=(0, 0))  # (major == 0, minor == 0)
+    assert 'dltensor' in repr(capsule)
+    assert 'versioned' not in repr(capsule)
+    capsule = obj.__dlpack__(max_version=(1, 0))  # (major == 1, minor == 0)
+    assert 'dltensor_versioned' in repr(capsule)
+    with pytest.raises(TypeError) as excinfo:
+        capsule = obj.__dlpack__(0)
+    assert 'does not accept positional arguments' in str(excinfo.value)
+    del obj
+    collect()
+    assert t.destruct_count() == dc
+    del capsule
+    collect()
+    assert t.destruct_count() - dc == 1
+    dc += 1
+
+    obj = t.ret_array_api()  # obj also supports the buffer protocol
+    mv = memoryview(obj)
+    assert mv.tolist() == [[1, 2, 3, 4], [5, 6, 7, 8]]
+    del obj
+    collect()
+    assert t.destruct_count() == dc
+    del mv
+    collect()
+    assert t.destruct_count() - dc == 1
+    dc += 1
+
+    if (hasattr(np, '__array_api_version__') and
+        np.__array_api_version__ >= '2024'):
+        obj = t.ret_array_api()
+        x = np.from_dlpack(obj)
+        del obj
+        collect()
+        assert t.destruct_count() == dc
+        assert x.shape == (2, 4)
+        assert x.flags.writeable
+        assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
+        del x
+        collect()
+        assert t.destruct_count() - dc == 1
 
 
 @needs_numpy
@@ -418,6 +495,8 @@ def test26_return_ro():
     assert t.ret_numpy_const_ref_f.__doc__  == 'ret_numpy_const_ref_f() -> numpy.ndarray[dtype=float32, shape=(2, 4), order=\'F\', writable=False]'
     assert x.shape == (2, 4)
     assert y.shape == (2, 4)
+    assert not x.flags.writeable
+    assert not y.flags.writeable
     assert np.all(x == [[1, 2, 3, 4], [5, 6, 7, 8]])
     assert np.all(y == [[1, 3, 5, 7], [2, 4, 6, 8]])
     with pytest.raises(ValueError) as excinfo:
@@ -428,13 +507,49 @@ def test26_return_ro():
     assert 'read-only' in str(excinfo.value)
 
 
+def test27_python_array():
+    import array
+    a = array.array('d', [0, 0, 0, 3.14159, 0])
+    assert t.check(a)
+    assert t.check_rw_by_value(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
+
+    a[1] = 0.1
+    a[2] = 0.2
+    a[4] = 0.4
+    mv = memoryview(a)
+    assert t.check(mv)
+    assert t.check_rw_by_value(mv)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(mv)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(mv)
+    assert t.check_ro_by_value_const_float64(mv)
+
+    x = t.passthrough(a)
+    assert x is a
+
+
+def test28_check_bytearray():
+    a = bytearray(b'xyz')
+    assert t.check(a)
+    mv = memoryview(a)
+    assert t.check(mv)
+
+
 @needs_numpy
-def test27_check_numpy():
+def test29_check_numpy():
     assert t.check(np.zeros(1))
 
 
 @needs_torch
-def test28_check_torch():
+def test30_check_torch():
     assert t.check(torch.zeros((1)))
 
 
@@ -597,7 +712,7 @@ def test35_view():
     x2 = x1 * (-1+2j)
     t.fill_view_5(x1)
     assert np.allclose(x1, x2)
-    x2 = -x2;
+    x2 = -x2
     t.fill_view_6(x1)
     assert np.allclose(x1, x2)
 
@@ -659,109 +774,109 @@ def test41_noninteger_stride():
     a = np.array([[1, 2, 3, 4, 0, 0], [5, 6, 7, 8, 0, 0]], dtype=np.float32)
     s = a[:, 0:4]  # slice
     t.pass_float32(s)
-    assert t.get_stride(s, 0) == 6;
-    assert t.get_stride(s, 1) == 1;
+    assert t.get_stride(s, 0) == 6
+    assert t.get_stride(s, 1) == 1
     try:
         v = s.view(np.complex64)
     except:
         pytest.skip('your version of numpy is too old')
     t.pass_complex64(v)
-    assert t.get_stride(v, 0) == 3;
-    assert t.get_stride(v, 1) == 1;
+    assert t.get_stride(v, 0) == 3
+    assert t.get_stride(v, 1) == 1
 
     a = np.array([[1, 2, 3, 4, 0], [5, 6, 7, 8, 0]], dtype=np.float32)
     s = a[:, 0:4]  # slice
     t.pass_float32(s)
-    assert t.get_stride(s, 0) == 5;
-    assert t.get_stride(s, 1) == 1;
+    assert t.get_stride(s, 0) == 5
+    assert t.get_stride(s, 1) == 1
     v = s.view(np.complex64)
     with pytest.raises(TypeError) as excinfo:
         t.pass_complex64(v)
     assert 'incompatible function arguments' in str(excinfo.value)
     with pytest.raises(TypeError) as excinfo:
-        t.get_stride(v, 0);
+        t.get_stride(v, 0)
     assert 'incompatible function arguments' in str(excinfo.value)
 
 
 @needs_numpy
 def test42_const_qualifiers_numpy():
     a = np.array([0, 0, 0, 3.14159, 0], dtype=np.float64)
-    assert t.check_rw_by_value(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_value_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_value_ro(a);
-    assert t.check_ro_by_value_const_float64(a);
+    assert t.check_rw_by_value(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
     a.setflags(write=False)
-    assert t.check_ro_by_value_ro(a);
-    assert t.check_ro_by_value_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = np.array([0, 0, 0, 3.14159, 0], dtype=np.float64)
-    assert t.check_rw_by_const_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_const_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_const_ref_ro(a);
-    assert t.check_ro_by_const_ref_const_float64(a);
+    assert t.check_rw_by_const_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_const_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
     a.setflags(write=False)
-    assert t.check_ro_by_const_ref_ro(a);
-    assert t.check_ro_by_const_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = np.array([0, 0, 0, 3.14159, 0], dtype=np.float64)
-    assert t.check_rw_by_rvalue_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_rvalue_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_rvalue_ref_ro(a);
-    assert t.check_ro_by_rvalue_ref_const_float64(a);
+    assert t.check_rw_by_rvalue_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_rvalue_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
     a.setflags(write=False)
-    assert t.check_ro_by_rvalue_ref_ro(a);
-    assert t.check_ro_by_rvalue_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
 
 @needs_torch
 def test43_const_qualifiers_pytorch():
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
-    assert t.check_rw_by_value(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_value_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_value_ro(a);
-    assert t.check_ro_by_value_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_rw_by_value(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_value_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_value_ro(a)
+    assert t.check_ro_by_value_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
-    assert t.check_rw_by_const_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_const_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_const_ref_ro(a);
-    assert t.check_ro_by_const_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_rw_by_const_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_const_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_const_ref_ro(a)
+    assert t.check_ro_by_const_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
     a = torch.tensor([0, 0, 0, 3.14159, 0], dtype=torch.float64)
-    assert t.check_rw_by_rvalue_ref(a);
-    assert a[1] == 1.414214;
-    assert t.check_rw_by_rvalue_ref_float64(a);
-    assert a[2] == 2.718282;
-    assert a[4] == 16.0;
-    assert t.check_ro_by_rvalue_ref_ro(a);
-    assert t.check_ro_by_rvalue_ref_const_float64(a);
-    assert a[0] == 0.0;
-    assert a[3] == 3.14159;
+    assert t.check_rw_by_rvalue_ref(a)
+    assert a[1] == 1.414214
+    assert t.check_rw_by_rvalue_ref_float64(a)
+    assert a[2] == 2.718282
+    assert a[4] == 16.0
+    assert t.check_ro_by_rvalue_ref_ro(a)
+    assert t.check_ro_by_rvalue_ref_const_float64(a)
+    assert a[0] == 0.0
+    assert a[3] == 3.14159
 
 
 @needs_cupy
@@ -896,3 +1011,26 @@ def test52_accept_np_both_true_contig():
 def test53_issue_930():
     wrapper = t.Wrapper(np.ones(3, dtype=np.float32))
     assert wrapper.value[0] == 1
+
+
+@needs_numpy
+def test54_docs_example():
+    ma = t.MyArray()
+    aa = ma.array_api()
+    assert 'versioned' not in repr(aa.__dlpack__())
+    assert 'versioned' not in repr(ma.__dlpack__())
+    assert 'versioned' in repr(aa.__dlpack__(max_version=(1, 2)))
+    assert 'versioned' in repr(ma.__dlpack__(max_version=(1, 2)))
+    assert aa.__dlpack_device__() == (1, 0)
+    assert ma.__dlpack_device__() == (1, 0)
+
+    if hasattr(np, 'from_dlpack'):
+        x = np.from_dlpack(aa)
+        y = np.from_dlpack(ma)
+        assert np.all(x == [0.0, 1.0, 2.0, 3.0, 4.0])
+        assert np.all(y == [0.0, 1.0, 2.0, 3.0, 4.0])
+        ma.mutate()
+        assert np.all(x == [0.5, 1.5, 2.5, 3.5, 4.5])
+        assert np.all(y == [0.5, 1.5, 2.5, 3.5, 4.5])
+    else:
+        pytest.skip('your version of numpy is too old')

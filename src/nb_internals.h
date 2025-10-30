@@ -426,6 +426,8 @@ struct pyobj_name {
     enum : int {
         value_str = 0,      // string "value"
         copy_str,           // string "copy"
+        clone_str,          // string "clone"
+        array_str,          // string "array"
         from_dlpack_str,    // string "from_dlpack"
         dunder_dlpack_str,  // string "__dlpack__"
         max_version_str,    // string "max_version"
@@ -490,11 +492,12 @@ inline void *inst_ptr(nb_inst *self) {
 }
 
 template <typename T> struct scoped_pymalloc {
-    scoped_pymalloc(size_t size = 1) {
-        ptr = (T *) PyMem_Malloc(size * sizeof(T));
+    scoped_pymalloc(size_t size = 1, size_t extra_bytes = 0) {
+        // Tip: construct objects in the extra bytes using placement new.
+        ptr = (T *) PyMem_Malloc(size * sizeof(T) + extra_bytes);
         if (!ptr)
             fail("scoped_pymalloc(): could not allocate %llu bytes of memory!",
-                 (unsigned long long) size);
+                 (unsigned long long) (size * sizeof(T) + extra_bytes));
     }
     ~scoped_pymalloc() { PyMem_Free(ptr); }
     T *release() {

@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/pair.h>
 #include <algorithm>
 #include <complex>
 #include <vector>
@@ -189,6 +190,12 @@ NB_MODULE(test_ndarray_ext, m) {
     m.def("check_device", [](nb::ndarray<nb::device::cuda>) -> const char * { return "cuda"; });
 
     m.def("initialize",
+          [](nb::ndarray<unsigned char, nb::shape<10>, nb::device::cpu> &t) {
+              for (size_t i = 0; i < 10; ++i)
+                t(i) = (unsigned char) i;
+          });
+
+    m.def("initialize",
           [](nb::ndarray<float, nb::shape<10>, nb::device::cpu> &t) {
               for (size_t i = 0; i < 10; ++i)
                 t(i) = (float) i;
@@ -313,6 +320,19 @@ NB_MODULE(test_ndarray_ext, m) {
                                                                  deleter);
     });
 
+    m.def("ret_array_api", []() {
+        double *d = new double[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+
+        nb::capsule deleter(d, [](void *data) noexcept {
+           destruct_count++;
+           delete[] (double *) data;
+        });
+
+        return nb::ndarray<nb::array_api, double, nb::shape<2, 4>>(d, 2, shape,
+                                                                   deleter);
+    });
+
     m.def("ret_array_scalar", []() {
             float* f = new float{ 1.0f };
 
@@ -351,7 +371,7 @@ NB_MODULE(test_ndarray_ext, m) {
            destruct_count++;
         }
 
-        float data [10] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+        float data[10] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     };
 
     nb::class_<Cls>(m, "Cls")
@@ -507,4 +527,33 @@ NB_MODULE(test_ndarray_ext, m) {
     nb::class_<Wrapper>(m, "Wrapper", nb::type_slots(wrapper_slots))
         .def(nb::init<nb::ndarray<float>>())
         .def_rw("value", &Wrapper::value);
+
+    // Example from docs/ndarray.rst in section "Array libraries"
+    class MyArray {
+        double* d;
+     public:
+        MyArray() { d = new double[5] { 0.0, 1.0, 2.0, 3.0, 4.0 }; }
+        ~MyArray() { delete[] d; }
+        double* data() const { return d; }
+        void mutate() { for (int i = 0; i < 5; ++i) d[i] += 0.5; }
+    };
+
+    nb::class_<MyArray>(m, "MyArray")
+       .def(nb::init<>())
+       .def("mutate", &MyArray::mutate)
+       .def("__dlpack__", [](nb::pointer_and_handle<MyArray> self,
+                             nb::kwargs kwargs) {
+               using array_api_t = nb::ndarray<nb::array_api, double>;
+               nb::object aa = nb::cast(array_api_t(self.p->data(), {5}),
+                                        nb::rv_policy::reference_internal,
+                                        self.h);
+               return aa.attr("__dlpack__")(**kwargs);
+           })
+       .def("__dlpack_device__", [](nb::handle /*self*/) {
+               return std::make_pair(nb::device::cpu::value, 0);
+           })
+       .def("array_api", [](const MyArray& self) {
+               return nb::ndarray<nb::array_api, double>(self.data(), {5});
+           }, nb::rv_policy::reference_internal);
+
 }

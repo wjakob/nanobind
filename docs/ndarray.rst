@@ -275,12 +275,19 @@ desired Python type.
 - :cpp:class:`nb::tensorflow <tensorflow>`: create a ``tensorflow.python.framework.ops.EagerTensor``.
 - :cpp:class:`nb::jax <jax>`: create a ``jaxlib.xla_extension.DeviceArray``.
 - :cpp:class:`nb::cupy <cupy>`: create a ``cupy.ndarray``.
+- :cpp:class:`nb::memview <memview>`: create a Python ``memoryview``.
+- :cpp:class:`nb::array_api <array_api>`: create an object that supports the
+  Python buffer protocol (i.e., is accepted as an argument to ``memoryview()``)
+  and also has the DLPack attributes  ``__dlpack__`` and ``__dlpack_device__``
+  (i.e., it is accepted as an argument to a framework's ``from_dlpack()``
+  function).
 - No framework annotation. In this case, nanobind will create a raw Python
   ``dltensor`` `capsule <https://docs.python.org/3/c-api/capsule.html>`__
-  representing the `DLPack <https://github.com/dmlc/dlpack>`__ metadata.
+  representing the `DLPack <https://github.com/dmlc/dlpack>`__ metadata of
+  a ``DLManagedTensor``.
 
 This annotation also affects the auto-generated docstring of the function,
-which in this case becomes:
+which in this example's case becomes:
 
 .. code-block:: python
 
@@ -457,6 +464,21 @@ interpreted as follows:
 
 - :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
   :cpp:enumerator:`rv_policy::copy`.
+
+Note that when a copy is returned, the copy is made by the framework, not by
+nanobind itself.
+For example, ``numpy.array()`` is passed the keyword argument ``copy`` with
+value ``True``, or the PyTorch tensor's ``clone()`` method is immediately
+called to create the copy.
+This design has a couple of advantages.
+First, nanobind does not have a build-time dependency on the libraries and
+frameworks (NumPy, PyTorch, CUDA, etc.) that would otherwise be necessary
+to perform the copy.
+Second, frameworks have the opportunity to optimize how the copy is created.
+The copy is owned by the framework, so the framework can choose to use a custom
+memory allocator, over-align the data, etc. based on the nd-array's size,
+the specific CPU, GPU, or memory types detected, etc.
+
 
 .. _ndarray-temporaries:
 
@@ -643,26 +665,80 @@ support inter-framework data exchange, custom array types should implement the
 - `__dlpack__ <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack__.html#array_api.array.__dlpack__>`__ and
 - `__dlpack_device__ <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack_device__.html#array_api.array.__dlpack_device__>`__
 
-methods. This is easy thanks to the nd-array integration in nanobind. An example is shown below:
+methods.
+These, as well as the buffer protocol, are implemented in the object returned
+by nanobind when specifying :cpp:class:`nb::array_api <array_api>` as the
+framework template parameter.
+For example:
 
 .. code-block:: cpp
 
-   nb::class_<MyArray>(m, "MyArray")
-      // ...
-      .def("__dlpack__", [](nb::kwargs kwargs) {
-          return nb::ndarray<>( /* ... */);
-      })
-      .def("__dlpack_device__", []() {
-          return std::make_pair(nb::device::cpu::value, 0);
-      });
+    class MyArray {
+        double* d;
+     public:
+        MyArray() { d = new double[5] { 0.0, 1.0, 2.0, 3.0, 4.0 }; }
+        ~MyArray() { delete[] d; }
+        double* data() const { return d; }
+    };
 
-Returning a raw :cpp:class:`nb::ndarray <ndarray>` without framework annotation
-will produce a DLPack capsule, which is what the interface expects.
+    nb::class_<MyArray>(m, "MyArray")
+       .def(nb::init<>())
+       .def("array_api", [](const MyArray& self) {
+               return nb::ndarray<nb::array_api, double>(self.data(), {5});
+           }, nb::rv_policy::reference_internal);
 
-The ``kwargs`` argument can be used to provide additional parameters (for
-example to request a copy), please see the DLPack documentation for details.
-Note that nanobind does not yet implement the versioned DLPack protocol. The
-version number should be ignored for now.
+which can be used as follows:
+
+.. code-block:: pycon
+
+    >>> import my_extension
+    >>> ma = my_extension.MyArray()
+    >>> aa = ma.array_api()
+    >>> aa.__dlpack_device__()
+    (1, 0)
+    >>> import numpy as np
+    >>> x = np.from_dlpack(aa)
+    >>> x
+    array([0., 1., 2., 3., 4.])
+
+The DLPack methods can also be provided for the class itself, by implementing
+``__dlpack__()`` as a wrapper function.
+For example, by adding the following lines to the binding:
+
+.. code-block:: cpp
+
+       .def("__dlpack__", [](nb::pointer_and_handle<MyArray> self,
+                             nb::kwargs kwargs) {
+               using array_api_t = nb::ndarray<nb::array_api, double>;
+               nb::object aa = nb::cast(array_api_t(self.p->data(), {5}),
+                                        nb::rv_policy::reference_internal,
+                                        self.h);
+               return aa.attr("__dlpack__")(**kwargs);
+           })
+       .def("__dlpack_device__", [](nb::handle /*self*/) {
+               return std::make_pair(nb::device::cpu::value, 0);
+           })
+
+the class can be used as follows:
+
+.. code-block:: pycon
+
+    >>> import my_extension
+    >>> ma = my_extension.MyArray()
+    >>> ma.__dlpack_device__()
+    (1, 0)
+    >>> import numpy as np
+    >>> y = np.from_dlpack(ma)
+    >>> y
+    array([0., 1., 2., 3., 4.])
+
+
+The ``kwargs`` argument in the implementation of ``__dlpack__`` above can be
+used to support additional parameters (e.g., to allow the caller to request a
+copy).  See
+`__dlpack__() <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack__.html>`__
+in the Python array API standard for details.
+
 
 Frequently asked questions
 --------------------------
@@ -708,7 +784,3 @@ be more restrictive. Presently supported dtypes include signed/unsigned
 integers, floating point values, complex numbers, and boolean values. Some
 :ref:`nonstandard arithmetic types <ndarray-nonstandard>` can be supported as
 well.
-
-Nanobind can receive and return *read-only* arrays via the buffer protocol when
-exhanging data with NumPy. The DLPack interface currently ignores this
-annotation.

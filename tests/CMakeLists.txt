@@ -160,7 +160,7 @@ nanobind_add_stub(
   MODULE test_inter_module_1_ext
   OUTPUT ${PYI_PREFIX}test_inter_module_1_ext.pyi
   PYTHON_PATH $<TARGET_FILE_DIR:test_inter_module_1_ext>
-  LIB_PATH $<TARGET_FILE_DIR:inter_module>
+  # LIB_PATH $<TARGET_FILE_DIR:inter_module>
   DEPENDS test_inter_module_1_ext inter_module
 )
 

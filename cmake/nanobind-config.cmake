@@ -246,15 +246,20 @@ function (nanobind_build_library TARGET_NAME)
   # However, if the directory _does_ exist, then the user is free to choose
   # whether nanobind uses them (based on `NB_USE_SUBMODULE_DEPS`), with a
   # preference to choose them if `NB_USE_SUBMODULE_DEPS` is not defined
-  if (NOT IS_DIRECTORY ${NB_DIR}/ext/robin_map/include OR
-      (DEFINED NB_USE_SUBMODULE_DEPS AND NOT NB_USE_SUBMODULE_DEPS))
-    include(CMakeFindDependencyMacro)
-    find_dependency(tsl-robin-map)
-    target_link_libraries(${TARGET_NAME} PRIVATE tsl::robin_map)
-  else()
-    target_include_directories(${TARGET_NAME} PRIVATE
-      ${NB_DIR}/ext/robin_map/include)
+  if(IS_DIRECTORY ${NB_DIR}/ext/robin_map/include 
+      AND (DEFINED NB_USE_SUBMODULE_DEPS AND NB_USE_SUBMODULE_DEPS)
+      AND NOT TARGET tsl::robin_map
+    )
+    add_library(tsl::robin_map INTERFACE IMPORTED)
+    set_target_properties(tsl::robin_map PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES ${NB_DIR}/ext/robin_map/include)
   endif()
+
+  if(NOT TARGET tsl::robin_map)
+    include(CMakeFindDependencyMacro)
+    find_dependency(tsl-robin-map CONFIG REQUIRED)
+  endif()
+  target_link_libraries(${TARGET_NAME} PRIVATE tsl::robin_map)
 
   target_include_directories(${TARGET_NAME} ${AS_SYSINCLUDE} PUBLIC
     ${Python_INCLUDE_DIRS}

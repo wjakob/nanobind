@@ -811,14 +811,13 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
         if (size_seq != (Py_ssize_t) size) {
             if (size_seq == -1)
                 PyErr_Clear();
-            return nullptr;
+        } else {
+            temp = PySequence_Tuple(seq);
+            if (temp)
+                result = seq_get_with_size(temp, size, temp_out);
+            else
+                PyErr_Clear();
         }
-
-        temp = PySequence_Tuple(seq);
-        if (temp)
-            result = seq_get_with_size(temp, size, temp_out);
-        else
-            PyErr_Clear();
     }
 #else
     /* There isn't a nice way to get a PyObject** in Py_LIMITED_API. This

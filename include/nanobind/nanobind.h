@@ -29,6 +29,7 @@
 // Core C++ headers that nanobind depends on
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <stdexcept>
 #include <type_traits>

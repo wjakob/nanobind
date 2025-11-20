@@ -100,6 +100,7 @@ struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
+    bool has_kwargs;    // whether any overload has keyword arguments
     bool complex_call;
     bool doc_uniform;
 };

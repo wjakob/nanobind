@@ -250,7 +250,14 @@ struct metadata_builder {
             meta.return_type.append(data, size);
             return;
         }
-        if (param.active && param.annotate && param.collecting)
+        // Append annotation data for the active parameter when annotation
+        // collection is enabled. Previously this required 'collecting' to be
+        // true (set when a ':' token was encountered). However, type tokens
+        // produced by '%' in the descriptor should always contribute to the
+        // parameter annotation even if a ':' token wasn't present in the
+        // descriptor. Relax the condition so that active/annotate is enough
+        // to accept these type tokens.
+        if (param.active && param.annotate)
             param.entry.annotation.append(data, size);
     }
 
@@ -302,9 +309,12 @@ struct metadata_builder {
         if (param.annotate) {
             trim_inplace(param.entry.annotation);
             if (param.entry.annotation.empty())
-                param.entry.annotation = "typing.Any";
+                param.entry.has_annotation = false;
+            else
+                param.entry.has_annotation = true;
         } else {
             param.entry.annotation.clear();
+            param.entry.has_annotation = false;
         }
 
         meta.parameters.push_back(param.entry);
@@ -698,6 +708,8 @@ static PyObject *build_annotation_dict(const std::vector<signature_metadata> &me
     if (!metas.empty()) {
         merged.reserve(metas.front().parameters.size());
         return_values.reserve(metas.size());
+        for (const auto &p : metas.front().parameters)
+            merged.push_back(annotation_bucket{p.name, {}});
     }
 
     auto find_or_create = [&](const std::string &name) -> annotation_bucket & {
@@ -728,7 +740,7 @@ static PyObject *build_annotation_dict(const std::vector<signature_metadata> &me
     for (const auto &entry : merged) {
         std::string merged_value = merge_annotation_values(entry.values);
         if (merged_value.empty())
-            continue;
+            merged_value = "typing.Any";
         PyObject *value = PyUnicode_FromString(merged_value.c_str());
         if (!value ||
             PyDict_SetItemString(annotations, entry.name.c_str(), value) < 0) {

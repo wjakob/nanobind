@@ -1014,15 +1014,15 @@ def test52_property_metadata():
     assert str(sig) == "(self, /) -> 'test_classes_ext.Struct'"
     assert inspect.signature(getter) == sig
 
-
 def test53_static_method_metadata():
     method = t.Struct.static_test
     expected_nb = (
-        ("def static_test(arg: int) -> int", None, None),
-        ("def static_test(arg: float) -> int", None, None),
+        ("def static_test(arg: int, /) -> int", None, None),
+        ("def static_test(arg: float, /) -> int", None, None),
     )
     assert method.__nb_signature__ == expected_nb
-    assert method.__text_signature__ == "(arg)"
+    assert method.__text_signature__ == "(arg, /)"
     annotations = method.__annotations__
     assert annotations["arg"] == "typing.Union[int, float]"
     assert annotations["return"] == "int"
+

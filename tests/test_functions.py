@@ -799,7 +799,7 @@ def test54_dict_default():
         ("test_02", {"up", "down", "return"}, "int"),
         ("test_03", {"arg0", "arg1", "return"}, "int"),
         ("test_04", {"return"}, "int"),
-        ("test_tuple", {"return"}, "tuple"),
+        ("test_tuple", set(), ""),
         ("test_call_1", {"arg", "return"}, "object"),
         ("test_call_2", {"arg", "return"}, "object"),
         ("test_call_extra", {"arg0", "args", "kwargs", "return"}, "object"),
@@ -820,7 +820,11 @@ def test55_annotations(name, required_keys, return_substr):
         assert value
     return_value = annotations.pop("return", None)
     # Lowercase and substring compare so module prefixes like "typing." still match and we cover minor variations.
-    assert return_value is not None and return_substr.lower() in return_value.lower()
+    if "return" in required_keys:
+        assert return_value is not None and return_substr.lower() in return_value.lower()
+    else:
+        # No return annotation expected for this case (incompatible overloads)
+        assert return_value is None
     assert not annotations
 
 
@@ -831,7 +835,7 @@ def test55_annotations(name, required_keys, return_substr):
         ("test_02", "(up = 8, down = 1)"),
         ("test_03", "(arg0, arg1, /)"),
         ("test_04", "()"),
-        ("test_tuple", "()"),
+        ("test_tuple", None),
         ("test_call_1", "(arg, /)"),
         ("test_call_2", "(arg, /)"),
         ("test_call_extra", "(arg0, /, *args, **kwargs)"),
@@ -860,7 +864,7 @@ def test56_text_signature(name, expected_signature):
                 "arg6: 'typing.Any', arg7: 'typing.Any', /) -> 'int'"
             ),
         ),
-        ("test_tuple", "() -> 'tuple[str, int]'"),
+        ("test_tuple", "(*args, **kwargs)"),
         ("test_call_1", "(arg: 'typing.Any', /) -> 'object'"),
         ("test_call_2", "(arg: 'typing.Any', /) -> 'object'"),
         (

@@ -96,7 +96,6 @@ def test05_signature():
         f"test_07(a: int, b: int, *myargs, **mykwargs) -> {TYPING_TUPLE}[int, int]"
     )
 
-
 def test06_signature_error():
     with pytest.raises(TypeError) as excinfo:
         t.test_05("x", y=4)
@@ -790,3 +789,55 @@ def test53_fallback():
 def test54_dict_default():
     assert t.test_get_dict_default({'key': 100}) == 100
     assert t.test_get_dict_default({'key2': 100}) == 123
+
+
+@pytest.mark.parametrize(
+    "name, required_keys, return_substr",
+    [
+        ("test_01", {"return"}, "None"),
+        ("test_02", {"up", "down", "return"}, "int"),
+        ("test_03", {"arg0", "arg1", "return"}, "int"),
+        ("test_04", {"return"}, "int"),
+        ("test_tuple", {"return"}, "tuple"),
+        ("test_call_1", {"arg", "return"}, "object"),
+        ("test_call_2", {"arg", "return"}, "object"),
+        ("test_call_extra", {"arg0", "args", "kwargs", "return"}, "object"),
+        ("test_list", {"arg", "return"}, "None"),
+        ("test_iter", {"arg", "return"}, "list"),
+        ("test_iter_tuple", {"arg", "return"}, "list"),
+        (
+            "test_simple",
+            {"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7", "return"},
+            "int",
+        ),
+    ],
+)
+def test55_annotations(name, required_keys, return_substr):
+    annotations = dict(getattr(t, name).__annotations__)
+    for entry in required_keys - {"return"}:
+        value = annotations.pop(entry, None)
+        assert value
+    return_value = annotations.pop("return", None)
+    assert return_value is not None and return_substr in return_value
+    assert not annotations
+
+
+@pytest.mark.parametrize(
+    "name, expected_signature",
+    [
+        ("test_01", "()"),
+        ("test_02", "(up = 8, down = 1)"),
+        ("test_03", "(arg0, arg1, /)"),
+        ("test_04", "()"),
+        ("test_tuple", "()"),
+        ("test_call_1", "(arg, /)"),
+        ("test_call_2", "(arg, /)"),
+        ("test_call_extra", "(arg0, /, *args, **kwargs)"),
+        ("test_list", "(arg, /)"),
+        ("test_iter", "(arg, /)"),
+        ("test_iter_tuple", "(arg, /)"),
+        ("test_simple", "(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, /)"),
+    ],
+)
+def test56_text_signature(name, expected_signature):
+    assert getattr(t, name).__text_signature__ == expected_signature

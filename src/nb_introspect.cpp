@@ -17,9 +17,121 @@ NAMESPACE_BEGIN(detail)
 namespace {
 
 /* This file keeps the PEP 3107/362 plumbing self-contained so nb_func only
-   exposes the hooks. We translate nanobind's signature metadata directly
-   into annotations/text signatures without touching nb.__nb_signature__ or
-   cached Python objects to avoid ABI changes. */
+     exposes the hooks. We translate nanobind's signature metadata directly
+     into annotations/text signatures without touching nb.__nb_signature__ or
+     cached Python objects to avoid ABI changes.
+
+     Detailed behavior for overloads and how the three PEP-style introspection
+     outputs are produced:
+
+     - Goals
+         * Provide `__annotations__`, `__text_signature__` and `__signature__`
+             (inspect.Signature) for nanobind-wrapped callables where possible,
+             based on internal C++ metadata (`func_data::descr`, `func_data::args`,
+             `func_data::descr_types`, etc.).
+         * Avoid touching or replacing the legacy `__nb_signature__` text blob
+             stored in `func_data::signature` (this keeps backward compatibility).
+
+     - High-level flow
+         1. `collect_signature_metadata()` iterates overloads and calls
+                `build_signature_metadata()` to produce a `signature_metadata` for each
+                overload. This captures parameter names, kinds (positional-only,
+                positional-or-keyword, keyword-only, *args, **kwargs), sanitized
+                tokens for a compact text signature, and return type text.
+         2. If `collect_signature_metadata()` fails (returns false), the
+                introspection functions return `Py_None`. A primary reason for
+                failure is when an overload is marked with
+                `func_flags::has_signature` (i.e. the binding author provided an
+                explicit `nb::sig(...)`/legacy signature string). In that case the
+                code intentionally refuses to auto-generate PEP-style metadata so as
+                not to overwrite or conflict with an explicit signature provided by
+                the author.
+         3. If collection succeeds, the code checks whether all overloads are
+                "compatible" via `signatures_are_compatible()`. Compatibility
+                requires:
+                - same number of parameters across overloads
+                - same parameter names and kinds at every position
+                - identical `sanitized_tokens` sequences (this encodes layout such
+                    as `self`, `*`, `**name`, `/`, default value text, etc.)
+
+     - Result rules per introspection output
+         * `__annotations__` (nb_introspect_annotations)
+             - If `collect_signature_metadata()` fails: returns `Py_None`.
+             - If collection succeeds but there are no metas or overloads are
+                 incompatible: returns an empty `dict` (not `None`) to indicate
+                 "we have no typed annotations to provide".
+             - If collection succeeds and overloads are compatible: merge
+                 parameter annotations and return types across overloads. Merging
+                 logic:
+                 - Collect all distinct annotation strings for each parameter
+                     (only when `has_annotation` is true for that parameter).
+                 - If any annotation is `"typing.Any"`, that wins and the merged
+                     result for that parameter is `"typing.Any"`.
+                 - If there is exactly one distinct annotation, use it.
+                 - If multiple distinct concrete annotations are present, emit
+                     `"typing.Union[T1, T2, ...]"` as the merged annotation string.
+                 - The merged return type is constructed the same way and stored
+                     under the `"return"` key.
+
+         * `__text_signature__` (nb_introspect_text_signature)
+             - If `collect_signature_metadata()` fails: returns `Py_None`.
+             - If collection succeeds but metas are empty or overloads are
+                 incompatible: returns `Py_None` (no single compact text signature
+                 can be provided).
+             - If collection succeeds and overloads are compatible: return a
+                 compact text signature string built from the `sanitized_tokens`
+                 of the first meta (compatibility guarantees all metas have the
+                 same `sanitized_tokens`). Example: "(self, arg0, /)".
+
+         * `__signature__` (nb_introspect_signature -> inspect.Signature)
+             - If `collect_signature_metadata()` fails: returns `Py_None`.
+             - If collection yields no metas: returns `Py_None`.
+             - If collection succeeds and overloads are compatible: build and
+                 return an `inspect.Signature` object derived from the first
+                 `signature_metadata` (parameters include kinds, default values, and
+                 annotation strings where present).
+             - If collection succeeds but overloads are *incompatible*: do not
+                 return `Py_None`. Instead, construct and return a fallback
+                 variadic `Signature` equivalent to `(*args, **kwargs)` so that
+                 `inspect.signature()` still returns a usable, permissive signature
+                 object.
+
+     - Why `has_signature` causes collection failure
+         * `func_flags::has_signature` is set when the binding author provided
+             an explicit signature string via `nb::sig(...)`. That string is
+             stored in `func_data::signature` and is used for legacy nb-style
+             signatures and doc rendering (`__nb_signature__`, `nb_func_render_signature`,
+             etc.). If at least one overload has this flag, `build_signature_metadata`
+             returns `false` to signal: "do not auto-generate/merge PEP-style
+             metadata for this callable". In this codebase `Py_None` is used as
+             the signal value to indicate that automatic PEP introspection was
+             intentionally skipped.
+
+     - Notes and implementation details
+         * `sanitized_tokens` contains tokens used for text signature merging
+             (includes param names, '*'/'**' markers, '/' for positional-only
+             boundary, and default-value text when available). Differences in
+             sanitized tokens across overloads make them incompatible.
+         * Default argument text is included in `sanitized_tokens` (so
+             difference in default values usually prevents merging of text
+             signatures).
+         * Annotations are stored/merged as *strings* (e.g. "typing.Any",
+             "module.Type"), not as evaluated Python objects. This avoids
+             importing/resolving types at C++ side and keeps ABI surface stable.
+         * The implementation purposely avoids mutating or replacing the
+             legacy `__nb_signature__` (stored in `func_data::signature`) so that
+             existing code relying on that string is not affected.
+
+     Summary:
+         - `collect_signature_metadata()` failure -> all `nb_introspect_*`
+             return `Py_None` (signal: skip auto-generation).
+         - collection success + compatible overloads -> produce merged
+             `__annotations__` (dict), a single `__text_signature__` (str), and a
+             concrete `inspect.Signature`.
+         - collection success + incompatible overloads -> annotations = `{}`;
+             text_signature = `None`; signature = permissive variadic
+             `inspect.Signature`.
+ */
 
 static char *dup_string(const char *s) {
 #if defined(_WIN32)

@@ -1533,6 +1533,8 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
         return nb_introspect_annotations((nb_func *) self, nb_func_data(self));
     else if (strcmp(name, "__text_signature__") == 0)
         return nb_introspect_text_signature((nb_func *) self, nb_func_data(self));
+    else if (strcmp(name, "__signature__") == 0)
+        return nb_introspect_signature((nb_func *) self, nb_func_data(self));
     else
         return PyObject_GenericGetAttr(self, name_);
 }

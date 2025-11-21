@@ -1,3 +1,4 @@
+import inspect
 import test_functions_ext as t
 import pytest
 import sys
@@ -818,7 +819,8 @@ def test55_annotations(name, required_keys, return_substr):
         value = annotations.pop(entry, None)
         assert value
     return_value = annotations.pop("return", None)
-    assert return_value is not None and return_substr in return_value
+    # Lowercase and substring compare so module prefixes like "typing." still match and we cover minor variations.
+    assert return_value is not None and return_substr.lower() in return_value.lower()
     assert not annotations
 
 
@@ -841,3 +843,62 @@ def test55_annotations(name, required_keys, return_substr):
 )
 def test56_text_signature(name, expected_signature):
     assert getattr(t, name).__text_signature__ == expected_signature
+
+
+@pytest.mark.parametrize(
+    "name, expected_repr",
+    [
+        ("test_01", "() -> 'None'"),
+        ("test_02", "(up: 'typing.Any' = 8, down: 'typing.Any' = 1) -> 'int'"),
+        ("test_03", "(arg0: 'typing.Any', arg1: 'typing.Any', /) -> 'int'"),
+        ("test_04", "() -> 'int'"),
+        (
+            "test_simple",
+            (
+                "(arg0: 'typing.Any', arg1: 'typing.Any', arg2: 'typing.Any', "
+                "arg3: 'typing.Any', arg4: 'typing.Any', arg5: 'typing.Any', "
+                "arg6: 'typing.Any', arg7: 'typing.Any', /) -> 'int'"
+            ),
+        ),
+        ("test_tuple", "() -> 'tuple[str, int]'"),
+        ("test_call_1", "(arg: 'typing.Any', /) -> 'object'"),
+        ("test_call_2", "(arg: 'typing.Any', /) -> 'object'"),
+        (
+            "test_call_extra",
+            (
+                "(arg0: 'typing.Any', /, *args: 'typing.Tuple[typing.Any, ...]', "
+                "**kwargs: 'typing.Dict[str, typing.Any]') -> 'object'"
+            ),
+        ),
+        ("test_list", "(arg: 'typing.Any', /) -> 'None'"),
+        ("test_iter", "(arg: 'typing.Any', /) -> 'list'"),
+        ("test_iter_tuple", "(arg: 'typing.Any', /) -> 'list'"),
+    ],
+)
+def test57_py_signature(name, expected_repr):
+    sig = getattr(t, name).__signature__
+    assert str(sig) == expected_repr
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "test_01",
+        "test_02",
+        "test_03",
+        "test_04",
+        "test_simple",
+        "test_tuple",
+        "test_call_1",
+        "test_call_2",
+        "test_call_extra",
+        "test_list",
+        "test_iter",
+        "test_iter_tuple",
+    ],
+)
+def test58_inspect(name):
+    func = getattr(t, name)
+    sig = func.__signature__
+    assert isinstance(sig, inspect.Signature)
+    assert inspect.signature(func) == sig

@@ -10,6 +10,7 @@
 #include "nb_internals.h"
 #include "buffer.h"
 #include "nb_ft.h"
+#include "nb_introspect.h"
 
 /// Maximum number of arguments supported by 'nb_vectorcall_simple'
 #define NB_MAXARGS_SIMPLE 8
@@ -1528,6 +1529,10 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
         return nb_func_get_qualname(self);
     else if (strcmp(name, "__doc__") == 0)
         return nb_func_get_doc(self, nullptr);
+    else if (strcmp(name, "__annotations__") == 0)
+        return nb_introspect_annotations((nb_func *) self, nb_func_data(self));
+    else if (strcmp(name, "__text_signature__") == 0)
+        return nb_introspect_text_signature((nb_func *) self, nb_func_data(self));
     else
         return PyObject_GenericGetAttr(self, name_);
 }

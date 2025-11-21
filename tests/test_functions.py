@@ -902,3 +902,13 @@ def test58_inspect(name):
     sig = func.__signature__
     assert isinstance(sig, inspect.Signature)
     assert inspect.signature(func) == sig
+
+
+def test59_incompatible_overload_metadata():
+    func = t.metadata_incompatible
+    assert func.__annotations__ == {}
+    assert func.__text_signature__ is None
+    sig = getattr(func, "__signature__", None)
+    assert sig is not None
+    assert str(sig) == "(*args, **kwargs)"
+    assert inspect.signature(func) == sig

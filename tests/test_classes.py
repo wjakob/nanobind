@@ -1,3 +1,4 @@
+import inspect
 import sys
 import test_classes_ext as t
 import pytest
@@ -981,3 +982,47 @@ def test50_weakref_with_slots_subclass():
     # Clean up
     del x
     gc.collect()
+
+
+def test51_struct_member_metadata():
+    method = t.Struct.value_plus
+    annotations = method.__annotations__
+    for idx in range(7):
+        assert annotations[f"arg{idx}"] == "typing.Any"
+    assert annotations["return"] == "int"
+    assert method.__text_signature__ == "(self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, /)"
+    sig = getattr(method, "__signature__", None)
+    assert sig is not None
+    assert str(sig) == (
+        "(self, arg0: 'typing.Any', arg1: 'typing.Any', arg2: 'typing.Any', "
+        "arg3: 'typing.Any', arg4: 'typing.Any', arg5: 'typing.Any', "
+        "arg6: 'typing.Any', /) -> 'int'"
+    )
+    assert inspect.signature(method) == sig
+
+
+def test52_property_metadata():
+    prop = t.PairStruct.s1
+    assert isinstance(prop, property)
+    getter = prop.fget
+    assert getter is not None
+    annotations = getter.__annotations__
+    assert annotations["return"] == "test_classes_ext.Struct"
+    assert getter.__text_signature__ == "(self)"
+    sig = getattr(getter, "__signature__", None)
+    assert sig is not None
+    assert str(sig) == "(self, /) -> 'test_classes_ext.Struct'"
+    assert inspect.signature(getter) == sig
+
+
+def test53_static_method_metadata():
+    method = t.Struct.static_test
+    expected_nb = (
+        ("def static_test(arg: int) -> int", None, None),
+        ("def static_test(arg: float) -> int", None, None),
+    )
+    assert method.__nb_signature__ == expected_nb
+    assert method.__text_signature__ == "(arg)"
+    annotations = method.__annotations__
+    assert annotations["arg"] == "typing.Union[int, float]"
+    assert annotations["return"] == "int"

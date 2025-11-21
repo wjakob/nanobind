@@ -520,4 +520,7 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_fallback_2", [](nb::fallback){ return 1; });
 
     m.def("test_get_dict_default", [](nb::dict l) { return l.get("key", nb::int_(123)); });
+
+    m.def("metadata_incompatible", [](int value) { return value; });
+    m.def("metadata_incompatible", [](int value, int extra) { return value + extra; });
 }

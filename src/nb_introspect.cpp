@@ -490,22 +490,136 @@ static bool build_signature_metadata(const func_data *f,
     return true;
 }
 
-PyObject *nb_introspect_annotations(nb_func *, const func_data *f) noexcept {
-    signature_metadata meta;
-    if (!build_signature_metadata(f, meta)) {
-        Py_INCREF(Py_None);
-        return Py_None;
+static bool collect_signature_metadata(nb_func *func, const func_data *f,
+                                       std::vector<signature_metadata> &out) noexcept {
+    Py_ssize_t overloads = Py_SIZE((PyObject *) func);
+    if (overloads < 1)
+        overloads = 1;
+
+    out.clear();
+    out.reserve((size_t) overloads);
+
+    for (Py_ssize_t i = 0; i < overloads; ++i) {
+        signature_metadata meta;
+        if (!build_signature_metadata(f + i, meta))
+            return false;
+        out.emplace_back(std::move(meta));
+    }
+
+    return true;
+}
+
+static bool signatures_are_compatible(const std::vector<signature_metadata> &metas) {
+    if (metas.empty())
+        return true;
+
+    const signature_metadata &first = metas.front();
+    for (size_t i = 1; i < metas.size(); ++i) {
+        const signature_metadata &other = metas[i];
+        if (first.parameters.size() != other.parameters.size())
+            return false;
+
+        for (size_t j = 0; j < first.parameters.size(); ++j) {
+            const signature_param &a = first.parameters[j];
+            const signature_param &b = other.parameters[j];
+            if (a.name != b.name || a.kind != b.kind)
+                return false;
+        }
+
+        if (first.sanitized_tokens.size() != other.sanitized_tokens.size())
+            return false;
+
+        for (size_t j = 0; j < first.sanitized_tokens.size(); ++j) {
+            if (first.sanitized_tokens[j] != other.sanitized_tokens[j])
+                return false;
+        }
+    }
+
+    return true;
+}
+
+static void append_unique_annotation(std::vector<std::string> &values,
+                                     const std::string &value) {
+    if (value.empty())
+        return;
+
+    for (const auto &existing : values) {
+        if (existing == value)
+            return;
+    }
+
+    values.push_back(value);
+}
+
+static std::string merge_annotation_values(const std::vector<std::string> &values) {
+    std::string result;
+    if (values.empty())
+        return result;
+
+    for (const auto &entry : values) {
+        if (entry == "typing.Any")
+            return entry;
+    }
+
+    if (values.size() == 1)
+        return values[0];
+
+    result = "typing.Union[";
+    for (size_t i = 0; i < values.size(); ++i) {
+        result += values[i];
+        if (i + 1 < values.size())
+            result += ", ";
+    }
+    result += "]";
+    return result;
+}
+
+static PyObject *build_annotation_dict(const std::vector<signature_metadata> &metas) {
+    struct annotation_bucket {
+        std::string name;
+        std::vector<std::string> values;
+    };
+
+    std::vector<annotation_bucket> merged;
+    std::vector<std::string> return_values;
+
+    if (!metas.empty()) {
+        merged.reserve(metas.front().parameters.size());
+        return_values.reserve(metas.size());
+    }
+
+    auto find_or_create = [&](const std::string &name) -> annotation_bucket & {
+        for (auto &entry : merged) {
+            if (entry.name == name)
+                return entry;
+        }
+        merged.push_back(annotation_bucket{name, {}});
+        return merged.back();
+    };
+
+    for (const auto &meta : metas) {
+        for (const auto &entry : meta.parameters) {
+            if (!entry.has_annotation)
+                continue;
+            annotation_bucket &slot = find_or_create(entry.name);
+            append_unique_annotation(slot.values, entry.annotation);
+        }
+
+        if (!meta.return_type.empty())
+            append_unique_annotation(return_values, meta.return_type);
     }
 
     PyObject *annotations = PyDict_New();
     if (!annotations)
         return nullptr;
 
-    for (const auto &entry : meta.parameters) {
-        if (!entry.has_annotation)
+    for (const auto &entry : merged) {
+        std::string merged_value = merge_annotation_values(entry.values);
+        if (merged_value.empty())
             continue;
-        PyObject *value = PyUnicode_FromString(entry.annotation.c_str());
-        if (!value || PyDict_SetItemString(annotations, entry.name.c_str(), value) < 0) {
+        PyObject *value = PyUnicode_FromString(merged_value.c_str());
+        if (!value ||
+            PyDict_SetItemString(annotations, entry.name.c_str(), value) < 0) {
             Py_XDECREF(value);
             Py_DECREF(annotations);
             return nullptr;
@@ -513,9 +627,9 @@ PyObject *nb_introspect_annotations(nb_func *, const func_data *f) noexcept {
         Py_DECREF(value);
     }
 
-    trim_inplace(meta.return_type);
-    if (!meta.return_type.empty()) {
-        PyObject *ret = PyUnicode_FromString(meta.return_type.c_str());
+    std::string merged_return = merge_annotation_values(return_values);
+    if (!merged_return.empty()) {
+        PyObject *ret = PyUnicode_FromString(merged_return.c_str());
         if (!ret || PyDict_SetItemString(annotations, "return", ret) < 0) {
             Py_XDECREF(ret);
             Py_DECREF(annotations);
@@ -527,13 +641,7 @@ PyObject *nb_introspect_annotations(nb_func *, const func_data *f) noexcept {
     return annotations;
 }
 
-PyObject *nb_introspect_text_signature(nb_func *, const func_data *f) noexcept {
-    signature_metadata meta;
-    if (!build_signature_metadata(f, meta)) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-
+static PyObject *build_text_signature_from_meta(const signature_metadata &meta) {
     std::string signature = "(";
     for (size_t i = 0; i < meta.sanitized_tokens.size(); ++i) {
         signature += meta.sanitized_tokens[i];
@@ -545,13 +653,7 @@ PyObject *nb_introspect_text_signature(nb_func *, const func_data *f) noexcept {
     return PyUnicode_FromString(signature.c_str());
 }
 
-PyObject *nb_introspect_signature(nb_func *, const func_data *f) noexcept {
-    signature_metadata meta;
-    if (!build_signature_metadata(f, meta)) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-
+static PyObject *build_signature_object(const signature_metadata &meta) {
     if (!ensure_inspect_cache())
         return nullptr;
 
@@ -603,7 +705,8 @@ PyObject *nb_introspect_signature(nb_func *, const func_data *f) noexcept {
 
         if (entry.has_annotation && !entry.annotation.empty()) {
             PyObject *ann = PyUnicode_FromString(entry.annotation.c_str());
-            if (!ann || PyDict_SetItemString(kwargs, "annotation", ann) != 0) {
+            if (!ann ||
+                PyDict_SetItemString(kwargs, "annotation", ann) != 0) {
                 Py_XDECREF(ann);
                 Py_DECREF(kwargs);
                 Py_DECREF(args);
@@ -670,6 +773,77 @@ PyObject *nb_introspect_signature(nb_func *, const func_data *f) noexcept {
     Py_DECREF(empty_args);
     Py_DECREF(kwargs);
     return result;
+}
+
+static signature_metadata build_variadic_signature_metadata() {
+    signature_metadata meta;
+
+    signature_param args;
+    args.name = "args";
+    args.annotation.clear();
+    args.kind = signature_param_kind::var_positional;
+    args.default_value = nullptr;
+    args.has_annotation = false;
+    meta.parameters.push_back(std::move(args));
+
+    signature_param kwargs;
+    kwargs.name = "kwargs";
+    kwargs.annotation.clear();
+    kwargs.kind = signature_param_kind::var_keyword;
+    kwargs.default_value = nullptr;
+    kwargs.has_annotation = false;
+    meta.parameters.push_back(std::move(kwargs));
+
+    return meta;
+}
+
+PyObject *nb_introspect_annotations(nb_func *func, const func_data *f) noexcept {
+    std::vector<signature_metadata> metas;
+    if (!collect_signature_metadata(func, f, metas)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    if (metas.empty() || !signatures_are_compatible(metas)) {
+        PyObject *annotations = PyDict_New();
+        return annotations;
+    }
+
+    return build_annotation_dict(metas);
+}
+
+PyObject *nb_introspect_text_signature(nb_func *func, const func_data *f) noexcept {
+    std::vector<signature_metadata> metas;
+    if (!collect_signature_metadata(func, f, metas)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    if (metas.empty() || !signatures_are_compatible(metas)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    return build_text_signature_from_meta(metas.front());
+}
+
+PyObject *nb_introspect_signature(nb_func *func, const func_data *f) noexcept {
+    std::vector<signature_metadata> metas;
+    if (!collect_signature_metadata(func, f, metas)) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    if (metas.empty()) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+
+    if (signatures_are_compatible(metas))
+        return build_signature_object(metas.front());
+
+    signature_metadata fallback = build_variadic_signature_metadata();
+    return build_signature_object(fallback);
 }
 
 NAMESPACE_END(detail)

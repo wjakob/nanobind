@@ -102,11 +102,6 @@ struct nb_func {
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     bool complex_call;
     bool doc_uniform;
-    /** Cached ``__annotations__``/``__text_signature__`` values for the PEP 3107
-        and PEP 362 bridges. Storing them directly on the descriptor keeps
-        reference counts and getattr fast while avoiding repeated reconstruction. */
-    PyObject *annotations;
-    PyObject *text_signature;
 };
 
 /// Python object representing a `nb_ndarray` (which wraps a DLPack ndarray)

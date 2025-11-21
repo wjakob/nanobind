@@ -10,15 +10,6 @@
 #include "nb_internals.h"
 #include "buffer.h"
 #include "nb_ft.h"
-#include <cctype>
-#include <string>
-#include <string_view>
-#include <vector>
-
-/** The helpers below translate nanobind's metadata into the standard Python
-    introspection hooks mandated by PEP 3107 (``__annotations__``) and PEP 362
-    (``__text_signature__``). Native nanobind callables lack those fields, so we
-    derive them mechanically from the C++ binding information. */
 
 /// Maximum number of arguments supported by 'nb_vectorcall_simple'
 #define NB_MAXARGS_SIMPLE 8
@@ -46,108 +37,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
-
-struct signature_capture_entry {
-    std::string name;
-    std::string type;
-};
-
-struct signature_capture {
-    std::vector<signature_capture_entry> parameters;
-    std::string current_name;
-    std::string current_type;
-    std::string return_type;
-    bool capturing_param = false;
-    bool capturing_return = false;
-};
-
-/** 
- * ``find_top_level``/``trim_view`` are tiny parsing utilities that work on the
- * already rendered docstring signature. They purposely understand just enough
- * syntax to keep ``__text_signature__`` compliant with CPython's parser. 
- */
-static size_t find_top_level(std::string_view text, char target) {
-    int depth = 0;
-    for (size_t i = 0; i < text.size(); ++i) {
-        char ch = text[i];
-        if (ch == '[' || ch == '(' || ch == '{') {
-            depth++;
-        } else if (ch == ']' || ch == ')' || ch == '}') {
-            if (depth > 0)
-                depth--;
-        } else if (ch == target && depth == 0) {
-            return i;
-        }
-    }
-    return std::string_view::npos;
-}
-
-static std::string_view trim_view(std::string_view text) {
-    size_t start = 0;
-    size_t end = text.size();
-    while (start < end && std::isspace(static_cast<unsigned char>(text[start])))
-        start++;
-    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1])))
-        end--;
-    return text.substr(start, end - start);
-}
-
-/** The ``capture_*`` helpers are used by ``nb_func_render_signature`` so that we
-    do not have to re-render the signature when populating the PEP metadata. */
-static void capture_append(signature_capture *capture, const char *data,
-                           size_t size) {
-    if (!capture)
-        return;
-
-    std::string *target = nullptr;
-    if (capture->capturing_param)
-        target = &capture->current_type;
-    else if (capture->capturing_return)
-        target = &capture->return_type;
-
-    if (target)
-        target->append(data, size);
-}
-
-static void capture_append(signature_capture *capture, const char *data) {
-    if (data)
-        capture_append(capture, data, strlen(data));
-}
-
-static void capture_append(signature_capture *capture, char c) {
-    capture_append(capture, &c, 1);
-}
-
-static void capture_start_param(signature_capture *capture,
-                                std::string name) {
-    if (!capture)
-        return;
-    capture->capturing_param = true;
-    capture->current_name = std::move(name);
-    capture->current_type.clear();
-}
-
-static void capture_finish_param(signature_capture *capture) {
-    if (!capture || !capture->capturing_param)
-        return;
-
-    if (capture->current_type.empty())
-        capture->current_type = "typing.Any";
-
-    capture->parameters.push_back({capture->current_name, capture->current_type});
-    capture->capturing_param = false;
-    capture->current_name.clear();
-    capture->current_type.clear();
-}
-
-/** Render a single overload's signature. When ``capture`` is provided it also
-    records the pieces needed to build the PEP 3107/362 metadata later on. */
 static uint32_t nb_func_render_signature(const func_data *f,
-                                         bool nb_signature_mode = false,
-                                         signature_capture *capture = nullptr) noexcept;
-/** Populate ``__annotations__`` and ``__text_signature__`` on the descriptor so
-    nanobind callables satisfy the expectations of PEP 3107/362 tooling. */
-static bool nb_func_apply_introspection(nb_func *func, const func_data *f);
+                                         bool nb_signature_mode = false) noexcept;
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
     size_t size = (size_t) Py_SIZE(self);
@@ -229,12 +120,6 @@ void nb_func_dealloc(PyObject *self) {
         }
     }
 
-    nb_func *nf = (nb_func *) self;
-    // ``annotations`` and ``text_signature`` are borrowed frequently via
-    // ``__getattr__``. Manage their lifetime here so cached references remain
-    // valid and leak-free.
-    Py_XDECREF(nf->annotations);
-    Py_XDECREF(nf->text_signature);
     PyObject_GC_Del(self);
 }
 
@@ -411,8 +296,6 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
           name_cstr);
 
     make_immortal((PyObject *) func);
-    func->annotations = nullptr;
-    func->text_signature = nullptr;
 
     // Check if the complex dispatch loop is needed
     bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||
@@ -604,11 +487,6 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     }
 
     Py_XDECREF(name);
-
-    // Populate ``__annotations__`` / ``__text_signature__`` once so every
-    // descriptor instance exposes the data expected by PEP 3107/362 consumers.
-    if (!nb_func_apply_introspection(func, nb_func_data(func)))
-        PyErr_Clear();
 
     if (return_ref) {
         return (PyObject *) func;
@@ -1258,25 +1136,12 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 /// Render the function signature of a single function. Callers must hold the
 /// 'internals' mutex.
 static uint32_t nb_func_render_signature(const func_data *f,
-                                         bool nb_signature_mode,
-                                         signature_capture *capture) noexcept {
+                                         bool nb_signature_mode) noexcept {
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
                has_args       = f->flags & (uint32_t) func_flags::has_args,
                has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
                has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
                has_signature  = f->flags & (uint32_t) func_flags::has_signature;
-
-    if (capture) {
-        // When the caller requests a ``signature_capture`` (PEP 3107/362
-        // plumbing), ensure the structure starts in a clean state so we don't
-        // leak information across overloads.
-        capture->parameters.clear();
-        capture->current_name.clear();
-        capture->current_type.clear();
-        capture->return_type.clear();
-        capture->capturing_param = false;
-        capture->capturing_return = false;
-    }
 
     nb_internals *internals_ = internals;
     if (has_signature) {
@@ -1336,12 +1201,6 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     if (has_var_kwargs && arg_index + 1 == f->nargs) {
                         buf.put("**");
                         buf.put_dstr(arg_name ? arg_name : "kwargs");
-                        if (capture) {
-                            capture_start_param(capture,
-                                                std::string(arg_name ? arg_name : "kwargs"));
-                            capture->current_type = "typing.Dict[str, typing.Any]";
-                            capture_finish_param(capture);
-                        }
                         pc += 4; // strlen("dict")
                         break;
                     }
@@ -1350,12 +1209,6 @@ static uint32_t nb_func_render_signature(const func_data *f,
                         buf.put("*");
                         if (has_var_args) {
                             buf.put_dstr(arg_name ? arg_name : "args");
-                            if (capture) {
-                                capture_start_param(capture,
-                                                    std::string(arg_name ? arg_name : "args"));
-                                capture->current_type = "typing.Tuple[typing.Any, ...]";
-                                capture_finish_param(capture);
-                            }
                             pc += 5; // strlen("tuple")
                             break;
                         } else {
@@ -1366,8 +1219,6 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
                     if (is_method && arg_index == 0) {
                         buf.put("self");
-                        if (capture)
-                            capture->capturing_param = false;
 
                         // Skip over type
                         while (*pc != '}') {
@@ -1379,24 +1230,17 @@ static uint32_t nb_func_render_signature(const func_data *f,
                         continue;
                     } else if (arg_name) {
                         buf.put_dstr(arg_name);
-                        if (capture)
-                            capture_start_param(capture, std::string(arg_name));
                     } else {
-                        std::string generated = "arg";
+                        buf.put("arg");
                         if (f->nargs > 1 + (uint32_t) is_method)
-                            generated += std::to_string(arg_index - is_method);
-                        buf.put_dstr(generated.c_str());
-                        if (capture)
-                            capture_start_param(capture, generated);
+                            buf.put_uint32(arg_index - is_method);
                     }
 
                     buf.put(": ");
-                    capture_append(capture, ": ", 2);
                     if (has_args && f->args[arg_index].flag &
                                         (uint8_t) cast_flags::accepts_none) {
 #if PY_VERSION_HEX < 0x030A0000
                             buf.put("typing.Optional[");
-                            capture_append(capture, "typing.Optional[");
                         #else
                             // See below
                         #endif
@@ -1410,10 +1254,8 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     if (f->args[arg_index].flag & (uint8_t) cast_flags::accepts_none) {
                         #if PY_VERSION_HEX < 0x030A0000
                             buf.put(']');
-                            capture_append(capture, ']');
                         #else
                             buf.put(" | None");
-                            capture_append(capture, " | None");
                         #endif
                     }
 
@@ -1453,7 +1295,6 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     }
                 }
 
-                capture_finish_param(capture);
                 arg_index++;
 
                 if (arg_index == f->nargs_pos && !has_args)
@@ -1471,14 +1312,9 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
                     if (it != internals_->type_c2p_slow.end()) {
                         handle th((PyObject *) it->second->type_py);
-                        str module = borrow<str>(th.attr("__module__"));
-                        str qualname = borrow<str>(th.attr("__qualname__"));
-                        buf.put_dstr(module.c_str());
-                        capture_append(capture, module.c_str());
+                        buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                         buf.put('.');
-                        capture_append(capture, '.');
-                        buf.put_dstr(qualname.c_str());
-                        capture_append(capture, qualname.c_str());
+                        buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
                         found = true;
                     }
                     if (!found) {
@@ -1486,7 +1322,6 @@ static uint32_t nb_func_render_signature(const func_data *f,
                             buf.put('"');
                         char *name = type_name(*descr_type);
                         buf.put_dstr(name);
-                        capture_append(capture, name);
                         free(name);
                         if (nb_signature_mode)
                             buf.put('"');
@@ -1497,13 +1332,8 @@ static uint32_t nb_func_render_signature(const func_data *f,
                 break;
 
             case '-':
-                if (pc[1] == '>') {
+                if (pc[1] == '>')
                     rv = true;
-                    if (capture) {
-                        capture->capturing_return = true;
-                        capture->return_type.clear();
-                    }
-                }
                 buf.put(c);
                 break;
 
@@ -1527,147 +1357,6 @@ static PyObject *nb_func_get_name(PyObject *self) {
     if (f->flags & (uint32_t) func_flags::has_name)
         name = f->name;
     return PyUnicode_FromString(name);
-}
-
-/** Build PEP-compliant introspection metadata directly on the ``nb_func``
-    descriptor. PEP 3107 expects ``__annotations__`` describing the arguments,
-    while PEP 362 relies on ``__text_signature__`` to recover parameter order.
-    We derive both from nanobind's canonical signature rendering so that
-    downstream Python tooling (inspect, Sphinx, typing) can treat nanobind
-    callables just like builtins. */
-static bool nb_func_apply_introspection(nb_func *func, const func_data *f) {
-    std::string rendered_signature;
-    {
-        lock_internals guard(internals);
-        buf.clear();
-        nb_func_render_signature(f, false);
-        rendered_signature = buf.get();
-    }
-
-    auto paren_open = rendered_signature.find('(');
-    auto paren_close = rendered_signature.rfind(')');
-    std::vector<std::pair<std::string, std::string>> params;
-    /** ``sanitized_tokens`` mirrors the textual argument list but strips all
-        annotations; this mirrors what CPython does for builtin functions so
-        that ``inspect`` can rehydrate the signature. */
-    std::vector<std::string> sanitized_tokens;
-    if (paren_open != std::string::npos && paren_close != std::string::npos &&
-        paren_close > paren_open + 1) {
-        std::string_view params_view(
-            rendered_signature.c_str() + paren_open + 1,
-            paren_close - paren_open - 1
-        );
-        size_t token_start = 0;
-        int depth = 0;
-        auto flush_token = [&](size_t end) {
-            std::string_view token = trim_view(params_view.substr(token_start, end - token_start));
-            token_start = end + 1;
-            if (token.empty())
-                return;
-
-            if (token == "/" || token == "*") {
-                sanitized_tokens.emplace_back(std::string(token));
-                return;
-            }
-
-            if (token[0] == '*') {
-                bool kw = token.size() > 1 && token[1] == '*';
-                std::string_view name_view = trim_view(token.substr(kw ? 2 : 1));
-                if (name_view.empty())
-                    return;
-                std::string type = kw ? "typing.Dict[str, typing.Any]"
-                                      : "typing.Tuple[typing.Any, ...]";
-                params.emplace_back(std::string(name_view), std::move(type));
-                std::string sanitized = kw ? "**" : "*";
-                sanitized.append(name_view.begin(), name_view.end());
-                sanitized_tokens.emplace_back(std::move(sanitized));
-                return;
-            }
-
-            size_t eq_pos = find_top_level(token, '=');
-            std::string_view before = trim_view(token.substr(0, eq_pos));
-            size_t colon_pos = find_top_level(before, ':');
-            std::string_view name_view = trim_view(before.substr(0, colon_pos));
-            if (name_view.empty() || name_view == "self")
-                return;
-            std::string_view type_view;
-            if (colon_pos != std::string_view::npos)
-                type_view = trim_view(before.substr(colon_pos + 1));
-
-            std::string type = type_view.empty() ? "typing.Any" : std::string(type_view);
-            params.emplace_back(std::string(name_view), std::move(type));
-
-            std::string sanitized(name_view.begin(), name_view.end());
-            if (eq_pos != std::string_view::npos) {
-                std::string_view default_view = trim_view(token.substr(eq_pos + 1));
-                if (!default_view.empty()) {
-                    sanitized += " = ";
-                    sanitized.append(default_view.begin(), default_view.end());
-                }
-            }
-            sanitized_tokens.emplace_back(std::move(sanitized));
-        };
-
-        for (size_t i = 0; i < params_view.size(); ++i) {
-            char ch = params_view[i];
-            if (ch == '[' || ch == '(' || ch == '{') {
-                depth++;
-            } else if (ch == ']' || ch == ')' || ch == '}') {
-                if (depth > 0)
-                    depth--;
-            } else if (ch == ',' && depth == 0) {
-                flush_token(i);
-            }
-        }
-        flush_token(params_view.size());
-    }
-
-    PyObject *annotations = PyDict_New();
-    if (!annotations)
-        return false;
-
-    for (const auto &entry : params) {
-        PyObject *value = PyUnicode_FromString(entry.second.c_str());
-        if (!value || PyDict_SetItemString(annotations, entry.first.c_str(), value) < 0) {
-            Py_XDECREF(value);
-            Py_DECREF(annotations);
-            return false;
-        }
-        Py_DECREF(value);
-    }
-
-    auto arrow_pos = rendered_signature.rfind("->");
-    if (arrow_pos != std::string::npos) {
-        std::string_view return_view
-            = trim_view(std::string_view(rendered_signature).substr(arrow_pos + 2));
-        if (!return_view.empty()) {
-            PyObject *ret = PyUnicode_FromString(std::string(return_view).c_str());
-            if (!ret || PyDict_SetItemString(annotations, "return", ret) < 0) {
-                Py_XDECREF(ret);
-                Py_DECREF(annotations);
-                return false;
-            }
-            Py_DECREF(ret);
-        }
-    }
-
-    Py_XDECREF(func->annotations);
-    func->annotations = annotations;
-
-    /** ``inspect`` rejects text signatures containing annotations, so emit the
-        minimal positional structure while keeping the actual typing data in
-        ``__annotations__``. */
-    std::string clean_params;
-    for (size_t i = 0; i < sanitized_tokens.size(); ++i) {
-        clean_params += sanitized_tokens[i];
-        if (i + 1 < sanitized_tokens.size())
-            clean_params += ", ";
-    }
-
-    Py_XDECREF(func->text_signature);
-    func->text_signature = PyUnicode_FromString(("(" + clean_params + ")").c_str());
-
-    return true;
 }
 
 static PyObject *nb_func_get_qualname(PyObject *self) {
@@ -1839,25 +1528,6 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
         return nb_func_get_qualname(self);
     else if (strcmp(name, "__doc__") == 0)
         return nb_func_get_doc(self, nullptr);
-    else if (strcmp(name, "__annotations__") == 0) {
-        // PEP 3107: expose the cached annotations dict to CPython callers.
-        nb_func *func = (nb_func *) self;
-        if (func->annotations) {
-            Py_INCREF(func->annotations);
-            return func->annotations;
-        }
-        Py_INCREF(Py_None);
-        return Py_None;
-    } else if (strcmp(name, "__text_signature__") == 0) {
-        // PEP 362: the sanitized text signature feeds ``inspect.signature``.
-        nb_func *func = (nb_func *) self;
-        if (func->text_signature) {
-            Py_INCREF(func->text_signature);
-            return func->text_signature;
-        }
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
     else
         return PyObject_GenericGetAttr(self, name_);
 }

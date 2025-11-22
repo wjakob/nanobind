@@ -1,12 +1,12 @@
 #include "nb_introspect.h"
-
 #include "nb_internals.h"
-
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
+#include <algorithm>
+
 #if defined(__GNUG__)
 #  include <cxxabi.h>
 #endif
@@ -20,864 +20,488 @@ NAMESPACE_BEGIN(detail)
 
 namespace {
 
-/* PEP 3107/362 helpers:
-   - NB_INTROSPECT_SKIP_NB_SIG (default 1) controls whether overloads that
-     used nb::sig skip PEP metadata (1) or are parsed like regular overloads (0).
-   - Only merge overloads when parameter order, names, kinds, and sanitized
-     tokens align; otherwise surface empty annotations and None for
-     __signature__/__text_signature__.
-   - For compatible overloads, annotations/return types are merged (Union when
-     multiple concrete values, typing.Any when unspecified) and reused by all
-     three exported attributes. */
-
-static char *dup_string(const char *s) {
-#if defined(_WIN32)
-    char *result = _strdup(s);
-#else
-    char *result = strdup(s);
-#endif
-    if (!result)
-        fail("nanobind: strdup() failed!");
-    return result;
-}
-
-static char *type_name_local(const std::type_info *t) {
-    const char *name_in = t->name();
-#if defined(__GNUG__)
-    int status = 0;
-    char *name = abi::__cxa_demangle(name_in, nullptr, nullptr, &status);
-    if (!name)
-        return dup_string(name_in);
-#else
-    char *name = dup_string(name_in);
-    auto strexc = [](char *str, const char *sub) {
-        size_t len = strlen(sub);
-        if (len == 0)
-            return;
-        char *p = str;
-        while ((p = strstr(p, sub)))
-            memmove(p, p + len, strlen(p + len) + 1);
-    };
-    strexc(name, "class ");
-    strexc(name, "struct ");
-    strexc(name, "enum ");
-#endif
-    return name;
-}
-
-NB_INLINE void trim_inplace(std::string &value) {
-    size_t start = 0;
-    while (start < value.size() && std::isspace((unsigned char) value[start]))
-        ++start;
-    size_t end = value.size();
-    while (end > start && std::isspace((unsigned char) value[end - 1]))
-        --end;
-    if (start != 0 || end != value.size())
-        value = value.substr(start, end - start);
-}
-
-enum class signature_param_kind {
-    positional_only,
-    positional_or_keyword,
-    keyword_only,
-    var_positional,
-    var_keyword
-};
-
-struct signature_param {
-    std::string name;
-    std::string annotation;
-    signature_param_kind kind;
-    PyObject *default_value = nullptr;
-    bool has_annotation = false;
-};
-
-struct signature_metadata {
-    std::vector<signature_param> parameters;
-    std::vector<std::string> sanitized_tokens;
-    std::string return_type;
-};
-
-struct param_state {
-    signature_param entry;
-    std::string sanitized;
-    bool active = false;
-    bool annotate = false;
-    bool collecting = false;
-    const arg_data *arg_info = nullptr;
-#if PY_VERSION_HEX < 0x030A0000
-    bool optional_wrap = false;
-#else
-    bool optional_suffix = false;
-#endif
-};
-
-struct metadata_builder {
-    signature_metadata &meta;
-    param_state param;
-    bool capturing_return = false;
-
-    explicit metadata_builder(signature_metadata &m) : meta(m) { }
-
-    void reset_param() { param = param_state(); }
-
-    void start_param(std::string name, signature_param_kind kind, bool annotate,
-                     bool include_token, const arg_data *arg_info) {
-        param.active = true;
-        param.annotate = annotate;
-        param.collecting = false;
-        param.entry.name = std::move(name);
-        param.entry.annotation.clear();
-        param.entry.kind = kind;
-        param.entry.default_value = arg_info ? arg_info->value : nullptr;
-        param.entry.has_annotation = annotate;
-        param.arg_info = arg_info;
-        param.sanitized = include_token ? param.entry.name : std::string();
-#if PY_VERSION_HEX < 0x030A0000
-        param.optional_wrap = false;
-#else
-        param.optional_suffix = false;
-#endif
-    }
-
-    void append_annotation(const char *data, size_t size) {
-        if (size == 0)
-            return;
-        if (capturing_return) {
-            meta.return_type.append(data, size);
-            return;
-        }
-        // Append annotation data for the active parameter when annotation
-        // collection is enabled. Previously this required 'collecting' to be
-        // true (set when a ':' token was encountered). However, type tokens
-        // produced by '%' in the descriptor should always contribute to the
-        // parameter annotation even if a ':' token wasn't present in the
-        // descriptor. Relax the condition so that active/annotate is enough
-        // to accept these type tokens.
-        if (param.active && param.annotate)
-            param.entry.annotation.append(data, size);
-    }
-
-    void append_annotation(char c) { append_annotation(&c, 1); }
-
-    void append_sanitized(const char *data) {
-        if (param.active && !param.sanitized.empty())
-            param.sanitized.append(data);
-    }
-
-    void append_sanitized(const char *data, size_t size) {
-        if (param.active && !param.sanitized.empty())
-            param.sanitized.append(data, size);
-    }
-
-    void finish_param() {
-        if (!param.active)
-            return;
-
-        const arg_data *arg_info = param.arg_info;
-        if (arg_info && arg_info->value) {
-            if (arg_info->signature) {
-                append_sanitized(" = ");
-                append_sanitized(arg_info->signature);
-            } else {
-                PyObject *repr = PyObject_Repr(arg_info->value);
-                if (repr) {
-                    Py_ssize_t size = 0;
-                    const char *cstr = PyUnicode_AsUTF8AndSize(repr, &size);
-                    if (cstr) {
-                        append_sanitized(" = ");
-                        append_sanitized(cstr, (size_t) size);
-                    }
-                    Py_DECREF(repr);
-                } else {
-                    PyErr_Clear();
-                }
-            }
-        }
-
-#if PY_VERSION_HEX < 0x030A0000
-        if (param.optional_wrap)
-            param.entry.annotation.push_back(']');
-#else
-        if (param.annotate && param.optional_suffix)
-            param.entry.annotation.append(" | None");
-#endif
-
-        if (param.annotate) {
-            trim_inplace(param.entry.annotation);
-            if (param.entry.annotation.empty())
-                param.entry.has_annotation = false;
-            else
-                param.entry.has_annotation = true;
-        } else {
-            param.entry.annotation.clear();
-            param.entry.has_annotation = false;
-        }
-
-        meta.parameters.push_back(param.entry);
-
-        if (!param.sanitized.empty())
-            meta.sanitized_tokens.emplace_back(std::move(param.sanitized));
-
-        reset_param();
-    }
-};
-
-struct inspect_cache {
+// Helper that loads inspect module objects on-demand (performance is secondary).
+struct inspect_handles {
+    PyObject *module = nullptr;
     PyObject *parameter = nullptr;
     PyObject *signature = nullptr;
     PyObject *empty = nullptr;
-    PyObject *kind_positional_only = nullptr;
-    PyObject *kind_positional_or_keyword = nullptr;
-    PyObject *kind_keyword_only = nullptr;
-    PyObject *kind_var_positional = nullptr;
-    PyObject *kind_var_keyword = nullptr;
+    PyObject *kinds[5] = {nullptr};
+
+    ~inspect_handles() {
+        Py_XDECREF(parameter);
+        Py_XDECREF(signature);
+        Py_XDECREF(empty);
+        for (PyObject *&kind : kinds)
+            Py_XDECREF(kind);
+        Py_XDECREF(module);
+    }
+
+    bool init() {
+        module = PyImport_ImportModule("inspect");
+        if (!module)
+            return false;
+
+        parameter = PyObject_GetAttrString(module, "Parameter");
+        signature = PyObject_GetAttrString(module, "Signature");
+        empty = PyObject_GetAttrString(module, "_empty");
+        if (!parameter || !signature || !empty)
+            return false;
+
+        const char *names[5] = {
+            "POSITIONAL_ONLY", "POSITIONAL_OR_KEYWORD", "KEYWORD_ONLY",
+            "VAR_POSITIONAL", "VAR_KEYWORD"
+        };
+        for (size_t i = 0; i < 5; ++i) {
+            kinds[i] = PyObject_GetAttrString(parameter, names[i]);
+            if (!kinds[i])
+                return false;
+        }
+
+        return true;
+    }
 };
 
-static inspect_cache g_inspect;
+enum class param_kind { pos_only = 0, pos_or_kw, kw_only, var_pos, var_kw };
 
-static bool ensure_inspect_cache() noexcept {
-    if (g_inspect.parameter)
-        return true;
+struct sig_param {
+    std::string name, annotation;
+    param_kind kind;
+    PyObject *def_val = nullptr;
+    bool has_anno = false;
 
-    PyObject *inspect = PyImport_ImportModule("inspect");
-    if (!inspect)
-        return false;
+    /// Checks equality for overload merging
+    bool operator==(const sig_param &o) const {
+        return name == o.name && kind == o.kind;
+    }
+};
 
-    PyObject *parameter = nullptr, *signature = nullptr, *empty = nullptr;
-    PyObject *pos_only = nullptr, *pos_or_kw = nullptr, *kw_only = nullptr;
-    PyObject *var_pos = nullptr, *var_kw = nullptr;
+struct sig_meta {
+    std::vector<sig_param> params;
+    std::vector<std::string> tokens;
+    std::string ret_type;
+};
 
-    parameter = PyObject_GetAttrString(inspect, "Parameter");
-    signature = PyObject_GetAttrString(inspect, "Signature");
-    empty = PyObject_GetAttrString(inspect, "_empty");
-    if (!parameter || !signature || !empty)
-        goto fail;
-
-    pos_only = PyObject_GetAttrString(parameter, "POSITIONAL_ONLY");
-    pos_or_kw = PyObject_GetAttrString(parameter, "POSITIONAL_OR_KEYWORD");
-    kw_only = PyObject_GetAttrString(parameter, "KEYWORD_ONLY");
-    var_pos = PyObject_GetAttrString(parameter, "VAR_POSITIONAL");
-    var_kw = PyObject_GetAttrString(parameter, "VAR_KEYWORD");
-    if (!pos_only || !pos_or_kw || !kw_only || !var_pos || !var_kw)
-        goto fail;
-
-    g_inspect.parameter = parameter;
-    g_inspect.signature = signature;
-    g_inspect.empty = empty;
-    g_inspect.kind_positional_only = pos_only;
-    g_inspect.kind_positional_or_keyword = pos_or_kw;
-    g_inspect.kind_keyword_only = kw_only;
-    g_inspect.kind_var_positional = var_pos;
-    g_inspect.kind_var_keyword = var_kw;
-    Py_DECREF(inspect);
-    return true;
-
-fail:
-    Py_XDECREF(parameter);
-    Py_XDECREF(signature);
-    Py_XDECREF(empty);
-    Py_XDECREF(pos_only);
-    Py_XDECREF(pos_or_kw);
-    Py_XDECREF(kw_only);
-    Py_XDECREF(var_pos);
-    Py_XDECREF(var_kw);
-    Py_DECREF(inspect);
-    return false;
+/**
+ * @brief Demangles C++ type name and strips keywords (class/struct) for cleaner display.
+ * @param t The type_info to demangle.
+ * @return formatted std::string.
+ */
+static std::string type_name_local(const std::type_info *t) {
+    const char *name_in = t->name();
+#if defined(__GNUG__)
+    int status = 0;
+    char *demangled = abi::__cxa_demangle(name_in, nullptr, nullptr, &status);
+    std::string res = demangled ? demangled : name_in;
+    free(demangled);
+#else
+    std::string res = name_in;
+    for (const char *sub : {"class ", "struct ", "enum "}) {
+        size_t p = 0, len = strlen(sub);
+        while ((p = res.find(sub, p)) != std::string::npos) res.erase(p, len);
+    }
+#endif
+    return res;
 }
 
-static PyObject *inspect_kind_object(signature_param_kind kind) {
-    switch (kind) {
-        case signature_param_kind::positional_only:
-            return g_inspect.kind_positional_only;
-        case signature_param_kind::positional_or_keyword:
-            return g_inspect.kind_positional_or_keyword;
-        case signature_param_kind::keyword_only:
-            return g_inspect.kind_keyword_only;
-        case signature_param_kind::var_positional:
-            return g_inspect.kind_var_positional;
-        case signature_param_kind::var_keyword:
-            return g_inspect.kind_var_keyword;
-        default:
-            return g_inspect.kind_positional_or_keyword;
-    }
+/**
+ * @brief Trims whitespace from the ends of a string in-place.
+ */
+static void trim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
 }
 
 } // namespace
 
-// Build a single overload's parameter/return description; skip when nb::sig is present.
-static bool build_signature_metadata(const func_data *f,
-                                     signature_metadata &out) noexcept {
+/**
+ * @brief Parses nanobind function descriptor to build signature metadata.
+ * @param f Function data pointer.
+ * @param out Output metadata structure.
+ * @return true if successful and should be used, false if skipped.
+ */
+static bool build_meta(const func_data *f, sig_meta &out) noexcept {
 #if NB_INTROSPECT_SKIP_NB_SIG
-    if (f->flags & (uint32_t) func_flags::has_signature)
-        return false;
+    if (f->flags & (uint32_t) func_flags::has_signature) return false;
 #endif
 
-    const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
-               has_args       = f->flags & (uint32_t) func_flags::has_args,
-               has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
-               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
+    bool is_method = f->flags & (uint32_t) func_flags::is_method;
+    bool has_args = f->flags & (uint32_t) func_flags::has_args;
+    bool has_vargs = f->flags & (uint32_t) func_flags::has_var_args;
+    bool has_vkwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
 
-    out.parameters.clear();
-    out.sanitized_tokens.clear();
-    out.return_type.clear();
+    out.params.clear(); out.tokens.clear(); out.ret_type.clear();
+    
+    const std::type_info **dtypes = f->descr_types;
+    uint32_t arg_idx = 0;
+    bool capturing_ret = false;
+    bool kw_section = false;
 
-    nb_internals *internals_ = internals;
-    metadata_builder builder(out);
+    // State for the parameter currently being parsed
+    struct {
+        sig_param p;
+        std::string sanitized;
+        bool active = false, annotate = false, collect_anno = false, opt_suffix = false;
+    } curr;
 
-    const bool positional_only_section = !has_args;
-    bool keyword_only_section = false;
-
-    const std::type_info **descr_type = f->descr_types;
-    uint32_t arg_index = 0;
-    bool rv = false;
-
-    auto current_kind = [&](uint32_t) {
-        if (keyword_only_section)
-            return signature_param_kind::keyword_only;
-        return positional_only_section ? signature_param_kind::positional_only
-                                       : signature_param_kind::positional_or_keyword;
-    };
-
-    auto flush_optional = [&](uint32_t index) {
-        if (!has_args)
-            return;
-        const arg_data &arg = f->args[index];
-        if (arg.flag & (uint8_t) cast_flags::accepts_none) {
-#if PY_VERSION_HEX < 0x030A0000
-            builder.param.entry.annotation.append("typing.Optional[");
-            builder.param.optional_wrap = true;
-#else
-            builder.param.optional_suffix = true;
-#endif
+    auto finish_param = [&]() {
+        if (!curr.active) return;
+        // Append default value representation if available
+        if (curr.p.def_val) {
+            const char *sig = curr.p.def_val ? f->args[arg_idx].signature : nullptr;
+            curr.sanitized += " = ";
+            if (sig) curr.sanitized += sig;
+            else {
+                PyObject *r = PyObject_Repr(curr.p.def_val);
+                Py_ssize_t sz; const char *s = PyUnicode_AsUTF8AndSize(r, &sz);
+                if (s) curr.sanitized.append(s, sz);
+                Py_XDECREF(r);
+            }
         }
+        // Handle Optional[] suffix for Python < 3.10 or | None for >= 3.10 logic
+        // Simplified here to just use Union/Optional logic or suffixes
+#if PY_VERSION_HEX >= 0x030A0000
+        if (curr.annotate && curr.opt_suffix) curr.p.annotation += " | None";
+#else
+        if (curr.opt_suffix) curr.p.annotation += "]"; // Assumes Optional[ was prepended
+#endif
+        trim(curr.p.annotation);
+        curr.p.has_anno = !curr.p.annotation.empty();
+        out.params.push_back(std::move(curr.p));
+        if (!curr.sanitized.empty()) out.tokens.push_back(std::move(curr.sanitized));
+        curr = {}; // reset
     };
 
-    for (const char *pc = f->descr; *pc != '\0'; ++pc) {
-        char c = *pc;
-
-        switch (c) {
-            case '@':
-                pc++;
-                if (!rv) {
-                    while (*pc && *pc != '@')
-                        builder.append_annotation(*pc++);
+    for (const char *pc = f->descr; *pc; ++pc) {
+        switch (*pc) {
+            case '@': {
+                ++pc;
+                if (!capturing_ret) {
+                    while (*pc && *pc != '@') {
+                        if (curr.active && curr.annotate)
+                            curr.p.annotation.push_back(*pc);
+                        ++pc;
+                    }
                     if (*pc == '@')
-                        pc++;
+                        ++pc;
                     while (*pc && *pc != '@')
-                        pc++;
+                        ++pc;
                 } else {
                     while (*pc && *pc != '@')
-                        pc++;
+                        ++pc;
                     if (*pc == '@')
-                        pc++;
-                    while (*pc && *pc != '@')
-                        builder.append_annotation(*pc++);
-                }
-                break;
-
-            case '{':
-                {
-                    const char *arg_name = has_args ? f->args[arg_index].name : nullptr;
-
-                    if (has_var_kwargs && arg_index + 1 == f->nargs) {
-                        std::string name = arg_name ? arg_name : "kwargs";
-                        signature_param entry;
-                        entry.name = name;
-                        entry.annotation = "typing.Dict[str, typing.Any]";
-                        entry.kind = signature_param_kind::var_keyword;
-                        entry.default_value = nullptr;
-                        entry.has_annotation = true;
-                        out.parameters.push_back(std::move(entry));
-                        out.sanitized_tokens.emplace_back(std::string("**") + name);
-                        pc += 4;
-                        break;
-                    }
-
-                    if (arg_index == f->nargs_pos) {
-                        if (has_var_args) {
-                            std::string name = arg_name ? arg_name : "args";
-                            signature_param entry;
-                            entry.name = name;
-                            entry.annotation = "typing.Tuple[typing.Any, ...]";
-                            entry.kind = signature_param_kind::var_positional;
-                            entry.default_value = nullptr;
-                            entry.has_annotation = true;
-                            out.parameters.push_back(std::move(entry));
-                            out.sanitized_tokens.emplace_back(std::string("*") + name);
-                            keyword_only_section = true;
-                            pc += 5;
-                            break;
-                        } else {
-                            out.sanitized_tokens.emplace_back("*");
-                            keyword_only_section = true;
-                        }
-                    }
-
-                    if (is_method && arg_index == 0) {
-                        out.sanitized_tokens.emplace_back("self");
-                        signature_param entry;
-                        entry.name = "self";
-                        entry.annotation.clear();
-                        entry.kind = current_kind(arg_index);
-                        entry.default_value = nullptr;
-                        entry.has_annotation = false;
-                        out.parameters.push_back(std::move(entry));
-                        while (*pc != '}') {
-                            if (*pc == '%')
-                                descr_type++;
-                            pc++;
-                        }
-                        arg_index++;
-                        break;
-                    }
-
-                    std::string param_name;
-                    if (arg_name) {
-                        param_name = arg_name;
-                    } else {
-                        param_name = "arg";
-                        if (f->nargs > 1 + (uint32_t) is_method)
-                            param_name += std::to_string(arg_index - is_method);
-                    }
-
-                    const arg_data *arg_info = has_args ? (f->args + arg_index) : nullptr;
-                    signature_param_kind kind = current_kind(arg_index);
-                    builder.start_param(param_name, kind, true, true, arg_info);
-                    flush_optional(arg_index);
-                }
-                break;
-
-            case '}':
-                builder.finish_param();
-                arg_index++;
-                if (arg_index == f->nargs_pos && !has_args)
-                    out.sanitized_tokens.emplace_back("/");
-                break;
-
-            case '%':
-                check(*descr_type,
-                      "nanobind::detail::build_signature_metadata(): missing type!");
-
-                if (!(is_method && arg_index == 0)) {
-                    bool found = false;
-                    auto it = internals_->type_c2p_slow.find(*descr_type);
-
-                    if (it != internals_->type_c2p_slow.end()) {
-                        handle th((PyObject *) it->second->type_py);
-                        str module = borrow<str>(th.attr("__module__"));
-                        str qualname = borrow<str>(th.attr("__qualname__"));
-                        builder.append_annotation(module.c_str(), strlen(module.c_str()));
-                        builder.append_annotation('.');
-                        builder.append_annotation(qualname.c_str(), strlen(qualname.c_str()));
-                        found = true;
-                    }
-
-                    if (!found) {
-                        char *name = type_name_local(*descr_type);
-                        builder.append_annotation(name, strlen(name));
-                        free(name);
+                        ++pc;
+                    while (*pc && *pc != '@') {
+                        out.ret_type.push_back(*pc);
+                        ++pc;
                     }
                 }
-
-                descr_type++;
-                break;
-
-            case '-':
-                if (pc[1] == '>') {
-                    rv = true;
-                    builder.capturing_return = true;
-                    out.return_type.clear();
-                    ++pc;
-                    break;
-                }
-                builder.append_annotation(c);
-                break;
-
-            default:
-                if (builder.param.active && c == ':') {
-                    builder.param.collecting = true;
-                    break;
-                }
-                builder.append_annotation(c);
-                break;
-        }
-    }
-
-    check(arg_index == f->nargs && !*descr_type,
-          "nanobind::detail::build_signature_metadata(%s): argument inconsistency.",
-          f->name);
-
-    trim_inplace(out.return_type);
-    return true;
-}
-
-static bool signatures_are_compatible(const std::vector<signature_metadata> &metas);
-
-enum class metadata_state {
-    skip,
-    empty,
-    incompatible,
-    compatible
-};
-
-// Traverse all overloads, classify compatibility, and short-circuit on skip.
-static metadata_state collect_signature_metadata(nb_func *func, const func_data *f,
-                                                 std::vector<signature_metadata> &out) noexcept {
-    Py_ssize_t overloads = Py_SIZE((PyObject *) func);
-    if (overloads < 1)
-        overloads = 1;
-
-    out.clear();
-    out.reserve((size_t) overloads);
-
-    for (Py_ssize_t i = 0; i < overloads; ++i) {
-        signature_metadata meta;
-        if (!build_signature_metadata(f + i, meta))
-            return metadata_state::skip;
-        out.emplace_back(std::move(meta));
-    }
-
-    if (out.empty())
-        return metadata_state::empty;
-
-    if (!signatures_are_compatible(out))
-        return metadata_state::incompatible;
-
-    return metadata_state::compatible;
-}
-
-// Overloads are mergeable only when layout and tokens match exactly.
-static bool signatures_are_compatible(const std::vector<signature_metadata> &metas) {
-    if (metas.empty())
-        return true;
-
-    const signature_metadata &first = metas.front();
-    for (size_t i = 1; i < metas.size(); ++i) {
-        const signature_metadata &other = metas[i];
-        if (first.parameters.size() != other.parameters.size())
-            return false;
-
-        for (size_t j = 0; j < first.parameters.size(); ++j) {
-            const signature_param &a = first.parameters[j];
-            const signature_param &b = other.parameters[j];
-            if (a.name != b.name || a.kind != b.kind)
-                return false;
-        }
-
-        if (first.sanitized_tokens.size() != other.sanitized_tokens.size())
-            return false;
-
-        for (size_t j = 0; j < first.sanitized_tokens.size(); ++j) {
-            if (first.sanitized_tokens[j] != other.sanitized_tokens[j])
-                return false;
-        }
-    }
-
-    return true;
-}
-
-static void append_unique_annotation(std::vector<std::string> &values,
-                                     const std::string &value) {
-    if (value.empty())
-        return;
-
-    for (const auto &existing : values) {
-        if (existing == value)
-            return;
-    }
-
-    values.push_back(value);
-}
-
-static std::string merge_annotation_values(const std::vector<std::string> &values) {
-    std::string result;
-    if (values.empty())
-        return result;
-
-    for (const auto &entry : values) {
-        if (entry == "typing.Any")
-            return entry;
-    }
-
-    if (values.size() == 1)
-        return values[0];
-
-    result = "typing.Union[";
-    for (size_t i = 0; i < values.size(); ++i) {
-        result += values[i];
-        if (i + 1 < values.size())
-            result += ", ";
-    }
-    result += "]";
-    return result;
-}
-
-static PyObject *build_annotation_dict(const std::vector<signature_metadata> &metas) {
-    struct annotation_bucket {
-        std::string name;
-        std::vector<std::string> values;
-    };
-
-    std::vector<annotation_bucket> merged;
-    std::vector<std::string> return_values;
-
-    if (!metas.empty()) {
-        merged.reserve(metas.front().parameters.size());
-        return_values.reserve(metas.size());
-        for (const auto &p : metas.front().parameters)
-            merged.push_back(annotation_bucket{p.name, {}});
-    }
-
-    auto find_or_create = [&](const std::string &name) -> annotation_bucket & {
-        for (auto &entry : merged) {
-            if (entry.name == name)
-                return entry;
-        }
-        merged.push_back(annotation_bucket{name, {}});
-        return merged.back();
-    };
-
-    for (const auto &meta : metas) {
-        for (const auto &entry : meta.parameters) {
-            if (!entry.has_annotation)
                 continue;
-            annotation_bucket &slot = find_or_create(entry.name);
-            append_unique_annotation(slot.values, entry.annotation);
+            }
+            case '{': {
+                const char *aname_ptr = has_args ? f->args[arg_idx].name : nullptr;
+                std::string name_val; // Renamed to avoid collision with 'name' from earlier context
+
+                // Check for **kwargs
+                if (has_vkwargs && arg_idx + 1 == f->nargs) {
+                    name_val = aname_ptr ? aname_ptr : "kwargs";
+                    out.params.push_back({name_val, "typing.Dict[str, typing.Any]", param_kind::var_kw, nullptr, true});
+                    out.tokens.push_back("**" + name_val);
+                    pc += 4; break;
+                }
+                
+                // Check for *args or end of positional args
+                if (arg_idx == f->nargs_pos) {
+                    if (has_vargs) {
+                        name_val = aname_ptr ? aname_ptr : "args";
+                        out.params.push_back({name_val, "typing.Tuple[typing.Any, ...]", param_kind::var_pos, nullptr, true});
+                        out.tokens.push_back("*" + name_val);
+                        kw_section = true; pc += 5; break;
+                    }
+                    out.tokens.emplace_back("*");
+                    kw_section = true;
+                }
+
+                // Handle 'self'
+                if (is_method && arg_idx == 0) {
+                    out.tokens.emplace_back("self");
+                    out.params.push_back({"self", "", param_kind::pos_only, nullptr, false});
+                    while (*pc != '}') { if (*pc == '%') dtypes++; pc++; }
+                    arg_idx++; break;
+                }
+
+                // Regular Argument
+                if (aname_ptr) {
+                    name_val = aname_ptr;
+                } else {
+                    name_val = "arg";
+                    // Only append index if more than one argument or is_method is true (for self)
+                    // The original code was `if (f->nargs > 1 + (uint32_t) is_method)`
+                    // which means it appends index if there are more than 1 'effective' argument.
+                    // effective_arg_idx is already the index relative to non-self arguments.
+                    // So, if (f->nargs > 1 && !is_method) || (f->nargs > 2 && is_method)
+                    // This is equivalent to checking if effective_arg_idx is > 0 OR
+                    // if there are multiple arguments (f->nargs - (uint32_t)is_method) > 1
+                    if ((f->nargs - (uint32_t) is_method) > 1 ) {
+                       name_val += std::to_string(arg_idx - is_method);
+                    }
+                }
+                curr.active = true; curr.annotate = true; curr.p.name = name_val;
+                curr.p.kind = kw_section ? param_kind::kw_only : (!has_args ? param_kind::pos_only : param_kind::pos_or_kw);
+                curr.p.def_val = has_args ? f->args[arg_idx].value : nullptr;
+                curr.sanitized = name_val;
+                
+                if (has_args && (f->args[arg_idx].flag & (uint8_t) cast_flags::accepts_none)) {
+#if PY_VERSION_HEX < 0x030A0000
+                    curr.p.annotation += "typing.Optional[";
+#endif
+                    curr.opt_suffix = true;
+                }
+                break;
+            }
+            case '}': 
+                finish_param(); 
+                if (++arg_idx == f->nargs_pos && !has_args) out.tokens.emplace_back("/");
+                break;
+            case '%': {
+                std::string type_str;
+                auto it = internals->type_c2p_slow.find(*dtypes);
+                if (it != internals->type_c2p_slow.end()) {
+                    handle th((PyObject *)it->second->type_py);
+                    type_str = std::string(borrow<str>(th.attr("__module__")).c_str());
+                    type_str += ".";
+                    type_str += std::string(borrow<str>(th.attr("__qualname__")).c_str());
+                } else {
+                    type_str = type_name_local(*dtypes);
+                }
+                
+                if (capturing_ret) out.ret_type += type_str;
+                else if (curr.active && curr.annotate) curr.p.annotation += type_str;
+                dtypes++;
+                break;
+            }
+            case '-':
+                if (pc[1] == '>') { capturing_ret = true; pc++; }
+                else if (curr.active && curr.annotate) curr.p.annotation += *pc;
+                break;
+            case ':':
+                if (curr.active) curr.collect_anno = true; // fallthrough
+            default:
+                if (capturing_ret) out.ret_type += *pc;
+                else if (curr.active && curr.annotate) curr.p.annotation += *pc;
+
         }
-
-        if (!meta.return_type.empty())
-            append_unique_annotation(return_values, meta.return_type);
     }
-
-    PyObject *annotations = PyDict_New();
-    if (!annotations)
-        return nullptr;
-
-    for (const auto &entry : merged) {
-        std::string merged_value = merge_annotation_values(entry.values);
-        if (merged_value.empty())
-            merged_value = "typing.Any";
-        PyObject *value = PyUnicode_FromString(merged_value.c_str());
-        if (!value ||
-            PyDict_SetItemString(annotations, entry.name.c_str(), value) < 0) {
-            Py_XDECREF(value);
-            Py_DECREF(annotations);
-            return nullptr;
-        }
-        Py_DECREF(value);
-    }
-
-    std::string merged_return = merge_annotation_values(return_values);
-    if (!merged_return.empty()) {
-        PyObject *ret = PyUnicode_FromString(merged_return.c_str());
-        if (!ret || PyDict_SetItemString(annotations, "return", ret) < 0) {
-            Py_XDECREF(ret);
-            Py_DECREF(annotations);
-            return nullptr;
-        }
-        Py_DECREF(ret);
-    }
-
-    return annotations;
+    trim(out.ret_type);
+    return true;
 }
 
-// Render the compact text signature string from sanitized tokens.
-static PyObject *build_text_signature_from_meta(const signature_metadata &meta) {
-    std::string signature = "(";
-    for (size_t i = 0; i < meta.sanitized_tokens.size(); ++i) {
-        signature += meta.sanitized_tokens[i];
-        if (i + 1 < meta.sanitized_tokens.size())
-            signature += ", ";
-    }
-    signature += ")";
-
-    return PyUnicode_FromString(signature.c_str());
-}
-
-// Materialize inspect.Signature using cached inspect objects.
-static PyObject *build_signature_object(const signature_metadata &meta) {
-    if (!ensure_inspect_cache())
-        return nullptr;
-
-    Py_ssize_t count = (Py_ssize_t) meta.parameters.size();
-    PyObject *param_list = PyList_New(count);
-    if (!param_list)
-        return nullptr;
+/**
+ * @brief Collects and merges metadata for all overloads.
+ * @param func The nanobind function object.
+ * @param f The function data array.
+ * @return A merged dict (annotations) or specific error/empty states.
+ */
+static std::vector<sig_meta> collect_metas(nb_func *func, const func_data *f) {
+    std::vector<sig_meta> metas;
+    Py_ssize_t count = Py_SIZE((PyObject *) func);
+    if (count < 1) count = 1;
 
     for (Py_ssize_t i = 0; i < count; ++i) {
-        const signature_param &entry = meta.parameters[(size_t) i];
-        PyObject *name = PyUnicode_FromString(entry.name.c_str());
-        if (!name) {
-            Py_DECREF(param_list);
-            return nullptr;
+        sig_meta m;
+        if (build_meta(f + i, m)) metas.push_back(std::move(m));
+        else return {}; // Skip detected
+    }
+    
+    // Check compatibility: params must match exactly, tokens must match
+    if (!metas.empty()) {
+        const auto &base = metas[0];
+        for (size_t i = 1; i < metas.size(); ++i) {
+            if (metas[i].params != base.params || metas[i].tokens != base.tokens) return {}; 
         }
+    }
+    return metas;
+}
 
-        PyObject *kind = inspect_kind_object(entry.kind);
-        Py_INCREF(kind);
+/**
+ * @brief Constructs the __annotations__ dictionary.
+ */
+PyObject *nb_introspect_annotations(nb_func *func, const func_data *f) noexcept {
+    auto metas = collect_metas(func, f);
+    if (metas.empty()) return PyDict_New();
 
-        PyObject *args = PyTuple_New(2);
-        if (!args) {
-            Py_DECREF(name);
-            Py_DECREF(kind);
-            Py_DECREF(param_list);
-            return nullptr;
-        }
-        if (PyTuple_SetItem(args, 0, name) != 0) {
-            Py_DECREF(kind);
-            Py_DECREF(args);
-            Py_DECREF(param_list);
-            return nullptr;
-        }
-        if (PyTuple_SetItem(args, 1, kind) != 0) {
-            Py_DECREF(kind);
-            Py_DECREF(args);
-            Py_DECREF(param_list);
-            return nullptr;
-        }
+    PyObject *dict = PyDict_New();
+    if (!dict) return nullptr;
 
+    auto merge_vals = [](const std::vector<std::string> &vals) -> std::string {
+        if (vals.empty()) return "";
+        if (std::find(vals.begin(), vals.end(), "typing.Any") != vals.end()) return "typing.Any";
+        if (vals.size() == 1) return vals[0];
+        std::string res = "typing.Union[";
+        for (size_t i = 0; i < vals.size(); ++i) res += (i ? ", " : "") + vals[i];
+        return res + "]";
+    };
+
+    // Merge logic: iterate params of first overload (structure is identical)
+    for (size_t i = 0; i < metas[0].params.size(); ++i) {
+        const auto &p_base = metas[0].params[i];
+
+        
+        std::vector<std::string> distinct;
+        for (const auto &m : metas) {
+            const auto &val = m.params[i].annotation;
+            if (!val.empty() && std::find(distinct.begin(), distinct.end(), val) == distinct.end())
+                distinct.push_back(val);
+        }
+        
+        std::string merged = merge_vals(distinct);
+        if (merged.empty()) merged = "typing.Any";
+        
+        PyObject *s = PyUnicode_FromString(merged.c_str());
+        if (s) { PyDict_SetItemString(dict, p_base.name.c_str(), s); Py_DECREF(s); }
+    }
+
+    // Merge return type
+    std::vector<std::string> distinct_rets;
+    for (const auto &m : metas) {
+        if (!m.ret_type.empty() && std::find(distinct_rets.begin(), distinct_rets.end(), m.ret_type) == distinct_rets.end())
+            distinct_rets.push_back(m.ret_type);
+    }
+    std::string ret = merge_vals(distinct_rets);
+    if (!ret.empty()) {
+        PyObject *s = PyUnicode_FromString(ret.c_str());
+        if (s) { PyDict_SetItemString(dict, "return", s); Py_DECREF(s); }
+    }
+    return dict;
+}
+
+/**
+ * @brief Constructs the __text_signature__ string.
+ */
+PyObject *nb_introspect_text_signature(nb_func *func, const func_data *f) noexcept {
+    auto metas = collect_metas(func, f);
+    if (metas.empty()) {
+        PyErr_SetString(PyExc_AttributeError, "__text_signature__");
+        return nullptr;
+    }
+    std::string sig = "(";
+    const auto &toks = metas[0].tokens;
+    for (size_t i = 0; i < toks.size(); ++i) sig += (i ? ", " : "") + toks[i];
+    sig += ")";
+    return PyUnicode_FromString(sig.c_str());
+}
+
+/**
+ * @brief Constructs the inspect.Signature object.
+ */
+PyObject *nb_introspect_signature(nb_func *func, const func_data *f) noexcept {
+    auto metas = collect_metas(func, f);
+    if (metas.empty()) {
+        PyErr_SetString(PyExc_AttributeError, "__signature__");
+        return nullptr;
+    }
+
+    inspect_handles handles;
+    if (!handles.init())
+        return nullptr;
+
+    const auto &meta = metas[0];
+    PyObject *plist = PyList_New(meta.params.size());
+    if (!plist) return nullptr;
+
+    for (size_t i = 0; i < meta.params.size(); ++i) {
+        const auto &p = meta.params[i];
         PyObject *kwargs = PyDict_New();
         if (!kwargs) {
-            Py_DECREF(args);
-            Py_DECREF(param_list);
+            Py_DECREF(plist);
             return nullptr;
         }
+        PyObject *name = PyUnicode_FromString(p.name.c_str());
+        if (!name) {
+            Py_DECREF(kwargs);
+            Py_DECREF(plist);
+            return nullptr;
+        }
+        PyObject *kind = handles.kinds[(int) p.kind];
 
-        if (entry.default_value) {
-            PyObject *value = entry.default_value;
-            Py_INCREF(value);
-            if (PyDict_SetItemString(kwargs, "default", value) != 0) {
-                Py_DECREF(value);
-                Py_DECREF(kwargs);
-                Py_DECREF(args);
-                Py_DECREF(param_list);
-                return nullptr;
-            }
-            Py_DECREF(value);
+        if (p.def_val) PyDict_SetItemString(kwargs, "default", p.def_val);
+        if (p.has_anno && !p.annotation.empty()) {
+             PyObject *a = PyUnicode_FromString(p.annotation.c_str());
+             if (a) { PyDict_SetItemString(kwargs, "annotation", a); Py_DECREF(a); }
+             else {
+                 Py_DECREF(name);
+                 Py_DECREF(kwargs);
+                 Py_DECREF(plist);
+                 return nullptr;
+             }
         }
 
-        if (entry.has_annotation && !entry.annotation.empty()) {
-            PyObject *ann = PyUnicode_FromString(entry.annotation.c_str());
-            if (!ann ||
-                PyDict_SetItemString(kwargs, "annotation", ann) != 0) {
-                Py_XDECREF(ann);
-                Py_DECREF(kwargs);
-                Py_DECREF(args);
-                Py_DECREF(param_list);
-                return nullptr;
-            }
-            Py_DECREF(ann);
+        PyObject *args = PyTuple_Pack(2, name, kind);
+        Py_DECREF(name);
+        if (!args) {
+            Py_DECREF(kwargs);
+            Py_DECREF(plist);
+            return nullptr;
         }
+        PyObject *param_obj = PyObject_Call(handles.parameter, args, kwargs);
 
-        PyObject *param_obj = PyObject_Call(g_inspect.parameter, args, kwargs);
+        PyList_SetItem(plist, i, param_obj); // Steals ref to param_obj
         Py_DECREF(args);
         Py_DECREF(kwargs);
         if (!param_obj) {
-            Py_DECREF(param_list);
-            return nullptr;
-        }
-        if (PyList_SetItem(param_list, i, param_obj) != 0) {
-            Py_DECREF(param_list);
+            Py_DECREF(plist);
             return nullptr;
         }
     }
 
-    PyObject *parameters_tuple = PyList_AsTuple(param_list);
-    Py_DECREF(param_list);
-    if (!parameters_tuple)
-        return nullptr;
-
-    PyObject *kwargs = PyDict_New();
-    if (!kwargs) {
-        Py_DECREF(parameters_tuple);
+    PyObject *sig_kwargs = PyDict_New();
+    PyObject *params_tuple = PyList_AsTuple(plist);
+    if (!sig_kwargs || !params_tuple) {
+        Py_XDECREF(sig_kwargs);
+        Py_XDECREF(params_tuple);
+        Py_DECREF(plist);
         return nullptr;
     }
-
-    if (PyDict_SetItemString(kwargs, "parameters", parameters_tuple) != 0) {
-        Py_DECREF(parameters_tuple);
-        Py_DECREF(kwargs);
+    if (PyDict_SetItemString(sig_kwargs, "parameters", params_tuple) != 0) {
+        Py_DECREF(params_tuple);
+        Py_DECREF(plist);
+        Py_DECREF(sig_kwargs);
         return nullptr;
     }
-    Py_DECREF(parameters_tuple);
-
-    PyObject *return_annotation;
-    if (meta.return_type.empty()) {
-        return_annotation = g_inspect.empty;
-        Py_INCREF(return_annotation);
+    
+    if (!meta.ret_type.empty()) {
+        PyObject *ret = PyUnicode_FromString(meta.ret_type.c_str());
+        if (!ret || PyDict_SetItemString(sig_kwargs, "return_annotation", ret) != 0) {
+            Py_XDECREF(ret);
+            Py_DECREF(params_tuple);
+            Py_DECREF(plist);
+            Py_DECREF(sig_kwargs);
+            return nullptr;
+        }
+        Py_DECREF(ret);
     } else {
-        return_annotation = PyUnicode_FromString(meta.return_type.c_str());
-        if (!return_annotation) {
-            Py_DECREF(kwargs);
+        if (PyDict_SetItemString(sig_kwargs, "return_annotation", handles.empty) != 0) {
+            Py_DECREF(params_tuple);
+            Py_DECREF(plist);
+            Py_DECREF(sig_kwargs);
             return nullptr;
         }
     }
 
-    if (PyDict_SetItemString(kwargs, "return_annotation", return_annotation) != 0) {
-        Py_DECREF(return_annotation);
-        Py_DECREF(kwargs);
+    PyObject *empty = PyTuple_New(0);
+    if (!empty) {
+        Py_DECREF(params_tuple);
+        Py_DECREF(plist);
+        Py_DECREF(sig_kwargs);
         return nullptr;
     }
-    Py_DECREF(return_annotation);
-
-    PyObject *empty_args = PyTuple_New(0);
-    if (!empty_args) {
-        Py_DECREF(kwargs);
-        return nullptr;
-    }
-
-    PyObject *result = PyObject_Call(g_inspect.signature, empty_args, kwargs);
-    Py_DECREF(empty_args);
-    Py_DECREF(kwargs);
+    PyObject *result = PyObject_Call(handles.signature, empty, sig_kwargs);
+    
+    Py_DECREF(plist);
+    Py_DECREF(params_tuple);
+    Py_DECREF(sig_kwargs);
+    Py_DECREF(empty);
     return result;
-}
-
-static PyObject *return_none() noexcept {
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-// __annotations__: empty dict on skip/incompat, merged dict otherwise.
-PyObject *nb_introspect_annotations(nb_func *func, const func_data *f) noexcept {
-    std::vector<signature_metadata> metas;
-    switch (collect_signature_metadata(func, f, metas)) {
-        case metadata_state::skip:
-        case metadata_state::empty:
-        case metadata_state::incompatible:
-            return PyDict_New();
-        case metadata_state::compatible:
-            return build_annotation_dict(metas);
-    }
-    return PyDict_New();
-}
-
-// __text_signature__: AttributeError on skip/incompat, compact text otherwise.
-PyObject *nb_introspect_text_signature(nb_func *func, const func_data *f) noexcept {
-    std::vector<signature_metadata> metas;
-    switch (collect_signature_metadata(func, f, metas)) {
-        case metadata_state::skip:
-        case metadata_state::empty:
-        case metadata_state::incompatible:
-            PyErr_SetString(PyExc_AttributeError, "__text_signature__");
-            return nullptr;
-        case metadata_state::compatible:
-            return build_text_signature_from_meta(metas.front());
-    }
-    return return_none();
-}
-
-// __signature__: AttributeError on skip/incompat, inspect.Signature otherwise.
-PyObject *nb_introspect_signature(nb_func *func, const func_data *f) noexcept {
-    std::vector<signature_metadata> metas;
-    switch (collect_signature_metadata(func, f, metas)) {
-        case metadata_state::skip:
-        case metadata_state::empty:
-        case metadata_state::incompatible:
-            PyErr_SetString(PyExc_AttributeError, "__signature__");
-            return nullptr;
-        case metadata_state::compatible:
-            return build_signature_object(metas.front());
-    }
-    return return_none();
 }
 
 NAMESPACE_END(detail)

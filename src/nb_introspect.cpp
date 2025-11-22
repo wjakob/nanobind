@@ -116,6 +116,14 @@ static void trim(std::string &s) {
 
 /**
  * @brief Parses nanobind function descriptor to build signature metadata.
+ *
+ * This state machine intentionally mirrors the logic in nb_func.cpp's
+ * nb_func_render_signature(). That helper is not exposed via headers and we
+ * want introspection to remain isolated from the call machinery, so the code
+ * was copied here and trimmed to the minimum needed for metadata extraction.
+ * Any tweaks should stay in sync with nb_func.cpp to avoid diverging
+ * descriptor semantics.
+ *
  * @param f Function data pointer.
  * @param out Output metadata structure.
  * @return true if successful and should be used, false if skipped.
@@ -141,7 +149,7 @@ static bool build_meta(const func_data *f, sig_meta &out) noexcept {
     struct {
         sig_param p;
         std::string sanitized;
-        bool active = false, annotate = false, collect_anno = false, opt_suffix = false;
+        bool active = false, annotate = false, opt_suffix = false;
     } curr;
 
     auto finish_param = [&]() {
@@ -285,7 +293,6 @@ static bool build_meta(const func_data *f, sig_meta &out) noexcept {
                 else if (curr.active && curr.annotate) curr.p.annotation += *pc;
                 break;
             case ':':
-                if (curr.active) curr.collect_anno = true; // fallthrough
             default:
                 if (capturing_ret) out.ret_type += *pc;
                 else if (curr.active && curr.annotate) curr.p.annotation += *pc;

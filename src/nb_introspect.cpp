@@ -11,127 +11,24 @@
 #  include <cxxabi.h>
 #endif
 
+#ifndef NB_INTROSPECT_SKIP_NB_SIG
+#  define NB_INTROSPECT_SKIP_NB_SIG 1
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 namespace {
 
-/* This file keeps the PEP 3107/362 plumbing self-contained so nb_func only
-     exposes the hooks. We translate nanobind's signature metadata directly
-     into annotations/text signatures without touching nb.__nb_signature__ or
-     cached Python objects to avoid ABI changes.
-
-     Detailed behavior for overloads and how the three PEP-style introspection
-     outputs are produced:
-
-     - Goals
-         * Provide `__annotations__`, `__text_signature__` and `__signature__`
-             (inspect.Signature) for nanobind-wrapped callables where possible,
-             based on internal C++ metadata (`func_data::descr`, `func_data::args`,
-             `func_data::descr_types`, etc.).
-         * Avoid touching or replacing the legacy `__nb_signature__` text blob
-             stored in `func_data::signature` (this keeps backward compatibility).
-
-     - High-level flow
-         1. `collect_signature_metadata()` iterates overloads and calls
-                `build_signature_metadata()` to produce a `signature_metadata` for each
-                overload. This captures parameter names, kinds (positional-only,
-                positional-or-keyword, keyword-only, *args, **kwargs), sanitized
-                tokens for a compact text signature, and return type text.
-         2. If `collect_signature_metadata()` fails (returns false), the
-                introspection functions return `Py_None`. A primary reason for
-                failure is when an overload is marked with
-                `func_flags::has_signature` (i.e. the binding author provided an
-                explicit `nb::sig(...)`/legacy signature string). In that case the
-                code intentionally refuses to auto-generate PEP-style metadata so as
-                not to overwrite or conflict with an explicit signature provided by
-                the author.
-         3. If collection succeeds, the code checks whether all overloads are
-                "compatible" via `signatures_are_compatible()`. Compatibility
-                requires:
-                - same number of parameters across overloads
-                - same parameter names and kinds at every position
-                - identical `sanitized_tokens` sequences (this encodes layout such
-                    as `self`, `*`, `**name`, `/`, default value text, etc.)
-
-     - Result rules per introspection output
-         * `__annotations__` (nb_introspect_annotations)
-             - If `collect_signature_metadata()` fails: returns `Py_None`.
-             - If collection succeeds but there are no metas or overloads are
-                 incompatible: returns an empty `dict` (not `None`) to indicate
-                 "we have no typed annotations to provide".
-             - If collection succeeds and overloads are compatible: merge
-                 parameter annotations and return types across overloads. Merging
-                 logic:
-                 - Collect all distinct annotation strings for each parameter
-                     (only when `has_annotation` is true for that parameter).
-                 - If any annotation is `"typing.Any"`, that wins and the merged
-                     result for that parameter is `"typing.Any"`.
-                 - If there is exactly one distinct annotation, use it.
-                 - If multiple distinct concrete annotations are present, emit
-                     `"typing.Union[T1, T2, ...]"` as the merged annotation string.
-                 - The merged return type is constructed the same way and stored
-                     under the `"return"` key.
-
-         * `__text_signature__` (nb_introspect_text_signature)
-             - If `collect_signature_metadata()` fails: returns `Py_None`.
-             - If collection succeeds but metas are empty or overloads are
-                 incompatible: returns `Py_None` (no single compact text signature
-                 can be provided).
-             - If collection succeeds and overloads are compatible: return a
-                 compact text signature string built from the `sanitized_tokens`
-                 of the first meta (compatibility guarantees all metas have the
-                 same `sanitized_tokens`). Example: "(self, arg0, /)".
-
-         * `__signature__` (nb_introspect_signature -> inspect.Signature)
-             - If `collect_signature_metadata()` fails: returns `Py_None`.
-             - If collection yields no metas: returns `Py_None`.
-             - If collection succeeds and overloads are compatible: build and
-                 return an `inspect.Signature` object derived from the first
-                 `signature_metadata` (parameters include kinds, default values, and
-                 annotation strings where present).
-             - If collection succeeds but overloads are *incompatible*: do not
-                 return `Py_None`. Instead, construct and return a fallback
-                 variadic `Signature` equivalent to `(*args, **kwargs)` so that
-                 `inspect.signature()` still returns a usable, permissive signature
-                 object.
-
-     - Why `has_signature` causes collection failure
-         * `func_flags::has_signature` is set when the binding author provided
-             an explicit signature string via `nb::sig(...)`. That string is
-             stored in `func_data::signature` and is used for legacy nb-style
-             signatures and doc rendering (`__nb_signature__`, `nb_func_render_signature`,
-             etc.). If at least one overload has this flag, `build_signature_metadata`
-             returns `false` to signal: "do not auto-generate/merge PEP-style
-             metadata for this callable". In this codebase `Py_None` is used as
-             the signal value to indicate that automatic PEP introspection was
-             intentionally skipped.
-
-     - Notes and implementation details
-         * `sanitized_tokens` contains tokens used for text signature merging
-             (includes param names, '*'/'**' markers, '/' for positional-only
-             boundary, and default-value text when available). Differences in
-             sanitized tokens across overloads make them incompatible.
-         * Default argument text is included in `sanitized_tokens` (so
-             difference in default values usually prevents merging of text
-             signatures).
-         * Annotations are stored/merged as *strings* (e.g. "typing.Any",
-             "module.Type"), not as evaluated Python objects. This avoids
-             importing/resolving types at C++ side and keeps ABI surface stable.
-         * The implementation purposely avoids mutating or replacing the
-             legacy `__nb_signature__` (stored in `func_data::signature`) so that
-             existing code relying on that string is not affected.
-
-     Summary:
-         - `collect_signature_metadata()` failure -> all `nb_introspect_*`
-             return `Py_None` (signal: skip auto-generation).
-         - collection success + compatible overloads -> produce merged
-             `__annotations__` (dict), a single `__text_signature__` (str), and a
-             concrete `inspect.Signature`.
-         - collection success + incompatible overloads -> annotations = `{}`;
-             text_signature = `None`; signature = permissive variadic
-             `inspect.Signature`.
- */
+/* PEP 3107/362 helpers:
+   - NB_INTROSPECT_SKIP_NB_SIG (default 1) controls whether overloads that
+     used nb::sig skip PEP metadata (1) or are parsed like regular overloads (0).
+   - Only merge overloads when parameter order, names, kinds, and sanitized
+     tokens align; otherwise surface empty annotations and None for
+     __signature__/__text_signature__.
+   - For compatible overloads, annotations/return types are merged (Union when
+     multiple concrete values, typing.Any when unspecified) and reused by all
+     three exported attributes. */
 
 static char *dup_string(const char *s) {
 #if defined(_WIN32)
@@ -408,10 +305,13 @@ static PyObject *inspect_kind_object(signature_param_kind kind) {
 
 } // namespace
 
+// Build a single overload's parameter/return description; skip when nb::sig is present.
 static bool build_signature_metadata(const func_data *f,
                                      signature_metadata &out) noexcept {
+#if NB_INTROSPECT_SKIP_NB_SIG
     if (f->flags & (uint32_t) func_flags::has_signature)
         return false;
+#endif
 
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
                has_args       = f->flags & (uint32_t) func_flags::has_args,
@@ -612,8 +512,18 @@ static bool build_signature_metadata(const func_data *f,
     return true;
 }
 
-static bool collect_signature_metadata(nb_func *func, const func_data *f,
-                                       std::vector<signature_metadata> &out) noexcept {
+static bool signatures_are_compatible(const std::vector<signature_metadata> &metas);
+
+enum class metadata_state {
+    skip,
+    empty,
+    incompatible,
+    compatible
+};
+
+// Traverse all overloads, classify compatibility, and short-circuit on skip.
+static metadata_state collect_signature_metadata(nb_func *func, const func_data *f,
+                                                 std::vector<signature_metadata> &out) noexcept {
     Py_ssize_t overloads = Py_SIZE((PyObject *) func);
     if (overloads < 1)
         overloads = 1;
@@ -624,13 +534,20 @@ static bool collect_signature_metadata(nb_func *func, const func_data *f,
     for (Py_ssize_t i = 0; i < overloads; ++i) {
         signature_metadata meta;
         if (!build_signature_metadata(f + i, meta))
-            return false;
+            return metadata_state::skip;
         out.emplace_back(std::move(meta));
     }
 
-    return true;
+    if (out.empty())
+        return metadata_state::empty;
+
+    if (!signatures_are_compatible(out))
+        return metadata_state::incompatible;
+
+    return metadata_state::compatible;
 }
 
+// Overloads are mergeable only when layout and tokens match exactly.
 static bool signatures_are_compatible(const std::vector<signature_metadata> &metas) {
     if (metas.empty())
         return true;
@@ -765,6 +682,7 @@ static PyObject *build_annotation_dict(const std::vector<signature_metadata> &me
     return annotations;
 }
 
+// Render the compact text signature string from sanitized tokens.
 static PyObject *build_text_signature_from_meta(const signature_metadata &meta) {
     std::string signature = "(";
     for (size_t i = 0; i < meta.sanitized_tokens.size(); ++i) {
@@ -777,6 +695,7 @@ static PyObject *build_text_signature_from_meta(const signature_metadata &meta) 
     return PyUnicode_FromString(signature.c_str());
 }
 
+// Materialize inspect.Signature using cached inspect objects.
 static PyObject *build_signature_object(const signature_metadata &meta) {
     if (!ensure_inspect_cache())
         return nullptr;
@@ -804,8 +723,18 @@ static PyObject *build_signature_object(const signature_metadata &meta) {
             Py_DECREF(param_list);
             return nullptr;
         }
-        PyTuple_SET_ITEM(args, 0, name);
-        PyTuple_SET_ITEM(args, 1, kind);
+        if (PyTuple_SetItem(args, 0, name) != 0) {
+            Py_DECREF(kind);
+            Py_DECREF(args);
+            Py_DECREF(param_list);
+            return nullptr;
+        }
+        if (PyTuple_SetItem(args, 1, kind) != 0) {
+            Py_DECREF(kind);
+            Py_DECREF(args);
+            Py_DECREF(param_list);
+            return nullptr;
+        }
 
         PyObject *kwargs = PyDict_New();
         if (!kwargs) {
@@ -847,7 +776,10 @@ static PyObject *build_signature_object(const signature_metadata &meta) {
             Py_DECREF(param_list);
             return nullptr;
         }
-        PyList_SET_ITEM(param_list, i, param_obj);
+        if (PyList_SetItem(param_list, i, param_obj) != 0) {
+            Py_DECREF(param_list);
+            return nullptr;
+        }
     }
 
     PyObject *parameters_tuple = PyList_AsTuple(param_list);
@@ -899,75 +831,53 @@ static PyObject *build_signature_object(const signature_metadata &meta) {
     return result;
 }
 
-static signature_metadata build_variadic_signature_metadata() {
-    signature_metadata meta;
-
-    signature_param args;
-    args.name = "args";
-    args.annotation.clear();
-    args.kind = signature_param_kind::var_positional;
-    args.default_value = nullptr;
-    args.has_annotation = false;
-    meta.parameters.push_back(std::move(args));
-
-    signature_param kwargs;
-    kwargs.name = "kwargs";
-    kwargs.annotation.clear();
-    kwargs.kind = signature_param_kind::var_keyword;
-    kwargs.default_value = nullptr;
-    kwargs.has_annotation = false;
-    meta.parameters.push_back(std::move(kwargs));
-
-    return meta;
+static PyObject *return_none() noexcept {
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
+// __annotations__: empty dict on skip/incompat, merged dict otherwise.
 PyObject *nb_introspect_annotations(nb_func *func, const func_data *f) noexcept {
     std::vector<signature_metadata> metas;
-    if (!collect_signature_metadata(func, f, metas)) {
-        Py_INCREF(Py_None);
-        return Py_None;
+    switch (collect_signature_metadata(func, f, metas)) {
+        case metadata_state::skip:
+        case metadata_state::empty:
+        case metadata_state::incompatible:
+            return PyDict_New();
+        case metadata_state::compatible:
+            return build_annotation_dict(metas);
     }
-
-    if (metas.empty() || !signatures_are_compatible(metas)) {
-        PyObject *annotations = PyDict_New();
-        return annotations;
-    }
-
-    return build_annotation_dict(metas);
+    return PyDict_New();
 }
 
+// __text_signature__: AttributeError on skip/incompat, compact text otherwise.
 PyObject *nb_introspect_text_signature(nb_func *func, const func_data *f) noexcept {
     std::vector<signature_metadata> metas;
-    if (!collect_signature_metadata(func, f, metas)) {
-        Py_INCREF(Py_None);
-        return Py_None;
+    switch (collect_signature_metadata(func, f, metas)) {
+        case metadata_state::skip:
+        case metadata_state::empty:
+        case metadata_state::incompatible:
+            PyErr_SetString(PyExc_AttributeError, "__text_signature__");
+            return nullptr;
+        case metadata_state::compatible:
+            return build_text_signature_from_meta(metas.front());
     }
-
-    if (metas.empty() || !signatures_are_compatible(metas)) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-
-    return build_text_signature_from_meta(metas.front());
+    return return_none();
 }
 
+// __signature__: AttributeError on skip/incompat, inspect.Signature otherwise.
 PyObject *nb_introspect_signature(nb_func *func, const func_data *f) noexcept {
     std::vector<signature_metadata> metas;
-    if (!collect_signature_metadata(func, f, metas)) {
-        Py_INCREF(Py_None);
-        return Py_None;
+    switch (collect_signature_metadata(func, f, metas)) {
+        case metadata_state::skip:
+        case metadata_state::empty:
+        case metadata_state::incompatible:
+            PyErr_SetString(PyExc_AttributeError, "__signature__");
+            return nullptr;
+        case metadata_state::compatible:
+            return build_signature_object(metas.front());
     }
-
-    if (metas.empty()) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-
-    if (signatures_are_compatible(metas))
-        return build_signature_object(metas.front());
-
-    signature_metadata fallback = build_variadic_signature_metadata();
-    return build_signature_object(fallback);
+    return return_none();
 }
 
 NAMESPACE_END(detail)

@@ -988,15 +988,14 @@ def test51_struct_member_metadata():
     method = t.Struct.value_plus
     annotations = method.__annotations__
     for idx in range(7):
-        assert annotations[f"arg{idx}"] == "typing.Any"
+        assert annotations[f"arg{idx}"] == "int"
     assert annotations["return"] == "int"
     assert method.__text_signature__ == "(self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, /)"
     sig = getattr(method, "__signature__", None)
     assert sig is not None
     assert str(sig) == (
-        "(self, arg0: 'typing.Any', arg1: 'typing.Any', arg2: 'typing.Any', "
-        "arg3: 'typing.Any', arg4: 'typing.Any', arg5: 'typing.Any', "
-        "arg6: 'typing.Any', /) -> 'int'"
+        "(self, arg0: 'int', arg1: 'int', arg2: 'int', arg3: 'int', "
+        "arg4: 'int', arg5: 'int', arg6: 'int', /) -> 'int'"
     )
     assert inspect.signature(method) == sig
 
@@ -1025,4 +1024,3 @@ def test53_static_method_metadata():
     annotations = method.__annotations__
     assert annotations["arg"] == "typing.Union[int, float]"
     assert annotations["return"] == "int"
-

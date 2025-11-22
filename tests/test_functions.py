@@ -846,42 +846,52 @@ def test55_annotations(name, required_keys, return_substr):
     ],
 )
 def test56_text_signature(name, expected_signature):
-    assert getattr(t, name).__text_signature__ == expected_signature
+    if expected_signature is None:
+        with pytest.raises(AttributeError):
+            getattr(t, name).__text_signature__
+    else:
+        assert getattr(t, name).__text_signature__ == expected_signature
 
 
 @pytest.mark.parametrize(
     "name, expected_repr",
     [
         ("test_01", "() -> 'None'"),
-        ("test_02", "(up: 'typing.Any' = 8, down: 'typing.Any' = 1) -> 'int'"),
-        ("test_03", "(arg0: 'typing.Any', arg1: 'typing.Any', /) -> 'int'"),
+        ("test_02", "(up: 'int' = 8, down: 'int' = 1) -> 'int'"),
+        ("test_03", "(arg0: 'int', arg1: 'int', /) -> 'int'"),
         ("test_04", "() -> 'int'"),
         (
             "test_simple",
             (
-                "(arg0: 'typing.Any', arg1: 'typing.Any', arg2: 'typing.Any', "
-                "arg3: 'typing.Any', arg4: 'typing.Any', arg5: 'typing.Any', "
-                "arg6: 'typing.Any', arg7: 'typing.Any', /) -> 'int'"
+                "(arg0: 'int', arg1: 'int', arg2: 'int', arg3: 'int', "
+                "arg4: 'int', arg5: 'int', arg6: 'int', arg7: 'int', /) -> 'int'"
             ),
         ),
-        ("test_tuple", "(*args, **kwargs)"),
-        ("test_call_1", "(arg: 'typing.Any', /) -> 'object'"),
-        ("test_call_2", "(arg: 'typing.Any', /) -> 'object'"),
+        ("test_tuple", None),
+        ("test_call_1", "(arg: 'collections.abc.Callable[[int], int]', /) -> 'object'"),
+        ("test_call_2", "(arg: 'collections.abc.Callable[[int, int], None]', /) -> 'object'"),
         (
             "test_call_extra",
             (
-                "(arg0: 'typing.Any', /, *args: 'typing.Tuple[typing.Any, ...]', "
+                "(arg0: 'collections.abc.Callable[..., None]', /, "
+                "*args: 'typing.Tuple[typing.Any, ...]', "
                 "**kwargs: 'typing.Dict[str, typing.Any]') -> 'object'"
             ),
         ),
-        ("test_list", "(arg: 'typing.Any', /) -> 'None'"),
-        ("test_iter", "(arg: 'typing.Any', /) -> 'list'"),
-        ("test_iter_tuple", "(arg: 'typing.Any', /) -> 'list'"),
+        ("test_list", "(arg: 'list', /) -> 'None'"),
+        ("test_iter", "(arg: 'object', /) -> 'list'"),
+        ("test_iter_tuple", "(arg: 'tuple', /) -> 'list'"),
     ],
 )
 def test57_py_signature(name, expected_repr):
-    sig = getattr(t, name).__signature__
-    assert str(sig) == expected_repr
+    if expected_repr is None:
+        with pytest.raises(AttributeError):
+            getattr(t, name).__signature__
+        sig = inspect.signature(getattr(t, name))
+        assert str(sig) == "(*args, **kwargs)"
+    else:
+        sig = getattr(t, name).__signature__
+        assert str(sig) == expected_repr
 
 
 @pytest.mark.parametrize(
@@ -903,16 +913,31 @@ def test57_py_signature(name, expected_repr):
 )
 def test58_inspect(name):
     func = getattr(t, name)
-    sig = func.__signature__
-    assert isinstance(sig, inspect.Signature)
-    assert inspect.signature(func) == sig
+    sig = getattr(func, "__signature__", None)
+    inspect_sig = inspect.signature(func)
+    if sig is None:
+        assert str(inspect_sig) == "(*args, **kwargs)"
+    else:
+        assert isinstance(sig, inspect.Signature)
+        assert inspect_sig == sig
 
 
 def test59_incompatible_overload_metadata():
     func = t.metadata_incompatible
     assert func.__annotations__ == {}
-    assert func.__text_signature__ is None
-    sig = getattr(func, "__signature__", None)
-    assert sig is not None
-    assert str(sig) == "(*args, **kwargs)"
-    assert inspect.signature(func) == sig
+    with pytest.raises(AttributeError):
+        func.__text_signature__
+    with pytest.raises(AttributeError):
+        func.__signature__
+    assert str(inspect.signature(func)) == "(*args, **kwargs)"
+
+
+def test60_nb_sig_opt_out():
+    # Explicit nb::sig should leave PEP-style attributes unset by default.
+    func = t.test_08
+    assert func.__annotations__ == {}
+    with pytest.raises(AttributeError):
+        func.__text_signature__
+    with pytest.raises(AttributeError):
+        func.__signature__
+    assert str(inspect.signature(func)) == "(*args, **kwargs)"

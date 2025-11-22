@@ -1,3 +1,4 @@
+import inspect
 import test_functions_ext as t
 import pytest
 import sys
@@ -95,7 +96,6 @@ def test05_signature():
         f"test_07(arg0: int, arg1: int, /, *args, **kwargs) -> {TYPING_TUPLE}[int, int]\n"
         f"test_07(a: int, b: int, *myargs, **mykwargs) -> {TYPING_TUPLE}[int, int]"
     )
-
 
 def test06_signature_error():
     with pytest.raises(TypeError) as excinfo:
@@ -790,3 +790,190 @@ def test53_fallback():
 def test54_dict_default():
     assert t.test_get_dict_default({'key': 100}) == 100
     assert t.test_get_dict_default({'key2': 100}) == 123
+
+
+@pytest.mark.parametrize(
+    "name, required_keys, return_substr",
+    [
+        ("test_01", {"return"}, "None"),
+        ("test_02", {"up", "down", "return"}, "int"),
+        ("test_03", {"arg0", "arg1", "return"}, "int"),
+        ("test_04", {"return"}, "int"),
+        ("test_tuple", set(), ""),
+        ("test_call_1", {"arg", "return"}, "object"),
+        ("test_call_2", {"arg", "return"}, "object"),
+        ("test_call_extra", {"arg0", "args", "kwargs", "return"}, "object"),
+        ("test_list", {"arg", "return"}, "None"),
+        ("test_iter", {"arg", "return"}, "list"),
+        ("test_iter_tuple", {"arg", "return"}, "list"),
+        (
+            "test_simple",
+            {"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7", "return"},
+            "int",
+        ),
+    ],
+)
+def test55_annotations(name, required_keys, return_substr):
+    annotations = dict(getattr(t, name).__annotations__)
+    for entry in required_keys - {"return"}:
+        value = annotations.pop(entry, None)
+        assert value
+    return_value = annotations.pop("return", None)
+    # Lowercase and substring compare so module prefixes like "typing." still match and we cover minor variations.
+    if "return" in required_keys:
+        assert return_value is not None and return_substr.lower() in return_value.lower()
+    else:
+        # No return annotation expected for this case (incompatible overloads)
+        assert return_value is None
+    assert not annotations
+
+
+def test_unregistered_type_annotation():
+    func = t.test_unregistered_type
+    annotations = dict(func.__annotations__)
+    assert annotations.get("arg") is not None
+    assert "nanobind::" not in annotations["arg"]
+    doc = func.__doc__
+    assert doc and "nanobind::" not in doc
+
+
+@pytest.mark.parametrize(
+    "name, expected_signature",
+    [
+        ("test_01", "()"),
+        ("test_02", "(up = 8, down = 1)"),
+        ("test_03", "(arg0, arg1, /)"),
+        ("test_04", "()"),
+        ("test_tuple", None),
+        ("test_call_1", "(arg, /)"),
+        ("test_call_2", "(arg, /)"),
+        ("test_call_extra", "(arg0, /, *args, **kwargs)"),
+        ("test_list", "(arg, /)"),
+        ("test_iter", "(arg, /)"),
+        ("test_iter_tuple", "(arg, /)"),
+        ("test_simple", "(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, /)"),
+    ],
+)
+def test56_text_signature(name, expected_signature):
+    if expected_signature is None:
+        with pytest.raises(AttributeError):
+            getattr(t, name).__text_signature__
+    else:
+        assert getattr(t, name).__text_signature__ == expected_signature
+
+
+@pytest.mark.parametrize(
+    "name, expected_repr",
+    [
+        ("test_01", "() -> 'None'"),
+        ("test_02", "(up: 'int' = 8, down: 'int' = 1) -> 'int'"),
+        ("test_03", "(arg0: 'int', arg1: 'int', /) -> 'int'"),
+        ("test_04", "() -> 'int'"),
+        (
+            "test_simple",
+            (
+                "(arg0: 'int', arg1: 'int', arg2: 'int', arg3: 'int', "
+                "arg4: 'int', arg5: 'int', arg6: 'int', arg7: 'int', /) -> 'int'"
+            ),
+        ),
+        ("test_tuple", None),
+        ("test_call_1", "(arg: 'collections.abc.Callable[[int], int]', /) -> 'object'"),
+        ("test_call_2", "(arg: 'collections.abc.Callable[[int, int], None]', /) -> 'object'"),
+        (
+            "test_call_extra",
+            (
+                "(arg0: 'collections.abc.Callable[..., None]', /, "
+                "*args: 'typing.Tuple[typing.Any, ...]', "
+                "**kwargs: 'typing.Dict[str, typing.Any]') -> 'object'"
+            ),
+        ),
+        ("test_list", "(arg: 'list', /) -> 'None'"),
+        ("test_iter", "(arg: 'object', /) -> 'list'"),
+        ("test_iter_tuple", "(arg: 'tuple', /) -> 'list'"),
+    ],
+)
+def test57_py_signature(name, expected_repr):
+    if expected_repr is None:
+        with pytest.raises(AttributeError):
+            getattr(t, name).__signature__
+        # On Python <= 3.10, inspect.signature on C callables without __signature__
+        # can raise ValueError; if it succeeds, it should fall back to a permissive form.
+        try:
+            sig = inspect.signature(getattr(t, name))
+        except ValueError:
+            return
+        assert str(sig) == "(*args, **kwargs)"
+    else:
+        sig = getattr(t, name).__signature__
+        actual = str(sig)
+        # Python versions differ on printing Callable (typing vs collections.abc).
+        allowed = {expected_repr}
+        if "collections.abc.Callable" in expected_repr:
+            allowed.add(expected_repr.replace("collections.abc.Callable", "typing.Callable"))
+        elif "typing.Callable" in expected_repr:
+            allowed.add(expected_repr.replace("typing.Callable", "collections.abc.Callable"))
+        assert actual in allowed
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "test_01",
+        "test_02",
+        "test_03",
+        "test_04",
+        "test_simple",
+        "test_tuple",
+        "test_call_1",
+        "test_call_2",
+        "test_call_extra",
+        "test_list",
+        "test_iter",
+        "test_iter_tuple",
+    ],
+)
+def test58_inspect(name):
+    func = getattr(t, name)
+    sig = getattr(func, "__signature__", None)
+    if sig is None:
+        # On Python <= 3.10, inspect.signature may raise when __signature__ is missing on C callables.
+        try:
+            inspect_sig = inspect.signature(func)
+        except ValueError:
+            return
+        assert str(inspect_sig) == "(*args, **kwargs)"
+    else:
+        inspect_sig = inspect.signature(func)
+        assert isinstance(sig, inspect.Signature)
+        assert inspect_sig == sig
+
+
+def test59_incompatible_overload_metadata():
+    func = t.metadata_incompatible
+    assert func.__annotations__ == {}
+    with pytest.raises(AttributeError):
+        func.__text_signature__
+    with pytest.raises(AttributeError):
+        func.__signature__
+    # On Python <= 3.10, inspect.signature may raise; otherwise expect a permissive fallback.
+    try:
+        sig = inspect.signature(func)
+    except ValueError:
+        return
+    assert str(sig) == "(*args, **kwargs)"
+
+
+def test60_nb_sig_opt_out():
+    # Explicit nb::sig should leave PEP-style attributes unset by default.
+    func = t.test_08
+    assert func.__annotations__ == {}
+    with pytest.raises(AttributeError):
+        func.__text_signature__
+    with pytest.raises(AttributeError):
+        func.__signature__
+    # On Python <= 3.10, inspect.signature may raise; otherwise expect a permissive fallback.
+    try:
+        sig = inspect.signature(func)
+    except ValueError:
+        return
+    assert str(sig) == "(*args, **kwargs)"

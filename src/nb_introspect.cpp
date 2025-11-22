@@ -451,11 +451,15 @@ PyObject *nb_introspect_signature(nb_func *func, const func_data *f) noexcept {
             return nullptr;
         }
         PyObject *param_obj = PyObject_Call(handles.parameter, args, kwargs);
-
-        PyList_SetItem(plist, i, param_obj); // Steals ref to param_obj
         Py_DECREF(args);
         Py_DECREF(kwargs);
+
         if (!param_obj) {
+            Py_DECREF(plist);
+            return nullptr;
+        }
+        if (PyList_SetItem(plist, i, param_obj) != 0) {
+            Py_DECREF(param_obj);
             Py_DECREF(plist);
             return nullptr;
         }

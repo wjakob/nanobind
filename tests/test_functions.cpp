@@ -84,6 +84,20 @@ template <> struct nb::detail::type_caster<numeric_string> {
     }
 };
 
+namespace nanobind {
+struct anonymous_signature_type { };
+}
+using anonymous_signature_type = nanobind::anonymous_signature_type;
+
+template <> struct nb::detail::type_caster<anonymous_signature_type> {
+    NB_TYPE_CASTER(anonymous_signature_type, const_name<anonymous_signature_type>())
+
+    bool from_python(handle, uint8_t, cleanup_list *) noexcept {
+        PyErr_SetString(PyExc_TypeError, "anonymous_signature_type is not constructible");
+        return false;
+    }
+};
+
 int test_31(int i) noexcept { return i; }
 
 NB_MODULE(test_functions_ext, m) {
@@ -518,6 +532,8 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_fallback_1", [](nb::handle){ return 1; });
     m.def("test_fallback_2", [](double) { return 0; });
     m.def("test_fallback_2", [](nb::fallback){ return 1; });
+
+    m.def("test_unregistered_type", [](anonymous_signature_type) { return 0; });
 
     m.def("test_get_dict_default", [](nb::dict l) { return l.get("key", nb::int_(123)); });
 

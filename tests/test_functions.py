@@ -828,6 +828,15 @@ def test55_annotations(name, required_keys, return_substr):
     assert not annotations
 
 
+def test_unregistered_type_annotation():
+    func = t.test_unregistered_type
+    annotations = dict(func.__annotations__)
+    assert annotations.get("arg") is not None
+    assert "nanobind::" not in annotations["arg"]
+    doc = func.__doc__
+    assert doc and "nanobind::" not in doc
+
+
 @pytest.mark.parametrize(
     "name, expected_signature",
     [

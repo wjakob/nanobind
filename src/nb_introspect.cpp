@@ -96,11 +96,12 @@ static std::string type_name_local(const std::type_info *t) {
     free(demangled);
 #else
     std::string res = name_in;
-    for (const char *sub : {"class ", "struct ", "enum "}) {
-        size_t p = 0, len = strlen(sub);
-        while ((p = res.find(sub, p)) != std::string::npos) res.erase(p, len);
-    }
 #endif
+    for (const char *sub : {"class ", "struct ", "enum ", "nanobind::"}) {
+        size_t p = 0, len = strlen(sub);
+        while ((p = res.find(sub, p)) != std::string::npos)
+            res.erase(p, len);
+    }
     return res;
 }
 

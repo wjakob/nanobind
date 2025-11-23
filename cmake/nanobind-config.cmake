@@ -357,13 +357,33 @@ function(nanobind_add_module name)
     set(ARG_STABLE_ABI FALSE)
   endif()
 
-  if (NB_ABI MATCHES "t")
-    # Free-threaded Python interpreters don't support building a nanobind
-    # module that uses the stable ABI.
-    set(ARG_STABLE_ABI FALSE)
+  if (Python_VERSION VERSION_GREATER_EQUAL 3.13)
+    # Query Python directly to check GIL support
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" "-c"
+        "import sysconfig; print(sysconfig.get_config_var('Py_GIL_DISABLED'))"
+      RESULT_VARIABLE NB_GIL_RET
+      OUTPUT_VARIABLE NB_GIL_DISABLED
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+    if(NB_GIL_RET AND NOT NB_GIL_RET EQUAL 0)
+      message(FATAL_ERROR "nanobind: Python sysconfig query to "
+        "find 'Py_GIL_DISABLED' property failed!")
+    endif()
+
+    if("${NB_GIL_DISABLED}" STREQUAL "0")
+      # A free-threaded Python interpreter is required to build a free-threaded
+      # nanobind module.
+      set(ARG_FREE_THREADED FALSE)
+    elseif("${NB_GIL_DISABLED}" STREQUAL "1")
+      # Free-threaded Python interpreters don't support building a nanobind
+      # module that uses the stable ABI.
+      set(ARG_STABLE_ABI FALSE)
+    else()
+      message(FATAL_ERROR "nanobind: Python sysconfig query to "
+        "find 'Py_GIL_DISABLED' property failed!")
+    endif()
   else()
-    # A free-threaded Python interpreter is required to build a free-threaded
-    # nanobind module.
     set(ARG_FREE_THREADED FALSE)
   endif()
 

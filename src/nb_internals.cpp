@@ -53,7 +53,7 @@ static PyType_Spec nb_meta_spec = {
 
 static PyMemberDef nb_func_members[] = {
     { "__vectorcalloffset__", T_PYSSIZET,
-      (Py_ssize_t) offsetof(nb_func, vectorcall), READONLY, nullptr },
+      static_cast<Py_ssize_t>(offsetof(nb_func, vectorcall)), READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 
@@ -66,20 +66,20 @@ static PyGetSetDef nb_func_getset[] = {
 static PyType_Slot nb_func_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
-    { Py_tp_getattro, (void *) nb_func_getattro },
-    { Py_tp_traverse, (void *) nb_func_traverse },
-    { Py_tp_clear, (void *) nb_func_clear },
-    { Py_tp_dealloc, (void *) nb_func_dealloc },
-    { Py_tp_traverse, (void *) nb_func_traverse },
-    { Py_tp_new, (void *) PyType_GenericNew },
-    { Py_tp_call, (void *) PyVectorcall_Call },
+    { Py_tp_getattro, reinterpret_cast<void *>(nb_func_getattro) },
+    { Py_tp_traverse, reinterpret_cast<void *>(nb_func_traverse) },
+    { Py_tp_clear, reinterpret_cast<void *>(nb_func_clear) },
+    { Py_tp_dealloc, reinterpret_cast<void *>(nb_func_dealloc) },
+    { Py_tp_traverse, reinterpret_cast<void *>(nb_func_traverse) },
+    { Py_tp_new, reinterpret_cast<void *>(PyType_GenericNew) },
+    { Py_tp_call, reinterpret_cast<void *>(PyVectorcall_Call) },
     { 0, nullptr }
 };
 
 static PyType_Spec nb_func_spec = {
     /* .name = */ "nanobind.nb_func",
-    /* .basicsize = */ (int) sizeof(nb_func),
-    /* .itemsize = */ (int) sizeof(func_data),
+    /* .basicsize = */ static_cast<int>(sizeof(nb_func)),
+    /* .itemsize = */ static_cast<int>(sizeof(func_data)),
     /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
                    NB_HAVE_VECTORCALL_PY39_OR_NEWER,
     /* .slots = */ nb_func_slots
@@ -88,20 +88,20 @@ static PyType_Spec nb_func_spec = {
 static PyType_Slot nb_method_slots[] = {
     { Py_tp_members, (void *) nb_func_members },
     { Py_tp_getset, (void *) nb_func_getset },
-    { Py_tp_getattro, (void *) nb_func_getattro },
-    { Py_tp_traverse, (void *) nb_func_traverse },
-    { Py_tp_clear, (void *) nb_func_clear },
-    { Py_tp_dealloc, (void *) nb_func_dealloc },
-    { Py_tp_descr_get, (void *) nb_method_descr_get },
-    { Py_tp_new, (void *) PyType_GenericNew },
-    { Py_tp_call, (void *) PyVectorcall_Call },
+    { Py_tp_getattro, reinterpret_cast<void *>(nb_func_getattro) },
+    { Py_tp_traverse, reinterpret_cast<void *>(nb_func_traverse) },
+    { Py_tp_clear, reinterpret_cast<void *>(nb_func_clear) },
+    { Py_tp_dealloc, reinterpret_cast<void *>(nb_func_dealloc) },
+    { Py_tp_descr_get, reinterpret_cast<void *>(nb_method_descr_get) },
+    { Py_tp_new, reinterpret_cast<void *>(PyType_GenericNew) },
+    { Py_tp_call, reinterpret_cast<void *>(PyVectorcall_Call) },
     { 0, nullptr }
 };
 
 static PyType_Spec nb_method_spec = {
     /*.name = */ "nanobind.nb_method",
-    /*.basicsize = */ (int) sizeof(nb_func),
-    /*.itemsize = */ (int) sizeof(func_data),
+    /*.basicsize = */ static_cast<int>(sizeof(nb_func)),
+    /*.itemsize = */ static_cast<int>(sizeof(func_data)),
     /*.flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
                   Py_TPFLAGS_METHOD_DESCRIPTOR |
                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
@@ -110,28 +110,28 @@ static PyType_Spec nb_method_spec = {
 
 static PyMemberDef nb_bound_method_members[] = {
     { "__vectorcalloffset__", T_PYSSIZET,
-      (Py_ssize_t) offsetof(nb_bound_method, vectorcall), READONLY, nullptr },
+      static_cast<Py_ssize_t>(offsetof(nb_bound_method, vectorcall)), READONLY, nullptr },
     { "__func__", T_OBJECT_EX,
-      (Py_ssize_t) offsetof(nb_bound_method, func), READONLY, nullptr },
+      static_cast<Py_ssize_t>(offsetof(nb_bound_method, func)), READONLY, nullptr },
     { "__self__", T_OBJECT_EX,
-      (Py_ssize_t) offsetof(nb_bound_method, self), READONLY, nullptr },
+      static_cast<Py_ssize_t>(offsetof(nb_bound_method, self)), READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 
 static PyType_Slot nb_bound_method_slots[] = {
     { Py_tp_members, (void *) nb_bound_method_members },
-    { Py_tp_getattro, (void *) nb_bound_method_getattro },
-    { Py_tp_traverse, (void *) nb_bound_method_traverse },
-    { Py_tp_clear, (void *) nb_bound_method_clear },
-    { Py_tp_dealloc, (void *) nb_bound_method_dealloc },
-    { Py_tp_traverse, (void *) nb_bound_method_traverse },
-    { Py_tp_call, (void *) PyVectorcall_Call },
+    { Py_tp_getattro, reinterpret_cast<void *>(nb_bound_method_getattro) },
+    { Py_tp_traverse, reinterpret_cast<void *>(nb_bound_method_traverse) },
+    { Py_tp_clear, reinterpret_cast<void *>(nb_bound_method_clear) },
+    { Py_tp_dealloc, reinterpret_cast<void *>(nb_bound_method_dealloc) },
+    { Py_tp_traverse, reinterpret_cast<void *>(nb_bound_method_traverse) },
+    { Py_tp_call, reinterpret_cast<void *>(PyVectorcall_Call) },
     { 0, nullptr }
 };
 
 static PyType_Spec nb_bound_method_spec = {
     /* .name = */ "nanobind.nb_bound_method",
-    /* .basicsize = */ (int) sizeof(nb_bound_method),
+    /* .basicsize = */ static_cast<int>(sizeof(nb_bound_method)),
     /* .itemsize = */ 0,
     /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
                    NB_HAVE_VECTORCALL_PY39_OR_NEWER,
@@ -179,7 +179,7 @@ static const char* interned_c_strs[pyobj_name::string_count] {
 PyObject **static_pyobjects = nullptr;
 
 static bool init_pyobjects(PyObject* m) {
-    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
+    PyObject** pyobjects = static_cast<PyObject**>(PyModule_GetState(m));
     if (!pyobjects)
         return false;
 
@@ -210,7 +210,7 @@ static bool init_pyobjects(PyObject* m) {
 }
 
 NB_NOINLINE int nb_module_traverse(PyObject *m, visitproc visit, void *arg) {
-    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
+    PyObject** pyobjects = static_cast<PyObject**>(PyModule_GetState(m));
     NB_NOUNROLL
     for (int i = 0; i < pyobj_name::total_count; ++i)
         Py_VISIT(pyobjects[i]);
@@ -218,7 +218,7 @@ NB_NOINLINE int nb_module_traverse(PyObject *m, visitproc visit, void *arg) {
 }
 
 NB_NOINLINE int nb_module_clear(PyObject *m) {
-    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
+    PyObject** pyobjects = static_cast<PyObject**>(PyModule_GetState(m));
     NB_NOUNROLL
     for (int i = 0; i < pyobj_name::total_count; ++i)
         Py_CLEAR(pyobjects[i]);
@@ -227,7 +227,7 @@ NB_NOINLINE int nb_module_clear(PyObject *m) {
 
 void nb_module_free(void *m) {
     // Allow nanobind_##name##_exec to omit calling nb_module_clear on error.
-    (void) nb_module_clear((PyObject *) m);
+    (void) nb_module_clear(static_cast<PyObject *>(m));
 }
 
 
@@ -292,7 +292,7 @@ static void internals_cleanup() {
                         INC_CTR;
                     }
                 } else {
-                    print_leak(k, (PyObject*)v);
+                    print_leak(k, static_cast<PyObject*>(v));
                     INC_CTR;
                 }
                 if (ctr >= 20)
@@ -409,7 +409,7 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
     PyObject *capsule = dict_get_item_ref_or_fail(dict, key);
     if (capsule) {
         Py_DECREF(key);
-        internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
+        internals = static_cast<nb_internals *>(PyCapsule_GetPointer(capsule, "nb_internals"));
         check(internals, "nanobind::detail::nb_module_exec(): "
                          "capsule pointer is NULL!");
         nb_meta_cache = internals->nb_meta;
@@ -434,12 +434,12 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
     str nb_name("nanobind");
     p->nb_module = PyModule_NewObject(nb_name.ptr());
 
-    nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
-    nb_meta_cache = p->nb_meta = (PyTypeObject *) PyType_FromSpec(&nb_meta_spec);
+    nb_meta_slots[0].pfunc = reinterpret_cast<PyObject *>(&PyType_Type);
+    nb_meta_cache = p->nb_meta = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(&nb_meta_spec));
     p->nb_type_dict = PyDict_New();
-    p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
-    p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
-    p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
+    p->nb_func = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(&nb_func_spec));
+    p->nb_method = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(&nb_method_spec));
+    p->nb_bound_method = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(&nb_bound_method_spec));
 
 #if defined(NB_FREE_THREADED)
     p->nb_static_property_disabled = PyThread_tss_alloc();

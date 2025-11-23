@@ -6,7 +6,7 @@ NAMESPACE_BEGIN(detail)
 
 struct int64_hash {
     size_t operator()(const int64_t value) const {
-        return (size_t) fmix64((uint64_t) value);
+        return static_cast<size_t>(fmix64(static_cast<uint64_t>(value)));
     }
 };
 
@@ -29,7 +29,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
             PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
                              "nanobind: type '%s' was already registered!\n",
                              ed->name);
-            PyObject *tp = (PyObject *) it->second->type_py;
+            PyObject *tp = reinterpret_cast<PyObject *>(it->second->type_py);
             Py_INCREF(tp);
             return tp;
         }
@@ -37,8 +37,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     handle scope(ed->scope);
 
-    bool is_arithmetic = ed->flags & (uint32_t) enum_flags::is_arithmetic;
-    bool is_flag = ed->flags & (uint32_t) enum_flags::is_flag;
+    bool is_arithmetic = ed->flags & static_cast<uint32_t>(enum_flags::is_arithmetic);
+    bool is_flag = ed->flags & static_cast<uint32_t>(enum_flags::is_flag);
 
     str name(ed->name), qualname = name;
     object modname;
@@ -79,7 +79,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     memset(t, 0, sizeof(type_data));
     t->name = strdup_check(ed->name);
     t->type = ed->type;
-    t->type_py = (PyTypeObject *) result.ptr();
+    t->type_py = reinterpret_cast<PyTypeObject *>(result.ptr());
     t->flags = ed->flags;
     t->enum_tbl.fwd = new enum_map();
     t->enum_tbl.rev = new enum_map();
@@ -99,11 +99,11 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     make_immortal(result.ptr());
 
     result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
-        type_init_data *t = (type_init_data *) p;
-        delete (enum_map *) t->enum_tbl.fwd;
-        delete (enum_map *) t->enum_tbl.rev;
+        type_init_data *t = static_cast<type_init_data *>(p);
+        delete static_cast<enum_map *>(t->enum_tbl.fwd);
+        delete static_cast<enum_map *>(t->enum_tbl.rev);
         nb_type_unregister(t);
-        free((char*) t->name);
+        free(const_cast<char*>(t->name));
         delete t;
     });
 
@@ -111,22 +111,22 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 }
 
 static type_init_data *enum_get_type_data(handle tp) {
-    return (type_init_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
+    return static_cast<type_init_data *>((borrow<capsule>(handle(tp).attr("__nb_enum__"))).data());
 }
 
 void enum_append(PyObject *tp_, const char *name_, int64_t value_,
                  const char *doc) noexcept {
     handle tp(tp_),
            val_tp(&PyLong_Type),
-           obj_tp((PyObject *) &PyBaseObject_Type);
+           obj_tp(reinterpret_cast<PyObject *>(&PyBaseObject_Type));
 
     type_data *t = enum_get_type_data(tp);
 
     object val;
-    if (t->flags & (uint32_t) enum_flags::is_signed)
-        val = steal(PyLong_FromLongLong((long long) value_));
+    if (t->flags & static_cast<uint32_t>(enum_flags::is_signed))
+        val = steal(PyLong_FromLongLong(static_cast<long long>(value_)));
     else
-        val = steal(PyLong_FromUnsignedLongLong((unsigned long long) value_));
+        val = steal(PyLong_FromUnsignedLongLong(static_cast<unsigned long long>(value_)));
 
     dict value_map = tp.attr("_value2member_map_"),
          member_map = tp.attr("_member_map_");
@@ -140,7 +140,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     # if PY_VERSION_HEX >= 0x030B0000
     // In Python 3.11+, update the flag and bit masks by hand,
     // since enum._proto_member.__set_name__ is not called in this code path.
-    if (t->flags & (uint32_t) enum_flags::is_flag) {
+    if (t->flags & static_cast<uint32_t>(enum_flags::is_flag)) {
         tp.attr("_flag_mask_") |= val;
 
         bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
@@ -177,11 +177,11 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
 
     member_map[name] = el;
 
-    enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
-    fwd->emplace(value_, (int64_t) (uintptr_t) el.ptr());
+    enum_map *fwd = static_cast<enum_map *>(t->enum_tbl.fwd);
+    fwd->emplace(value_, reinterpret_cast<int64_t>(el.ptr()));
 
-    enum_map *rev = (enum_map *) t->enum_tbl.rev;
-    rev->emplace((int64_t) (uintptr_t) el.ptr(), value_);
+    enum_map *rev = static_cast<enum_map *>(t->enum_tbl.rev);
+    rev->emplace(reinterpret_cast<int64_t>(el.ptr()), value_);
 }
 
 bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8_t flags) noexcept {
@@ -189,63 +189,63 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (!t)
         return false;
 
-    if ((t->flags & (uint32_t) enum_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
+    if ((t->flags & static_cast<uint32_t>(enum_flags::is_flag)) != 0 && Py_TYPE(o) == t->type_py) {
         PyObject *value_o =
                 PyObject_GetAttr(o, static_pyobjects[pyobj_name::value_str]);
         if (value_o == nullptr) {
             PyErr_Clear();
             return false;
         }
-        if ((t->flags & (uint32_t) enum_flags::is_signed)) {
+        if ((t->flags & static_cast<uint32_t>(enum_flags::is_signed))) {
             long long value = PyLong_AsLongLong(value_o);
             if (value == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
                 return false;
             }
-            *out = (int64_t) value;
+            *out = static_cast<int64_t>(value);
             return true;
         } else {
             unsigned long long value = PyLong_AsUnsignedLongLong(value_o);
-            if (value == (unsigned long long) -1 && PyErr_Occurred()) {
+            if (value == static_cast<unsigned long long>(-1) && PyErr_Occurred()) {
                 PyErr_Clear();
                 return false;
             }
-            *out = (int64_t) value;
+            *out = static_cast<int64_t>(value);
             return true;
         }
     }
 
-    enum_map *rev = (enum_map *) t->enum_tbl.rev;
-    enum_map::iterator it = rev->find((int64_t) (uintptr_t) o);
+    enum_map *rev = static_cast<enum_map *>(t->enum_tbl.rev);
+    enum_map::iterator it = rev->find(reinterpret_cast<int64_t>(o));
 
     if (it != rev->end()) {
         *out = it->second;
         return true;
     }
 
-    if (flags & (uint8_t) cast_flags::convert) {
-        enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
+    if (flags & static_cast<uint8_t>(cast_flags::convert)) {
+        enum_map *fwd = static_cast<enum_map *>(t->enum_tbl.fwd);
 
-        if (t->flags & (uint32_t) enum_flags::is_signed) {
+        if (t->flags & static_cast<uint32_t>(enum_flags::is_signed)) {
             long long value = PyLong_AsLongLong(o);
             if (value == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
                 return false;
             }
-            enum_map::iterator it2 = fwd->find((int64_t) value);
+            enum_map::iterator it2 = fwd->find(static_cast<int64_t>(value));
             if (it2 != fwd->end()) {
-                *out = (int64_t) value;
+                *out = static_cast<int64_t>(value);
                 return true;
             }
         } else {
             unsigned long long value = PyLong_AsUnsignedLongLong(o);
-            if (value == (unsigned long long) -1 && PyErr_Occurred()) {
+            if (value == static_cast<unsigned long long>(-1) && PyErr_Occurred()) {
                 PyErr_Clear();
                 return false;
             }
-            enum_map::iterator it2 = fwd->find((int64_t) value);
+            enum_map::iterator it2 = fwd->find(static_cast<int64_t>(value));
             if (it2 != fwd->end()) {
-                *out = (int64_t) value;
+                *out = static_cast<int64_t>(value);
                 return true;
             }
         }
@@ -260,34 +260,34 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
     if (!t)
         return nullptr;
 
-    enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
+    enum_map *fwd = static_cast<enum_map *>(t->enum_tbl.fwd);
 
     enum_map::iterator it = fwd->find(key);
     if (it != fwd->end()) {
-        PyObject *value = (PyObject *) it->second;
+        PyObject *value = reinterpret_cast<PyObject *>(it->second);
         Py_INCREF(value);
         return value;
     }
 
     uint32_t flags = t->flags;
-    if ((flags & (uint32_t) enum_flags::is_flag) != 0) {
+    if ((flags & static_cast<uint32_t>(enum_flags::is_flag)) != 0) {
         handle enum_tp(t->type_py);
 
         object val;
-        if (flags & (uint32_t) enum_flags::is_signed)
-            val = steal(PyLong_FromLongLong((long long) key));
+        if (flags & static_cast<uint32_t>(enum_flags::is_signed))
+            val = steal(PyLong_FromLongLong(key));
         else
-            val = steal(PyLong_FromUnsignedLongLong((unsigned long long) key));
+            val = steal(PyLong_FromUnsignedLongLong(static_cast<unsigned long long>(key)));
 
         return enum_tp.attr("__new__")(enum_tp, val).release().ptr();
     }
 
-    if (flags & (uint32_t) enum_flags::is_signed)
+    if (flags & static_cast<uint32_t>(enum_flags::is_signed))
         PyErr_Format(PyExc_ValueError, "%lli is not a valid %s.",
-                     (long long) key, t->name);
+                     static_cast<long long>(key), t->name);
     else
         PyErr_Format(PyExc_ValueError, "%llu is not a valid %s.",
-                     (unsigned long long) key, t->name);
+                     static_cast<unsigned long long>(key), t->name);
 
     return nullptr;
 }

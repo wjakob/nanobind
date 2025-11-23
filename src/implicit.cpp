@@ -23,16 +23,16 @@ void implicitly_convertible(const std::type_info *src,
     lock_internals guard(internals_);
     size_t size = 0;
 
-    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
+    if (t->flags & static_cast<uint32_t>(type_flags::has_implicit_conversions)) {
         while (t->implicit.cpp && t->implicit.cpp[size])
             size++;
     } else {
         t->implicit.cpp = nullptr;
         t->implicit.py = nullptr;
-        t->flags |= (uint32_t) type_flags::has_implicit_conversions;
+        t->flags |= static_cast<uint32_t>(type_flags::has_implicit_conversions);
     }
 
-    void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
+    void **data = static_cast<void **>(PyMem_Malloc(sizeof(void *) * (size + 2)));
 
     if (size)
         memcpy(data, t->implicit.cpp, size * sizeof(void *));
@@ -53,22 +53,22 @@ void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
     lock_internals guard(internals_);
     size_t size = 0;
 
-    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
+    if (t->flags & static_cast<uint32_t>(type_flags::has_implicit_conversions)) {
         while (t->implicit.py && t->implicit.py[size])
             size++;
     } else {
         t->implicit.cpp = nullptr;
         t->implicit.py = nullptr;
-        t->flags |= (uint32_t) type_flags::has_implicit_conversions;
+        t->flags |= static_cast<uint32_t>(type_flags::has_implicit_conversions);
     }
 
-    void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
+    void **data = static_cast<void **>(PyMem_Malloc(sizeof(void *) * (size + 2)));
     if (size)
         memcpy(data, t->implicit.py, size * sizeof(void *));
-    data[size] = (void *) predicate;
+    data[size] = reinterpret_cast<void *>(predicate);
     data[size + 1] = nullptr;
     PyMem_Free(t->implicit.py);
-    t->implicit.py = (decltype(t->implicit.py)) data;
+    t->implicit.py = reinterpret_cast<decltype(t->implicit.py)>(data);
 }
 
 NAMESPACE_END(detail)

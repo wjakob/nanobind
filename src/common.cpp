@@ -23,7 +23,7 @@ create_exception(exception_type type, const char *fmt, va_list args_) {
     int size = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    if (size < (int) sizeof(buf)) {
+    if (size < static_cast<int>(sizeof(buf))) {
         return builtin_exception(type, buf);
     } else {
         scoped_pymalloc<char> temp(size + 1);
@@ -83,16 +83,16 @@ void fail(const char *fmt, ...) noexcept {
 PyObject *capsule_new(const void *ptr, const char *name,
         void (*cleanup)(void *) noexcept) noexcept {
     auto capsule_cleanup = [](PyObject *o) {
-        auto cleanup_2 = (void (*)(void *))(PyCapsule_GetContext(o));
+        auto cleanup_2 = reinterpret_cast<void (*)(void *)>(PyCapsule_GetContext(o));
         if (cleanup_2)
             cleanup_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
     };
 
-    PyObject *c = PyCapsule_New((void *) ptr, name, capsule_cleanup);
+    PyObject *c = PyCapsule_New(const_cast<void *>(ptr), name, capsule_cleanup);
 
     check(c, "nanobind::detail::capsule_new(): allocation failed!");
 
-    int rv = PyCapsule_SetContext(c, (void *) cleanup);
+    int rv = PyCapsule_SetContext(c, reinterpret_cast<void *>(cleanup));
     check(rv == 0, "nanobind::detail::capsule_new(): could not set context!");
 
     return c;
@@ -130,7 +130,7 @@ void cleanup_list::release() noexcept {
 
 void cleanup_list::expand() noexcept {
     uint32_t new_capacity = m_capacity * 2;
-    PyObject **new_data = (PyObject **) malloc(new_capacity * sizeof(PyObject *));
+    PyObject **new_data = static_cast<PyObject **>(malloc(new_capacity * sizeof(PyObject *)));
     check(new_data, "nanobind::detail::cleanup_list::expand(): out of memory!");
     memcpy(new_data, m_data, m_size * sizeof(PyObject *));
     if (m_capacity != Small)
@@ -208,7 +208,7 @@ size_t obj_len(PyObject *o) {
     Py_ssize_t res = PyObject_Size(o);
     if (res < 0)
         raise_python_error();
-    return (size_t) res;
+    return static_cast<size_t>(res);
 }
 
 size_t obj_len_hint(PyObject *o) noexcept {
@@ -218,7 +218,7 @@ size_t obj_len_hint(PyObject *o) noexcept {
         PyErr_Clear();
         res = 0;
     }
-    return (size_t) res;
+    return static_cast<size_t>(res);
 #else
     PyTypeObject *tp = Py_TYPE(o);
     lenfunc l = (lenfunc) type_get_slot(tp, Py_sq_length);
@@ -277,7 +277,7 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
     PyObject *res = nullptr;
     bool gil_error = false, cast_error = false;
 
-    size_t nargs_total = (size_t) (NB_VECTORCALL_NARGS(nargsf) +
+    size_t nargs_total = static_cast<size_t>(NB_VECTORCALL_NARGS(nargsf) +
                          (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
 
 #if !defined(Py_LIMITED_API)
@@ -586,7 +586,7 @@ PyObject *str_from_cstr(const char *str) {
 }
 
 PyObject *str_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyUnicode_FromStringAndSize(str, (Py_ssize_t) size);
+    PyObject *result = PyUnicode_FromStringAndSize(str, static_cast<Py_ssize_t>(size));
     if (!result)
         raise("nanobind::detail::str_from_cstr_and_size(): conversion error!");
     return result;
@@ -609,7 +609,7 @@ PyObject *bytes_from_cstr(const char *str) {
 }
 
 PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
-    PyObject *result = PyBytes_FromStringAndSize((const char *) str, (Py_ssize_t) size);
+    PyObject *result = PyBytes_FromStringAndSize(static_cast<const char *>(str), static_cast<Py_ssize_t>(size));
     if (!result)
         raise_python_error();
     return result;
@@ -625,7 +625,7 @@ PyObject *bytearray_from_obj(PyObject *o) {
 }
 
 PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
-    PyObject *result = PyByteArray_FromStringAndSize((const char *) str, (Py_ssize_t) size);
+    PyObject *result = PyByteArray_FromStringAndSize(static_cast<const char *>(str), static_cast<Py_ssize_t>(size));
     if (!result)
         raise_python_error();
     return result;
@@ -704,8 +704,8 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
 
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     if (PyTuple_CheckExact(seq)) {
-        size = (size_t) PyTuple_GET_SIZE(seq);
-        result = ((PyTupleObject *) seq)->ob_item;
+        size = static_cast<size_t>(PyTuple_GET_SIZE(seq));
+        result = (reinterpret_cast<PyTupleObject *>(seq))->ob_item;
         /* Special case for zero-sized lists/tuples. CPython
            sets ob_item to NULL, which this function incidentally uses to
            signal an error. Return a nonzero pointer that will, however,
@@ -714,8 +714,8 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
             result = (PyObject **) 1;
 #  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
     } else if (PyList_CheckExact(seq)) {
-        size = (size_t) PyList_GET_SIZE(seq);
-        result = ((PyListObject *) seq)->ob_item;
+        size = static_cast<size_t>(PyList_GET_SIZE(seq));
+        result = (reinterpret_cast<PyListObject *>(seq))->ob_item;
         if (size == 0) // ditto
             result = (PyObject **) 1;
 #  endif
@@ -799,8 +799,8 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     if (PyTuple_CheckExact(seq)) {
-        if (size == (size_t) PyTuple_GET_SIZE(seq)) {
-            result = ((PyTupleObject *) seq)->ob_item;
+        if (size == static_cast<size_t>(PyTuple_GET_SIZE(seq))) {
+            result = (reinterpret_cast<PyTupleObject *>(seq))->ob_item;
             /* Special case for zero-sized lists/tuples. CPython
                sets ob_item to NULL, which this function incidentally uses to
                signal an error. Return a nonzero pointer that will, however,
@@ -810,15 +810,15 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
         }
 #  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
     } else if (PyList_CheckExact(seq)) {
-        if (size == (size_t) PyList_GET_SIZE(seq)) {
-            result = ((PyListObject *) seq)->ob_item;
+        if (size == static_cast<size_t>(PyList_GET_SIZE(seq))) {
+            result = (reinterpret_cast<PyListObject *>(seq))->ob_item;
             if (size == 0) // ditto
                 result = (PyObject **) 1;
         }
 #  endif
     } else if (PySequence_Check(seq)) {
         Py_ssize_t size_seq = PySequence_Size(seq);
-        if (size_seq != (Py_ssize_t) size) {
+        if (size_seq != static_cast<Py_ssize_t>(size)) {
             if (size_seq == -1)
                 PyErr_Clear();
         } else {
@@ -896,7 +896,7 @@ static void property_install_impl(PyTypeObject *tp, PyObject *scope,
     if (m && (Py_TYPE(m) == internals->nb_func ||
               Py_TYPE(m) == internals->nb_method)) {
         func_data *f = nb_func_data(m);
-        if (f->flags & (uint32_t) func_flags::has_doc)
+        if (f->flags & static_cast<uint32_t>(func_flags::has_doc))
             doc = str(f->doc);
     }
 
@@ -952,7 +952,7 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
                         std::complex<double> *out) noexcept {
     bool is_complex = PyComplex_CheckExact(ob),
-         convert = (flags & (uint8_t) cast_flags::convert);
+         convert = (flags & static_cast<uint8_t>(cast_flags::convert));
 #if !defined(Py_LIMITED_API)
     if (is_complex || convert) {
         Py_complex result = PyComplex_AsCComplex(ob);
@@ -1012,7 +1012,7 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     is_float = false;
 #endif
 
-    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
+    if (is_float || (flags & static_cast<uint8_t>(cast_flags::convert))) {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred()) {
@@ -1028,13 +1028,13 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
 
 bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
-    bool convert = flags & (uint8_t) cast_flags::convert;
+    bool convert = flags & static_cast<uint8_t>(cast_flags::convert);
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
         double d = PyFloat_AS_DOUBLE(o);
-        float result = (float) d;
-        if (convert || (double) result == d || d != d) {
+        float result = static_cast<float>(d);
+        if (convert || static_cast<double>(result) == d || d != d) {
             *out = result;
             return true;
         } else {
@@ -1048,8 +1048,8 @@ bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
     if (is_float || convert) {
         double d = PyFloat_AsDouble(o);
         if (d != -1.0 || !PyErr_Occurred()) {
-            float result = (float) d;
-            if (convert || (double) result == d || d != d) {
+            float result = static_cast<float>(d);
+            if (convert || static_cast<double>(result) == d || d != d) {
                 *out = result;
                 return true;
             }
@@ -1078,7 +1078,7 @@ template <typename T, bool Recurse = true>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o))) {
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
-        PyLongObject *l = (PyLongObject *) o;
+        PyLongObject *l = reinterpret_cast<PyLongObject *>(o);
 
         // Fast path for compact integers
         if (NB_LIKELY(PyUnstable_Long_IsCompact(l))) {
@@ -1123,7 +1123,7 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     }
 
     if constexpr (Recurse) {
-        if ((flags & (uint8_t) cast_flags::convert) && !PyFloat_Check(o)) {
+        if ((flags & static_cast<uint8_t>(cast_flags::convert)) && !PyFloat_Check(o)) {
             PyObject* temp = PyNumber_Long(o);
             if (temp) {
                 bool result = load_int<T, false>(temp, 0, out);
@@ -1220,8 +1220,8 @@ void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
     if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
         detail::raise_python_error();
     Py_ssize_t slice_length_ =
-        PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
-    slice_length = (size_t) slice_length_;
+        PySlice_AdjustIndices(size, &start, &stop, step);
+    slice_length = static_cast<size_t>(slice_length_);
 }
 
 bool iterable_check(PyObject *o) noexcept {
@@ -1274,7 +1274,7 @@ bool issubclass(PyObject *a, PyObject *b) {
     int rv = PyObject_IsSubclass(a, b);
     if (rv == -1)
         raise_python_error();
-    return bool(rv);
+    return static_cast<bool>(rv);
 }
 
 // ========================================================================

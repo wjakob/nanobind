@@ -39,7 +39,7 @@ struct managed_dltensor_versioned {
 
 static void mt_from_buffer_delete(managed_dltensor_versioned* self) {
     gil_scoped_acquire guard;
-    Py_buffer *buf = (Py_buffer *) self->manager_ctx;
+    Py_buffer *buf = static_cast<Py_buffer *>(self->manager_ctx);
     PyBuffer_Release(buf);
     PyMem_Free(buf);
     PyMem_Free(self);  // This also frees shape and size arrays.
@@ -136,13 +136,13 @@ struct ndarray_handle {
 
 static void nb_ndarray_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
-    ndarray_dec_ref(((nb_ndarray *) self)->th);
+    ndarray_dec_ref((reinterpret_cast<nb_ndarray *>(self))->th);
     PyObject_Free(self);
     Py_DECREF(tp);
 }
 
 static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    ndarray_handle *th = (reinterpret_cast<nb_ndarray *>(self))->th;
     dlpack::dltensor &t = (th->versioned) ? th->mt_versioned->dltensor
                                           : th->mt_unversioned->dltensor;
 
@@ -153,7 +153,7 @@ static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
     }
 
     const char *format = nullptr;
-    switch ((dlpack::dtype_code) t.dtype.code) {
+    switch (static_cast<dlpack::dtype_code>(t.dtype.code)) {
         case dlpack::dtype_code::Int:
             switch (t.dtype.bits) {
                 case 8: format = "b"; break;
@@ -205,23 +205,23 @@ static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
     view->obj = self;
     Py_INCREF(self);
 
-    scoped_pymalloc<Py_ssize_t> shape_and_strides(2 * (size_t) t.ndim);
+    scoped_pymalloc<Py_ssize_t> shape_and_strides(2 * static_cast<size_t>(t.ndim));
     Py_ssize_t* shape = shape_and_strides.get();
     Py_ssize_t* strides = shape + t.ndim;
 
     const Py_ssize_t itemsize = t.dtype.bits / 8;
     Py_ssize_t len = itemsize;
-    for (size_t i = 0; i < (size_t) t.ndim; ++i) {
-        len *= (Py_ssize_t) t.shape[i];
-        shape[i] = (Py_ssize_t) t.shape[i];
-        strides[i] = (Py_ssize_t) t.strides[i] * itemsize;
+    for (size_t i = 0; i < static_cast<size_t>(t.ndim); ++i) {
+        len *= static_cast<Py_ssize_t>(t.shape[i]);
+        shape[i] = static_cast<Py_ssize_t>(t.shape[i]);
+        strides[i] = static_cast<Py_ssize_t>(t.strides[i]) * itemsize;
     }
 
     view->len = len;
     view->itemsize = itemsize;
     view->readonly = th->ro;
     view->ndim = t.ndim;
-    view->format = (char *) format;
+    view->format = const_cast<char *>(format);
     view->shape = shape;
     view->strides = strides;
     view->suboffsets = nullptr;
@@ -269,7 +269,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
         }
     }
 
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    ndarray_handle *th = (reinterpret_cast<nb_ndarray *>(self))->th;
     PyObject *capsule;
     if (max_major_version >= dlpack::major_version)
         capsule = th->make_capsule_versioned();
@@ -281,7 +281,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
 
 // This function implements __dlpack_device__() for a nanobind.nb_ndarray.
 static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyObject *) {
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    ndarray_handle *th = (reinterpret_cast<nb_ndarray *>(self))->th;
     dlpack::dltensor& t = (th->versioned)
                               ? th->mt_versioned->dltensor
                               : th->mt_unversioned->dltensor;
@@ -306,7 +306,7 @@ static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyObject *) {
 }
 
 static PyMethodDef nb_ndarray_methods[] = {
-   { "__dlpack__", (PyCFunction) (void *) nb_ndarray_dlpack,
+   { "__dlpack__", reinterpret_cast<PyCFunction>(reinterpret_cast<void *>(nb_ndarray_dlpack)),
                    METH_FASTCALL | METH_KEYWORDS, nullptr },
    { "__dlpack_device__", nb_ndarray_dlpack_device, METH_NOARGS, nullptr },
    { nullptr, nullptr, 0, nullptr }
@@ -323,24 +323,24 @@ static PyTypeObject *nb_ndarray_tp() noexcept {
             return tp;
 
         PyType_Slot slots[] = {
-            { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
+            { Py_tp_dealloc, reinterpret_cast<void *>(nb_ndarray_dealloc) },
             { Py_tp_methods, (void *) nb_ndarray_methods },
 #if PY_VERSION_HEX >= 0x03090000
-            { Py_bf_getbuffer, (void *) nb_ndarray_getbuffer },
-            { Py_bf_releasebuffer, (void *) nb_ndarray_releasebuffer },
+            { Py_bf_getbuffer, reinterpret_cast<void *>(nb_ndarray_getbuffer) },
+            { Py_bf_releasebuffer, reinterpret_cast<void *>(nb_ndarray_releasebuffer) },
 #endif
             { 0, nullptr }
         };
 
         PyType_Spec spec = {
             /* .name = */ "nanobind.nb_ndarray",
-            /* .basicsize = */ (int) sizeof(nb_ndarray),
+            /* .basicsize = */ static_cast<int>(sizeof(nb_ndarray)),
             /* .itemsize = */ 0,
             /* .flags = */ Py_TPFLAGS_DEFAULT,
             /* .slots = */ slots
         };
 
-        tp = (PyTypeObject *) PyType_FromSpec(&spec);
+        tp = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(&spec));
         check(tp, "nb_ndarray type creation failed!");
 
 #if PY_VERSION_HEX < 0x03090000
@@ -376,7 +376,7 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     bool skip_first = format_c == '@' || format_c == '=';
 
     int32_t num = 1;
-    if (*(uint8_t *) &num == 1) {
+    if (*reinterpret_cast<uint8_t *>(&num) == 1) {
         if (format_c == '<')
             skip_first = true;
     } else {
@@ -402,31 +402,31 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
             case 'i':
             case 'l':
             case 'q':
-            case 'n': dt.code = (uint8_t) dlpack::dtype_code::Int; break;
+            case 'n': dt.code = static_cast<uint8_t>(dlpack::dtype_code::Int); break;
 
             case 'B':
             case 'H':
             case 'I':
             case 'L':
             case 'Q':
-            case 'N': dt.code = (uint8_t) dlpack::dtype_code::UInt; break;
+            case 'N': dt.code = static_cast<uint8_t>(dlpack::dtype_code::UInt); break;
 
             case 'e':
             case 'f':
-            case 'd': dt.code = (uint8_t) dlpack::dtype_code::Float; break;
+            case 'd': dt.code = static_cast<uint8_t>(dlpack::dtype_code::Float); break;
 
-            case '?': dt.code = (uint8_t) dlpack::dtype_code::Bool; break;
+            case '?': dt.code = static_cast<uint8_t>(dlpack::dtype_code::Bool); break;
 
             default: fail = true;
         }
 
         if (is_complex) {
-            fail |= dt.code != (uint8_t) dlpack::dtype_code::Float;
-            dt.code = (uint8_t) dlpack::dtype_code::Complex;
+            fail |= dt.code != static_cast<uint8_t>(dlpack::dtype_code::Float);
+            dt.code = static_cast<uint8_t>(dlpack::dtype_code::Complex);
         }
 
         dt.lanes = 1;
-        dt.bits = (uint8_t) (view->itemsize * 8);
+        dt.bits = static_cast<uint8_t>(view->itemsize * 8);
     }
 
     if (fail) {
@@ -463,7 +463,7 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     mt->dltensor.strides = strides;
     mt->dltensor.byte_offset = data_offset;
 
-    const int64_t itemsize = (int64_t) view->itemsize;
+    const int64_t itemsize = static_cast<int64_t>(view->itemsize);
     for (int32_t i = 0; i < ndim; ++i) {
         int64_t stride = view->strides[i] / itemsize;
         if (stride * itemsize != view->strides[i]) {
@@ -471,7 +471,7 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
             return mt_unique_ptr;
         }
         strides[i] = stride;
-        shape[i] = (int64_t) view->shape[i];
+        shape[i] = static_cast<int64_t>(view->shape[i]);
     }
 
     mt->version = {dlpack::major_version, dlpack::minor_version};
@@ -492,7 +492,7 @@ bool ndarray_check(PyObject *o) noexcept {
     if (tp == &PyCapsule_Type)
         return true;
 
-    PyObject *name = nb_type_name((PyObject *) tp);
+    PyObject *name = nb_type_name(reinterpret_cast<PyObject *>(tp));
     check(name, "Could not obtain type name! (1)");
 
     const char *tp_name = PyUnicode_AsUTF8AndSize(name, nullptr);
@@ -593,10 +593,10 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     }
 
     dlpack::dltensor& t = (versioned)
-                              ? ((managed_dltensor_versioned *) mt)->dltensor
-                              : ((managed_dltensor *) mt)->dltensor;
+                              ? (static_cast<managed_dltensor_versioned *>(mt))->dltensor
+                              : (static_cast<managed_dltensor *>(mt))->dltensor;
 
-    uint64_t flags = (versioned) ? ((managed_dltensor_versioned *) mt)->flags
+    uint64_t flags = (versioned) ? (static_cast<managed_dltensor_versioned *>(mt))->flags
                                  : 0UL;
 
     // Reject a read-only ndarray if a writable one is required, and
@@ -647,7 +647,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
             } else {
                 int nontrivial_dims = 0;
                 for (int i = 0; i < t.ndim; ++i)
-                    nontrivial_dims += (int) (t.shape[i] > 1);
+                    nontrivial_dims += static_cast<int>(t.shape[i] > 1);
                 pass_order = nontrivial_dims <= 1;
             }
         } else {
@@ -671,9 +671,9 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
     // Do not convert shape and do not convert complex numbers to non-complex.
     convert &= pass_shape &
-               !(t.dtype.code == (uint8_t) dlpack::dtype_code::Complex
+               !(t.dtype.code == static_cast<uint8_t>(dlpack::dtype_code::Complex)
                  && has_dtype
-                 && c->dtype.code != (uint8_t) dlpack::dtype_code::Complex);
+                 && c->dtype.code != static_cast<uint8_t>(dlpack::dtype_code::Complex));
 
     // Support implicit conversion of dtype and order.
     if (convert && (!pass_dtype || !pass_order) && !src_is_pycapsule) {
@@ -690,21 +690,21 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
             return nullptr;
 
         char dtype[11];
-        if (dt.code == (uint8_t) dlpack::dtype_code::Bool) {
+        if (dt.code == static_cast<uint8_t>(dlpack::dtype_code::Bool)) {
             std::strcpy(dtype, "bool");
         } else {
             const char *prefix = nullptr;
             switch (dt.code) {
-                case (uint8_t) dlpack::dtype_code::Int:
+                case static_cast<uint8_t>(dlpack::dtype_code::Int):
                     prefix = "int";
                     break;
-                case (uint8_t) dlpack::dtype_code::UInt:
+                case static_cast<uint8_t>(dlpack::dtype_code::UInt):
                     prefix = "uint";
                     break;
-                case (uint8_t) dlpack::dtype_code::Float:
+                case static_cast<uint8_t>(dlpack::dtype_code::Float):
                     prefix = "float";
                     break;
-                case (uint8_t) dlpack::dtype_code::Complex:
+                case static_cast<uint8_t>(dlpack::dtype_code::Complex):
                     prefix = "complex";
                     break;
                 default:
@@ -747,9 +747,9 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     // Create a reference-counted wrapper
     scoped_pymalloc<ndarray_handle> result;
     if (versioned)
-        result->mt_versioned = (managed_dltensor_versioned *) mt;
+        result->mt_versioned = static_cast<managed_dltensor_versioned *>(mt);
     else
-        result->mt_unversioned = (managed_dltensor *) mt;
+        result->mt_unversioned = static_cast<managed_dltensor *>(mt);
 
     result->refcount = 0;
     result->owner = nullptr;
@@ -770,7 +770,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     } else {
         result->free_strides = true;
 
-        scoped_pymalloc<int64_t> strides((size_t) t.ndim);
+        scoped_pymalloc<int64_t> strides(static_cast<size_t>(t.ndim));
         for (int64_t i = t.ndim - 1, accum = 1; i >= 0; --i) {
             strides[i] = accum;
             accum *= t.shape[i];
@@ -871,7 +871,7 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     }
 
     for (size_t i = 0; i < ndim; ++i)
-        shape[i] = (int64_t) shape_in[i];
+        shape[i] = static_cast<int64_t>(shape_in[i]);
 
     if (ndim > 0) {
         int64_t prod = 1;
@@ -881,12 +881,12 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
         } else if (order == 'F') {
             for (size_t i = 0; i < ndim; ++i) {
                 strides[i] = prod;
-                prod *= (int64_t) shape_in[i];
+                prod *= static_cast<int64_t>(shape_in[i]);
             }
         } else if (order == '\0' || order == 'A' || order == 'C') {
-            for (ssize_t i = (ssize_t) ndim - 1; i >= 0; --i) {
+            for (ssize_t i = static_cast<ssize_t>(ndim) - 1; i >= 0; --i) {
                 strides[i] = prod;
-                prod *= (int64_t) shape_in[i];
+                prod *= static_cast<int64_t>(shape_in[i]);
             }
         } else {
             check(false, "ndarray_create(): unknown memory order requested!");
@@ -898,13 +898,13 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     mt->version = {dlpack::major_version, dlpack::minor_version};
     mt->manager_ctx = result.get();
     mt->deleter = [](managed_dltensor_versioned *self) {
-                      ndarray_dec_ref((ndarray_handle *) self->manager_ctx);
+                      ndarray_dec_ref(static_cast<ndarray_handle *>(self->manager_ctx));
                   };
     mt->flags = (ro) ? dlpack::flag_bitmask_read_only : 0;
     mt->dltensor.data = data;
-    mt->dltensor.device.device_type = (int32_t) device_type;
-    mt->dltensor.device.device_id = (int32_t) device_id;
-    mt->dltensor.ndim = (int32_t) ndim;
+    mt->dltensor.device.device_type = static_cast<int32_t>(device_type);
+    mt->dltensor.device.device_id = static_cast<int32_t>(device_id);
+    mt->dltensor.ndim = static_cast<int32_t>(ndim);
     mt->dltensor.dtype = dtype;
     mt->dltensor.shape = shape;
     mt->dltensor.strides = strides;
@@ -982,7 +982,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
             return nullptr;
         h->th = th;
         ndarray_inc_ref(th);
-        o = steal((PyObject *) h);
+        o = steal(reinterpret_cast<PyObject *>(h));
     }
 
     if (framework == numpy::value) {

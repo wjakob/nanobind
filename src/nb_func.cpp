@@ -41,13 +41,13 @@ static uint32_t nb_func_render_signature(const func_data *f,
                                          bool nb_signature_mode = false) noexcept;
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
-    size_t size = (size_t) Py_SIZE(self);
+    size_t size = static_cast<size_t>(Py_SIZE(self));
 
     if (size) {
         func_data *f = nb_func_data(self);
 
         for (size_t i = 0; i < size; ++i) {
-            if (f->flags & (uint32_t) func_flags::has_args) {
+            if (f->flags & static_cast<uint32_t>(func_flags::has_args)) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_VISIT(f->args[j].value);
                 }
@@ -60,13 +60,13 @@ int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
 }
 
 int nb_func_clear(PyObject *self) {
-    size_t size = (size_t) Py_SIZE(self);
+    size_t size = static_cast<size_t>(Py_SIZE(self));
 
     if (size) {
         func_data *f = nb_func_data(self);
 
         for (size_t i = 0; i < size; ++i) {
-            if (f->flags & (uint32_t) func_flags::has_args) {
+            if (f->flags & static_cast<uint32_t>(func_flags::has_args)) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_CLEAR(f->args[j].value);
                 }
@@ -82,7 +82,7 @@ int nb_func_clear(PyObject *self) {
 void nb_func_dealloc(PyObject *self) {
     PyObject_GC_UnTrack(self);
 
-    size_t size = (size_t) Py_SIZE(self);
+    size_t size = static_cast<size_t>(Py_SIZE(self));
     if (size) {
         func_data *f = nb_func_data(self);
 
@@ -96,24 +96,24 @@ void nb_func_dealloc(PyObject *self) {
 #endif
 
         for (size_t i = 0; i < size; ++i) {
-            if (f->flags & (uint32_t) func_flags::has_free)
+            if (f->flags & static_cast<uint32_t>(func_flags::has_free))
                 f->free_capture(f->capture);
 
-            if (f->flags & (uint32_t) func_flags::has_args) {
+            if (f->flags & static_cast<uint32_t>(func_flags::has_args)) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     const arg_data &arg = f->args[j];
                     Py_XDECREF(arg.value);
                     Py_XDECREF(arg.name_py);
-                    free((char *) arg.signature);
+                    free(const_cast<char *>(arg.signature));
                 }
             }
 
-            if (f->flags & (uint32_t) func_flags::has_doc)
-                free((char *) f->doc);
+            if (f->flags & static_cast<uint32_t>(func_flags::has_doc))
+                free(const_cast<char *>(f->doc));
 
-            free((char *) f->name);
+            free(const_cast<char *>(f->name));
             free(f->args);
-            free((char *) f->descr);
+            free(const_cast<char *>(f->descr));
             free(f->descr_types);
             free(f->signature);
             ++f;
@@ -124,21 +124,21 @@ void nb_func_dealloc(PyObject *self) {
 }
 
 int nb_bound_method_traverse(PyObject *self, visitproc visit, void *arg) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    nb_bound_method *mb = reinterpret_cast<nb_bound_method *>(self);
     Py_VISIT((PyObject *) mb->func);
     Py_VISIT(mb->self);
     return 0;
 }
 
 int nb_bound_method_clear(PyObject *self) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    nb_bound_method *mb = reinterpret_cast<nb_bound_method *>(self);
     Py_CLEAR(mb->func);
     Py_CLEAR(mb->self);
     return 0;
 }
 
 void nb_bound_method_dealloc(PyObject *self) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    nb_bound_method *mb = reinterpret_cast<nb_bound_method *>(self);
     PyObject_GC_UnTrack(self);
     Py_DECREF((PyObject *) mb->func);
     Py_DECREF(mb->self);
@@ -198,17 +198,17 @@ char *strdup_check(const char *s) {
  * This is an implementation detail of nanobind::cpp_function.
  */
 PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
-    bool has_scope       = f->flags & (uint32_t) func_flags::has_scope,
-         has_name        = f->flags & (uint32_t) func_flags::has_name,
-         has_args        = f->flags & (uint32_t) func_flags::has_args,
-         has_var_args    = f->flags & (uint32_t) func_flags::has_var_args,
-         has_var_kwargs  = f->flags & (uint32_t) func_flags::has_var_kwargs,
-         can_mutate_args = f->flags & (uint32_t) func_flags::can_mutate_args,
-         has_doc         = f->flags & (uint32_t) func_flags::has_doc,
-         has_signature   = f->flags & (uint32_t) func_flags::has_signature,
-         is_implicit     = f->flags & (uint32_t) func_flags::is_implicit,
-         is_method       = f->flags & (uint32_t) func_flags::is_method,
-         return_ref      = f->flags & (uint32_t) func_flags::return_ref,
+    bool has_scope       = f->flags & static_cast<uint32_t>(func_flags::has_scope),
+         has_name        = f->flags & static_cast<uint32_t>(func_flags::has_name),
+         has_args        = f->flags & static_cast<uint32_t>(func_flags::has_args),
+         has_var_args    = f->flags & static_cast<uint32_t>(func_flags::has_var_args),
+         has_var_kwargs  = f->flags & static_cast<uint32_t>(func_flags::has_var_kwargs),
+         can_mutate_args = f->flags & static_cast<uint32_t>(func_flags::can_mutate_args),
+         has_doc         = f->flags & static_cast<uint32_t>(func_flags::has_doc),
+         has_signature   = f->flags & static_cast<uint32_t>(func_flags::has_signature),
+         is_implicit     = f->flags & static_cast<uint32_t>(func_flags::is_implicit),
+         is_method       = f->flags & static_cast<uint32_t>(func_flags::is_method),
+         return_ref      = f->flags & static_cast<uint32_t>(func_flags::return_ref),
          is_constructor  = false,
          is_init         = false,
          is_new          = false,
@@ -280,7 +280,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         if (is_constructor && f->nargs == 2 && f->descr_types[0] &&
             f->descr_types[0] == f->descr_types[1]) {
             if (has_args) {
-                args_in[0].flag &= ~(uint8_t) cast_flags::convert;
+                args_in[0].flag &= ~static_cast<uint8_t>(cast_flags::convert);
             } else {
                 args_in = method_args + 1;
                 has_args = true;
@@ -290,12 +290,12 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     // Create a new function and destroy the old one
     Py_ssize_t prev_overloads = func_prev ? Py_SIZE(func_prev) : 0;
-    nb_func *func = (nb_func *) PyType_GenericAlloc(
-        is_method ? internals_->nb_method : internals_->nb_func, prev_overloads + 1);
+    nb_func *func = reinterpret_cast<nb_func *>(PyType_GenericAlloc(
+        is_method ? internals_->nb_method : internals_->nb_func, prev_overloads + 1));
     check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
 
-    make_immortal((PyObject *) func);
+    make_immortal(reinterpret_cast<PyObject *>(func));
 
     // Check if the complex dispatch loop is needed
     bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||
@@ -314,7 +314,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     const char *prev_doc = nullptr;
 
     if (func_prev) {
-        nb_func *nb_func_prev = (nb_func *) func_prev;
+        nb_func *nb_func_prev = reinterpret_cast<nb_func *>(func_prev);
         complex_call |= nb_func_prev->complex_call;
         max_nargs = std::max(max_nargs, nb_func_prev->max_nargs);
 
@@ -327,7 +327,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         memcpy(cur, prev, sizeof(func_data) * prev_overloads);
         memset(prev, 0, sizeof(func_data) * prev_overloads);
 
-        ((PyVarObject *) func_prev)->ob_size = 0;
+        (reinterpret_cast<PyVarObject *>(func_prev))->ob_size = 0;
 
 #if !defined(NB_FREE_THREADED)
         size_t n_deleted = internals_->funcs.erase(func_prev);
@@ -369,7 +369,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
             fc->doc++;
         if (fc->doc[0] == '\0') {
             fc->doc = nullptr;
-            fc->flags &= ~(uint32_t) func_flags::has_doc;
+            fc->flags &= ~static_cast<uint32_t>(func_flags::has_doc);
             has_doc = false;
         } else {
             fc->doc = strdup_check(fc->doc);
@@ -382,9 +382,9 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                      (prev_doc && strcmp(fc->doc, prev_doc) == 0)));
 
     if (is_constructor)
-        fc->flags |= (uint32_t) func_flags::is_constructor;
+        fc->flags |= static_cast<uint32_t>(func_flags::is_constructor);
     if (has_args)
-        fc->flags |= (uint32_t) func_flags::has_args;
+        fc->flags |= static_cast<uint32_t>(func_flags::has_args);
 
     fc->name = name_cstr;
     fc->signature = has_signature ? strdup_check(f->name) : nullptr;
@@ -405,16 +405,15 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     for (size_t i = 0;; ++i) {
         if (!f->descr[i]) {
-            fc->descr = (char *) malloc_check(sizeof(char) * (i + 1));
-            memcpy((char *) fc->descr, f->descr, (i + 1) * sizeof(char));
+            fc->descr = static_cast<char *>(malloc_check(sizeof(char) * (i + 1)));
+            memcpy(const_cast<char *>(fc->descr), f->descr, (i + 1) * sizeof(char));
             break;
         }
     }
 
     for (size_t i = 0;; ++i) {
         if (!f->descr_types[i]) {
-            fc->descr_types = (const std::type_info **)
-                malloc_check(sizeof(const std::type_info *) * (i + 1));
+            fc->descr_types = static_cast<const std::type_info **>(malloc_check(sizeof(const std::type_info *) * (i + 1)));
             memcpy(fc->descr_types, f->descr_types,
                         (i + 1) * sizeof(const std::type_info *));
             break;
@@ -422,7 +421,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     }
 
     if (has_args) {
-        fc->args = (arg_data *) malloc_check(sizeof(arg_data) * f->nargs);
+        fc->args = static_cast<arg_data *>(malloc_check(sizeof(arg_data) * f->nargs));
 
         if (is_method) // add implicit 'self' argument annotation
             fc->args[0] = method_args[0];
@@ -438,7 +437,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                 a.name_py = nullptr;
             }
             if (a.value == Py_None)
-                a.flag |= (uint8_t) cast_flags::accepts_none;
+                a.flag |= static_cast<uint8_t>(cast_flags::accepts_none);
             a.signature = a.signature ? strdup_check(a.signature) : nullptr;
             Py_XINCREF(a.value);
         }
@@ -447,8 +446,8 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     // Fast path for vector call object construction
     if (((is_init && is_method) || (is_new && !is_method)) &&
         nb_type_check(f->scope)) {
-        type_data *td = nb_type_data((PyTypeObject *) f->scope);
-        bool has_new = td->flags & (uint32_t) type_flags::has_new;
+        type_data *td = nb_type_data(reinterpret_cast<PyTypeObject *>(f->scope));
+        bool has_new = td->flags & static_cast<uint32_t>(type_flags::has_new);
 
         if (is_init) {
             if (!has_new) {
@@ -463,7 +462,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                 // skips Python's usual logic where __init__ is always called
                 // if __new__ returns an instance of the type.
                 bool noargs_ok = true;
-                for (uint32_t i = 1; i < fc->nargs - (uint32_t) has_var_kwargs; ++i) {
+                for (uint32_t i = 1; i < fc->nargs - static_cast<uint32_t>(has_var_kwargs); ++i) {
                     if (has_var_args && i == fc->nargs_pos)
                         continue; // skip `nb::args` since it can be empty
                     if (has_args && fc->args[i].value != nullptr)
@@ -472,16 +471,16 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                     break;
                 }
                 if (noargs_ok)
-                    td->flags |= (uint32_t) type_flags::has_nullary_new;
+                    td->flags |= static_cast<uint32_t>(type_flags::has_nullary_new);
             }
         } else if (is_new) {
             td->init = func;
-            td->flags |= (uint32_t) type_flags::has_new;
+            td->flags |= static_cast<uint32_t>(type_flags::has_new);
         }
     }
 
     if (has_scope && name) {
-        int rv = PyObject_SetAttr(f->scope, name, (PyObject *) func);
+        int rv = PyObject_SetAttr(f->scope, name, reinterpret_cast<PyObject *>(func));
         check(rv == 0, "nb::detail::nb_func_new(\"%s\"): setattr. failed.",
               name_cstr);
     }
@@ -489,7 +488,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     Py_XDECREF(name);
 
     if (return_ref) {
-        return (PyObject *) func;
+        return reinterpret_cast<PyObject *>(func);
     } else {
         Py_DECREF(func);
         return nullptr;
@@ -500,10 +499,10 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
                        size_t nargs_in, PyObject *kwargs_in) noexcept {
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = static_cast<uint32_t>(Py_SIZE(self));
     func_data *f = nb_func_data(self);
 
-    if (f->flags & (uint32_t) func_flags::is_operator)
+    if (f->flags & static_cast<uint32_t>(func_flags::is_operator))
         return not_implemented().release().ptr();
 
     // The buffer 'buf' is protected by 'internals.mutex'
@@ -541,7 +540,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             buf.put(", ");
         buf.put("kwargs = { ");
 
-        size_t nkwargs_in = (size_t) NB_TUPLE_GET_SIZE(kwargs_in);
+        size_t nkwargs_in = static_cast<size_t>(NB_TUPLE_GET_SIZE(kwargs_in));
         for (size_t j = 0; j < nkwargs_in; ++j) {
             PyObject *key   = NB_TUPLE_GET_ITEM(kwargs_in, j),
                      *value = args_in[nargs_in + j];
@@ -605,14 +604,14 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                             PyObject *const *args_in,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
-    const size_t count      = (size_t) Py_SIZE(self),
-                 nargs_in   = (size_t) NB_VECTORCALL_NARGS(nargsf),
-                 nkwargs_in = kwargs_in ? (size_t) NB_TUPLE_GET_SIZE(kwargs_in) : 0;
+    const size_t count      = static_cast<size_t>(Py_SIZE(self)),
+                 nargs_in   = static_cast<size_t>(NB_VECTORCALL_NARGS(nargsf)),
+                 nkwargs_in = kwargs_in ? static_cast<size_t>(NB_TUPLE_GET_SIZE(kwargs_in)) : 0;
 
     func_data *fr = nb_func_data(self);
 
-    const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const bool is_method      = fr->flags & static_cast<uint32_t>(func_flags::is_method),
+               is_constructor = fr->flags & static_cast<uint32_t>(func_flags::is_constructor);
 
     PyObject *result = nullptr,
              *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
@@ -636,10 +635,10 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     cleanup_list cleanup(self_arg);
 
     // Preallocate stack memory for function dispatch
-    size_t max_nargs = ((nb_func *) self)->max_nargs;
-    PyObject **args = (PyObject **) alloca(max_nargs * sizeof(PyObject *));
-    uint8_t *args_flags = (uint8_t *) alloca(max_nargs * sizeof(uint8_t));
-    bool *kwarg_used = (bool *) alloca(nkwargs_in * sizeof(bool));
+    size_t max_nargs = (reinterpret_cast<nb_func *>(self))->max_nargs;
+    PyObject **args = static_cast<PyObject **>(alloca(max_nargs * sizeof(PyObject *)));
+    uint8_t *args_flags = static_cast<uint8_t *>(alloca(max_nargs * sizeof(uint8_t)));
+    bool *kwarg_used = static_cast<bool *>(alloca(nkwargs_in * sizeof(bool)));
 
     // Ensure that keyword argument names are interned. That makes it faster
     // to compare them against pre-interned argument names in the overload chain.
@@ -651,15 +650,15 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     bool kwnames_interned = true;
     for (size_t i = 0; i < nkwargs_in; ++i) {
         PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
-        kwnames_interned &= ((PyASCIIObject *) key)->state.interned != 0;
+        kwnames_interned &= (reinterpret_cast<PyASCIIObject *>(key))->state.interned != 0;
     }
     if (kwargs_in && NB_LIKELY(kwnames_interned)) {
-        kwnames = ((PyTupleObject *) kwargs_in)->ob_item;
+        kwnames = (reinterpret_cast<PyTupleObject *>(kwargs_in))->ob_item;
         goto traverse_overloads;
     }
 #endif
 
-    kwnames = (PyObject **) alloca(nkwargs_in * sizeof(PyObject *));
+    kwnames = static_cast<PyObject **>(alloca(nkwargs_in * sizeof(PyObject *)));
     for (size_t i = 0; i < nkwargs_in; ++i) {
         PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
         Py_INCREF(key);
@@ -709,9 +708,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
         for (size_t k = 0; k < count; ++k) {
             const func_data *f = fr + k;
 
-            const bool has_args       = f->flags & (uint32_t) func_flags::has_args,
-                       has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
-                       has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs;
+            const bool has_args       = f->flags & static_cast<uint32_t>(func_flags::has_args),
+                       has_var_args   = f->flags & static_cast<uint32_t>(func_flags::has_var_args),
+                       has_var_kwargs = f->flags & static_cast<uint32_t>(func_flags::has_var_kwargs);
 
             // Number of C++ parameters eligible to be filled from individual
             // Python positional arguments
@@ -783,7 +782,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     break;
 
                 // Implicit conversion only active in the 2nd pass
-                args_flags[i] = arg_flag & ~uint8_t(pass == 0);
+                args_flags[i] = arg_flag & ~static_cast<uint8_t>(pass == 0);
                 args[i] = arg;
             }
 
@@ -794,7 +793,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             // Deal with remaining positional arguments
             if (has_var_args) {
                 PyObject *tuple = PyTuple_New(
-                    nargs_in > nargs_pos ? (Py_ssize_t) (nargs_in - nargs_pos) : 0);
+                    nargs_in > nargs_pos ? static_cast<Py_ssize_t>(nargs_in - nargs_pos) : 0);
 
                 for (size_t j = nargs_pos; j < nargs_in; ++j) {
                     PyObject *o = args_in[j];
@@ -829,9 +828,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
 
             if (is_constructor)
-                args_flags[0] |= (uint8_t) cast_flags::construct;
+                args_flags[0] |= static_cast<uint8_t>(cast_flags::construct);
 
-            rv_policy policy = (rv_policy) (f->flags & 0b111);
+            rv_policy policy = static_cast<rv_policy>(f->flags & 0b111);
 
             try {
                 result = nullptr;
@@ -853,7 +852,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
-                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    nb_inst *self_arg_nb = reinterpret_cast<nb_inst *>(self_arg);
                     self_arg_nb->destruct = true;
                     self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
@@ -887,11 +886,11 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     uint8_t args_flags[NB_MAXARGS_SIMPLE];
     func_data *fr = nb_func_data(self);
 
-    const size_t count         = (size_t) Py_SIZE(self),
-                 nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    const size_t count         = static_cast<size_t>(Py_SIZE(self)),
+                 nargs_in      = static_cast<size_t>(NB_VECTORCALL_NARGS(nargsf));
 
-    const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
-               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const bool is_method      = fr->flags & static_cast<uint32_t>(func_flags::is_method),
+               is_constructor = fr->flags & static_cast<uint32_t>(func_flags::is_constructor);
 
     PyObject *result = nullptr,
              *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
@@ -915,10 +914,10 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
     for (size_t pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
         for (int i = 0; i < NB_MAXARGS_SIMPLE; ++i)
-            args_flags[i] = (uint8_t) pass;
+            args_flags[i] = static_cast<uint8_t>(pass);
 
         if (is_constructor)
-            args_flags[0] = (uint8_t) cast_flags::construct;
+            args_flags[0] = static_cast<uint8_t>(cast_flags::construct);
 
         for (size_t k = 0; k < count; ++k) {
             const func_data *f = fr + k;
@@ -930,8 +929,8 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 result = nullptr;
 
                 // Found a suitable overload, let's try calling it
-                result = f->impl((void *) f->capture, (PyObject **) args_in,
-                                 args_flags, (rv_policy) (f->flags & 0b111),
+                result = f->impl((void *) f->capture, const_cast<PyObject **>(args_in),
+                                 args_flags, static_cast<rv_policy>(f->flags & 0b111),
                                  &cleanup);
 
                 if (NB_UNLIKELY(!result))
@@ -947,7 +946,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
-                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    nb_inst *self_arg_nb = reinterpret_cast<nb_inst *>(self_arg);
                     self_arg_nb->destruct = true;
                     self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
@@ -978,7 +977,7 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    const size_t nargs_in = static_cast<size_t>(NB_VECTORCALL_NARGS(nargsf));
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -988,8 +987,8 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *self,
 
     if (kwargs_in == nullptr && nargs_in == 0) {
         try {
-            result = fr->impl((void *) fr->capture, (PyObject **) args_in,
-                              nullptr, (rv_policy) (fr->flags & 0b111), nullptr);
+            result = fr->impl((void *) fr->capture, const_cast<PyObject **>(args_in),
+                              nullptr, static_cast<rv_policy>(fr->flags & 0b111), nullptr);
             if (result == NB_NEXT_OVERLOAD)
                 error_handler = nb_func_error_overload;
             else if (!result)
@@ -1018,8 +1017,8 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
-    bool is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const size_t nargs_in = static_cast<size_t>(NB_VECTORCALL_NARGS(nargsf));
+    bool is_constructor = fr->flags & static_cast<uint32_t>(func_flags::is_constructor);
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -1031,18 +1030,18 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
         PyObject *arg = args_in[0];
         cleanup_list cleanup(arg);
         uint8_t args_flags[1] = {
-            (uint8_t) (is_constructor ? (1 | (uint8_t) cast_flags::construct) : 1)
+            static_cast<uint8_t>(is_constructor ? (1 | static_cast<uint8_t>(cast_flags::construct)) : 1)
         };
 
         try {
-            result = fr->impl((void *) fr->capture, (PyObject **) args_in,
-                              args_flags, (rv_policy) (fr->flags & 0b111), &cleanup);
+            result = fr->impl((void *) fr->capture, const_cast<PyObject **>(args_in),
+                              args_flags, static_cast<rv_policy>(fr->flags & 0b111), &cleanup);
             if (result == NB_NEXT_OVERLOAD) {
                 error_handler = nb_func_error_overload;
             } else if (!result) {
                 error_handler = nb_func_error_noconvert;
             } else if (is_constructor) {
-                nb_inst *arg_nb = (nb_inst *) arg;
+                nb_inst *arg_nb = reinterpret_cast<nb_inst *>(arg);
                 arg_nb->destruct = true;
                 arg_nb->state = nb_inst::state_ready;
                 if (NB_UNLIKELY(arg_nb->intrusive))
@@ -1074,14 +1073,14 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
                                             PyObject *const *args_in,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
-    nb_bound_method *mb = (nb_bound_method *) self;
-    size_t nargs = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    nb_bound_method *mb = reinterpret_cast<nb_bound_method *>(self);
+    size_t nargs = static_cast<size_t>(NB_VECTORCALL_NARGS(nargsf));
     const size_t buf_size = 5;
     PyObject **args, *args_buf[buf_size], *temp = nullptr, *result;
     bool alloc = false;
 
     if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
-        args = (PyObject **) (args_in - 1);
+        args = const_cast<PyObject **>(args_in - 1);
         temp = args[0];
     } else {
         size_t size = nargs + 1;
@@ -1091,7 +1090,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
         if (size < buf_size) {
             args = args_buf;
         } else {
-            args = (PyObject **) PyMem_Malloc(size * sizeof(PyObject *));
+            args = static_cast<PyObject **>(PyMem_Malloc(size * sizeof(PyObject *)));
             if (!args)
                 return PyErr_NoMemory();
             alloc = true;
@@ -1102,7 +1101,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
     }
 
     args[0] = mb->self;
-    result = mb->func->vectorcall((PyObject *) mb->func, args, nargs + 1, kwargs_in);
+    result = mb->func->vectorcall(reinterpret_cast<PyObject *>(mb->func), args, nargs + 1, kwargs_in);
     args[0] = temp;
 
     if (NB_UNLIKELY(alloc))
@@ -1119,14 +1118,14 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 
         nb_bound_method *mb =
             PyObject_GC_New(nb_bound_method, internals->nb_bound_method);
-        mb->func = (nb_func *) self;
+        mb->func = reinterpret_cast<nb_func *>(self);
         mb->self = inst;
         mb->vectorcall = nb_bound_method_vectorcall;
 
         Py_INCREF(self);
         Py_INCREF(inst);
 
-        return (PyObject *) mb;
+        return reinterpret_cast<PyObject *>(mb);
     } else {
         Py_INCREF(self);
         return self;
@@ -1137,11 +1136,11 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 /// 'internals' mutex.
 static uint32_t nb_func_render_signature(const func_data *f,
                                          bool nb_signature_mode) noexcept {
-    const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
-               has_args       = f->flags & (uint32_t) func_flags::has_args,
-               has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
-               has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
-               has_signature  = f->flags & (uint32_t) func_flags::has_signature;
+    const bool is_method      = f->flags & static_cast<uint32_t>(func_flags::is_method),
+               has_args       = f->flags & static_cast<uint32_t>(func_flags::has_args),
+               has_var_args   = f->flags & static_cast<uint32_t>(func_flags::has_var_args),
+               has_var_kwargs = f->flags & static_cast<uint32_t>(func_flags::has_var_kwargs),
+               has_signature  = f->flags & static_cast<uint32_t>(func_flags::has_signature);
 
     nb_internals *internals_ = internals;
     if (has_signature) {
@@ -1232,13 +1231,13 @@ static uint32_t nb_func_render_signature(const func_data *f,
                         buf.put_dstr(arg_name);
                     } else {
                         buf.put("arg");
-                        if (f->nargs > 1 + (uint32_t) is_method)
+                        if (f->nargs > 1 + static_cast<uint32_t>(is_method))
                             buf.put_uint32(arg_index - is_method);
                     }
 
                     buf.put(": ");
                     if (has_args && f->args[arg_index].flag &
-                                        (uint8_t) cast_flags::accepts_none) {
+                                        static_cast<uint8_t>(cast_flags::accepts_none)) {
 #if PY_VERSION_HEX < 0x030A0000
                             buf.put("typing.Optional[");
                         #else
@@ -1251,7 +1250,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
             case '}':
                 // Default argument
                 if (has_args) {
-                    if (f->args[arg_index].flag & (uint8_t) cast_flags::accepts_none) {
+                    if (f->args[arg_index].flag & static_cast<uint8_t>(cast_flags::accepts_none)) {
                         #if PY_VERSION_HEX < 0x030A0000
                             buf.put(']');
                         #else
@@ -1285,7 +1284,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                                     PyErr_Clear();
                                 } else {
                                     buf.put(" = ");
-                                    buf.put(cstr, (size_t) size);
+                                    buf.put(cstr, static_cast<size_t>(size));
                                 }
                                 Py_DECREF(str);
                             } else {
@@ -1311,7 +1310,7 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     auto it = internals_->type_c2p_slow.find(*descr_type);
 
                     if (it != internals_->type_c2p_slow.end()) {
-                        handle th((PyObject *) it->second->type_py);
+                        handle th(reinterpret_cast<PyObject *>(it->second->type_py));
                         buf.put_dstr((borrow<str>(th.attr("__module__"))).c_str());
                         buf.put('.');
                         buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
@@ -1354,15 +1353,15 @@ static uint32_t nb_func_render_signature(const func_data *f,
 static PyObject *nb_func_get_name(PyObject *self) {
     func_data *f = nb_func_data(self);
     const char *name = "";
-    if (f->flags & (uint32_t) func_flags::has_name)
+    if (f->flags & static_cast<uint32_t>(func_flags::has_name))
         name = f->name;
     return PyUnicode_FromString(name);
 }
 
 static PyObject *nb_func_get_qualname(PyObject *self) {
     func_data *f = nb_func_data(self);
-    if ((f->flags & (uint32_t) func_flags::has_scope) &&
-        (f->flags & (uint32_t) func_flags::has_name)) {
+    if ((f->flags & static_cast<uint32_t>(func_flags::has_scope)) &&
+        (f->flags & static_cast<uint32_t>(func_flags::has_name))) {
         PyObject *scope_name = PyObject_GetAttrString(f->scope, "__qualname__");
         if (scope_name) {
             return PyUnicode_FromFormat("%U.%s", scope_name, f->name);
@@ -1378,7 +1377,7 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
 
 static PyObject *nb_func_get_module(PyObject *self) {
     func_data *f = nb_func_data(self);
-    if (f->flags & (uint32_t) func_flags::has_scope) {
+    if (f->flags & static_cast<uint32_t>(func_flags::has_scope)) {
         return PyObject_GetAttrString(
             f->scope, PyModule_Check(f->scope) ? "__name__" : "__module__");
     } else {
@@ -1392,7 +1391,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
              *defaults = nullptr;
 
     func_data *f = nb_func_data(self);
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = static_cast<uint32_t>(Py_SIZE(self));
     PyObject *result = PyTuple_New(count);
     if (!result)
         return nullptr;
@@ -1401,8 +1400,8 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         docstr = item = sigstr = defaults = nullptr;
 
         const func_data *fi = f + i;
-        if ((fi->flags & (uint32_t) func_flags::has_doc) &&
-            (!((nb_func *) self)->doc_uniform || i == 0)) {
+        if ((fi->flags & static_cast<uint32_t>(func_flags::has_doc)) &&
+            (!(reinterpret_cast<nb_func *>(self))->doc_uniform || i == 0)) {
             docstr = PyUnicode_FromString(fi->doc);
         } else {
             docstr = Py_None;
@@ -1468,7 +1467,7 @@ fail:
 
 PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = static_cast<uint32_t>(Py_SIZE(self));
 
     // The buffer 'buf' is protected by 'internals.mutex'
     lock_internals guard(internals);
@@ -1481,11 +1480,11 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
         const func_data *fi = f + i;
         nb_func_render_signature(fi);
         buf.put('\n');
-        doc_found |= (fi->flags & (uint32_t) func_flags::has_doc) != 0;
+        doc_found |= (fi->flags & static_cast<uint32_t>(func_flags::has_doc)) != 0;
     }
 
     if (doc_found) {
-        if (((nb_func *) self)->doc_uniform) {
+        if ((reinterpret_cast<nb_func *>(self))->doc_uniform) {
             buf.put('\n');
             buf.put_dstr(f->doc);
             buf.put('\n');
@@ -1500,7 +1499,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
                 nb_func_render_signature(fi);
                 buf.put("``\n\n");
 
-                if (fi->flags & (uint32_t) func_flags::has_doc) {
+                if (fi->flags & static_cast<uint32_t>(func_flags::has_doc)) {
                     buf.put_dstr(fi->doc);
                     buf.put('\n');
                 }
@@ -1546,8 +1545,8 @@ PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name_) {
             return res;
         PyErr_Clear();
     }
-    nb_func *func = ((nb_bound_method *) self)->func;
-    return nb_func_getattro((PyObject *) func, name_);
+    nb_func *func = (reinterpret_cast<nb_bound_method *>(self))->func;
+    return nb_func_getattro(reinterpret_cast<PyObject *>(func), name_);
 }
 
 /// Excise a substring from 's'

@@ -154,7 +154,7 @@ const char *python_error::what() const noexcept {
 #else
     buf.clear();
     if (exc_traceback.is_valid()) {
-        PyTracebackObject *to = (PyTracebackObject *) exc_traceback.ptr();
+        PyTracebackObject *to = reinterpret_cast<PyTracebackObject *>(exc_traceback.ptr());
 
         // Get the deepest trace possible
         while (to->tb_next)

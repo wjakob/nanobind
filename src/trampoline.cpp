@@ -41,7 +41,7 @@ static void trampoline_enter_internal(void **data, size_t size,
     PyGILState_STATE state{ };
     const char *error = nullptr;
     PyObject *key = nullptr, *value = nullptr;
-    PyObject *self = (PyObject *) data[0];
+    PyObject *self = static_cast<PyObject *>(data[0]);
     PyTypeObject *value_tp = nullptr;
     size_t offset = 0;
 
@@ -52,7 +52,7 @@ static void trampoline_enter_internal(void **data, size_t size,
         if (name == d_name && d_value) {
             if (d_value != None) {
                 t->state = PyGILState_Ensure();
-                t->key = (PyObject *) d_value;
+                t->key = static_cast<PyObject *>(d_value);
                 return;
             } else {
                 if (pure) {
@@ -78,7 +78,7 @@ static void trampoline_enter_internal(void **data, size_t size,
         if (name == d_name && d_value) {
             if (d_value != None) {
                 t->state = state;
-                t->key = (PyObject *) d_value;
+                t->key = static_cast<PyObject *>(d_value);
                 return;
             } else {
                 if (pure) {
@@ -159,7 +159,7 @@ void trampoline_enter(void **data, size_t size, const char *name, bool pure, tic
     trampoline_enter_internal(data, size, name, pure, t);
 
     if (t->key) {
-        t->self = (PyObject *) data[0];
+        t->self = static_cast<PyObject *>(data[0]);
         t->prev = current_ticket;
 
         if (t->prev && t->prev->self.is(t->self) && t->prev->key.is(t->key)) {

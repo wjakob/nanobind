@@ -24,7 +24,7 @@ static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObje
 
 /// `nb_static_property.__set__()`: Just like the above `__get__()`.
 static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject *value) {
-    PyObject *cls = PyType_Check(obj) ? obj : (PyObject *) Py_TYPE(obj);
+    PyObject *cls = PyType_Check(obj) ? obj : reinterpret_cast<PyObject *>(Py_TYPE(obj));
     return NB_SLOT(PyProperty_Type, tp_descr_set)(self, cls, value);
 }
 
@@ -49,7 +49,7 @@ PyTypeObject *nb_static_property_tp() noexcept {
 
         PyType_Slot slots[] = {
             { Py_tp_base, &PyProperty_Type },
-            { Py_tp_descr_get, (void *) nb_static_property_descr_get },
+            { Py_tp_descr_get, reinterpret_cast<void *>(nb_static_property_descr_get) },
             { Py_tp_members, members },
             { 0, nullptr }
         };
@@ -62,7 +62,7 @@ PyTypeObject *nb_static_property_tp() noexcept {
             /* .slots = */ slots
         };
 
-        tp = (PyTypeObject *) PyType_FromSpec(&spec);
+        tp = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(&spec));
         check(tp, "nb_static_property type creation failed!");
 
         internals_->nb_static_property_descr_set = nb_static_property_descr_set;

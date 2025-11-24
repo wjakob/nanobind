@@ -981,3 +981,11 @@ def test50_weakref_with_slots_subclass():
     # Clean up
     del x
     gc.collect()
+
+def test51_constexpr_trampoline():
+    class PyConstexprClass(t.ConstexprClass):
+        def getInt(self):
+            return 42
+
+    c = PyConstexprClass(4)
+    assert t.constexpr_call_getInt(c) == 42

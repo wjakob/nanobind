@@ -747,4 +747,34 @@ NB_MODULE(test_classes_ext, m) {
         .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 42; });
     nb::class_<StaticPropertyOverride2, StaticPropertyOverride>(m, "StaticPropertyOverride2")
         .def_prop_ro_static("x", [](nb::handle /*unused*/) { return 43; });
+
+
+    // nanobind::detail::trampoline's constructor must be constexpr otherwise
+    // the trampoline will not compile under MSVC
+    struct ConstexprClass {
+        constexpr ConstexprClass(int i) : something(i) {}
+        virtual ~ConstexprClass() = default;
+
+        virtual int getInt() const {
+            return 1;
+        };
+
+        int something;
+    };
+
+    struct PyConstexprClass : ConstexprClass {
+        NB_TRAMPOLINE(ConstexprClass, 1);
+
+        int getInt() const override {
+            NB_OVERRIDE(getInt);
+        }
+    };
+
+    auto constexpr_class = nb::class_<ConstexprClass, PyConstexprClass>(m, "ConstexprClass")
+        .def(nb::init<int>())
+        .def("getInt", &ConstexprClass::getInt);
+
+    m.def("constexpr_call_getInt", [](ConstexprClass *c) {
+        return c->getInt();
+    });
 }

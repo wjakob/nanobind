@@ -26,7 +26,7 @@ NB_CORE void trampoline_leave(ticket *ticket) noexcept;
 template <size_t Size> struct trampoline {
     mutable void *data[2 * Size + 1];
 
-    NB_INLINE trampoline(void *ptr) { trampoline_new(data, Size, ptr); }
+    NB_INLINE constexpr trampoline(void *ptr) { trampoline_new(data, Size, ptr); }
     NB_INLINE ~trampoline() { trampoline_release(data, Size); }
 
     NB_INLINE handle base() const { return (PyObject *) data[0]; }

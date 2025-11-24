@@ -357,7 +357,7 @@ function(nanobind_add_module name)
     set(ARG_STABLE_ABI FALSE)
   endif()
 
-  if (NB_ABI MATCHES "t")
+  if (NB_ABI MATCHES "[0-9]t")
     # Free-threaded Python interpreters don't support building a nanobind
     # module that uses the stable ABI.
     set(ARG_STABLE_ABI FALSE)

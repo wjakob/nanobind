@@ -704,6 +704,9 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
                 case (uint8_t) dlpack::dtype_code::Float:
                     prefix = "float";
                     break;
+                case (uint8_t) dlpack::dtype_code::Bfloat:
+                    prefix = "bfloat";
+                    break;
                 case (uint8_t) dlpack::dtype_code::Complex:
                     prefix = "complex";
                     break;

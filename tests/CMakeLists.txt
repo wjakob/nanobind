@@ -143,10 +143,26 @@ target_compile_definitions(inter_module PRIVATE -DSHARED_BUILD)
 target_compile_features(inter_module PRIVATE cxx_std_17)
 target_include_directories(inter_module PRIVATE ${NB_DIR}/include)
 
+# Output inter_module to a separate lib subdirectory to test LIB_PATH functionality
+set_target_properties(inter_module PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib
+  LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib
+)
+
 nanobind_add_module(test_inter_module_1_ext NB_DOMAIN mydomain test_inter_module_1.cpp ${NB_EXTRA_ARGS})
 nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module_2.cpp ${NB_EXTRA_ARGS})
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
+
+# Generate stub for inter_module_1 to test LIB_PATH functionality
+nanobind_add_stub(
+  inter_module_1_ext_stub
+  MODULE test_inter_module_1_ext
+  OUTPUT ${PYI_PREFIX}test_inter_module_1_ext.pyi
+  PYTHON_PATH $<TARGET_FILE_DIR:test_inter_module_1_ext>
+  LIB_PATH $<TARGET_FILE_DIR:inter_module>
+  DEPENDS test_inter_module_1_ext inter_module
+)
 
 set(TEST_FILES
   common.py
@@ -177,6 +193,7 @@ set(TEST_FILES
   # Stub reference files
   test_classes_ext.pyi.ref
   test_functions_ext.pyi.ref
+  test_inter_module_1_ext.pyi.ref
   test_make_iterator_ext.pyi.ref
   test_ndarray_ext.pyi.ref
   test_jax_ext.pyi.ref

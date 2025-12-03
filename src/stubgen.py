@@ -523,8 +523,10 @@ class StubGen:
                 self.put_docstr(docstr)
                 if len(tp_dict):
                     self.write("\n")
+            self.apply_pattern(self.prefix + ".__prefix__", None)
             for k, v in tp_dict.items():
                 self.put(v, k, tp)
+            self.apply_pattern(self.prefix + ".__suffix__", None)
             if output_len == len(self.output):
                 self.write_ln("pass\n")
             self.depth -= 1

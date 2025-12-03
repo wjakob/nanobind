@@ -9,6 +9,8 @@ from .submodule import F as F, f as f2
 # a prefix
 
 class Foo:
+    # a class prefix
+
     def __lt__(self, arg: int, /) -> bool: ...
 
     def __gt__(self, arg: int, /) -> bool: ...
@@ -18,6 +20,8 @@ class Foo:
     def __ge__(self, arg: Foo, /) -> bool: ...
 
     lt_alias = __lt__
+
+    # a class suffix
 
 def f() -> None: ...
 

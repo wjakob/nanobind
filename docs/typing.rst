@@ -673,6 +673,6 @@ you may use the special ``\from`` escape code to import them:
        def lookup(array: Array[T], index: Literal[0] = 0) -> _Opt[T]:
            \doc
 
-You may also add free-form text the beginning or the end of the generated stub.
-To do so, add an entry that matches on ``module_name.__prefix__`` or
-``module_name.__suffix__``.
+You may also add free-form text the beginning or the end of the generated stub
+module or of a class. To do so, add an entry that matches on ``name.__prefix__``
+or ``name.__suffix__`` where ``name`` is the name of the module or class.

@@ -17,3 +17,9 @@ test_typing_ext.__prefix__:
 
 test_typing_ext.__suffix__:
     # a suffix
+
+test_typing_ext.Foo.__prefix__:
+    # a class prefix
+
+test_typing_ext.Foo.__suffix__:
+    # a class suffix

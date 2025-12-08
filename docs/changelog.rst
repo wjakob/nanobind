@@ -15,24 +15,94 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version TBD (not yet released)
-------------------------------
+Version 2.10.0 (Dec 8, 2025)
+----------------------------
 
-- ABI version 17. The layout of the `nb_inst` class was changed to fix a data race
-  between `clear_keep_alive` and other bitfields in the same struct (PR `#1191
+- ABI version 17.
+
+- Nanobind now officially supports the **MinGW-w64** and **Intel ICX**
+  compilers. (PR `#1188 <https://github.com/wjakob/nanobind/pull/1188>`__).
+
+- Version 2.10 drops support for Python 3.8, which reached *End-Of-Life* in
+  October 2025. (PR `#1236 <https://github.com/wjakob/nanobind/pull/1236>`__).
+
+- The new :cpp:class:`nb::array_api <array_api>` framework tag can be used to
+  create an nd-array wrapper object that supports both the Python buffer
+  protocol and the DLPack methods ``__dlpack__`` and ``__dlpack_device__``.
+
+  Furthermore, nanobind now supports importing/exporting tensors via the legacy
+  (unversioned) DLPack interface, as well a new versioned interface. The latter
+  provides a flag indicating whether an nd-array is read-only. (PR `#1175
+  <https://github.com/wjakob/nanobind/pull/1175>`__).
+
+- Added ``bfloat`` to the nd-array import conversion code, fixing imports of
+  bfloat16 tensors. (PR `#1228
+  <https://github.com/wjakob/nanobind/pull/1228>`__).
+
+- nanobind now uses per-module precomputed constants, particularly strings, to
+  avoid costs from creating these repeatedly. This improves the performance of
+  nd-array and enumeration casts. (PR `#1184
+  <https://github.com/wjakob/nanobind/pull/1184>`__).
+
+- Fixed a segfault in garbage collection traversal of Python subclasses of
+  class bindings with :cpp:class:`nb::is_weak_referenceable
+  <is_weak_referenceable>`. (PR `#1206
+  <https://github.com/wjakob/nanobind/pull/1206>`__).
+
+- Fixed a potential reference leak in the ``std::array`` type caster. (commit
+  `bfacaf7
+  <https://github.com/wjakob/nanobind/commit/bfacaf75525c8a5e5f0a80fd69a985c4ae03d3d1>`__).
+
+- STL type casters now directly reject incorrectly sized inputs, which avoids
+  performance pitfalls when passing large arrays. (commit `edf5753
+  <https://github.com/wjakob/nanobind/commit/edf5753a13f98132b8da3d56fe94c31c678b2273>`__,
+  `dc35d69
+  <https://github.com/wjakob/nanobind/commit/dc35d69f65936280b2521941b2ce9d5ad16141d1>`__).
+
+- Fixed ``__new__`` overloads with variadic positional arguments but no
+  variadic keyword arguments, which incorrectly prevented nullary calls. (PR
+  `#1172 <https://github.com/wjakob/nanobind/pull/1172>`__).
+
+- Removed zero-length arrays to improve compiler compatibility. (PR `#1158
+  <https://github.com/wjakob/nanobind/pull/1158>`__).
+
+- Fixed a data race related caused by writes to a bit-field in free-threaded
+  extension builds (PR `#1191
   <https://github.com/wjakob/nanobind/pull/1191>`__)
 
-- Nanobind now officially supports **MinGW-w64** and **Intel ICX** (the modern
-  Clang-based Intel compiler). Continuous integration tests have been added to
-  ensure compatibility with these compilers on an ongoing basis.
+- **Stub generation improvements**:
 
-- The framework ``nb::array_api`` is now available to return an nd-array from
-  C++ to Python as an object that supports both the Python buffer protocol as
-  well as the DLPack methods ``__dlpack__`` and ``_dlpack_device__``.
-  Nanobind now supports importing and exporting nd-arrays via capsules that
-  contain the ``DLManagedTensorVersioned`` struct, which has a flag bit
-  indicating the nd-array is read-only.
-  (PR `#1175 <https://github.com/wjakob/nanobind/pull/1175>`__).
+  - Added a new ``--exclude-values`` flag that forces all values to be rendered
+    as ``...`` in stub files. (PR `#1185
+    <https://github.com/wjakob/nanobind/pull/1185>`__).
+
+  - Added support for ``typing.ParamSpec`` in generated stubs.
+    (PR `#1194 <https://github.com/wjakob/nanobind/pull/1194>`__).
+
+  - NumPy boolean arrays now use ``np.bool_`` dtype in generated stubs instead
+    of deprecated alternatives.
+    (commit `20fab93 <https://github.com/wjakob/nanobind/commit/20fab9386cd6c363878f67296d6b39a66af60a0a>`__).
+
+  - Auto-generated enum APIs are now excluded from stub files.
+    (PR `#1182 <https://github.com/wjakob/nanobind/pull/1182>`__).
+
+  - Pattern files now support ``__prefix__`` and ``__suffix__`` patterns
+    within classes for further customization of class stubs.
+    (PR `#1235 <https://github.com/wjakob/nanobind/pull/1235>`__).
+
+  - Various minor improvements to the stub generator.
+    (PR `#1179 <https://github.com/wjakob/nanobind/pull/1179>`__).
+
+- Minor/miscellaneous fixes: PRs `#1157
+  <https://github.com/wjakob/nanobind/pull/1157>`__, `#1186
+  <https://github.com/wjakob/nanobind/pull/1186>`__, `#1193
+  <https://github.com/wjakob/nanobind/pull/1193>`__, `#1198
+  <https://github.com/wjakob/nanobind/pull/1198>`__, `#1212
+  <https://github.com/wjakob/nanobind/pull/1212>`__, `#1218
+  <https://github.com/wjakob/nanobind/pull/1218>`__, `#1223
+  <https://github.com/wjakob/nanobind/pull/1223>`__, `#1225
+  <https://github.com/wjakob/nanobind/pull/1225>`__.
+
 
 Version 2.9.2 (Sep 4, 2025)
 ---------------------------

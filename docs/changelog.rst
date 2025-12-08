@@ -15,6 +15,16 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.10.1 (Dec 8, 2025)
+----------------------------
+
+- Fixed a regression related to handling of the ``NB_USE_SUBMODULE_DEPS``
+  flag that could cause CMake build system failures (commit `06aaa3
+  <https://github.com/wjakob/nanobind/commit/06aaa39dfd1a55ba546a96f0c3eebfced2c152c2>`__).
+
+- Minor/miscellaneous fixes: commit `cf289b
+  <https://github.com/wjakob/nanobind/commit/cf289bbeb301a2d684e66fe6a4690932e2ae9df4>`__.
+
 Version 2.10.0 (Dec 8, 2025)
 ----------------------------
 

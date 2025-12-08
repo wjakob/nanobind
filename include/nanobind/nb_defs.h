@@ -163,7 +163,7 @@
     X(const X &) = delete;                                                     \
     X &operator=(const X &) = delete;
 
-#define NB_MOD_STATE_SIZE 96
+#define NB_MOD_STATE_SIZE (12 * sizeof(PyObject*))
 
 // Helper macros to ensure macro arguments are expanded before token pasting/stringification
 #define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)

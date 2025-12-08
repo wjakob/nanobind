@@ -349,21 +349,7 @@ template <typename T> struct typed_base_name {
       static constexpr auto Name = type_caster<T>::Name;
 };
 
-#if PY_VERSION_HEX < 0x03090000
-#define NB_TYPED_NAME_PYTHON38(type, name)                     \
-    template <> struct typed_base_name<type> {                 \
-        static constexpr auto Name = detail::const_name(name); \
-    };
-
-NB_TYPED_NAME_PYTHON38(nanobind::tuple, NB_TYPING_TUPLE)
-NB_TYPED_NAME_PYTHON38(list, NB_TYPING_LIST)
-NB_TYPED_NAME_PYTHON38(set, NB_TYPING_SET)
-NB_TYPED_NAME_PYTHON38(dict, NB_TYPING_DICT)
-NB_TYPED_NAME_PYTHON38(type_object, NB_TYPING_TYPE)
-#endif
-
-// Base case: typed<T, Ts...> renders as T[Ts...], with some adjustments to
-// T for older versions of Python (typing.List instead of list, for example)
+// Base case: typed<T, Ts...> renders as T[Ts...]
 template <typename T, typename... Ts> struct typed_name {
     static constexpr auto Name =
             typed_base_name<intrinsic_t<T>>::Name + const_name("[") +
@@ -385,7 +371,7 @@ template <typename R, typename... Args>
 struct typed_name<callable, R(Args...)> {
     using Ret = std::conditional_t<std::is_void_v<R>, void_type, R>;
     static constexpr auto Name =
-            const_name(NB_TYPING_CALLABLE "[[") +
+            const_name("collections.abc.Callable[[") +
             concat(make_caster<Args>::Name...) + const_name("], ") +
             make_caster<Ret>::Name + const_name("]");
 };
@@ -394,7 +380,7 @@ template <typename R>
 struct typed_name<callable, R(...)> {
     using Ret = std::conditional_t<std::is_void_v<R>, void_type, R>;
     static constexpr auto Name =
-            const_name(NB_TYPING_CALLABLE "[..., ") +
+            const_name("collections.abc.Callable[..., ") +
             make_caster<Ret>::Name + const_name("]");
 };
 

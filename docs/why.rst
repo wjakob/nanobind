@@ -20,7 +20,7 @@ Curiously, the situation now is reminiscent of 2015: binding generation with
 existing tools (`Boost.Python <https://github.com/boostorg/python>`__, `pybind11
 <http://github.com/pybind/pybind11>`__) is slow and produces enormous binaries
 with overheads on runtime performance. At the same time, key improvements in
-C++17 and Python 3.8 provide opportunities for drastic simplifications.
+C++17 and Python 3.9 provide opportunities for drastic simplifications.
 Therefore, I am starting *another* binding project. This time, the scope is
 intentionally limited so that this doesn't turn into an endless cycle.
 

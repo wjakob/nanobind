@@ -4,6 +4,10 @@ if (NOT TARGET Python::Module)
   message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
 endif()
 
+if (Python_VERSION VERSION_LESS "3.9")
+  message(FATAL_ERROR "nanobind requires Python 3.9 or newer (found Python ${Python_VERSION}).")
+endif()
+
 # Determine the right suffix for ordinary and stable ABI extensions.
 
 # We always need to know the extension

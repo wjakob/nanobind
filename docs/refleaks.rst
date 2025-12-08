@@ -337,11 +337,9 @@ Here is an example of the required code for a ``Wrapper`` type:
    struct Wrapper { std::shared_ptr<Wrapper> value; };
 
    int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
-       // On Python 3.9+, we must traverse the implicit dependency
-       // of an object on its associated type object.
-       #if PY_VERSION_HEX >= 0x03090000
-           Py_VISIT(Py_TYPE(self));
-       #endif
+       // We must traverse the implicit dependency of an object on its
+       // associated type object.
+       Py_VISIT(Py_TYPE(self));
 
        // The tp_traverse method may be called after __new__ but before or during
        // __init__, before the C++ constructor has been completed. We must not
@@ -453,28 +451,6 @@ how deal with them. For completeness, let's consider some other possibilities.
   (this is a hypothesis). In this case, the leak would be benign---even so, it
   should be fixed in the responsible framework so that leak warnings aren't
   cluttered with flukes and can be more broadly useful.
-
-- **Older Python versions**: Very old Python versions (e.g., 3.8) don't
-  do a good job cleaning up global references when the interpreter shuts down.
-  The following code may leak a reference if it is a top-level statement in a
-  Python file or the REPL.
-
-  .. code-block:: python
-
-     a = my_ext.MyObject()
-
-  Such a warning is benign and does not indicate an actual leak. It simply
-  highlights a flaws in the interpreter shutdown logic of old Python versions.
-  Wrap your code into a function to address this issue even on such versions:
-
-  .. code-block:: python
-
-     def run():
-         a = my_ext.MyObject()
-         # ...
-
-     if __name__ == '__main__':
-         run()
 
 - **Exceptions**. Some exceptions such as ``AttributeError`` have been observed
   to hold references, e.g. to the object which lacked the desired attribute. If

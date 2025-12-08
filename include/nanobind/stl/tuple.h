@@ -23,7 +23,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     using Indices = std::make_index_sequence<N>;
 
     static constexpr auto Name =
-        const_name(NB_TYPING_TUPLE "[") +
+        const_name("tuple[") +
         const_name<N == 0>(const_name("()"), concat(make_caster<Ts>::Name...)) +
         const_name("]");
 

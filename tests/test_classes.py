@@ -3,11 +3,6 @@ import test_classes_ext as t
 import pytest
 from common import skip_on_pypy, collect
 
-# Some helper declaration to check types across different Python versions
-if sys.version_info < (3, 9):
-    TYPING_TYPE = "typing.Type"
-else:
-    TYPING_TYPE = "type"
 
 
 def optional(arg: str, /) -> str:
@@ -528,7 +523,7 @@ def test23_handle_t(clean):
 def test24_type_object_t(clean):
     assert (
         t.test_type_object_t.__doc__
-        == f"test_type_object_t(arg: {TYPING_TYPE}[test_classes_ext.Struct], /) -> object"
+        == "test_type_object_t(arg: type[test_classes_ext.Struct], /) -> object"
     )
 
     assert t.test_type_object_t(t.Struct) is t.Struct

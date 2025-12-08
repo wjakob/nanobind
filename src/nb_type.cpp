@@ -49,9 +49,7 @@ static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
     PyObject **dict = nb_dict_ptr(self, tp);
     if (dict)
         Py_VISIT(*dict);
-#if PY_VERSION_HEX >= 0x03090000
     Py_VISIT(tp);
-#endif
     return 0;
 }
 
@@ -591,11 +589,6 @@ template <size_t I1, size_t I2, size_t Offset1, size_t Offset2> nb_slot constexp
        offsetof(PyHeapTypeObject, p1),                 \
        offsetof(PyHeapTypeObject, p1.p2##_##name)>()
 
-#if PY_VERSION_HEX < 0x03090000
-#  define Py_bf_getbuffer 1
-#  define Py_bf_releasebuffer 2
-#endif
-
 static constexpr nb_slot type_slots[] {
     E(1,  as_buffer, bf, getbuffer),
     E(2,  as_buffer, bf, releasebuffer),
@@ -735,14 +728,10 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     ht->ht_qualname = name_o;
     Py_INCREF(name_o);
 
-#if PY_VERSION_HEX >= 0x03090000
     if (mod) {
         Py_INCREF(mod);
         ht->ht_module = mod;
     }
-#else
-    (void) mod;
-#endif
 
     PyTypeObject *tp = &ht->ht_type;
     tp->tp_name = name_cstr;
@@ -949,12 +938,10 @@ NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *
     return result;
 }
 
-#if PY_VERSION_HEX >= 0x03090000
 static PyMethodDef class_getitem_method[] = {
     { "__class_getitem__", Py_GenericAlias, METH_O | METH_CLASS, nullptr },
     { nullptr }
 };
-#endif
 
 // Implements the vector call protocol directly on type objects to construct
 // instances more efficiently.
@@ -965,7 +952,7 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     type_data *td = nb_type_data(tp);
     nb_func *func = (nb_func *) td->init;
     bool is_init = (td->flags & (uint32_t) type_flags::has_new) == 0;
-    Py_ssize_t nargs = NB_VECTORCALL_NARGS(nargsf);
+    Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
 
     if (NB_UNLIKELY(!func)) {
         PyErr_Format(PyExc_TypeError, "%s: no constructor defined!", td->name);
@@ -993,7 +980,7 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     PyObject **args, *buf[buf_size], *temp = nullptr;
     bool alloc = false;
 
-    if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
+    if (NB_LIKELY(nargsf & PY_VECTORCALL_ARGUMENTS_OFFSET)) {
         args = (PyObject **) (args_in - 1);
         temp = args[0];
     } else {
@@ -1110,17 +1097,16 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     PyObject *base = nullptr;
 
-#if PY_VERSION_HEX >= 0x03090000
+#if !defined(PYPY_VERSION) // see https://github.com/pypy/pypy/issues/4914
     bool generic_base = false;
 #endif
-
     if (has_base_py) {
         check(!has_base,
               "nanobind::detail::nb_type_new(\"%s\"): multiple base types "
               "specified!", t_name);
         base = (PyObject *) t->base_py;
 
-        #if PY_VERSION_HEX >= 0x03090000 && !defined(PYPY_VERSION) // see https://github.com/pypy/pypy/issues/4914
+#if !defined(PYPY_VERSION) // see https://github.com/pypy/pypy/issues/4914
         if (Py_TYPE(base) == &Py_GenericAliasType) {
             base = PyObject_GetAttrString(base, "__origin__");
             check(base != nullptr,
@@ -1128,7 +1114,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             Py_DECREF(base);
             generic_base = true;
         }
-        #endif
+#endif
 
         check(nb_type_check(base),
               "nanobind::detail::nb_type_new(\"%s\"): base type is not a "
@@ -1294,14 +1280,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (num_members > 0)
         *s++ = { Py_tp_members, (void*) members };
 
-#if PY_VERSION_HEX < 0x03090000
-    // Features that are unsupported in Python 3.8
-    (void) is_generic;
-    type_vectorcall = nullptr;
-#else
     if (is_generic)
         *s++ = { Py_tp_methods, (void*) class_getitem_method };
-#endif
 
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
@@ -1381,7 +1361,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         free((char *) t_name);
     }
 
-#if PY_VERSION_HEX >= 0x03090000
+#if !defined(PYPY_VERSION)
     if (generic_base)
         setattr(result, "__orig_bases__", make_tuple(handle(t->base_py)));
 #endif
@@ -1391,21 +1371,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
 
 PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
-    PyObject *result;
-#if PY_VERSION_HEX < 0x03090000
-    PyObject *args = PyTuple_New(1);
-    if (!args)
-        return nullptr;
-    Py_INCREF(arg);
-    NB_TUPLE_SET_ITEM(args, 0, arg);
-    result = PyObject_CallObject(fn, args);
-    Py_DECREF(args);
-#else
-    PyObject *args[2] = { nullptr, arg };
-    result = PyObject_Vectorcall(fn, args + 1,
-                                 NB_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
-#endif
-    return result;
+    PyObject *argv[2] = { nullptr, arg };
+    return PyObject_Vectorcall(fn, argv + 1,
+                               PY_VECTORCALL_ARGUMENTS_OFFSET + 1, nullptr);
 }
 
 /// Encapsulates the implicit conversion part of nb_type_get()

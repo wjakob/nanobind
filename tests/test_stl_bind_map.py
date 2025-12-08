@@ -95,10 +95,7 @@ def test_map_string_double(capfd):
     assert type(values).__qualname__ == 'MapStringDouble.ValueView'
     assert type(items).__qualname__ == 'MapStringDouble.ItemView'
 
-    if sys.version_info < (3, 9):
-        d = "typing.Dict"
-    else:
-        d = "dict"
+    d = "dict"
 
     assert t.MapStringDouble.__init__.__doc__ == \
 """__init__(self) -> None

@@ -167,22 +167,13 @@ const char *python_error::what() const noexcept {
 
         while (frame) {
             frames.push_back(frame);
-#if PY_VERSION_HEX >= 0x03090000
             frame = PyFrame_GetBack(frame);
-#else
-            frame = frame->f_back;
-            Py_XINCREF(frame);
-#endif
         }
 
         buf.put("Traceback (most recent call last):\n");
         for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
             frame = *it;
-#if PY_VERSION_HEX >= 0x03090000
             PyCodeObject *f_code = PyFrame_GetCode(frame);
-#else
-            PyCodeObject *f_code = frame->f_code;
-#endif
             buf.put("  File \"");
             buf.put_dstr(borrow<str>(f_code->co_filename).c_str());
             buf.put("\", line ");
@@ -190,9 +181,7 @@ const char *python_error::what() const noexcept {
             buf.put(", in ");
             buf.put_dstr(borrow<str>(f_code->co_name).c_str());
             buf.put('\n');
-#if PY_VERSION_HEX >= 0x03090000
             Py_DECREF(f_code);
-#endif
             Py_DECREF(frame);
         }
     }

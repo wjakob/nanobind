@@ -69,10 +69,7 @@ from pathlib import Path
 import re
 import sys
 
-if sys.version_info < (3, 9):
-    from typing import Match, Pattern
-else:
-    from re import Match, Pattern
+from re import Match, Pattern
 
 if sys.version_info < (3, 11):
     try:
@@ -690,8 +687,7 @@ class StubGen:
         # Process nd-array type annotations so that MyPy accepts them
         s = self.ndarray_re.sub(lambda m: self._format_ndarray(m.group(2)), s)
 
-        if sys.version_info >= (3, 9, 0):
-            s = self.abc_re.sub(r'collections.abc.\1', s)
+        s = self.abc_re.sub(r'collections.abc.\1', s)
 
         # Process other type names and add suitable import statements
         def process_general(m: Match[str]) -> str:

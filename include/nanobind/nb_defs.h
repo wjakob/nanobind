@@ -81,56 +81,10 @@
 #  define NB_HAS_U8STRING
 #endif
 
-#if defined(Py_TPFLAGS_HAVE_VECTORCALL)
-#  define NB_VECTORCALL PyObject_Vectorcall
-#  define NB_HAVE_VECTORCALL Py_TPFLAGS_HAVE_VECTORCALL
-#elif defined(_Py_TPFLAGS_HAVE_VECTORCALL)
-#  define NB_VECTORCALL _PyObject_Vectorcall
-#  define NB_HAVE_VECTORCALL _Py_TPFLAGS_HAVE_VECTORCALL
-#else
-#  define NB_HAVE_VECTORCALL (1UL << 11)
-#endif
-
-#if defined(PY_VECTORCALL_ARGUMENTS_OFFSET)
-#  define NB_VECTORCALL_ARGUMENTS_OFFSET PY_VECTORCALL_ARGUMENTS_OFFSET
-#  define NB_VECTORCALL_NARGS PyVectorcall_NARGS
-#else
-#  define NB_VECTORCALL_ARGUMENTS_OFFSET ((size_t) 1 << (8 * sizeof(size_t) - 1))
-#  define NB_VECTORCALL_NARGS(n) ((n) & ~NB_VECTORCALL_ARGUMENTS_OFFSET)
-#endif
-
-#if PY_VERSION_HEX < 0x03090000
-#  define NB_TYPING_ABC   "typing."
-#  define NB_TYPING_TUPLE "typing.Tuple"
-#  define NB_TYPING_LIST  "typing.List"
-#  define NB_TYPING_DICT  "typing.Dict"
-#  define NB_TYPING_SET   "typing.Set"
-#  define NB_TYPING_TYPE  "typing.Type"
-#else
-#  define NB_TYPING_ABC   "collections.abc."
-#  define NB_TYPING_TUPLE "tuple"
-#  define NB_TYPING_LIST  "list"
-#  define NB_TYPING_DICT  "dict"
-#  define NB_TYPING_SET   "set"
-#  define NB_TYPING_TYPE  "type"
-#endif
-
 #if PY_VERSION_HEX < 0x030D0000
 #  define NB_TYPING_CAPSULE "typing_extensions.CapsuleType"
 #else
 #  define NB_TYPING_CAPSULE "types.CapsuleType"
-#endif
-
-#define NB_TYPING_SEQUENCE     NB_TYPING_ABC "Sequence"
-#define NB_TYPING_MAPPING      NB_TYPING_ABC "Mapping"
-#define NB_TYPING_CALLABLE     NB_TYPING_ABC "Callable"
-#define NB_TYPING_ITERATOR     NB_TYPING_ABC "Iterator"
-#define NB_TYPING_ITERABLE     NB_TYPING_ABC "Iterable"
-
-#if PY_VERSION_HEX < 0x03090000
-#  define NB_TYPING_ABSTRACT_SET "typing.AbstractSet"
-#else
-#  define NB_TYPING_ABSTRACT_SET "collections.abc.Set"
 #endif
 
 #if defined(Py_LIMITED_API)

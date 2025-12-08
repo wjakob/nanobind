@@ -505,9 +505,7 @@ NB_MODULE(test_ndarray_ext, m) {
             Wrapper* w = nb::inst_ptr<Wrapper>(self);
             nb::handle value = nb::find(w->value);
             Py_VISIT(value.ptr());
-#if PY_VERSION_HEX >= 0x03090000
             Py_VISIT(Py_TYPE(self));
-#endif
             return 0;
         }
 

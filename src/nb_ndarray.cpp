@@ -325,10 +325,8 @@ static PyTypeObject *nb_ndarray_tp() noexcept {
         PyType_Slot slots[] = {
             { Py_tp_dealloc, (void *) nb_ndarray_dealloc },
             { Py_tp_methods, (void *) nb_ndarray_methods },
-#if PY_VERSION_HEX >= 0x03090000
             { Py_bf_getbuffer, (void *) nb_ndarray_getbuffer },
             { Py_bf_releasebuffer, (void *) nb_ndarray_releasebuffer },
-#endif
             { 0, nullptr }
         };
 
@@ -342,11 +340,6 @@ static PyTypeObject *nb_ndarray_tp() noexcept {
 
         tp = (PyTypeObject *) PyType_FromSpec(&spec);
         check(tp, "nb_ndarray type creation failed!");
-
-#if PY_VERSION_HEX < 0x03090000
-        tp->tp_as_buffer->bf_getbuffer = nb_ndarray_getbuffer;
-        tp->tp_as_buffer->bf_releasebuffer = nb_ndarray_releasebuffer;
-#endif
 
         internals_->nb_ndarray.store_release(tp);
     }
@@ -523,9 +516,6 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         capsule = borrow(src);
     } else {
         // Try calling src.__dlpack__()
-#if PY_VERSION_HEX < 0x03090000
-        capsule = steal(PyObject_CallMethod(src, "__dlpack__", nullptr));
-#else
         PyObject* args[] = {src, static_pyobjects[pyobj_name::dl_version_tpl]};
         Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
         capsule = steal(PyObject_VectorcallMethod(
@@ -541,7 +531,6 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
                               static_pyobjects[pyobj_name::dunder_dlpack_str],
                               args, nargsf, nullptr));
         }
-#endif
 
         // Try creating an ndarray via the buffer protocol
         if (!capsule.is_valid()) {
@@ -990,12 +979,6 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
 
     if (framework == numpy::value) {
         try {
-#if PY_VERSION_HEX < 0x03090000
-            module_ pkg_mod = module_::import_("numpy");
-            return pkg_mod.attr(static_pyobjects[pyobj_name::array_str])(
-                            o, arg("copy") = copy)
-                    .release().ptr();
-#else
             PyObject* pkg_mod = module_import("numpy");
             PyObject* args[] = {pkg_mod, o.ptr(),
                                 (copy) ? Py_True : Py_False};
@@ -1003,7 +986,6 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
             return PyObject_VectorcallMethod(
                         static_pyobjects[pyobj_name::array_str], args, nargsf,
                         static_pyobjects[pyobj_name::copy_tpl]);
-#endif
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_TypeError,
                          "could not export nanobind::ndarray: %s",
@@ -1033,17 +1015,12 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
                 pkg_name = nullptr;
         }
         if (pkg_name) {
-#if PY_VERSION_HEX < 0x03090000
-            o = module_::import_(pkg_name)
-                .attr(static_pyobjects[pyobj_name::from_dlpack_str])(o);
-#else
             PyObject* pkg_mod = module_import(pkg_name);
             PyObject* args[] = {pkg_mod, o.ptr()};
             Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             o = steal(PyObject_VectorcallMethod(
                           static_pyobjects[pyobj_name::from_dlpack_str],
                           args, nargsf, nullptr));
-#endif
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_TypeError,

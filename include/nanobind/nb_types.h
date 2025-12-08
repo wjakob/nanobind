@@ -487,13 +487,8 @@ NAMESPACE_END(literals)
 class bytearray : public object {
     NB_OBJECT(bytearray, object, "bytearray", PyByteArray_Check)
 
-#if PY_VERSION_HEX >= 0x03090000
     bytearray()
         : object(PyObject_CallNoArgs((PyObject *)&PyByteArray_Type), detail::steal_t{}) { }
-#else
-    bytearray()
-        : object(PyObject_CallObject((PyObject *)&PyByteArray_Type, NULL), detail::steal_t{}) { }
-#endif
 
     explicit bytearray(handle h)
         : object(detail::bytearray_from_obj(h.ptr()), detail::steal_t{}) { }
@@ -631,11 +626,11 @@ class frozenset : public object {
 };
 
 class sequence : public object {
-    NB_OBJECT_DEFAULT(sequence, object, NB_TYPING_SEQUENCE, PySequence_Check)
+    NB_OBJECT_DEFAULT(sequence, object, "collections.abc.Sequence", PySequence_Check)
 };
 
 class mapping : public object {
-    NB_OBJECT_DEFAULT(mapping, object, NB_TYPING_MAPPING, PyMapping_Check)
+    NB_OBJECT_DEFAULT(mapping, object, "collections.abc.Mapping", PyMapping_Check)
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Keys)); }
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
@@ -657,7 +652,7 @@ public:
     using reference = const handle;
     using pointer = const handle *;
 
-    NB_OBJECT_DEFAULT(iterator, object, NB_TYPING_ITERATOR, PyIter_Check)
+    NB_OBJECT_DEFAULT(iterator, object, "collections.abc.Iterator", PyIter_Check)
 
     iterator& operator++() {
         m_value = steal(detail::obj_iter_next(m_ptr));
@@ -689,7 +684,7 @@ private:
 
 class iterable : public object {
 public:
-    NB_OBJECT_DEFAULT(iterable, object, NB_TYPING_ITERABLE, detail::iterable_check)
+    NB_OBJECT_DEFAULT(iterable, object, "collections.abc.Iterable", detail::iterable_check)
 };
 
 /// Retrieve the Python type object associated with a C++ class
@@ -776,7 +771,7 @@ public:
 
 class callable : public object {
 public:
-    NB_OBJECT(callable, object, NB_TYPING_CALLABLE, PyCallable_Check)
+    NB_OBJECT(callable, object, "collections.abc.Callable", PyCallable_Check)
     using object::object;
 };
 
@@ -820,7 +815,7 @@ public:
 
 template <typename T> class type_object_t : public type_object {
 public:
-    static constexpr auto Name = detail::const_name(NB_TYPING_TYPE "[") +
+    static constexpr auto Name = detail::const_name("type[") +
                                  detail::make_caster<T>::Name +
                                  detail::const_name("]");
 

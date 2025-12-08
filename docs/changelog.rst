@@ -18,16 +18,6 @@ below inherit that of the preceding release.
 Version 2.10.1 (Dec 8, 2025)
 ----------------------------
 
-- Fixed a regression related to handling of the ``NB_USE_SUBMODULE_DEPS``
-  flag that could cause CMake build system failures (commit `06aaa3
-  <https://github.com/wjakob/nanobind/commit/06aaa39dfd1a55ba546a96f0c3eebfced2c152c2>`__).
-
-- Minor/miscellaneous fixes: commit `cf289b
-  <https://github.com/wjakob/nanobind/commit/cf289bbeb301a2d684e66fe6a4690932e2ae9df4>`__.
-
-Version 2.10.0 (Dec 8, 2025)
-----------------------------
-
 - ABI version 17.
 
 - Nanobind now officially supports the **MinGW-w64** and **Intel ICX**
@@ -103,6 +93,10 @@ Version 2.10.0 (Dec 8, 2025)
   - Various minor improvements to the stub generator.
     (PR `#1179 <https://github.com/wjakob/nanobind/pull/1179>`__).
 
+- Fixed a regression in 2.10.0 (yanked release) related to handling of the ``NB_USE_SUBMODULE_DEPS``
+  flag that could cause CMake build system failures (commit `06aaa3
+  <https://github.com/wjakob/nanobind/commit/06aaa39dfd1a55ba546a96f0c3eebfced2c152c2>`__).
+
 - Minor/miscellaneous fixes: PRs `#1157
   <https://github.com/wjakob/nanobind/pull/1157>`__, `#1186
   <https://github.com/wjakob/nanobind/pull/1186>`__, `#1193
@@ -111,8 +105,14 @@ Version 2.10.0 (Dec 8, 2025)
   <https://github.com/wjakob/nanobind/pull/1212>`__, `#1218
   <https://github.com/wjakob/nanobind/pull/1218>`__, `#1223
   <https://github.com/wjakob/nanobind/pull/1223>`__, `#1225
-  <https://github.com/wjakob/nanobind/pull/1225>`__.
+  <https://github.com/wjakob/nanobind/pull/1225>`__, commit `cf289b
+  <https://github.com/wjakob/nanobind/commit/cf289bbeb301a2d684e66fe6a4690932e2ae9df4>`__.
 
+
+Version 2.10.0 (Dec 8, 2025)
+----------------------------
+
+This release was yanked due to a regression.
 
 Version 2.9.2 (Sep 4, 2025)
 ---------------------------

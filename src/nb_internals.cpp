@@ -65,7 +65,6 @@ static PyType_Slot nb_func_slots[] = {
     { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_clear, (void *) nb_func_clear },
     { Py_tp_dealloc, (void *) nb_func_dealloc },
-    { Py_tp_traverse, (void *) nb_func_traverse },
     { Py_tp_new, (void *) PyType_GenericNew },
     { Py_tp_call, (void *) PyVectorcall_Call },
     { 0, nullptr }
@@ -119,7 +118,6 @@ static PyType_Slot nb_bound_method_slots[] = {
     { Py_tp_traverse, (void *) nb_bound_method_traverse },
     { Py_tp_clear, (void *) nb_bound_method_clear },
     { Py_tp_dealloc, (void *) nb_bound_method_dealloc },
-    { Py_tp_traverse, (void *) nb_bound_method_traverse },
     { Py_tp_call, (void *) PyVectorcall_Call },
     { 0, nullptr }
 };

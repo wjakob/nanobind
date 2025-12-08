@@ -67,7 +67,7 @@ NB_MODULE(test_typing_ext, m) {
     // Custom signature generation for classes and methods
     struct CustomSignature { int value; };
     nb::class_<CustomSignature>(
-        m, "CustomSignature", nb::sig("@my_decorator\nclass CustomSignature(" NB_TYPING_ITERABLE "[int])"))
+        m, "CustomSignature", nb::sig("@my_decorator\nclass CustomSignature(collections.abc.Iterable[int])"))
         .def("method", []{}, nb::sig("@my_decorator\ndef method(self: typing.Self)"))
         .def("method_with_default", [](CustomSignature&,bool){}, "value"_a.sig("bool(True)") = true)
         .def_rw("value", &CustomSignature::value,
@@ -102,7 +102,7 @@ NB_MODULE(test_typing_ext, m) {
             nb::sig("def get(self, /) -> T"))
        .def(nb::self == nb::self, nb::sig("def __eq__(self, arg: object, /) -> bool"));
 
-#if PY_VERSION_HEX >= 0x03090000 && !defined(PYPY_VERSION) // https://github.com/pypy/pypy/issues/4914
+#if !defined(PYPY_VERSION) // https://github.com/pypy/pypy/issues/4914
     struct WrapperFoo : Wrapper { };
     nb::class_<WrapperFoo>(m, "WrapperFoo", wrapper[nb::type<Foo>()]);
 #endif

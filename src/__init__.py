@@ -1,8 +1,8 @@
 import sys
 import os
 
-if sys.version_info < (3, 8):
-    raise ImportError("nanobind does not support Python < 3.8.")
+if sys.version_info < (3, 9):
+    raise ImportError("nanobind does not support Python < 3.9.")
 
 def source_dir() -> str:
     "Return the path to the nanobind source directory."

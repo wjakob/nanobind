@@ -606,7 +606,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
     const size_t count      = (size_t) Py_SIZE(self),
-                 nargs_in   = (size_t) NB_VECTORCALL_NARGS(nargsf),
+                 nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
                  nkwargs_in = kwargs_in ? (size_t) NB_TUPLE_GET_SIZE(kwargs_in) : 0;
 
     func_data *fr = nb_func_data(self);
@@ -888,7 +888,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     func_data *fr = nb_func_data(self);
 
     const size_t count         = (size_t) Py_SIZE(self),
-                 nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
+                 nargs_in      = (size_t) PyVectorcall_NARGS(nargsf);
 
     const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
@@ -978,7 +978,7 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -1018,7 +1018,7 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
     bool is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
     // Handler routine that will be invoked in case of an error condition
@@ -1075,12 +1075,12 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
     nb_bound_method *mb = (nb_bound_method *) self;
-    size_t nargs = (size_t) NB_VECTORCALL_NARGS(nargsf);
+    size_t nargs = (size_t) PyVectorcall_NARGS(nargsf);
     const size_t buf_size = 5;
     PyObject **args, *args_buf[buf_size], *temp = nullptr, *result;
     bool alloc = false;
 
-    if (NB_LIKELY(nargsf & NB_VECTORCALL_ARGUMENTS_OFFSET)) {
+    if (NB_LIKELY(nargsf & PY_VECTORCALL_ARGUMENTS_OFFSET)) {
         args = (PyObject **) (args_in - 1);
         temp = args[0];
     } else {
@@ -1514,7 +1514,6 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
     return PyUnicode_FromString(buf.get());
 }
 
-// PyGetSetDef entry for __module__ is ignored in Python 3.8
 PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
     const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr);
 

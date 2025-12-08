@@ -277,7 +277,7 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
     PyObject *res = nullptr;
     bool gil_error = false, cast_error = false;
 
-    size_t nargs_total = (size_t) (NB_VECTORCALL_NARGS(nargsf) +
+    size_t nargs_total = (size_t) (PyVectorcall_NARGS(nargsf) +
                          (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
 
 #if !defined(Py_LIMITED_API)
@@ -294,20 +294,8 @@ PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
         }
     }
 
-#if PY_VERSION_HEX < 0x03090000
-    if (method_call) {
-        PyObject *self = PyObject_GetAttr(args[0], /* name = */ base);
-        if (self) {
-            res = _PyObject_Vectorcall(self, (PyObject **) args + 1, nargsf - 1, kwnames);
-            Py_DECREF(self);
-        }
-    } else {
-        res = _PyObject_Vectorcall(base, (PyObject **) args, nargsf, kwnames);
-    }
-#else
     res = (method_call ? PyObject_VectorcallMethod
                        : PyObject_Vectorcall)(base, args, nargsf, kwnames);
-#endif
 
 end:
     for (size_t i = 0; i < nargs_total; ++i)

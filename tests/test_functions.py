@@ -3,11 +3,6 @@ import pytest
 import sys
 import re
 
-# Some helper declaration to check types across different Python versions
-if sys.version_info < (3, 9):
-    TYPING_TUPLE = "typing.Tuple"
-else:
-    TYPING_TUPLE = "tuple"
 
 # Reference counting behavior changed on 3.14a7+
 py_3_14a7_or_newer = sys.version_info >= (3, 14, 0, 'alpha', 7)
@@ -92,8 +87,8 @@ def test05_signature():
     )
 
     assert t.test_07.__doc__ == (
-        f"test_07(arg0: int, arg1: int, /, *args, **kwargs) -> {TYPING_TUPLE}[int, int]\n"
-        f"test_07(a: int, b: int, *myargs, **mykwargs) -> {TYPING_TUPLE}[int, int]"
+        "test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]\n"
+        "test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]"
     )
 
 
@@ -284,7 +279,6 @@ def test23_byte_return():
     assert t.test_18("hello world", 5) == b"hello"
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
 def test24_pydoc():
     import pydoc
 
@@ -481,19 +475,18 @@ def test40_nb_signature():
         (r"def test_05(arg: int, /) -> int", "doc_1", None),
         (r"def test_05(arg: float, /) -> int", "doc_2", None),
     )
-    if sys.version_info >= (3, 9):
-        assert t.test_07.__nb_signature__ == (
-            (
-                r"def test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]",
-                None,
-                None,
-            ),
-            (
-                r"def test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]",
-                None,
-                None,
-            ),
-        )
+    assert t.test_07.__nb_signature__ == (
+        (
+            r"def test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]",
+            None,
+            None,
+        ),
+        (
+            r"def test_07(a: int, b: int, *myargs, **mykwargs) -> tuple[int, int]",
+            None,
+            None,
+        ),
+    )
 
 
 def test41_kw_only():

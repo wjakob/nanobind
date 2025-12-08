@@ -123,11 +123,8 @@ struct UniqueInt {
 std::map<int, std::weak_ptr<UniqueInt>> UniqueInt::instances;
 
 int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
-    // On Python 3.9+, we must traverse the implicit dependency
-    // of an object on its associated type object.
-    #if PY_VERSION_HEX >= 0x03090000
-        Py_VISIT(Py_TYPE(self));
-    #endif
+    // We must traverse the implicit dependency of an object on its associated type object.
+    Py_VISIT(Py_TYPE(self));
 
     // The tp_traverse method may be called after __new__ but before or during
     // __init__, before the C++ constructor has been called. We must not inspect

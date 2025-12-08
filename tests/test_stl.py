@@ -4,17 +4,6 @@ import pytest
 import sys
 from common import collect, skip_on_pypy
 
-# Some helper declaration to check types across different Python versions
-if sys.version_info < (3, 9):
-    TYPING_DICT = "typing.Dict"
-    TYPING_SET = "typing.Set"
-    TYPING_ABC = "typing"
-    TYPING_ABSTRACT_SET = "typing.AbstractSet"
-else:
-    TYPING_DICT = "dict"
-    TYPING_SET = "set"
-    TYPING_ABC = "collections.abc"
-    TYPING_ABSTRACT_SET = "collections.abc.Set"
 
 
 def optional(arg: str, /) -> str:
@@ -517,7 +506,7 @@ def test50_map_return_movable_value():
         assert k == chr(ord("a") + i)
         assert v.value == i
         assert t.map_return_movable_value.__doc__ == (
-            f"map_return_movable_value() -> {TYPING_DICT}[str, test_stl_ext.Movable]"
+            "map_return_movable_value() -> dict[str, test_stl_ext.Movable]"
         )
 
 
@@ -526,14 +515,14 @@ def test51_map_return_copyable_value():
         assert k == chr(ord("a") + i)
         assert v.value == i
         assert t.map_return_copyable_value.__doc__ == (
-            f"map_return_copyable_value() -> {TYPING_DICT}[str, test_stl_ext.Copyable]"
+            "map_return_copyable_value() -> dict[str, test_stl_ext.Copyable]"
         )
 
 
 def test52_map_movable_in_value():
     t.map_movable_in_value(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
     assert t.map_movable_in_value.__doc__ == (
-        f"map_movable_in_value(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
+        "map_movable_in_value(x: collections.abc.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
@@ -542,7 +531,7 @@ def test53_map_copyable_in_value():
         dict([(chr(ord("a") + i), t.Copyable(i)) for i in range(10)])
     )
     assert t.map_copyable_in_value.__doc__ == (
-        f"map_copyable_in_value(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Copyable]) -> None"
+        "map_copyable_in_value(x: collections.abc.Mapping[str, test_stl_ext.Copyable]) -> None"
     )
 
 
@@ -551,7 +540,7 @@ def test54_map_movable_in_lvalue_ref():
         dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)])
     )
     assert t.map_movable_in_lvalue_ref.__doc__ == (
-        f"map_movable_in_lvalue_ref(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
+        "map_movable_in_lvalue_ref(x: collections.abc.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
@@ -560,14 +549,14 @@ def test55_map_movable_in_rvalue_ref():
         dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)])
     )
     assert t.map_movable_in_rvalue_ref.__doc__ == (
-        f"map_movable_in_rvalue_ref(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
+        "map_movable_in_rvalue_ref(x: collections.abc.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
 def test56_map_movable_in_ptr():
     t.map_movable_in_ptr(dict([(chr(ord("a") + i), t.Movable(i)) for i in range(10)]))
     assert t.map_movable_in_ptr.__doc__ == (
-        f"map_movable_in_ptr(x: {TYPING_ABC}.Mapping[str, test_stl_ext.Movable]) -> None"
+        "map_movable_in_ptr(x: collections.abc.Mapping[str, test_stl_ext.Movable]) -> None"
     )
 
 
@@ -601,9 +590,9 @@ def test60_set_return_value():
         assert k == chr(ord("a") + i)
     for i, k in enumerate(sorted(t.unordered_set_return_value())):
         assert k == chr(ord("a") + i)
-    assert t.set_return_value.__doc__ == (f"set_return_value() -> {TYPING_SET}[str]")
+    assert t.set_return_value.__doc__ == "set_return_value() -> set[str]"
     assert t.unordered_set_return_value.__doc__ == (
-        f"unordered_set_return_value() -> {TYPING_SET}[str]"
+        "unordered_set_return_value() -> set[str]"
     )
 
 
@@ -611,24 +600,24 @@ def test61_set_in_value():
     t.set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     t.unordered_set_in_value(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_value.__doc__ == (
-        f"set_in_value(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+        "set_in_value(x: collections.abc.Set[str]) -> None"
     )
     assert t.unordered_set_in_value.__doc__ == (
-        f"unordered_set_in_value(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+        "unordered_set_in_value(x: collections.abc.Set[str]) -> None"
     )
 
 
 def test62_set_in_lvalue_ref():
     t.set_in_lvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_lvalue_ref.__doc__ == (
-        f"set_in_lvalue_ref(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+        "set_in_lvalue_ref(x: collections.abc.Set[str]) -> None"
     )
 
 
 def test63_set_in_rvalue_ref():
     t.set_in_rvalue_ref(set([chr(ord("a") + i) for i in range(10)]))
     assert t.set_in_rvalue_ref.__doc__ == (
-        f"set_in_rvalue_ref(x: {TYPING_ABSTRACT_SET}[str]) -> None"
+        "set_in_rvalue_ref(x: collections.abc.Set[str]) -> None"
     )
 
 

@@ -99,13 +99,8 @@ public:
         return pack_timedelta(dd.count(), ss.count(), us.count());
     }
 
-    #if PY_VERSION_HEX < 0x03090000
-        NB_TYPE_CASTER(type, io_name("typing.Union[datetime.timedelta, float]",
-                                     "datetime.timedelta"))
-    #else
-        NB_TYPE_CASTER(type, io_name("datetime.timedelta | float",
-                                     "datetime.timedelta"))
-    #endif
+    NB_TYPE_CASTER(type, io_name("datetime.timedelta | float",
+                                 "datetime.timedelta"))
 };
 
 template <class... Args>
@@ -214,13 +209,8 @@ public:
                              localtime.tm_sec,
                              (int) us.count());
     }
-    #if PY_VERSION_HEX < 0x03090000
-        NB_TYPE_CASTER(type, io_name("typing.Union[datetime.datetime, datetime.date, datetime.time]",
-                                     "datetime.datetime"))
-    #else
-        NB_TYPE_CASTER(type, io_name("datetime.datetime | datetime.date | datetime.time",
-                                     "datetime.datetime"))
-    #endif
+    NB_TYPE_CASTER(type, io_name("datetime.datetime | datetime.date | datetime.time",
+                                 "datetime.datetime"))
 };
 
 // Other clocks that are not the system clock are not measured as

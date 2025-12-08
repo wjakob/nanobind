@@ -69,9 +69,7 @@ struct FuncWrapper {
 };
 
 int funcwrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
-    #if PY_VERSION_HEX >= 0x03090000
-        Py_VISIT(Py_TYPE(self));
-    #endif
+    Py_VISIT(Py_TYPE(self));
 
     if (!nb::inst_ready(self)) {
         return 0;

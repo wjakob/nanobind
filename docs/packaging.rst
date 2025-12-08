@@ -101,7 +101,7 @@ An example is shown below:
    version = "0.0.1"
    description = "A brief description of what this project does"
    readme = "README.md"
-   requires-python = ">=3.8"
+   requires-python = ">=3.9"
    authors = [
        { name = "Your Name", email = "your.email@address.com" },
    ]
@@ -178,7 +178,7 @@ component that can be used to create `stable ABI
 .. code-block:: cmake
 
    # Try to import all Python components potentially needed by nanobind
-   find_package(Python 3.8
+   find_package(Python 3.9
      REQUIRED COMPONENTS Interpreter Development.Module
      OPTIONAL_COMPONENTS Development.SABIModule)
 
@@ -316,7 +316,6 @@ block to remove incompatible configurations from the matrix:
 
 .. code-block:: toml
 
-    skip = ["cp38-*", "pp38-*"] # Skip CPython and PyPy 3.8
     archs = ["auto64"]          # Only target 64 bit architectures
 
 The `cibuildwheel documentation

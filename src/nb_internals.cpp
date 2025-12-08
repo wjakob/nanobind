@@ -32,11 +32,6 @@ extern int nb_bound_method_clear(PyObject *);
 extern void nb_bound_method_dealloc(PyObject *);
 extern PyObject *nb_method_descr_get(PyObject *, PyObject *, PyObject *);
 
-#if PY_VERSION_HEX >= 0x03090000
-#  define NB_HAVE_VECTORCALL_PY39_OR_NEWER NB_HAVE_VECTORCALL
-#else
-#  define NB_HAVE_VECTORCALL_PY39_OR_NEWER 0
-#endif
 
 static PyType_Slot nb_meta_slots[] = {
     { Py_tp_base, nullptr },
@@ -81,7 +76,7 @@ static PyType_Spec nb_func_spec = {
     /* .basicsize = */ (int) sizeof(nb_func),
     /* .itemsize = */ (int) sizeof(func_data),
     /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+                   Py_TPFLAGS_HAVE_VECTORCALL,
     /* .slots = */ nb_func_slots
 };
 
@@ -104,7 +99,7 @@ static PyType_Spec nb_method_spec = {
     /*.itemsize = */ (int) sizeof(func_data),
     /*.flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
                   Py_TPFLAGS_METHOD_DESCRIPTOR |
-                  NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+                  Py_TPFLAGS_HAVE_VECTORCALL,
     /*.slots = */ nb_method_slots
 };
 
@@ -134,7 +129,7 @@ static PyType_Spec nb_bound_method_spec = {
     /* .basicsize = */ (int) sizeof(nb_bound_method),
     /* .itemsize = */ 0,
     /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                   NB_HAVE_VECTORCALL_PY39_OR_NEWER,
+                   Py_TPFLAGS_HAVE_VECTORCALL,
     /* .slots = */ nb_bound_method_slots
 };
 
@@ -393,8 +388,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
 
 #if defined(PYPY_VERSION)
     PyObject *dict = PyEval_GetBuiltins();
-#elif PY_VERSION_HEX < 0x03090000
-    PyObject *dict = PyInterpreterState_GetDict(_PyInterpreterState_Get());
 #else
     PyObject *dict = PyInterpreterState_GetDict(PyInterpreterState_Get());
 #endif
@@ -454,15 +447,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
     check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
               p->nb_method && p->nb_bound_method,
           "nanobind::detail::nb_module_exec(): initialization failed!");
-
-#if PY_VERSION_HEX < 0x03090000
-    p->nb_func->tp_flags |= NB_HAVE_VECTORCALL;
-    p->nb_func->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
-    p->nb_method->tp_flags |= NB_HAVE_VECTORCALL;
-    p->nb_method->tp_vectorcall_offset = offsetof(nb_func, vectorcall);
-    p->nb_bound_method->tp_flags |= NB_HAVE_VECTORCALL;
-    p->nb_bound_method->tp_vectorcall_offset = offsetof(nb_bound_method, vectorcall);
-#endif
 
 #if defined(Py_LIMITED_API)
     // Cache important functions from PyType_Type and PyProperty_Type

@@ -15,6 +15,12 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.10.2 (Dec 10, 2025)
+----------------------------
+
+- Fixes a regression that broke compilation on 32-bit architectures.
+  (PR `#1239 <https://github.com/wjakob/nanobind/pull/1239>`__).
+
 Version 2.10.1 (Dec 8, 2025)
 ----------------------------
 

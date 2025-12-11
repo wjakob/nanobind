@@ -95,6 +95,9 @@ NB_MODULE(test_functions_ext, m) {
     // Simple binary function (via function pointer)
     auto test_02 = [](int up, int down) -> int { return up - down; };
     m.def("test_02", (int (*)(int, int)) test_02, "up"_a = 8, "down"_a = 1);
+    m.def("test_02p", (int (*)(int, int)) test_02, nb::arg()=8, nb::arg()=1);
+    m.def("test_02nc", (int (*)(int, int)) test_02, nb::arg().noconvert()=8,
+                                                    nb::arg().noconvert()=1);
 
     // Simple binary function with capture object
     int i = 42;

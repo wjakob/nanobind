@@ -15,6 +15,8 @@ def test01_capture():
     # Functions with and without capture object of different sizes
     assert t.test_01() is None
     assert t.test_02(5, 3) == 2
+    assert t.test_02p(5, 3) == 2
+    assert t.test_02nc(5, 3) == 2
     assert t.test_03(5, 3) == 44
     assert t.test_04() == 60
     assert t.test_simple(0, 1, 2, 3, 4, 5, 6, 7) == 14
@@ -24,6 +26,14 @@ def test02_default_args():
     # Default arguments
     assert t.test_02() == 7
     assert t.test_02(7) == 6
+    assert t.test_02('17') == 16
+    assert t.test_02p() == 7
+    assert t.test_02p(7) == 6
+    assert t.test_02p('17') == 16
+    assert t.test_02nc() == 7
+    assert t.test_02nc(7) == 6
+    with pytest.raises(TypeError):
+        t.test_02nc('17')
 
 
 def test03_kwargs():

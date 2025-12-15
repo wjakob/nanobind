@@ -19,6 +19,9 @@ struct EnumProperty { Enum get_enum() { return Enum::A; } };
 enum class OpaqueEnum { X, Y };
 NB_MAKE_OPAQUE(OpaqueEnum)
 
+// Enum with members named 'name' and 'value' to test stubgen (issue #1246)
+enum class Item { name, value, extra };
+
 NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum", "enum-level docstring")
         .value("A", Enum::A, "Value A")
@@ -85,4 +88,12 @@ NB_MODULE(test_enum_ext, m) {
         })
         .def(nb::self == nb::self);
     nb::implicitly_convertible<std::string, OpaqueEnum>();
+
+    // Enum with members named 'name' and 'value' (issue #1246)
+    nb::enum_<Item>(m, "Item")
+        .value("name", Item::name)
+        .value("value", Item::value)
+        .value("extra", Item::extra);
+
+    m.def("item_to_int", [](Item i) { return (int) i; }, nb::arg("item") = Item::name);
 }

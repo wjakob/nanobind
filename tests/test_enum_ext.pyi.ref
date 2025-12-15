@@ -120,3 +120,12 @@ class OpaqueEnum:
     """(arg: object, /) -> test_enum_ext.OpaqueEnum"""
 
     def __eq__(self, arg: OpaqueEnum, /) -> bool: ...
+
+class Item(enum.Enum):
+    name = 0
+
+    value = 1
+
+    extra = 2
+
+def item_to_int(item: Item = Item.name) -> int: ...

@@ -187,3 +187,18 @@ def test09_enum_methods():
 
 def test10_enum_opaque():
     assert t.OpaqueEnum.X == t.OpaqueEnum("X") and t.OpaqueEnum.Y == t.OpaqueEnum("Y")
+
+def test11_enum_name_value_members():
+    # Test for issue #1246: enums with members named 'name' or 'value'
+    # When an enum has members named 'name' or 'value', accessing .name/.value
+    # returns the enum member instead of the attribute. Use _name_/_value_.
+    assert t.Item.name._value_ == 0
+    assert t.Item.value._value_ == 1
+    assert t.Item.extra._value_ == 2
+    assert t.Item.name._name_ == 'name'
+    assert t.Item.value._name_ == 'value'
+    assert t.Item.extra._name_ == 'extra'
+    assert t.item_to_int(t.Item.name) == 0
+    assert t.item_to_int(t.Item.value) == 1
+    assert t.item_to_int(t.Item.extra) == 2
+    assert t.item_to_int() == 0  # default is Item.name

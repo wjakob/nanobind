@@ -610,7 +610,7 @@ class StubGen:
 
         if isinstance(parent, type) and issubclass(tp, parent):
             # This is an entry of an enumeration
-            self.write_ln(f"{name} = {typing.cast(enum.Enum, value).value}")
+            self.write_ln(f"{name} = {typing.cast(enum.Enum, value)._value_}")
             if value.__doc__ and self.include_docstrings:
                 self.put_docstr(value.__doc__)
             self.write("\n")
@@ -1028,7 +1028,7 @@ class StubGen:
         elif issubclass(tp, typing.ForwardRef):
             return f'"{e.__forward_arg__}"'
         elif issubclass(tp, enum.Enum):
-            return self.type_str(tp) + '.' + e.name
+            return self.type_str(tp) + '.' + e._name_
         elif (sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.ParamSpec)):
             tv = self.import_object(tp.__module__, "ParamSpec")

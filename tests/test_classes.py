@@ -984,3 +984,6 @@ def test51_constexpr_trampoline():
 
     c = PyConstexprClass(4)
     assert t.constexpr_call_getInt(c) == 42
+
+def test52_noncopyable():
+    assert t.PrivateNonCopyable.get_instance().get_int() == 42

@@ -75,7 +75,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     if constexpr (CheckGuard && !std::is_same_v<typename Info::call_guard, void>) {
         return func_create<ReturnRef, false>(
-            [func = (forward_t<Func>) func](Args... args) NB_INLINE_LAMBDA {
+            [func = (forward_t<Func>) func](Args... args) NB_INLINE_LAMBDA -> Return {
                 typename Info::call_guard::type g;
                 (void) g;
                 return func((forward_t<Args>) args...);

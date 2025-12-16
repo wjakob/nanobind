@@ -13,6 +13,7 @@
 #include <vector>
 #include <nanobind/stl/detail/traits.h>
 #include "inter_module.h"
+#include "test_classes.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -793,4 +794,9 @@ NB_MODULE(test_classes_ext, m) {
     m.def("constexpr_call_getInt", [](ConstexprClass *c) {
         return c->getInt();
     });
+
+    auto never_destroy_class = nb::class_<NeverDestroy>(m, "NeverDestroy", nb::never_destroy())
+        .def_static("make_ref", &NeverDestroy::make, nb::rv_policy::reference)
+        .def("getVar", &NeverDestroy::getVar)
+        .def("setVar", &NeverDestroy::setVar);
 }

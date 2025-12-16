@@ -15,6 +15,12 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (not yet released)
+------------------------------
+
+- Add ``nb::never_destroy`` to prevent nanobind from destroying instances
+
+
 Version 2.10.2 (Dec 10, 2025)
 ----------------------------
 

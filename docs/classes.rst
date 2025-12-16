@@ -1141,3 +1141,32 @@ Two limitations of :cpp:struct:`nb::new_ <new_>` are worth noting:
    just helps unpickling work. If your first :cpp:struct:`nb::new_ <new_>`
    method is one that takes no arguments, then nanobind won't add its own,
    and you'll have to deal with unpickling some other way.
+
+Preventing object destruction
+-----------------------------
+
+Rarely you might need to bind a class that should never be destroyed by python:
+
+.. code-block:: cpp
+
+   class Singleton {
+     public:
+       static Singleton &get_instance();
+   };
+
+You can use the :cpp:class:`never_destroy` annotation to indicate that python
+should never destroy the instance.
+
+.. code-block:: cpp
+
+   nb::class_<Singleton>(m, "Singleton")
+       .def_static("get_instance", &Singleton::get_instance, nb::rv_policy::reference);
+
+.. warning::
+
+   When providing the instance of a class marked as ``never_destroy`` to python
+   you must always provide it as a reference (and the usual lifetime rules for
+   references should be heeded), usually by explicitly specifying a
+   :cpp:enumerator:`reference <rv_policy::reference>` rv_policy. If nanobind
+   creates an instance or a copy constructor is invoked, the program will abort
+   with an internal error at destruction.

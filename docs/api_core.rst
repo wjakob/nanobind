@@ -2187,6 +2187,9 @@ declarations in generated :ref:`stubs <stubs>`,
       Declares a callback that will be invoked when a C++ instance is first
       cast into a Python object.
 
+.. cpp:struct:: never_destroy
+
+   Disables destroying the instance.
 
 .. _enum_binding_annotations:
 

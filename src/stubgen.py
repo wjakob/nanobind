@@ -251,6 +251,9 @@ class StubGen:
         # Output will be appended to this string
         self.output = ""
 
+        # Module-level docstring (to be placed at the very top of the output)
+        self.module_docstring: Optional[str] = None
+
         # A stack to avoid infinite recursion
         self.stack: List[object] = []
 
@@ -310,8 +313,8 @@ class StubGen:
         """Append an indented paragraph"""
         self.output += textwrap.indent(line, "    " * self.depth)
 
-    def put_docstr(self, docstr: str) -> None:
-        """Append an indented single or multi-line docstring"""
+    def format_docstr(self, docstr: str) -> str:
+        """Generate a properly escaped docstring (no indentation)"""
         docstr = textwrap.dedent(docstr).strip()
         raw_str = ""
         if "''" in docstr or "\\" in docstr:
@@ -320,8 +323,11 @@ class StubGen:
             raw_str = "r"
         if len(docstr) > 70 or "\n" in docstr:
             docstr = "\n" + docstr + "\n"
-        docstr = f'{raw_str}"""{docstr}"""\n'
-        self.write_par(docstr)
+        return f'{raw_str}"""{docstr}"""\n'
+
+    def put_docstr(self, docstr: str) -> None:
+        """Append an indented single or multi-line docstring"""
+        self.write_par(self.format_docstr(docstr))
 
     def put_nb_overload(self, fn: NbFunction, sig: NbFunctionSignature, name: Optional[str] = None) -> None:
         """
@@ -908,6 +914,9 @@ class StubGen:
                             f.write(sg.get())
                     return
                 else:
+                    if self.include_docstrings:
+                        self.module_docstring = getattr(value, "__doc__", None)
+
                     self.apply_pattern(self.prefix + ".__prefix__", None)
                     # using value.__dict__ rather than inspect.getmembers
                     # to preserve insertion order
@@ -1211,6 +1220,12 @@ class StubGen:
     def get(self) -> str:
         """Generate the final stub output"""
         s = ""
+
+        # The module docstring must be before the imports
+        if self.module_docstring:
+            s = self.format_docstr(self.module_docstring)
+            s += "\n"
+
         last_party = None
 
         for module in sorted(self.imports, key=lambda i: str(self.check_party(i)) + i):

@@ -30,6 +30,64 @@ runtime overheads compared to pybind11. nanobind also outperforms Cython in
 important metrics (**3-12×** binary size reduction, **1.6-4×** compilation time
 reduction, similar runtime performance).
 
+## Testimonials
+
+A selection of testimonials from projects that migrated from pybind11 to nanobind.
+
+<table>
+<tr><td>
+
+**IREE** · [LLVM Discourse](https://discourse.llvm.org/t/nanobind-for-mlir-python-bindings/83511/5)
+
+> *"IREE and its derivatives switched 1.5 years ago. It has been one of the single best dep decisions I've made. Not only is it much-much faster to compile, it produces smaller binaries and has a much more lean interface to the underlying Python machinery that all adds up to significant performance improvements. Worked exactly like it said on the tin."*
+
+— **Stella Laurenzo**, Google
+
+</td></tr>
+<tr><td>
+
+**XLA/MLIR** · [GitHub PR](https://github.com/llvm/llvm-project/pull/118583)
+
+> *"For a complicated Google-internal LLM model in JAX, this change improves the MLIR lowering time by around 5s (out of around 30s), which is a significant speedup for simply switching binding frameworks."*
+
+— **Peter Hawkins**, Google
+
+</td></tr>
+<tr><td>
+
+**Apple MLX** · [X](https://x.com/awnihannun/status/1890495434021326974)
+
+> *"MLX uses nanobind to bind C++ to Python. It's a critical piece of MLX infra and is why running Python code is nearly the same speed as running C++ directly. Also makes it super easy to move arrays between frameworks."*
+
+— **Awni Hannun**, Apple
+
+</td></tr>
+<tr><td>
+
+**JAX** · [GitHub](https://github.com/jax-ml/jax/commit/70b7d501816c6e9f131a0a8b3e4a527e53eeebd7)
+
+> *"nanobind has a number of [advantages](https://nanobind.readthedocs.io/en/latest/why.html), notably speed of compilation and dispatch, but the main reason to do this for these bindings is because nanobind can target the Python Stable ABI starting with Python 3.12. This means that we will not need to ship per-Python version CUDA plugins starting with Python 3.12."*
+
+— **Peter Hawkins**, Google
+
+</td></tr>
+<tr><td>
+
+**FEniCS / DOLFINx** · [GitHub](https://github.com/FEniCS/dolfinx/pull/2820)
+
+> *"nanobind is smaller than pybind11, the wrappers build faster and it has significantly improved support for wrapping multi-dimensional arrays, which we use heavily. The nanobind docs are easier to follow on the low-level details, which makes understanding the memory management in the wrapper layer easier."*
+
+— **Garth N. Wells**
+</td></tr>
+<tr><td>
+
+**PennyLane** · [Release notes](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/release_notes.html)
+
+> *"Nanobind has been developed as a natural successor to the pybind11 library and offers a number of advantages like its ability to target Python's Stable ABI."*
+
+</td></tr>
+</table>
+
 ## Documentation
 
 Please see the following links for tutorial and reference documentation in

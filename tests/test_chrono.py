@@ -8,6 +8,13 @@ import sys
 
 import pytest
 
+# tzset is unix-only but necessary after changing timezones
+try:
+    from time import tzset
+except ImportError:
+    def tzset():
+        pass
+
 
 def test_chrono_system_clock():
     # Get the time from both c++ and datetime
@@ -104,6 +111,7 @@ SKIP_TZ_ENV_ON_WIN = pytest.mark.skipif(
 def test_chrono_system_clock_roundtrip_time(time1, tz, monkeypatch):
     if tz is not None:
         monkeypatch.setenv("TZ", f"/usr/share/zoneinfo/{tz}")
+    tzset()
 
     # Roundtrip the time
     datetime2 = m.test_chrono2(time1)
@@ -261,6 +269,36 @@ def test_chrono_misc():
     # time_point -> datetime conversion
     assert roundtrip_datetime(d1) == d1
     assert roundtrip_datetime(d2) == d2
+
+
+
+@SKIP_TZ_ENV_ON_WIN
+@pytest.mark.parametrize(
+    "tz",
+    [
+        None,
+        pytest.param("UTC"),
+        pytest.param("America/New_York"),
+    ],
+)
+@pytest.mark.parametrize(
+    "sys_tz",
+    [
+        None,
+        pytest.param("UTC"),
+        pytest.param("America/New_York"),
+    ]
+)
+def test_chrono_tz_aware(sys_tz, tz, monkeypatch):
+    if sys_tz is not None:
+        monkeypatch.setenv("TZ", f"/usr/share/zoneinfo/{sys_tz}")
+    tzset()
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+    roundtrip_datetime = m.test_nano_timepoint_roundtrip
+    now = datetime.now()
+    now_tz = now.astimezone(ZoneInfo(tz) if tz is not None else None)
+    assert roundtrip_datetime(now) == roundtrip_datetime(now_tz)
 
 
 @pytest.mark.parametrize(

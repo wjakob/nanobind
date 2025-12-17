@@ -15,6 +15,19 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version TBD (not yet released)
+------------------------------
+
+- Improved the behavior of ``datetime``/``std::chrono`` type caster when
+  converting ``datetime`` with timezone information ("aware datetime") to C++:
+  the tz annotation is no longer silently dropped but first translated into
+  the system time zone and then to UTC.
+
+  Note that this second translation between system time zone and UTC also applies
+  to "naive datetime" conversions due to their use of ``mktime()`` and
+  ``localtime_r()`` functions.
+  (PR `#1253 <https://github.com/wjakob/nanobind/pull/1253>`__).
+
 Version 2.10.2 (Dec 10, 2025)
 ----------------------------
 

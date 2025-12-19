@@ -1145,28 +1145,39 @@ Two limitations of :cpp:struct:`nb::new_ <new_>` are worth noting:
 Preventing object destruction
 -----------------------------
 
-Rarely you might need to bind a class that should never be destroyed by python:
+In rare cases, you may need to bind a class that should never be destructed
+by nanobind:
 
 .. code-block:: cpp
 
    class Singleton {
-     public:
+   public:
        static Singleton &get_instance();
    };
 
-You can use the :cpp:class:`never_destroy` annotation to indicate that python
-should never destroy the instance.
+You may use the :cpp:class:`nb::never_destruct <never_destruct>` annotation to
+make nanobind aware of this. This feature is particularly helpful when attempts
+to bind the destructor would fail with a compilation error (e.g., because this
+would require access to implementation details that are not available in the
+current compilation unit).
 
 .. code-block:: cpp
 
-   nb::class_<Singleton>(m, "Singleton")
+   nb::class_<Singleton>(m, "Singleton", nb::never_destruct())
        .def_static("get_instance", &Singleton::get_instance, nb::rv_policy::reference);
 
 .. warning::
 
-   When providing the instance of a class marked as ``never_destroy`` to python
-   you must always provide it as a reference (and the usual lifetime rules for
-   references should be heeded), usually by explicitly specifying a
-   :cpp:enumerator:`reference <rv_policy::reference>` rv_policy. If nanobind
-   creates an instance or a copy constructor is invoked, the program will abort
-   with an internal error at destruction.
+   Instance class marked with :cpp:class:`nb::never_destruct <never_destruct>`
+   must be returned using the :cpp:enumerator:`reference
+   <rv_policy::reference>` return value policy. Otherwise, nanobind will assume
+   ownership, which includes the requirement of destructing the object at
+   a later point.
+
+   Similarly, you must not bind constructors or copy constructors, as the
+   eventual garbage collection of constructed instances would require calling
+   the destructor.
+
+   nanobind will abort with a fatal error if it is ever put into a situation
+   where an object with the :cpp:class:`nb::never_destruct <never_destruct>`
+   annotation must be destructed.

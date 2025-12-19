@@ -18,7 +18,8 @@ below inherit that of the preceding release.
 Version TBD (not yet released)
 ------------------------------
 
-- Add ``nb::never_destroy`` to prevent nanobind from destroying instances
+- Added the :cpp:class:`nb::never_destruct <never_destruct>` class binding
+  annotation to inform nanobind that it should not bind the destructor.
 
 
 Version 2.10.2 (Dec 10, 2025)

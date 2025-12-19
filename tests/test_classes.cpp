@@ -795,8 +795,8 @@ NB_MODULE(test_classes_ext, m) {
         return c->getInt();
     });
 
-    auto never_destroy_class = nb::class_<NeverDestroy>(m, "NeverDestroy", nb::never_destroy())
-        .def_static("make_ref", &NeverDestroy::make, nb::rv_policy::reference)
-        .def("getVar", &NeverDestroy::getVar)
-        .def("setVar", &NeverDestroy::setVar);
+    auto never_destruct_class = nb::class_<NeverDestruct>(m, "NeverDestruct", nb::never_destruct())
+        .def_static("make_ref", &NeverDestruct::make, nb::rv_policy::reference)
+        .def("var", &NeverDestruct::var)
+        .def("set_var", &NeverDestruct::set_var);
 }

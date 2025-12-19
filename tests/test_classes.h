@@ -2,18 +2,18 @@
 
 #include <memory>
 
-class NeverDestroy {
+class NeverDestruct {
   public:
-    static NeverDestroy& make();
+    static NeverDestruct& make();
 
-    NeverDestroy(const NeverDestroy&) = delete;
-    NeverDestroy& operator=(const NeverDestroy&) = delete;
+    NeverDestruct(const NeverDestruct&) = delete;
+    NeverDestruct& operator=(const NeverDestruct&) = delete;
 
-    int getVar() const;
-    void setVar(int i);
+    int var() const;
+    void set_var(int i);
 
   private:
-    NeverDestroy();
+    NeverDestruct();
 
     // incomplete type error if nanobind tries to instantiate the destructor
     struct NDImpl;

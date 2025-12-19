@@ -184,7 +184,7 @@ NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
     t.name = s.value;
 }
 
-NB_INLINE void type_extra_apply(type_init_data &, never_destroy) {
+NB_INLINE void type_extra_apply(type_init_data &, never_destruct) {
     // intentionally empty
 }
 
@@ -590,9 +590,9 @@ public:
             }
         }
 
-        constexpr bool has_never_destroy = (std::is_same_v<Extra, never_destroy> || ...);
+        constexpr bool has_never_destruct = (std::is_same_v<Extra, never_destruct> || ...);
 
-        if constexpr (std::is_destructible_v<T> && !has_never_destroy) {
+        if constexpr (std::is_destructible_v<T> && !has_never_destruct) {
             d.flags |= (uint32_t) detail::type_flags::is_destructible;
 
             if constexpr (!std::is_trivially_destructible_v<T>) {

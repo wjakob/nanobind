@@ -1,22 +1,22 @@
 #include "test_classes.h"
 
-struct NeverDestroy::NDImpl{
+struct NeverDestruct::NDImpl{
     int var = 0;
 };
 
-NeverDestroy::NeverDestroy() {
-    impl = std::make_unique<NeverDestroy::NDImpl>();
+NeverDestruct::NeverDestruct() {
+    impl = std::make_unique<NeverDestruct::NDImpl>();
 }
 
-int NeverDestroy::getVar() const {
+int NeverDestruct::var() const {
     return impl->var;
 }
 
-void NeverDestroy::setVar(int i) {
+void NeverDestruct::set_var(int i) {
     impl->var = i;
 }
 
-NeverDestroy& NeverDestroy::make() {
-    static NeverDestroy nd;
+NeverDestruct& NeverDestruct::make() {
+    static NeverDestruct nd;
     return nd;
 }

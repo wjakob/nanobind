@@ -151,7 +151,7 @@ on object ownership <enable_shared_from_this>` for more details.
 
 ``py::nodelete`` was used with holders in pybind11 to prevent destroying
 instances. nanobind can automatically detect this in some cases, but to
-be certain you can use the :cpp:class:`never_destroy` when binding the
+be certain you can use the :cpp:class:`never_destruct` when binding the
 class.
 
 Custom constructors

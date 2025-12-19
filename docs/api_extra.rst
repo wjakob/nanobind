@@ -1169,10 +1169,11 @@ to a Python :py:class:`~datetime.datetime` object; other clocks may convert to
 
 The first clock defined by the standard is ``std::chrono::system_clock``.
 This clock measures the current date and time, much like the Python
-:py:func:`time.time` function. It can change abruptly due to
-administrative actions, daylight savings time transitions, or
-synchronization with an external time server. That makes this clock a
-poor choice for timing purposes, but a good choice for wall-clock time.
+:py:func:`time.time` function. It tracks elapsed time since 1970 in
+the UTC timezone, but can change abruptly due to administrative actions,
+leap second changes, or synchronization with an external time server.
+That makes this clock a poor choice for timing purposes, but a good choice
+for wall-clock time.
 
 The second clock defined by the standard is ``std::chrono::steady_clock``.
 This clock ticks at a steady rate and is never adjusted, like
@@ -1209,6 +1210,8 @@ converting to Python.
     :py:class:`~datetime.datetime` instance.  The result describes a time in the
     local timezone, but does not have any timezone information
     attached to it (it is a naive datetime object).
+    Note that some time conversion can occur if your system is not set to use the
+    UTC timezone as the C++ and Python types follow different conventions.
 
 - ``std::chrono::duration`` → :py:class:`datetime.timedelta`
     A duration will be converted to a Python :py:class:`~datetime.timedelta`.
@@ -1224,9 +1227,11 @@ converting to Python.
 - :py:class:`datetime.datetime` or :py:class:`datetime.date` or :py:class:`datetime.time` → ``std::chrono::system_clock::time_point``
     A Python date, time, or datetime object can be converted into a
     system clock timepoint.  A :py:class:`~datetime.time` with no date
-    information is treated as that time on January 1, 1970. A
-    :py:class:`~datetime.date` with no time information is treated as midnight
-    on that date. **Any timezone information is ignored.**
+    information is treated as that time on January 1, 1970 (timezone information
+    is ignored). A :py:class:`~datetime.date` with no time information is treated
+    as midnight on that date. A :py:class:`~datetime.datetime` is treated as a
+    local time if no timezone information is provided. Otherwise, it is treated as
+    a time in its associated tzinfo.
 
 - :py:class:`datetime.timedelta` → ``std::chrono::duration``
     A Python time delta object can be converted into a duration

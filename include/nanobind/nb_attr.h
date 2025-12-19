@@ -123,6 +123,7 @@ struct is_final {};
 struct is_generic {};
 struct kw_only {};
 struct lock_self {};
+struct never_destroy {};
 
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};

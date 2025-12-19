@@ -184,6 +184,10 @@ NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
     t.name = s.value;
 }
 
+NB_INLINE void type_extra_apply(type_init_data &, never_destroy) {
+    // intentionally empty
+}
+
 template <typename T>
 NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
     static_assert(std::is_trivially_default_constructible_v<T>,
@@ -586,7 +590,9 @@ public:
             }
         }
 
-        if constexpr (std::is_destructible_v<T>) {
+        constexpr bool has_never_destroy = (std::is_same_v<Extra, never_destroy> || ...);
+
+        if constexpr (std::is_destructible_v<T> && !has_never_destroy) {
             d.flags |= (uint32_t) detail::type_flags::is_destructible;
 
             if constexpr (!std::is_trivially_destructible_v<T>) {

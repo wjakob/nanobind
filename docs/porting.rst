@@ -149,6 +149,11 @@ by always passing such objects across the Python/C++ boundary as
 ``std::shared_ptr<T>`` rather than as ``T*``. See the :ref:`advanced section
 on object ownership <enable_shared_from_this>` for more details.
 
+``py::nodelete`` was used with holders in pybind11 to prevent destroying
+instances. nanobind can automatically detect this in some cases, but to
+be certain you can use the :cpp:class:`never_destroy` when binding the
+class.
+
 Custom constructors
 -------------------
 In pybind11, custom constructors (i.e. ones that do not already exist in the

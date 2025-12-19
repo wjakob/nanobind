@@ -987,3 +987,8 @@ def test51_constexpr_trampoline():
 
 def test52_noncopyable():
     assert t.PrivateNonCopyable.get_instance().get_int() == 42
+
+def test53_never_destroy():
+    r = t.NeverDestroy.make_ref()
+    r.setVar(5)
+    assert r.getVar() == 5

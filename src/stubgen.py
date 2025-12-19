@@ -94,7 +94,7 @@ SKIP_LIST = [
     # shouldn't appear in the stubs.
     "_new_member_", "_use_args_", "_member_names_", "_member_map_",
     "_value2member_map_", "_hashable_values_", "_unhashable_values_",
-    "_unhashable_values_", "_unhashable_values_map_", "_value_repr_",
+    "_unhashable_values_map_", "_value_repr_",
 ]
 
 # Interpreter-internal types.

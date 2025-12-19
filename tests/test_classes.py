@@ -251,13 +251,9 @@ def test11_trampoline_failures():
         def what(self):
             return "b"
 
-    with pytest.warns(
-        RuntimeWarning,
-        match="nanobind: attempted to access an uninitialized instance of type",
-    ):
-        with pytest.raises(TypeError) as excinfo:
-            t.go(Incomplete2())
-    assert "incompatible function arguments" in str(excinfo.value)
+    with pytest.raises(TypeError) as excinfo:
+        Incomplete2()
+    assert "__init__() must be called when overriding __init__" in str(excinfo.value)
 
 
 def test12_large_pointers():

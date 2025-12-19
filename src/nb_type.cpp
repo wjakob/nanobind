@@ -496,6 +496,33 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     return 0;
 }
 
+/// metaclass `__call__` function that is used to create all nanobind objects
+static PyObject *nb_type_call(PyObject *type, PyObject *args, PyObject *kwargs) {
+
+    // use the default metaclass call to create/initialize the object
+#if defined(Py_LIMITED_API)
+    PyObject *self = ((ternaryfunc)PyType_GetSlot(&PyType_Type, Py_tp_call))(type, args, kwargs);
+#else
+    PyObject *self = PyType_Type.tp_call(type, args, kwargs);
+#endif
+    if (self == nullptr) {
+        return nullptr;
+    }
+
+    // This must be a nanobind instance
+    nb_inst *inst = (nb_inst *) self;
+    if (inst->state == nb_inst::state_uninitialized) {
+        const type_data *t = nb_type_data(Py_TYPE(self));
+        PyErr_Format(PyExc_TypeError,
+                    "%.200s.__init__() must be called when overriding __init__",
+                    t->name);
+        Py_DECREF(self);
+        return nullptr;
+    }
+
+    return self;
+}
+
 /// Special case to handle 'Class.property = value' assignments
 int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     nb_internals *int_p = internals;
@@ -850,6 +877,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             { Py_tp_dealloc, (void *) nb_type_dealloc },
             { Py_tp_setattro, (void *) nb_type_setattro },
             { Py_tp_init, (void *) nb_type_init },
+            { Py_tp_call, (void *) nb_type_call },
 #if defined(Py_LIMITED_API)
             { Py_tp_members, (void *) members },
 #endif

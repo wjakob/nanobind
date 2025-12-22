@@ -139,6 +139,26 @@ Naturally, since stub generation relies on the given shared object files, the
 actual extensions are built in the process before invocation of the stub
 generation script.
 
+Controlling shared vs. static library production
+------------------------------------------------
+
+You can control how nanobind is linked to your extensions and libraries with the
+``nanobind_link_mode`` attribute of the ``nanobind_extension``, ``nanobind_library``,
+and ``nanobind_test`` macros.
+
+Setting ``nanobind_link_mode = "static"`` will link nanobind statically, while
+``nanobind_link_mode = "shared"`` will request linkage against a shared ``libnanobind.so``.
+The default, ``nanobind_link_mode = "auto"`` , will set the linkage for nanobind automatically
+based on the value of the given ``linkstatic`` attribute (where ``True`` requests static linkage,
+while ``False`` requests dynamic linkage).
+
+.. note::
+
+    Linking ``nanobind_extension`` s dynamically on macOS can fail because of undefined libpython
+    symbols referenced in the extension's object files. In that case, you can supply a linker
+    response file by using the ``nb_library_linkopts`` function from ``@nanobind_bazel//:helpers.bzl``
+    when setting your extension's ``linkopts``.
+
 Building extensions for free-threaded Python
 --------------------------------------------
 

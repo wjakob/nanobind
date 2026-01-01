@@ -78,7 +78,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         uintptr_t payload = (uintptr_t) (self + 1);
 
         if (NB_UNLIKELY(align > sizeof(void *)))
-            payload = (payload + align - 1) / align * align;
+            payload = (payload + align - 1) & ~(uintptr_t(align) - 1);
 
         self->offset = (int32_t) ((intptr_t) payload - (intptr_t) self);
         self->direct = 1;

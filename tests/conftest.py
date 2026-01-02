@@ -3,4 +3,4 @@ def pytest_addoption(parser):
                      action='store_true',
                      dest="enable-slow-tests",
                      default=False,
-                     help="enable longrundecorated tests")
+                     help="enable long-running tests")

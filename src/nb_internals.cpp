@@ -437,11 +437,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
     PyThread_tss_create(p->nb_static_property_disabled);
 #endif
 
-    for (size_t i = 0; i < shard_count; ++i) {
-        p->shards[i].keep_alive.min_load_factor(.1f);
-        p->shards[i].inst_c2p.min_load_factor(.1f);
-    }
-
     check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
               p->nb_method && p->nb_bound_method,
           "nanobind::detail::nb_module_exec(): initialization failed!");

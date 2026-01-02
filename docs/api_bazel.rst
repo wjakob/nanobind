@@ -30,6 +30,9 @@ The main tool to build nanobind extensions is the ``nanobind_extension`` rule.
             srcs = [],
             copts = [],
             deps = [],
+            dynamic_deps = [],
+            linkstatic = True,
+            nanobind_link_mode = "auto",
             local_defines = [],
             **kwargs):
 
@@ -41,6 +44,8 @@ The main tool to build nanobind extensions is the ``nanobind_extension`` rule.
     The ``domain`` argument can be used to build the target extension under a
     different ABI domain, as described in the :ref:`FAQ <type-visibility>`
     section.
+
+    *New in nanobind-bazel v2.10.2: Added the "nanobind_link_mode" attribute.*
 
 To generate typing stubs for an extension, you can use the ``nanobind_stubgen``
 rule.
@@ -64,9 +69,9 @@ rule.
             exclude_docstrings = False,
             recursive = False):
 
-    It generates a `py_binary <https://bazel.build/reference/be/python#py_binary>`__ 
-    rule with a corresponding runfiles distribution, which invokes nanobind's 
-    builtin stubgen script, outputs a stub file and, optionally, 
+    It generates a `py_binary <https://bazel.build/reference/be/python#py_binary>`__
+    rule with a corresponding runfiles distribution, which invokes nanobind's
+    builtin stubgen script, outputs a stub file and, optionally,
     a typing marker file into ``output_directory`` (defaults to
     the build output directory, commonly called "bindir" in Bazel terms).
 
@@ -92,12 +97,16 @@ To build a C++ library with nanobind as a dependency, use the
             name,
             copts = [],
             deps = [],
+            linkstatic = False,
+            nanobind_link_mode = "auto",
             **kwargs):
 
     It corresponds directly to the builtin
     `cc_library <https://bazel.build/reference/be/c-cpp#cc_library>`__ rule,
     with all keyword arguments being directly forwarded to a ``cc_library``
     target.
+
+    *New in nanobind-bazel v2.10.2: Added the "nanobind_link_mode" attribute.*
 
 To build a C++ shared library with nanobind as a dependency, use the
 ``nanobind_shared_library`` rule.
@@ -134,12 +143,12 @@ To build a C++ static library containing nanobind, use the
         def nanobind_static_library(name, deps, **kwargs):
 
     It corresponds directly to the builtin
-    `cc_static_library <https://bazel.build/reference/be/c-cpp#cc_static_library>`__ 
+    `cc_static_library <https://bazel.build/reference/be/c-cpp#cc_static_library>`__
     rule, with all keyword arguments being directly
     forwarded to a ``cc_static_library`` target.
 
     NB: This macro requires Bazel 7.4.0 or greater to use, as well as setting the
-    ``--experimental_cc_static_library`` flag for the build, since the 
+    ``--experimental_cc_static_library`` flag for the build, since the
     ``cc_static_library`` rule is considered experimental.
 
     *New in nanobind-bazel version 2.7.0.*
@@ -156,11 +165,16 @@ To build a C++ test target requiring nanobind, use the ``nanobind_test`` rule.
             name,
             copts = [],
             deps = [],
+            dynamic_deps = [],
+            linkstatic = False,
+            nanobind_link_mode = "auto",
             **kwargs):
 
     It corresponds directly to the builtin
     `cc_test <https://bazel.build/reference/be/c-cpp#cc_test>`__ rule, with all
     keyword arguments being directly forwarded to a ``cc_test`` target.
+
+    *New in nanobind-bazel v2.10.2: Added the "nanobind_link_mode" attribute.*
 
 .. _flags-bazel:
 
@@ -181,5 +195,5 @@ following flag settings.
 
     Build nanobind extensions against the stable ABI of the configured Python
     version. Allowed values are ``"cp312"``, ``"cp313"``, and ``"cp314"``, which
-    target the stable ABI starting from CPython 3.12, 3.13, or 3.14 respectively. 
+    target the stable ABI starting from CPython 3.12, 3.13, or 3.14 respectively.
     By default, all extensions are built without any ABI limitations.

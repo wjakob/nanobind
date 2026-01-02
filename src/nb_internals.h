@@ -31,6 +31,12 @@
 #  define NB_THREAD_LOCAL __thread
 #endif
 
+#if PY_VERSION_HEX >= 0x030A0000
+#  define NB_TPFLAGS_IMMUTABLETYPE Py_TPFLAGS_IMMUTABLETYPE
+#else
+#  define NB_TPFLAGS_IMMUTABLETYPE 0
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -412,6 +418,9 @@ struct nb_internals {
     descrgetfunc PyProperty_Type_tp_descr_get;
     descrsetfunc PyProperty_Type_tp_descr_set;
     size_t type_data_offset;
+
+    // PyType_Freeze (Python 3.14+), looked up dynamically
+    int (*PyType_Freeze)(PyTypeObject *) = nullptr;
 #endif
 
 #if defined(NB_FREE_THREADED)

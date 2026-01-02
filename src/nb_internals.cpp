@@ -13,6 +13,14 @@
 #include "nb_abi.h"
 #include <thread>
 
+#if defined(Py_LIMITED_API)
+#  if !defined(_WIN32)
+#    include <dlfcn.h>
+#  else
+#    include <windows.h>
+#  endif
+#endif
+
 #if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
@@ -42,7 +50,8 @@ static PyType_Spec nb_meta_spec = {
     /* .name = */ "nanobind.nb_meta",
     /* .basicsize = */ 0,
     /* .itemsize = */ 0,
-    /* .flags = */ Py_TPFLAGS_DEFAULT,
+    /* .flags = */ Py_TPFLAGS_DEFAULT |
+                   NB_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_meta_slots
 };
 
@@ -74,8 +83,10 @@ static PyType_Spec nb_func_spec = {
     /* .name = */ "nanobind.nb_func",
     /* .basicsize = */ (int) sizeof(nb_func),
     /* .itemsize = */ (int) sizeof(func_data),
-    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                   Py_TPFLAGS_HAVE_VECTORCALL,
+    /* .flags = */ Py_TPFLAGS_DEFAULT |
+                   Py_TPFLAGS_HAVE_GC |
+                   Py_TPFLAGS_HAVE_VECTORCALL |
+                   NB_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_func_slots
 };
 
@@ -96,9 +107,11 @@ static PyType_Spec nb_method_spec = {
     /*.name = */ "nanobind.nb_method",
     /*.basicsize = */ (int) sizeof(nb_func),
     /*.itemsize = */ (int) sizeof(func_data),
-    /*.flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    /*.flags = */ Py_TPFLAGS_DEFAULT |
+                  Py_TPFLAGS_HAVE_GC |
                   Py_TPFLAGS_METHOD_DESCRIPTOR |
-                  Py_TPFLAGS_HAVE_VECTORCALL,
+                  Py_TPFLAGS_HAVE_VECTORCALL |
+                  NB_TPFLAGS_IMMUTABLETYPE,
     /*.slots = */ nb_method_slots
 };
 
@@ -126,8 +139,10 @@ static PyType_Spec nb_bound_method_spec = {
     /* .name = */ "nanobind.nb_bound_method",
     /* .basicsize = */ (int) sizeof(nb_bound_method),
     /* .itemsize = */ 0,
-    /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-                   Py_TPFLAGS_HAVE_VECTORCALL,
+    /* .flags = */ Py_TPFLAGS_DEFAULT |
+                   Py_TPFLAGS_HAVE_GC |
+                   Py_TPFLAGS_HAVE_VECTORCALL |
+                   NB_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_bound_method_slots
 };
 
@@ -476,6 +491,18 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
 #endif
 
     p->translators = { default_exception_translator, nullptr, nullptr };
+
+#if defined(Py_LIMITED_API)
+    // Dynamically look up PyType_Freeze (Python 3.14+)
+#  if !defined(_WIN32)
+    p->PyType_Freeze = (int (*)(PyTypeObject *)) dlsym(
+        RTLD_DEFAULT, "PyType_Freeze");
+#  else
+    p->PyType_Freeze = (int (*)(PyTypeObject *)) GetProcAddress(
+        GetModuleHandleA("python3.dll"), "PyType_Freeze");
+#  endif
+#endif
+
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;
     p->is_alive_ptr = is_alive_ptr;

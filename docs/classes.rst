@@ -1181,3 +1181,29 @@ current compilation unit).
    nanobind will abort with a fatal error if it is ever put into a situation
    where an object with the :cpp:class:`nb::never_destruct <never_destruct>`
    annotation must be destructed.
+
+.. _freezing_types:
+
+Freezing types
+--------------
+
+After binding a class, you may call :cpp:func:`.freeze() <class_::freeze>` to
+prevent further modifications such as adding or removing methods, properties,
+or other attributes. Note that this function is a no-op on Python versions
+prior to 3.14.
+
+.. code-block:: cpp
+
+   nb::class_<Pet>(m, "Pet")
+       .def(nb::init<const std::string &>())
+       .def_rw("name", &Pet::name)
+       .freeze();
+
+There are two reasons to freeze a type:
+
+1. **Immutability**: the type should be immutable, rejecting subsequent
+   modification attempts.
+
+2. **Optimization**: on Python 3.14+, freezing enables the `adaptive
+   specializing interpreter <https://peps.python.org/pep-0659/>`_ to generate
+   more efficient type-specialized bytecode.

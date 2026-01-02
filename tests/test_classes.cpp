@@ -177,7 +177,8 @@ NB_MODULE(test_classes_ext, m) {
                     nb::rv_policy::reference)
         .def_static("create_copy", &Struct::create_copy,
                     nb::rv_policy::copy)
-        .def_static("create_take", &Struct::create_take);
+        .def_static("create_take", &Struct::create_take)
+        .freeze();
 
     if (!nb::type<Struct>().is(cls))
         nb::detail::raise("type lookup failed!");

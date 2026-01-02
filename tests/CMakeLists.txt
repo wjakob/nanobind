@@ -177,6 +177,7 @@ set(TEST_FILES
   test_stubs.py
   test_typing.py
   test_thread.py
+  test_specialization.py
 
   # Stub reference files
   test_classes_ext.pyi.ref

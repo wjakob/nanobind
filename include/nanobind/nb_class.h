@@ -765,6 +765,11 @@ public:
         op.execute_cast(*this, extra...);
         return *this;
     }
+
+    class_ & freeze() {
+        detail::type_freeze((PyTypeObject *) m_ptr);
+        return *this;
+    }
 };
 
 template <typename T> class enum_ : public object {

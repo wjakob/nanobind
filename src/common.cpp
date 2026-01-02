@@ -1284,5 +1284,24 @@ PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k) {
     return value;
 }
 
+// ========================================================================
+
+void type_freeze(PyTypeObject *t) {
+    (void) t;
+#if !defined(PYPY_VERSION)
+#  if PY_VERSION_HEX >= 0x030e0000 && !defined(Py_LIMITED_API)
+    // Direct call when PyType_Freeze is available at compile time
+    if (PyType_Freeze(t))
+        raise_python_error();
+#  elif defined(Py_LIMITED_API)
+    // Dynamic lookup for stable ABI (runtime may be newer than compile time)
+    if (internals->PyType_Freeze) {
+        if (internals->PyType_Freeze(t))
+            raise_python_error();
+    }
+#  endif
+#endif
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

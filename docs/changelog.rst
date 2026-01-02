@@ -18,9 +18,70 @@ below inherit that of the preceding release.
 Version TBD (not yet released)
 ------------------------------
 
+- This release improves performance by exploiting CPython's *adaptive
+  specializing interpreter* (added to Python 3.11 as part of `PEP 659
+  <https://peps.python.org/pep-0659/>`__). The adaptive specializing
+  interpreter monitors code execution to replace slow generic bytecode
+  instructions with faster type-specialized versions. The following table shows
+  speedups measured in a microbenchmark:
+
+  .. list-table::
+     :header-rows: 1
+
+     * - Operation
+       - Speedup
+       - Requirements
+     * - Method calls
+       - **1.22x** faster
+       - Python 3.11+
+     * - Static attribute lookups
+       - **1.63x** faster
+       - Python 3.14+
+     * - Instance construction
+       - **1.06x** faster
+       - Python 3.14+ and :cpp:func:`class_::freeze() <class_::freeze>`.
+
+  The method call and static attribute lookup improvements are automatic and
+  require no changes to binding code. They are enabled by making nanobind's
+  internal types (``nb_func``, ``nb_method``, ``nb_meta``, etc.) immutable.
+  These are internal classes that nanobind uses to construct its type hierarchy
+  and efficiently dispatch function calls to C++ code.
+
+  To benefit from faster instance construction, you must use Python 3.14+ and
+  furthermore call the new :cpp:func:`class_::freeze() <class_::freeze>` method
+  at the end of a class binding:
+
+  .. code-block:: cpp
+
+     nb::class_<MyClass>(m, "MyClass")
+         .def(nb::init<>())
+         .def("method", &MyClass::method)
+         .freeze();
+
+  This makes the type immutable, meaning that no methods or attributes can be
+  added, removed, or modified after the type is created, which can be a
+  desirable property in its own right.
+
+  On CPython 3.14+, ``.freeze()`` calls ``PyType_Freeze()`` to set the
+  ``Py_TPFLAGS_IMMUTABLETYPE`` flag. When targeting the stable ABI, nanobind
+  resolves ``PyType_Freeze()`` dynamically, which makes it possible to build a
+  CPython 3.12+ stable ABI wheel that still benefits from this optimization
+  when running on CPython 3.14+. On older Python versions, the call is a no-op.
+
+  At a low level, the immutability enables specializing:
+
+  * static attribute lookups from the ``LOAD_ATTR`` opcode to
+    ``LOAD_ATTR_CLASS``.
+
+  * method lookups from the ``LOAD_ATTR`` opcode to ``LOAD_ATTR_METHOD``.
+
+  * instance construction from the ``CALL_NON_PY_GENERAL`` opcode
+    to ``CALL_BUILTIN_CLASS`` that is dispatched via a vector call.
+
 - Added the :cpp:class:`nb::never_destruct <never_destruct>` class binding
   annotation to inform nanobind that it should not bind the destructor.
 
+- ABI version 18.
 
 Version 2.10.2 (Dec 10, 2025)
 ----------------------------

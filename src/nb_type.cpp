@@ -703,23 +703,32 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
        is why nanobind can only target the stable ABI on version 3.12+. */
 
     const char *name = strrchr(spec->name, '.');
-    if (name)
+    PyObject *modname_o = nullptr;
+    if (name) {
+        modname_o = PyUnicode_FromStringAndSize(spec->name, name - spec->name);
+        if (!modname_o)
+            return nullptr;
         name++;
-    else
+    } else {
         name = spec->name;
+    }
 
     PyObject *name_o = PyUnicode_InternFromString(name);
-    if (!name_o)
+    if (!name_o) {
+        Py_XDECREF(modname_o);
         return nullptr;
+    }
 
     const char *name_cstr = PyUnicode_AsUTF8AndSize(name_o, nullptr);
     if (!name_cstr) {
+        Py_XDECREF(modname_o);
         Py_DECREF(name_o);
         return nullptr;
     }
 
     PyHeapTypeObject *ht = (PyHeapTypeObject *) PyType_GenericAlloc(meta, 0);
     if (!ht) {
+        Py_XDECREF(modname_o);
         Py_DECREF(name_o);
         return nullptr;
     }
@@ -809,6 +818,14 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
         }
     }
 
+    if (modname_o && !fail) {
+        tp->tp_dict = PyDict_New();
+        if (!tp->tp_dict ||
+            PyDict_SetItemString(tp->tp_dict, "__module__", modname_o) < 0)
+            fail = true;
+    }
+    Py_XDECREF(modname_o);
+
     if (fail || PyType_Ready(tp) != 0) {
         Py_DECREF(tp);
         return nullptr;
@@ -819,6 +836,69 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 }
 
 extern int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value);
+
+// Implements the vector call protocol directly on type objects to construct
+// instances more efficiently.
+static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
+                                    size_t nargsf,
+                                    PyObject *kwargs_in) noexcept {
+    PyTypeObject *tp = (PyTypeObject *) self;
+    type_data *td = nb_type_data(tp);
+    nb_func *func = (nb_func *) td->init;
+    bool is_init = (td->flags & (uint32_t) type_flags::has_new) == 0;
+    Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+
+    if (NB_UNLIKELY(!func)) {
+        PyErr_Format(PyExc_TypeError, "%s: no constructor defined!", td->name);
+        return nullptr;
+    }
+
+    if (NB_LIKELY(is_init)) {
+        self = inst_new_int(tp, nullptr, nullptr);
+        if (!self)
+            return nullptr;
+    } else if (nargs == 0 && !kwargs_in &&
+               !(td->flags & (uint32_t) type_flags::has_nullary_new)) {
+        // When the bindings define a custom __new__ operator, nanobind always
+        // provides a no-argument dummy __new__ constructor to handle unpickling
+        // via __setstate__. This is an implementation detail that should not be
+        // exposed. Therefore, only allow argument-less calls if there is an
+        // actual __new__ overload with a compatible signature. This is
+        // detected in nb_func.cpp based on whether any __init__ overload can
+        // accept no arguments.
+
+        return func->vectorcall((PyObject *) func, nullptr, 0, nullptr);
+    }
+
+    // The parts of CPython that invoke nb_type_vectorcall() provide
+    // an scratch element at position -1. However, its presence is not
+    // always correctly declared.
+    // See https://github.com/python/cpython/issues/143361.
+
+    PyObject **args = (PyObject **) (args_in - 1);
+    PyObject *temp = args[0];
+    args[0] = self;
+
+    PyObject *rv =
+        func->vectorcall((PyObject *) func, args, nargs + 1, kwargs_in);
+
+    args[0] = temp;
+
+    if (NB_LIKELY(is_init)) {
+        if (!rv) {
+            Py_DECREF(self);
+            return nullptr;
+        }
+
+        // __init__ constructor: 'rv' is None
+        Py_DECREF(rv);
+        return self;
+    } else {
+        // __new__ constructor
+        return rv;
+    }
+}
+
 
 static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
     object key = steal(PyLong_FromSize_t(supplement));
@@ -835,27 +915,6 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
         if (tp)
             return tp;
 
-#if defined(Py_LIMITED_API)
-        PyMemberDef members[] = {
-            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
-            { nullptr, 0, 0, 0, nullptr }
-        };
-
-        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
-        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
-#endif
-
-        PyType_Slot slots[] = {
-            { Py_tp_base, &PyType_Type },
-            { Py_tp_dealloc, (void *) nb_type_dealloc },
-            { Py_tp_setattro, (void *) nb_type_setattro },
-            { Py_tp_init, (void *) nb_type_init },
-#if defined(Py_LIMITED_API)
-            { Py_tp_members, (void *) members },
-#endif
-            { 0, nullptr }
-        };
-
 #if PY_VERSION_HEX >= 0x030C0000
         int basicsize = -(int) (sizeof(type_data) + supplement),
             itemsize = 0;
@@ -867,24 +926,42 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
         char name[17 + 20 + 1];
         snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
 
+        PyType_Slot slots[] = {
+            { Py_tp_base, &PyType_Type },
+            { Py_tp_dealloc, (void *) nb_type_dealloc },
+            { Py_tp_setattro, (void *) nb_type_setattro },
+            { Py_tp_init, (void *) nb_type_init },
+            { 0, nullptr },
+            { 0, nullptr }
+        };
+
         PyType_Spec spec = {
             /* .name = */ name,
             /* .basicsize = */ basicsize,
             /* .itemsize = */ itemsize,
-            /* .flags = */ Py_TPFLAGS_DEFAULT,
+            /* .flags = */ Py_TPFLAGS_DEFAULT | NB_TPFLAGS_IMMUTABLETYPE,
             /* .slots = */ slots
         };
 
 #if defined(Py_LIMITED_API)
-        spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+        PyMemberDef members[] = {
+            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
+            { nullptr, 0, 0, 0, nullptr }
+        };
+
+        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
+        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
+
+        if (NB_DYNAMIC_VERSION < 0x030E0000) {
+            slots[4] = { Py_tp_members, (void *) members };
+            spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+        }
 #endif
 
         tp = (PyTypeObject *) nb_type_from_metaclass(
             internals_->nb_meta, internals_->nb_module, &spec);
 
         make_immortal((PyObject *) tp);
-
-        handle(tp).attr("__module__") = "nanobind";
 
         int rv = 1;
         if (tp)
@@ -942,91 +1019,6 @@ static PyMethodDef class_getitem_method[] = {
     { "__class_getitem__", Py_GenericAlias, METH_O | METH_CLASS, nullptr },
     { nullptr }
 };
-
-// Implements the vector call protocol directly on type objects to construct
-// instances more efficiently.
-static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
-                                    size_t nargsf,
-                                    PyObject *kwargs_in) noexcept {
-    PyTypeObject *tp = (PyTypeObject *) self;
-    type_data *td = nb_type_data(tp);
-    nb_func *func = (nb_func *) td->init;
-    bool is_init = (td->flags & (uint32_t) type_flags::has_new) == 0;
-    Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
-
-    if (NB_UNLIKELY(!func)) {
-        PyErr_Format(PyExc_TypeError, "%s: no constructor defined!", td->name);
-        return nullptr;
-    }
-
-    if (NB_LIKELY(is_init)) {
-        self = inst_new_int(tp, nullptr, nullptr);
-        if (!self)
-            return nullptr;
-    } else if (nargs == 0 && !kwargs_in &&
-               !(td->flags & (uint32_t) type_flags::has_nullary_new)) {
-        // When the bindings define a custom __new__ operator, nanobind always
-        // provides a no-argument dummy __new__ constructor to handle unpickling
-        // via __setstate__. This is an implementation detail that should not be
-        // exposed. Therefore, only allow argument-less calls if there is an
-        // actual __new__ overload with a compatible signature. This is
-        // detected in nb_func.cpp based on whether any __init__ overload can
-        // accept no arguments.
-
-        return func->vectorcall((PyObject *) func, nullptr, 0, nullptr);
-    }
-
-    const size_t buf_size = 5;
-    PyObject **args, *buf[buf_size], *temp = nullptr;
-    bool alloc = false;
-
-    if (NB_LIKELY(nargsf & PY_VECTORCALL_ARGUMENTS_OFFSET)) {
-        args = (PyObject **) (args_in - 1);
-        temp = args[0];
-    } else {
-        size_t size = nargs + 1;
-        if (kwargs_in)
-            size += NB_TUPLE_GET_SIZE(kwargs_in);
-
-        if (size < buf_size) {
-            args = buf;
-        } else {
-            args = (PyObject **) PyMem_Malloc(size * sizeof(PyObject *));
-            if (!args) {
-                if (is_init)
-                    Py_DECREF(self);
-                return PyErr_NoMemory();
-            }
-            alloc = true;
-        }
-
-        memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
-    }
-
-    args[0] = self;
-
-    PyObject *rv =
-        func->vectorcall((PyObject *) func, args, nargs + 1, kwargs_in);
-
-    args[0] = temp;
-
-    if (NB_UNLIKELY(alloc))
-        PyMem_Free(args);
-
-    if (NB_LIKELY(is_init)) {
-        if (!rv) {
-            Py_DECREF(self);
-            return nullptr;
-        }
-
-        // __init__ constructor: 'rv' is None
-        Py_DECREF(rv);
-        return self;
-    } else {
-        // __new__ constructor
-        return rv;
-    }
-}
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
@@ -1172,7 +1164,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     char *name_copy = strdup_check(name.c_str());
 
-    constexpr size_t nb_type_max_slots = 11,
+    constexpr size_t nb_type_max_slots = 12,
                      nb_extra_slots = 80,
                      nb_total_slots = nb_type_max_slots +
                                       nb_extra_slots + 1;
@@ -1283,6 +1275,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (is_generic)
         *s++ = { Py_tp_methods, (void*) class_getitem_method };
 
+    if (NB_DYNAMIC_VERSION >= 0x030E0000 && type_vectorcall)
+        *s++ = { Py_tp_vectorcall, (void *) type_vectorcall };
+
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
 
@@ -1318,11 +1313,17 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         to->keep_shared_from_this_alive = tb->keep_shared_from_this_alive;
     }
 
-    #if defined(Py_LIMITED_API)
-        to->vectorcall = type_vectorcall;
-    #else
-        ((PyTypeObject *) result)->tp_vectorcall = type_vectorcall;
-    #endif
+    if (NB_DYNAMIC_VERSION < 0x030E0000) {
+        // On Python 3.14+, use Py_tp_vectorcall to set the type vectorcall
+        // slot. Otherwise, assign tp_vectorcall or use a workaround (via
+        // tp_vectorcall_offset) for stable ABI builds.
+
+        #if defined(Py_LIMITED_API)
+            to->vectorcall = type_vectorcall;
+        #else
+            ((PyTypeObject *) result)->tp_vectorcall = type_vectorcall;
+        #endif
+    }
 
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;

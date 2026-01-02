@@ -2632,6 +2632,24 @@ Class binding
 
       Like the above ``.def()`` variant, but furthermore cast the result of the operation back to `T`.
 
+   .. cpp:function:: class_ &freeze()
+
+      Freeze the type to prevent further modifications such as adding or
+      removing methods, properties, or other attributes. This function is a
+      no-op on Python versions prior to 3.14.
+
+      There are two reasons to freeze a type:
+
+      1. **Immutability**: the type should be immutable, rejecting subsequent
+         modification attempts.
+
+      2. **Optimization**: on Python 3.14+, freezing enables the `adaptive
+         specializing interpreter <https://peps.python.org/pep-0659/>`_ to
+         generate more efficient type-specialized bytecode.
+
+      See the :ref:`section on freezing types <freezing_types>` for further
+      detail.
+
 
 .. cpp:class:: template <typename T> enum_ : public class_<T>
 

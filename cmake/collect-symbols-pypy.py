@@ -5,7 +5,8 @@ import subprocess
 funcs: "set[str]" = set()
 
 files = [
-    ('https://downloads.python.org/pypy/pypy3.9-v7.3.11-macos_arm64.tar.bz2', 'pypy3.9-v7.3.11-macos_arm64/bin/libpypy3.9-c.dylib')
+    ('https://downloads.python.org/pypy/pypy3.9-v7.3.11-macos_arm64.tar.bz2', 'pypy3.9-v7.3.11-macos_arm64/bin/libpypy3.9-c.dylib'),
+    ('https://downloads.python.org/pypy/pypy3.11-v7.3.20-macos_arm64.tar.bz2', 'pypy3.11-v7.3.20-macos_arm64/bin/libpypy3.11-c.dylib'),
 ]
 
 for f in files:
@@ -25,4 +26,4 @@ for f in files:
 
 with open("darwin-ld-pypy.sym", "w") as f:
     for func in sorted(list(funcs)):
-        f.write(f'-U _{func}\n')
+        f.write(f'-U {func}\n')

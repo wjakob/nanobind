@@ -418,6 +418,9 @@ struct nb_internals {
     descrgetfunc PyProperty_Type_tp_descr_get;
     descrsetfunc PyProperty_Type_tp_descr_set;
     size_t type_data_offset;
+
+    // PyType_Freeze (Python 3.14+), looked up dynamically
+    int (*PyType_Freeze)(PyTypeObject *) = nullptr;
 #endif
 
 #if defined(NB_FREE_THREADED)

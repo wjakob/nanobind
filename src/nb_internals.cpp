@@ -13,6 +13,14 @@
 #include "nb_abi.h"
 #include <thread>
 
+#if defined(Py_LIMITED_API)
+#  if !defined(_WIN32)
+#    include <dlfcn.h>
+#  else
+#    include <windows.h>
+#  endif
+#endif
+
 #if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
@@ -483,6 +491,17 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
 #endif
 
     p->translators = { default_exception_translator, nullptr, nullptr };
+
+#if defined(Py_LIMITED_API)
+    // Dynamically look up PyType_Freeze (Python 3.14+)
+#  if !defined(_WIN32)
+    p->PyType_Freeze = (int (*)(PyTypeObject *)) dlsym(
+        RTLD_DEFAULT, "PyType_Freeze");
+#  else
+    p->PyType_Freeze = (int (*)(PyTypeObject *)) GetProcAddress(
+        GetModuleHandleA("python3.dll"), "PyType_Freeze");
+#  endif
+#endif
 
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;

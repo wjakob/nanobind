@@ -32,6 +32,31 @@ def count_op(ops, expected):
 
 @pytest.mark.skipif(
     sys.version_info < (3, 14) or skip_tests,
+    reason="Constructor specialization requires CPython 3.14+")
+def test_constructor_specialization():
+    s = t.Struct
+    def fn():
+        return s()
+    ops = disasm(fn)
+    print(ops)
+    op_base = count_op(ops, "CALL")
+    op_opt = (
+        count_op(ops, "CALL_ADAPTIVE") +
+        count_op(ops, "CALL_BUILTIN_CLASS"))
+    assert op_base == 1 and op_opt == 0
+
+    warmup(fn)
+    ops = disasm(fn)
+    print(ops)
+
+    op_base = count_op(ops, "CALL")
+    op_opt = (
+        count_op(ops, "CALL_ADAPTIVE") +
+        count_op(ops, "CALL_BUILTIN_CLASS"))
+    assert op_base == 0 and op_opt == 1
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 14) or skip_tests,
     reason="Static attribute specialization requires CPython 3.14+")
 def test_static_attribute_specialization():
     s = t.Struct
@@ -101,3 +126,8 @@ def test_immutability():
     assert metaclass.__name__.startswith("nb_type")
     with pytest.raises(TypeError, match="immutable"):
         metaclass.test_attr = 123
+
+    # Test class immutability (only on Python 3.14+ where PyType_Freeze is available)
+    if sys.version_info >= (3, 14):
+        with pytest.raises(TypeError, match="immutable"):
+            t.Struct.test_attr = 123

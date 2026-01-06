@@ -574,6 +574,9 @@ NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
 
 NB_CORE const char *abi_tag();
 
+/// Freeze a type object to make it immutable (calls PyType_Freeze on 3.14+)
+NB_CORE void type_freeze(PyTypeObject *t);
+
 NAMESPACE_END(detail)
 
 using detail::raise;

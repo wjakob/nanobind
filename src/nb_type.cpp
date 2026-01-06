@@ -703,23 +703,32 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
        is why nanobind can only target the stable ABI on version 3.12+. */
 
     const char *name = strrchr(spec->name, '.');
-    if (name)
+    PyObject *modname_o = nullptr;
+    if (name) {
+        modname_o = PyUnicode_FromStringAndSize(spec->name, name - spec->name);
+        if (!modname_o)
+            return nullptr;
         name++;
-    else
+    } else {
         name = spec->name;
+    }
 
     PyObject *name_o = PyUnicode_InternFromString(name);
-    if (!name_o)
+    if (!name_o) {
+        Py_XDECREF(modname_o);
         return nullptr;
+    }
 
     const char *name_cstr = PyUnicode_AsUTF8AndSize(name_o, nullptr);
     if (!name_cstr) {
+        Py_XDECREF(modname_o);
         Py_DECREF(name_o);
         return nullptr;
     }
 
     PyHeapTypeObject *ht = (PyHeapTypeObject *) PyType_GenericAlloc(meta, 0);
     if (!ht) {
+        Py_XDECREF(modname_o);
         Py_DECREF(name_o);
         return nullptr;
     }
@@ -809,6 +818,14 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
         }
     }
 
+    if (modname_o && !fail) {
+        tp->tp_dict = PyDict_New();
+        if (!tp->tp_dict ||
+            PyDict_SetItemString(tp->tp_dict, "__module__", modname_o) < 0)
+            fail = true;
+    }
+    Py_XDECREF(modname_o);
+
     if (fail || PyType_Ready(tp) != 0) {
         Py_DECREF(tp);
         return nullptr;
@@ -819,129 +836,6 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 }
 
 extern int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value);
-
-static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
-    object key = steal(PyLong_FromSize_t(supplement));
-    nb_internals *internals_ = internals;
-
-    PyTypeObject *tp =
-        (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
-
-    if (NB_UNLIKELY(!tp)) {
-        // Retry in critical section to avoid races that create the same nb_type
-        lock_internals guard(internals_);
-
-        tp = (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
-        if (tp)
-            return tp;
-
-#if defined(Py_LIMITED_API)
-        PyMemberDef members[] = {
-            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
-            { nullptr, 0, 0, 0, nullptr }
-        };
-
-        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
-        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
-#endif
-
-        PyType_Slot slots[] = {
-            { Py_tp_base, &PyType_Type },
-            { Py_tp_dealloc, (void *) nb_type_dealloc },
-            { Py_tp_setattro, (void *) nb_type_setattro },
-            { Py_tp_init, (void *) nb_type_init },
-#if defined(Py_LIMITED_API)
-            { Py_tp_members, (void *) members },
-#endif
-            { 0, nullptr }
-        };
-
-#if PY_VERSION_HEX >= 0x030C0000
-        int basicsize = -(int) (sizeof(type_data) + supplement),
-            itemsize = 0;
-#else
-        int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement)),
-            itemsize = (int) PyType_Type.tp_itemsize;
-#endif
-
-        char name[17 + 20 + 1];
-        snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
-
-        PyType_Spec spec = {
-            /* .name = */ name,
-            /* .basicsize = */ basicsize,
-            /* .itemsize = */ itemsize,
-            /* .flags = */ Py_TPFLAGS_DEFAULT,
-            /* .slots = */ slots
-        };
-
-#if defined(Py_LIMITED_API)
-        spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
-#endif
-
-        tp = (PyTypeObject *) nb_type_from_metaclass(
-            internals_->nb_meta, internals_->nb_module, &spec);
-
-        make_immortal((PyObject *) tp);
-
-        handle(tp).attr("__module__") = "nanobind";
-
-        int rv = 1;
-        if (tp)
-            rv = PyDict_SetItem(internals_->nb_type_dict, key.ptr(), (PyObject *) tp);
-        check(rv == 0, "nb_type type creation failed!");
-    }
-
-    return tp;
-}
-
-// This helper function extracts the function/class name from a custom signature attribute
-NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *s) {
-    (void) cmd;
-
-    // Move to the last line
-    const char *p = strrchr(s, '\n');
-    p = p ? (p + 1) : s;
-
-    // Check that the last line starts with the right prefix
-    size_t prefix_len = strlen(prefix);
-    check(strncmp(p, prefix, prefix_len) == 0,
-          "%s(): last line of custom signature \"%s\" must start with \"%s\"!",
-          cmd, s, prefix);
-    p += prefix_len;
-
-    // Find the opening parenthesis or bracket
-    const char *p2 = strchr(p, '(');
-    const char *p3 = strchr(p, '[');
-    if (p2 == nullptr)
-        p2 = p3;
-    else if (p3 != nullptr)
-        p2 = p2 < p3 ? p2 : p3;
-    check(p2 != nullptr,
-          "%s(): last line of custom signature \"%s\" must contain an opening "
-          "parenthesis (\"(\") or bracket (\"[\")!", cmd, s);
-
-    // A few sanity checks
-    size_t len = strlen(p);
-    char last = p[len ? (len - 1) : 0];
-
-    check(last != ':' && last != ' ',
-          "%s(): custom signature \"%s\" should not end with \":\" or \" \"!", cmd, s);
-    check((p2 == p || (p[0] != ' ' && p2[-1] != ' ')),
-          "%s(): custom signature \"%s\" contains leading/trailing space around name!", cmd, s);
-
-    size_t size = p2 - p;
-    char *result = (char *) malloc_check(size + 1);
-    memcpy(result, p, size);
-    result[size] = '\0';
-
-    return result;
-}
-
-static PyMethodDef class_getitem_method[] = {
-    { "__class_getitem__", Py_GenericAlias, METH_O | METH_CLASS, nullptr },
-    { nullptr }
-};
 
 // Implements the vector call protocol directly on type objects to construct
 // instances more efficiently.
@@ -1027,6 +921,127 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
         return rv;
     }
 }
+
+
+static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
+    object key = steal(PyLong_FromSize_t(supplement));
+    nb_internals *internals_ = internals;
+
+    PyTypeObject *tp =
+        (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
+
+    if (NB_UNLIKELY(!tp)) {
+        // Retry in critical section to avoid races that create the same nb_type
+        lock_internals guard(internals_);
+
+        tp = (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
+        if (tp)
+            return tp;
+
+#if PY_VERSION_HEX >= 0x030C0000
+        int basicsize = -(int) (sizeof(type_data) + supplement),
+            itemsize = 0;
+#else
+        int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement)),
+            itemsize = (int) PyType_Type.tp_itemsize;
+#endif
+
+        char name[17 + 20 + 1];
+        snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
+
+        PyType_Slot slots[] = {
+            { Py_tp_base, &PyType_Type },
+            { Py_tp_dealloc, (void *) nb_type_dealloc },
+            { Py_tp_setattro, (void *) nb_type_setattro },
+            { Py_tp_init, (void *) nb_type_init },
+            { 0, nullptr },
+            { 0, nullptr }
+        };
+
+        PyType_Spec spec = {
+            /* .name = */ name,
+            /* .basicsize = */ basicsize,
+            /* .itemsize = */ itemsize,
+            /* .flags = */ Py_TPFLAGS_DEFAULT | NB_TPFLAGS_IMMUTABLETYPE,
+            /* .slots = */ slots
+        };
+
+#if defined(Py_LIMITED_API)
+        PyMemberDef members[] = {
+            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
+            { nullptr, 0, 0, 0, nullptr }
+        };
+
+        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
+        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
+
+        if (NB_DYNAMIC_VERSION < 0x030E0000) {
+            slots[4] = { Py_tp_members, (void *) members };
+            spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+        }
+#endif
+
+        tp = (PyTypeObject *) nb_type_from_metaclass(
+            internals_->nb_meta, internals_->nb_module, &spec);
+
+        make_immortal((PyObject *) tp);
+
+        int rv = 1;
+        if (tp)
+            rv = PyDict_SetItem(internals_->nb_type_dict, key.ptr(), (PyObject *) tp);
+        check(rv == 0, "nb_type type creation failed!");
+    }
+
+    return tp;
+}
+
+// This helper function extracts the function/class name from a custom signature attribute
+NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *s) {
+    (void) cmd;
+
+    // Move to the last line
+    const char *p = strrchr(s, '\n');
+    p = p ? (p + 1) : s;
+
+    // Check that the last line starts with the right prefix
+    size_t prefix_len = strlen(prefix);
+    check(strncmp(p, prefix, prefix_len) == 0,
+          "%s(): last line of custom signature \"%s\" must start with \"%s\"!",
+          cmd, s, prefix);
+    p += prefix_len;
+
+    // Find the opening parenthesis or bracket
+    const char *p2 = strchr(p, '(');
+    const char *p3 = strchr(p, '[');
+    if (p2 == nullptr)
+        p2 = p3;
+    else if (p3 != nullptr)
+        p2 = p2 < p3 ? p2 : p3;
+    check(p2 != nullptr,
+          "%s(): last line of custom signature \"%s\" must contain an opening "
+          "parenthesis (\"(\") or bracket (\"[\")!", cmd, s);
+
+    // A few sanity checks
+    size_t len = strlen(p);
+    char last = p[len ? (len - 1) : 0];
+
+    check(last != ':' && last != ' ',
+          "%s(): custom signature \"%s\" should not end with \":\" or \" \"!", cmd, s);
+    check((p2 == p || (p[0] != ' ' && p2[-1] != ' ')),
+          "%s(): custom signature \"%s\" contains leading/trailing space around name!", cmd, s);
+
+    size_t size = p2 - p;
+    char *result = (char *) malloc_check(size + 1);
+    memcpy(result, p, size);
+    result[size] = '\0';
+
+    return result;
+}
+
+static PyMethodDef class_getitem_method[] = {
+    { "__class_getitem__", Py_GenericAlias, METH_O | METH_CLASS, nullptr },
+    { nullptr }
+};
 
 /// Called when a C++ type is bound via nb::class_<>
 PyObject *nb_type_new(const type_init_data *t) noexcept {
@@ -1172,7 +1187,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     char *name_copy = strdup_check(name.c_str());
 
-    constexpr size_t nb_type_max_slots = 11,
+    constexpr size_t nb_type_max_slots = 12,
                      nb_extra_slots = 80,
                      nb_total_slots = nb_type_max_slots +
                                       nb_extra_slots + 1;
@@ -1283,6 +1298,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (is_generic)
         *s++ = { Py_tp_methods, (void*) class_getitem_method };
 
+    if (NB_DYNAMIC_VERSION >= 0x030E0000 && type_vectorcall)
+        *s++ = { Py_tp_vectorcall, (void *) type_vectorcall };
+
     if (has_traverse)
         spec.flags |= Py_TPFLAGS_HAVE_GC;
 
@@ -1318,11 +1336,17 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         to->keep_shared_from_this_alive = tb->keep_shared_from_this_alive;
     }
 
-    #if defined(Py_LIMITED_API)
-        to->vectorcall = type_vectorcall;
-    #else
-        ((PyTypeObject *) result)->tp_vectorcall = type_vectorcall;
-    #endif
+    if (NB_DYNAMIC_VERSION < 0x030E0000) {
+        // On Python 3.14+, use Py_tp_vectorcall to set the type vectorcall
+        // slot. Otherwise, assign tp_vectorcall or use a workaround (via
+        // tp_vectorcall_offset) for stable ABI builds.
+
+        #if defined(Py_LIMITED_API)
+            to->vectorcall = type_vectorcall;
+        #else
+            ((PyTypeObject *) result)->tp_vectorcall = type_vectorcall;
+        #endif
+    }
 
     to->name = name_copy;
     to->type_py = (PyTypeObject *) result;

@@ -704,6 +704,7 @@
 -U _PyTuple_Size
 -U _PyTuple_Type
 -U _PyType_ClearCache
+-U _PyType_Freeze
 -U _PyType_FromMetaclass
 -U _PyType_FromModuleAndSpec
 -U _PyType_FromSpec

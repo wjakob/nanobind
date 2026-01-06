@@ -18,9 +18,33 @@ below inherit that of the preceding release.
 Version TBD (not yet released)
 ------------------------------
 
+- This release improves binding performance using CPython's *adaptive
+  specializing interpreter* (`PEP 659 <https://peps.python.org/pep-0659/>`__).
+  The speedups are automatic and require no changes to binding code:
+
+  .. list-table::
+     :header-rows: 1
+
+     * - Operation
+       - Speedup
+       - Requirements
+     * - Method calls
+       - **1.22x** faster
+       - Python 3.11+
+     * - Static attribute lookups
+       - **1.63x** faster
+       - Python 3.14+
+
+  This was achieved by making a number of nanobind-internal classes
+  (``nb_func``, ``nb_method``, ``nb_meta``, etc.) immutable, which allows
+  CPython to specialize generic ``LOAD_ATTR`` opcodes to faster type-specific
+  versions (``LOAD_ATTR_METHOD`` for method calls, ``LOAD_ATTR_CLASS`` for
+  static attribute lookups).
+
 - Added the :cpp:class:`nb::never_destruct <never_destruct>` class binding
   annotation to inform nanobind that it should not bind the destructor.
 
+- ABI version 18.
 
 Version 2.10.2 (Dec 10, 2025)
 ----------------------------

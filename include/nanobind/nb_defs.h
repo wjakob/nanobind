@@ -140,6 +140,12 @@
 #  define NB_TYPE_GET_SLOT_IMPL 1
 #endif
 
+#if defined(Py_LIMITED_API)
+#  define NB_DYNAMIC_VERSION Py_Version
+#else
+#  define NB_DYNAMIC_VERSION PY_VERSION_HEX
+#endif
+
 #define NB_MODULE_SLOTS_0 { 0, nullptr }
 
 #if PY_VERSION_HEX < 0x030C0000

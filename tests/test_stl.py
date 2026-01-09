@@ -386,6 +386,11 @@ def test38_std_optional_none():
     assert t.optional_cstr(None) == "none"
     assert t.optional_cstr("hi") == "hi"
 
+    # `.none()` to optional argument specifier to avoid costs.
+    # Ref: https://github.com/wjakob/nanobind/pull/950
+    with pytest.raises(TypeError):
+        assert t.optional_non_assignable(None).value == None
+
 
 def test39_std_optional_ret_opt_movable(clean):
     assert t.optional_ret_opt_movable().value == 5

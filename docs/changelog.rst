@@ -44,6 +44,16 @@ Version TBD (not yet released)
 - Added the :cpp:class:`nb::never_destruct <never_destruct>` class binding
   annotation to inform nanobind that it should not bind the destructor.
 
+- Improved the behavior of ``datetime``/``std::chrono`` type caster when
+  converting ``datetime`` with timezone information ("aware datetime") to C++:
+  the tz annotation is no longer silently dropped but first translated into
+  the system time zone and then to UTC.
+
+  Note that this second translation between system time zone and UTC also applies
+  to "naive datetime" conversions due to their use of ``mktime()`` and
+  ``localtime_r()`` functions.
+  (PR `#1253 <https://github.com/wjakob/nanobind/pull/1253>`__).
+
 - ABI version 18.
 
 Version 2.10.2 (Dec 10, 2025)

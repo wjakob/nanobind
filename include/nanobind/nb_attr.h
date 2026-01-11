@@ -7,8 +7,6 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
-#include <array>
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 struct scope {
@@ -265,7 +263,7 @@ struct func_data_prelim_base {
 };
 
 template<size_t Size> struct func_data_prelim : func_data_prelim_base {
-    std::array<arg_data, Size> args;
+    arg_data args[Size];
 };
 
 template<> struct func_data_prelim<0> : func_data_prelim_base {};

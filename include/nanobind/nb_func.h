@@ -190,7 +190,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_prelim<has_arg_annotations ? std::max(nargs, nargs_provided) : 1> f{};
+    func_data_prelim<has_complex_args ? nargs : nargs_provided> f{};
     if constexpr (has_complex_args) {
         arg_data def_args[] = {default_arg_data<Args>()...};
         for (size_t i = 0; i < nargs; ++i) {

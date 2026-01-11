@@ -405,6 +405,33 @@ return, which was done in the earlier ``Matrix4f`` :ref:`example
    released and reused at some point, while stale arrays still point to the
    associated memory region (i.e., a classic "use-after-free" bug).
 
+Arrays backed by external memory (capsule-backed arrays)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When NumPy arrays are created from external memory (e.g., via ``numpy.frombuffer()``
+or returned from nanobind bindings), they may have ``OWNDATA=False`` and a
+``base`` attribute pointing to a ``PyCapsule``. These arrays are views into
+memory managed by the capsule, not copies.
+
+By default, nanobind accepts such capsule-backed arrays as valid inputs to
+:cpp:class:`nb::ndarray\<...\> <ndarray>` bindings. If the initial DLPack import
+fails for a capsule-backed array, nanobind will detect the capsule base and
+re-attempt the import with relaxed constraints (specifically, dtype constraints are
+relaxed), allowing zero-copy passing of arrays between bindings.
+
+**When the feature activates**: The fallback only activates if:
+1. The initial ``ndarray_import()`` fails
+2. The object passes ``ndarray_check()`` (is a valid array-like object)
+3. The array has a ``base`` attribute that is a ``PyCapsule``
+4. The capsule is well-formed (has a valid pointer)
+
+**Limitations**: The fallback only relaxes dtype constraints. Other constraints
+(shape, device, order) are not relaxed. If an array fails due to these constraints,
+it will still be rejected.
+
+The fallback has zero overhead for normal arrays (only activates when the initial
+import fails) and maintains backward compatibility with existing code.
+
 In more advanced situations, it may be helpful to have a capsule that manages
 the lifetime of data structures containing *multiple* storage regions. The same
 capsule can be referenced from different nd-arrays and will call the deleter

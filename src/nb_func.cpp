@@ -216,7 +216,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     arg_data *args_in = nullptr;
     if (has_args)
-        args_in = std::launder((arg_data*) ((func_data_prelim<1>*) f)->args);
+        args_in = std::launder((arg_data*) ((func_data_prelim<1>*) f)->args.data());
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;

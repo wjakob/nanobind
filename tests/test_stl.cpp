@@ -19,6 +19,9 @@ NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
 namespace nb = nanobind;
 
+static_assert(nb::detail::is_none_acceptable_v<std::optional<bool>>);
+static_assert(nb::detail::is_complex_argument_type<std::optional<bool>>());
+
 static int default_constructed = 0, value_constructed = 0, copy_constructed = 0,
            move_constructed = 0, copy_assigned = 0, move_assigned = 0,
            destructed = 0;

@@ -195,6 +195,17 @@ struct is_complex<T, enable_if_t<std::is_same_v<
 template<typename T>
 inline constexpr bool is_complex_v = is_complex<T>::value;
 
+template <typename T>
+struct is_none_acceptable : std::false_type {};
+
+template <typename T>
+constexpr bool is_none_acceptable_v = is_none_acceptable<intrinsic_t<T>>::value;
+
+template <typename T>
+constexpr bool is_complex_argument_type() {
+    return is_none_acceptable_v<intrinsic_t<T>>;
+}
+
 NAMESPACE_END(detail)
 
 template <typename... Args>

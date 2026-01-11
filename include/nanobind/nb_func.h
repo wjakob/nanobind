@@ -95,6 +95,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         kwargs_pos_n = index_n_v<std::is_same_v<intrinsic_t<Args>, kwargs>...>,
         nargs = sizeof...(Args);
 
+    constexpr bool has_complex_args = (detail::is_complex_argument_type<Args>() || ... || false);
+
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
         (std::is_base_of_v<arg, Extra> + ... + 0);
@@ -102,7 +104,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
-    constexpr bool has_arg_annotations = nargs_provided > 0 && !is_getter_det;
+    constexpr bool has_arg_annotations = has_complex_args || (nargs_provided > 0 && !is_getter_det);
 
     // Determine the number of potentially-locked function arguments
     constexpr bool lock_self_det =
@@ -128,7 +130,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
         "Repeated use of nb::kwargs or nb::args in the function signature!");
-    static_assert(!has_arg_annotations || nargs_provided + is_method_det == nargs,
+    static_assert(!has_arg_annotations || has_complex_args || nargs_provided + is_method_det == nargs,
         "The number of nb::arg annotations must match the argument count!");
     static_assert(kwargs_pos_1 == nargs || kwargs_pos_1 + 1 == nargs,
         "nb::kwargs must be the last element of the function signature!");
@@ -188,7 +190,10 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_prelim<nargs_provided> f;
+    func_data_prelim<has_arg_annotations ? std::max(nargs, nargs_provided) : 1> f{};
+    if constexpr (has_complex_args) {
+        f.args = {default_arg_data<Args>()...};
+    }
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |

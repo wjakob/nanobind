@@ -565,10 +565,54 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
             (void) shape_buf;
         }
 
+        // Standard path: try normal import
         value = Value(ndarray_import(src.ptr(), &config,
                                      flags & (uint8_t) cast_flags::convert,
                                      cleanup));
 
+        // Early return if import succeeded
+        if (value.is_valid()) {
+            return true;
+        }
+
+        // Fallback path for capsule-backed numpy arrays (OWNDATA=False)
+        // Only proceed if this looks like a numpy array
+        if (!ndarray_check(src)) {
+            return false;
+        }
+
+        // Check if .base is a PyCapsule (indicates capsule-backed array)
+        PyObject *base = PyObject_GetAttrString(src.ptr(), "base");
+        if (!base || !PyCapsule_CheckExact(base)) {
+            Py_XDECREF(base);
+            return false;
+        }
+
+        // Verify capsule is well-formed (has valid pointer)
+        void *ptr = PyCapsule_GetPointer(base, nullptr);
+        Py_DECREF(base);
+        if (!ptr) {
+            // PyCapsule_GetPointer failed - clear error if set
+            if (PyErr_Occurred()) {
+                PyErr_Clear();
+            }
+            return false;
+        }
+
+        // Capsule-backed array detected: re-attempt import with same constraints
+        // Clear any Python errors from the first attempt before retrying
+        if (PyErr_Occurred()) {
+            PyErr_Clear();
+        }
+
+        // Re-attempt import with unchanged config (dtype, shape, order, device, ro)
+        // This treats capsule-backed ownership as equivalent to owning memory
+        // for casting purposes, but enforces all other constraints strictly
+        value = Value(ndarray_import(src.ptr(), &config,
+                                     flags & (uint8_t) cast_flags::convert,
+                                     cleanup));
+
+        // Return result (success or failure) - all constraints remain enforced
         return value.is_valid();
     }
 

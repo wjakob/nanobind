@@ -110,6 +110,8 @@ struct type_data {
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
+    void (*delete_)(void*);
+    void (*delete_aligned)(void*, std::align_val_t);
     union {
         // Implicit conversions for C++ type bindings
         struct {
@@ -245,6 +247,19 @@ template <typename T> void wrap_destruct(void *value) noexcept {
     ((T *) value)->~T();
 }
 
+template<typename T>
+void wrap_delete(void* value) noexcept
+{
+    T::operator delete ((T*) value);
+}
+
+template<typename T>
+void wrap_delete_aligned(void* value, std::align_val_t alignment) noexcept
+{
+    T::operator delete((T*)value, alignment);
+}
+
+
 template <typename, template <typename, typename> typename, typename...>
 struct extract;
 
@@ -277,6 +292,23 @@ struct is_copy_constructible : std::is_copy_constructible<T> { };
 
 template <typename T>
 constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
+
+// SFINAE implementation to check for explicit type 'delete' operator
+template<class, class = void>
+struct has_class_delete : std::false_type { };
+template<class T>
+struct has_class_delete<T, std::void_t<decltype(T::operator delete(std::declval<void*>()))>> : std::true_type { };
+template<class T>
+inline constexpr bool has_class_delete_v = has_class_delete<T>::value;
+
+template<class, class = void>
+struct has_class_delete_aligned : std::false_type { };
+template<class T>
+struct has_class_delete_aligned<T, std::void_t<decltype(T::operator delete(std::declval<void*>()), std::align_val_t)>> : std::true_type {
+};
+template<class T>
+inline constexpr bool has_class_delete_aligned_v = has_class_delete_aligned<T>::value;
+
 
 NAMESPACE_END(detail)
 
@@ -592,6 +624,17 @@ public:
                 d.flags |= (uint32_t) detail::type_flags::has_destruct;
                 d.destruct = detail::wrap_destruct<T>;
             }
+        }
+
+        if constexpr (detail::has_class_delete_v<T>) {
+            d.delete_ = detail::wrap_delete<T>;
+        } else {
+            d.delete_ = nullptr;
+        }
+        if constexpr (detail::has_class_delete_aligned_v<T>) {
+            d.delete_aligned = detail::wrap_delete_aligned<T>;
+        } else {
+            d.delete_aligned = nullptr;
         }
 
         if constexpr (detail::has_shared_from_this_v<T>) {

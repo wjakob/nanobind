@@ -256,10 +256,17 @@ static void inst_dealloc(PyObject *self) {
     }
 
     if (inst->cpp_delete) {
-        if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
-            operator delete(p);
-        else
-            operator delete(p, std::align_val_t(t->align));
+        if (NB_LIKELY(t->align <= (uint32_t)__STDCPP_DEFAULT_NEW_ALIGNMENT__)) {
+            if (t->delete_)
+                t->delete_(p);
+            else
+                operator delete(p);
+        } else {
+            if (t->delete_aligned)
+                t->delete_aligned(p, std::align_val_t(t->align));
+            else
+                operator delete(p, std::align_val_t(t->align));
+        }
     }
 
     nb_weakref_seq *wr_seq = nullptr;

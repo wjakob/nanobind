@@ -196,15 +196,10 @@ template<typename T>
 inline constexpr bool is_complex_v = is_complex<T>::value;
 
 template <typename T>
-struct is_none_acceptable : std::false_type {};
+struct has_arg_defaults : std::false_type {};
 
 template <typename T>
-constexpr bool is_none_acceptable_v = is_none_acceptable<intrinsic_t<T>>::value;
-
-template <typename T>
-constexpr bool is_complex_argument_type() {
-    return is_none_acceptable_v<intrinsic_t<T>>;
-}
+constexpr bool has_arg_defaults_v = has_arg_defaults<intrinsic_t<T>>::value;
 
 NAMESPACE_END(detail)
 

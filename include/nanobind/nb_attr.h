@@ -268,15 +268,6 @@ template<size_t Size> struct func_data_prelim : func_data_prelim_base {
 
 template<> struct func_data_prelim<0> : func_data_prelim_base {};
 
-template<typename T>
-constexpr arg_data default_arg_data() {
-    return {
-        nullptr, nullptr, nullptr, nullptr,
-        (detail::is_none_acceptable_v<T> ? cast_flags::accepts_none : 0) |
-        0
-    };
-}
-
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const name &name, size_t &) {
@@ -337,7 +328,7 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
         flag |= (uint8_t) cast_flags::convert;
 
     arg_data &arg = f.args[index];
-    arg.flag = flag;
+    arg.flag |= flag;
     arg.name = a.name_;
     arg.signature = a.signature_;
     arg.value = nullptr;

@@ -95,7 +95,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         kwargs_pos_n = index_n_v<std::is_same_v<intrinsic_t<Args>, kwargs>...>,
         nargs = sizeof...(Args);
 
-    constexpr bool has_complex_args = (detail::is_complex_argument_type<Args>() || ... || false);
+    constexpr bool has_arg_defaults = (detail::has_arg_defaults_v<Args> || ... || false);
 
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
@@ -104,7 +104,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
-    constexpr bool has_arg_annotations = has_complex_args || (nargs_provided > 0 && !is_getter_det);
+    constexpr bool has_arg_annotations = has_arg_defaults || (nargs_provided > 0 && !is_getter_det);
 
     // Determine the number of potentially-locked function arguments
     constexpr bool lock_self_det =
@@ -130,7 +130,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
         "Repeated use of nb::kwargs or nb::args in the function signature!");
-    static_assert(!has_arg_annotations || has_complex_args || nargs_provided + is_method_det == nargs,
+    static_assert(!has_arg_annotations || has_arg_defaults || nargs_provided + is_method_det == nargs,
         "The number of nb::arg annotations must match the argument count!");
     static_assert(kwargs_pos_1 == nargs || kwargs_pos_1 + 1 == nargs,
         "nb::kwargs must be the last element of the function signature!");
@@ -190,12 +190,21 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_prelim<has_complex_args ? nargs : nargs_provided> f{};
-    if constexpr (has_complex_args) {
-        arg_data def_args[] = {default_arg_data<Args>()...};
+    func_data_prelim<has_arg_defaults ? nargs : nargs_provided> f;
+    if constexpr (has_arg_defaults) {
+        uint8_t def_args[] = {has_arg_defaults_v<Args>...};
         for (size_t i = 0; i < nargs; ++i) {
-            f.args[i] = def_args[i];
+            if (def_args[i]) {
+                f.args[i].flag = cast_flags::accepts_none;
+                f.args[i].name = nullptr;
+                f.args[i].value = nullptr;
+            } else {
+                f.args[i].flag = 0;
+            }
         }
+    } else if constexpr (nargs_provided > 0) {
+        for (size_t i = 0; i < nargs_provided; ++i)
+            f.args[i].flag = 0;
     }
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |

@@ -190,21 +190,14 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_prelim<has_arg_defaults ? nargs : nargs_provided> f;
+    func_data_prelim<has_arg_defaults ? nargs : nargs_provided> f{};
     if constexpr (has_arg_defaults) {
         uint8_t def_args[] = {has_arg_defaults_v<Args>...};
         for (size_t i = 0; i < nargs; ++i) {
             if (def_args[i]) {
                 f.args[i].flag = cast_flags::accepts_none;
-                f.args[i].name = nullptr;
-                f.args[i].value = nullptr;
-            } else {
-                f.args[i].flag = 0;
             }
         }
-    } else if constexpr (nargs_provided > 0) {
-        for (size_t i = 0; i < nargs_provided; ++i)
-            f.args[i].flag = 0;
     }
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |

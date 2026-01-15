@@ -44,6 +44,9 @@ Version TBD (not yet released)
 - Added the :cpp:class:`nb::never_destruct <never_destruct>` class binding
   annotation to inform nanobind that it should not bind the destructor.
 
+- Treats std::optional's argument annotation `.none()` by default to
+  resolve overload with `None` without explicit custom arugment annotation.
+
 - ABI version 18.
 
 Version 2.10.2 (Dec 10, 2025)

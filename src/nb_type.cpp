@@ -345,9 +345,9 @@ type_data *nb_type_c2p(nb_internals *internals_,
     nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
 #endif
 
-    nb_type_map_fast::iterator it_fast = type_c2p_fast.find(type);
+    nb_type_map_fast::iterator it_fast = type_c2p_fast.find((void *) type);
     if (it_fast != type_c2p_fast.end())
-        return it_fast->second;
+        return (type_data *) it_fast->second;
 
     lock_internals guard(internals_);
     nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
@@ -367,7 +367,7 @@ type_data *nb_type_c2p(nb_internals *internals_,
         d->alias_chain = chain;
 #endif
 
-        type_c2p_fast[type] = d;
+        type_c2p_fast[(void *) type] = d;
         return d;
     }
 
@@ -403,14 +403,14 @@ void nb_type_unregister(type_data *t) noexcept {
     bool fail = n_del_slow != 1;
 #else
     nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
-    size_t n_del_fast = type_c2p_fast.erase(t->type);
+    size_t n_del_fast = type_c2p_fast.erase((void *) t->type);
 
     bool fail = n_del_fast != 1 || n_del_slow != 1;
     if (!fail) {
         nb_alias_chain *cur = t->alias_chain;
         while (cur) {
             nb_alias_chain *next = cur->next;
-            n_del_fast = type_c2p_fast.erase(cur->value);
+            n_del_fast = type_c2p_fast.erase((void *) cur->value);
             if (n_del_fast != 1) {
                 fail = true;
                 break;
@@ -1376,7 +1376,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         internals_->type_c2p_slow[t->type] = to;
 
         #if !defined(NB_FREE_THREADED)
-            internals_->type_c2p_fast[t->type] = to;
+            internals_->type_c2p_fast[(void *) t->type] = to;
         #endif
     }
 

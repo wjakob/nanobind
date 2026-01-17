@@ -189,13 +189,13 @@ struct std_typeinfo_eq {
     }
 };
 
-using nb_type_map_fast = tsl::robin_map<const std::type_info *, type_data *, ptr_hash>;
-using nb_type_map_slow = tsl::robin_map<const std::type_info *, type_data *,
-                                        std_typeinfo_hash, std_typeinfo_eq>;
-
 /// A simple pointer-to-pointer map that is reused a few times below (even if
 /// not 100% ideal) to avoid template code generation bloat.
 using nb_ptr_map  = tsl::robin_map<void *, void*, ptr_hash>;
+
+using nb_type_map_fast = nb_ptr_map;
+using nb_type_map_slow = tsl::robin_map<const std::type_info *, type_data *,
+                                        std_typeinfo_hash, std_typeinfo_eq>;
 
 /// Convenience functions to deal with the pointer encoding in 'internals.inst_c2p'
 

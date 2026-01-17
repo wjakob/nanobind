@@ -92,7 +92,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         internals_->type_c2p_slow[ed->type] = t;
 
         #if !defined(NB_FREE_THREADED)
-            internals_->type_c2p_fast[ed->type] = t;
+            internals_->type_c2p_fast[(void *) ed->type] = t;
         #endif
     }
 

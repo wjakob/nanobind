@@ -466,3 +466,20 @@ def test17_sparse_map_complex():
     c1 = scipy.sparse.csc_matrix([[1j+2, 0], [-3j, 1]], dtype=np.complex128)
     c2 = t.sparse_complex_map_c(c1)
     assert np.array_equal(c1.todense(), c2.todense())
+
+
+@needs_numpy_and_eigen
+def test18_zero_size_vec():
+    # Test for stride issues after numpy 2.4, when using
+    a = np.ones((0, 2), dtype=np.uint32, order='C')
+    b = np.ones((0, 2), dtype=np.uint32, order='C')
+    print(a.strides)
+    print(b.strides)
+    assert_array_equal(t.addRefCnstMXuCC(a, b), a + b)
+    assert_array_equal(t.addRefCnstMXuCC_nc(a, b), a + b)
+    assert_array_equal(t.addMapCnstMXuCC(a, b), a + b)
+
+    c = np.zeros(0, dtype=np.int32)
+    assert_array_equal(t.castToRefVXi(c), c)
+    assert_array_equal(t.castToMapCnstVXi(c), c)
+

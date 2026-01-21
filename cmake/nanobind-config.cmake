@@ -53,25 +53,9 @@ endif()
 # Extract Python version and extensions (e.g. free-threaded build)
 string(REGEX REPLACE "[^-]*-([^-]*)-.*" "\\1" NB_ABI "${NB_SOABI}")
 
-# Determine whether the interpreter was built without the GIL. This mirrors
-# Python's sysconfig variable and is used to skip compiling free-threaded-only
-# sources when they aren't needed.
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" "-c"
-    "import sysconfig; print(int(bool(sysconfig.get_config_var('Py_GIL_DISABLED'))))"
-  RESULT_VARIABLE NB_PY_GIL_DISABLED_RET
-  OUTPUT_VARIABLE NB_PY_GIL_DISABLED_STR
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-if(NB_PY_GIL_DISABLED_RET AND NOT NB_PY_GIL_DISABLED_RET EQUAL 0)
-  message(FATAL_ERROR "nanobind: Python sysconfig query to find 'Py_GIL_DISABLED' property failed!")
-endif()
-
-if(NB_PY_GIL_DISABLED_STR STREQUAL "")
-  set(NB_PY_GIL_DISABLED_STR 0)
-endif()
-
-set(NB_PY_GIL_DISABLED ${NB_PY_GIL_DISABLED_STR})
+# Determine whether the interpreter was built without the GIL using the ABI tag
+# (free-threaded builds encode this using a trailing 't').
+set(NB_PY_GIL_DISABLED 0)
 
 if(NB_ABI MATCHES "[0-9]t")
   set(NB_PY_GIL_DISABLED 1)

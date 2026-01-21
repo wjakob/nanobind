@@ -45,7 +45,7 @@ Version TBD (not yet released)
   annotation to inform nanobind that it should not bind the destructor.
 
 - Treats std::optional's argument annotation `.none()` by default to
-  resolve overload with `None` without explicit custom arugment annotation.
+  resolve overload with `None` without explicit custom argument annotation.
 
 - ABI version 18.
 

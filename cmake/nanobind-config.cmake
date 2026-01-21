@@ -53,6 +53,30 @@ endif()
 # Extract Python version and extensions (e.g. free-threaded build)
 string(REGEX REPLACE "[^-]*-([^-]*)-.*" "\\1" NB_ABI "${NB_SOABI}")
 
+# Determine whether the interpreter was built without the GIL. This mirrors
+# Python's sysconfig variable and is used to skip compiling free-threaded-only
+# sources when they aren't needed.
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" "-c"
+    "import sysconfig; print(int(bool(sysconfig.get_config_var('Py_GIL_DISABLED'))))"
+  RESULT_VARIABLE NB_PY_GIL_DISABLED_RET
+  OUTPUT_VARIABLE NB_PY_GIL_DISABLED_STR
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+if(NB_PY_GIL_DISABLED_RET AND NOT NB_PY_GIL_DISABLED_RET EQUAL 0)
+  message(FATAL_ERROR "nanobind: Python sysconfig query to find 'Py_GIL_DISABLED' property failed!")
+endif()
+
+if(NB_PY_GIL_DISABLED_STR STREQUAL "")
+  set(NB_PY_GIL_DISABLED_STR 0)
+endif()
+
+set(NB_PY_GIL_DISABLED ${NB_PY_GIL_DISABLED_STR})
+
+if(NB_ABI MATCHES "[0-9]t")
+  set(NB_PY_GIL_DISABLED 1)
+endif()
+
 # If either suffix is missing, call Python to compute it
 if(NOT DEFINED NB_SUFFIX OR NOT DEFINED NB_SUFFIX_S)
   # Query Python directly to get the right suffix.
@@ -83,9 +107,10 @@ if(NOT DEFINED NB_SUFFIX OR NOT DEFINED NB_SUFFIX_S)
 endif()
 
 # Stash these for later use
-set(NB_SUFFIX   ${NB_SUFFIX}   CACHE INTERNAL "")
-set(NB_SUFFIX_S ${NB_SUFFIX_S} CACHE INTERNAL "")
-set(NB_ABI      ${NB_ABI}      CACHE INTERNAL "")
+set(NB_SUFFIX         ${NB_SUFFIX}         CACHE INTERNAL "")
+set(NB_SUFFIX_S       ${NB_SUFFIX_S}       CACHE INTERNAL "")
+set(NB_ABI            ${NB_ABI}            CACHE INTERNAL "")
+set(NB_PY_GIL_DISABLED ${NB_PY_GIL_DISABLED} CACHE INTERNAL "")
 
 get_filename_component(NB_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 get_filename_component(NB_DIR "${NB_DIR}" PATH)
@@ -193,12 +218,15 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/src/nb_ndarray.cpp
     ${NB_DIR}/src/nb_static_property.cpp
     ${NB_DIR}/src/nb_ft.h
-    ${NB_DIR}/src/nb_ft.cpp
     ${NB_DIR}/src/common.cpp
     ${NB_DIR}/src/error.cpp
     ${NB_DIR}/src/trampoline.cpp
     ${NB_DIR}/src/implicit.cpp
   )
+
+  if (NB_PY_GIL_DISABLED)
+    target_sources(${TARGET_NAME} PRIVATE ${NB_DIR}/src/nb_ft.cpp)
+  endif()
 
   if (TARGET_TYPE STREQUAL "SHARED")
     nanobind_link_options(${TARGET_NAME})

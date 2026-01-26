@@ -64,7 +64,7 @@ import importlib.util
 import types
 import typing
 from dataclasses import dataclass
-from typing import Dict, Sequence, List, Optional, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal
+from typing import Dict, Sequence, List, Optional, Set, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal
 from pathlib import Path
 import re
 import sys
@@ -81,7 +81,8 @@ if sys.version_info < (3, 11):
 else:
     typing_extensions = None
 
-SKIP_LIST = [
+# O(1) lookup for skip list
+SKIP_SET = {
     # Various standard attributes found in modules, classes, etc.
     "__doc__", "__module__", "__name__", "__new__", "__builtins__",
     "__cached__", "__path__", "__version__", "__spec__", "__loader__",
@@ -95,7 +96,7 @@ SKIP_LIST = [
     "_new_member_", "_use_args_", "_member_names_", "_member_map_",
     "_value2member_map_", "_hashable_values_", "_unhashable_values_",
     "_unhashable_values_map_", "_value_repr_",
-]
+}
 
 # Interpreter-internal types.
 TYPES_TYPES = {
@@ -211,7 +212,8 @@ class StubGen:
         max_expr_length: int = 50,
         patterns: List[ReplacePattern] = [],
         quiet: bool = True,
-        output_file: Optional[Path] = None
+        output_file: Optional[Path] = None,
+        module_cache: Optional[Dict[str, bool]] = None
     ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
@@ -248,8 +250,8 @@ class StubGen:
         # Current depth / indentation level
         self.depth = 0
 
-        # Output will be appended to this string
-        self.output = ""
+        # Output will be appended to this list (avoids O(n^2) string concatenation)
+        self._output_parts: List[str] = []
 
         # A stack to avoid infinite recursion
         self.stack: List[object] = []
@@ -260,6 +262,13 @@ class StubGen:
         # Dictionary to keep track of import directives added by the stub generator
         # Maps package_name -> ((name, desired_as_name) -> actual_as_name)
         self.imports: PackagesDict = {}
+
+        # Cache for module existence checks (find_spec is expensive)
+        # Share cache between parent and child StubGen instances
+        self.module_cache: Dict[str, bool] = module_cache if module_cache is not None else {}
+
+        # O(1) cycle detection via object id set
+        self.stack_set: Set[int] = set()
 
         # ---------- Regular expressions ----------
 
@@ -296,19 +305,43 @@ class StubGen:
             'MutableSequence|MutableSet|Sequence|ValuesView)'
         )
 
+    @property
+    def output(self) -> str:
+        """Get concatenated output (for backward compatibility)"""
+        return "".join(self._output_parts)
+
+    @output.setter
+    def output(self, value: str) -> None:
+        """Set output (for backward compatibility with in-place modifications)"""
+        self._output_parts = [value]
+
     def write(self, s: str) -> None:
         """Append raw characters to the output"""
-        self.output += s
+        self._output_parts.append(s)
 
     def write_ln(self, line: str) -> None:
         """Append an indented line"""
         if len(line) != 0 and not line.isspace():
-            self.output += "    " * self.depth + line
-        self.output += "\n"
+            self._output_parts.append("    " * self.depth + line)
+        self._output_parts.append("\n")
 
     def write_par(self, line: str) -> None:
         """Append an indented paragraph"""
-        self.output += textwrap.indent(line, "    " * self.depth)
+        self._output_parts.append(textwrap.indent(line, "    " * self.depth))
+
+    def _replace_last_chars(self, num_chars: int, replacement: str) -> None:
+        """Efficiently replace last N characters with replacement string."""
+        # Remove characters from the end of the last part(s)
+        chars_to_remove = num_chars
+        while chars_to_remove > 0 and self._output_parts:
+            last = self._output_parts[-1]
+            if len(last) <= chars_to_remove:
+                chars_to_remove -= len(last)
+                self._output_parts.pop()
+            else:
+                self._output_parts[-1] = last[:-chars_to_remove]
+                chars_to_remove = 0
+        self._output_parts.append(replacement)
 
     def put_docstr(self, docstr: str) -> None:
         """Append an indented single or multi-line docstring"""
@@ -383,12 +416,12 @@ class StubGen:
         if not docstr or not self.include_docstrings:
             for s in sig_str.split("\n"):
                 self.write_ln(s)
-            self.output = self.output[:-1] + ": ...\n"
+            self._replace_last_chars(1, ": ...\n")
         else:
             docstr = textwrap.dedent(docstr)
             for s in sig_str.split("\n"):
                 self.write_ln(s)
-            self.output = self.output[:-1] + ":\n"
+            self._replace_last_chars(1, ":\n")
             self.depth += 1
             self.put_docstr(docstr)
             self.depth -= 1
@@ -542,7 +575,7 @@ class StubGen:
                 # Types with a custom signature override
                 for s in tp.__nb_signature__.split("\n"):
                     self.write_ln(self.simplify_types(s))
-                self.output = self.output[:-1] + ":\n"
+                self._replace_last_chars(1, ":\n")
             else:
                 self.write_ln(f"class {tp_name}:")
                 if tp_bases is None:
@@ -552,7 +585,7 @@ class StubGen:
                     tp_bases = [self.type_str(base) for base in tp_bases]
 
                 if tp_bases != ["object"]:
-                    self.output = self.output[:-2] + "("
+                    self._replace_last_chars(2, "(")
                     for i, base in enumerate(tp_bases):
                         if i:
                             self.write(", ")
@@ -560,7 +593,7 @@ class StubGen:
                     self.write("):\n")
 
             self.depth += 1
-            output_len = len(self.output)
+            output_parts_count = len(self._output_parts)
             if docstr and self.include_docstrings:
                 self.put_docstr(docstr)
                 if len(tp_dict):
@@ -569,7 +602,7 @@ class StubGen:
             for k, v in tp_dict.items():
                 self.put(v, k, tp)
             self.apply_pattern(self.prefix + ".__suffix__", None)
-            if output_len == len(self.output):
+            if output_parts_count == len(self._output_parts):
                 self.write_ln("pass\n")
             self.depth -= 1
 
@@ -685,24 +718,37 @@ class StubGen:
            changed to 'collections.abc' on newer Python versions)
         """
 
+        # Early exit: no qualified names to process if no '.' in string
+        if '.' not in s:
+            return s
+
         # Process nd-array type annotations so that MyPy accepts them
         s = self.ndarray_re.sub(lambda m: self._format_ndarray(m.group(2)), s)
 
         s = self.abc_re.sub(r'collections.abc.\1', s)
 
+        # Cache reference for closure
+        module_cache = self.module_cache
+
         # Process other type names and add suitable import statements
         def process_general(m: Match[str]) -> str:
             def is_valid_module(module_name: str) -> bool:
+                # Check cache first
+                cached = module_cache.get(module_name)
+                if cached is not None:
+                    return cached
                 try:
                     importlib.util.find_spec(module_name)
                     # If we get here, the module exists and has a valid spec.
-                    return True
+                    result = True
                 except ValueError:
                     # The module exists but has no spec, `find_spec` raises a
                     # `ValueError`, so if we get here, the module does exist.
-                    return True
+                    result = True
                 except ModuleNotFoundError:
-                    return False
+                    result = False
+                module_cache[module_name] = result
+                return result
 
             full_name, mod_name, cls_name = m.group(0), m.group(1)[:-1], m.group(2)
 
@@ -764,6 +810,10 @@ class StubGen:
         Check if ``value`` matches an entry of a pattern file. Applies the
         pattern and returns ``True`` in that case, otherwise returns ``False``.
         """
+
+        # Early exit when no patterns
+        if not self.patterns:
+            return False
 
         match: Optional[Match[str]] = None
         pattern: Optional[ReplacePattern] = None
@@ -827,12 +877,15 @@ class StubGen:
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
         old_prefix = self.prefix
 
-        if value in self.stack:
+        # O(1) cycle detection using id set
+        value_id = id(value)
+        if value_id in self.stack_set:
             # Avoid infinite recursion due to cycles
             return
 
         try:
             self.stack.append(value)
+            self.stack_set.add(value_id)
             self.prefix = self.prefix + (("." + name) if name else "")
 
             # Check if an entry in a provided pattern file matches
@@ -840,7 +893,7 @@ class StubGen:
                 return
 
             # Exclude various standard elements found in modules, classes, etc.
-            if name in SKIP_LIST:
+            if name in SKIP_SET:
                 return
 
             is_type_alias = typing.get_origin(value) or (
@@ -895,7 +948,8 @@ class StubGen:
                             max_expr_length=self.max_expr_length,
                             patterns=self.patterns,
                             output_file=output_file,
-                            quiet=self.quiet
+                            quiet=self.quiet,
+                            module_cache=self.module_cache
                         )
 
                         sg.put(value)
@@ -940,6 +994,7 @@ class StubGen:
                 self.put_value(value, name, parent)
         finally:
             self.stack.pop()
+            self.stack_set.discard(value_id)
             self.prefix = old_prefix
 
     def import_object(

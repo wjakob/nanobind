@@ -420,7 +420,12 @@ class StubGen:
 
         # Check if this function is an alias from *another* module
         if name and fn_module and fn_module != self.module.__name__:
-            self.put_value(fn, name)
+            if parent is None:
+                self.put_value(fn, name)
+            else:
+                import_name = self.import_object(fn_module, fn.__name__)
+                self.write_ln(f"{name} = {import_name}\n")
+                
             return
 
         # Check if this function is an alias from the *same* module

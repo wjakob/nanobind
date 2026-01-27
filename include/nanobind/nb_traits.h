@@ -195,6 +195,12 @@ struct is_complex<T, enable_if_t<std::is_same_v<
 template<typename T>
 inline constexpr bool is_complex_v = is_complex<T>::value;
 
+template <typename T>
+struct has_arg_defaults : std::false_type {};
+
+template <typename T>
+constexpr bool has_arg_defaults_v = has_arg_defaults<intrinsic_t<T>>::value;
+
 NAMESPACE_END(detail)
 
 template <typename... Args>

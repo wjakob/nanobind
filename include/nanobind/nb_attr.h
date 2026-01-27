@@ -328,7 +328,7 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
         flag |= (uint8_t) cast_flags::convert;
 
     arg_data &arg = f.args[index];
-    arg.flag = flag;
+    arg.flag |= flag;
     arg.name = a.name_;
     arg.signature = a.signature_;
     arg.value = nullptr;

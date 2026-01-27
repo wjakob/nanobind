@@ -20,7 +20,7 @@ Curiously, the situation now is reminiscent of 2015: binding generation with
 existing tools (`Boost.Python <https://github.com/boostorg/python>`__, `pybind11
 <http://github.com/pybind/pybind11>`__) is slow and produces enormous binaries
 with overheads on runtime performance. At the same time, key improvements in
-C++17 and Python 3.9 provide opportunities for drastic simplifications.
+C++17 and Python 3.8 provide opportunities for drastic simplifications.
 Therefore, I am starting *another* binding project. This time, the scope is
 intentionally limited so that this doesn't turn into an endless cycle.
 
@@ -122,14 +122,12 @@ nanobind includes a number of quality-of-life improvements for developers:
 
 - **Stable ABI**: nanobind can target Python's `stable ABI interface
   <https://docs.python.org/3/c-api/stable.html>`__ starting with Python 3.12.
-  This means that extension modules will be compatible with future version of
-  Python without having to compile separate binaries per interpreter. That
-  vision is still relatively far out, however: it will require Python 3.12+ to
-  be widely deployed.
+  This means that extension modules are compatible with later version of
+  Python without having to compile separate binaries per interpreter.
 
 - **Stub generation**: nanobind ships with a custom :ref:`stub generator
-  <stubs>` and CMake integration to automatically create high quality stubs as
-  part of the build process. `Stubs
+  <stubs>` and CMake integration to automatically create high quality type
+  stubs as part of the build process. `Stubs
   <https://typing.readthedocs.io/en/latest/source/stubs.html>`__ make compiled
   extension code compatible with visual autocomplete in editors like `Visual
   Studio Code <https://code.visualstudio.com>`__ and static type checkers like
@@ -140,9 +138,9 @@ nanobind includes a number of quality-of-life improvements for developers:
 - **Smart pointers, ownership, etc.**: corner cases in pybind11 related to
   smart/unique pointers and callbacks could lead to undefined behavior. A later
   pybind11 redesign (``smart_holder``) was able to address these problems, but
-  this came at the cost of further increased runtime overheads. The object
-  ownership model of nanobind avoids this undefined behavior without penalizing
-  runtime performance.
+  this came at the cost of further increased binary size and runtime overheads.
+  The object ownership model of nanobind avoids this undefined behavior without
+  penalizing performance.
 
 - **Leak warnings**: When the Python interpreter shuts down, nanobind reports
   instance, type, and function leaks related to bindings, which is useful for
@@ -178,42 +176,6 @@ Minor additions
 
 The following lists minor-but-useful additions relative to pybind11.
 
-- **Finding Python objects associated with a C++ instance**: In addition to all
-  of the return value policies supported by pybind11, nanobind provides one
-  additional policy named :cpp:enumerator:`nb::rv_policy::none
-  <rv_policy::none>` that *only* succeeds when the return value is already a
-  known/registered Python object. In other words, this policy will never
-  attempt to move, copy, or reference a C++ instance by constructing a new
-  Python object.
-
-  The new :cpp:func:`nb::find() <find>` function encapsulates this behavior. It
-  resembles :cpp:func:`nb::cast() <cast>` in the sense that it returns the
-  Python object associated with a C++ instance. But while :cpp:func:`nb::cast()
-  <cast>` will create that Python object if it doesn't yet exist,
-  :cpp:func:`nb::find() <find>` will return a ``nullptr`` object. This function
-  is useful to interface with Python's :ref:`cyclic garbage collector
-  <fixing_refleaks>`.
-
-- **Parameterized wrappers**: The :cpp:class:`nb::handle_t\<T\> <handle_t>` type
-  behaves just like the :cpp:class:`nb::handle <handle>` class and wraps a
-  ``PyObject *`` pointer. However, when binding a function that takes such an
-  argument, nanobind will only call the associated function overload when the
-  underlying Python object wraps a C++ instance of type ``T``.
-
-  Similarly, the :cpp:class:`nb::type_object_t\<T\> <type_object_t>` type
-  behaves just like the :cpp:class:`nb::type_object <type_object>` class and
-  wraps a ``PyTypeObject *`` pointer. However, when binding a function that
-  takes such an argument, nanobind will only call the associated function
-  overload when the underlying Python type object is a subtype of the C++ type
-  ``T``.
-
-  Finally, the :cpp:class:`nb::typed\<T, Ts...\> <typed>` annotation can 
-  parameterize any other type. The feature exists to improve the
-  expressiveness of type signatures (e.g., to turn ``list`` into
-  ``list[int]``). Note, however, that nanobind does not perform additional
-  runtime checks in this case. Please see the section on :ref:`parameterizing
-  generics <typing_generics_parameterizing>` for further details.
-
 - **Signature overrides**: it may sometimes be necessary to tweak the
   type signature of a class or function to provide richer type information to
   static type checkers like `MyPy <https://github.com/python/mypy>`__ or
@@ -240,6 +202,42 @@ The following lists minor-but-useful additions relative to pybind11.
   <typing_signature_functions>` and :ref:`class signatures
   <typing_signature_classes>` for further details.
 
+- **Parameterized wrappers**: The :cpp:class:`nb::handle_t\<T\> <handle_t>` type
+  behaves just like the :cpp:class:`nb::handle <handle>` class and wraps a
+  ``PyObject *`` pointer. However, when binding a function that takes such an
+  argument, nanobind will only call the associated function overload when the
+  underlying Python object wraps a C++ instance of type ``T``.
+
+  Similarly, the :cpp:class:`nb::type_object_t\<T\> <type_object_t>` type
+  behaves just like the :cpp:class:`nb::type_object <type_object>` class and
+  wraps a ``PyTypeObject *`` pointer. However, when binding a function that
+  takes such an argument, nanobind will only call the associated function
+  overload when the underlying Python type object is a subtype of the C++ type
+  ``T``.
+
+  Finally, the :cpp:class:`nb::typed\<T, Ts...\> <typed>` annotation can
+  parameterize any other type. The feature exists to improve the
+  expressiveness of type signatures (e.g., to turn ``list`` into
+  ``list[int]``). Note, however, that nanobind does not perform additional
+  runtime checks in this case. Please see the section on :ref:`parameterizing
+  generics <typing_generics_parameterizing>` for further details.
+
+- **Finding Python objects associated with a C++ instance**: In addition to all
+  of the return value policies supported by pybind11, nanobind provides one
+  additional policy named :cpp:enumerator:`nb::rv_policy::none
+  <rv_policy::none>` that *only* succeeds when the return value is already a
+  known/registered Python object. In other words, this policy will never
+  attempt to move, copy, or reference a C++ instance by constructing a new
+  Python object.
+
+  The new :cpp:func:`nb::find() <find>` function encapsulates this behavior. It
+  resembles :cpp:func:`nb::cast() <cast>` in the sense that it returns the
+  Python object associated with a C++ instance. But while :cpp:func:`nb::cast()
+  <cast>` will create that Python object if it doesn't yet exist,
+  :cpp:func:`nb::find() <find>` will return a ``nullptr`` object. This function
+  is useful to interface with Python's :ref:`cyclic garbage collector
+  <fixing_refleaks>`.
+
 TLDR
 ----
 
@@ -248,5 +246,8 @@ nanobind. Fixing all the long-standing issues in pybind11 (see above list)
 would require a substantial redesign and years of careful work by a team of C++
 metaprogramming experts. At the same time, changing anything in pybind11 is
 extremely hard because of the large number of downstream users and their
-requirements on API/ABI stability. I personally don't have the time and
-energy to fix pybind11 and have moved my focus to this project.
+requirements on API/ABI stability. I personally don't have the time and energy
+to fix pybind11 and have moved my focus to this project. The `testimonials
+section
+<https://github.com/wjakob/nanobind/blob/master/README.md#testimonials>` lists
+the experience of a number of large projects that made the switch.

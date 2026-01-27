@@ -136,6 +136,10 @@ if (TARGET Eigen3::Eigen)
   target_link_libraries(test_eigen_ext PRIVATE Eigen3::Eigen)
 endif()
 
+nanobind_add_module(test_xtensor_ext test_xtensor.cpp ${NB_EXTRA_ARGS})
+target_include_directories(test_xtensor_ext PRIVATE ${XTENSOR_INCLUDE_DIR} ${XTL_INCLUDE_DIR})
+target_compile_features(test_xtensor_ext PRIVATE cxx_std_20)
+
 add_library(
   inter_module
   SHARED
@@ -160,6 +164,7 @@ set(TEST_FILES
   test_classes.py
   test_eigen.py
   test_enum.py
+  test_xtensor.py
   test_eval.py
   test_exception.py
   test_functions.py

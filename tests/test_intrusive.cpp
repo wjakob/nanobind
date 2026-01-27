@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
+#include <nanobind/stl/string.h>
 #include <nanobind/trampoline.h>
 #include <nanobind/intrusive/counter.h>
 #include <nanobind/intrusive/ref.h>
@@ -28,6 +29,27 @@ class PyTest : Test {
         NB_OVERRIDE(value, i);
     }
 };
+
+
+class Inner : public nb::intrusive_base {
+public:
+    std::string get_name() const { return "Inner"; }
+};
+
+class Outter : public nb::intrusive_base {
+public:
+    Outter()
+    {
+        m_inner = new Inner;
+    }
+
+    Inner& get_inner() { return *m_inner; }
+    Inner* get_inner_ptr() { return m_inner.get(); }
+    nb::ref<Inner> get_inner_ref() { return m_inner; }
+private:
+    nb::ref<Inner> m_inner;
+};
+
 
 NB_MODULE(test_intrusive_ext, m) {
     nb::intrusive_init(
@@ -63,4 +85,14 @@ NB_MODULE(test_intrusive_ext, m) {
     m.def("get_value_1", [](Test *o) { nb::ref<Test> x(o); return x->value(1); });
     m.def("get_value_2", [](nb::ref<Test> x) { return x->value(2); });
     m.def("get_value_3", [](const nb::ref<Test> &x) { return x->value(3); });
+
+
+    nb::class_<Inner, nb::intrusive_base>(m, "Inner")
+        .def("get_name", &Inner::get_name);
+
+    nb::class_<Outter, nb::intrusive_base>(m, "Outter")
+        .def(nb::init<>())
+        .def("get_inner", &Outter::get_inner)
+        .def("get_inner_ptr", &Outter::get_inner_ptr)
+        .def("get_inner_ref", &Outter::get_inner_ref);
 }

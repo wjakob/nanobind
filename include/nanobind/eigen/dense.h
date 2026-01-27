@@ -182,7 +182,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
 
         object owner;
         if (policy == rv_policy::move) {
-            T *temp = new T(std::move(v));
+            T *temp = new T((T&&) v);
             owner = capsule(temp, [](void *p) noexcept { delete (T *) p; });
             ptr = temp->data();
             policy = rv_policy::reference;

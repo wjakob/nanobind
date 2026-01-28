@@ -57,6 +57,7 @@ import argparse
 import builtins
 import enum
 from inspect import Signature, Parameter, signature, ismodule
+import io
 import textwrap
 import importlib
 import importlib.machinery
@@ -248,8 +249,8 @@ class StubGen:
         # Current depth / indentation level
         self.depth = 0
 
-        # Output will be appended to this string
-        self.output = ""
+        # Output buffer
+        self._output = io.StringIO()
 
         # A stack to avoid infinite recursion
         self.stack: List[object] = []
@@ -296,19 +297,30 @@ class StubGen:
             'MutableSequence|MutableSet|Sequence|ValuesView)'
         )
 
+    @property
+    def output(self) -> str:
+        """Get the current output as a string."""
+        return self._output.getvalue()
+
     def write(self, s: str) -> None:
         """Append raw characters to the output"""
-        self.output += s
+        self._output.write(s)
 
     def write_ln(self, line: str) -> None:
         """Append an indented line"""
         if len(line) != 0 and not line.isspace():
-            self.output += "    " * self.depth + line
-        self.output += "\n"
+            self._output.write("    " * self.depth + line)
+        self._output.write("\n")
 
     def write_par(self, line: str) -> None:
         """Append an indented paragraph"""
-        self.output += textwrap.indent(line, "    " * self.depth)
+        self._output.write(textwrap.indent(line, "    " * self.depth))
+
+    def _replace_tail(self, num_chars: int, replacement: str) -> None:
+        """Remove the last num_chars from output and append replacement."""
+        self._output.seek(self._output.tell() - num_chars)
+        self._output.truncate()
+        self._output.write(replacement)
 
     def put_docstr(self, docstr: str) -> None:
         """Append an indented single or multi-line docstring"""
@@ -383,12 +395,12 @@ class StubGen:
         if not docstr or not self.include_docstrings:
             for s in sig_str.split("\n"):
                 self.write_ln(s)
-            self.output = self.output[:-1] + ": ...\n"
+            self._replace_tail(1, ": ...\n")
         else:
             docstr = textwrap.dedent(docstr)
             for s in sig_str.split("\n"):
                 self.write_ln(s)
-            self.output = self.output[:-1] + ":\n"
+            self._replace_tail(1, ":\n")
             self.depth += 1
             self.put_docstr(docstr)
             self.depth -= 1
@@ -542,7 +554,7 @@ class StubGen:
                 # Types with a custom signature override
                 for s in tp.__nb_signature__.split("\n"):
                     self.write_ln(self.simplify_types(s))
-                self.output = self.output[:-1] + ":\n"
+                self._replace_tail(1, ":\n")
             else:
                 self.write_ln(f"class {tp_name}:")
                 if tp_bases is None:
@@ -552,7 +564,7 @@ class StubGen:
                     tp_bases = [self.type_str(base) for base in tp_bases]
 
                 if tp_bases != ["object"]:
-                    self.output = self.output[:-2] + "("
+                    self._replace_tail(2, "(")
                     for i, base in enumerate(tp_bases):
                         if i:
                             self.write(", ")
@@ -560,7 +572,7 @@ class StubGen:
                     self.write("):\n")
 
             self.depth += 1
-            output_len = len(self.output)
+            output_pos = self._output.tell()
             if docstr and self.include_docstrings:
                 self.put_docstr(docstr)
                 if len(tp_dict):
@@ -569,7 +581,7 @@ class StubGen:
             for k, v in tp_dict.items():
                 self.put(v, k, tp)
             self.apply_pattern(self.prefix + ".__suffix__", None)
-            if output_len == len(self.output):
+            if output_pos == self._output.tell():
                 self.write_ln("pass\n")
             self.depth -= 1
 

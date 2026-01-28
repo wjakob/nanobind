@@ -49,6 +49,9 @@ Version TBD (not yet released)
 
 - ABI version 18.
 
+- Fixed O(n^2) string concatenation performance issue in stub generation.
+  (PR `#1274 <https://github.com/wjakob/nanobind/pull/1274>`__).
+
 Version 2.10.2 (Dec 10, 2025)
 ----------------------------
 

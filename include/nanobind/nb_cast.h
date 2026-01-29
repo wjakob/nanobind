@@ -281,11 +281,12 @@ template <> struct type_caster<char> {
     template <typename T_>
     using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
 
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         value = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
         if (!value) {
             PyErr_Clear();
-            return false;
+            // optimize for src being a string, check for None afterwards
+            return src.is_none() && (flags & (uint8_t) cast_flags::accepts_none);
         }
         return true;
     }

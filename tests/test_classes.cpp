@@ -55,6 +55,12 @@ struct Struct {
     Struct &self() { return *this; }
 };
 
+struct WrongNone {
+    int value_plus(int i, std::optional<int> j, int k) const {
+        return i + j.value_or(0) + k;
+    }
+};
+
 struct PairStruct {
     Struct s1;
     Struct s2;
@@ -181,6 +187,11 @@ NB_MODULE(test_classes_ext, m) {
 
     if (!nb::type<Struct>().is(cls))
         nb::detail::raise("type lookup failed!");
+
+    nb::class_<WrongNone>(m, "WrongNone")
+        .def(nb::init<>())
+        .def("value_plus", &WrongNone::value_plus, 
+             "i"_a, "j"_a = nb::none(), "k"_a = 0);
 
     nb::class_<PairStruct>(m, "PairStruct")
         .def(nb::init<>())

@@ -121,6 +121,8 @@ void nb_func_dealloc(PyObject *self) {
     }
 
     PyObject_GC_Del(self);
+
+    internals_dec_ref();
 }
 
 int nb_bound_method_traverse(PyObject *self, visitproc visit, void *arg) {
@@ -296,6 +298,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
           name_cstr);
 
     make_immortal((PyObject *) func);
+    internals_inc_ref();
 
     // Check if the complex dispatch loop is needed
     bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||

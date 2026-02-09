@@ -176,58 +176,128 @@ static const char* interned_c_strs[pyobj_name::string_count] {
     "dl_device",
 };
 
-PyObject **static_pyobjects = nullptr;
+PyObject *static_pyobjects[pyobj_name::total_count] = {};
 
-static bool init_pyobjects(PyObject* m) {
-    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
-    if (!pyobjects)
-        return false;
+static void new_constant(nb_internals *p, int index, PyObject *o) {
+    static_pyobjects[index] = o;
+    new_object(p, o);
+}
+
+/// Populate this library's static_pyobjects[]
+static void init_pyobjects(nb_internals *p) {
+    if (static_pyobjects[0])
+        return;
 
     NB_NOUNROLL
     for (int i = 0; i < pyobj_name::string_count; ++i)
-        pyobjects[i] = PyUnicode_InternFromString(interned_c_strs[i]);
+        new_constant(p, i, PyUnicode_InternFromString(interned_c_strs[i]));
 
-    pyobjects[pyobj_name::copy_tpl] =
-            PyTuple_Pack(1, pyobjects[pyobj_name::copy_str]);
-    pyobjects[pyobj_name::max_version_tpl] =
-            PyTuple_Pack(1, pyobjects[pyobj_name::max_version_str]);
+    new_constant(p, pyobj_name::copy_tpl,
+                 PyTuple_Pack(1, static_pyobjects[pyobj_name::copy_str]));
+    new_constant(p, pyobj_name::max_version_tpl,
+                 PyTuple_Pack(1, static_pyobjects[pyobj_name::max_version_str]));
 
-    PyObject* one = PyLong_FromLong(1);
-    PyObject* zero = PyLong_FromLong(0);
-    pyobjects[pyobj_name::dl_cpu_tpl] = PyTuple_Pack(2, one, zero);
+    PyObject *one = PyLong_FromLong(1), *zero = PyLong_FromLong(0);
+    new_constant(p, pyobj_name::dl_cpu_tpl, PyTuple_Pack(2, one, zero));
     Py_DECREF(zero);
     Py_DECREF(one);
 
-    PyObject* major = PyLong_FromLong(dlpack::major_version);
-    PyObject* minor = PyLong_FromLong(dlpack::minor_version);
-    pyobjects[pyobj_name::dl_version_tpl] = PyTuple_Pack(2, major, minor);
+    PyObject *major = PyLong_FromLong(dlpack::major_version),
+             *minor = PyLong_FromLong(dlpack::minor_version);
+    new_constant(p, pyobj_name::dl_version_tpl, PyTuple_Pack(2, major, minor));
     Py_DECREF(minor);
     Py_DECREF(major);
-
-    static_pyobjects = pyobjects;
-
-    return true;
 }
 
-NB_NOINLINE int nb_module_traverse(PyObject *m, visitproc visit, void *arg) {
-    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
-    NB_NOUNROLL
+/// Create lifeline + internal types if needed
+static void init_internals(nb_internals *p) {
+    if (p->lifeline)
+        return;
+
+    p->lifeline = PyList_New(0);
+    check(p->lifeline, "nanobind::detail::nb_module_exec(): "
+                        "could not create lifeline list!");
+
+    str nb_name("nanobind");
+    p->nb_module = PyModule_NewObject(nb_name.ptr());
+    new_object(p, p->nb_module);
+
+    nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
+    p->nb_meta = new_type(p, &nb_meta_spec);
+
+    p->nb_type_dict = PyDict_New();
+    new_object(p, p->nb_type_dict);
+
+    p->nb_func         = new_type(p, &nb_func_spec);
+    p->nb_method       = new_type(p, &nb_method_spec);
+    p->nb_bound_method = new_type(p, &nb_bound_method_spec);
+
+    check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
+              p->nb_method && p->nb_bound_method,
+          "nanobind::detail::nb_module_exec(): initialization failed!");
+
+#if defined(Py_LIMITED_API)
+    p->PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
+    p->PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
+    p->PyType_Type_tp_dealloc =
+        (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
+    p->PyType_Type_tp_setattro =
+        (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
+    p->PyProperty_Type_tp_descr_get =
+        (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
+    p->PyProperty_Type_tp_descr_set =
+        (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
+
+    PyType_Slot dummy_slots[] = {
+        { Py_tp_base, &PyType_Type },
+        { 0, nullptr }
+    };
+
+    PyType_Spec dummy_spec = {
+        /* .name = */ "nanobind.dummy",
+        /* .basicsize = */ - (int) sizeof(void*),
+        /* .itemsize = */ 0,
+        /* .flags = */ Py_TPFLAGS_DEFAULT,
+        /* .slots = */ dummy_slots
+    };
+
+    PyObject *dummy = PyType_FromMetaclass(
+        p->nb_meta, p->nb_module, &dummy_spec, nullptr);
+    p->type_data_offset =
+        (uint8_t *) PyObject_GetTypeData(dummy, p->nb_meta) - (uint8_t *) dummy;
+    Py_DECREF(dummy);
+#endif
+}
+
+void internals_inc_ref() {
+    internals->shared_ref_count.value++;
+}
+
+void internals_dec_ref() {
+    nb_internals *p = internals;
+    auto value = --p->shared_ref_count.value;
+    if (value != 0)
+        return;
+
+    Py_CLEAR(p->lifeline);
+
+    p->nb_module = nullptr;
+    p->nb_meta = nullptr;
+    p->nb_type_dict = nullptr;
+    p->nb_func = nullptr;
+    p->nb_method = nullptr;
+    p->nb_bound_method = nullptr;
+    p->nb_static_property.store_release(nullptr);
+    p->nb_ndarray.store_release(nullptr);
+
+    nb_meta_cache = nullptr;
+
     for (int i = 0; i < pyobj_name::total_count; ++i)
-        Py_VISIT(pyobjects[i]);
-    return 0;
+        static_pyobjects[i] = nullptr;
 }
 
-NB_NOINLINE int nb_module_clear(PyObject *m) {
-    PyObject** pyobjects = (PyObject**) PyModule_GetState(m);
-    NB_NOUNROLL
-    for (int i = 0; i < pyobj_name::total_count; ++i)
-        Py_CLEAR(pyobjects[i]);
-    return 0;
-}
-
-void nb_module_free(void *m) {
-    // Allow nanobind_##name##_exec to omit calling nb_module_clear on error.
-    (void) nb_module_clear((PyObject *) m);
+void nb_module_free(void *) {
+    internals_dec_ref();
 }
 
 
@@ -384,12 +454,14 @@ static void internals_cleanup() {
 #endif
 }
 
-NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
-    if (internals)
+NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
+    if (internals) {
+        init_internals(internals);
+        init_pyobjects(internals);
+        nb_meta_cache = internals->nb_meta;
+        internals_inc_ref();
         return;
-
-    check(init_pyobjects(m), "nanobind::detail::nb_module_exec(): "
-                             "could not initialize module state!");
+    }
 
 #if defined(PYPY_VERSION)
     PyObject *dict = PyEval_GetBuiltins();
@@ -410,8 +482,13 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
         internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
         check(internals, "nanobind::detail::nb_module_exec(): "
                          "capsule pointer is NULL!");
-        nb_meta_cache = internals->nb_meta;
         is_alive_ptr = internals->is_alive_ptr;
+
+        init_internals(internals);
+        init_pyobjects(internals);
+        nb_meta_cache = internals->nb_meta;
+        internals_inc_ref();
+
         Py_DECREF(capsule);
         return;
     }
@@ -429,57 +506,15 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
 #endif
     p->shard_count = shard_count;
 
-    str nb_name("nanobind");
-    p->nb_module = PyModule_NewObject(nb_name.ptr());
+    internals = p;
 
-    nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
-    nb_meta_cache = p->nb_meta = (PyTypeObject *) PyType_FromSpec(&nb_meta_spec);
-    p->nb_type_dict = PyDict_New();
-    p->nb_func = (PyTypeObject *) PyType_FromSpec(&nb_func_spec);
-    p->nb_method = (PyTypeObject *) PyType_FromSpec(&nb_method_spec);
-    p->nb_bound_method = (PyTypeObject *) PyType_FromSpec(&nb_bound_method_spec);
+    init_internals(p);
+    init_pyobjects(p);
+    nb_meta_cache = p->nb_meta;
 
 #if defined(NB_FREE_THREADED)
     p->nb_static_property_disabled = PyThread_tss_alloc();
     PyThread_tss_create(p->nb_static_property_disabled);
-#endif
-
-    check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
-              p->nb_method && p->nb_bound_method,
-          "nanobind::detail::nb_module_exec(): initialization failed!");
-
-#if defined(Py_LIMITED_API)
-    // Cache important functions from PyType_Type and PyProperty_Type
-    p->PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
-    p->PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
-    p->PyType_Type_tp_dealloc =
-        (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
-    p->PyType_Type_tp_setattro =
-        (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
-    p->PyProperty_Type_tp_descr_get =
-        (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
-    p->PyProperty_Type_tp_descr_set =
-        (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
-
-    PyType_Slot dummy_slots[] = {
-        { Py_tp_base, &PyType_Type },
-        { 0, nullptr }
-    };
-
-    PyType_Spec dummy_spec = {
-        /* .name = */ "nanobind.dummy",
-        /* .basicsize = */ - (int) sizeof(void*),
-        /* .itemsize = */ 0,
-        /* .flags = */ Py_TPFLAGS_DEFAULT,
-        /* .slots = */ dummy_slots
-    };
-
-    // Determine the offset, at which types defined by nanobind begin
-    PyObject *dummy = PyType_FromMetaclass(
-        p->nb_meta, p->nb_module, &dummy_spec, nullptr);
-    p->type_data_offset =
-        (uint8_t *) PyObject_GetTypeData(dummy, p->nb_meta) - (uint8_t *) dummy;
-    Py_DECREF(dummy);
 #endif
 
     p->translators = { default_exception_translator, nullptr, nullptr };
@@ -487,6 +522,8 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;
     p->is_alive_ptr = is_alive_ptr;
+
+    internals_inc_ref();
 
 #if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)
     /* The implementation of typing.py on CPython <3.12 tends to introduce
@@ -536,7 +573,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *m) {
           "nanobind::detail::nb_module_exec(): capsule creation failed!");
     Py_DECREF(capsule);
     Py_DECREF(key);
-    internals = p;
 }
 
 #if defined(NB_COMPACT_ASSERTIONS)

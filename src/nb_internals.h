@@ -426,6 +426,13 @@ struct nb_internals {
 
     // Size of the 'shards' data structure. Only rarely accessed, hence at the end
     size_t shard_count = 1;
+
+    /// Reference count tracking modules + types + functions using shared state
+    nb_maybe_atomic<uint32_t> shared_ref_count = 0;
+
+    /// PyList keeping managed PyObjects alive. Cleared when shared_ref_count
+    /// reaches 0.
+    PyObject *lifeline = nullptr;
 };
 
 // Names for the PyObject* entries in the per-module state array.
@@ -450,9 +457,24 @@ struct pyobj_name {
     };
 };
 
-static_assert(pyobj_name::total_count * sizeof(PyObject*) == NB_MOD_STATE_SIZE);
+extern PyObject *static_pyobjects[];
 
-extern PyObject **static_pyobjects;
+extern void internals_inc_ref();
+extern void internals_dec_ref();
+
+/// Append 'o' to the lifeline and transfer ownership to it
+inline void new_object(nb_internals *p, PyObject *o) {
+    PyList_Append(p->lifeline, o);
+    Py_DECREF(o);
+}
+
+/// Create a type via PyType_FromSpec and transfer ownership to the lifeline
+inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
+    PyTypeObject *tp = (PyTypeObject *) PyType_FromSpec(spec);
+    if (tp)
+        new_object(p, (PyObject *) tp);
+    return tp;
+}
 
 /// Convenience macro to potentially access cached functions
 #if defined(Py_LIMITED_API)

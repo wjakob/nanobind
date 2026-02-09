@@ -14,7 +14,7 @@
 
 /// Tracks the version of nanobind's internal data structures
 #ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 18
+#  define NB_INTERNALS_VERSION 19
 #endif
 
 #if defined(__MINGW32__)

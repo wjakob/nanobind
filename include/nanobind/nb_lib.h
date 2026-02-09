@@ -117,8 +117,6 @@ NB_CORE void raise_next_overload_if_null(void *p);
 // ========================================================================
 
 NB_CORE void nb_module_exec(const char *domain, PyObject *m);
-NB_CORE int  nb_module_traverse(PyObject *m, visitproc visit, void *arg);
-NB_CORE int  nb_module_clear(PyObject *m);
 NB_CORE void nb_module_free(void *m);
 
 // ========================================================================

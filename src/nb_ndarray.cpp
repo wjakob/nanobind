@@ -338,7 +338,7 @@ static PyTypeObject *nb_ndarray_tp() noexcept {
             /* .slots = */ slots
         };
 
-        tp = (PyTypeObject *) PyType_FromSpec(&spec);
+        tp = new_type(internals_, &spec);
         check(tp, "nb_ndarray type creation failed!");
 
         internals_->nb_ndarray.store_release(tp);

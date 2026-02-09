@@ -437,8 +437,12 @@ static void nb_type_dealloc(PyObject *o) {
         PyMem_Free(t->implicit.py);
     }
 
+    bool initialized = t->name != nullptr;
     free((char *) t->name);
     NB_SLOT(PyType_Type, tp_dealloc)(o);
+
+    if (initialized)
+        internals_dec_ref();
 }
 
 /// Called when a C++ type is extended from within Python
@@ -492,6 +496,8 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 #else
     ((PyTypeObject *) self)->tp_vectorcall = nullptr;
 #endif
+
+    internals_inc_ref();
 
     return 0;
 }
@@ -1319,6 +1325,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     Py_DECREF(metaclass);
 
     make_immortal(result);
+    internals_inc_ref();
 
     type_data *to = nb_type_data((PyTypeObject *) result);
 

@@ -169,8 +169,6 @@
     X(const X &) = delete;                                                     \
     X &operator=(const X &) = delete;
 
-#define NB_MOD_STATE_SIZE (12 * sizeof(PyObject*))
-
 // Helper macros to ensure macro arguments are expanded before token pasting/stringification
 #define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)
 #define NB_MODULE_IMPL2(name, variable)                                        \
@@ -196,9 +194,9 @@
         NB_MODULE_SLOTS_2                                                      \
     };                                                                         \
     static struct PyModuleDef nanobind_##name##_module = {                     \
-        PyModuleDef_HEAD_INIT, #name, nullptr, NB_MOD_STATE_SIZE, nullptr,     \
-        nanobind_##name##_slots, nanobind::detail::nb_module_traverse,         \
-        nanobind::detail::nb_module_clear, nanobind::detail::nb_module_free    \
+        PyModuleDef_HEAD_INIT, #name, nullptr, 0, nullptr,                     \
+        nanobind_##name##_slots, nullptr, nullptr,                             \
+        nanobind::detail::nb_module_free                                       \
     };                                                                         \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \

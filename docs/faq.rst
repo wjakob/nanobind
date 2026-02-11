@@ -16,6 +16,7 @@ unordered JSON objects and works on all platforms. The library requires no code
 changes other than including the header:
 
 .. code-block:: cpp
+   
    #include <nlohmann/json.hpp>
    #include <nanobind/nanobind.h>
    #include <nanobind_json/nanobind_json.h>

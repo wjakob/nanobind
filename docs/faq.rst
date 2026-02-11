@@ -5,6 +5,40 @@
 Frequently asked questions
 ==========================
 
+Is there a way to pass ``JSON`` objects between Python and C++? 
+-------------------------------------------------
+Yes, an unofficial, currently maintained, package supporting that can be found `here
+<https://github.com/Griger5/nanobind_json>`_. It is based on a similar package for 
+``pybind11`` called ``pybind11_json``. 
+
+The library is header-only, and uses ``nlohmann::json``. It supports ordered and
+unordered JSON objects and works on all platforms. The library requires no code
+changes other than including the header:
+
+.. code-block:: cpp
+   #include <nlohmann/json.hpp>
+   #include <nanobind/nanobind.h>
+   #include <nanobind_json/nanobind_json.h>
+
+   void take_json(const nlohmann::json &j) {
+       std::cout << "This function took an nlohmann::json instance as argument: " << j << std::endl;
+   }
+
+   nlohmann::json return_json() {
+       nlohmann::json j = {{"value", 1}};
+
+       std::cout << "This function returns an nlohmann::json instance: "  << j << std::endl;
+
+       return j;
+   }
+
+   NB_MODULE(my_module, m) {
+       m.doc() = "My awesome module";
+
+       m.def("take_json", &take_json, "pass nb::object to a C++ function that takes an nlohmann::json");
+       m.def("return_json", &return_json, "return nb::object from a C++ function that returns an nlohmann::json");
+   }
+
 Importing my module fails with an ``ImportError``
 -------------------------------------------------
 

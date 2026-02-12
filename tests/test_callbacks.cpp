@@ -3,11 +3,12 @@
 // directly keep a Python object alive (they're trivially copyable), we
 // maintain a sideband structure to manage the lifetimes.
 
+#include <nanobind/nanobind.h>
+
 #include <algorithm>
 #include <unordered_set>
 #include <vector>
 
-#include <nanobind/nanobind.h>
 #include <nanobind/stl/unordered_set.h>
 
 namespace nb = nanobind;

@@ -1,9 +1,10 @@
+#include <nanobind/stl/bind_map.h>
+
 #include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 

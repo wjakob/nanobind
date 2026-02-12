@@ -955,6 +955,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
             { Py_tp_setattro, (void *) nb_type_setattro },
             { Py_tp_init, (void *) nb_type_init },
             { 0, nullptr },
+            { 0, nullptr },
             { 0, nullptr }
         };
 
@@ -977,6 +978,7 @@ static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
 
         if (NB_DYNAMIC_VERSION < 0x030E0000) {
             slots[4] = { Py_tp_members, (void *) members };
+            slots[5] = { Py_tp_call, (void *) PyVectorcall_Call };
             spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
         }
 #endif

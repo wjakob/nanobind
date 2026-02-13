@@ -783,3 +783,10 @@ def test53_fallback():
 def test54_dict_default():
     assert t.test_get_dict_default({'key': 100}) == 100
     assert t.test_get_dict_default({'key2': 100}) == 123
+
+def test_55_memoryview():
+    memview = t.test_memoryview()
+    assert isinstance(memview, memoryview)
+    assert bytes(memview[0:3]) == b'123'
+    with pytest.raises(TypeError):
+        t.test_bad_memview()

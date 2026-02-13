@@ -174,6 +174,9 @@ NB_CORE PyObject *set_from_obj(PyObject *o);
 /// Convert a Python object into a Python frozenset
 NB_CORE PyObject *frozenset_from_obj(PyObject *o);
 
+/// Convert a Python object into a Python memoryview
+NB_CORE PyObject *memoryview_from_obj(PyObject *o);
+
 // ========================================================================
 
 /// Get an object attribute or raise an exception

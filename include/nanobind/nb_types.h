@@ -753,6 +753,12 @@ public:
     }
 };
 
+class memoryview : public object {
+    NB_OBJECT(memoryview, object, "memoryview", PyMemoryView_Check)
+    explicit memoryview(handle h)
+        : object(detail::memoryview_from_obj(h.ptr()), detail::steal_t{}) { }
+};
+
 class ellipsis : public object {
     static bool is_ellipsis(PyObject *obj) { return obj == Py_Ellipsis; }
 

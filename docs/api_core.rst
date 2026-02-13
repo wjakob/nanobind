@@ -1268,6 +1268,15 @@ Wrapper classes
               // Now do something ...
           });
 
+.. cpp:class:: memoryview: public object
+
+    Wrapper class representing Python ``memoryview`` instances.
+
+    .. cpp:function:: memoryview(handle h)
+
+    Attempt to create a ``memoryview`` Python object from an object. Analogous
+    to the expression ``memoryview(h)`` in Python.
+
 .. cpp:class:: ellipsis: public object
 
    Wrapper class representing a Python ellipsis (``...``) object.

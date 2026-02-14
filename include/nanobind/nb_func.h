@@ -195,7 +195,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Initialize argument flags. The first branch turns std::optional<> types
     // into implicit nb::none() annotations (skipping 'self' for methods).
     if constexpr (has_arg_defaults) {
-        ((void)(Is < is_method_det ||
+        ((void)(Is < int(is_method_det) ||
                 (f.args[Is - is_method_det] = { nullptr, nullptr, nullptr, nullptr,
                     has_arg_defaults_v<Args> ? (uint8_t) cast_flags::accepts_none
                                              : (uint8_t) 0 }, true)), ...);

@@ -1,6 +1,7 @@
+#include <nanobind/nanobind.h>
+
 #include <string.h>
 
-#include <nanobind/nanobind.h>
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>

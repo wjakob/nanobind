@@ -26,6 +26,9 @@
 #define NB_VERSION_PATCH 1
 #define NB_VERSION_DEV   1 // A value > 0 indicates a development release
 
+// As it includes Python.h, it needs to be the first file included
+#include "nb_python.h"
+
 // Core C++ headers that nanobind depends on
 #include <cstddef>
 #include <cstdint>
@@ -39,7 +42,6 @@
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
 // IWYU pragma: begin_exports
-#include "nb_python.h"
 #include "nb_defs.h"
 #include "nb_enums.h"
 #include "nb_traits.h"

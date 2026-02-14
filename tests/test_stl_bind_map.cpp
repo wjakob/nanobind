@@ -1,3 +1,5 @@
+#include <nanobind/nanobind.h>
+
 #include <map>
 #include <string>
 #include <unordered_map>

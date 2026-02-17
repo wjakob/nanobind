@@ -271,7 +271,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
 
     ndarray_handle *th = ((nb_ndarray *) self)->th;
     PyObject *capsule;
-    if (max_major_version >= dlpack::major_version)
+    if (max_major_version >= (long)dlpack::major_version)
         capsule = th->make_capsule_versioned();
     else
         capsule = th->make_capsule_unversioned();

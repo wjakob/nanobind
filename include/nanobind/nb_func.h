@@ -195,7 +195,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Pre-initialize argument flags with 'convert'. The 'accepts_none' flag
     // for std::optional<> args is applied after func_extra_apply (see below).
     if constexpr (has_arg_defaults) {
-        ((void)(Is < is_method_det ||
+        ((void)(Is < (size_t)is_method_det ||
                 (f.args[Is - is_method_det] = { nullptr, nullptr, nullptr, nullptr,
                     (uint8_t) cast_flags::convert }, true)), ...);
     } else if constexpr (nargs_provided > 0) {
@@ -328,7 +328,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Apply implicit accepts_none for std::optional<> typed arguments
     // after func_extra_apply, so that explicit nb::arg().noconvert() works.
     if constexpr (has_arg_defaults) {
-        ((void)(Is >= is_method_det && has_arg_defaults_v<Args> &&
+        ((void)(Is >= (size_t)is_method_det && has_arg_defaults_v<Args> &&
                 (f.args[Is - is_method_det].flag |=
                      (uint8_t) cast_flags::accepts_none, true)), ...);
     }

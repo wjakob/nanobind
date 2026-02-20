@@ -2650,8 +2650,8 @@ Class binding
 
       Bind the enumeration of type `T` to the identifier `name` within the
       scope `scope`. The variable length `extra` parameter can be used to pass
-      a docstring and other :ref:`enum binding annotations
-      <enum_binding_annotations>` (currently, only :cpp:class:`is_arithmetic` is supported).
+      a docstring and
+      :ref:`enum binding annotations <enum_binding_annotations>`.
 
    .. cpp:function:: enum_ &value(const char * name, T value, const char * doc = nullptr)
 

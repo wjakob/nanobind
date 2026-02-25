@@ -136,13 +136,13 @@ struct ndarray_handle {
 
 static void nb_ndarray_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
-    ndarray_dec_ref(((nb_ndarray *) self)->th);
+    ndarray_dec_ref(nb_ndarray_data(self)->th);
     PyObject_Free(self);
     Py_DECREF(tp);
 }
 
 static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    ndarray_handle *th = nb_ndarray_data(self)->th;
     dlpack::dltensor &t = (th->versioned) ? th->mt_versioned->dltensor
                                           : th->mt_unversioned->dltensor;
 
@@ -269,7 +269,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
         }
     }
 
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    ndarray_handle *th = nb_ndarray_data(self)->th;
     PyObject *capsule;
     if (max_major_version >= (long)dlpack::major_version)
         capsule = th->make_capsule_versioned();
@@ -281,7 +281,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
 
 // This function implements __dlpack_device__() for a nanobind.nb_ndarray.
 static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyObject *) {
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    ndarray_handle *th = nb_ndarray_data(self)->th;
     dlpack::dltensor& t = (th->versioned)
                               ? th->mt_versioned->dltensor
                               : th->mt_unversioned->dltensor;
@@ -332,7 +332,11 @@ static PyTypeObject *nb_ndarray_tp() noexcept {
 
         PyType_Spec spec = {
             /* .name = */ "nanobind.nb_ndarray",
+#if defined(_Py_OPAQUE_PYOBJECT)
+            /* .basicsize = */ (int) (object_data_offset + sizeof(nb_ndarray)),
+#else
             /* .basicsize = */ (int) sizeof(nb_ndarray),
+#endif
             /* .itemsize = */ 0,
             /* .flags = */ Py_TPFLAGS_DEFAULT,
             /* .slots = */ slots
@@ -969,12 +973,16 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     } else {
         // Make a Python object providing the buffer interface and having
         // the two DLPack methods __dlpack__() and __dlpack_device__().
-        nb_ndarray *h = PyObject_New(nb_ndarray, nb_ndarray_tp());
+#if defined(_Py_OPAQUE_PYOBJECT)
+        PyObject *h = PyType_GenericAlloc(nb_ndarray_tp(), 0);
+#else
+        PyObject *h = (PyObject *) PyObject_New(nb_ndarray, nb_ndarray_tp());
+#endif
         if (!h)
             return nullptr;
-        h->th = th;
+        nb_ndarray_data(h)->th = th;
         ndarray_inc_ref(th);
-        o = steal((PyObject *) h);
+        o = steal(h);
     }
 
     if (framework == numpy::value) {

@@ -171,6 +171,42 @@
 
 // Helper macros to ensure macro arguments are expanded before token pasting/stringification
 #define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)
+
+#if defined(_Py_OPAQUE_PYOBJECT)
+#define NB_MODULE_IMPL2(name, variable)                                        \
+    static void nanobind_##name##_exec_impl(nanobind::module_);                \
+    static int nanobind_##name##_exec(PyObject *m) {                           \
+        nanobind::detail::nb_module_exec(NB_DOMAIN_STR, m);                    \
+        try {                                                                  \
+            nanobind_##name##_exec_impl(                                       \
+                nanobind::borrow<nanobind::module_>(m));                       \
+            return 0;                                                          \
+        } catch (nanobind::python_error &e) {                                  \
+            e.restore();                                                       \
+            nanobind::chain_error(                                             \
+                PyExc_ImportError,                                             \
+                "Encountered an error while initializing the extension.");     \
+        } catch (const std::exception &e) {                                    \
+            PyErr_SetString(PyExc_ImportError, e.what());                      \
+        }                                                                      \
+        return -1;                                                             \
+    }                                                                          \
+    PyABIInfo_VAR(nanobind_##name##_abiinfo);                                  \
+    static PyModuleDef_Slot nanobind_##name##_slots[] = {                      \
+        { Py_mod_abi, (void *) &nanobind_##name##_abiinfo },                   \
+        { Py_mod_name, (void *) #name },                                       \
+        { Py_mod_exec, (void *) nanobind_##name##_exec },                      \
+        { Py_mod_state_free,                                                   \
+          (void *) nanobind::detail::nb_module_free },                         \
+        NB_MODULE_SLOTS_2                                                      \
+    };                                                                         \
+    extern "C" [[maybe_unused]] NB_EXPORT                                      \
+        PyModuleDef_Slot *PyModExport_##name(void);                            \
+    extern "C" PyModuleDef_Slot *PyModExport_##name(void) {                    \
+        return nanobind_##name##_slots;                                        \
+    }                                                                          \
+    void nanobind_##name##_exec_impl(nanobind::module_ variable)
+#else
 #define NB_MODULE_IMPL2(name, variable)                                        \
     static void nanobind_##name##_exec_impl(nanobind::module_);                \
     static int nanobind_##name##_exec(PyObject *m) {                           \
@@ -203,5 +239,6 @@
         return PyModuleDef_Init(&nanobind_##name##_module);                    \
     }                                                                          \
     void nanobind_##name##_exec_impl(nanobind::module_ variable)
+#endif
 
 #define NB_MODULE(name, variable) NB_MODULE_IMPL(name, variable)

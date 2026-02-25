@@ -8,7 +8,6 @@
 */
 
 #include <nanobind/nanobind.h>
-#include <structmember.h>
 #include "nb_internals.h"
 #include "nb_abi.h"
 #include <thread>
@@ -47,9 +46,15 @@ static PyType_Spec nb_meta_spec = {
     /* .slots = */ nb_meta_slots
 };
 
+#if defined(_Py_OPAQUE_PYOBJECT)
+#  define NB_MEMBER_OFFSET(type, field) 0 // filled at init time
+#else
+#  define NB_MEMBER_OFFSET(type, field) (Py_ssize_t) offsetof(type, field)
+#endif
+
 static PyMemberDef nb_func_members[] = {
-    { "__vectorcalloffset__", T_PYSSIZET,
-      (Py_ssize_t) offsetof(nb_func, vectorcall), READONLY, nullptr },
+    { "__vectorcalloffset__", Py_T_PYSSIZET,
+      NB_MEMBER_OFFSET(nb_func, vectorcall), Py_READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 
@@ -108,12 +113,12 @@ static PyType_Spec nb_method_spec = {
 };
 
 static PyMemberDef nb_bound_method_members[] = {
-    { "__vectorcalloffset__", T_PYSSIZET,
-      (Py_ssize_t) offsetof(nb_bound_method, vectorcall), READONLY, nullptr },
-    { "__func__", T_OBJECT_EX,
-      (Py_ssize_t) offsetof(nb_bound_method, func), READONLY, nullptr },
-    { "__self__", T_OBJECT_EX,
-      (Py_ssize_t) offsetof(nb_bound_method, self), READONLY, nullptr },
+    { "__vectorcalloffset__", Py_T_PYSSIZET,
+      NB_MEMBER_OFFSET(nb_bound_method, vectorcall), Py_READONLY, nullptr },
+    { "__func__", Py_T_OBJECT_EX,
+      NB_MEMBER_OFFSET(nb_bound_method, func), Py_READONLY, nullptr },
+    { "__self__", Py_T_OBJECT_EX,
+      NB_MEMBER_OFFSET(nb_bound_method, self), Py_READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 
@@ -163,6 +168,10 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
 // Initialized once when the module is loaded, no locking needed
 nb_internals *internals = nullptr;
 PyTypeObject *nb_meta_cache = nullptr;
+#if defined(_Py_OPAQUE_PYOBJECT)
+size_t object_data_offset = 0;
+size_t varobject_data_offset = 0;
+#endif
 
 
 static const char* interned_c_strs[pyobj_name::string_count] {
@@ -211,8 +220,13 @@ static void init_pyobjects(nb_internals *p) {
 
 /// Create lifeline + internal types if needed
 static void init_internals(nb_internals *p) {
-    if (p->lifeline)
+    if (p->lifeline) {
+#if defined(_Py_OPAQUE_PYOBJECT)
+        object_data_offset = p->object_data_offset;
+        varobject_data_offset = p->varobject_data_offset;
+#endif
         return;
+    }
 
     p->lifeline = PyList_New(0);
     check(p->lifeline, "nanobind::detail::nb_module_exec(): "
@@ -227,6 +241,48 @@ static void init_internals(nb_internals *p) {
 
     p->nb_type_dict = PyDict_New();
     new_object(p, p->nb_type_dict);
+
+#if defined(_Py_OPAQUE_PYOBJECT)
+    // Measure the runtime sizeof(PyObject) via PEP 697, then derive
+    // sizeof(PyVarObject) = sizeof(PyObject) + sizeof(Py_ssize_t).
+    {
+        PyType_Slot slots[] = { { 0, nullptr } };
+        PyType_Spec spec = {
+            "nanobind._dummy", -(int) sizeof(void *), 0,
+            Py_TPFLAGS_DEFAULT, slots
+        };
+        PyObject *tp = PyType_FromSpec(&spec),
+                 *inst = PyType_GenericAlloc((PyTypeObject *) tp, 0);
+        size_t odo = (uint8_t *) PyObject_GetTypeData(
+                         inst, (PyTypeObject *) tp) -
+                     (uint8_t *) inst;
+        Py_DECREF(inst);
+        Py_DECREF(tp);
+
+        check(odo >= sizeof(void *) * 2 && odo <= 1024,
+              "nanobind::detail::init_internals(): unexpected "
+              "object_data_offset: %zu", odo);
+
+        size_t vodo = odo + sizeof(Py_ssize_t);
+
+        p->object_data_offset = object_data_offset = odo;
+        p->varobject_data_offset = varobject_data_offset = vodo;
+
+        // Fix up type specs and member offsets for the opaque layout
+        nb_func_spec.basicsize = (int) (vodo + sizeof(nb_func));
+        nb_method_spec.basicsize = (int) (vodo + sizeof(nb_func));
+        nb_bound_method_spec.basicsize = (int) (odo + sizeof(nb_bound_method));
+
+        nb_func_members[0].offset =
+            (Py_ssize_t) (vodo + offsetof(nb_func, vectorcall));
+        nb_bound_method_members[0].offset =
+            (Py_ssize_t) (odo + offsetof(nb_bound_method, vectorcall));
+        nb_bound_method_members[1].offset =
+            (Py_ssize_t) (odo + offsetof(nb_bound_method, func));
+        nb_bound_method_members[2].offset =
+            (Py_ssize_t) (odo + offsetof(nb_bound_method, self));
+    }
+#endif
 
     p->nb_func         = new_type(p, &nb_func_spec);
     p->nb_method       = new_type(p, &nb_method_spec);

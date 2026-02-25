@@ -126,23 +126,23 @@ void nb_func_dealloc(PyObject *self) {
 }
 
 int nb_bound_method_traverse(PyObject *self, visitproc visit, void *arg) {
-    nb_bound_method *mb = (nb_bound_method *) self;
-    Py_VISIT((PyObject *) mb->func);
+    nb_bound_method *mb = nb_bound_method_data(self);
+    Py_VISIT(mb->func);
     Py_VISIT(mb->self);
     return 0;
 }
 
 int nb_bound_method_clear(PyObject *self) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    nb_bound_method *mb = nb_bound_method_data(self);
     Py_CLEAR(mb->func);
     Py_CLEAR(mb->self);
     return 0;
 }
 
 void nb_bound_method_dealloc(PyObject *self) {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    nb_bound_method *mb = nb_bound_method_data(self);
     PyObject_GC_UnTrack(self);
-    Py_DECREF((PyObject *) mb->func);
+    Py_DECREF(mb->func);
     Py_DECREF(mb->self);
     PyObject_GC_Del(self);
 }
@@ -292,12 +292,13 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     // Create a new function and destroy the old one
     Py_ssize_t prev_overloads = func_prev ? Py_SIZE(func_prev) : 0;
-    nb_func *func = (nb_func *) PyType_GenericAlloc(
+    PyObject *func_obj = PyType_GenericAlloc(
         is_method ? internals_->nb_method : internals_->nb_func, prev_overloads + 1);
-    check(func, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
+    check(func_obj, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
+    nb_func *func = nb_func_ptr(func_obj);
 
-    make_immortal((PyObject *) func);
+    make_immortal(func_obj);
     internals_inc_ref();
 
     // Check if the complex dispatch loop is needed
@@ -317,11 +318,11 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     const char *prev_doc = nullptr;
 
     if (func_prev) {
-        nb_func *nb_func_prev = (nb_func *) func_prev;
+        nb_func *nb_func_prev = nb_func_ptr(func_prev);
         complex_call |= nb_func_prev->complex_call;
         max_nargs = std::max(max_nargs, nb_func_prev->max_nargs);
 
-        func_data *cur  = nb_func_data(func),
+        func_data *cur  = nb_func_data(func_obj),
                   *prev = nb_func_data(func_prev);
 
         if (nb_func_prev->doc_uniform)
@@ -330,7 +331,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         memcpy(cur, prev, sizeof(func_data) * prev_overloads);
         memset(prev, 0, sizeof(func_data) * prev_overloads);
 
-        ((PyVarObject *) func_prev)->ob_size = 0;
+        Py_SET_SIZE((PyVarObject *) func_prev, 0);
 
 #if !defined(NB_FREE_THREADED)
         size_t n_deleted = internals_->funcs.erase(func_prev);
@@ -360,12 +361,12 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
 #if !defined(NB_FREE_THREADED)
     // Register the function
-    auto [it, success] = internals_->funcs.try_emplace(func, nullptr);
+    auto [it, success] = internals_->funcs.try_emplace(func_obj, nullptr);
     check(success,
           "nanobind::detail::nb_func_new(): internal update failed (2)!");
 #endif
 
-    func_data *fc = nb_func_data(func) + prev_overloads;
+    func_data *fc = nb_func_data(func_obj) + prev_overloads;
     memcpy(fc, f, sizeof(func_data_prelim_base));
     if (has_doc) {
         if (fc->doc[0] == '\n')
@@ -455,7 +456,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
         if (is_init) {
             if (!has_new) {
-                td->init = func;
+                td->init = func_obj;
             } else {
                 // Keep track of whether we have a __init__ overload that
                 // accepts no arguments (except self). If not, then we
@@ -478,13 +479,13 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                     td->flags |= (uint32_t) type_flags::has_nullary_new;
             }
         } else if (is_new) {
-            td->init = func;
+            td->init = func_obj;
             td->flags |= (uint32_t) type_flags::has_new;
         }
     }
 
     if (has_scope && name) {
-        int rv = PyObject_SetAttr(f->scope, name, (PyObject *) func);
+        int rv = PyObject_SetAttr(f->scope, name, func_obj);
         check(rv == 0, "nb::detail::nb_func_new(\"%s\"): setattr. failed.",
               name_cstr);
     }
@@ -492,9 +493,9 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     Py_XDECREF(name);
 
     if (return_ref) {
-        return (PyObject *) func;
+        return func_obj;
     } else {
-        Py_DECREF(func);
+        Py_DECREF(func_obj);
         return nullptr;
     }
 }
@@ -639,7 +640,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     cleanup_list cleanup(self_arg);
 
     // Preallocate stack memory for function dispatch
-    size_t max_nargs = ((nb_func *) self)->max_nargs;
+    size_t max_nargs = nb_func_ptr(self)->max_nargs;
     PyObject **args = (PyObject **) alloca(max_nargs * sizeof(PyObject *));
     uint8_t *args_flags = (uint8_t *) alloca(max_nargs * sizeof(uint8_t));
     bool *kwarg_used = (bool *) alloca(nkwargs_in * sizeof(bool));
@@ -856,12 +857,12 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
-                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    nb_inst *self_arg_nb = nb_inst_data(self_arg);
                     self_arg_nb->destruct = true;
                     self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
-                            ->set_self_py(inst_ptr(self_arg_nb), self_arg);
+                            ->set_self_py(inst_ptr(self_arg), self_arg);
                 }
 
                 goto done;
@@ -950,12 +951,12 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
-                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    nb_inst *self_arg_nb = nb_inst_data(self_arg);
                     self_arg_nb->destruct = true;
                     self_arg_nb->state = nb_inst::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->intrusive))
                         nb_type_data(Py_TYPE(self_arg))
-                            ->set_self_py(inst_ptr(self_arg_nb), self_arg);
+                            ->set_self_py(inst_ptr(self_arg), self_arg);
                 }
 
                 goto done;
@@ -1045,12 +1046,12 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
             } else if (!result) {
                 error_handler = nb_func_error_noconvert;
             } else if (is_constructor) {
-                nb_inst *arg_nb = (nb_inst *) arg;
+                nb_inst *arg_nb = nb_inst_data(arg);
                 arg_nb->destruct = true;
                 arg_nb->state = nb_inst::state_ready;
                 if (NB_UNLIKELY(arg_nb->intrusive))
                     nb_type_data(Py_TYPE(arg))
-                        ->set_self_py(inst_ptr(arg_nb), arg);
+                        ->set_self_py(inst_ptr(arg), arg);
             }
         } catch (builtin_exception &e) {
             if (!set_builtin_exception_status(e))
@@ -1077,7 +1078,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
                                             PyObject *const *args_in,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
-    nb_bound_method *mb = (nb_bound_method *) self;
+    nb_bound_method *mb = nb_bound_method_data(self);
     size_t nargs = (size_t) PyVectorcall_NARGS(nargsf);
     const size_t buf_size = 5;
     PyObject **args, *args_buf[buf_size], *temp = nullptr, *result;
@@ -1105,7 +1106,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
     }
 
     args[0] = mb->self;
-    result = mb->func->vectorcall((PyObject *) mb->func, args, nargs + 1, kwargs_in);
+    result = nb_func_ptr(mb->func)->vectorcall(mb->func, args, nargs + 1, kwargs_in);
     args[0] = temp;
 
     if (NB_UNLIKELY(alloc))
@@ -1120,16 +1121,21 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
            'CALL_METHOD' opcode and vector calls. Pytest rewrites the bytecode
            in a way that breaks this optimization :-/ */
 
-        nb_bound_method *mb =
-            PyObject_GC_New(nb_bound_method, internals->nb_bound_method);
-        mb->func = (nb_func *) self;
+#if defined(_Py_OPAQUE_PYOBJECT)
+        PyObject *mb_obj = PyType_GenericAlloc(internals->nb_bound_method, 0);
+#else
+        PyObject *mb_obj =
+            (PyObject *) PyObject_GC_New(nb_bound_method, internals->nb_bound_method);
+#endif
+        nb_bound_method *mb = nb_bound_method_data(mb_obj);
+        mb->func = self;
         mb->self = inst;
         mb->vectorcall = nb_bound_method_vectorcall;
 
         Py_INCREF(self);
         Py_INCREF(inst);
 
-        return (PyObject *) mb;
+        return mb_obj;
     } else {
         Py_INCREF(self);
         return self;
@@ -1405,7 +1411,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
 
         const func_data *fi = f + i;
         if ((fi->flags & (uint32_t) func_flags::has_doc) &&
-            (!((nb_func *) self)->doc_uniform || i == 0)) {
+            (!nb_func_ptr(self)->doc_uniform || i == 0)) {
             docstr = PyUnicode_FromString(fi->doc);
         } else {
             docstr = Py_None;
@@ -1488,7 +1494,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
     }
 
     if (doc_found) {
-        if (((nb_func *) self)->doc_uniform) {
+        if (nb_func_ptr(self)->doc_uniform) {
             buf.put('\n');
             buf.put_dstr(f->doc);
             buf.put('\n');
@@ -1548,8 +1554,8 @@ PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name_) {
             return res;
         PyErr_Clear();
     }
-    nb_func *func = ((nb_bound_method *) self)->func;
-    return nb_func_getattro((PyObject *) func, name_);
+    PyObject *func = nb_bound_method_data(self)->func;
+    return nb_func_getattro(func, name_);
 }
 
 /// Excise a substring from 's'

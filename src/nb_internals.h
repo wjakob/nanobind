@@ -55,7 +55,9 @@ struct func_data : func_data_prelim_base {
 
 /// Python object representing an instance of a bound C++ type
 struct nb_inst { // usually: 24 bytes
+#if !defined(_Py_OPAQUE_PYOBJECT)
     PyObject_HEAD
+#endif
 
     /// Offset to the actual instance data
     int32_t offset;
@@ -99,11 +101,17 @@ struct nb_inst { // usually: 24 bytes
     uint16_t unused;
 };
 
+#if defined(_Py_OPAQUE_PYOBJECT)
+static_assert(sizeof(nb_inst) == sizeof(uint32_t) * 2);
+#else
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
+#endif
 
 /// Python object representing a bound C++ function
 struct nb_func {
+#if !defined(_Py_OPAQUE_PYOBJECT)
     PyObject_VAR_HEAD
+#endif
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     bool complex_call;
@@ -112,15 +120,19 @@ struct nb_func {
 
 /// Python object representing a `nb_ndarray` (which wraps a DLPack ndarray)
 struct nb_ndarray {
+#if !defined(_Py_OPAQUE_PYOBJECT)
     PyObject_HEAD
+#endif
     ndarray_handle *th;
 };
 
 /// Python object representing an `nb_method` bound to an instance (analogous to non-public PyMethod_Type)
 struct nb_bound_method {
+#if !defined(_Py_OPAQUE_PYOBJECT)
     PyObject_HEAD
+#endif
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
-    nb_func *func;
+    PyObject *func;
     PyObject *self;
 };
 
@@ -433,6 +445,13 @@ struct nb_internals {
     /// PyList keeping managed PyObjects alive. Cleared when shared_ref_count
     /// reaches 0.
     PyObject *lifeline = nullptr;
+
+#if defined(_Py_OPAQUE_PYOBJECT)
+    /// Runtime sizeof(PyObject) -- offset from PyObject* to type-specific data
+    size_t object_data_offset;
+    /// Runtime sizeof(PyVarObject) -- same but for variable-size types (ob_size included)
+    size_t varobject_data_offset;
+#endif
 };
 
 // Names for the PyObject* entries in the per-module state array.
@@ -485,6 +504,10 @@ inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
 
 extern nb_internals *internals;
 extern PyTypeObject *nb_meta_cache;
+#if defined(_Py_OPAQUE_PYOBJECT)
+extern size_t object_data_offset;
+extern size_t varobject_data_offset;
+#endif
 
 extern char *type_name(const std::type_info *t);
 
@@ -498,9 +521,46 @@ extern void nb_type_unregister(type_data *t) noexcept;
 
 extern PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept;
 
+/// Accessors to retrieve the data portion of nanobind PyObject types.
+/// Under _Py_OPAQUE_PYOBJECT, the struct no longer contains PyObject_HEAD,
+/// so we must offset from the PyObject* by the runtime sizeof(PyObject).
+#if defined(_Py_OPAQUE_PYOBJECT)
+NB_INLINE nb_inst *nb_inst_data(PyObject *o) {
+    return (nb_inst *) ((char *) o + object_data_offset);
+}
+NB_INLINE nb_func *nb_func_ptr(PyObject *o) {
+    // nb_func is a variable-size type (has itemsize), so header is PyVarObject
+    return (nb_func *) ((char *) o + varobject_data_offset);
+}
+NB_INLINE nb_ndarray *nb_ndarray_data(PyObject *o) {
+    return (nb_ndarray *) ((char *) o + object_data_offset);
+}
+NB_INLINE nb_bound_method *nb_bound_method_data(PyObject *o) {
+    return (nb_bound_method *) ((char *) o + object_data_offset);
+}
+#else
+NB_INLINE nb_inst *nb_inst_data(PyObject *o) {
+    return (nb_inst *) o;
+}
+NB_INLINE nb_func *nb_func_ptr(PyObject *o) {
+    return (nb_func *) o;
+}
+NB_INLINE nb_ndarray *nb_ndarray_data(PyObject *o) {
+    return (nb_ndarray *) o;
+}
+NB_INLINE nb_bound_method *nb_bound_method_data(PyObject *o) {
+    return (nb_bound_method *) o;
+}
+#endif
+
 /// Fetch the nanobind function record from a 'nb_func' instance
 NB_INLINE func_data *nb_func_data(void *o) {
+#if defined(_Py_OPAQUE_PYOBJECT)
+    // nb_func is a variable-size type (has itemsize), so header is PyVarObject
+    return (func_data *) ((char *) o + varobject_data_offset + sizeof(nb_func));
+#else
     return (func_data *) (((char *) o) + sizeof(nb_func));
+#endif
 }
 
 #if defined(Py_LIMITED_API)
@@ -516,8 +576,9 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
     #endif
 }
 
-inline void *inst_ptr(nb_inst *self) {
-    void *ptr = (void *) ((intptr_t) self + self->offset);
+inline void *inst_ptr(PyObject *obj) {
+    nb_inst *self = nb_inst_data(obj);
+    void *ptr = (void *) ((intptr_t) obj + self->offset);
     return self->direct ? ptr : *(void **) ptr;
 }
 

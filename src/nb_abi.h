@@ -90,6 +90,13 @@
 #  define NB_FREE_THREADED_ABI ""
 #endif
 
+// As above, but for opaque PyObject builds (abi3t)
+#if defined(_Py_OPAQUE_PYOBJECT)
+#  define NB_OPAQUE_ABI "_opaque"
+#else
+#  define NB_OPAQUE_ABI ""
+#endif
+
 #if NB_VERSION_DEV > 0
   #define NB_VERSION_DEV_STR "_dev" NB_TOSTRING(NB_VERSION_DEV)
 #else
@@ -99,4 +106,4 @@
 #define NB_ABI_TAG                                                             \
     "v" NB_TOSTRING(NB_INTERNALS_VERSION)                                      \
         NB_VERSION_DEV_STR "_" NB_PLATFORM_ABI_TAG NB_STABLE_ABI               \
-            NB_FREE_THREADED_ABI
+            NB_FREE_THREADED_ABI NB_OPAQUE_ABI

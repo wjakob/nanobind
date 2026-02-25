@@ -112,7 +112,7 @@ NB_MODULE(test_functions_ext, m) {
 #if !defined(PYPY_VERSION) && !defined(Py_GIL_DISABLED)
     // Make sure we don't leak the previous member of the overload chain
     // (pypy's refcounts are bogus and will not help us with this check)
-    if (first_overload.ptr()->ob_refcnt != 1) {
+    if (Py_REFCNT(first_overload.ptr()) != 1) {
         throw std::runtime_error("Overload was leaked!");
     }
 #endif

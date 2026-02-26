@@ -238,7 +238,7 @@ nanobind_add_stub(
   RECURSIVE
   MODULE test_prefix_module
   OUTPUT_PATH
-    ${PYI_PREFIX}
+    ${PYI_PREFIX}test_prefix_module
   OUTPUT
     ${PYI_PREFIX}test_prefix_module/__init__.pyi
     ${PYI_PREFIX}test_prefix_module/prefix.pyi

@@ -1,5 +1,5 @@
 from test_prefix_module.prefixabc import Type
 
 
-def test_prefix() -> Type:
+def func() -> Type:
     return Type()

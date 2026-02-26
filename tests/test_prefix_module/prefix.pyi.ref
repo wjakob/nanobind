@@ -1,0 +1,4 @@
+import test_prefix_module.prefixabc
+
+
+def func() -> test_prefix_module.prefixabc.Type: ...

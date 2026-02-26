@@ -1,0 +1,4 @@
+from . import prefix as prefix, prefixabc as prefixabc
+
+
+def func() -> prefixabc.Type: ...

@@ -193,7 +193,6 @@ set(TEST_FILES
   py_stub_test.pyi.ref
   py_recursive_stub_test/__init__.pyi.ref
   py_recursive_stub_test/bar.pyi.ref
-  prefix.pyi.ref
   test_prefix_module/__init__.pyi.ref
   test_prefix_module/prefix.pyi.ref
   test_prefix_module/prefixabc.pyi.ref
@@ -233,15 +232,6 @@ nanobind_add_stub(
     ${PYI_PREFIX}py_recursive_stub_test/bar.pyi
   PYTHON_PATH ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
-nanobind_add_stub(
-  py_prefix_stub
-  MODULE prefix
-  OUTPUT ${PYI_PREFIX}prefix.pyi
-  PYTHON_PATH ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-nanobind_add_module(test_prefix_module test_prefix_module.cpp ${NB_EXTRA_ARGS})
 
 nanobind_add_stub(
   test_prefix_module_stub

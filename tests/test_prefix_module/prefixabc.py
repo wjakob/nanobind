@@ -3,5 +3,5 @@
 # but instead need to check for the module name followed by a dot.
 
 
-class T:
+class Type:
     pass

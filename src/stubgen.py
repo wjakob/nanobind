@@ -721,9 +721,9 @@ class StubGen:
             if mod_name == "builtins":
                 # Simplify builtins
                 return cls_name if cls_name != "NoneType" else "None"
-            if full_name.startswith(self.module.__name__ + "."):
+            if mod_name == self.module.__name__:
                 # Strip away the module prefix for local classes
-                return full_name[len(self.module.__name__) + 1 :]
+                return cls_name
             elif mod_name == "typing" or mod_name == "collections.abc":
                 # Import frequently-occurring typing classes and ABCs directly
                 return self.import_object(mod_name, cls_name)
@@ -968,7 +968,7 @@ class StubGen:
             return name
 
         # Rewrite module name if this is relative import from a submodule
-        if module.startswith(self.module.__name__) and module != self.module.__name__:
+        if module.startswith(self.module.__name__ + '.') and module != self.module.__name__:
             module_short = module[len(self.module.__name__) :]
             if not name and as_name and module_short[0] == ".":
                 name = as_name = module_short[1:]

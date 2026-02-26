@@ -1,0 +1,4 @@
+import prefixabc
+
+
+def test_prefix() -> prefixabc.T: ...

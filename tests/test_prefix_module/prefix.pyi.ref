@@ -1,0 +1,5 @@
+import test_prefix_module.prefixabc
+from test_prefix_module.prefixabc import Type as Type
+
+
+def func() -> test_prefix_module.prefixabc.Type: ...

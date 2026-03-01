@@ -280,6 +280,9 @@ NB_CORE PyObject **seq_get(PyObject *seq, size_t *size,
 
 // ========================================================================
 
+/// Non-null placeholder for size-0 capsules and ndarrays
+NB_CORE void *placeholder_ptr() noexcept;
+
 /// Create a new capsule object with a name
 NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
                               void (*cleanup)(void *) noexcept) noexcept;

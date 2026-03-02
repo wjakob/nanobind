@@ -82,10 +82,8 @@ void fail(const char *fmt, ...) noexcept {
 
 PyObject *capsule_new(const void *ptr, const char *name,
         void (*cleanup)(void *) noexcept) noexcept {
-    if (!ptr) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    if (!ptr)
+        Py_RETURN_NONE;
 
     auto capsule_cleanup = [](PyObject *o) {
         auto cleanup_2 = (void (*)(void *))(PyCapsule_GetContext(o));

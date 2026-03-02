@@ -1037,7 +1037,7 @@ def test54_docs_example():
 
 
 @needs_numpy
-def test_empty_ndarray():
+def test55_empty_ndarray():
     arr = t.ret_ndarray_empty()
     assert arr.shape == (0,)
     assert arr.dtype == np.float32

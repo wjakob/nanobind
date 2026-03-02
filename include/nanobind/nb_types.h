@@ -364,20 +364,23 @@ class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, NB_TYPING_CAPSULE, PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
-        if (ptr) m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
-        else { m_ptr = Py_None; Py_INCREF(m_ptr); }
+        m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
     }
 
     capsule(const void *ptr, const char *name,
             void (*cleanup)(void *) noexcept = nullptr) {
-        if (ptr) m_ptr = detail::capsule_new(ptr, name, cleanup);
-        else { m_ptr = Py_None; Py_INCREF(m_ptr); }
+        m_ptr = detail::capsule_new(ptr, name, cleanup);
     }
 
-    const char *name() const { return PyCapsule_GetName(m_ptr); }
+    const char *name() const {
+        return (m_ptr != Py_None) ? PyCapsule_GetName(m_ptr) : nullptr;
+    }
 
-    void *data() const { return PyCapsule_GetPointer(m_ptr, name()); }
+    void *data() const {
+        return (m_ptr != Py_None) ? PyCapsule_GetPointer(m_ptr, name()) : nullptr;
+    }
     void *data(const char *name) const {
+        if (m_ptr == Py_None) return nullptr;
         void *p = PyCapsule_GetPointer(m_ptr, name);
         if (!p && PyErr_Occurred())
             raise_python_error();

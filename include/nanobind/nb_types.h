@@ -364,12 +364,14 @@ class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, NB_TYPING_CAPSULE, PyCapsule_CheckExact)
 
     capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
+        if (ptr) m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
+        else { m_ptr = Py_None; Py_INCREF(m_ptr); }
     }
 
     capsule(const void *ptr, const char *name,
             void (*cleanup)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, name, cleanup);
+        if (ptr) m_ptr = detail::capsule_new(ptr, name, cleanup);
+        else { m_ptr = Py_None; Py_INCREF(m_ptr); }
     }
 
     const char *name() const { return PyCapsule_GetName(m_ptr); }

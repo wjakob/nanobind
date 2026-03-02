@@ -310,9 +310,9 @@ def test26_capsule():
 
 def test26b_capsule_nullptr():
     p = t.test_capsule_nullptr()
-    assert p is not None
+    assert p is None
     p = t.test_capsule_nullptr_no_cleanup()
-    assert p is not None
+    assert p is None
 
 
 def test27_slice():

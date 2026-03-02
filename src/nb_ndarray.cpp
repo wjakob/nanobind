@@ -893,9 +893,6 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
                       ndarray_dec_ref((ndarray_handle *) self->manager_ctx);
                   };
     mt->flags = (ro) ? dlpack::flag_bitmask_read_only : 0;
-    if (!data)
-        data = placeholder_ptr();
-
     mt->dltensor.data = data;
     mt->dltensor.device.device_type = (int32_t) device_type;
     mt->dltensor.device.device_id = (int32_t) device_id;

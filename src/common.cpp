@@ -80,19 +80,8 @@ void fail(const char *fmt, ...) noexcept {
     abort();
 }
 
-void *placeholder_ptr() noexcept {
-    static char placeholder = 0;
-    return &placeholder;
-}
-
 PyObject *capsule_new(const void *ptr, const char *name,
         void (*cleanup)(void *) noexcept) noexcept {
-    /* PyCapsule_New rejects nullptr; swap in a placeholder */
-    if (!ptr) {
-        ptr = placeholder_ptr();
-        cleanup = nullptr;
-    }
-
     auto capsule_cleanup = [](PyObject *o) {
         auto cleanup_2 = (void (*)(void *))(PyCapsule_GetContext(o));
         if (cleanup_2)

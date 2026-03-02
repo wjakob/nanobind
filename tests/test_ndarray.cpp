@@ -554,4 +554,13 @@ NB_MODULE(test_ndarray_ext, m) {
                return nb::ndarray<nb::array_api, double>(self.data(), {5});
            }, nb::rv_policy::reference_internal);
 
+    // Test size-0 ndarray with nullptr data
+    m.def("ret_ndarray_empty", []() {
+        float *data = nullptr;
+        size_t n = 0;
+        auto capsule = nb::capsule(data,
+            [](void *p) noexcept { delete[] static_cast<float *>(p); });
+        return nb::ndarray<nb::numpy, float, nb::shape<-1>>(data, {n}, capsule);
+    });
+
 }

@@ -282,6 +282,14 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_23", []() -> void * { return nullptr; });
     m.def("test_24", [](void *p) { return (uintptr_t) p; }, "p"_a.none());
 
+    // Test capsule with nullptr
+    m.def("test_capsule_nullptr", []() {
+        return nb::capsule(nullptr, [](void *) noexcept {});
+    });
+    m.def("test_capsule_nullptr_no_cleanup", []() {
+        return nb::capsule(nullptr);
+    });
+
     // Test slice
     m.def("test_25", [](nb::slice s) { return s; });
     m.def("test_26", []() { return nb::slice(4); });

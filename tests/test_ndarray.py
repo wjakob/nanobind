@@ -1034,3 +1034,10 @@ def test54_docs_example():
         assert np.all(y == [0.5, 1.5, 2.5, 3.5, 4.5])
     else:
         pytest.skip('your version of numpy is too old')
+
+
+@needs_numpy
+def test55_empty_ndarray():
+    arr = t.ret_ndarray_empty()
+    assert arr.shape == (0,)
+    assert arr.dtype == np.float32

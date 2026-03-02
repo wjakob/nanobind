@@ -372,10 +372,15 @@ class capsule : public object {
         m_ptr = detail::capsule_new(ptr, name, cleanup);
     }
 
-    const char *name() const { return PyCapsule_GetName(m_ptr); }
+    const char *name() const {
+        return (m_ptr != Py_None) ? PyCapsule_GetName(m_ptr) : nullptr;
+    }
 
-    void *data() const { return PyCapsule_GetPointer(m_ptr, name()); }
+    void *data() const {
+        return (m_ptr != Py_None) ? PyCapsule_GetPointer(m_ptr, name()) : nullptr;
+    }
     void *data(const char *name) const {
+        if (m_ptr == Py_None) return nullptr;
         void *p = PyCapsule_GetPointer(m_ptr, name);
         if (!p && PyErr_Occurred())
             raise_python_error();

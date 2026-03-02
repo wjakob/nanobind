@@ -458,7 +458,9 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
     if (internals) {
         init_internals(internals);
         init_pyobjects(internals);
-        nb_meta_cache = internals->nb_meta;
+        if (nb_meta_cache != internals->nb_meta) {
+            nb_meta_cache = internals->nb_meta;
+        }
         internals_inc_ref();
         return;
     }
@@ -486,7 +488,9 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 
         init_internals(internals);
         init_pyobjects(internals);
-        nb_meta_cache = internals->nb_meta;
+        if (nb_meta_cache != internals->nb_meta) {
+            nb_meta_cache = internals->nb_meta;
+        }
         internals_inc_ref();
 
         Py_DECREF(capsule);
@@ -510,7 +514,9 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 
     init_internals(p);
     init_pyobjects(p);
-    nb_meta_cache = p->nb_meta;
+    if (nb_meta_cache != p->nb_meta) {
+        nb_meta_cache = p->nb_meta;
+    }
 
 #if defined(NB_FREE_THREADED)
     p->nb_static_property_disabled = PyThread_tss_alloc();

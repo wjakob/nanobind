@@ -534,8 +534,11 @@ class StubGen:
         pos = getter_sig.find("/) -> ")
         if pos == -1:
             raise RuntimeError(f"Static property '{name}' ({getter_sig}) has an invalid signature!")
-        getter_sig = getter_sig[pos + 6 :]
-        self.write_ln(f"{name}: {getter_sig} = ...")
+        tp = self.simplify_types(getter_sig[pos + 6 :])
+        if prop.fset is None:
+            tp = f"{self.import_object('typing', 'Final')}[{tp}]"
+        tp = f"{self.import_object('typing', 'ClassVar')}[{tp}]"
+        self.write_ln(f"{name}: {tp} = ...")
         if prop.__doc__ and self.include_docstrings:
             self.put_docstr(prop.__doc__)
         self.write("\n")

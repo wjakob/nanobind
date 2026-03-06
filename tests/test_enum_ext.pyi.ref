@@ -1,5 +1,5 @@
 import enum
-from typing import overload
+from typing import ClassVar, Final, overload
 
 
 class Enum(enum.Enum):
@@ -113,10 +113,10 @@ class OpaqueEnum:
     @overload
     def __init__(self, arg: str, /) -> None: ...
 
-    X: test_enum_ext.OpaqueEnum = ...
+    X: ClassVar[Final[OpaqueEnum]] = ...
     """(arg: object, /) -> test_enum_ext.OpaqueEnum"""
 
-    Y: test_enum_ext.OpaqueEnum = ...
+    Y: ClassVar[Final[OpaqueEnum]] = ...
     """(arg: object, /) -> test_enum_ext.OpaqueEnum"""
 
     def __eq__(self, arg: OpaqueEnum, /) -> bool: ...

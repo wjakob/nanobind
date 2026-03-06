@@ -1,4 +1,4 @@
-from typing import overload
+from typing import ClassVar, Final, overload
 
 
 class Struct:
@@ -31,6 +31,12 @@ class Struct:
     @overload
     @staticmethod
     def static_test(arg: float, /) -> int: ...
+
+    static_ro: ClassVar[Final[int]] = ...
+    """(arg: object, /) -> int"""
+
+    static_rw: ClassVar[int] = ...
+    """(arg: object, /) -> int"""
 
     @staticmethod
     def create_move() -> Struct: ...
@@ -183,7 +189,7 @@ class MyClass:
     def f(self) -> None: ...
 
 class StaticProperties:
-    value: int = ...
+    value: ClassVar[int] = ...
     """Static property docstring"""
 
     @staticmethod
@@ -376,11 +382,11 @@ class MonkeyPatchable:
     def value(self, arg: int, /) -> None: ...
 
 class StaticPropertyOverride:
-    x: int = ...
+    x: ClassVar[Final[int]] = ...
     """(arg: object, /) -> int"""
 
 class StaticPropertyOverride2(StaticPropertyOverride):
-    x: int = ...
+    x: ClassVar[Final[int]] = ...
     """(arg: object, /) -> int"""
 
 class ConstexprClass:

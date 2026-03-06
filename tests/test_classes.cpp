@@ -179,6 +179,10 @@ NB_MODULE(test_classes_ext, m) {
         .def("__setstate__", &Struct::setstate)
         .def_static("static_test", nb::overload_cast<int>(&Struct::static_test))
         .def_static("static_test", nb::overload_cast<float>(&Struct::static_test))
+        .def_prop_ro_static("static_ro", [](nb::handle) { return 42; })
+        .def_prop_rw_static("static_rw",
+            [](nb::handle) { return 42; },
+            [](nb::handle, int) {})
         .def_static("create_move", &Struct::create_move)
         .def_static("create_reference", &Struct::create_reference,
                     nb::rv_policy::reference)

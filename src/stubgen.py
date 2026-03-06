@@ -335,7 +335,13 @@ class StubGen:
         """Append an indented single or multi-line docstring"""
         self.write(self.format_docstr(docstr, self.depth))
 
-    def put_nb_overload(self, fn: NbFunction, sig: NbFunctionSignature, name: Optional[str] = None) -> None:
+    def put_nb_overload(
+        self,
+        fn: NbFunction,
+        sig: NbFunctionSignature,
+        name: Optional[str] = None,
+        is_classmethod: bool = False,
+    ) -> None:
         """
         The ``put_nb_func()`` repeatedly calls this method to render the
         individual method overloads.
@@ -389,7 +395,10 @@ class StubGen:
                 sig_str = sig_str[:pos] + arg_str + sig_str[pos + len(pattern) :]
                 start = pos + len(arg_str)
 
-        if type(fn).__name__ == "nb_func" and self.depth > 0:
+        if is_classmethod:
+            # Rewrite the first parameter to just cls.
+            sig_str = re.sub(r'(def \w+\()[^,)]+', r'\1cls', sig_str, count=1)
+        elif type(fn).__name__ == "nb_func" and self.depth > 0:
             self.write_ln("@staticmethod")
 
         if not docstr or not self.include_docstrings:
@@ -406,20 +415,22 @@ class StubGen:
             self.depth -= 1
         self.write("\n")
 
-    def put_nb_func(self, fn: NbFunction, name: Optional[str] = None) -> None:
+    def put_nb_func(
+        self, fn: NbFunction, name: Optional[str] = None, is_classmethod: bool = False,
+    ) -> None:
         """Append a nanobind function binding to the stub"""
         sigs = fn.__nb_signature__
         count = len(sigs)
         assert count > 0
         if count == 1:
             # No overloads write directly
-            self.put_nb_overload(fn, sigs[0], name)
+            self.put_nb_overload(fn, sigs[0], name, is_classmethod=is_classmethod)
         else:
             # Render an @overload-decorated chain
             overload = self.import_object("typing", "overload")
             for s in sigs:
                 self.write_ln(f"@{overload}")
-                self.put_nb_overload(fn, s, name)
+                self.put_nb_overload(fn, s, name, is_classmethod=is_classmethod)
 
     def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None):
         """Append a function of an arbitrary type to the stub"""
@@ -440,18 +451,21 @@ class StubGen:
             self.write_ln(f"{name} = {fn_name}\n")
             return
 
-        # Special handling for nanobind functions with overloads
-        if type(fn).__module__ == "nanobind":
-            fn = cast(NbFunction, fn)
-            self.put_nb_func(fn, name)
-            return
-
-        if isinstance(fn, staticmethod):
-            self.write_ln("@staticmethod")
+        # Unwrap staticmethod/classmethod descriptors.
+        if is_staticmethod := isinstance(fn, staticmethod):
             fn = fn.__func__
-        elif isinstance(fn, classmethod):
+        if is_classmethod := isinstance(fn, classmethod):
             self.write_ln("@classmethod")
             fn = fn.__func__
+
+        # Special handling for nanobind functions with overloads.
+        if type(fn).__module__ == "nanobind":
+            fn = cast(NbFunction, fn)
+            self.put_nb_func(fn, name, is_classmethod=is_classmethod)
+            return
+
+        if is_staticmethod:
+            self.write_ln("@staticmethod")
 
         if name is None:
             name = fn.__name__

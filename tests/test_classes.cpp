@@ -186,6 +186,20 @@ NB_MODULE(test_classes_ext, m) {
                     nb::rv_policy::copy)
         .def_static("create_take", &Struct::create_take);
 
+    cls.attr("class_method") =
+        nb::module_::import_("builtins").attr("classmethod")(
+            nb::cpp_function(
+                [](nb::handle cls, int value) -> int { return value * 2; },
+                "cls"_a, "value"_a = 0,
+                "A classmethod that wraps a nanobind function."));
+
+    cls.attr("static_method") =
+        nb::module_::import_("builtins").attr("staticmethod")(
+            nb::cpp_function(
+                [](int value) -> int { return value * 3; },
+                "value"_a = 0,
+                "A staticmethod that wraps a nanobind function."));
+
     if (!nb::type<Struct>().is(cls))
         nb::detail::raise("type lookup failed!");
 

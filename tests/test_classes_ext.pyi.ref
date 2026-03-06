@@ -44,6 +44,14 @@ class Struct:
     @staticmethod
     def create_take() -> Struct: ...
 
+    @classmethod
+    def class_method(cls, value: int = 0) -> int:
+        """A classmethod that wraps a nanobind function."""
+
+    @staticmethod
+    def static_method(value: int = 0) -> int:
+        """A staticmethod that wraps a nanobind function."""
+
 class PairStruct:
     def __init__(self) -> None: ...
 

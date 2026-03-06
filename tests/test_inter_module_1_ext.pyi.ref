@@ -1,0 +1,3 @@
+
+
+def create_shared() -> "Shared": ...

@@ -326,7 +326,10 @@ endfunction()
 
 function (nanobind_compile_options name)
   if (MSVC)
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/bigobj /MP>)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/bigobj>)
+  endif()
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/MP>)
   endif()
 endfunction()
 

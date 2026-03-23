@@ -96,7 +96,8 @@ set(NB_SUFFIX_S       ${NB_SUFFIX_S}       CACHE INTERNAL "")
 set(NB_ABI            ${NB_ABI}            CACHE INTERNAL "")
 set(NB_FREE_THREADED  ${NB_FREE_THREADED} CACHE INTERNAL "")
 
-get_filename_component(NB_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(NB_DIR "${CMAKE_CURRENT_LIST_FILE}" REALPATH)
+get_filename_component(NB_DIR "${NB_DIR}" PATH)
 get_filename_component(NB_DIR "${NB_DIR}" PATH)
 
 set(NB_DIR      ${NB_DIR} CACHE INTERNAL "")

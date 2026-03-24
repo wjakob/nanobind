@@ -174,6 +174,7 @@ set(TEST_FILES
   test_ndarray.py
   test_jax.py
   test_tensorflow.py
+  test_stubgen.py
   test_stubs.py
   test_typing.py
   test_thread.py

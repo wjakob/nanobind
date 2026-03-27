@@ -1076,7 +1076,15 @@ class StubGen:
         elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
             tv = self.import_object(tp.__module__, "TypeVarTuple")
-            return f'{tv}("{e.__name__}")'
+            s = f'{tv}("{e.__name__}"'
+            if sys.version_info >= (3, 13):
+                v = e.__default__
+                if v is not typing.NoDefault:
+                    v = self.expr_str(v, abbrev=False)
+                    if v is None:
+                        return None
+                    s += ", default=" + v
+            return s + ')'
         elif issubclass(tp, typing.TypeVar):
             tv = self.import_object("typing", "TypeVar")
             s = f'{tv}("{e.__name__}"'
@@ -1095,6 +1103,13 @@ class StubGen:
                     if v is None:
                         return None
                     s += f", {k}=" + v
+            if sys.version_info >= (3, 13):
+                v = e.__default__
+                if v is not typing.NoDefault:
+                    v = self.expr_str(v, abbrev=False)
+                    if v is None:
+                        return None
+                    s += ", default=" + v
             s += ")"
             return s
         elif issubclass(tp, str):

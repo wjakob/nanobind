@@ -118,6 +118,20 @@ NB_MODULE(test_typing_ext, m) {
     m.attr("T2") = nb::type_var("T2", "bound"_a = nb::type<Foo>());
     m.attr("T3") = nb::type_var("T3", *nb::make_tuple(nb::type<Foo>(), nb::type<Wrapper>()));
 
+    m.attr("T4") = nb::type_var("T4", "bound"_a = nb::builtins()["float"]
+#if PY_VERSION_HEX >= 0x030D0000
+      , "default"_a = nb::builtins()["int"]
+#endif
+    );
+
+#if PY_VERSION_HEX >= 0x030B0000
+    m.attr("T5") = nb::type_var_tuple("T5"
+#if PY_VERSION_HEX >= 0x030D0000
+      , "default"_a = nb::typing().attr("Unpack")[nb::builtins()["tuple"][nb::make_tuple(nb::type<Foo>(), nb::ellipsis())]]
+#endif
+    );
+#endif
+
     // Some statements that will be modified by the pattern file
     m.def("remove_me", []{});
     m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");

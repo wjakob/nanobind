@@ -1,6 +1,15 @@
 from collections.abc import Iterable
 import py_stub_test
-from typing import Any, Generic, Optional, Self, TypeAlias, TypeVar
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    Self,
+    TypeAlias,
+    TypeVar,
+    TypeVarTuple,
+    Unpack
+)
 
 from . import submodule as submodule
 from .submodule import F as F, f as f2
@@ -70,6 +79,10 @@ def list_front[T](arg: list[T], /) -> T: ...
 T2 = TypeVar("T2", bound=Foo)
 
 T3 = TypeVar("T3", Foo, Wrapper)
+
+T4 = TypeVar("T4", bound=float, default=int)
+
+T5 = TypeVarTuple("T5", default=Unpack[tuple[Foo, ...]])
 
 def tweak_me(arg: int):
     """

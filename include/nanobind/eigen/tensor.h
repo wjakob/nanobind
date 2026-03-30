@@ -1,7 +1,9 @@
 /*
     nanobind/eigen/tensor.h: type casters for Eigen tensors
 
-    Copyright (c) 2026 Wilson Jallet
+    Copyright (c) 2026 INRIA
+
+    Author(s): Wilson Jallet
 
     All rights reserved. Use of this source code is governed by a
     BSD-style license that can be found in the LICENSE file.

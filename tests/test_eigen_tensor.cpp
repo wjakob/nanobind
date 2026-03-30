@@ -9,19 +9,20 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 NB_MODULE(test_eigen_tensor_ext, m) {
-    using DoubleTensor = Eigen::Tensor<double, 3, 0>;
-    using Dims = DoubleTensor::Dimensions;
-    using DimPair = DoubleTensor::DimensionPair;
-    constexpr bool isEig = nb::detail::is_eigen_v<DoubleTensor>;
-    constexpr bool isTens = nb::detail::is_eigen_tensor_v<DoubleTensor>;
+    using Tensor3d = Eigen::Tensor<double, 3, 0>;
+    using RowTensor3d = Eigen::Tensor<double, 3, 1>;
+    using Dims = Tensor3d::Dimensions;
+    using DimPair = Tensor3d::DimensionPair;
+    static_assert(nb::detail::make_caster<RowTensor3d>::IsRowMajor); 
 
-    DoubleTensor t;
-    m.def("add3dTensor", [](const DoubleTensor &a, const DoubleTensor &b) -> DoubleTensor {
-        return a + b;
+    m.def("add3dTensor", [](const Tensor3d &a, const Tensor3d &b) -> Tensor3d {
+        auto c = (a + b).eval();
+        return c;
     }, "a"_a, "b"_a.noconvert());
 
-    m.def("mul3dTensor", [](const double &a, const DoubleTensor &b) -> DoubleTensor {
-        return a * b;
+    m.def("mul3dTensor", [](const double &a, const Tensor3d &b) -> Tensor3d {
+        auto c = (a * b).eval();
+        return c;
     }, "a"_a, "b"_a.noconvert());
 
 

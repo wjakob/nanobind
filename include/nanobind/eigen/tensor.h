@@ -27,41 +27,100 @@ template<typename T, int MapOptions,
     template<class> class MakePointer>
 struct type_caster<
     Eigen::TensorMap<T, MapOptions, MakePointer>,
-    enable_if_t<is_eigen_tensor_v<T> && is_ndarray_scalar_v<typename T::Scalar>>>
-     {
-        using Scalar = typename T::Scalar;
-        using IndexType = typename T::IndexType;
-        static constexpr int NumIndices = T::NumIndices;
-        static constexpr int Options = T::Options;
-        using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
-        using Dimensions = typename T::Dimensions;
-        using MapType = Eigen::TensorMap<T, MapOptions, MakePointer>;
+    enable_if_t<is_eigen_tensor_v<T> && is_ndarray_scalar_v<typename T::Scalar>>> {
 
-        // Only partial specification. Dimensions not known at compile time...
-        using NDArray = ndarray<Scalar, numpy, device::cpu>;
-        using NDArrayCaster = make_caster<NDArray>;
+    using Scalar = typename T::Scalar;
+    using IndexType = typename T::IndexType;
+    static constexpr int NumIndices = T::NumIndices;
+    static constexpr int Options = T::Options;
+    using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
+    using Dimensions = typename T::Dimensions;
+    using MapType = Eigen::TensorMap<T, MapOptions, MakePointer>;
 
-        static constexpr auto Name = NDArrayCaster::Name;
-        template<typename T_> using Cast = MapType;
-        template<typename T_> static constexpr bool can_cast() { return true; };
+    // Only partial specification. Dimensions not known at compile time...
+    using NDArray = ndarray<Scalar, numpy, device::cpu>;
+    using NDArrayCaster = make_caster<NDArray>;
 
-        NDArrayCaster caster;
+    static constexpr auto Name = NDArrayCaster::Name;
+    template<typename T_> using Cast = MapType;
+    template<typename T_> static constexpr bool can_cast() { return true; };
 
-        bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    NDArrayCaster caster;
 
-        }
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        // Disable implicit conversions
+        return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
+    }
 
-        bool from_python_(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {}
+    bool from_python_(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        
+    }
+
+    static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept = delete;
 };
 
 
 template<typename Scalar, int NumIndices, int Options, typename IndexType>
 struct type_caster<
-        Eigen::Tensor<Scalar, NumIndices, Options, IndexType>
-    > {
-        using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
-        using Dimensions = typename PlainTensor::Dimensions;
-        using Coeffs = typename PlainTensor::CoeffReturnType;
+        Eigen::Tensor<Scalar, NumIndices, Options, IndexType>> {
+
+    using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
+    using Dimensions = typename PlainTensor::Dimensions;
+    using Coeffs = typename PlainTensor::CoeffReturnType;
+    static constexpr bool IsRowMajor = bool(Options & Eigen::RowMajorBit);
+    using NDArray = ndarray<Scalar, numpy, device::cpu>;
+    using NDArrayCaster = make_caster<NDArray>;
+
+    // PlainTensor value;
+    NB_TYPE_CASTER(PlainTensor, NDArrayCaster::Name);
+
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        using NDArrayConst = ndarray<const Scalar, numpy, ndim<NumIndices>>;
+        make_caster<NDArrayConst> caster;
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
+            return false;
+
+        const NDArrayConst &array = caster.value;
+        // copy tensor dims
+        std::array<long, NumIndices> out_dims;
+        for(size_t i = 0; i < NumIndices; i++) {
+            out_dims[i] = array.shape(i);
+        }
+        value.resize(out_dims);
+
+        memcpy(value.data(), array.data(), array.size() * sizeof(Scalar));
+
+        return true;
+    }
+
+    static handle from_cpp(const PlainTensor &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        size_t shape[NumIndices];
+
+        for (size_t i = 0 ; i < NumIndices; i++) {
+            shape[i] = static_cast<size_t>(v.dimension(i));
+        }
+        
+        void *ptr = (void *)v.data();
+
+        object owner;
+        if (policy == rv_policy::move) {
+            PlainTensor *tmp = new PlainTensor((PlainTensor&&)v);
+            owner = capsule(tmp, [](void* p) noexcept {
+                delete (PlainTensor*) p;
+            });
+            ptr = tmp->data();
+            policy = rv_policy::reference;
+        } else if (policy == rv_policy::reference_internal && cleanup->self()) {
+            owner = borrow(cleanup->self());
+            policy = rv_policy::reference;
+        }
+        object o = steal(
+            NDArrayCaster::from_cpp(
+                NDArray {ptr, NumIndices, shape, owner},
+                policy, cleanup)
+        );
+        return o.release();
+    }
 };
 
 /// TODO: implement caster for Eigen::TensorRef. 

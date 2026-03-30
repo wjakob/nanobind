@@ -23,6 +23,18 @@ NAMESPACE_BEGIN(detail)
 template<typename T> constexpr bool is_eigen_tensor_v = 
     std::is_base_of_v<Eigen::TensorBase<T, Eigen::ReadOnlyAccessors>, T>;
 
+template<typename T> constexpr bool eigen_tensor_is_row_major_v = bool(T::Options & Eigen::RowMajorBit);
+
+template<typename T, typename Scalar = typename T::Scalar>
+using ndarray_for_eigen_tensor_t = ndarray<
+    Scalar,
+    numpy,
+    ndim<T::NumDimensions>, 
+    std::conditional_t<
+        eigen_tensor_is_row_major_v<T>,
+        c_contig,
+        f_contig>>;
+
 /** \brief Type caster for ``Eigen::TensorMap<T>``
  */
 template<typename T, int MapOptions,
@@ -40,9 +52,11 @@ struct type_caster<
     using MapType = Eigen::TensorMap<T, MapOptions, MakePointer>;
 
     // Only partial specification. Dimensions not known at compile time...
-    using NDArray = ndarray<Scalar, numpy, device::cpu>;
+    using NDArray =
+        ndarray_for_eigen_tensor_t<T, std::conditional_t<std::is_const_v<T>,
+                                                         const Scalar,
+                                                         Scalar>>;
     using NDArrayCaster = make_caster<NDArray>;
-
     static constexpr auto Name = NDArrayCaster::Name;
     template<typename T_> using Cast = MapType;
     template<typename T_> static constexpr bool can_cast() { return true; };
@@ -70,14 +84,14 @@ struct type_caster<
     using Dimensions = typename PlainTensor::Dimensions;
     using Coeffs = typename PlainTensor::CoeffReturnType;
     static constexpr bool IsRowMajor = bool(Options & Eigen::RowMajorBit);
-    using NDArray = ndarray<Scalar, numpy, device::cpu>;
+    using NDArray = ndarray_for_eigen_tensor_t<PlainTensor>;
     using NDArrayCaster = make_caster<NDArray>;
 
     // PlainTensor value;
     NB_TYPE_CASTER(PlainTensor, NDArrayCaster::Name);
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        using NDArrayConst = ndarray<const Scalar, numpy, ndim<NumIndices>>;
+        using NDArrayConst = ndarray_for_eigen_tensor_t<PlainTensor, const Scalar>;
         make_caster<NDArrayConst> caster;
         if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
             return false;

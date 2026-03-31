@@ -28,10 +28,10 @@ NB_MODULE(test_eigen_tensor_ext, m) {
         return a + b;
     }, "a"_a, "b"_a);
     m.def("add3dTensor_nc", [](const Tensor3d &a, const Tensor3d &b) -> Tensor3d {
-        return (a + b).eval();
+        return a + b;
     }, "a"_a.noconvert(), "b"_a.noconvert());
     m.def("square3dTensorR", [](const RowTensor3d &a) -> RowTensor3d {
-        return a.square().eval();
+        return a.square();
     }, "a"_a.noconvert());
 
     m.def("mul3dTensor", [](double a, const Tensor3d &b) -> Tensor3d {

@@ -95,7 +95,8 @@ struct type_caster<
 
 template<typename Scalar, int NumIndices, int Options, typename IndexType>
 struct type_caster<
-        Eigen::Tensor<Scalar, NumIndices, Options, IndexType>> {
+        Eigen::Tensor<Scalar, NumIndices, Options, IndexType>,
+        enable_if_t<is_ndarray_scalar_v<Scalar>>> {
 
     using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
     using Dimensions = typename PlainTensor::Dimensions;
@@ -110,6 +111,7 @@ struct type_caster<
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         using NDArrayConst = ndarray_for_eigen_tensor_t<PlainTensor, const Scalar>;
         make_caster<NDArrayConst> caster;
+        // Do not accept None
         if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
             return false;
 

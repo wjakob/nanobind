@@ -178,7 +178,93 @@ struct type_caster<
     }
 };
 
-/// TODO: implement caster for Eigen::TensorRef. 
+/** \brief Type caster for ``Eigen::TensorRef<T>``
+ */
+template<typename T>
+struct type_caster<
+    Eigen::TensorRef<T>,
+    enable_if_t<is_ndarray_scalar_v<typename T::Scalar>>> {
+
+    using Scalar = typename T::Scalar;
+    using IndexType = typename T::Index;
+    static constexpr int NumIndices = T::NumIndices;
+    static constexpr int Options = T::Options;
+    using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
+    using Dimensions = typename T::Dimensions;
+
+    // Only partial specification. Dimensions not known at compile time...
+    using NDArray =
+        ndarray_for_eigen_tensor_t<T, std::conditional_t<std::is_const_v<T>,
+                                                         const Scalar,
+                                                         Scalar>>;
+    using NDArrayCaster = make_caster<NDArray>;
+
+    using MapType = Eigen::TensorMap<T>;
+    using MapCaster = make_caster<MapType>;
+
+    using RefType = Eigen::TensorRef<T>;
+
+
+    static constexpr bool MaybeConvert = std::is_const_v<T>;
+    using PlainCaster = make_caster<PlainTensor>;
+
+    static constexpr auto Name = const_name<MaybeConvert>(PlainCaster::Name, MapCaster::Name);
+
+    template<typename T_> using Cast = RefType;
+    template<typename T_> static constexpr bool can_cast() { return true; };
+
+    MapCaster caster;
+    struct Empty {};
+    std::conditional_t<MaybeConvert, PlainCaster, Empty> plain_caster;
+
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        // no conversion for mutable Ref
+        if constexpr (!std::is_const_v<T>)
+            flags &= ~(uint8_t) cast_flags::convert;
+
+        // Try direct cast
+        if (caster.from_python(src, flags, cleanup))
+            return true;
+
+        // if const T, attempt leveraging PlainTensor conversion
+        if constexpr (MaybeConvert) {
+            // we create a new temporary tensor object, and
+            // its lifetime is that of plain_caster.
+            // for manual conversion, disable conversion.
+            if ((flags & (uint8_t) cast_flags::manual))
+                flags &= ~(uint8_t) cast_flags::convert;
+            if (plain_caster.from_python(src, flags, cleanup))
+                return true;
+        }
+
+        return false;
+    }
+
+    static handle from_cpp(const RefType &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        size_t shape[NumIndices];
+
+        for (size_t i = 0; i < NumIndices; i++) {
+            shape[i] = static_cast<size_t>(v.dimension(i));
+        }
+    
+        return NDArrayCaster::from_cpp(
+            NDArray((void *) v.data(), NumIndices, shape, handle()),
+            (policy == rv_policy::automatic ||
+             policy == rv_policy::automatic_reference)
+                ? rv_policy::reference
+                : policy,
+            cleanup);
+    }
+
+    operator RefType() {
+        if constexpr (MaybeConvert) {
+            // if there's a value, return it
+            if (plain_caster.caster.value.is_valid())
+                return RefType(plain_caster.operator PlainTensor&());
+        }
+        return RefType(caster.operator MapType());
+    }
+};
 
 
 NAMESPACE_END(detail)

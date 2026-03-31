@@ -39,6 +39,12 @@ NB_MODULE(test_eigen_tensor_ext, m) {
         return c;
     }, "a"_a, "b"_a);
 
+    // -- Refs
+
+    m.def("update3dTensorRef", [](Eigen::TensorRef<Tensor3d> a) {
+        a.coeffRef(0, 0, 0) = 42.0;
+    }, "a"_a.noconvert());
+
     // -- Maps - noconvert() is implicit
 
     m.def("mul3dTensorMap", [](double a, Eigen::TensorMap<const Tensor3d> b) -> Tensor3d {

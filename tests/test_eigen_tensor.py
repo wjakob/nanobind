@@ -12,6 +12,7 @@ needs_numpy_and_eigen = pytest.mark.skipif(
     not HAS_NUMPY_AND_EIGEN,
     reason="NumPy and Eigen are required")
 
+
 @needs_numpy_and_eigen
 def test01_tensor3d():
     a = np.arange(0, 12, dtype=float).reshape(2, 3, 2)
@@ -42,3 +43,16 @@ def test01_tensor3d():
     arr = np.asfortranarray(a.copy())
     t.mul3dTensorMapInPlace(2.0, arr)
     assert_array_equal(arr, 2.0 * a)
+
+
+@needs_numpy_and_eigen
+def test02_update_tensorref():
+    a = np.arange(0, 12, dtype=float).reshape(2, 3, 2)
+
+    arr = np.asfortranarray(a.copy())
+    t.update3dTensorRef(arr)
+    assert arr[0, 0, 0] == 42.0
+
+    # wrong scalar type is rejected
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.update3dTensorRef(np.asfortranarray(a).astype(np.int32))

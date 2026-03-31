@@ -169,12 +169,9 @@ struct type_caster<
             owner = borrow(cleanup->self());
             policy = rv_policy::reference;
         }
-        object o = steal(
-            NDArrayCaster::from_cpp(
-                NDArray {ptr, NumIndices, shape, owner},
-                policy, cleanup)
-        );
-        return o.release();
+        return NDArrayCaster::from_cpp(
+            NDArray {ptr, NumIndices, shape, owner},
+            policy, cleanup);
     }
 };
 

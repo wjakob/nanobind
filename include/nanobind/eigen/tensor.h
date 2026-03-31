@@ -28,6 +28,20 @@ template<typename T> constexpr bool is_eigen_tensor_v =
 template<typename T> constexpr bool eigen_tensor_is_row_major_v = T::Layout == Eigen::RowMajor;
 template<typename T> constexpr bool eigen_tensor_is_col_major_v = T::Layout == Eigen::ColMajor;
 
+template<typename T>
+constexpr bool is_eigen_tensor_map_v = false;
+
+// Covers const case
+template<typename T, int Options, template<class> class MakePointer>
+constexpr bool is_eigen_tensor_map_v<Eigen::TensorMap<T, Options, MakePointer>> = true;
+
+template<typename T>
+constexpr bool is_eigen_tensor_ref_v = false;
+
+// Covers const case
+template<typename T>
+constexpr bool is_eigen_tensor_ref_v<Eigen::TensorRef<T>> = true;
+
 template<typename T, typename Scalar = typename T::Scalar>
 using ndarray_for_eigen_tensor_t = ndarray<
     Scalar,

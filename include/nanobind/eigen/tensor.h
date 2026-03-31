@@ -20,10 +20,13 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 NAMESPACE_BEGIN(detail)
 
+/// Type trait for inheriting from Eigen::TensorBase.
+/// All TensorBase specializations inherit from TensorBase<T, ReadOnlyAccessors>.
 template<typename T> constexpr bool is_eigen_tensor_v = 
     std::is_base_of_v<Eigen::TensorBase<T, Eigen::ReadOnlyAccessors>, T>;
 
-template<typename T> constexpr bool eigen_tensor_is_row_major_v = bool(T::Options & Eigen::RowMajorBit);
+template<typename T> constexpr bool eigen_tensor_is_row_major_v = T::Layout == Eigen::RowMajor;
+template<typename T> constexpr bool eigen_tensor_is_col_major_v = T::Layout == Eigen::ColMajor;
 
 template<typename T, typename Scalar = typename T::Scalar>
 using ndarray_for_eigen_tensor_t = ndarray<

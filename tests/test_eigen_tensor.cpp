@@ -55,4 +55,20 @@ NB_MODULE(test_eigen_tensor_ext, m) {
         b = a * b;
     }, "a"_a, "b"_a);
 
+    struct ClassWithEigenMember {
+        Tensor3d member;
+        ClassWithEigenMember() : member(2, 1, 2) {
+            member.setConstant(1.0);
+        }
+        const Tensor3d &get_member_ref() { return member; }
+        const Tensor3d get_member_copy() { return member; }
+    };
+
+    nb::class_<ClassWithEigenMember>(m, "ClassWithEigenMember")
+        .def(nb::init<>())
+        .def_prop_ro("member_ro_ref", &ClassWithEigenMember::get_member_ref)
+        .def_prop_ro("member_ro_copy", &ClassWithEigenMember::get_member_copy, nb::rv_policy::automatic)
+        .def_rw("member", &ClassWithEigenMember::member)
+        ;
+
 }

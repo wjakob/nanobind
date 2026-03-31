@@ -1,3 +1,4 @@
+import gc
 import pytest
 
 try:
@@ -56,3 +57,30 @@ def test02_update_tensorref():
     # wrong scalar type is rejected
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.update3dTensorRef(np.asfortranarray(a).astype(np.int32))
+
+@needs_numpy_and_eigen
+def test03_prop():
+    print("test03_prop() ------------")
+    for j in range(3):
+        c = t.ClassWithEigenMember()
+        ref = np.ones((2, 1, 2))
+        if j == 0:
+            c.member = ref
+
+        for i in range(2):
+            member = c.member
+            if j == 2 and i == 0:
+                member[0, 0, 0] = 10
+                ref[0, 0, 0] = 10
+            assert_array_equal(member, ref)
+            del member
+            gc.collect()
+            gc.collect()
+
+        member = c.member
+        assert_array_equal(c.member_ro_ref, ref)
+        assert_array_equal(c.member_ro_copy, ref)
+        del c
+        gc.collect()
+        gc.collect()
+        assert_array_equal(member, ref)

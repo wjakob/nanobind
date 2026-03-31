@@ -54,14 +54,13 @@ using ndarray_for_eigen_tensor_t = ndarray<
 
 /** \brief Type caster for ``Eigen::TensorMap<T>``
  */
-template<typename T, int MapOptions,
-    template<class> class MakePointer>
+template<typename T, int MapOptions, template<class> class MakePointer>
 struct type_caster<
     Eigen::TensorMap<T, MapOptions, MakePointer>,
-    enable_if_t<is_eigen_tensor_v<T> && is_ndarray_scalar_v<typename T::Scalar>>> {
+    enable_if_t<is_ndarray_scalar_v<typename T::Scalar>>> {
 
     using Scalar = typename T::Scalar;
-    using IndexType = typename T::IndexType;
+    using IndexType = typename T::Index;
     static constexpr int NumIndices = T::NumIndices;
     static constexpr int Options = T::Options;
     using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
@@ -82,14 +81,35 @@ struct type_caster<
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         // Disable implicit conversions
-        return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
+        flags &= ~(uint8_t)cast_flags::convert;
+        // Do not accept None
+        flags &= ~(uint8_t)cast_flags::accepts_none;
+        return caster.from_python(src, flags, cleanup);
     }
 
-    bool from_python_(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        
+    static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        size_t shape[NumIndices];
+        for (size_t i = 0 ; i < NumIndices; i++) {
+            shape[i] = static_cast<size_t>(v.dimension(i));
+        }
+
+        void* ptr = (void *)v.data();
+        if (policy == rv_policy::automatic || policy == rv_policy::automatic_reference)
+            policy = rv_policy::reference;
+        return NDArrayCaster::from_cpp(
+            NDArray {ptr, NumIndices, shape, handle()},
+            policy,
+            cleanup);
     }
 
-    static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept = delete;
+    operator MapType() {
+        NDArray &t = caster.value;
+        std::array<long, NumIndices> shape;
+        for (size_t i = 0 ; i < NumIndices; i++) {
+            shape[i] = t.shape(i);
+        }
+        return MapType(t.data(), shape);
+    }
 };
 
 

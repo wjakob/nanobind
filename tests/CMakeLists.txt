@@ -161,6 +161,7 @@ set(TEST_FILES
   test_callbacks.py
   test_classes.py
   test_eigen.py
+  test_eigen_tensor.py
   test_enum.py
   test_eval.py
   test_exception.py

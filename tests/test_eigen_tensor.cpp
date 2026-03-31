@@ -55,6 +55,18 @@ NB_MODULE(test_eigen_tensor_ext, m) {
         b = a * b;
     }, "a"_a, "b"_a);
 
+    struct Buffer {
+        uint32_t x[18];
+        using Tensor3u = Eigen::Tensor<uint32_t, 3>;
+        using Map = Eigen::TensorMap<Tensor3u>;
+
+        Map map() { return Map(x, std::array{2, 3, 3}); }
+    };
+
+    nb::class_<Buffer>(m, "Buffer")
+        .def(nb::init<>())
+        .def("map", &Buffer::map, nb::rv_policy::reference_internal);
+
     struct ClassWithEigenMember {
         Tensor3d member;
         ClassWithEigenMember() : member(2, 1, 2) {

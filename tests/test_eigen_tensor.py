@@ -84,3 +84,20 @@ def test03_prop():
         gc.collect()
         gc.collect()
         assert_array_equal(member, ref)
+
+@needs_numpy_and_eigen
+def test04_map():
+    b = t.Buffer()
+    m = b.map()
+    for i in range(2):
+        for j in range(3):
+            for k in range(3):
+                m[i, j, k] = i*3*3+j*3+k
+    print(m)
+    del b
+    gc.collect()
+    gc.collect()
+    for i in range(2):
+        for j in range(3):
+            for k in range(3):
+                m[i, j, k] = i*3*3+j*3+k

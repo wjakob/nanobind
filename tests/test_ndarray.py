@@ -536,6 +536,21 @@ def test27_python_array():
     assert x is a
 
 
+def test27c_python_complex_array():
+    import array
+    try:
+        a = array.array('F', [1.0+2.0j, 3.0+4.0j])
+    except:
+        pytest.skip('your python does not support complex arrays')
+    assert t.check(a)
+    t.pass_complex64(a)
+    mv = memoryview(a)
+    assert t.check(mv)
+    t.pass_complex64(mv)
+    x = t.passthrough(a)
+    assert x is a
+
+
 def test28_check_bytearray():
     a = bytearray(b'xyz')
     assert t.check(a)
@@ -945,7 +960,7 @@ def test46_implicit_conversion_contiguous_complex():
 
 
 @needs_numpy
-def test_47_ret_infer():
+def test47_ret_infer():
     assert np.all(t.ret_infer_c() == [[1, 2, 3, 4], [5, 6, 7, 8]])
     assert np.all(t.ret_infer_f() == [[1, 3, 5, 7], [2, 4, 6, 8]])
 

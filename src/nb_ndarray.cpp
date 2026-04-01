@@ -407,6 +407,9 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
             case 'Q':
             case 'N': dt.code = (uint8_t) dlpack::dtype_code::UInt; break;
 
+            case 'E':
+            case 'F':
+            case 'D': is_complex = true; [[fallthrough]];
             case 'e':
             case 'f':
             case 'd': dt.code = (uint8_t) dlpack::dtype_code::Float; break;

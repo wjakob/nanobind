@@ -110,9 +110,11 @@ static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
 /// Python object representing a bound C++ function
 struct nb_func {
 #if !defined(_Py_OPAQUE_PYOBJECT)
-    PyObject_VAR_HEAD
+    PyObject_HEAD
 #endif
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
+    func_data *overloads;
+    uint32_t overload_count;
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     bool complex_call;
     bool doc_uniform;
@@ -449,8 +451,6 @@ struct nb_internals {
 #if defined(_Py_OPAQUE_PYOBJECT)
     /// Runtime sizeof(PyObject) -- offset from PyObject* to type-specific data
     size_t object_data_offset;
-    /// Runtime sizeof(PyVarObject) -- same but for variable-size types (ob_size included)
-    size_t varobject_data_offset;
 #endif
 };
 
@@ -506,7 +506,6 @@ extern nb_internals *internals;
 extern PyTypeObject *nb_meta_cache;
 #if defined(_Py_OPAQUE_PYOBJECT)
 extern size_t object_data_offset;
-extern size_t varobject_data_offset;
 #endif
 
 extern char *type_name(const std::type_info *t);
@@ -529,8 +528,7 @@ NB_INLINE nb_inst *nb_inst_data(PyObject *o) {
     return (nb_inst *) ((char *) o + object_data_offset);
 }
 NB_INLINE nb_func *nb_func_ptr(PyObject *o) {
-    // nb_func is a variable-size type (has itemsize), so header is PyVarObject
-    return (nb_func *) ((char *) o + varobject_data_offset);
+    return (nb_func *) ((char *) o + object_data_offset);
 }
 NB_INLINE nb_ndarray *nb_ndarray_data(PyObject *o) {
     return (nb_ndarray *) ((char *) o + object_data_offset);
@@ -555,12 +553,7 @@ NB_INLINE nb_bound_method *nb_bound_method_data(PyObject *o) {
 
 /// Fetch the nanobind function record from a 'nb_func' instance
 NB_INLINE func_data *nb_func_data(void *o) {
-#if defined(_Py_OPAQUE_PYOBJECT)
-    // nb_func is a variable-size type (has itemsize), so header is PyVarObject
-    return (func_data *) ((char *) o + varobject_data_offset + sizeof(nb_func));
-#else
-    return (func_data *) (((char *) o) + sizeof(nb_func));
-#endif
+    return nb_func_ptr((PyObject *) o)->overloads;
 }
 
 #if defined(Py_LIMITED_API)

@@ -79,7 +79,7 @@ static PyType_Slot nb_func_slots[] = {
 static PyType_Spec nb_func_spec = {
     /* .name = */ "nanobind.nb_func",
     /* .basicsize = */ (int) sizeof(nb_func),
-    /* .itemsize = */ (int) sizeof(func_data),
+    /* .itemsize = */ 0,
     /* .flags = */ Py_TPFLAGS_DEFAULT |
                    Py_TPFLAGS_HAVE_GC |
                    Py_TPFLAGS_HAVE_VECTORCALL |
@@ -103,7 +103,7 @@ static PyType_Slot nb_method_slots[] = {
 static PyType_Spec nb_method_spec = {
     /*.name = */ "nanobind.nb_method",
     /*.basicsize = */ (int) sizeof(nb_func),
-    /*.itemsize = */ (int) sizeof(func_data),
+    /*.itemsize = */ 0,
     /*.flags = */ Py_TPFLAGS_DEFAULT |
                   Py_TPFLAGS_HAVE_GC |
                   Py_TPFLAGS_METHOD_DESCRIPTOR |
@@ -170,7 +170,6 @@ nb_internals *internals = nullptr;
 PyTypeObject *nb_meta_cache = nullptr;
 #if defined(_Py_OPAQUE_PYOBJECT)
 size_t object_data_offset = 0;
-size_t varobject_data_offset = 0;
 #endif
 
 
@@ -223,7 +222,6 @@ static void init_internals(nb_internals *p) {
     if (p->lifeline) {
 #if defined(_Py_OPAQUE_PYOBJECT)
         object_data_offset = p->object_data_offset;
-        varobject_data_offset = p->varobject_data_offset;
 #endif
         return;
     }
@@ -263,18 +261,15 @@ static void init_internals(nb_internals *p) {
               "nanobind::detail::init_internals(): unexpected "
               "object_data_offset: %zu", odo);
 
-        size_t vodo = odo + sizeof(Py_ssize_t);
-
         p->object_data_offset = object_data_offset = odo;
-        p->varobject_data_offset = varobject_data_offset = vodo;
 
         // Fix up type specs and member offsets for the opaque layout
-        nb_func_spec.basicsize = (int) (vodo + sizeof(nb_func));
-        nb_method_spec.basicsize = (int) (vodo + sizeof(nb_func));
+        nb_func_spec.basicsize = (int) (odo + sizeof(nb_func));
+        nb_method_spec.basicsize = (int) (odo + sizeof(nb_func));
         nb_bound_method_spec.basicsize = (int) (odo + sizeof(nb_bound_method));
 
         nb_func_members[0].offset =
-            (Py_ssize_t) (vodo + offsetof(nb_func, vectorcall));
+            (Py_ssize_t) (odo + offsetof(nb_func, vectorcall));
         nb_bound_method_members[0].offset =
             (Py_ssize_t) (odo + offsetof(nb_bound_method, vectorcall));
         nb_bound_method_members[1].offset =

@@ -41,12 +41,13 @@ static uint32_t nb_func_render_signature(const func_data *f,
                                          bool nb_signature_mode = false) noexcept;
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
-    size_t size = (size_t) Py_SIZE(self);
+    nb_func *func = nb_func_ptr(self);
+    uint32_t size = func->overload_count;
 
     if (size) {
-        func_data *f = nb_func_data(self);
+        func_data *f = func->overloads;
 
-        for (size_t i = 0; i < size; ++i) {
+        for (uint32_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_VISIT(f->args[j].value);
@@ -60,12 +61,13 @@ int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
 }
 
 int nb_func_clear(PyObject *self) {
-    size_t size = (size_t) Py_SIZE(self);
+    nb_func *func = nb_func_ptr(self);
+    uint32_t size = func->overload_count;
 
     if (size) {
-        func_data *f = nb_func_data(self);
+        func_data *f = func->overloads;
 
-        for (size_t i = 0; i < size; ++i) {
+        for (uint32_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_args) {
                 for (size_t j = 0; j < f->nargs; ++j) {
                     Py_CLEAR(f->args[j].value);
@@ -82,9 +84,10 @@ int nb_func_clear(PyObject *self) {
 void nb_func_dealloc(PyObject *self) {
     PyObject_GC_UnTrack(self);
 
-    size_t size = (size_t) Py_SIZE(self);
+    nb_func *func = nb_func_ptr(self);
+    uint32_t size = func->overload_count;
     if (size) {
-        func_data *f = nb_func_data(self);
+        func_data *f = func->overloads;
 
         // Delete from registered function list
 #if !defined(NB_FREE_THREADED)
@@ -95,7 +98,7 @@ void nb_func_dealloc(PyObject *self) {
                                                         : "<anonymous>"));
 #endif
 
-        for (size_t i = 0; i < size; ++i) {
+        for (uint32_t i = 0; i < size; ++i) {
             if (f->flags & (uint32_t) func_flags::has_free)
                 f->free_capture(f->capture);
 
@@ -118,6 +121,8 @@ void nb_func_dealloc(PyObject *self) {
             free(f->signature);
             ++f;
         }
+
+        free(func->overloads);
     }
 
     PyObject_GC_Del(self);
@@ -291,12 +296,20 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     }
 
     // Create a new function and destroy the old one
-    Py_ssize_t prev_overloads = func_prev ? Py_SIZE(func_prev) : 0;
+    uint32_t prev_overloads = func_prev ? nb_func_ptr(func_prev)->overload_count : 0;
+    uint32_t total_overloads = prev_overloads + 1;
     PyObject *func_obj = PyType_GenericAlloc(
-        is_method ? internals_->nb_method : internals_->nb_func, prev_overloads + 1);
+        is_method ? internals_->nb_method : internals_->nb_func, 0);
     check(func_obj, "nb::detail::nb_func_new(\"%s\"): alloc. failed (1).",
           name_cstr);
     nb_func *func = nb_func_ptr(func_obj);
+
+    // Allocate the overloads array
+    func->overloads = (func_data *) malloc(sizeof(func_data) * total_overloads);
+    check(func->overloads, "nb::detail::nb_func_new(\"%s\"): alloc. failed (2).",
+          name_cstr);
+    memset(func->overloads, 0, sizeof(func_data) * total_overloads);
+    func->overload_count = total_overloads;
 
     make_immortal(func_obj);
     internals_inc_ref();
@@ -322,16 +335,15 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         complex_call |= nb_func_prev->complex_call;
         max_nargs = std::max(max_nargs, nb_func_prev->max_nargs);
 
-        func_data *cur  = nb_func_data(func_obj),
-                  *prev = nb_func_data(func_prev);
+        func_data *prev = nb_func_prev->overloads;
 
         if (nb_func_prev->doc_uniform)
             prev_doc = prev->doc;
 
-        memcpy(cur, prev, sizeof(func_data) * prev_overloads);
+        memcpy(func->overloads, prev, sizeof(func_data) * prev_overloads);
         memset(prev, 0, sizeof(func_data) * prev_overloads);
 
-        Py_SET_SIZE((PyVarObject *) func_prev, 0);
+        nb_func_prev->overload_count = 0;
 
 #if !defined(NB_FREE_THREADED)
         size_t n_deleted = internals_->funcs.erase(func_prev);
@@ -366,7 +378,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
           "nanobind::detail::nb_func_new(): internal update failed (2)!");
 #endif
 
-    func_data *fc = nb_func_data(func_obj) + prev_overloads;
+    func_data *fc = func->overloads + prev_overloads;
     memcpy(fc, f, sizeof(func_data_prelim_base));
     if (has_doc) {
         if (fc->doc[0] == '\n')
@@ -504,7 +516,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
                        size_t nargs_in, PyObject *kwargs_in) noexcept {
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = nb_func_ptr(self)->overload_count;
     func_data *f = nb_func_data(self);
 
     if (f->flags & (uint32_t) func_flags::is_operator)
@@ -609,7 +621,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                             PyObject *const *args_in,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
-    const size_t count      = (size_t) Py_SIZE(self),
+    const size_t count      = (size_t) nb_func_ptr(self)->overload_count,
                  nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
                  nkwargs_in = kwargs_in ? (size_t) NB_TUPLE_GET_SIZE(kwargs_in) : 0;
 
@@ -891,7 +903,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     uint8_t args_flags[NB_MAXARGS_SIMPLE];
     func_data *fr = nb_func_data(self);
 
-    const size_t count         = (size_t) Py_SIZE(self),
+    const size_t count         = (size_t) nb_func_ptr(self)->overload_count,
                  nargs_in      = (size_t) PyVectorcall_NARGS(nargsf);
 
     const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
@@ -1401,7 +1413,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
              *defaults = nullptr;
 
     func_data *f = nb_func_data(self);
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = nb_func_ptr(self)->overload_count;
     PyObject *result = PyTuple_New(count);
     if (!result)
         return nullptr;
@@ -1477,7 +1489,7 @@ fail:
 
 PyObject *nb_func_get_doc(PyObject *self, void *) {
     func_data *f = nb_func_data(self);
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    uint32_t count = nb_func_ptr(self)->overload_count;
 
     // The buffer 'buf' is protected by 'internals.mutex'
     lock_internals guard(internals);

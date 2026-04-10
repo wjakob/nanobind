@@ -143,6 +143,8 @@ to external projects that provide further casters:
     - ``#include <nanobind/eigen/dense.h>``
   * - ``Eigen::SparseMatrix<..>``
     - ``#include <nanobind/eigen/sparse.h>``
+  * - ``Eigen::Tensor<..>``, ``Eigen::TensorMap<..>``, ``Eigen::TensorRef<..>``
+    - ``#include <nanobind/eigen/tensor.h>``
   * - Apache Arrow types
     -  `https://github.com/maximiliank/nanobind_pyarrow <https://github.com/maximiliank/nanobind_pyarrow>`__
   * - ...

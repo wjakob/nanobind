@@ -20,6 +20,11 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 
 NAMESPACE_BEGIN(detail)
 
+/// As of April 2026, Eigen::Tensor types support 16-byte alignment or no alignment.
+inline bool is_tensor_aligned(const void *data, std::size_t align = Eigen::Aligned) {
+    return (reinterpret_cast<std::size_t>(data) % align) == 0;
+}
+
 /// Type trait for inheriting from Eigen::TensorBase.
 /// All TensorBase specializations inherit from TensorBase<T, ReadOnlyAccessors>.
 template<typename T> constexpr bool is_eigen_tensor_v = 
@@ -66,6 +71,7 @@ struct type_caster<
     using PlainTensor = Eigen::Tensor<Scalar, NumIndices, Options, IndexType>;
     using Dimensions = typename T::Dimensions;
     using MapType = Eigen::TensorMap<T, MapOptions, MakePointer>;
+    static constexpr bool IsAligned = MapType::IsAligned;
 
     // Only partial specification. Dimensions not known at compile time...
     using NDArray =
@@ -84,7 +90,13 @@ struct type_caster<
         flags &= ~(uint8_t)cast_flags::convert;
         // Do not accept None
         flags &= ~(uint8_t)cast_flags::accepts_none;
-        return caster.from_python(src, flags, cleanup);
+
+        if (!caster.from_python(src, flags, cleanup))
+            return false;
+        if(IsAligned && !is_tensor_aligned(caster.value.data()))
+            return false;
+
+        return true;
     }
 
     static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept {

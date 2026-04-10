@@ -47,6 +47,23 @@ constexpr bool is_eigen_tensor_ref_v = false;
 template<typename T>
 constexpr bool is_eigen_tensor_ref_v<Eigen::TensorRef<T>> = true;
 
+template<typename T>
+constexpr bool is_eigen_tensor_plain_v = false;
+
+template<typename Scalar, int NumIndices, int Options, typename IndexType>
+constexpr bool is_eigen_tensor_plain_v<Eigen::Tensor<Scalar, NumIndices, Options, IndexType>>
+    = true;
+
+template<typename Scalar, std::ptrdiff_t... Indices, int Options, typename IndexType>
+constexpr bool is_eigen_tensor_plain_v<Eigen::TensorFixedSize<Scalar, Eigen::Sizes<Indices...>, Options, IndexType>> = true;
+
+template<typename T>
+constexpr bool is_eigen_tensor_xpr_v = 
+    is_eigen_tensor_v<T> &&
+    !is_eigen_tensor_plain_v<T> &&
+    !is_eigen_tensor_map_v<T> &&
+    !is_eigen_tensor_ref_v<T>;
+
 template<typename T, typename Scalar = typename T::Scalar>
 using ndarray_for_eigen_tensor_t = ndarray<
     Scalar,
@@ -125,6 +142,8 @@ struct type_caster<
 };
 
 
+/** \brief Type caster for plain ``Eigen::Tensor<T>`` types.
+ */
 template<typename Scalar, int NumIndices, int Options, typename IndexType>
 struct type_caster<
         Eigen::Tensor<Scalar, NumIndices, Options, IndexType>,
@@ -184,6 +203,30 @@ struct type_caster<
         return NDArrayCaster::from_cpp(
             NDArray {ptr, NumIndices, shape, owner},
             policy, cleanup);
+    }
+};
+
+/** \brief Type caster for Tensor expressions. From-cpp conversion just converts the expression to a plain Tensor object.
+ */
+template<typename T>
+struct type_caster<T, enable_if_t<is_eigen_tensor_xpr_v<T> && is_ndarray_scalar_v<typename T::Scalar>>> {
+    static constexpr int NumDimensions = T::NumDimensions;
+    static constexpr int Options = T::Options;
+    using IndexType = typename T::Index;
+    using XprTraits = typename Eigen::internal::traits<T>;
+    static constexpr int Layout = XprTraits::Layout;
+    using PlainTensor = Eigen::Tensor<typename T::Scalar, NumDimensions, Layout, IndexType>;
+    using Caster = make_caster<PlainTensor>;
+    static constexpr auto Name = Caster::Name;
+    template<typename T_> using Cast = T;
+    template<typename T_> static constexpr bool can_cast() { return true; }
+
+    /// Generating an expression template from a Python object is impossible.
+    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+
+    template <typename T2>
+    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(std::forward<T2>(v), policy, cleanup);
     }
 };
 

@@ -28,13 +28,13 @@ NB_MODULE(test_eigen_tensor_ext, m) {
 
     // -- Plain tensor types
 
-    m.def("add3dTensor", [](const Tensor3d &a, const Tensor3d &b) -> Tensor3d {
+    m.def("add3dTensor", [](const Tensor3d &a, const Tensor3d &b) {
         return a + b;
     }, "a"_a, "b"_a);
-    m.def("add3dTensor_nc", [](const Tensor3d &a, const Tensor3d &b) -> Tensor3d {
+    m.def("add3dTensor_nc", [](const Tensor3d &a, const Tensor3d &b) {
         return a + b;
     }, "a"_a.noconvert(), "b"_a.noconvert());
-    m.def("square3dTensorR", [](const RowTensor3d &a) -> RowTensor3d {
+    m.def("square3dTensorR", [](const RowTensor3d &a) {
         return a.square();
     }, "a"_a.noconvert());
 

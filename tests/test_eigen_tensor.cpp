@@ -9,11 +9,15 @@ using namespace nb::literals;
 
 NB_MODULE(test_eigen_tensor_ext, m) {
     using Tensor3d = Eigen::Tensor<double, 3, 0>;
+    using Tensor3i = Eigen::Tensor<int32_t, 3, 0>;
     static_assert(nb::detail::is_eigen_tensor_v<Tensor3d>);
     using RowTensor3d = Eigen::Tensor<double, 3, Eigen::RowMajor>;
     static_assert(nb::detail::make_caster<RowTensor3d>::IsRowMajor);
 
-    using MapTensor3d = Eigen::TensorMap<Tensor3d>;
+    using Tensor0d = Eigen::Tensor<double, 0, 0>;
+
+    using MapTensor3d = Eigen::TensorMap<Tensor3d>; // Unaligned by default
+    using MapTensor3dConst = Eigen::TensorMap<const Tensor3d>;
     static_assert(nb::detail::is_eigen_tensor_v<MapTensor3d>);
     static_assert(nb::detail::is_eigen_tensor_map_v<MapTensor3d>);
 
@@ -35,8 +39,7 @@ NB_MODULE(test_eigen_tensor_ext, m) {
     }, "a"_a.noconvert());
 
     m.def("mul3dTensor", [](double a, const Tensor3d &b) -> Tensor3d {
-        auto c = (a * b).eval();
-        return c;
+        return a * b;
     }, "a"_a, "b"_a);
 
     // -- Refs
@@ -46,6 +49,26 @@ NB_MODULE(test_eigen_tensor_ext, m) {
     }, "a"_a.noconvert());
 
     // -- Maps - noconvert() is implicit
+
+    m.def("add3dTensorCnstMap", [](MapTensor3dConst a, MapTensor3dConst b) -> Tensor3d {
+        return a + b;
+    }, "a"_a.noconvert(), "b"_a.noconvert());
+
+    m.def("castTo3iTensorMap", [](nb::object obj)  {
+        return nb::cast<Eigen::TensorMap<Tensor3i, Eigen::Unaligned>>(obj);
+    });
+
+    m.def("castTo3iTensorMapCnst", [](nb::object obj)  {
+        return nb::cast<Eigen::TensorMap<const Tensor3i, Eigen::Unaligned>>(obj);
+    });
+
+    m.def("castTo3iTensorMapAligned", [](nb::object obj)  {
+        return nb::cast<Eigen::TensorMap<Tensor3i, Eigen::Aligned>>(obj);
+    });
+
+    m.def("castTo0dTensorMap", [](nb::object obj) {
+        return nb::cast<Eigen::TensorMap<Tensor0d>>(obj);
+    });
 
     m.def("mul3dTensorMap", [](double a, Eigen::TensorMap<const Tensor3d> b) -> Tensor3d {
         return (a * b).eval();

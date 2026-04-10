@@ -60,7 +60,6 @@ def test02_update_tensorref():
 
 @needs_numpy_and_eigen
 def test03_prop():
-    print("test03_prop() ------------")
     for j in range(3):
         c = t.ClassWithEigenMember()
         ref = np.ones((2, 1, 2))
@@ -93,7 +92,6 @@ def test04_map():
         for j in range(3):
             for k in range(3):
                 m[i, j, k] = i*3*3+j*3+k
-    print(m)
     del b
     gc.collect()
     gc.collect()
@@ -101,3 +99,34 @@ def test04_map():
         for j in range(3):
             for k in range(3):
                 m[i, j, k] = i*3*3+j*3+k
+
+@needs_numpy_and_eigen
+def test05_cast():
+    a = np.arange(12, dtype=np.int32).reshape(2, 2, 3, order='F')
+    assert_array_equal(t.castTo3iTensorMap(a), a)
+    assert_array_equal(t.castTo3iTensorMapAligned(a), a)
+
+
+@needs_numpy_and_eigen
+def test06_zero_size_tensor():
+    a = np.ones((0, 2, 4), dtype=np.float64, order='F')
+    b = np.ones((0, 2, 4), dtype=np.float64, order='F')
+    assert_array_equal(t.add3dTensorCnstMap(a, b), a + b)
+
+    c= np.ones((0, 2, 4), dtype=np.int32, order='F')
+    c_map = t.castTo3iTensorMap(c)
+    assert_array_equal(c_map, c)
+    assert not c_map.flags.owndata
+    assert c_map.flags.writeable
+
+    c_map_const = t.castTo3iTensorMapCnst(c)
+    assert_array_equal(c_map_const, c)
+    assert not c_map_const.flags.owndata
+    assert not c_map_const.flags.writeable
+    assert_array_equal(t.castTo3iTensorMapAligned(c), c)
+
+    # Pretty much a scalar
+    d = np.ones((), order='F')
+    d_cast = t.castTo0dTensorMap(d)
+    assert_array_equal(d_cast, d)
+    assert not d_cast.flags.owndata

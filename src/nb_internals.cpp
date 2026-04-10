@@ -83,6 +83,7 @@ static PyType_Spec nb_func_spec = {
     /* .flags = */ Py_TPFLAGS_DEFAULT |
                    Py_TPFLAGS_HAVE_GC |
                    Py_TPFLAGS_HAVE_VECTORCALL |
+                   NB_TPFLAGS_ITEMS_AT_END |
                    NB_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_func_slots
 };
@@ -108,6 +109,7 @@ static PyType_Spec nb_method_spec = {
                   Py_TPFLAGS_HAVE_GC |
                   Py_TPFLAGS_METHOD_DESCRIPTOR |
                   Py_TPFLAGS_HAVE_VECTORCALL |
+                  NB_TPFLAGS_ITEMS_AT_END |
                   NB_TPFLAGS_IMMUTABLETYPE,
     /*.slots = */ nb_method_slots
 };
@@ -243,27 +245,21 @@ static void init_internals(nb_internals *p) {
     new_object(p, p->nb_type_dict);
 
 #if defined(_Py_OPAQUE_PYOBJECT)
-    // Measure the runtime sizeof(PyObject) via PEP 697, then derive
-    // sizeof(PyVarObject) = sizeof(PyObject) + sizeof(Py_ssize_t).
+    // Measure the runtime size of PyObject and sizeof(PyVarObject)
     {
         PyType_Slot slots[] = { { 0, nullptr } };
         PyType_Spec spec = {
-            "nanobind._dummy", -(int) sizeof(void *), 0,
-            Py_TPFLAGS_DEFAULT, slots
+            "nanobind._dummy", -(int) sizeof(void *), 1,
+            Py_TPFLAGS_DEFAULT | Py_TPFLAGS_ITEMS_AT_END, slots
         };
         PyObject *tp = PyType_FromSpec(&spec),
                  *inst = PyType_GenericAlloc((PyTypeObject *) tp, 0);
         size_t odo = (uint8_t *) PyObject_GetTypeData(
                          inst, (PyTypeObject *) tp) -
                      (uint8_t *) inst;
+        size_t vodo = (uint8_t *) PyObject_GetItemData(inst) - (uint8_t *) inst;
         Py_DECREF(inst);
         Py_DECREF(tp);
-
-        check(odo >= sizeof(void *) * 2 && odo <= 1024,
-              "nanobind::detail::init_internals(): unexpected "
-              "object_data_offset: %zu", odo);
-
-        size_t vodo = odo + sizeof(Py_ssize_t);
 
         p->object_data_offset = object_data_offset = odo;
         p->varobject_data_offset = varobject_data_offset = vodo;

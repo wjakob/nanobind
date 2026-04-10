@@ -551,6 +551,7 @@
 -U _PyObject_GetAttrString
 -U _PyObject_GetBuffer
 -U _PyObject_GetItem
+-U _PyObject_GetItemData
 -U _PyObject_GetIter
 -U _PyObject_HasAttr
 -U _PyObject_HasAttrString

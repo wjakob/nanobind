@@ -175,7 +175,16 @@ struct type_caster<
         return true;
     }
 
-    static handle from_cpp(const PlainTensor &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    template<typename T2>
+    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+        policy = infer_policy<T2>(policy);
+        if constexpr (std::is_pointer_v<T2>)
+            return from_cpp_internal((const PlainTensor &) *v, policy, cleanup);
+        else
+            return from_cpp_internal((const PlainTensor &) v, policy, cleanup);
+    }
+
+    static handle from_cpp_internal(const PlainTensor &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[NumIndices];
 
         for (size_t i = 0 ; i < NumIndices; i++) {

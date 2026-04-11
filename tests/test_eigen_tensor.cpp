@@ -102,8 +102,7 @@ NB_MODULE(test_eigen_tensor_ext, m) {
     nb::class_<ClassWithEigenMember>(m, "ClassWithEigenMember")
         .def(nb::init<>())
         .def_prop_ro("member_ro_ref", &ClassWithEigenMember::get_member_ref)
-        .def_prop_ro("member_ro_copy", &ClassWithEigenMember::get_member_copy, nb::rv_policy::automatic)
-        .def_rw("member", &ClassWithEigenMember::member)
-        ;
+        .def_prop_ro("member_ro_copy", &ClassWithEigenMember::get_member_copy)
+        .def_rw("member", &ClassWithEigenMember::member);
 
 }

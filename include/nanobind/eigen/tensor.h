@@ -12,12 +12,9 @@
 #pragma once
 
 #include <nanobind/ndarray.h>
-
 #include <unsupported/Eigen/CXX11/Tensor>
 
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
-
 NAMESPACE_BEGIN(detail)
 
 /// As of April 2026, Eigen::Tensor types support 16-byte alignment or no alignment.
@@ -51,8 +48,7 @@ template<typename T>
 constexpr bool is_eigen_tensor_plain_v = false;
 
 template<typename Scalar, int NumIndices, int Options, typename IndexType>
-constexpr bool is_eigen_tensor_plain_v<Eigen::Tensor<Scalar, NumIndices, Options, IndexType>>
-    = true;
+constexpr bool is_eigen_tensor_plain_v<Eigen::Tensor<Scalar, NumIndices, Options, IndexType>> = true;
 
 template<typename Scalar, std::ptrdiff_t... Indices, int Options, typename IndexType>
 constexpr bool is_eigen_tensor_plain_v<Eigen::TensorFixedSize<Scalar, Eigen::Sizes<Indices...>, Options, IndexType>> = true;
@@ -119,7 +115,7 @@ struct type_caster<
     static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[NumIndices];
         for (size_t i = 0 ; i < NumIndices; i++) {
-            shape[i] = static_cast<size_t>(v.dimension(i));
+            shape[i] = (size_t) v.dimension(i);
         }
 
         void* ptr = (void *)v.data();
@@ -183,7 +179,7 @@ struct type_caster<
         size_t shape[NumIndices];
 
         for (size_t i = 0 ; i < NumIndices; i++) {
-            shape[i] = static_cast<size_t>(v.dimension(i));
+            shape[i] = (size_t) v.dimension(i);
         }
         
         void *ptr = (void *)v.data();
@@ -296,7 +292,7 @@ struct type_caster<
         size_t shape[NumIndices];
 
         for (size_t i = 0; i < NumIndices; i++) {
-            shape[i] = static_cast<size_t>(v.dimension(i));
+            shape[i] = (size_t) v.dimension(i);
         }
     
         return NDArrayCaster::from_cpp(

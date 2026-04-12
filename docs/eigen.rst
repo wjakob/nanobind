@@ -178,3 +178,18 @@ case.
 
 There is no support for Eigen sparse vectors because an equivalent type does
 not exist as part of ``scipy.sparse``.
+
+Tensors
+-------
+
+Add the following include directive to your binding code to exchange Eigen Tensor
+types:
+
+.. code-block:: cpp
+
+   #include <nanobind/eigen/tensor.h>
+
+The ``Eigen::Tensor<..>``, ``Eigen::TensorMap<..>`` and ``Eigen::TensorRef<..>``
+types are all supported, and map to `numpy.ndarray` with the appropriate sizes.
+Both column-major and row-major tensors are supported. Note that taking
+non-contiguous NumPy arrays as arguments is not supported for any of these types.

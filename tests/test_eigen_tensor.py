@@ -73,15 +73,11 @@ def test03_prop():
                 ref[0, 0, 0] = 10
             assert_array_equal(member, ref)
             del member
-            gc.collect()
-            gc.collect()
 
         member = c.member
         assert_array_equal(c.member_ro_ref, ref)
         assert_array_equal(c.member_ro_copy, ref)
         del c
-        gc.collect()
-        gc.collect()
         assert_array_equal(member, ref)
 
 @needs_numpy_and_eigen
@@ -93,8 +89,6 @@ def test04_map():
             for k in range(3):
                 m[i, j, k] = i*3*3+j*3+k
     del b
-    gc.collect()
-    gc.collect()
     for i in range(2):
         for j in range(3):
             for k in range(3):

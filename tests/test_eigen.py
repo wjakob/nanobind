@@ -216,8 +216,6 @@ def test06_map():
             assert dm[i, j] == i*3+j
     del dm
     del b
-    gc.collect()
-    gc.collect()
     for i in range(10):
         for j in range(3):
             assert m[i, j] == i*3+j
@@ -344,15 +342,11 @@ def test11_prop():
                 ref[0, 0] = 10
             assert_array_equal(member, ref)
             del member
-            gc.collect()
-            gc.collect()
 
         member = c.member
         assert_array_equal(c.member_ro_ref, ref)
         assert_array_equal(c.member_ro_copy, ref)
         del c
-        gc.collect()
-        gc.collect()
         assert_array_equal(member, ref)
 
 @needs_numpy_and_eigen

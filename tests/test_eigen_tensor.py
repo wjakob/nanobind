@@ -1,3 +1,4 @@
+import pytest
 import gc
 import pytest
 
@@ -44,6 +45,13 @@ def test01_tensor3d():
     arr = np.asfortranarray(a.copy())
     t.mul3dTensorMapInPlace(2.0, arr)
     assert_array_equal(arr, 2.0 * a)
+
+    # try non-contiguous
+    c = a[:, 1:, :]
+    d = a[:, :-1, :]
+    assert_array_equal(t.add3dTensor(c, d), c + d)
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.add3dTensor_nc(c, d)
 
 
 @needs_numpy_and_eigen

@@ -52,6 +52,12 @@ def test01_tensor3d():
     with pytest.raises(TypeError, match='incompatible function arguments'):
         t.add3dTensor_nc(c, d)
 
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.add3dTensorCnstMap(c, d)
+
+    with pytest.raises(TypeError, match='incompatible function arguments'):
+        t.update3dTensorRef(c)
+
 
 @needs_numpy_and_eigen
 def test02_update_tensorref():

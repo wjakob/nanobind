@@ -192,4 +192,4 @@ types:
 The ``Eigen::Tensor<..>``, ``Eigen::TensorMap<..>`` and ``Eigen::TensorRef<..>``
 types are all supported, and map to `numpy.ndarray` with the appropriate sizes.
 Both column-major and row-major tensors are supported. Note that taking
-non-contiguous NumPy arrays as arguments is not supported for any of these types.
+non-contiguous NumPy arrays as arguments is not supported for the Map and Ref types.

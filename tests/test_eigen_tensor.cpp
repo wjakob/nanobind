@@ -52,7 +52,7 @@ NB_MODULE(test_eigen_tensor_ext, m) {
 
     m.def("add3dTensorCnstMap", [](MapTensor3dConst a, MapTensor3dConst b) -> Tensor3d {
         return a + b;
-    }, "a"_a.noconvert(), "b"_a.noconvert());
+    }, "a"_a, "b"_a);
 
     m.def("castTo3iTensorMap", [](nb::object obj)  {
         return nb::cast<Eigen::TensorMap<Tensor3i, Eigen::Unaligned>>(obj);

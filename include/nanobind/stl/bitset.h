@@ -18,7 +18,12 @@ struct type_caster<std::bitset<N>> {
     NB_TYPE_CASTER(std::bitset<N>, const_name("int"))
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
-        value = std::bitset<N>(src.ptr());
+        if (!PyNumber_Check(src.ptr())) {
+            PyErr_Clear();
+            return false;
+        }
+        str bin(builtins()["bin"](src));
+        value = std::bitset<N>(bin.c_str() + 2); // std::bitset does not allow 0b prefix in string
         return true;
     }
 

@@ -13,16 +13,16 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-template <size_t T>
-struct type_caster<std::bitset<T>> {
-    NB_TYPE_CASTER(std::bitset<T>, const_name("int"))
+template <size_t N>
+struct type_caster<std::bitset<N>> {
+    NB_TYPE_CASTER(std::bitset<N>, const_name("int"))
 
     bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
-        value = std::bitset<T>(src.ptr());
+        value = std::bitset<N>(src.ptr());
         return true;
     }
 
-    static handle from_cpp(const std::bitset<T> &value, rv_policy,
+    static handle from_cpp(const std::bitset<N> &value, rv_policy,
                            cleanup_list *) noexcept {
         return cast(value.to_ullong());
     }

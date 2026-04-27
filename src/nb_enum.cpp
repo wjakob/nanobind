@@ -109,7 +109,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     t->name = strdup_check(ed->name);
     t->type = ed->type;
     t->type_py = (PyTypeObject *) result.ptr();
-    t->flags = ed->flags;
+    t->flags = ed->flags & 0xFFFFFF;
     t->enum_tbl.fwd = new enum_map();
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;

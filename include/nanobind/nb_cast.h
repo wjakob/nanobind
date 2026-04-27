@@ -676,7 +676,7 @@ template <rv_policy policy = rv_policy::automatic, typename... Args>
 tuple make_tuple(Args &&...args) {
     tuple result = steal<tuple>(PyTuple_New((Py_ssize_t) sizeof...(Args)));
 
-    size_t nargs = 0;
+    Py_ssize_t nargs = 0;
     PyObject *o = result.ptr();
 
     (NB_TUPLE_SET_ITEM(o, nargs++,

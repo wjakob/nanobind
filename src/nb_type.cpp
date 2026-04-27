@@ -684,13 +684,13 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
 
     *t = *t_b;
     t->flags |=  (uint32_t) type_flags::is_python_type;
-    t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
+    t->flags &= (~(uint32_t) type_flags::has_implicit_conversions) & 0xFFFFFF;
 
     // A Python subclass is always a GC heap type
-    t->flags |= (uint32_t) type_flags::has_gc;
+    t->flags |= ((uint32_t) type_flags::has_gc) & 0xFFFFFF;
 
     // Sublclasses do not inherit the pooling feature as a consequence
-    t->flags &= ~((uint32_t) type_flags::pooled);
+    t->flags &= ~((uint32_t) type_flags::pooled) & 0xFFFFFF;
     t->pool_capacity = 0;
 #if defined(NB_FREE_THREADED)
     t->pool_index = 0;
@@ -984,7 +984,7 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
         if (slot == 0) {
             break;
-        } else if (slot * sizeof(nb_slot) <= (int) sizeof(type_slots)) {
+        } else if ((size_t) slot * sizeof(nb_slot) <= sizeof(type_slots)) {
             *(((void **) ht) + type_slots[slot - 1].direct) = ts->pfunc;
         } else {
             PyErr_Format(PyExc_RuntimeError,
@@ -1074,7 +1074,7 @@ nb_type_vectorcall_fixup(nb_func *func, PyObject *self, PyObject *const *args_in
 
     size_t size = (size_t) nargs + 1;
     if (kwargs_in)
-        size += NB_TUPLE_GET_SIZE(kwargs_in);
+        size += (size_t) NB_TUPLE_GET_SIZE(kwargs_in);
 
     if (size < buf_size) {
         args = buf;
@@ -1187,7 +1187,7 @@ PyTypeObject *nb_type_create_metaclass(nb_internals *p,
     int basicsize = -(int) sizeof(type_data),
         itemsize = 0;
 #else
-    int basicsize = (int) (PyType_Type.tp_basicsize + sizeof(type_data)),
+    int basicsize = (int) PyType_Type.tp_basicsize + (int) sizeof(type_data),
         itemsize = (int) PyType_Type.tp_itemsize;
 #endif
 
@@ -1216,7 +1216,7 @@ PyTypeObject *nb_type_create_metaclass(nb_internals *p,
     };
 
     // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
-    members[0].offset = p->type_data_offset + offsetof(type_data, vectorcall);
+    members[0].offset = p->type_data_offset + (Py_ssize_t) offsetof(type_data, vectorcall);
 
     if (NB_DYNAMIC_VERSION < 0x030E0000) {
         slots[4] = { Py_tp_members, (void *) members };
@@ -1272,7 +1272,7 @@ NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *
     check((p2 == p || (p[0] != ' ' && p2[-1] != ' ')),
           "%s(): custom signature \"%s\" contains leading/trailing space around name!", cmd, s);
 
-    size_t size = p2 - p;
+    size_t size = (size_t) (p2 - p);
     char *result = (char *) malloc_check(size + 1);
     memcpy(result, p, size);
     result[size] = '\0';
@@ -1570,7 +1570,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     type_data *to = nb_type_data((PyTypeObject *) result);
 
     *to = *t; // note: slices off _init parts
-    to->flags &= ~(uint32_t) type_init_flags::all_init_flags;
+    to->flags &= (~(uint32_t) type_init_flags::all_init_flags) & 0xFFFFFF;
 
     if (!intrusive_ptr && base_intrusive_ptr) {
         to->flags |= (uint32_t) type_flags::intrusive_ptr;
@@ -1638,10 +1638,10 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (to->flags & (uint32_t) type_flags::pooled) {
 #if defined(PYPY_VERSION)
         // PyPy's cpyext object model is incompatible with park/revive step
-        to->flags &= ~(uint32_t) type_flags::pooled;
+        to->flags &= (~(uint32_t) type_flags::pooled) & 0xFFFFFF;
 #else
         if (t->pool_capacity == 0) {
-            to->flags &= ~(uint32_t) type_flags::pooled;
+            to->flags &= (~(uint32_t) type_flags::pooled) & 0xFFFFFF;
         } else {
             bool eligible =
                 !(to->flags & (uint32_t) type_flags::intrusive_ptr);

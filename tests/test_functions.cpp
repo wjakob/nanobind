@@ -32,7 +32,7 @@ struct example_policy {
     static inline std::vector<std::pair<nb::tuple, nb::object>> calls;
     static void precall(PyObject **args, size_t nargs,
                         nb::detail::cleanup_list *cleanup) {
-        PyObject* tup = PyTuple_New(nargs);
+        PyObject* tup = PyTuple_New((Py_ssize_t) nargs);
         for (size_t i = 0; i < nargs; ++i) {
             if (!PyUnicode_CheckExact(args[i])) {
                 Py_DECREF(tup);
@@ -44,7 +44,7 @@ struct example_policy {
                 cleanup->append(replacement.release().ptr());
             }
             Py_INCREF(args[i]);
-            PyTuple_SetItem(tup, i, args[i]);
+            PyTuple_SetItem(tup, (Py_ssize_t) i, args[i]);
         }
         calls.emplace_back(nb::steal<nb::tuple>(tup), nb::cast("<unfinished>"));
     }
@@ -268,7 +268,7 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_15_d", [](nb::bytes o) { return nb::bytes(o.data(), o.size()); });
     m.def("test_16",   [](const char *c) { return nb::bytes(c); });
     m.def("test_17",   [](nb::bytes c) { return c.size(); });
-    m.def("test_18",   [](const char *c, int size) { return nb::bytes(c, size); });
+    m.def("test_18",   [](const char *c, int size) { return nb::bytes(c, (size_t) size); });
 
     // Test int type
     m.def("test_19", [](nb::int_ i) { return i + nb::int_(123); });
@@ -516,11 +516,12 @@ NB_MODULE(test_functions_ext, m) {
 
     // Test bytearray type
     m.def("test_bytearray_new",     []() { return nb::bytearray(); });
-    m.def("test_bytearray_new",     [](const char *c, int size) { return nb::bytearray(c, size); });
+    m.def("test_bytearray_new",     [](const char *c, int size) { return nb::bytearray(c, (size_t) size); });
     m.def("test_bytearray_copy",    [](nb::bytearray o) { return nb::bytearray(o.c_str(), o.size()); });
     m.def("test_bytearray_c_str",   [](nb::bytearray o) -> const char * { return o.c_str(); });
     m.def("test_bytearray_size",    [](nb::bytearray o) { return o.size(); });
-    m.def("test_bytearray_resize",  [](nb::bytearray c, int size) { return c.resize(size); });
+    m.def("test_bytearray_resize",  [](nb::bytearray c, int size) { return c.resize((size_t) size);
+    });
 
     // Test call_policy feature
     m.def("test_call_policy",

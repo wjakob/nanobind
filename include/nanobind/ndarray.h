@@ -291,7 +291,7 @@ template <typename Scalar, size_t Dim, char Order> struct ndarray_view {
     }
 
     size_t ndim() const { return Dim; }
-    size_t shape(size_t i) const { return m_shape[i]; }
+    size_t shape(size_t i) const { return (size_t) m_shape[i]; }
     int64_t stride(size_t i) const { return m_strides[i]; }
     Scalar *data() const { return m_data; }
 
@@ -518,7 +518,7 @@ private:
             int64_t index = 0;
             ((index += int64_t(indices) * m_dltensor.strides[counter++]), ...);
 
-            return (int64_t) m_dltensor.byte_offset + index * sizeof(Scalar);
+            return (int64_t) m_dltensor.byte_offset + index * (int64_t) sizeof(Scalar);
         } else {
             return 0;
         }

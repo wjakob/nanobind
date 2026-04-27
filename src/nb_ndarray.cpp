@@ -281,8 +281,8 @@ static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
 
 // This function implements __dlpack__() for a nanobind.nb_ndarray.
 static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
-                                   Py_ssize_t nargsf, PyObject *kwnames) {
-    if (PyVectorcall_NARGS(nargsf) != 0) {
+                                   Py_ssize_t nargs, PyObject *kwnames) {
+    if (nargs != 0) {
         PyErr_SetString(PyExc_TypeError,
                 "__dlpack__() does not accept positional arguments");
         return nullptr;
@@ -542,11 +542,11 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     }
 
     static_assert(alignof(managed_dltensor_versioned) >= alignof(int64_t));
-    scoped_pymalloc<managed_dltensor_versioned> mt(1, 2 * sizeof(int64_t)*ndim);
+    scoped_pymalloc<managed_dltensor_versioned> mt(1, 2 * sizeof(int64_t) * (size_t) ndim);
     int64_t* shape = nullptr;
     int64_t* strides = nullptr;
     if (ndim > 0) {
-        shape = new ((void*) (mt.get() + 1)) int64_t[2 * ndim];
+        shape = new ((void*) (mt.get() + 1)) int64_t[2 * (size_t) ndim];
         strides = shape + ndim;
     }
 
@@ -627,7 +627,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         capsule = borrow(src);
     } else {
         PyObject* args[] = {src, NB_INTERNED(dl_version_tpl)};
-        Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+        size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
 
         // Call src.__dlpack__(): max_version_kw requests a versioned capsule
         // nullptr the cheaper unversioned one.
@@ -908,8 +908,9 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         result->free_strides = true;
 
         scoped_pymalloc<int64_t> strides((size_t) t.ndim);
-        for (int64_t i = t.ndim - 1, accum = 1; i >= 0; --i) {
-            strides[i] = accum;
+        int64_t accum = 1;
+        for (int32_t i = t.ndim - 1; i >= 0; --i) {
+            strides[(size_t) i] = accum;
             accum *= t.shape[i];
         }
         t.strides = strides.release();
@@ -1196,7 +1197,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
             PyObject *export_fn = ndarray_export_fn(
                 internals_, copy ? nd_export_numpy_copy : nd_export_numpy_view);
             PyObject *stack[] = {nullptr, o.ptr()};
-            Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+            size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             return PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr);
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_TypeError,
@@ -1221,7 +1222,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         if (slot != nd_export_count) {
             PyObject *export_fn = ndarray_export_fn(internals_, slot);
             PyObject *stack[] = {nullptr, o.ptr()};
-            Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+            size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             o = steal(PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr));
             if (!o.is_valid())
                 return nullptr;

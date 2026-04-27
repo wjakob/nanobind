@@ -60,7 +60,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
 
     if constexpr (std::is_same_v<D, arg_v>) {
         args[kwargs_offset + nkwargs] = value.value.release().ptr();
-        NB_TUPLE_SET_ITEM(kwnames, nkwargs++,
+        NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkwargs++,
                          PyUnicode_InternFromString(value.name_));
     } else if constexpr (std::is_same_v<D, args_proxy>) {
         for (size_t i = 0, l = len(value); i < l; ++i)
@@ -74,7 +74,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         while (PyDict_Next(value.ptr(), &pos, &key, &entry)) {
             Py_INCREF(key); Py_INCREF(entry);
             args[kwargs_offset + nkwargs] = entry;
-            NB_TUPLE_SET_ITEM(kwnames, nkwargs++, key);
+            NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkwargs++, key);
         }
     } else {
         args[nargs++] =

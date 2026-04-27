@@ -24,7 +24,8 @@ struct type_caster<std::bitset<N>> {
 
     static handle from_cpp(const std::bitset<N> &value, rv_policy,
                            cleanup_list *) noexcept {
-        return cast(value.to_ullong());
+        auto str = value.to_string();
+        return PyLong_FromString(str.data(), NULL, 2);
     }
 };
 

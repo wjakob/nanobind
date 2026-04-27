@@ -31,7 +31,7 @@ template <> struct type_caster<std::string_view> {
 
     static handle from_cpp(std::string_view value, rv_policy,
                            cleanup_list *) noexcept {
-        return PyUnicode_FromStringAndSize(value.data(), value.size());
+        return PyUnicode_FromStringAndSize(value.data(), (Py_ssize_t) value.size());
     }
 };
 

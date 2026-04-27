@@ -63,7 +63,7 @@ nb::dict cb_registry() {
 
 struct callback_data {
     struct py_hash {
-        size_t operator()(const nb::object& obj) const { return nb::hash(obj); }
+        size_t operator()(const nb::object& obj) const { return (size_t) nb::hash(obj); }
     };
     struct py_eq {
         bool operator()(const nb::object& a, const nb::object& b) const {

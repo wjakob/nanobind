@@ -32,7 +32,7 @@ template <> struct type_caster<std::wstring> {
 
     static handle from_cpp(const std::wstring &value, rv_policy,
                            cleanup_list *) noexcept {
-        return PyUnicode_FromWideChar(value.c_str(), value.size());
+        return PyUnicode_FromWideChar(value.c_str(), (Py_ssize_t) value.size());
     }
 };
 

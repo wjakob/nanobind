@@ -223,7 +223,7 @@ NB_MODULE(test_stl_ext, m) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
-            if (x[i].value != i)
+            if (x[(size_t) i].value != i)
                 fail();
     });
 
@@ -232,7 +232,7 @@ NB_MODULE(test_stl_ext, m) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
-            if (x[i].value != i)
+            if (x[(size_t) i].value != i)
                 fail();
     });
 
@@ -241,7 +241,7 @@ NB_MODULE(test_stl_ext, m) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
-            if (x[i].value != i)
+            if (x[(size_t) i].value != i)
                 fail();
     });
 
@@ -250,7 +250,7 @@ NB_MODULE(test_stl_ext, m) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
-            if (x[i].value != i)
+            if (x[(size_t) i].value != i)
                 fail();
     });
 
@@ -258,7 +258,7 @@ NB_MODULE(test_stl_ext, m) {
         if (x.size() != 10)
             fail();
         for (int i = 0; i< 10; ++i)
-            if (x[i]->value != i)
+            if (x[(size_t) i]->value != i)
                 fail();
     });
 

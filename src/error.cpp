@@ -199,7 +199,7 @@ const char *python_error::what() const noexcept {
             buf.put("  File \"");
             buf.put_dstr(filename);
             buf.put("\", line ");
-            buf.put_uint32(PyFrame_GetLineNumber(frame));
+            buf.put_uint32((uint32_t) PyFrame_GetLineNumber(frame));
             buf.put(", in ");
             buf.put_dstr(name);
             buf.put('\n');

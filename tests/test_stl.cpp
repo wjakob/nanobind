@@ -14,6 +14,7 @@
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/complex.h>
 #include <nanobind/stl/wstring.h>
+#include <nanobind/stl/bitset.h>
 
 NB_MAKE_OPAQUE(std::vector<float, std::allocator<float>>)
 
@@ -538,4 +539,10 @@ NB_MODULE(test_stl_ext, m) {
     // Test some esoteric "None"-ish types
     m.def("takes_nullptr", [](std::nullptr_t) { return "nullptr"; });
     m.def("takes_monostate", [](std::monostate) { return "monostate"; });
+
+    // test76
+    m.def("bitset_1", [](const std::bitset<1>& x){ return x; });
+    m.def("bitset_8", [](const std::bitset<8>& x){ return x; });
+    m.def("bitset_64", [](const std::bitset<64>& x){ return x; });
+    m.def("bitset_128", [](const std::bitset<128>& x){ return x; });
 }

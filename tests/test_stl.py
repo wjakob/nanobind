@@ -883,3 +883,16 @@ def test74_variant_implicit_conversions():
 def test75_weird_nones():
     assert t.takes_nullptr(None) == "nullptr"
     assert t.takes_monostate(None) == "monostate"
+
+def test76_bitset():
+    assert t.bitset_1(0b0) == 0b0
+    assert t.bitset_1(0b1) == 0b1
+    assert t.bitset_8(0b1) == 0b1
+    assert t.bitset_8(0xFF) == 0xFF
+    assert t.bitset_64(0xFF) == 0xFF
+    assert t.bitset_64((2**64) - 1) == (2**64) - 1
+    assert t.bitset_128(2**64) == 2**64
+    assert t.bitset_128((2**128) - 1) == (2**128) - 1
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.bitset_1('test')
+

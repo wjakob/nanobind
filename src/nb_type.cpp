@@ -1060,7 +1060,7 @@ nb_type_vectorcall_fixup(nb_func *func, PyObject *self, PyObject *const *args_in
 
     size_t size = (size_t) nargs + 1;
     if (kwargs_in)
-        size += NB_TUPLE_GET_SIZE(kwargs_in);
+        size += (size_t) NB_TUPLE_GET_SIZE(kwargs_in);
 
     if (size < buf_size) {
         args = buf;
@@ -1258,7 +1258,7 @@ NB_NOINLINE char *extract_name(const char *cmd, const char *prefix, const char *
     check((p2 == p || (p[0] != ' ' && p2[-1] != ' ')),
           "%s(): custom signature \"%s\" contains leading/trailing space around name!", cmd, s);
 
-    size_t size = p2 - p;
+    size_t size = (size_t) (p2 - p);
     char *result = (char *) malloc_check(size + 1);
     memcpy(result, p, size);
     result[size] = '\0';

@@ -20,10 +20,10 @@ create_exception(exception_type type, const char *fmt, va_list args_) {
     va_list args;
 
     va_copy(args, args_);
-    int size = vsnprintf(buf, sizeof(buf), fmt, args);
+    size_t size = (size_t) vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    if (size < (int) sizeof(buf)) {
+    if (size < sizeof(buf)) {
         return builtin_exception(type, buf);
     } else {
         scoped_pymalloc<char> temp(size + 1);

@@ -344,8 +344,8 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         if (nb_func_prev->doc_uniform)
             prev_doc = prev->doc;
 
-        memcpy(cur, prev, sizeof(func_data) * prev_overloads);
-        memset(prev, 0, sizeof(func_data) * prev_overloads);
+        memcpy(cur, prev, sizeof(func_data) * (size_t) prev_overloads);
+        memset(prev, 0, sizeof(func_data) * (size_t) prev_overloads);
 
         ((PyVarObject *) func_prev)->ob_size = 0;
 
@@ -826,7 +826,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 for (size_t j = nargs_pos; j < nargs_in; ++j) {
                     PyObject *o = args_in[j];
                     Py_INCREF(o);
-                    NB_TUPLE_SET_ITEM(tuple, j - nargs_pos, o);
+                    NB_TUPLE_SET_ITEM(tuple, (Py_ssize_t) (j - nargs_pos), o);
                 }
 
                 args[nargs_pos] = tuple;
@@ -1310,7 +1310,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
     } else {
         size_t size = nargs + 1;
         if (kwargs_in)
-            size += NB_TUPLE_GET_SIZE(kwargs_in);
+            size += (size_t) NB_TUPLE_GET_SIZE(kwargs_in);
 
         if (size < buf_size) {
             args = args_buf;
@@ -1671,7 +1671,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
                 } else {
                     Py_INCREF(value);
                 }
-                NB_TUPLE_SET_ITEM(defaults, pos, value);
+                NB_TUPLE_SET_ITEM(defaults, (Py_ssize_t) pos, value);
                 pos++;
             }
 

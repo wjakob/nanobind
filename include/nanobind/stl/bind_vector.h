@@ -123,7 +123,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
                 [](Vector &v, Py_ssize_t i) {
                     size_t index = detail::wrap(i, v.size());
                     Value result = std::move(v[index]);
-                    v.erase(v.begin() + index);
+                    v.erase(v.begin() + (ptrdiff_t) index);
                     return result;
                 },
                 arg("index") = -1,
@@ -153,7 +153,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
 
           .def("__delitem__",
                [](Vector &v, Py_ssize_t i) {
-                   v.erase(v.begin() + detail::wrap(i, v.size()));
+                   v.erase(v.begin() + (ptrdiff_t) detail::wrap(i, (size_t) v.size()));
                })
 
           .def("__getitem__",
@@ -163,7 +163,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
                    seq->reserve(length);
 
                    for (size_t i = 0; i < length; ++i) {
-                       seq->push_back(v[start]);
+                       seq->push_back(v[(size_t) start]);
                        start += step;
                    }
 
@@ -185,12 +185,12 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
                    if (&value == &v) {
                        Vector copy(value);
                        for (size_t i = 0; i < length; ++i) {
-                           v[start] = copy[i];
+                           v[(size_t) start] = copy[i];
                            start += step;
                        }
                    } else {
                        for (size_t i = 0; i < length; ++i) {
-                           v[start] = value[i];
+                           v[(size_t) start] = value[i];
                            start += step;
                        }
                    }
@@ -202,7 +202,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
                    if (length == 0)
                        return;
 
-                   stop = start + (length - 1) * step;
+                   stop = start + ((Py_ssize_t) length - 1) * step;
                    if (start > stop) {
                        std::swap(start, stop);
                        step = -step;

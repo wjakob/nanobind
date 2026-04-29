@@ -281,8 +281,8 @@ static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
 
 // This function implements __dlpack__() for a nanobind.nb_ndarray.
 static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
-                                   Py_ssize_t nargsf, PyObject *kwnames) {
-    if (PyVectorcall_NARGS(nargsf) != 0) {
+                                   Py_ssize_t nargs, PyObject *kwnames) {
+    if (nargs != 0) {
         PyErr_SetString(PyExc_TypeError,
                 "__dlpack__() does not accept positional arguments");
         return nullptr;

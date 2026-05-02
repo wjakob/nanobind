@@ -129,3 +129,23 @@ class Item(enum.Enum):
     extra = 2
 
 def item_to_int(item: Item = Item.name) -> int: ...
+
+class EnumWrapper:
+    def __init__(self, arg: Value, /) -> None: ...
+
+    class Value(enum.Enum):
+        Alpha = 0
+
+        Beta = 1
+
+        Gamma = 2
+
+    Alpha: Value = Value.Alpha
+
+    Beta: Value = Value.Beta
+
+    Gamma: Value = Value.Gamma
+
+    def __eq__(self, arg: Value, /) -> bool: ...
+
+    def get_value(self) -> Value: ...

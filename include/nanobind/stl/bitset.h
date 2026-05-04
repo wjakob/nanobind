@@ -23,6 +23,10 @@ struct type_caster<std::bitset<N>> {
             return false;
         }
         str bin(builtins()["bin"](src));
+        if (len(bin) - 2 > N) {
+            PyErr_Clear();
+            return false;
+        }
         value = std::bitset<N>(bin.c_str() + 2); // std::bitset does not allow 0b prefix in string
         return true;
     }

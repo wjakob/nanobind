@@ -1384,6 +1384,17 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-d",
+        "--dep",
+        action="append",
+        metavar="PATH=NAME",
+        dest="deps",
+        default=[],
+        help="load a dependency module from PATH, using NAME as its "
+             "import name in the generated stub (can specify multiple times)",
+    )
+
+    parser.add_argument(
         "-q",
         "--quiet",
         default=False,
@@ -1458,6 +1469,28 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
     return patterns
 
 
+def load_module_from_file(path: str, name: str) -> types.ModuleType:
+    """Load an extension module from a file path and register it under the given name."""
+    module_dir = str(Path(path).resolve().parent)
+    module_stem = Path(path).stem.split(".")[0]
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
+    mod = importlib.import_module(module_stem)
+    _alias_module(mod, module_stem, name)
+    return mod
+
+
+def _alias_module(mod: types.ModuleType, old_name: str, new_name: str) -> None:
+    """Recursively re-register a module under a new name."""
+    mod.__name__ = new_name
+    sys.modules[new_name] = mod
+    for attr in vars(mod).values():
+        if isinstance(attr, type) and getattr(attr, '__module__', None) == old_name:
+            attr.__module__ = new_name
+        elif isinstance(attr, types.ModuleType) and getattr(attr, '__name__', '').startswith(old_name + '.'):
+            _alias_module(attr, attr.__name__, new_name + attr.__name__[len(old_name):])
+
+
 def main(args: Optional[List[str]] = None) -> None:
     import sys
 
@@ -1479,6 +1512,12 @@ def main(args: Optional[List[str]] = None) -> None:
 
     for i in opt.imports:
         sys.path.insert(0, i)
+
+    for dep in opt.deps:
+        if "=" not in dep:
+            raise ValueError(f"Invalid --dep format '{dep}', expected PATH=NAME")
+        path, name = dep.split("=", 1)
+        load_module_from_file(path, name)
 
     for i, mod in enumerate(opt.modules):
         if not opt.quiet:

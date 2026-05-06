@@ -1,0 +1,19 @@
+import my_package.test_dep_base_ext
+import my_package.test_dep_other_ext
+
+import my_package.test_dep_base_ext.sub
+import my_package.test_dep_base_ext.sub.inner
+
+
+class Child(my_package.test_dep_base_ext.Base):
+    def __init__(self) -> None: ...
+
+    def get_doubled(self) -> int: ...
+
+def make_other() -> my_package.test_dep_other_ext.Other: ...
+
+def read_other(arg: my_package.test_dep_other_ext.Other, /) -> int: ...
+
+def make_subtype() -> my_package.test_dep_base_ext.sub.SubModType: ...
+
+def make_deep() -> my_package.test_dep_base_ext.sub.inner.SubSubModType: ...

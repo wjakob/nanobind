@@ -540,7 +540,8 @@ The program has the following command line options:
 .. code-block:: text
 
    usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH] [-m MODULE]
-                                     [-r] [-M FILE] [-P] [-D] [--exclude-values] [-q]
+                                     [-r] [-M FILE] [-P] [-D]
+                                     [-d PATH=NAME] [--exclude-values] [-q]
 
    Generate stubs for nanobind-based extensions.
 
@@ -556,6 +557,10 @@ The program has the following command line options:
      -M FILE, --marker-file FILE   generate a marker file (usually named 'py.typed')
      -p FILE, --pattern-file FILE  apply the given patterns to the generated stub
                                    (see the docs for syntax)
+     -d PATH=NAME, --dep PATH=NAME
+                                   load a dependency module from PATH, using NAME
+                                   as its import name in the generated stub
+                                   (can specify multiple times)
      -P, --include-private         include private members (with single leading or
                                    trailing underscore)
      -D, --exclude-docstrings      exclude docstrings from the generated stub

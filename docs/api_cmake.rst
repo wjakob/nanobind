@@ -521,6 +521,14 @@ Nanobind's CMake tooling includes a convenience command to interface with the
         - Specify a pattern file used to replace declarations in the stub. The
           syntax is described in the section on :ref:`stub generation <stubs>`.
 
+      * - ``MODULE_DEP``
+        - Load one or more dependency modules from a file path, using
+          ``NAME`` as the import name in the generated stub. Each entry
+          has the form ``PATH=NAME``. This is useful when the target
+          module depends on shared library symbols provided by another
+          module, and the generated imports should reflect the final
+          package structure. Can be specified multiple times. Optional.
+
       * - ``COMPONENT``
         - Specify a component when ``INSTALL_TIME`` stub generation is used.
           This is analogous to ``install(..., COMPONENT [name])`` in other

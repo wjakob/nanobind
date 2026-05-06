@@ -154,6 +154,10 @@ nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
+nanobind_add_module(test_dep_base_ext NB_DOMAIN depdomain test_dep_base_ext.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_dep_other_ext NB_DOMAIN depdomain test_dep_other_ext.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_dep_child_ext NB_DOMAIN depdomain test_dep_child_ext.cpp ${NB_EXTRA_ARGS})
+
 set(TEST_FILES
   common.py
   conftest.py
@@ -192,6 +196,7 @@ set(TEST_FILES
   test_stl_ext.pyi.ref
   test_enum_ext.pyi.ref
   test_typing_ext.pyi.ref
+  test_dep_child_ext.pyi.ref
   py_stub_test.py
   py_stub_test.pyi.ref
   py_recursive_stub_test/__init__.pyi.ref
@@ -246,5 +251,16 @@ nanobind_add_stub(
     ${PYI_PREFIX}test_prefix_module/__init__.pyi
     ${PYI_PREFIX}test_prefix_module/prefix.pyi
     ${PYI_PREFIX}test_prefix_module/prefixabc.pyi
+  PYTHON_PATH ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+nanobind_add_stub(
+  test_dep_child_ext_stub
+  MODULE test_dep_child_ext
+  OUTPUT ${PYI_PREFIX}test_dep_child_ext.pyi
+  DEPENDS test_dep_child_ext test_dep_base_ext test_dep_other_ext
+  MODULE_DEP
+    $<TARGET_FILE:test_dep_base_ext>=my_package.test_dep_base_ext
+    $<TARGET_FILE:test_dep_other_ext>=my_package.test_dep_other_ext
   PYTHON_PATH ${CMAKE_CURRENT_SOURCE_DIR}
 )

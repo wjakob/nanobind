@@ -879,6 +879,16 @@ section <ndarrays>`.
       Return a pointer to the array data.
       If :cpp:var:`ReadOnly` is true, a pointer-to-const is returned.
 
+   .. cpp:function:: void * data_handle() const
+
+      Return the raw DLPack ``DLTensor::data`` field without applying the byte
+      offset. For non-CPU devices, this may be an opaque device handle such as
+      an ``id<MTLBuffer>`` for :cpp:class:`device::metal <device::metal>`.
+
+   .. cpp:function:: uint64_t data_offset() const
+
+      Return the DLPack ``DLTensor::byte_offset`` value in bytes.
+
    .. cpp:function:: template <typename... Args2> auto& operator()(Args2... indices)
 
       Return a reference to the element stored at the provided index/indices.

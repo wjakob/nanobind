@@ -436,6 +436,8 @@ public:
     bool is_valid() const { return m_handle != nullptr; }
     int device_type() const { return (int) m_dltensor.device.device_type; }
     int device_id() const { return (int) m_dltensor.device.device_id; }
+    void *data_handle() const { return m_dltensor.data; }
+    uint64_t data_offset() const { return m_dltensor.byte_offset; }
     detail::ndarray_handle *handle() const { return m_handle; }
 
     size_t size() const {

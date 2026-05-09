@@ -122,6 +122,7 @@ struct type_data {
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
+    void (*dealloc)(void *) noexcept = nullptr;
     union {
         implicit_t implicit;  // for C++ type bindings
         enum_tbl_t enum_tbl;  // for enumerations
@@ -248,6 +249,10 @@ template <typename T> void wrap_move(void *dst, void *src) noexcept {
 
 template <typename T> void wrap_destruct(void *value) noexcept {
     ((T *) value)->~T();
+}
+
+template <typename T> void wrap_delete(void *value) noexcept {
+    delete (T *) value;
 }
 
 template <typename, template <typename, typename> typename, typename...>
@@ -597,6 +602,10 @@ public:
             if constexpr (!std::is_trivially_destructible_v<T>) {
                 d.flags |= (uint32_t) detail::type_flags::has_destruct;
                 d.destruct = detail::wrap_destruct<T>;
+            }
+
+            if constexpr (std::has_virtual_destructor_v<T> || std::is_final_v<T>) {
+                d.dealloc = detail::wrap_delete<T>;
             }
         }
 

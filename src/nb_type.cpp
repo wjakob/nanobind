@@ -239,19 +239,23 @@ static void inst_dealloc(PyObject *self) {
     nb_inst *inst = (nb_inst *) self;
     void *p = inst_ptr(inst);
 
-    if (inst->destruct) {
-        check(t->flags & (uint32_t) type_flags::is_destructible,
-              "nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
-              "the destructor of a non-destructible type!", t->name);
-        if (t->flags & (uint32_t) type_flags::has_destruct)
-            t->destruct(p);
-    }
+    if (inst->cpp_delete && t->dealloc) {
+        t->dealloc(p);
+    } else {
+        if (inst->destruct) {
+            check(t->flags & (uint32_t) type_flags::is_destructible,
+                  "nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
+                  "the destructor of a non-destructible type!", t->name);
+            if (t->flags & (uint32_t) type_flags::has_destruct)
+                t->destruct(p);
+        }
 
-    if (inst->cpp_delete) {
-        if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
-            operator delete(p);
-        else
-            operator delete(p, std::align_val_t(t->align));
+        if (inst->cpp_delete) {
+            if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
+                operator delete(p);
+            else
+                operator delete(p, std::align_val_t(t->align));
+        }
     }
 
     nb_weakref_seq *wr_seq = nullptr;

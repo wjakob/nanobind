@@ -487,7 +487,7 @@ NB_CORE ndarray_handle *ndarray_create(void *data, size_t ndim,
                                        const int64_t *strides,
                                        dlpack::dtype dtype, bool ro,
                                        int device, int device_id,
-                                       char order);
+                                       char order, uint64_t data_offset);
 
 /// Increase the reference count of the given ndarray object; returns a pointer
 /// to the underlying DLTensor

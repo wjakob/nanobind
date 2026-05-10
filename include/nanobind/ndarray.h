@@ -353,11 +353,12 @@ public:
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int device_type = DeviceType,
             int device_id = 0,
-            char order = Order) {
+            char order = Order,
+            uint64_t data_offset = 0) {
 
         m_handle = detail::ndarray_create(
             (void *) data, ndim, shape, owner.ptr(), strides, dtype,
-            ReadOnly, device_type, device_id, order);
+            ReadOnly, device_type, device_id, order, data_offset);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
@@ -369,7 +370,8 @@ public:
             dlpack::dtype dtype = nanobind::dtype<Scalar>(),
             int device_type = DeviceType,
             int device_id = 0,
-            char order = Order) {
+            char order = Order,
+            uint64_t data_offset = 0) {
 
         size_t shape_size = shape.size();
 
@@ -392,7 +394,7 @@ public:
         m_handle = detail::ndarray_create(
             (void *) data, shape_size, shape_ptr, owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), dtype,
-            ReadOnly, device_type, device_id, order);
+            ReadOnly, device_type, device_id, order, data_offset);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }

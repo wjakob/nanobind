@@ -851,6 +851,22 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     check(ndim <= (size_t) max_ndim,
           "ndarray_create(): ndim is too large!");
 
+    /* DLPack mandates 256-byte alignment of the 'DLTensor::data' field,
+       but this requirement is generally ignored.  Also, PyTorch has/had
+       a bug in ignoring byte_offset and assuming it's zero.
+       It would be wrong to split the 64-bit raw pointer into two pieces,
+       as disabled below, since the pointer dltensor.data must point to
+       allocated memory (i.e., memory that can be accessed).
+       A byte_offset can be used to support array slicing when data is an
+       opaque device pointer or handle, on which arithmetic is impossible.
+       However, this function is not slicing the data.
+       See also: https://github.com/data-apis/array-api/discussions/779  */
+#if 0
+    uintptr_t data_uint = (uintptr_t) data;
+    data = (void *) (data_uint & ~uintptr_t{255});      // upper bits
+    uint64_t data_offset = data_uint & uintptr_t{255};  // lowest 8 bits
+#endif
+
     if (device_type == 0)
         device_type = device::cpu::value;
 

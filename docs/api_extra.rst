@@ -735,7 +735,7 @@ section <ndarrays>`.
 
    .. _ndarray_dynamic_constructor:
 
-   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape = { }, handle owner = { }, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = DeviceType, int32_t device_id = 0, char order = Order, uint64_t data_offset = 0)
+   .. cpp:function:: ndarray(VoidPtr data, const std::initializer_list<size_t> shape = { }, handle owner = { }, std::initializer_list<int64_t> strides = { }, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int32_t device_type = DeviceType, int32_t device_id = 0, char order = Order, uint64_t byte_offset = 0)
 
       Create an array wrapping an existing memory allocation.
 
@@ -796,7 +796,7 @@ section <ndarrays>`.
         implementation uses the order specified as an ndarray template
         argument, or C-style order as a fallback.
 
-      - `data_offset` specifies the DLPack ``DLTensor::byte_offset`` field in
+      - `byte_offset` specifies the DLPack ``DLTensor::byte_offset`` field in
         bytes. This is useful when `data` is an opaque device handle pointing to
         the start of an allocation, while the logical array begins later in the
         allocation.
@@ -810,7 +810,7 @@ section <ndarrays>`.
          The Python *global interpreter lock* (GIL) must be held when calling
          this function.
 
-   .. cpp:function:: ndarray(VoidPtr data, size_t ndim, const size_t * shape, handle owner, const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int device_type = DeviceType, int device_id = 0, char order = Order, uint64_t data_offset = 0)
+   .. cpp:function:: ndarray(VoidPtr data, size_t ndim, const size_t * shape, handle owner, const int64_t * strides = nullptr, dlpack::dtype dtype = nanobind::dtype<Scalar>(), int device_type = DeviceType, int device_id = 0, char order = Order, uint64_t byte_offset = 0)
 
       Alternative form of the above constructor, which accepts the `shape`
       and `strides` arguments using pointers instead of initializer lists.
@@ -890,7 +890,7 @@ section <ndarrays>`.
       offset. For non-CPU devices, this may be an opaque device handle such as
       an ``id<MTLBuffer>`` for :cpp:class:`device::metal <device::metal>`.
 
-   .. cpp:function:: uint64_t data_offset() const
+   .. cpp:function:: uint64_t byte_offset() const
 
       Return the DLPack ``DLTensor::byte_offset`` value in bytes.
 

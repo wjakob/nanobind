@@ -354,11 +354,11 @@ public:
             int device_type = DeviceType,
             int device_id = 0,
             char order = Order,
-            uint64_t data_offset = 0) {
+            uint64_t byte_offset = 0) {
 
         m_handle = detail::ndarray_create(
             (void *) data, ndim, shape, owner.ptr(), strides, dtype,
-            ReadOnly, device_type, device_id, order, data_offset);
+            ReadOnly, device_type, device_id, order, byte_offset);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
@@ -371,7 +371,7 @@ public:
             int device_type = DeviceType,
             int device_id = 0,
             char order = Order,
-            uint64_t data_offset = 0) {
+            uint64_t byte_offset = 0) {
 
         size_t shape_size = shape.size();
 
@@ -394,7 +394,7 @@ public:
         m_handle = detail::ndarray_create(
             (void *) data, shape_size, shape_ptr, owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), dtype,
-            ReadOnly, device_type, device_id, order, data_offset);
+            ReadOnly, device_type, device_id, order, byte_offset);
 
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
@@ -439,7 +439,7 @@ public:
     int device_type() const { return (int) m_dltensor.device.device_type; }
     int device_id() const { return (int) m_dltensor.device.device_id; }
     void *data_handle() const { return m_dltensor.data; }
-    uint64_t data_offset() const { return m_dltensor.byte_offset; }
+    uint64_t byte_offset() const { return m_dltensor.byte_offset; }
     detail::ndarray_handle *handle() const { return m_handle; }
 
     size_t size() const {
@@ -460,7 +460,7 @@ public:
     template <typename... Args2>
     NB_INLINE auto& operator()(Args2... indices) const {
         return *(Scalar *) ((uint8_t *) m_dltensor.data +
-                            byte_offset(indices...));
+                            compute_byte_offset(indices...));
     }
 
     template <typename... Args2> NB_INLINE auto view() const {
@@ -496,7 +496,7 @@ public:
 
 private:
     template <typename... Args2>
-    NB_INLINE int64_t byte_offset(Args2... indices) const {
+    NB_INLINE int64_t compute_byte_offset(Args2... indices) const {
         constexpr bool has_scalar = !std::is_void_v<Scalar>,
                        has_shape  = Config::N != -1;
 

@@ -418,8 +418,8 @@ def test20_return_array_api():
         assert t.destruct_count() - dc == 1
         dc += 1
 
-    obj = t.ret_array_api_offset()
-    assert t.inspect_offset(obj) == (1, 0, 2, 2, 4, 8)
+    obj = t.ret_array_api_byte_offset()
+    assert t.inspect_byte_offset(obj) == (1, 0, 2, 2, 4, 8)
     mv = memoryview(obj)
     assert mv.tolist() == [[2, 3, 4, 5], [6, 7, 8, 9]]
     del obj
@@ -432,7 +432,7 @@ def test20_return_array_api():
 
     if (hasattr(np, '__array_api_version__') and
         np.__array_api_version__ >= '2024'):
-        obj = t.ret_array_api_offset()
+        obj = t.ret_array_api_byte_offset()
         x = np.from_dlpack(obj)
         del obj
         collect()
@@ -465,7 +465,7 @@ def test20b_import_metal_dlpack():
     assert t.check_metal_contig(rec) == (8, 0, 2, 2, 4, True, 0)
     assert "max_version" in rec.kwargs
 
-    obj = t.ret_array_api_metal_offset()
+    obj = t.ret_array_api_metal_byte_offset()
     assert t.check_metal_contig(obj) == (8, 0, 2, 2, 3, True, 4)
 
 

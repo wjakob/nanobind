@@ -198,7 +198,7 @@ NB_MODULE(test_ndarray_ext, m) {
                   a.shape(0),
                   a.shape(1),
                   a.data_handle() == (void *) f_global,
-                  a.data_offset());
+                  a.byte_offset());
           });
 
     m.def("inspect_metal_contig",
@@ -211,10 +211,10 @@ NB_MODULE(test_ndarray_ext, m) {
                   a.shape(1),
                   a.dtype() == nb::dtype<float>(),
                   a.data_handle() != nullptr,
-                  a.data_offset());
+                  a.byte_offset());
           });
 
-    m.def("inspect_offset",
+    m.def("inspect_byte_offset",
           [](nb::ndarray<nb::ro> a) {
               return nb::make_tuple(
                   a.device_type(),
@@ -222,7 +222,7 @@ NB_MODULE(test_ndarray_ext, m) {
                   a.ndim(),
                   a.shape(0),
                   a.shape(1),
-                  a.data_offset());
+                  a.byte_offset());
           });
 
     m.def("initialize",
@@ -369,7 +369,7 @@ NB_MODULE(test_ndarray_ext, m) {
                                                                    deleter);
     });
 
-    m.def("ret_array_api_offset", []() {
+    m.def("ret_array_api_byte_offset", []() {
         double *d = new double[9] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
         size_t shape[2] = { 2, 4 };
 
@@ -389,7 +389,7 @@ NB_MODULE(test_ndarray_ext, m) {
             f_global, { 2, 4 }, nb::none());
     });
 
-    m.def("ret_array_api_metal_offset", []() {
+    m.def("ret_array_api_metal_byte_offset", []() {
         return nb::ndarray<nb::array_api, float, nb::shape<2, 3>,
                            nb::device::metal, nb::c_contig>(
             f_global, { 2, 3 }, nb::none(), { }, nb::dtype<float>(),

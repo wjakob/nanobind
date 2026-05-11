@@ -448,24 +448,13 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
         strides = shape + ndim;
     }
 
-    /* Keep CPU buffer pointers as-is. The byte_offset field is only set
-       explicitly by ndarray_create(), e.g. for opaque device handles. */
-#if 0
-    uintptr_t data_uint = (uintptr_t) view->buf;
-    void* data_ptr = (void *) (data_uint & ~uintptr_t{255});
-    uint64_t data_offset = data_uint & uintptr_t{255};
-#else
-    void* data_ptr = view->buf;
-    constexpr uint64_t data_offset = 0UL;
-#endif
-
-    mt->dltensor.data = data_ptr;
+    mt->dltensor.data = view->buf;
     mt->dltensor.device = { device::cpu::value, 0 };
     mt->dltensor.ndim = ndim;
     mt->dltensor.dtype = dt;
     mt->dltensor.shape = shape;
     mt->dltensor.strides = strides;
-    mt->dltensor.byte_offset = data_offset;
+    mt->dltensor.byte_offset = 0UL;
 
     const int64_t itemsize = (int64_t) view->itemsize;
     for (int32_t i = 0; i < ndim; ++i) {
@@ -847,25 +836,18 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
                                PyObject *owner, const int64_t *strides_in,
                                dlpack::dtype dtype, bool ro, int device_type,
                                int device_id, char order,
-                               uint64_t data_offset) {
+                               uint64_t byte_offset) {
     check(ndim <= (size_t) max_ndim,
           "ndarray_create(): ndim is too large!");
 
-    /* DLPack mandates 256-byte alignment of the 'DLTensor::data' field,
-       but this requirement is generally ignored.  Also, PyTorch has/had
-       a bug in ignoring byte_offset and assuming it's zero.
-       It would be wrong to split the 64-bit raw pointer into two pieces,
-       as disabled below, since the pointer dltensor.data must point to
-       allocated memory (i.e., memory that can be accessed).
+    /* A comment in the DLPack header file suggests 256-byte alignment of the
+       DLTensor::data field, but this is generally (and necessarily) ignored.
+       Note that the pointer dltensor.data must point to allocated memory
+       (i.e., memory that can be accessed), so it cannot simply be rounded
+       down by zeroing its lowest 8 bits.
        A byte_offset can be used to support array slicing when data is an
        opaque device pointer or handle, on which arithmetic is impossible.
-       However, this function is not slicing the data.
        See also: https://github.com/data-apis/array-api/discussions/779  */
-#if 0
-    uintptr_t data_uint = (uintptr_t) data;
-    data = (void *) (data_uint & ~uintptr_t{255});      // upper bits
-    uint64_t data_offset = data_uint & uintptr_t{255};  // lowest 8 bits
-#endif
 
     if (device_type == 0)
         device_type = device::cpu::value;
@@ -917,7 +899,7 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     mt->dltensor.dtype = dtype;
     mt->dltensor.shape = shape;
     mt->dltensor.strides = strides;
-    mt->dltensor.byte_offset = data_offset;
+    mt->dltensor.byte_offset = byte_offset;
     result->mt_versioned = mt.release();
     result->refcount = 0;
     result->owner = owner;

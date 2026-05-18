@@ -42,9 +42,9 @@ struct doc {
 NAMESPACE_BEGIN(detail)
 
 /// Sentinel attribute set on every Python class registered via
-/// ``nanobind::named_tuple<T>``. Stubgen looks for this name (see Task 2 in
-/// the spec) to identify NamedTuple-bound types reliably. Do not change the
-/// spelling without updating the stubgen pass.
+/// ``nanobind::named_tuple<T>``. Stubgen looks for this name to identify
+/// NamedTuple-bound types reliably. Do not change the spelling without
+/// updating the stubgen pass.
 inline constexpr const char *named_tuple_sentinel_attr = "__nb_named_tuple__";
 
 /// Attribute on every NamedTuple-bound class storing per-field type strings
@@ -345,7 +345,7 @@ private:
     void register_field(const char *name, F T::*member, const char *field_doc) {
         field_names_.push_back(name);
         field_docs_.push_back(field_doc);
-        field_default_thunks_.emplace_back(); // no default
+        field_default_thunks_.emplace_back();
         // Capture the field type descriptor as a thunk; the actual ``%``
         // resolution happens in ``finalize()`` so that types registered in
         // any order can be referenced (including the enclosing T itself).
@@ -370,9 +370,8 @@ private:
     void build_class() {
         // Validate per-field default placement *before* contacting Python.
         // ``collections.namedtuple`` only supports trailing defaults; surface
-        // a clean C++ exception here instead of letting Python report it on
-        // a synthetic ``None`` placeholder (which is what the previous
-        // implementation did and which was both confusing and unsafe).
+        // a clean C++ exception here instead of letting Python report it
+        // through a synthetic ``None`` placeholder.
         const char *missing_default_after = nullptr;
         const char *first_default = nullptr;
         for (size_t i = 0; i < field_default_thunks_.size(); ++i) {
@@ -448,7 +447,6 @@ private:
             field.attr("__doc__") = str(field_docs_[i]);
         }
 
-        // Install the class as an attribute of its scope.
         scope_.attr(name_) = cls;
 
         // Make T discoverable in the typeid-keyed map *before* resolving

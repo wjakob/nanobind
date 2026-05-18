@@ -89,7 +89,7 @@ SKIP_LIST = [
     "__package__", "__nb_signature__", "__class_getitem__", "__orig_bases__",
     "__file__", "__dict__", "__weakref__", "__format__", "__nb_enum__",
     "__firstlineno__", "__static_attributes__", "__annotations__", "__annotate__",
-    "__annotate_func__",
+    "__annotate_func__", "__nb_named_tuple__", "__nb_named_tuple_fields__",
 
     # Auto-generated enum attributes. Type checkers synthesize these, so they
     # shouldn't appear in the stubs.
@@ -548,6 +548,14 @@ class StubGen:
         tp_name, tp_mod_name = tp.__name__, tp.__module__
         mod_name = self.module.__name__
 
+        # NamedTuple bindings (``nb::named_tuple<T>``) carry a sentinel
+        # attribute and don't fit the generic class flow: their runtime
+        # ``__module__`` is set by ``collections.namedtuple`` and rarely
+        # matches the binding module. Dispatch them to a dedicated emitter.
+        if getattr(tp, "__nb_named_tuple__", False) and name == tp_name:
+            self.put_named_tuple(tp, tp_name)
+            return
+
         if name and (name != tp_name or mod_name != tp_mod_name):
             same_module = tp_mod_name == mod_name
             same_toplevel_module = tp_mod_name.split(".")[0] == mod_name.split(".")[0]
@@ -601,6 +609,39 @@ class StubGen:
             if output_pos == self._output.tell():
                 self.write_ln("pass\n")
             self.depth -= 1
+
+    def put_named_tuple(self, tp: type, tp_name: str) -> None:
+        """
+        Emit a ``class Name(typing.NamedTuple): ...`` body for a class bound
+        via ``nb::named_tuple<T>``. Field names and per-field type strings
+        come from the ``__nb_named_tuple_fields__`` attribute populated by
+        the C++ binding; defaults are read from ``collections.namedtuple``'s
+        ``_field_defaults``.
+        """
+        nt_base = self.import_object("typing", "NamedTuple")
+        self.write_ln(f"class {tp_name}({nt_base}):")
+        self.depth += 1
+
+        docstr = tp.__doc__
+        if docstr and self.include_docstrings:
+            self.put_docstr(docstr)
+            self.write("\n")
+
+        fields = getattr(tp, "__nb_named_tuple_fields__", None) or []
+        defaults = dict(getattr(tp, "_field_defaults", {}) or {})
+
+        if not fields:
+            self.write_ln("pass\n")
+        else:
+            for fname, ftype in fields:
+                type_str = self.simplify_types(ftype)
+                if fname in defaults:
+                    default = self.expr_str(defaults[fname]) or "..."
+                    self.write_ln(f"{fname}: {type_str} = {default}")
+                else:
+                    self.write_ln(f"{fname}: {type_str}")
+            self.write("\n")
+        self.depth -= 1
 
     def is_function(self, tp: type) -> bool:
         """

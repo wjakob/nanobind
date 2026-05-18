@@ -19,6 +19,9 @@
 
 #include <nanobind/nanobind.h>
 #include <functional>
+#include <string>
+#include <typeindex>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -30,6 +33,89 @@ NAMESPACE_BEGIN(detail)
 /// the spec) to identify NamedTuple-bound types reliably. Do not change the
 /// spelling without updating the stubgen pass.
 inline constexpr const char *named_tuple_sentinel_attr = "__nb_named_tuple__";
+
+/// Attribute on every NamedTuple-bound class storing per-field type strings
+/// for stubgen consumption. Format: ``[(field_name, type_str), ...]`` in
+/// ``_fields`` order. Resolved at ``named_tuple<T>::finalize()`` time.
+inline constexpr const char *named_tuple_fields_attr = "__nb_named_tuple_fields__";
+
+/// Process-wide map from ``std::type_index`` to the Python class produced by
+/// ``named_tuple<T>``. Used by the descr-to-string walker (and indirectly by
+/// nanobind's ``'%'`` signature substitution, via the registry below) to
+/// resolve nested NamedTuple field types.
+inline std::unordered_map<std::type_index, handle> &named_tuple_type_index() {
+    static std::unordered_map<std::type_index, handle> value;
+    return value;
+}
+
+/// Walk a ``descr<N, Ts...>`` and build the Python type string used for
+/// NamedTuple field annotations. ``'%'`` markers are substituted with the
+/// qualified Python class name of the corresponding typeid (looked up first
+/// in the NamedTuple type index and then in nanobind's regular type
+/// registry); ``'@'`` io-name blocks emit only the output variant (after the
+/// middle ``'@'``). For unresolved types we fall back to the mangled C++
+/// ``std::type_info::name()`` to keep output deterministic.
+template <size_t N, typename... Ts>
+inline str descr_to_field_type_string(const descr<N, Ts...> &d) {
+    const std::type_info *types[sizeof...(Ts) + 1] = { nullptr };
+    if constexpr (sizeof...(Ts) > 0)
+        d.put_types(types);
+
+    auto resolve_pct = [&](const std::type_info *t, std::string &out) {
+        auto &reg = named_tuple_type_index();
+        auto it = reg.find(std::type_index(*t));
+        if (it != reg.end()) {
+            handle h = it->second;
+            object mod = h.attr("__module__");
+            object qn = h.attr("__qualname__");
+            out += borrow<str>(mod).c_str();
+            out += '.';
+            out += borrow<str>(qn).c_str();
+            return;
+        }
+        PyObject *py = nb_type_lookup(t);
+        if (py) {
+            handle h(py);
+            object mod = h.attr("__module__");
+            object qn = h.attr("__qualname__");
+            out += borrow<str>(mod).c_str();
+            out += '.';
+            out += borrow<str>(qn).c_str();
+            return;
+        }
+        out += t->name();
+    };
+
+    std::string out;
+    size_t ti = 0;
+    for (size_t i = 0; i < N; ++i) {
+        char c = d.text[i];
+        if (c == '%') {
+            resolve_pct(types[ti++], out);
+        } else if (c == '@') {
+            // io_name block: skip input variant (advancing ti for any '%'),
+            // then emit the output variant.
+            ++i;
+            while (i < N && d.text[i] != '@') {
+                if (d.text[i] == '%') ti++;
+                ++i;
+            }
+            if (i < N) ++i; // skip middle '@'
+            while (i < N && d.text[i] != '@') {
+                char c2 = d.text[i];
+                if (c2 == '%')
+                    resolve_pct(types[ti++], out);
+                else
+                    out += c2;
+                ++i;
+            }
+            // loop's ++i moves past the trailing '@'
+        } else {
+            out += c;
+        }
+    }
+    return str(out.c_str());
+}
 
 /// Per-type runtime state. Each ``T`` gets its own static instance through
 /// template instantiation. ``cls`` is a strong (incref'd) handle to the
@@ -57,7 +143,11 @@ template <typename T> struct named_tuple_registry {
 /// with the ``NB_NAMED_TUPLE_CASTER(T)`` macro (or via the
 /// ``NB_NAMED_TUPLE`` convenience macro which expands to it).
 template <typename T> struct named_tuple_caster {
-    NB_TYPE_CASTER(T, const_name("tuple"))
+    // Use the standard ``%`` substitution so function signatures show the
+    // bound class name (e.g. ``test_named_tuple_ext.Point``) once the type
+    // has been registered via ``named_tuple<T>::finalize()``. Before that,
+    // signature rendering falls back to the demangled C++ name.
+    NB_TYPE_CASTER(T, const_name<T>())
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         auto &writers = named_tuple_registry<T>::writers();
@@ -133,6 +223,13 @@ public:
     /// ``_fields`` tuple and becomes an attribute on each instance.
     template <typename F> named_tuple &def_rw(const char *name, F T::*member) {
         field_names_.push_back(name);
+        // Capture the field type descriptor as a thunk; the actual ``%``
+        // resolution happens in ``finalize()`` so that types registered in
+        // any order can be referenced (including the enclosing T itself).
+        field_type_thunks_.emplace_back(
+            []() -> str {
+                return detail::descr_to_field_type_string(detail::make_caster<F>::Name);
+            });
         readers_.emplace_back(
             [member](const T &v, rv_policy policy, detail::cleanup_list *cl) -> handle {
                 return detail::make_caster<F>::from_cpp(v.*member, policy, cl);
@@ -167,6 +264,16 @@ private:
         object cls = factory(str(name_), field_list);
         cls.attr(detail::named_tuple_sentinel_attr) = bool_(true);
 
+        // ``collections.namedtuple`` infers ``__module__`` from the calling
+        // C frame, which for nanobind bindings is ``_frozen_importlib``.
+        // Override it with the scope's real module name so that type-checker
+        // output and stubgen field-type rendering use the canonical path.
+        if (PyObject *mod_name = PyObject_GetAttrString(scope_.ptr(), "__name__")) {
+            cls.attr("__module__") = steal<object>(mod_name);
+        } else {
+            PyErr_Clear();
+        }
+
         // Register into the per-T runtime registry. The class is owned by
         // ``scope_`` (set as an attribute below) and the registry holds an
         // extra strong reference so it stays alive for the program lifetime.
@@ -176,11 +283,26 @@ private:
         detail::named_tuple_registry<T>::cls() = handle(cls);
         detail::named_tuple_registry<T>::readers() = std::move(readers_);
         detail::named_tuple_registry<T>::writers() = std::move(writers_);
+
+        // Make T discoverable in the typeid-keyed map *before* resolving
+        // field-type strings, so a NamedTuple that references itself
+        // resolves correctly.
+        detail::named_tuple_type_index()[std::type_index(typeid(T))] = handle(cls);
+
+        // Build ``__nb_named_tuple_fields__ = [(name, type_str), ...]`` for
+        // stubgen to consume.
+        list fields_meta;
+        for (size_t i = 0; i < field_names_.size(); ++i) {
+            tuple entry = make_tuple(str(field_names_[i]), field_type_thunks_[i]());
+            fields_meta.append(entry);
+        }
+        cls.attr(detail::named_tuple_fields_attr) = fields_meta;
     }
 
     handle scope_;
     const char *name_;
     std::vector<const char *> field_names_;
+    std::vector<std::function<str()>> field_type_thunks_;
     std::vector<reader_fn> readers_;
     std::vector<writer_fn> writers_;
     bool built_ = false;

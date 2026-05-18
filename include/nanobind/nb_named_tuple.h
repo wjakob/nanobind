@@ -223,6 +223,7 @@ public:
     /// ``_fields`` tuple and becomes an attribute on each instance.
     template <typename F> named_tuple &def_rw(const char *name, F T::*member) {
         field_names_.push_back(name);
+        field_default_thunks_.emplace_back(); // no default
         // Capture the field type descriptor as a thunk; the actual ``%``
         // resolution happens in ``finalize()`` so that types registered in
         // any order can be referenced (including the enclosing T itself).
@@ -245,6 +246,25 @@ public:
         return *this;
     }
 
+    /// Register a field that has a default value. ``collections.namedtuple``
+    /// only supports trailing defaults, so once a field has a default value
+    /// every subsequent field must also provide one. The default is converted
+    /// to a Python object at ``finalize()`` time via the regular ``from_cpp``
+    /// path so that types whose casters depend on other registrations resolve
+    /// correctly.
+    template <typename F>
+    named_tuple &def_rw(const char *name, F T::*member, const F &default_value) {
+        def_rw(name, member);
+        field_default_thunks_.back() = [default_value]() -> object {
+            handle h = detail::make_caster<F>::from_cpp(default_value,
+                rv_policy::copy, nullptr);
+            if (!h.is_valid())
+                raise_python_error();
+            return steal<object>(h);
+        };
+        return *this;
+    }
+
     ~named_tuple() {
         if (!built_)
             finalize();
@@ -261,7 +281,33 @@ private:
         for (const char *fn : field_names_)
             field_list.append(str(fn));
 
-        object cls = factory(str(name_), field_list);
+        // Collect trailing defaults (if any) and forward them to
+        // ``collections.namedtuple(..., defaults=...)``. ``collections``
+        // itself validates the "no non-default field after a defaulted one"
+        // rule and raises a descriptive ``TypeError`` if violated.
+        list defaults_list;
+        bool any_defaults = false;
+        for (auto &thunk : field_default_thunks_) {
+            if (thunk) {
+                any_defaults = true;
+                defaults_list.append(thunk());
+            } else if (any_defaults) {
+                // A non-default field follows a defaulted one. Let the
+                // helpful Python-side error surface by passing the full
+                // (sparse) defaults tuple unchanged -- collections.namedtuple
+                // will reject it.
+                defaults_list.append(none());
+            }
+        }
+
+        object cls;
+        if (any_defaults) {
+            dict kw;
+            kw["defaults"] = tuple(defaults_list);
+            cls = factory(str(name_), field_list, **kw);
+        } else {
+            cls = factory(str(name_), field_list);
+        }
         cls.attr(detail::named_tuple_sentinel_attr) = bool_(true);
 
         // ``collections.namedtuple`` infers ``__module__`` from the calling
@@ -303,6 +349,10 @@ private:
     const char *name_;
     std::vector<const char *> field_names_;
     std::vector<std::function<str()>> field_type_thunks_;
+    /// Per-field default-value thunks. Each entry is either an empty
+    /// ``std::function`` (no default for this field) or a callable that
+    /// produces the default Python object at ``finalize()`` time.
+    std::vector<std::function<object()>> field_default_thunks_;
     std::vector<reader_fn> readers_;
     std::vector<writer_fn> writers_;
     bool built_ = false;

@@ -21,6 +21,13 @@ Unreleased
 - The implicit :cpp:func:`.none() <arg::none>` annotation now also applies to
   ``std::nullptr_t`` and ``std::monostate``-typed arguments
 
+- Added opt-in support for binding C++ structs as Python NamedTuples via the
+  new header ``<nanobind/nb_named_tuple.h>``, exposing the
+  ``nanobind::named_tuple<T>`` helper class together with the
+  :c:macro:`NB_NAMED_TUPLE` and :c:macro:`NB_NAMED_TUPLE_CASTER` macros.
+  Stubgen emits canonical ``class Name(typing.NamedTuple): ...`` declarations
+  for the registered types. See :ref:`utilities_named_tuple`.
+
 Version 2.12.0 (Feb 25, 2025)
 -----------------------------
 

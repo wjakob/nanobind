@@ -43,6 +43,26 @@ Macros
    This macro should be used at the top level (outside of namespaces and
    program code).
 
+.. c:macro:: NB_NAMED_TUPLE_CASTER(T)
+
+   Opt the C++ type `T` into the named-tuple type caster, allowing it to be
+   used as a function argument or return type. Like :c:macro:`NB_MAKE_OPAQUE`,
+   this macro must be used at the top level (outside of namespaces and program
+   code) and is provided by the opt-in header
+   ``<nanobind/nb_named_tuple.h>``.
+
+.. c:macro:: NB_NAMED_TUPLE(scope, Type, ...)
+
+   Register the C++ struct `Type` as a Python NamedTuple in the given module
+   or scope, listing its public fields by name. Supports up to 16 fields; for
+   more (or for advanced features such as custom field names, computed fields,
+   or per-field defaults), use the ``nanobind::named_tuple<T>`` helper class
+   directly. Must be paired with :c:macro:`NB_NAMED_TUPLE_CASTER` at file
+   scope, and is provided by the opt-in header
+   ``<nanobind/nb_named_tuple.h>``.
+
+   See :ref:`utilities_named_tuple` for a worked example.
+
 Python object API
 -----------------
 

@@ -57,3 +57,178 @@ leading indent:
     return value is always ``none``), and ``eval_statements`` (sequence of
     statements, return value is always ``none``). `eval` defaults to
     ``eval_expr`` and `exec` is just a shortcut for ``eval<eval_statements>``.
+
+.. _utilities_named_tuple:
+
+Binding C++ structs as Python NamedTuples
+-----------------------------------------
+
+Plain C++ data-carrier structs (configuration records, small geometric types,
+function return aggregates) often map most naturally onto Python's
+:py:class:`typing.NamedTuple`: an immutable, positionally-indexable record with
+named fields, defaults, ``_asdict``, ``_replace``, and structural pattern
+matching. nanobind ships an opt-in helper for this pattern in
+``<nanobind/nb_named_tuple.h>``.
+
+The header is **not** included by ``<nanobind/nanobind.h>``; add it explicitly
+in any translation unit that registers or passes a NamedTuple-bound type.
+
+Macro API
+^^^^^^^^^
+
+For simple aggregate structs the :c:macro:`NB_NAMED_TUPLE` macro is a one-liner
+that registers the class. It is paired with the file-scope
+:c:macro:`NB_NAMED_TUPLE_CASTER` macro that opts the type into the named-tuple
+type caster -- the same two-macro pattern used by
+:c:macro:`NB_MAKE_OPAQUE`:
+
+.. code-block:: cpp
+
+    // At beginning of file (top-level, outside any namespace)
+    #include <nanobind/nb_named_tuple.h>
+
+    struct Point {
+        double x;
+        double y;
+    };
+
+    NB_NAMED_TUPLE_CASTER(Point)
+
+    NB_MODULE(my_ext, m) {
+        NB_NAMED_TUPLE(m, Point, x, y);
+
+        m.def("midpoint", [](Point a, Point b) {
+            return Point{(a.x + b.x) / 2, (a.y + b.y) / 2};
+        });
+    }
+
+On the Python side:
+
+.. code-block:: pycon
+
+    >>> from my_ext import Point, midpoint
+    >>> p = Point(1.0, 2.0)
+    >>> isinstance(p, tuple)
+    True
+    >>> p._fields
+    ('x', 'y')
+    >>> midpoint(Point(0, 0), (4, 6))     # plain tuple also accepted
+    Point(x=2.0, y=3.0)
+    >>> midpoint(Point(0, 0), Point(4, 6))._asdict()
+    {'x': 2.0, 'y': 3.0}
+
+The macro accepts up to 16 fields. For more fields, or any case that needs
+escape-hatch behaviour (custom field names, defaults, computed fields), use
+the helper class directly -- see :ref:`utilities_named_tuple_helper` below.
+
+Two-macro pattern
+^^^^^^^^^^^^^^^^^
+
+:c:macro:`NB_NAMED_TUPLE_CASTER` lives at file scope and registers the type
+caster specialization. :c:macro:`NB_NAMED_TUPLE` lives inside ``NB_MODULE``
+(or any function that has a :cpp:class:`module_` / :cpp:class:`handle` in
+scope) and actually creates the Python class. The split mirrors
+:c:macro:`NB_MAKE_OPAQUE` and lets the same C++ type be referenced from
+multiple translation units while only being *registered* once.
+
+.. _utilities_named_tuple_helper:
+
+Helper API
+^^^^^^^^^^
+
+The macro expands to a use of the underlying ``nanobind::named_tuple<T>``
+helper class. Instantiating it directly gives full control over field names
+and order, and is also the way to express features the macro does not cover
+(per-field defaults, more than 16 fields):
+
+.. code-block:: cpp
+
+    nb::named_tuple<Point>(m, "Point")
+        .def_rw("x", &Point::x)
+        .def_rw("y", &Point::y);
+
+You still need :c:macro:`NB_NAMED_TUPLE_CASTER(Point) <NB_NAMED_TUPLE_CASTER>`
+at file scope for the type to be usable as a function argument or return type.
+
+Per-field defaults
+^^^^^^^^^^^^^^^^^^
+
+``def_rw`` accepts an optional default value that becomes the Python field
+default. As with :py:func:`collections.namedtuple`, defaults are right-aligned:
+any field with a default must be preceded only by fields that also have
+defaults. The default is applied automatically when calling the class from
+Python and is surfaced in the generated stub.
+
+.. code-block:: cpp
+
+    struct LogConfig {
+        std::string path;
+        int level;
+        bool color;
+    };
+    NB_NAMED_TUPLE_CASTER(LogConfig)
+
+    // In NB_MODULE:
+    nb::named_tuple<LogConfig>(m, "LogConfig")
+        .def_rw("path", &LogConfig::path)
+        .def_rw("level", &LogConfig::level, 20)        // default: INFO
+        .def_rw("color", &LogConfig::color, true);
+
+    // Python:
+    //   LogConfig("/tmp/app.log")
+    //   LogConfig("/tmp/app.log", level=30)
+    //   LogConfig("/tmp/app.log", 30, False)
+
+Optional fields and nesting
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Fields of type ``std::optional<U>`` are converted to ``typing.Optional[U]`` in
+the generated stub; ``std::nullopt`` round-trips as ``None``. A NamedTuple
+type can be used as a field of another NamedTuple, including itself, as long
+as the referenced class has been registered by the time the enclosing
+``named_tuple<T>`` goes out of scope:
+
+.. code-block:: cpp
+
+    struct Node {
+        int value;
+        std::optional<Node> next;   // self-reference via std::optional
+    };
+    NB_NAMED_TUPLE_CASTER(Node)
+
+    NB_NAMED_TUPLE(m, Node, value, next);
+
+Accepted inputs and stub generation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a function takes a NamedTuple-bound type, nanobind accepts either an
+instance of the registered Python class *or* any plain tuple of the right
+length and field types, mirroring the permissiveness of the built-in
+``std::tuple`` caster. C++ functions returning the type always produce an
+instance of the registered class.
+
+The runtime class is constructed with :py:func:`collections.namedtuple`; the
+generated ``.pyi`` stub, on the other hand, emits the canonical
+``class Name(typing.NamedTuple): ...`` form with annotated fields and
+defaults. This is the standard pattern for typing C-extension NamedTuples:
+the runtime factory and the stub class share a binary-compatible shape, but
+the stub gives static type checkers the field-level type information they
+need.
+
+.. note::
+
+    Two follow-ups are intentionally deferred from this initial design:
+
+    * **Runtime ``__annotations__`` via ``typing.NamedTuple`` factory.** The
+      runtime class is currently produced by ``collections.namedtuple``, so
+      ``T.__annotations__`` is empty. A future revision can switch (or add an
+      opt-in flag) to ``typing.NamedTuple`` and populate the dict with real
+      Python type objects -- useful for frameworks that introspect annotations
+      at runtime (pydantic-style validators, JSON-schema generators). The
+      change is non-breaking.
+
+    * **C++20 auto-reflection.** Once nanobind raises its baseline beyond
+      C++17, the field list can be elided entirely for simple-aggregate
+      structs by extracting names via PFR / ``__PRETTY_FUNCTION__`` parsing.
+      The macro and helper API would remain the universal fallback for
+      non-aggregate types.

@@ -278,21 +278,3 @@ defaults. This is the standard pattern for typing C-extension NamedTuples:
 the runtime factory and the stub class share a binary-compatible shape, but
 the stub gives static type checkers the field-level type information they
 need.
-
-.. note::
-
-    Two follow-ups are intentionally deferred from this initial design:
-
-    * **Runtime ``__annotations__`` via ``typing.NamedTuple`` factory.** The
-      runtime class is currently produced by ``collections.namedtuple``, so
-      ``T.__annotations__`` is empty. A future revision can switch (or add an
-      opt-in flag) to ``typing.NamedTuple`` and populate the dict with real
-      Python type objects -- useful for frameworks that introspect annotations
-      at runtime (pydantic-style validators, JSON-schema generators). The
-      change is non-breaking.
-
-    * **C++20 auto-reflection.** Once nanobind raises its baseline beyond
-      C++17, the field list can be elided entirely for simple-aggregate
-      structs by extracting names via PFR / ``__PRETTY_FUNCTION__`` parsing.
-      The macro and helper API would remain the universal fallback for
-      non-aggregate types.

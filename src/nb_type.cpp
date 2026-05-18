@@ -2269,5 +2269,49 @@ bool nb_inst_python_derived(PyObject *o) noexcept {
            (uint32_t) type_flags::is_python_type;
 }
 
+void nb_type_register_namedtuple(const std::type_info *cpp_type,
+                                 PyObject *py_class) noexcept {
+    nb_internals *internals_ = internals;
+    nb_type_map_slow::iterator it;
+    bool success;
+
+    {
+        lock_internals guard(internals_);
+        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(cpp_type, nullptr);
+        if (!success) {
+            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                             "nanobind: NamedTuple type '%s' was already "
+                             "registered!\n", type_name(cpp_type));
+            return;
+        }
+    }
+
+    // Allocate a minimal type_data record so that ``nb_func_render_signature``
+    // can render ``module.QualName`` for this C++ type. The record is *not* a
+    // full nanobind type binding (no init/destruct/etc.) -- it exists solely
+    // for the name-resolution hot path. Storage is leaked at process exit but
+    // tracked via ``external_type_registrations`` so the leak checker can
+    // drop the corresponding ``type_c2p_slow`` entry first.
+    type_init_data *t = new type_init_data();
+    memset(t, 0, sizeof(type_data));
+    t->name = strdup_check(((PyTypeObject *) py_class)->tp_name);
+    t->type = cpp_type;
+    t->type_py = (PyTypeObject *) py_class;
+
+    {
+        lock_internals guard(internals_);
+        internals_->type_c2p_slow[cpp_type] = t;
+#if !defined(NB_FREE_THREADED)
+        internals_->type_c2p_fast[(void *) cpp_type] = t;
+#endif
+        internals_->external_type_registrations.push_back(cpp_type);
+    }
+
+    // Immortalize the class (no-op on stable Python; meaningful only in
+    // free-threaded builds) so the bare ``handle`` stored in the per-T
+    // registry inside ``<nanobind/nb_named_tuple.h>`` remains valid.
+    make_immortal(py_class);
+}
+
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

@@ -362,6 +362,16 @@ NB_CORE bool nb_type_isinstance(PyObject *obj, const std::type_info *t) noexcept
 /// Search for the Python type object associated with a C++ type
 NB_CORE PyObject *nb_type_lookup(const std::type_info *t) noexcept;
 
+/// Register an externally-managed Python class for a C++ type so that
+/// function signatures rendered by ``nb_func_render_signature()`` resolve the
+/// ``%`` descriptor of that type to ``module.QualName`` instead of the
+/// demangled C++ name. Used by ``<nanobind/nb_named_tuple.h>`` to surface the
+/// Python identifier for NamedTuple-bound structs. The Python class object is
+/// immortalized; subsequent registrations of the same ``cpp_type`` are ignored
+/// (a warning is emitted).
+NB_CORE void nb_type_register_namedtuple(const std::type_info *cpp_type,
+                                         PyObject *py_class) noexcept;
+
 /// Allocate an instance of type 't'
 NB_CORE PyObject *nb_inst_alloc(PyTypeObject *t);
 

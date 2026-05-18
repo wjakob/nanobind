@@ -19,6 +19,7 @@
 #include <cstring>
 #include <string_view>
 #include <functional>
+#include <vector>
 #include "hash.h"
 
 #if TSL_RH_VERSION_MAJOR != 1 || TSL_RH_VERSION_MINOR < 3
@@ -392,6 +393,14 @@ struct nb_internals {
 
     /// C++ -> Python type map -- slow fallback version based on hashed strings
     nb_type_map_slow type_c2p_slow;
+
+    /// std::type_info pointers registered via
+    /// ``nb_type_register_namedtuple``. The associated entries in
+    /// ``type_c2p_slow`` have no corresponding ``nb_type`` whose
+    /// ``tp_dealloc`` would unregister them, so we record them here and
+    /// drop them explicitly during ``internals_cleanup`` so that the
+    /// leak checker does not flag NamedTuple bindings as leaked types.
+    std::vector<const std::type_info *> external_type_registrations;
 
 #if !defined(NB_FREE_THREADED)
     /// nb_func/meth instance map for leak reporting (used as set, the value is unused)

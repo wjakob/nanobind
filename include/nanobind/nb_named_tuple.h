@@ -18,7 +18,9 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
+#include <exception>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <typeindex>
 #include <unordered_map>
@@ -26,6 +28,17 @@
 #include <vector>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
+
+/// Per-field documentation annotation accepted by ``named_tuple<T>::def_rw``.
+/// Use as ``nb::doc("text")`` analogously to nanobind's standard
+/// ``const char *`` docstring extras on functions and classes; introduced as
+/// a distinct type here so it never collides with positional default values
+/// (e.g. a ``std::string`` field default that happens to be a string literal).
+struct doc {
+    const char *value;
+    constexpr explicit doc(const char *v) : value(v) { }
+};
+
 NAMESPACE_BEGIN(detail)
 
 /// Sentinel attribute set on every Python class registered via
@@ -35,17 +48,43 @@ NAMESPACE_BEGIN(detail)
 inline constexpr const char *named_tuple_sentinel_attr = "__nb_named_tuple__";
 
 /// Attribute on every NamedTuple-bound class storing per-field type strings
-/// for stubgen consumption. Format: ``[(field_name, type_str), ...]`` in
-/// ``_fields`` order. Resolved at ``named_tuple<T>::finalize()`` time.
+/// and (optional) per-field docstrings for stubgen consumption. Format:
+/// ``[(field_name, type_str, doc_or_None), ...]`` in ``_fields`` order.
+/// Resolved at ``named_tuple<T>::finalize()`` time.
 inline constexpr const char *named_tuple_fields_attr = "__nb_named_tuple_fields__";
 
 /// Process-wide map from ``std::type_index`` to the Python class produced by
-/// ``named_tuple<T>``. Used by the descr-to-string walker (and indirectly by
-/// nanobind's ``'%'`` signature substitution, via the registry below) to
-/// resolve nested NamedTuple field types.
+/// ``named_tuple<T>``. Used by the descr-to-string walker to resolve nested
+/// NamedTuple field types.
+///
+/// Note: nanobind sets ``Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED`` on its
+/// module slots (see ``include/nanobind/nb_defs.h``), so a single
+/// process-wide map is acceptable. If nanobind ever gains sub-interpreter
+/// support this state must be relocated into ``nb_internals``.
 inline std::unordered_map<std::type_index, handle> &named_tuple_type_index() {
     static std::unordered_map<std::type_index, handle> value;
     return value;
+}
+
+/// Helper that walks a variadic Extra pack and extracts a single
+/// ``nb::doc("...")`` (or bare ``const char *``) entry. Other extras are
+/// silently ignored: this header intentionally supports only the docstring
+/// annotation, leaving the door open for future per-field metadata without
+/// breaking source compatibility.
+inline void named_tuple_extra_apply(const char *&out, const ::nanobind::doc &d) noexcept {
+    out = d.value;
+}
+inline void named_tuple_extra_apply(const char *&out, const char *d) noexcept {
+    out = d;
+}
+template <typename T>
+inline void named_tuple_extra_apply(const char *&, const T &) noexcept { }
+
+template <typename... Extra>
+inline const char *extract_field_doc(const Extra &...extra) noexcept {
+    const char *result = nullptr;
+    (named_tuple_extra_apply(result, extra), ...);
+    return result;
 }
 
 /// Walk a ``descr<N, Ts...>`` and build the Python type string used for
@@ -118,8 +157,15 @@ inline str descr_to_field_type_string(const descr<N, Ts...> &d) {
 }
 
 /// Per-type runtime state. Each ``T`` gets its own static instance through
-/// template instantiation. ``cls`` is a strong (incref'd) handle to the
-/// Python class produced by ``collections.namedtuple``.
+/// template instantiation. ``cls`` is a strong handle to the Python class
+/// produced by ``collections.namedtuple`` -- the class itself is immortalized
+/// by ``nb_type_register_namedtuple`` during ``finalize()``.
+///
+/// Note: like ``named_tuple_type_index()`` above, these statics are
+/// process-wide. They rely on nanobind's
+/// ``Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED`` module slot; if
+/// sub-interpreter support is ever added, the storage must move into
+/// ``nb_internals``.
 template <typename T> struct named_tuple_registry {
     using reader_fn = std::function<handle(const T &, rv_policy, cleanup_list *)>;
     using writer_fn = std::function<bool(T &, handle, uint8_t, cleanup_list *)>;
@@ -155,20 +201,22 @@ template <typename T> struct named_tuple_caster {
         if (!named_tuple_registry<T>::cls().is_valid())
             return false;
 
-        PyObject *temp;
-        PyObject **items = seq_get_with_size(src.ptr(), n, &temp);
+        // ``seq_get_with_size`` may return a borrowed view (``temp == src``)
+        // or a freshly built tuple that we own. Wrap the latter in ``steal``
+        // so it is released even when an unexpected exception escapes a
+        // writer thunk -- the registered writers are ``noexcept`` today, but
+        // RAII is the only safe option going forward.
+        PyObject *temp_raw = nullptr;
+        PyObject **items = seq_get_with_size(src.ptr(), n, &temp_raw);
+        object temp = steal(temp_raw);
         if (!items)
             return false;
 
-        bool ok = true;
         for (size_t i = 0; i < n; ++i) {
-            if (!writers[i](value, handle(items[i]), flags, cleanup)) {
-                ok = false;
-                break;
-            }
+            if (!writers[i](value, handle(items[i]), flags, cleanup))
+                return false;
         }
-        Py_XDECREF(temp);
-        return ok;
+        return true;
     }
 
     template <typename T_>
@@ -204,15 +252,15 @@ NAMESPACE_END(detail)
 
 /// Helper class that registers a C++ struct ``T`` as a Python NamedTuple.
 /// Use the ``NB_NAMED_TUPLE`` macro for the common case; instantiate this
-/// class directly when you need custom field names, computed properties,
-/// or other escape-hatch behaviour.
+/// class directly when you need custom field names, per-field defaults or
+/// docstrings, or other escape-hatch behaviour.
 template <typename T> class named_tuple {
 public:
     using reader_fn = typename detail::named_tuple_registry<T>::reader_fn;
     using writer_fn = typename detail::named_tuple_registry<T>::writer_fn;
 
-    named_tuple(handle scope, const char *name)
-        : scope_(scope), name_(name) { }
+    named_tuple(handle scope, const char *name, const char *doc = nullptr)
+        : scope_(scope), name_(name), doc_(doc) { }
 
     named_tuple(const named_tuple &) = delete;
     named_tuple &operator=(const named_tuple &) = delete;
@@ -220,9 +268,83 @@ public:
     named_tuple &operator=(named_tuple &&) = delete;
 
     /// Register a field. The field name appears in the Python NamedTuple's
-    /// ``_fields`` tuple and becomes an attribute on each instance.
-    template <typename F> named_tuple &def_rw(const char *name, F T::*member) {
+    /// ``_fields`` tuple and becomes an attribute on each instance. Optional
+    /// extras may include an ``nb::doc("...")`` annotation (or a bare
+    /// ``const char *`` interpreted as a docstring); unknown extras are
+    /// ignored to leave room for future field metadata.
+    template <typename F, typename... Extra>
+    named_tuple &def_rw(const char *name, F T::*member, const Extra &...extra) {
+        const char *field_doc = detail::extract_field_doc(extra...);
+        register_field<F>(name, member, field_doc);
+        return *this;
+    }
+
+    /// Register a field that has a default value. ``collections.namedtuple``
+    /// only supports trailing defaults, so once a field has a default value
+    /// every subsequent field must also provide one. The default is converted
+    /// to a Python object at ``finalize()`` time via the regular ``from_cpp``
+    /// path so that types whose casters depend on other registrations resolve
+    /// correctly. Trailing extras are forwarded the same way as the
+    /// no-default overload (e.g. ``nb::doc("...")`` for documentation).
+    template <typename F, typename... Extra>
+    named_tuple &def_rw(const char *name, F T::*member,
+                        const F &default_value, const Extra &...extra) {
+        const char *field_doc = detail::extract_field_doc(extra...);
+        register_field<F>(name, member, field_doc);
+        field_default_thunks_.back() = [default_value]() -> object {
+            handle h = detail::make_caster<F>::from_cpp(default_value,
+                rv_policy::copy, nullptr);
+            if (!h.is_valid())
+                raise_python_error();
+            return steal<object>(h);
+        };
+        return *this;
+    }
+
+    /// Build the Python NamedTuple class and register all per-field
+    /// metadata. Safe to call explicitly; the destructor invokes it
+    /// automatically if the user has not already done so. Throws
+    /// ``std::runtime_error`` if the field list is internally inconsistent
+    /// (non-trailing defaults) and propagates any caster errors raised by
+    /// default-value thunks.
+    void finalize() {
+        if (built_)
+            return;
+        built_ = true;
+        build_class();
+    }
+
+    /// ``noexcept(false)`` is intentional: ``finalize()`` may legitimately
+    /// throw on user errors (e.g. invalid default arrangements). We swallow
+    /// the exception here -- after logging via PyErr_WriteUnraisable -- so
+    /// that callers using the throwing path (explicit ``finalize()``) get
+    /// real diagnostics while accidental destruction never terminates the
+    /// process.
+    ~named_tuple() noexcept(false) {
+        if (built_)
+            return;
+        try {
+            finalize();
+        } catch (...) {
+            if (!std::uncaught_exceptions()) {
+                throw; // safe to propagate
+            }
+            // We are unwinding a different exception; report ours instead of
+            // terminating.
+            try {
+                PyErr_SetString(PyExc_RuntimeError,
+                    "nanobind::named_tuple<T>: implicit finalize() in "
+                    "destructor failed while unwinding another exception.");
+                PyErr_WriteUnraisable(nullptr);
+            } catch (...) { }
+        }
+    }
+
+private:
+    template <typename F>
+    void register_field(const char *name, F T::*member, const char *field_doc) {
         field_names_.push_back(name);
+        field_docs_.push_back(field_doc);
         field_default_thunks_.emplace_back(); // no default
         // Capture the field type descriptor as a thunk; the actual ``%``
         // resolution happens in ``finalize()`` so that types registered in
@@ -243,36 +365,36 @@ public:
                 v.*member = c.operator detail::cast_t<F>();
                 return true;
             });
-        return *this;
     }
 
-    /// Register a field that has a default value. ``collections.namedtuple``
-    /// only supports trailing defaults, so once a field has a default value
-    /// every subsequent field must also provide one. The default is converted
-    /// to a Python object at ``finalize()`` time via the regular ``from_cpp``
-    /// path so that types whose casters depend on other registrations resolve
-    /// correctly.
-    template <typename F>
-    named_tuple &def_rw(const char *name, F T::*member, const F &default_value) {
-        def_rw(name, member);
-        field_default_thunks_.back() = [default_value]() -> object {
-            handle h = detail::make_caster<F>::from_cpp(default_value,
-                rv_policy::copy, nullptr);
-            if (!h.is_valid())
-                raise_python_error();
-            return steal<object>(h);
-        };
-        return *this;
-    }
-
-    ~named_tuple() {
-        if (!built_)
-            finalize();
-    }
-
-private:
-    void finalize() {
-        built_ = true;
+    void build_class() {
+        // Validate per-field default placement *before* contacting Python.
+        // ``collections.namedtuple`` only supports trailing defaults; surface
+        // a clean C++ exception here instead of letting Python report it on
+        // a synthetic ``None`` placeholder (which is what the previous
+        // implementation did and which was both confusing and unsafe).
+        const char *missing_default_after = nullptr;
+        const char *first_default = nullptr;
+        for (size_t i = 0; i < field_default_thunks_.size(); ++i) {
+            if (field_default_thunks_[i]) {
+                if (!first_default)
+                    first_default = field_names_[i];
+            } else if (first_default) {
+                missing_default_after = field_names_[i];
+                break;
+            }
+        }
+        if (missing_default_after) {
+            std::string msg = "nanobind::named_tuple<T>(\"";
+            msg += name_;
+            msg += "\"): field '";
+            msg += missing_default_after;
+            msg += "' has no default but follows field '";
+            msg += first_default;
+            msg += "' which does -- collections.namedtuple only allows "
+                   "trailing defaults.";
+            throw std::runtime_error(msg);
+        }
 
         object collections = module_::import_("collections");
         object factory = collections.attr("namedtuple");
@@ -281,22 +403,12 @@ private:
         for (const char *fn : field_names_)
             field_list.append(str(fn));
 
-        // Collect trailing defaults (if any) and forward them to
-        // ``collections.namedtuple(..., defaults=...)``. ``collections``
-        // itself validates the "no non-default field after a defaulted one"
-        // rule and raises a descriptive ``TypeError`` if violated.
         list defaults_list;
-        bool any_defaults = false;
-        for (auto &thunk : field_default_thunks_) {
-            if (thunk) {
-                any_defaults = true;
-                defaults_list.append(thunk());
-            } else if (any_defaults) {
-                // A non-default field follows a defaulted one. Let the
-                // helpful Python-side error surface by passing the full
-                // (sparse) defaults tuple unchanged -- collections.namedtuple
-                // will reject it.
-                defaults_list.append(none());
+        bool any_defaults = first_default != nullptr;
+        if (any_defaults) {
+            for (auto &thunk : field_default_thunks_) {
+                if (thunk)
+                    defaults_list.append(thunk());
             }
         }
 
@@ -320,34 +432,63 @@ private:
             PyErr_Clear();
         }
 
-        // Register into the per-T runtime registry. The class is owned by
-        // ``scope_`` (set as an attribute below) and the registry holds an
-        // extra strong reference so it stays alive for the program lifetime.
-        scope_.attr(name_) = cls;
+        // Apply optional class docstring; ``collections.namedtuple`` sets a
+        // default of ``"Cls(f1, f2, ...)"``. Overwriting it matches the
+        // behaviour of ``nb::class_`` with the ``const char *`` extra.
+        if (doc_)
+            cls.attr("__doc__") = str(doc_);
 
-        cls.inc_ref();
-        detail::named_tuple_registry<T>::cls() = handle(cls);
-        detail::named_tuple_registry<T>::readers() = std::move(readers_);
-        detail::named_tuple_registry<T>::writers() = std::move(writers_);
+        // Apply optional per-field docstrings. Each field is a property on
+        // the namedtuple subclass; setting ``__doc__`` on the property is
+        // the canonical way to surface a per-attribute docstring.
+        for (size_t i = 0; i < field_names_.size(); ++i) {
+            if (!field_docs_[i])
+                continue;
+            object field = cls.attr(field_names_[i]);
+            field.attr("__doc__") = str(field_docs_[i]);
+        }
+
+        // Install the class as an attribute of its scope.
+        scope_.attr(name_) = cls;
 
         // Make T discoverable in the typeid-keyed map *before* resolving
         // field-type strings, so a NamedTuple that references itself
         // resolves correctly.
         detail::named_tuple_type_index()[std::type_index(typeid(T))] = handle(cls);
 
-        // Build ``__nb_named_tuple_fields__ = [(name, type_str), ...]`` for
-        // stubgen to consume.
+        // Register the Python class in nanobind's regular ``type_c2p_slow``
+        // map so that ``nb_func_render_signature()`` resolves the ``%``
+        // descriptor of T to ``module.QualName`` instead of the demangled
+        // C++ name. This also immortalizes the class, so the bare ``handle``
+        // refs stored in our registry maps remain safe for the lifetime of
+        // the process.
+        detail::nb_type_register_namedtuple(&typeid(T), cls.ptr());
+
+        // Build ``__nb_named_tuple_fields__ = [(name, type_str, doc), ...]``
+        // for stubgen to consume.
         list fields_meta;
         for (size_t i = 0; i < field_names_.size(); ++i) {
-            tuple entry = make_tuple(str(field_names_[i]), field_type_thunks_[i]());
+            object doc_obj = field_docs_[i]
+                ? object(str(field_docs_[i]))
+                : none();
+            tuple entry = make_tuple(str(field_names_[i]),
+                                     field_type_thunks_[i](), doc_obj);
             fields_meta.append(entry);
         }
         cls.attr(detail::named_tuple_fields_attr) = fields_meta;
+
+        // Now that registration is complete, publish the readers/writers and
+        // class handle to the per-T runtime registry.
+        detail::named_tuple_registry<T>::cls() = handle(cls);
+        detail::named_tuple_registry<T>::readers() = std::move(readers_);
+        detail::named_tuple_registry<T>::writers() = std::move(writers_);
     }
 
     handle scope_;
     const char *name_;
+    const char *doc_;
     std::vector<const char *> field_names_;
+    std::vector<const char *> field_docs_;
     std::vector<std::function<str()>> field_type_thunks_;
     /// Per-field default-value thunks. Each entry is either an empty
     /// ``std::function`` (no default for this field) or a callable that
@@ -403,5 +544,19 @@ NAMESPACE_END(NB_NAMESPACE)
 #define NB_NT_DEFS(T, ...)                                                     \
     NB_NT_EXPAND(NB_NT_CAT(NB_NT_F, NB_NT_NARG(__VA_ARGS__))(T, __VA_ARGS__))
 
+// ``NB_NAMED_TUPLE`` stringifies ``Type`` and uses the result as the Python
+// class name. This only works when ``Type`` is itself a valid Python
+// identifier; qualified types (``geom::Point``) produce strings that
+// ``collections.namedtuple`` rejects. Use ``NB_NAMED_TUPLE_NAMED`` to
+// provide an explicit Python identifier in that case (or instantiate
+// ``nanobind::named_tuple<Type>`` directly).
 #define NB_NAMED_TUPLE(scope, Type, ...)                                       \
     ::nanobind::named_tuple<Type>((scope), #Type) NB_NT_DEFS(Type, __VA_ARGS__)
+
+// Variant of ``NB_NAMED_TUPLE`` that accepts an explicit Python identifier
+// for the bound class. Use this for C++ types whose name is not a valid
+// Python identifier (e.g. ``geom::Point``). The ``NB_NAMED_TUPLE`` macro
+// is positional and cannot carry an ``nb::doc`` annotation; users who need
+// class/field docstrings should call the helper API directly.
+#define NB_NAMED_TUPLE_NAMED(scope, Type, PyName, ...)                         \
+    ::nanobind::named_tuple<Type>((scope), PyName) NB_NT_DEFS(Type, __VA_ARGS__)

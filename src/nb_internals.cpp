@@ -379,6 +379,26 @@ static void internals_cleanup() {
         fprintf(stderr, "nanobind: leaked %zu keep_alive records!\n",
                 keep_alive_leaks);
 
+    // Drop NamedTuple-style external registrations from ``type_c2p_slow``
+    // before the leak check. These were added via
+    // ``nb_type_register_namedtuple`` for signature-rendering only; they
+    // have no nb_type whose tp_dealloc would otherwise clean them up.
+    for (const std::type_info *ti : p->external_type_registrations) {
+        auto it = p->type_c2p_slow.find(ti);
+        if (it != p->type_c2p_slow.end()) {
+            type_data *td = it->second;
+            p->type_c2p_slow.erase(it);
+            if (td) {
+                free((char *) td->name);
+                delete static_cast<type_init_data *>(td);
+            }
+        }
+#if !defined(NB_FREE_THREADED)
+        p->type_c2p_fast.erase((void *) ti);
+#endif
+    }
+    p->external_type_registrations.clear();
+
     // Only report function/type leaks if actual nanobind instances were leaked
 #if !defined(NB_ABORT_ON_LEAK)
     if (!leak)

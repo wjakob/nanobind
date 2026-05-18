@@ -186,17 +186,81 @@ Fields of type ``std::optional<U>`` are converted to ``typing.Optional[U]`` in
 the generated stub; ``std::nullopt`` round-trips as ``None``. A NamedTuple
 type can be used as a field of another NamedTuple, including itself, as long
 as the referenced class has been registered by the time the enclosing
-``named_tuple<T>`` goes out of scope:
+``named_tuple<T>`` goes out of scope. Because the C++ struct definition needs
+to be complete at the point a field of the same type is declared, self-
+references must go through indirection -- ``std::vector<T>``, ``T *``, or
+``std::shared_ptr<T>`` all work. ``std::optional<T>`` does *not*, since
+``std::optional`` requires its element type to be complete:
 
 .. code-block:: cpp
 
-    struct Node {
+    struct Tree {
         int value;
-        std::optional<Node> next;   // self-reference via std::optional
+        std::vector<Tree> children;   // self-reference via std::vector
     };
-    NB_NAMED_TUPLE_CASTER(Node)
+    NB_NAMED_TUPLE_CASTER(Tree)
 
-    NB_NAMED_TUPLE(m, Node, value, next);
+    NB_NAMED_TUPLE(m, Tree, value, children);
+
+Docstrings
+^^^^^^^^^^
+
+The helper API accepts an optional class docstring as the third constructor
+argument, and per-field docstrings via :cpp:struct:`nb::doc` annotations on
+``def_rw``. Both flow through to the generated ``.pyi`` and Python's standard
+``__doc__`` introspection:
+
+.. code-block:: cpp
+
+    nb::named_tuple<Point>(m, "Point", "A 2D point in screen coordinates.")
+        .def_rw("x", &Point::x, nb::doc("horizontal pixel offset"))
+        .def_rw("y", &Point::y, 0, nb::doc("vertical pixel offset, default 0"));
+
+The macro form (``NB_NAMED_TUPLE`` / ``NB_NAMED_TUPLE_NAMED``) is positional
+and intentionally does not carry docstrings; use the helper API when
+documentation is needed.
+
+Qualified and templated C++ type names
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:c:macro:`NB_NAMED_TUPLE` stringifies its ``Type`` argument and uses the
+result as the Python class name. This only works when ``Type`` is itself a
+valid Python identifier; for qualified names (``geom::Point``,
+``ns::Inner``) the stringified form (``"geom::Point"``) is rejected by
+:py:func:`collections.namedtuple`. Use :c:macro:`NB_NAMED_TUPLE_NAMED` to
+provide an explicit Python identifier in that case, or instantiate
+``nanobind::named_tuple<T>`` directly:
+
+.. code-block:: cpp
+
+    NB_NAMED_TUPLE_NAMED(m, geom::Point, "Point", x, y);
+
+Templated types such as ``Foo<int, float>`` cannot be passed directly to the
+macros: the comma between template arguments terminates the variadic
+preprocessor argument list. Introduce a typedef first, or call the helper
+API which does not go through the preprocessor at all:
+
+.. code-block:: cpp
+
+    using FooIF = Foo<int, float>;
+    NB_NAMED_TUPLE(m, FooIF, x, y);
+
+    // or, equivalently, directly through the helper API:
+    nb::named_tuple<Foo<int, float>>(m, "FooIF")
+        .def_rw("x", &Foo<int, float>::x)
+        .def_rw("y", &Foo<int, float>::y);
+
+Limitations
+^^^^^^^^^^^
+
+The runtime state used by NamedTuple bindings (per-T registries and the
+typeid-keyed lookup map) is stored in function-local statics that are shared
+process-wide. This matches nanobind's overall stance on sub-interpreters:
+extension modules set ``Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED`` and
+sub-interpreter isolation is not currently a supported configuration. If a
+future nanobind release relaxes that restriction, NamedTuple state will need
+to be relocated into ``nb_internals`` alongside other per-interpreter
+registrations.
 
 Accepted inputs and stub generation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

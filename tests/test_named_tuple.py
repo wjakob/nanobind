@@ -1,3 +1,5 @@
+import types
+
 import pytest
 
 import test_named_tuple_ext as t
@@ -211,3 +213,124 @@ def test23_cross_module_input():
     p2 = tb.roundtrip_point(p)
     assert type(p2) is tb.Point
     assert p2 == (10, 20.5)
+
+
+# ---------------------------------------------------------------------------
+# Docstring API (class doc + per-field doc via nb::doc)
+# ---------------------------------------------------------------------------
+
+def test24_class_docstring_is_set():
+    # Class docstring passed via the helper-API constructor overrides
+    # ``collections.namedtuple``'s default ``"Cls(f1, f2, ...)"`` placeholder.
+    assert t.DocPoint.__doc__ == "A 2D point with documented fields."
+
+
+def test25_field_docstrings_are_set():
+    # Per-field docs are attached to the property/descriptor exposed on the
+    # class -- the canonical way to surface a per-attribute docstring.
+    assert t.DocPoint.x.__doc__ == "horizontal coordinate"
+    assert t.DocPoint.y.__doc__ == "vertical coordinate (default 0)"
+
+
+def test26_docpoint_default_still_applies():
+    # The default-value overload still works when combined with nb::doc.
+    p = t.DocPoint(5)
+    assert p == (5, 0)
+    p2 = t.DocPoint(1, 2)
+    assert p2 == (1, 2)
+    assert t.roundtrip_docpoint(p2) == p2
+
+
+# ---------------------------------------------------------------------------
+# Qualified type names via NB_NAMED_TUPLE_NAMED
+# ---------------------------------------------------------------------------
+
+def test27_named_macro_uses_explicit_pyname():
+    # ``geom::QualPoint`` is exposed as Python class ``QualPoint``.
+    qp = t.QualPoint(1, 2)
+    assert isinstance(qp, tuple)
+    assert qp._fields == ("x", "y")
+    assert t.roundtrip_qualpoint(qp) == qp
+
+
+# ---------------------------------------------------------------------------
+# Templated type bindings (typedef workaround + helper API path)
+# ---------------------------------------------------------------------------
+
+def test27a_templated_via_typedef_and_macro():
+    # PairIF is ``Pair<int, float>`` exposed via ``using PairIF = ...`` +
+    # NB_NAMED_TUPLE.
+    p = t.PairIF(1, 2.5)
+    assert p._fields == ("first", "second")
+    assert t.roundtrip_pair_if(p) == p
+
+
+def test27b_templated_via_helper_api():
+    # PairFI is ``Pair<float, int>`` exposed directly through the helper
+    # API -- no preprocessor involved, so the template argument list does
+    # not cause trouble.
+    p = t.PairFI(1.5, 7)
+    assert p._fields == ("first", "second")
+    assert t.roundtrip_pair_fi(p) == p
+
+
+# ---------------------------------------------------------------------------
+# Function signature uses the Python class name (fix #4)
+# ---------------------------------------------------------------------------
+
+def test28_function_signature_uses_python_name():
+    # ``__nb_signature__`` is nanobind's machine-readable signature payload.
+    # For a function taking a registered NamedTuple, the C++ type's ``%``
+    # marker should resolve to ``module.ClassName`` rather than the
+    # demangled C++ identifier.
+    sig = t.roundtrip_point.__nb_signature__
+    sig_str = str(sig)
+    assert "test_named_tuple_ext.Point" in sig_str
+    # Demangled-C++ fallback must not appear.
+    assert "5Point" not in sig_str  # mangled Itanium ABI name prefix
+    # Same check for the qualified-name macro path.
+    qsig = str(t.roundtrip_qualpoint.__nb_signature__)
+    assert "test_named_tuple_ext.QualPoint" in qsig
+
+
+# ---------------------------------------------------------------------------
+# Self-reference example from docs/utilities.rst (fix #8)
+# ---------------------------------------------------------------------------
+
+def test29_self_reference_example_works():
+    # The docstring example uses ``Tree`` with ``std::vector<Tree>`` children;
+    # exercising it here keeps the docs and the test suite in sync.
+    leaf = t.tree_leaf(1)
+    branch = t.tree_branch(0, [leaf, t.tree_leaf(2)])
+    assert branch.value == 0
+    assert [c.value for c in branch.children] == [1, 2]
+
+
+# ---------------------------------------------------------------------------
+# Validation regression tests (fix #2: non-trailing defaults, fix #7:
+# throwing default thunks). These call ``finalize()`` explicitly from the
+# trigger helper so the exception surfaces as a normal Python error.
+# ---------------------------------------------------------------------------
+
+def test30_non_trailing_defaults_rejected():
+    # Field 'a' has a default, field 'b' does not -- collections.namedtuple
+    # would reject this with a TypeError after the fact; we surface a clean
+    # RuntimeError up-front so the binding author sees a clear message.
+    scope = types.SimpleNamespace()
+    scope.__name__ = "scratch_scope"
+    with pytest.raises(RuntimeError, match=r"trailing defaults"):
+        t.trigger_non_trailing_defaults(scope)
+    # Importantly, the module / other types remain usable afterwards.
+    assert t.make_point(1, 2.0) == (1, 2.0)
+
+
+def test31_throwing_default_thunk_propagates():
+    # A default-value thunk whose from_cpp fails must surface as a Python
+    # exception out of finalize() (rather than terminating the process).
+    scope = types.SimpleNamespace()
+    scope.__name__ = "scratch_scope"
+    with pytest.raises(ValueError, match=r"deliberately failed"):
+        t.trigger_throwing_default(scope)
+    # The rest of the module continues to work.
+    assert t.roundtrip_point((1, 2.0)) == (1, 2.0)
+    assert t.roundtrip_docpoint(t.DocPoint(3, 4)) == (3, 4)

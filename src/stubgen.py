@@ -613,10 +613,15 @@ class StubGen:
     def put_named_tuple(self, tp: type, tp_name: str) -> None:
         """
         Emit a ``class Name(typing.NamedTuple): ...`` body for a class bound
-        via ``nb::named_tuple<T>``. Field names and per-field type strings
-        come from the ``__nb_named_tuple_fields__`` attribute populated by
-        the C++ binding; defaults are read from ``collections.namedtuple``'s
+        via ``nb::named_tuple<T>``. Field names, per-field type strings, and
+        optional per-field docstrings come from the
+        ``__nb_named_tuple_fields__`` attribute populated by the C++
+        binding; defaults are read from ``collections.namedtuple``'s
         ``_field_defaults``.
+
+        The fields attribute may be a sequence of either ``(name, type)`` or
+        ``(name, type, doc)`` tuples -- the latter is what the docstring API
+        produces.
         """
         nt_base = self.import_object("typing", "NamedTuple")
         self.write_ln(f"class {tp_name}({nt_base}):")
@@ -633,13 +638,20 @@ class StubGen:
         if not fields:
             self.write_ln("pass\n")
         else:
-            for fname, ftype in fields:
+            for entry in fields:
+                if len(entry) == 3:
+                    fname, ftype, fdoc = entry
+                else:
+                    fname, ftype = entry
+                    fdoc = None
                 type_str = self.simplify_types(ftype)
                 if fname in defaults:
                     default = self.expr_str(defaults[fname]) or "..."
                     self.write_ln(f"{fname}: {type_str} = {default}")
                 else:
                     self.write_ln(f"{fname}: {type_str}")
+                if fdoc and self.include_docstrings:
+                    self.put_docstr(fdoc)
             self.write("\n")
         self.depth -= 1
 

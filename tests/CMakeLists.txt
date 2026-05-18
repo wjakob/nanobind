@@ -81,6 +81,7 @@ set(TEST_NAMES
   issue
   intrusive
   thread
+  named_tuple
 )
 
 foreach (NAME ${TEST_NAMES})
@@ -170,6 +171,7 @@ set(TEST_FILES
   test_inter_module.py
   test_intrusive.py
   test_make_iterator.py
+  test_named_tuple.py
   test_stl.py
   test_stl_bind_map.py
   test_stl_bind_vector.py

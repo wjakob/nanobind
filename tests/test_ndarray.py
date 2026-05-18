@@ -539,7 +539,7 @@ def test27_python_array():
 def test27c_python_complex_array():
     import array
     try:
-        a = array.array('F', [1.0+2.0j, 3.0+4.0j])
+        a = array.array('Zf', [1.0+2.0j, 3.0+4.0j])
     except:
         pytest.skip('your python does not support complex arrays')
     assert t.check(a)

@@ -15,8 +15,14 @@ try:
     import torch
     def needs_torch(x):
         return x
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        def needs_torch_mps(x):
+            return x
+    else:
+        needs_torch_mps = pytest.mark.skip(reason="PyTorch MPS is required")
 except:
     needs_torch = pytest.mark.skip(reason="PyTorch is required")
+    needs_torch_mps = pytest.mark.skip(reason="PyTorch MPS is required")
 
 try:
     import cupy as cp
@@ -410,6 +416,64 @@ def test20_return_array_api():
         del x
         collect()
         assert t.destruct_count() - dc == 1
+        dc += 1
+
+    obj = t.ret_array_api_byte_offset()
+    assert t.inspect_byte_offset(obj) == (1, 0, 2, 2, 4, 8)
+    mv = memoryview(obj)
+    assert mv.tolist() == [[2, 3, 4, 5], [6, 7, 8, 9]]
+    del obj
+    collect()
+    assert t.destruct_count() == dc
+    del mv
+    collect()
+    assert t.destruct_count() - dc == 1
+    dc += 1
+
+    if (hasattr(np, '__array_api_version__') and
+        np.__array_api_version__ >= '2024'):
+        obj = t.ret_array_api_byte_offset()
+        x = np.from_dlpack(obj)
+        del obj
+        collect()
+        assert t.destruct_count() == dc
+        assert x.shape == (2, 4)
+        assert np.all(x == [[2, 3, 4, 5], [6, 7, 8, 9]])
+        del x
+        collect()
+        assert t.destruct_count() - dc == 1
+
+
+def test20b_import_metal_dlpack():
+    obj = t.ret_array_api_metal()
+    assert obj.__dlpack_device__() == (8, 0)
+
+    class Recorder:
+        def __init__(self, wrapped):
+            self.wrapped = wrapped
+            self.kwargs = None
+
+        def __dlpack_device__(self):
+            return self.wrapped.__dlpack_device__()
+
+        def __dlpack__(self, *args, **kwargs):
+            assert not args
+            self.kwargs = kwargs
+            return self.wrapped.__dlpack__(**kwargs)
+
+    rec = Recorder(obj)
+    assert t.check_metal_contig(rec) == (8, 0, 2, 2, 4, True, 0)
+    assert "max_version" in rec.kwargs
+
+    obj = t.ret_array_api_metal_byte_offset()
+    assert t.check_metal_contig(obj) == (8, 0, 2, 2, 3, True, 4)
+
+
+@needs_torch_mps
+def test20c_import_torch_mps_dlpack():
+    x = torch.arange(12, device="mps", dtype=torch.float32).reshape(3, 4)
+    assert x.__dlpack_device__()[0] == 8
+    assert t.inspect_metal_contig(x) == (8, 0, 2, 3, 4, True, True, 0)
 
 
 @needs_numpy

@@ -122,6 +122,7 @@
 -U _PyDict_Type
 -U _PyDict_Update
 -U _PyDict_Values
+-U _PyFrozenDict_Type
 -U _PyEllipsis_Type
 -U _PyEnum_Type
 -U _PyErr_BadArgument

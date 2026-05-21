@@ -228,8 +228,9 @@ def test12_str_enum():
     assert t.to_color(1) is t.Color.Green
     assert t.to_color(2) is t.Color.Blue
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as excinfo:
         t.to_color(99)
+    assert '99 is not a valid Color' in str(excinfo.value)
 
     # convert: bare strings are accepted.
     assert t.from_color_implicit("red") == 0

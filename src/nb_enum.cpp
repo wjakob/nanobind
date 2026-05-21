@@ -402,7 +402,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
     }
 
     if (flags & (uint32_t) enum_flags::is_signed)
-        PyErr_Format(PyExc_ValueError, "%lli is not a valid %s.",
+        PyErr_Format(PyExc_ValueError, "%lld is not a valid %s.",
                      (long long) key, t->name);
     else
         PyErr_Format(PyExc_ValueError, "%llu is not a valid %s.",

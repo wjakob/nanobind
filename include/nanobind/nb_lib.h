@@ -450,6 +450,10 @@ NB_CORE PyObject *enum_create(enum_init_data *) noexcept;
 NB_CORE void enum_append(PyObject *tp, const char *name,
                          int64_t value, const char *doc) noexcept;
 
+/// Append a string-valued entry to a StrEnum
+NB_CORE void enum_append_str(PyObject *tp, const char *name, int64_t value,
+                             const char *str_value, const char *doc) noexcept;
+
 // Query an enumeration's Python object -> integer value map
 NB_CORE bool enum_from_python(const std::type_info *, PyObject *, int64_t *,
                               uint8_t flags) noexcept;

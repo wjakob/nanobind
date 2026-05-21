@@ -193,6 +193,62 @@ def test09_enum_methods():
 def test10_enum_opaque():
     assert t.OpaqueEnum.X == t.OpaqueEnum("X") and t.OpaqueEnum.Y == t.OpaqueEnum("Y")
 
+def test12_str_enum():
+    assert isinstance(t.Color.Red, str)
+    assert isinstance(t.Color.Red, t.Color)
+    assert t.Color.Red == "red"
+    assert t.Color.Green == "green"
+    assert t.Color.Blue == "blue"
+
+    assert t.Color.Red.name == "Red"
+    assert t.Color.Red._name_ == "Red"
+    assert t.Color.Red.value == "red"
+    assert t.Color.Red._value_ == "red"
+
+    assert t.Color.__doc__ == "string-valued enum"
+    assert t.Color.Red.__doc__ is None
+
+    # str() returns the member's string value,
+    # repr() keeps the default Enum form.
+    assert str(t.Color.Red) == "red"
+    assert str(t.Color.Green) == "green"
+    assert repr(t.Color.Red) == "<Color.Red: 'red'>"
+
+    assert t.Color("red") is t.Color.Red
+    assert t.Color("green") is t.Color.Green
+    assert t.Color(t.Color.Blue) is t.Color.Blue
+
+    with pytest.raises(ValueError):
+        t.Color("not-a-color")
+
+    assert t.from_color(t.Color.Red) == 0
+    assert t.from_color(t.Color.Green) == 1
+    assert t.from_color(t.Color.Blue) == 2
+    assert t.to_color(0) is t.Color.Red
+    assert t.to_color(1) is t.Color.Green
+    assert t.to_color(2) is t.Color.Blue
+
+    with pytest.raises(ValueError):
+        t.to_color(99)
+
+    # convert: bare strings are accepted.
+    assert t.from_color_implicit("red") == 0
+    assert t.from_color_implicit("green") == 1
+    assert t.from_color_implicit("blue") == 2
+    assert t.from_color_implicit(t.Color.Red) == 0
+
+    with pytest.raises(TypeError):
+        t.from_color_implicit("not-a-color")
+
+    # convert: StrEnum is keyed by string value, not the underlying C++ integer.
+    with pytest.raises(TypeError):
+        t.from_color_implicit(0)
+
+    # noconvert: a bare string is not accepted, even if it would match.
+    with pytest.raises(TypeError):
+        t.from_color("red")
+
+
 def test11_enum_name_value_members():
     # Test for issue #1246: enums with members named 'name' or 'value'
     # When an enum has members named 'name' or 'value', accessing .name/.value

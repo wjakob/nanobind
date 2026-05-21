@@ -2253,6 +2253,23 @@ The following annotations can be specified using the variable-length
    whether or not the enumeration is also marked to support arithmetic
    operations (see :cpp:class:`is_arithmetic`).
 
+.. cpp:struct:: is_str_enum
+
+   Indicate that the enumeration carries a string value per entry. Passing
+   this annotation changes the Python enumeration parent class to
+   :py:class:`enum.StrEnum` (Python 3.11+) or an equivalent class derived from
+   ``(str, enum.Enum)`` on older Python versions. Each enumerator must then be
+   registered using :cpp:func:`enum_::str_value` instead of
+   :cpp:func:`enum_::value`, supplying the string that represents the entry in
+   Python.
+
+   Members are instances of :py:class:`str` and compare equal to their string
+   value (e.g., ``Color.Red == "red"``). Conversion of bare strings to the
+   enumeration is supported when implicit conversions are enabled.
+
+   This annotation cannot be combined with :cpp:class:`is_arithmetic` or
+   :cpp:class:`is_flag`.
+
 Function binding
 ----------------
 
@@ -2672,6 +2689,13 @@ Class binding
 
       Add the entry `value` to the enumeration using the identifier `name`,
       potentially with a docstring provided via `doc` (optional).
+
+   .. cpp:function:: enum_ &str_value(const char * name, T value, const char * str_val, const char * doc = nullptr)
+
+      Add the entry `value` to a string-valued enumeration using the identifier
+      `name` and the Python-side string `str_val`, optionally with a docstring
+      provided via `doc`. The enumeration must have been declared with the
+      :cpp:class:`is_str_enum` annotation.
 
    .. cpp:function:: enum_ &export_values()
 

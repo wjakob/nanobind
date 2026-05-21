@@ -138,6 +138,13 @@ if (TARGET Eigen3::Eigen)
   target_link_libraries(test_eigen_tensor_ext PRIVATE Eigen3::Eigen)
 endif()
 
+find_package (xtl NO_MODULE)
+find_package (xtensor NO_MODULE)
+if (TARGET xtl AND TARGET xtensor)
+  nanobind_add_module(test_xtensor_ext test_xtensor.cpp ${NB_EXTRA_ARGS})
+  target_link_libraries(test_xtensor_ext PRIVATE xtensor xtl)
+endif()
+
 add_library(
   inter_module
   SHARED
@@ -162,6 +169,7 @@ set(TEST_FILES
   test_classes.py
   test_eigen.py
   test_eigen_tensor.py
+  test_xtensor.py
   test_enum.py
   test_eval.py
   test_exception.py

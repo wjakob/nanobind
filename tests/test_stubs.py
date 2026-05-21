@@ -52,6 +52,10 @@ def test01_check_stub_refs(p_ref, request):
         s_ref.insert(5, "")
         s_ref.insert(6, "from typing_extensions import CapsuleType")
 
+    if "test_enum_ext" in p_in.name and sys.version_info < (3, 11):
+        # fallback to Python 3.10's `(str, Enum)` MRO.
+        s_ref = [line.replace("(enum.StrEnum)", "(str, enum.Enum)") for line in s_ref]
+
     if "test_typing_ext" in p_in.name and sys.version_info < (3, 13):
         # The 'T4'/'T5' bindings from test_typing.cpp carry PEP 696 'default='
         # values (and pull in the Unpack/TypeVarTuple imports) that only exist

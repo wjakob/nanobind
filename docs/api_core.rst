@@ -2253,7 +2253,7 @@ The following annotations can be specified using the variable-length
    whether or not the enumeration is also marked to support arithmetic
    operations (see :cpp:class:`is_arithmetic`).
 
-.. cpp:struct:: is_str_enum
+.. cpp:struct:: is_str
 
    Indicate that the enumeration carries a string value per entry. Passing
    this annotation changes the Python enumeration parent class to
@@ -2695,7 +2695,7 @@ Class binding
       Add the entry `value` to a string-valued enumeration using the identifier
       `name` and the Python-side string `str_val`, optionally with a docstring
       provided via `doc`. The enumeration must have been declared with the
-      :cpp:class:`is_str_enum` annotation.
+      :cpp:class:`is_str` annotation.
 
    .. cpp:function:: enum_ &export_values()
 

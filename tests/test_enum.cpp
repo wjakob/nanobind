@@ -129,7 +129,7 @@ NB_MODULE(test_enum_ext, m) {
       .def(nb::self == EnumWrapper::Value())
       .def("get_value", &EnumWrapper::get_value);
 
-    nb::enum_<Color>(m, "Color", "string-valued enum", nb::is_str_enum())
+    nb::enum_<Color>(m, "Color", "string-valued enum", nb::is_str())
         .str_value("Red",   Color::Red,   "red")
         .str_value("Green", Color::Green, "green")
         .str_value("Blue",  Color::Blue,  "blue");

@@ -308,7 +308,7 @@ C++11-style strongly typed enumerations.
        nb::enum_<Pet::Kind>(pet, "Kind", nb::is_arithmetic())
           ...
 
-   When the annotation :cpp:class:`nb::is_str_enum() <is_str_enum>` is passed to
+   When the annotation :cpp:class:`nb::is_str() <is_str>` is passed to
    :cpp:class:`nb::enum_\<T\> <enum_>`, the resulting Python type will be a class
    derived from ``enum.StrEnum``, and each entry must be registered using
    :cpp:func:`.str_value() <enum_::str_value>` (which takes an additional
@@ -316,7 +316,7 @@ C++11-style strongly typed enumerations.
 
    .. code-block:: cpp
 
-       nb::enum_<Color>(m, "Color", nb::is_str_enum())
+       nb::enum_<Color>(m, "Color", nb::is_str())
            .str_value("Red",   Color::Red,   "red")
            .str_value("Green", Color::Green, "green")
            .str_value("Blue",  Color::Blue,  "blue");

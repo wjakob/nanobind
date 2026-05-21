@@ -136,7 +136,7 @@ Unreleased
 
 - Added support for binding string-valued enumerations as Python
   :py:class:`enum.StrEnum` subclasses via the new
-  :cpp:class:`nb::is_str_enum() <is_str_enum>` annotation and the corresponding
+  :cpp:class:`nb::is_str() <is_str>` annotation and the corresponding
   :cpp:func:`enum_::str_value` member function. On Python 3.9 and 3.10, the
   generated type derives from ``(str, enum.Enum)`` instead.
 

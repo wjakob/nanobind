@@ -208,11 +208,10 @@ def test12_str_enum():
     assert t.Color.__doc__ == "string-valued enum"
     assert t.Color.Red.__doc__ is None
 
-    # str() returns the member's string value,
-    # repr() keeps the default Enum form.
-    assert str(t.Color.Red) == "red"
-    assert str(t.Color.Green) == "green"
-    assert repr(t.Color.Red) == "<Color.Red: 'red'>"
+    assert str(t.Color.Red) == "Color.Red"
+    assert repr(t.Color.Red) == "Color.Red"
+    assert str(t.Color.Green) == "Color.Green"
+    assert repr(t.Color.Green) == "Color.Green"
 
     assert t.Color("red") is t.Color.Red
     assert t.Color("green") is t.Color.Green

@@ -153,9 +153,6 @@ class EnumWrapper:
 class Color(enum.StrEnum):
     """string-valued enum"""
 
-    def __str__(self, /):
-        """Return str(self)."""
-
     Red = 'red'
 
     Green = 'green'

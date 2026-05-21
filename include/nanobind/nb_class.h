@@ -819,13 +819,13 @@ public:
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
-        detail::enum_append(m_ptr, name, (int64_t) value, doc);
+        detail::enum_append(m_ptr, name, (int64_t) value, nullptr, doc);
         return *this;
     }
 
     NB_INLINE enum_ &str_value(const char *name, T value, const char *str_val,
                                const char *doc = nullptr) {
-        detail::enum_append_str(m_ptr, name, (int64_t) value, str_val, doc);
+        detail::enum_append(m_ptr, name, (int64_t) value, str_val, doc);
         return *this;
     }
 

@@ -142,18 +142,35 @@ static type_init_data *enum_get_type_data(handle tp) {
 }
 
 void enum_append(PyObject *tp_, const char *name_, int64_t value_,
-                 const char *doc) noexcept {
+                 const char *str_value_, const char *doc) noexcept {
     handle tp(tp_),
            val_tp(&PyLong_Type),
+           str_tp((PyObject *) &PyUnicode_Type),
            obj_tp((PyObject *) &PyBaseObject_Type);
 
     type_data *t = enum_get_type_data(tp);
+    bool is_str = (t->flags & (uint32_t) enum_flags::is_str);
+
+    if (is_str && !str_value_)
+        fail("enum_append(): StrEnum member \"%s.%s\" must be added with "
+             "str_value() instead of value().", t->name, name_);
+
+    if (!is_str && str_value_)
+        fail("enum_append(): str_value() can only be used on enumerations "
+             "declared with nb::is_str() (member \"%s.%s\").",
+             t->name, name_);
 
     object val;
-    if (t->flags & (uint32_t) enum_flags::is_signed)
+    if (is_str) {
+        val = steal(PyUnicode_InternFromString(str_value_));
+        if (!val.is_valid())
+            fail("enum_append(): unable to intern string value for \"%s.%s\"",
+                 t->name, name_);
+    } else if (t->flags & (uint32_t) enum_flags::is_signed) {
         val = steal(PyLong_FromLongLong((long long) value_));
-    else
+    } else {
         val = steal(PyLong_FromUnsignedLongLong((unsigned long long) value_));
+    }
 
     dict value_map = tp.attr("_value2member_map_"),
          member_map = tp.attr("_member_map_");
@@ -180,7 +197,9 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     #endif
 
     object el;
-    if (issubclass(tp, val_tp))
+    if (issubclass(tp, str_tp))
+        el = str_tp.attr(NB_INTERNED(__new__))(tp, val);
+    else if (issubclass(tp, val_tp))
         el = val_tp.attr(NB_INTERNED(__new__))(tp, val);
     else
         el = obj_tp.attr(NB_INTERNED(__new__))(tp);
@@ -194,58 +213,6 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
 
     // Compatibility with nanobind 1.x
     el.attr("__name__") = name;
-
-    setattr(tp, name, el);
-
-    if (!value_map.contains(val)) {
-        member_names.append(name);
-        value_map[val] = el;
-    }
-
-    member_map[name] = el;
-
-    enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
-    fwd->emplace(value_, (int64_t) (uintptr_t) el.ptr());
-
-    enum_map *rev = (enum_map *) t->enum_tbl.rev;
-    rev->emplace((int64_t) (uintptr_t) el.ptr(), value_);
-}
-
-void enum_append_str(PyObject *tp_, const char *name_, int64_t value_,
-                     const char *str_value_, const char *doc) noexcept {
-    handle tp(tp_), str_tp((PyObject *) &PyUnicode_Type);
-
-    type_data *t = enum_get_type_data(tp);
-
-    if (!(t->flags & (uint32_t) enum_flags::is_str_enum))
-        fail("enum_append_str(): enumeration \"%s\" was not declared as a "
-             "StrEnum (missing nb::is_str_enum())", t->name);
-
-    if (!issubclass(tp, str_tp))
-        fail("enum_append_str(): enumeration \"%s\" is not a string subclass",
-             t->name);
-
-    object val = steal(PyUnicode_InternFromString(str_value_));
-    if (!val.is_valid())
-        fail("enum_append_str(): unable to intern string value for \"%s.%s\"",
-             t->name, name_);
-
-    dict value_map = tp.attr("_value2member_map_"),
-         member_map = tp.attr("_member_map_");
-    list member_names = tp.attr("_member_names_");
-    str name(name_);
-
-    if (member_map.contains(name))
-        fail("refusing to add duplicate key \"%s\" to enumeration \"%s\"!",
-             name_, type_name(tp).c_str());
-
-    object el = str_tp.attr("__new__")(tp, val);
-
-    el.attr("_name_") = name;
-    el.attr("__objclass__") = tp;
-    el.attr("_sort_order_") = len(member_names);
-    el.attr("_value_") = val;
-    el.attr("__doc__") = doc ? str(doc) : none();
 
     setattr(tp, name, el);
 

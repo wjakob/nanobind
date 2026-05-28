@@ -851,6 +851,19 @@ class StubGen:
                     import_as = item_list[1].strip() if len(item_list) > 1 else None
                     self.import_object(import_module, import_name, import_as)
                 continue
+            elif ls.startswith("\\import "):
+                # inline module imports like "\import A, B as b"
+                mod_list = ls[7:].split(",")
+                for mod in mod_list:
+                    items = mod.split(" as ")
+                    if len(items) == 1:
+                        modname, as_name = items[0].strip(), None
+                    elif len(items) == 2:
+                        modname, as_name = [i.strip() for i in items]
+                    else:
+                        raise RuntimeError(f"Could not parse import declaration {mod}")
+                    self.import_object(modname, None, as_name=as_name)
+                continue
 
             groups = match.groups()
             for i in reversed(range(len(groups))):

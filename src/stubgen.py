@@ -851,6 +851,7 @@ class StubGen:
             self.write_ln(line)
 
         # Success, pattern was applied
+        pattern.matches += 1
         return True
 
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:

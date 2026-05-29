@@ -1,6 +1,6 @@
 include_guard(GLOBAL)
 
-if (NOT TARGET Python::Module)
+if (NOT TARGET Python::Interpreter OR NOT TARGET Python::Module)
   message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
 endif()
 

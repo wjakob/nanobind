@@ -136,7 +136,7 @@ endif()
 # Find the Python interpreter and development libraries
 # ---------------------------------------------------------------------------
 
-if (NOT TARGET Python::Module OR NOT TARGET Python::Interpreter)
+if (NOT TARGET Python::Module AND NOT TARGET Python::Interpreter)
   set(Python_FIND_FRAMEWORK LAST) # Prefer Brew/Conda to Apple framework python
 
   if (CMAKE_VERSION VERSION_LESS 3.18)

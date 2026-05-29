@@ -503,6 +503,11 @@ bool ndarray_check(PyObject *o) noexcept {
     return result;
 }
 
+// Helper function reports whether `code` represents a complex number.
+static NB_INLINE bool dtype_code_is_complex(uint8_t code) {
+    return code == (uint8_t) dlpack::dtype_code::Complex ||
+           code == (uint8_t) dlpack::dtype_code::Bcomplex;
+}
 
 ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
                                bool convert, cleanup_list *cleanup) noexcept {
@@ -661,9 +666,8 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
     // Do not convert shape and do not convert complex numbers to non-complex.
     convert &= pass_shape &
-               !(t.dtype.code == (uint8_t) dlpack::dtype_code::Complex
-                 && has_dtype
-                 && c->dtype.code != (uint8_t) dlpack::dtype_code::Complex);
+               !(dtype_code_is_complex(t.dtype.code) &&
+                 has_dtype && !dtype_code_is_complex(c->dtype.code));
 
     // Support implicit conversion of dtype and order.
     if (convert && (!pass_dtype || !pass_order) && !src_is_pycapsule) {
@@ -679,7 +683,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         if (dt.lanes != 1)
             return nullptr;
 
-        char dtype[11];
+        char dtype[12];
         if (dt.code == (uint8_t) dlpack::dtype_code::Bool) {
             std::strcpy(dtype, "bool");
         } else {
@@ -699,6 +703,9 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
                     break;
                 case (uint8_t) dlpack::dtype_code::Complex:
                     prefix = "complex";
+                    break;
+                case (uint8_t) dlpack::dtype_code::Bcomplex:
+                    prefix = "bcomplex";
                     break;
                 default:
                     return nullptr;

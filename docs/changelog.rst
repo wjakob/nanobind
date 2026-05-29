@@ -21,7 +21,9 @@ Unreleased
 - The implicit :cpp:func:`.none() <arg::none>` annotation now also applies to
   ``std::nullptr_t`` and ``std::monostate``-typed arguments
 
-Version 2.12.0 (Feb 25, 2025)
+- Added ndarray ``dtype_code`` enumeration ``Bcomplex`` for complex bfloat16.
+
+Version 2.12.0 (Feb 25, 2026)
 -----------------------------
 
 - Added :cpp:class:`nb::memoryview` that wraps the Python ``memoryview`` type.

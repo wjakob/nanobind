@@ -27,18 +27,18 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         submodules: true
 
     - name: Setup Python ${{ matrix.python }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: ${{ matrix.python }}
         cache: 'pip'
 
     - name: Install the latest CMake
-      uses: lukka/get-cmake@latest
+      uses: lukka/get-cmake@591817e96fcad43505fb4eae36172462abb3a42e # v4.3.3
 
     - name: Install Eigen
       if: matrix.os == 'ubuntu-latest'
@@ -86,7 +86,7 @@ jobs:
     - name: Install dependencies
       run: apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y cmake git python3-dev python3-pytest python3-pip libeigen3-dev python3-typing-extensions python3-numpy
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         submodules: true
 
@@ -112,17 +112,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         submodules: true
 
-    - uses: deadsnakes/action@v3.1.0
+    - uses: deadsnakes/action@6c8b9b82fe0b4344f4b98f2775fcc395df45e494 # v3.1.0
       with:
         python-version: 3.14-dev
         nogil: true
 
     - name: Install the latest CMake
-      uses: lukka/get-cmake@latest
+      uses: lukka/get-cmake@591817e96fcad43505fb4eae36172462abb3a42e # v4.3.3
 
     - name: Install PyTest
       run: |
@@ -155,18 +155,18 @@ jobs:
         python: ['3.12']
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         submodules: true
 
     - name: Setup Python ${{ matrix.python }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: ${{ matrix.python }}
         cache: 'pip'
 
     - name: Setup MSYS2 (MINGW64)
-      uses: msys2/setup-msys2@v2
+      uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2
       with:
         msystem: MINGW64
         install: >-
@@ -218,19 +218,19 @@ jobs:
         python: ['3.12']
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         submodules: true
 
     - name: Setup Python ${{ matrix.python }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: ${{ matrix.python }}
         cache: 'pip'
 
     - name: Cache Intel oneAPI
       id: cache-oneapi
-      uses: actions/cache@v4
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: /opt/intel/oneapi
         key: install-${{ runner.os }}-intel-oneapi-compiler-2025.2
@@ -255,7 +255,7 @@ jobs:
         sudo rm -rf /opt/intel/oneapi/compiler/*/linux/lib/oclfpga
 
     - name: Install the latest CMake
-      uses: lukka/get-cmake@latest
+      uses: lukka/get-cmake@591817e96fcad43505fb4eae36172462abb3a42e # v4.3.3
 
     - name: Install PyTest
       run: |

@@ -9,17 +9,17 @@ jobs:
     name: "Python 3.12.7 / NVCC (CUDA 12.5.0) / windows-latest"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       with:
         submodules: true
 
-    - uses: Jimver/cuda-toolkit@v0.2.17
+    - uses: Jimver/cuda-toolkit@dc581bec6470cf161025608f13d71b3c00c2c0b7 # v0.2.17
       id: cuda-toolkit
       with:
         cuda: '12.5.0'
 
     - name: Setup Python 3.12.5
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: 3.12.5
         cache: 'pip'

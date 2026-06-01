@@ -900,12 +900,15 @@ class StubGen:
                 and (value.__name__ != name or value.__module__ != self.module.__name__)
             )
 
+            tp = type(value)
+
             # Ignore private members unless the user requests their inclusion
             if (
                 not self.include_private
                 and name
                 and not is_type_alias
                 and len(name) > 2
+                and not self.is_type_var(tp)
                 and (
                     (name[0] == "_" and name[1] != "_")
                     or (name[-1] == "_" and name[-2] != "_")
@@ -913,7 +916,6 @@ class StubGen:
             ):
                 return
 
-            tp = type(value)
             tp_mod, tp_name = tp.__module__, tp.__name__
 
             if ismodule(value):

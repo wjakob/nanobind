@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Cooldown prevents Dependabot from raising a PR the moment a new release
+    # lands. Fresh releases occasionally carry regressions; waiting a short
+    # period lets the ecosystem surface issues before we adopt them.
+    # Major bumps get a longer window because they are more likely to require
+    # manual migration work and should be adopted deliberately.
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    open-pull-requests-limit: 5

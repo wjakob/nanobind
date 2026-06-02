@@ -297,6 +297,11 @@ class StubGen:
             'MutableSequence|MutableSet|Sequence|ValuesView)'
         )
 
+        # Track types used in signatures to avoid suppressing them
+        self._used_in_signatures: set[str] = set()
+        self._collect_usages_mode: bool = False
+
+
     @property
     def output(self) -> str:
         """Get the current output as a string."""
@@ -740,7 +745,9 @@ class StubGen:
                 return cls_name if cls_name != "NoneType" else "None"
             if full_name.startswith(self.module.__name__ + "."):
                 # Strip away the module prefix for local classes
-                return full_name[len(self.module.__name__) + 1 :]
+                local_name = full_name[len(self.module.__name__) + 1 :]
+                self._used_in_signatures.add(local_name)
+                return local_name
             elif mod_name in ("typing", "typing_extensions", "collections.abc"):
                 # Import frequently-occurring typing classes and ABCs directly
                 return self.import_object(mod_name, cls_name)
@@ -853,7 +860,43 @@ class StubGen:
         # Success, pattern was applied
         return True
 
+    def _find_types_used_in_signatures(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
+        """Finds the set of all types and TypeVars used in public signatures.
+
+        Run a pre-pass to discover all transitively used private types (including TypeVars)
+        in signatures. This ensures they are not suppressed during the final stub
+        generation pass. Multiple iterations may be necessary to resolve nested dependencies.
+        """
+        assert not self.stack and self.depth == 0
+        while True:
+            old_used_count = len(self._used_in_signatures)
+            self._collect_usages_mode = True
+            old_output = self._output
+            old_imports = self.imports
+            old_prefix = self.prefix
+
+            self._output = io.StringIO()
+            self.imports = {}
+            try:
+                self.put(value, name, parent)
+            finally:
+                self._collect_usages_mode = False
+                self._output = old_output
+                self.imports = old_imports
+                self.depth = 0
+                self.stack = []
+                self.prefix = old_prefix
+
+            if len(self._used_in_signatures) == old_used_count:
+                break
+
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
+
+        # If necessary, initialize the set of types used by public signatures. This
+        # is used to then *not* suppress private members that are used in public signatures.
+        if not self._collect_usages_mode and not self.stack:
+            self._find_types_used_in_signatures(value, name, parent)
+
         old_prefix = self.prefix
 
         if value in self.stack:
@@ -877,22 +920,21 @@ class StubGen:
                 and (value.__name__ != name or value.__module__ != self.module.__name__)
             )
 
-            tp = type(value)
-
             # Ignore private members unless the user requests their inclusion
             if (
                 not self.include_private
                 and name
                 and not is_type_alias
                 and len(name) > 2
-                and not self.is_type_var(tp)
                 and (
                     (name[0] == "_" and name[1] != "_")
                     or (name[-1] == "_" and name[-2] != "_")
                 )
+                and self.prefix.removeprefix(f"{self.module.__name__}.") not in self._used_in_signatures
             ):
                 return
 
+            tp = type(value)
             tp_mod, tp_name = tp.__module__, tp.__name__
 
             if ismodule(value):
@@ -907,7 +949,7 @@ class StubGen:
                     self.import_object(value.__name__, name=None, as_name=name)
 
                     # If the user requested this, generate recursive stub files as well
-                    if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
+                    if not self._collect_usages_mode and self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
                         if create_subdirectory_for_module(value):
                             # Create a new subdirectory and start with an __init__.pyi file there
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
@@ -1182,7 +1224,12 @@ class StubGen:
         if isinstance(tp, str):
             result = tp
         elif isinstance(tp, typing.TypeVar):
-            return tp.__name__
+            mod = getattr(tp, "__module__", None)
+            if mod and mod != "builtins":
+                result = mod + "." + tp.__name__
+            else:
+                result = tp.__name__
+            return self.simplify_types(result)
         elif isinstance(tp, typing.ForwardRef):
             return repr(tp.__forward_arg__)
         elif isinstance(tp, list):

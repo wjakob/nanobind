@@ -130,8 +130,9 @@ foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iter
     ${EXTRA})
 endforeach()
 
-find_package (Eigen3 3...5 NO_MODULE)
-if (TARGET Eigen3::Eigen)
+# Check the version manually: Eigen's "SameMajorVersion" config rejects ranges like "3...5"
+find_package (Eigen3 NO_MODULE)
+if (TARGET Eigen3::Eigen AND Eigen3_VERSION VERSION_GREATER_EQUAL 3.3.1)
   nanobind_add_module(test_eigen_ext test_eigen.cpp ${NB_EXTRA_ARGS})
   target_link_libraries(test_eigen_ext PRIVATE Eigen3::Eigen)
   nanobind_add_module(test_eigen_tensor_ext test_eigen_tensor.cpp ${NB_EXTRA_ARGS})

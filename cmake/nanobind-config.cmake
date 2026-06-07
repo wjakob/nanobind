@@ -318,10 +318,12 @@ function(nanobind_opt_size name)
 endfunction()
 
 function(nanobind_disable_stack_protector name)
-  if (NOT MSVC)
-    # The stack protector affects binding size negatively (+8% on Linux in my
-    # benchmarks). Protecting from stack smashing in a Python VM seems in any
-    # case futile, so let's get rid of it by default in optimized modes.
+  # Drop the stack protector in optimized builds (it adds ~9-12% binary size
+  # and 1-2% runtime overheads, see docs/api_cmake.rst for the rationale).
+  # Pass PROTECT_STACK to opt out.
+  if (MSVC)
+    target_compile_options(${name} PRIVATE $<${NB_OPT}:$<$<COMPILE_LANGUAGE:CXX>:/GS->>)
+  else()
     target_compile_options(${name} PRIVATE $<${NB_OPT}:-fno-stack-protector>)
   endif()
 endfunction()
@@ -414,6 +416,12 @@ function(nanobind_add_module name)
     set(libname "${libname}-ft")
   endif()
 
+  # The stack protector changes how libnanobind is compiled, so the protected
+  # variant needs its own library (like -abi3 / -ft).
+  if (ARG_PROTECT_STACK)
+    set(libname "${libname}-ps")
+  endif()
+
   if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
     set(libname ${libname}-${ARG_NB_DOMAIN})
   endif()
@@ -443,6 +451,7 @@ function(nanobind_add_module name)
 
   if (NOT ARG_PROTECT_STACK)
     nanobind_disable_stack_protector(${name})
+    nanobind_disable_stack_protector(${libname})
   endif()
 
   if (NOT ARG_NOMINSIZE)

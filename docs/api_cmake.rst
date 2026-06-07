@@ -91,7 +91,8 @@ The high-level interface consists of just one CMake command:
           raises the warning level via flags like ``-pedantic``, ``-Wcast-qual``,
           ``-Wsign-conversion``.
       * - ``PROTECT_STACK``
-        - Don't remove stack smashing-related protections.
+        - Keep the stack protector enabled (for both the extension and
+          nanobind's core library).
       * - ``LTO``
         - Perform link time optimization.
       * - ``NOMINSIZE``
@@ -172,13 +173,22 @@ The high-level interface consists of just one CMake command:
      Size optimizations can be disabled by specifying the optional
      ``NOMINSIZE`` argument, though doing so is not recommended.
 
-   - ``nanobind_add_module()`` also disables stack-smashing protections
-     (i.e., it specifies ``-fno-stack-protector`` to Clang/GCC).
-     Protecting against such vulnerabilities in a Python VM seems futile,
-     and it adds non-negligible extra cost (+8% binary size in
-     benchmarks). This behavior can be disabled by specifying the optional
-     ``PROTECT_STACK`` flag. Either way, is not recommended that you use
-     nanobind in a setting where it presents an attack surface.
+   - On Linux, GCC normally compiles code with ``-fstack-protector-strong``,
+     which inserts stack canaries to defend against attacks where a buffer
+     overflow writes past a stack buffer into the saved return address.
+
+     This defense is especially costly for nanobind-based bindings, where it
+     instruments every function binding wrapper and all ndarray-related code.
+     In the test suite, it increases binary size by ~9-12% while adding 1-2%
+     runtime cost. The thread model is questionable in this context, since
+     the arrays being processed are either controlled by Python or validated
+     by nanobind.
+
+     The build system therefore disables the stack protector for both the user
+     extension and ``libnanobind`` (``-fno-stack-protector`` on Clang/GCC,
+     ``/GS-`` on MSVC). To opt out of this feature, pass ``PROTECT_STACK`` to
+     :cmake:command:`nanobind_add_module`, which reverts to the compiler's
+     default behavior.
 
    - It sets the default symbol visibility to ``hidden`` so that only functions
      and types specifically marked for export generate symbols in the resulting
@@ -327,10 +337,11 @@ The various commands are described below:
 
 .. cmake:command:: nanobind_disable_stack_protector
 
-   The stack protector affects the binary size of bindings negatively (+8%
-   on Linux in benchmarks). Protecting from stack smashing in a Python VM
-   seems in any case futile, so this function disables it for the specified
-   target when performing a build with optimizations. Use it as follows:
+   Disables the stack-smashing protector for the specified target in optimized
+   builds. The canary guards against stack buffer overflows, but nanobind's hot
+   path has only fixed-size stack arrays indexed by the validated argument
+   count, so it is pure overhead there (+8% binary size on Linux). Use it as
+   follows:
 
    .. code-block:: cmake
 

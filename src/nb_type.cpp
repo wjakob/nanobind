@@ -262,9 +262,8 @@ static void inst_dealloc(PyObject *self) {
         lock_shard guard(shard);
 
         if (NB_UNLIKELY(inst->clear_keep_alive)) {
-            size_t self_hash = ptr_hash()(self);
             nb_ptr_map &keep_alive = shard.keep_alive;
-            nb_ptr_map::iterator it = keep_alive.find(self, self_hash);
+            nb_ptr_map::iterator it = keep_alive.find(self);
             check(it != keep_alive.end(),
                   "nanobind::detail::inst_dealloc(\"%s\"): inconsistent "
                   "keep_alive information", t->name);
@@ -273,11 +272,9 @@ static void inst_dealloc(PyObject *self) {
             keep_alive.erase_fast(it);
         }
 
-        size_t p_hash = ptr_hash()(p);
-
         // Update hash table that maps from C++ to Python instance
         nb_ptr_map &inst_c2p = shard.inst_c2p;
-        nb_ptr_map::iterator it = inst_c2p.find(p, p_hash);
+        nb_ptr_map::iterator it = inst_c2p.find(p);
         bool found = false;
 
         if (NB_LIKELY(it != inst_c2p.end())) {

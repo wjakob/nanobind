@@ -27,7 +27,8 @@ enum class dtype_code : uint8_t {
     Float8_E4M3FN = 10, Float8_E4M3FNUZ = 11, Float8_E5M2 = 12,
     Float8_E5M2FNUZ = 13, Float8_E8M0FNU = 14,
     Float6_E2M3FN = 15, Float6_E3M2FN = 16,
-    Float4_E2M1FN = 17
+    Float4_E2M1FN = 17,
+    Bcomplex = 18
 };
 
 struct device {

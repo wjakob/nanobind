@@ -541,12 +541,12 @@ Nonstandard arithmetic types
 ----------------------------
 
 Low or extended-precision arithmetic types (e.g., ``int128``, ``float16``,
-``bfloat16``) are sometimes used but don't have standardized C++ equivalents.
+``bfloat16``) are sometimes used, though they are not standardized in C++17.
 If you wish to exchange arrays based on such types, you must register a partial
 overload of ``nanobind::detail::dtype_traits`` to inform nanobind about it.
 
 You are expressively allowed to create partial overloads of this class despite
-it being in the ``nanobind::detail`` namespace.
+its being in the ``nanobind::detail`` namespace.
 
 For example, the following snippet makes ``_Float16`` (half-precision type that
 is natively supported on some hardware) available by providing
@@ -561,11 +561,35 @@ is natively supported on some hardware) available by providing
            static constexpr dlpack::dtype value {
                (uint8_t) dlpack::dtype_code::Float, // type code
                16, // size in bits
-               1   // lanes (simd), usually set to 1
+               1   // lanes (simd), usually always set to 1
            };
            static constexpr auto name = const_name("float16");
        };
    }
+
+For complex numbers, nanobind assumes the ``T`` in ``std::complex<T>`` is an
+IEEE floating-point type.  Thus, above, it is not also necessary to specialize
+``dtype_traits<std::complex<_Float16>>``.
+
+To use ``bfloat16`` complex numbers, specialize ``dtype_traits`` for both the
+real and complex C++ types:
+
+.. code-block:: cpp
+
+   namespace nanobind::detail {
+   template<> struct dtype_traits<__bf16> {
+       static constexpr dlpack::dtype value{
+               /*code=*/static_cast<uint8_t>(dlpack::dtype_code::Bfloat),
+               /*bits=*/16, /*lanes=*/1};
+       static constexpr auto name = const_name("bfloat16");
+   };
+   template<> struct dtype_traits<std::complex<__bf16>> {
+       static constexpr dlpack::dtype value{
+               /*code=*/static_cast<uint8_t>(dlpack::dtype_code::Bcomplex),
+               /*bits=*/32, /*lanes=*/1};
+       static constexpr auto name = const_name("bcomplex32");
+   };
+   }  // namespace nanobind::detail
 
 .. _ndarray-views:
 

@@ -1473,9 +1473,27 @@ found:
     }
 }
 
+// Issue a warning when an instance is in an found to be in an invalid state
+NB_NOINLINE static bool nb_type_get_state_error(uint8_t state,
+                                                const char *name) noexcept {
+    constexpr const char *errors[4] = {
+        /* 0 = uninit  */ "attempted to access an uninitialized instance",
+        /* 1 = relinq  */ "attempted to access a relinquished instance",
+        /* 2 = ready   */ "attempted to initialize an already-initialized instance",
+        /* 3 = invalid */ "instance state has become corrupted",
+    };
+    PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
+                     errors[state & 3], name);
+    return false;
+}
+
 // Attempt to retrieve a pointer to a C++ instance
 bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
                  cleanup_list *cleanup, void **out) noexcept {
+    static_assert(cast_flags::construct == nb_inst::state_ready,
+                  "this function is optimized assuming that "
+                  "cast_flags::construct == nb_inst::state_ready");
+
     // Convert None -> nullptr
     if (src == Py_None) {
         *out = nullptr;
@@ -1508,10 +1526,6 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
         if (NB_LIKELY(valid)) {
             nb_inst *inst = (nb_inst *) src;
 
-            static_assert(cast_flags::construct == nb_inst::state_ready,
-                          "this function is optimized assuming that "
-                          "cast_flags::construct == nb_inst::state_ready");
-
             // (flags & construct)       state  xor-result  should accept?
             //          [normal] 0  [uninit] 0  0           no
             //          [normal] 0  [relinq] 1  1           no
@@ -1521,18 +1535,8 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
             //       [construct] 2   [ready] 2  0           no
 
             if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) ^
-                             inst->state) != nb_inst::state_ready)) {
-                constexpr const char* errors[4] = {
-                    /* 0 = uninit  */ "attempted to access an uninitialized instance",
-                    /* 1 = relinq  */ "attempted to access a relinquished instance",
-                    /* 2 = ready   */ "attempted to initialize an already-initialized instance",
-                    /* 3 = invalid */ "instance state has become corrupted",
-                };
-                PyErr_WarnFormat(
-                    PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
-                    errors[inst->state], t->name);
-                return false;
-            }
+                             inst->state) != nb_inst::state_ready))
+                return nb_type_get_state_error(inst->state, t->name);
 
             *out = inst_ptr(inst);
 

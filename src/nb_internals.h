@@ -291,15 +291,10 @@ struct nb_maybe_atomic {
  *
  * The following list clarifies locking semantics for each member.
  *
- * - `nb_module`, `nb_meta`, `nb_func`, `nb_method`, `nb_bound_method`,
+ * - `nb_module`, `nb_type`, `nb_func`, `nb_method`, `nb_bound_method`,
  *   `*_Type_tp_*`, `shard_count`, `is_alive_ptr`: these are initialized when
  *   loading the first nanobind extension within a domain, which happens within
  *   a critical section. They do not require locking.
- *
- * - `nb_type_dict`: created when the loading the first nanobind extension
- *   within a domain. While the dictionary itself is protected by its own
- *   lock, additional locking is needed to avoid races that create redundant
- *   entries. The `mutex` member is used for this.
  *
  * - `nb_static_property` and `nb_static_propert_descr_set`: created only once
  *   on demand, protected by `mutex`.
@@ -347,11 +342,8 @@ struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
 
-    /// Meta-metaclass of nanobind instances
-    PyTypeObject *nb_meta;
-
-    /// Dictionary with nanobind metaclass(es) for different payload sizes
-    PyObject *nb_type_dict;
+    /// The metaclass shared by every bound type
+    PyTypeObject *nb_type;
 
     /// Types of nanobind functions and methods
     PyTypeObject *nb_func, *nb_method, *nb_bound_method;
@@ -486,9 +478,12 @@ inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
 #endif
 
 extern nb_internals *internals;
-extern PyTypeObject *nb_meta_cache;
 
 extern char *type_name(const std::type_info *t);
+
+/// Construct 'nb_type' as an instance of the meta-metaclass 'nb_meta'
+extern PyTypeObject *nb_type_create_metaclass(nb_internals *p,
+                                              PyTypeObject *nb_meta) noexcept;
 
 // Forward declarations
 extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
@@ -505,16 +500,18 @@ NB_INLINE func_data *nb_func_data(void *o) {
     return (func_data *) (((char *) o) + sizeof(nb_func));
 }
 
-#if defined(Py_LIMITED_API)
-extern type_data *nb_type_data_static(PyTypeObject *o) noexcept;
-#endif
-
 /// Fetch the nanobind type record from a 'nb_type' instance
 NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
     #if !defined(Py_LIMITED_API)
         return (type_data *) (((char *) o) + sizeof(PyHeapTypeObject));
     #else
-        return nb_type_data_static(o);
+        #if 1
+            // Fast path that can be inlines without spilling registers
+            return (type_data *) ((char *) o + internals->type_data_offset);
+        #else
+            // Equivalent non-inlined reference version:
+            return (type_data *) PyObject_GetTypeData((PyObject *) o, Py_TYPE((PyObject *) o));
+        #endif
     #endif
 }
 

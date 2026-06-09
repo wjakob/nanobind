@@ -339,7 +339,7 @@ static void inst_dealloc(PyObject *self) {
 type_data *nb_type_c2p(nb_internals *internals_,
                        const std::type_info *type) {
 #if defined(NB_FREE_THREADED)
-    thread_local nb_type_map_fast type_c2p_fast;
+    nb_type_map_fast &type_c2p_fast = nb_thread_state_get()->type_c2p_fast;
 #else
     nb_type_map_fast &type_c2p_fast = internals_->type_c2p_fast;
 #endif

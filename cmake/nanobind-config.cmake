@@ -105,6 +105,15 @@ set(NB_OPT      $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>> CACHE INTERNAL "")
 set(NB_OPT_SIZE $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>,$<CONFIG:RelWithDebInfo>> CACHE INTERNAL "")
 
 # ---------------------------------------------------------------------------
+# Probe for the faster TLSDESC thread-local storage ABI (Linux/x86_64)
+# ---------------------------------------------------------------------------
+
+if (NOT (MSVC OR WIN32 OR APPLE))
+  include(CheckCXXCompilerFlag)
+  check_cxx_compiler_flag(-mtls-dialect=gnu2 NB_HAS_MTLS_GNU2)
+endif()
+
+# ---------------------------------------------------------------------------
 # Helper function to handle undefined CPython API symbols on macOS
 # ---------------------------------------------------------------------------
 
@@ -240,6 +249,11 @@ function (nanobind_build_library TARGET_NAME)
   else()
     # Generally needed to handle type punning in Python code
     target_compile_options(${TARGET_NAME} PRIVATE -fno-strict-aliasing)
+  endif()
+
+  # Use the faster TLSDESC model for libnanobind's thread_local accesses
+  if (NB_HAS_MTLS_GNU2)
+    target_compile_options(${TARGET_NAME} PRIVATE -mtls-dialect=gnu2)
   endif()
 
   if (WIN32)

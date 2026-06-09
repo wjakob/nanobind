@@ -13,6 +13,14 @@
 #include "nb_abi.h"
 #include <thread>
 
+#if defined(NB_FREE_THREADED)
+#  if defined(_WIN32)
+#    include <windows.h>
+#  else
+#    include <pthread.h>
+#  endif
+#endif
+
 #if defined(__GNUC__) && !defined(__clang__)
 #  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
@@ -162,6 +170,41 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
 
 // Initialized once when the module is loaded, no locking needed
 nb_internals *internals = nullptr;
+
+#if defined(NB_FREE_THREADED)
+NB_THREAD_LOCAL nb_thread_state *nb_thread_state_tls = nullptr;
+
+// Reclaims a thread's state when it exits (the cleanup-key callback).
+static void nb_thread_state_destroy(void *p) noexcept {
+    nb_thread_state *ts = (nb_thread_state *) p;
+    if (!ts)
+        return;
+    nb_thread_state_tls = nullptr;
+    delete ts;
+}
+
+// Slow path for nb_thread_state_get(): allocate the per-thread state with a cleanup callback
+nb_thread_state *nb_thread_state_alloc() noexcept {
+#if defined(_WIN32)
+    DWORD key = internals->thread_state_key;
+    nb_thread_state *ts = (nb_thread_state *) FlsGetValue(key);
+    if (!ts) {
+        ts = new nb_thread_state();
+        check(FlsSetValue(key, ts), "nanobind: FlsSetValue() failed!");
+    }
+#else
+    pthread_key_t key = internals->thread_state_key;
+    nb_thread_state *ts = (nb_thread_state *) pthread_getspecific(key);
+    if (!ts) {
+        ts = new nb_thread_state();
+        check(pthread_setspecific(key, ts) == 0,
+              "nanobind: pthread_setspecific() failed!");
+    }
+#endif
+    nb_thread_state_tls = ts;
+    return ts;
+}
+#endif
 
 
 static const char* interned_c_strs[pyobj_name::string_count] {
@@ -500,6 +543,15 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
     shard_count *= 2;
     p->shards = new nb_shard[shard_count];
     p->shard_mask = shard_count - 1;
+
+    // Per-domain key for reclaiming nb_thread_state at thread exit
+#if defined(_WIN32)
+    p->thread_state_key = FlsAlloc((PFLS_CALLBACK_FUNCTION) nb_thread_state_destroy);
+    check(p->thread_state_key != FLS_OUT_OF_INDEXES, "nanobind: FlsAlloc() failed!");
+#else
+    check(pthread_key_create(&p->thread_state_key, nb_thread_state_destroy) == 0,
+          "nanobind: pthread_key_create() failed!");
+#endif
 #endif
     p->shard_count = shard_count;
 

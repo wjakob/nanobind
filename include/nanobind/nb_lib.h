@@ -400,7 +400,7 @@ NB_CORE bool nb_inst_python_derived(PyObject *o) noexcept;
 NB_CORE void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept;
 
 /// Query the 'ready' and 'destruct' flags of an instance
-NB_CORE std::pair<bool, bool> nb_inst_state(PyObject *o) noexcept;
+NB_CORE std::pair<bool, bool> nb_inst_state_read(PyObject *o) noexcept;
 
 // ========================================================================
 

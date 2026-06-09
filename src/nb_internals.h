@@ -56,22 +56,17 @@ struct func_data : func_data_prelim_base {
     char *signature;
 };
 
-/// Python object representing an instance of a bound C++ type
-struct nb_inst { // usually: 24 bytes
-    PyObject_HEAD
-
-    /// Offset to the actual instance data
-    int32_t offset;
-
-    /// State of the C++ object this instance points to: is it constructed?
-    /// can we use it?
-    uint8_t state : 2;
-
-    // Values for `state`. Note that the numeric values of these are relied upon
-    // for an optimization in `nb_type_get()`.
+/// Packed status of a nanobind type instance.
+struct nb_inst_state {
+    // Values for the 'state' field. Note that the numeric values of these are
+    // relied upon for an optimization in `nb_type_get()`.
     static constexpr uint32_t state_uninitialized = 0; // not constructed
     static constexpr uint32_t state_relinquished = 1; // owned by C++, don't touch
     static constexpr uint32_t state_ready = 2; // constructed and usable
+
+    /// State of the C++ object this instance points to: is it constructed?
+    /// can we use it? (see the 'state_*' values below)
+    uint8_t state : 2;
 
     /**
      * The variable 'offset' can either encode an offset relative to the
@@ -93,16 +88,39 @@ struct nb_inst { // usually: 24 bytes
     /// Does this instance use intrusive reference counting?
     uint8_t intrusive : 1;
 
+    /// Currently not used (but needed to pad to 8 bit)
+    uint8_t pad : 1;
+
     /// Does this instance hold references to others? (via internals.keep_alive)
-    /// This may be accessed concurrently to 'state', so it must not be in
-    /// the same bitfield as 'state'.
+    /// This may be accessed concurrently to the flag byte above, so it is kept
+    /// in its own byte (never read-modify-written together with the flags).
     uint8_t clear_keep_alive;
 
     // That's a lot of unused space. I wonder if there is a good use for it..
     uint16_t unused;
 };
 
+static_assert(sizeof(nb_inst_state) == sizeof(uint32_t));
+
+/// Python object representing an instance of a bound C++ type
+struct nb_inst { // usually: 24 bytes
+    PyObject_HEAD
+
+    /// Offset to the actual instance data
+    int32_t offset;
+
+    /// Packed status flags (see nb_inst_state)
+    nb_inst_state state;
+};
+
 static_assert(sizeof(nb_inst) == sizeof(PyObject) + sizeof(uint32_t) * 2);
+
+/// Helper to ensure that nb_inst instance state updates produce one 4-byte store
+inline void nb_inst_state_write(nb_inst *self, nb_inst_state state) noexcept {
+    uint32_t w;
+    std::memcpy(&w, &state, sizeof(w));
+    std::memcpy(&self->state, &w, sizeof(w));
+}
 
 /// Python object representing a bound C++ function
 struct nb_func {
@@ -560,7 +578,7 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
 
 inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);
-    return self->direct ? ptr : *(void **) ptr;
+    return self->state.direct ? ptr : *(void **) ptr;
 }
 
 // Return the instance pool associated with type `td`

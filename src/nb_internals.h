@@ -14,7 +14,10 @@
 #include <nanobind/nanobind.h>
 #include <tsl/robin_map.h>
 #if defined(NB_FREE_THREADED)
-#include <atomic>
+#  include <atomic>
+#if !defined(_WIN32)
+#  include <pthread.h>
+#endif
 #endif
 #include <cstring>
 #include <string_view>
@@ -198,6 +201,25 @@ using nb_ptr_map  = tsl::robin_map<void *, void*, ptr_hash>;
 using nb_type_map_fast = nb_ptr_map;
 using nb_type_map_slow = tsl::robin_map<const std::type_info *, type_data *,
                                         std_typeinfo_hash, std_typeinfo_eq>;
+
+#if defined(NB_FREE_THREADED)
+// Per-thread state (currently just stores the C++ -> Python type cache)
+struct nb_thread_state {
+    nb_type_map_fast type_c2p_fast;
+};
+
+extern NB_THREAD_LOCAL nb_thread_state *nb_thread_state_tls;
+
+/// Slow path: allocate this thread's state and register a cleanup routine
+extern nb_thread_state *nb_thread_state_alloc() noexcept;
+
+NB_INLINE nb_thread_state *nb_thread_state_get() noexcept {
+    nb_thread_state *ts = nb_thread_state_tls;
+    if (NB_UNLIKELY(!ts))
+        ts = nb_thread_state_alloc();
+    return ts;
+}
+#endif
 
 /// Convenience functions to deal with the pointer encoding in 'internals.inst_c2p'
 
@@ -383,6 +405,15 @@ struct nb_internals {
 #else
     nb_shard shards[1];
     inline nb_shard &shard(void *) { return shards[0]; }
+#endif
+
+#if defined(NB_FREE_THREADED)
+    // Per-domain key for reclaiming nb_thread_state at thread exit
+#  if defined(_WIN32)
+    unsigned long thread_state_key;
+#  else
+    pthread_key_t thread_state_key;
+#  endif
 #endif
 
 #if !defined(NB_FREE_THREADED)

@@ -30,7 +30,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
                              "nanobind: type '%s' was already registered!\n",
                              ed->name);
             PyObject *tp = (PyObject *) it->second->type_py;
-            Py_INCREF(tp);
+            NB_INCREF_ENUM(tp);
             return tp;
         }
     }

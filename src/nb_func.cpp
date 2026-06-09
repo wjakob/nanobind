@@ -144,7 +144,7 @@ int nb_bound_method_clear(PyObject *self) {
 void nb_bound_method_dealloc(PyObject *self) {
     nb_bound_method *mb = (nb_bound_method *) self;
     PyObject_GC_UnTrack(self);
-    Py_DECREF((PyObject *) mb->func);
+    NB_DECREF_FUNC((PyObject *) mb->func);
     Py_DECREF(mb->self);
     PyObject_GC_Del(self);
 }
@@ -254,9 +254,9 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                 /* Never append a method to an overload chain of a parent class;
                    instead, hide the parent's overloads in this case */
                 if (fp->scope != f->scope)
-                    Py_CLEAR(func_prev);
+                    NB_CLEAR_FUNC(func_prev);
             } else if (name_cstr[0] == '_') {
-                Py_CLEAR(func_prev);
+                NB_CLEAR_FUNC(func_prev);
             } else {
                 check(false,
                       "nb::detail::nb_func_new(\"%s\"): cannot overload "
@@ -340,7 +340,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
               "nanobind::detail::nb_func_new(): internal update failed (1)!");
 #endif
 
-        Py_CLEAR(func_prev);
+        NB_CLEAR_FUNC(func_prev);
     }
 
     func->max_nargs = max_nargs;
@@ -498,7 +498,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     if (return_ref) {
         return (PyObject *) func;
     } else {
-        Py_DECREF(func);
+        NB_DECREF_FUNC(func);
         return nullptr;
     }
 }
@@ -1190,12 +1190,12 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
         mb->self = inst;
         mb->vectorcall = nb_bound_method_vectorcall;
 
-        Py_INCREF(self);
+        NB_INCREF_FUNC(self);
         Py_INCREF(inst);
 
         return (PyObject *) mb;
     } else {
-        Py_INCREF(self);
+        NB_INCREF_FUNC(self);
         return self;
     }
 }

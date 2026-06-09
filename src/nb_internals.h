@@ -203,9 +203,17 @@ using nb_type_map_slow = tsl::robin_map<const std::type_info *, type_data *,
                                         std_typeinfo_hash, std_typeinfo_eq>;
 
 #if defined(NB_FREE_THREADED)
-// Per-thread state (currently just stores the C++ -> Python type cache)
+// Per-thread state
 struct nb_thread_state {
+    // C++ -> Python type cache
     nb_type_map_fast type_c2p_fast;
+
+    /// Per-thread instance pools indexed by ``type_data::pool_index``
+    /// Grown lazily by nb_pool_ensure() and freed when the thread exists
+    nb_inst_pool *pools = nullptr;
+
+    /// Number of entries currently allocated in ``pools``
+    uint32_t pools_size = 0;
 };
 
 extern NB_THREAD_LOCAL nb_thread_state *nb_thread_state_tls;
@@ -406,6 +414,10 @@ struct nb_internals {
 #  else
     pthread_key_t thread_state_key;
 #  endif
+
+    // Current index into the per-thread object pool. Grows proportional
+    // to the number of pooled object types that are used across extensions
+    std::atomic<uint32_t> pool_index_counter{0};
 #endif
 
 #if !defined(NB_FREE_THREADED)
@@ -550,6 +562,26 @@ inline void *inst_ptr(nb_inst *self) {
     void *ptr = (void *) ((intptr_t) self + self->offset);
     return self->direct ? ptr : *(void **) ptr;
 }
+
+// Return the instance pool associated with type `td`
+NB_INLINE nb_inst_pool *nb_pool_lookup(type_data *td) noexcept {
+#if !defined(NB_FREE_THREADED)
+    // In GIL-protected Python, global pool data structure is reachable via `td`
+    return &td->pool;
+#else
+    // In FT builds, the pool is per thread and stored in a packed pointer array
+    nb_thread_state *ts = nb_thread_state_tls;
+    if (ts && td->pool_index < ts->pools_size)
+        return ts->pools + td->pool_index;
+    return nullptr;
+#endif
+}
+
+// Return the instance pool associated with type `td` or allocate it on demand
+extern nb_inst_pool *nb_pool_ensure(type_data *td) noexcept;
+
+/// Release all objects kept in the given instance pool
+extern void nb_pool_drain(nb_inst_pool *pool) noexcept;
 
 template <typename T> struct scoped_pymalloc {
     scoped_pymalloc(size_t size = 1, size_t extra_bytes = 0) {

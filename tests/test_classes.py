@@ -1,7 +1,7 @@
 import sys
 import test_classes_ext as t
 import pytest
-from common import skip_on_pypy, collect
+from common import skip_on_pypy, collect, parallelize
 
 
 
@@ -992,3 +992,90 @@ def test53_never_destruct():
     r = t.NeverDestruct.make_ref()
     r.set_var(5)
     assert r.var() == 5
+
+
+# Object pooling relies on reference counting: releasing an instance parks the
+# object immediately in 'tp_dealloc'. PyPy uses a tracing GC, so 'del' does not
+# deterministically run the C++ destructor, breaking the lifecycle assertions.
+@skip_on_pypy
+def test54_pooled():
+    # Basic correctness through the pool fast path
+    t.pooled_reset()
+    a = t.Pooled(3)
+    assert a.get() == 3 and a.value == 3
+    c0, d0 = t.pooled_stats()
+    assert c0 == 1 and d0 == 0
+
+    # Releasing 'a' parks the object (capacity 4): the C++ destructor runs...
+    addr = id(a)
+    del a
+    c1, d1 = t.pooled_stats()
+    assert c1 == 1 and d1 == 1
+
+    # ...and the next construction revives the SAME object (no realloc),
+    # running a fresh C++ constructor. Identity (address) is reused.
+    b = t.Pooled(7)
+    assert id(b) == addr
+    assert b.get() == 7   # no stale data from the previous occupant
+    c2, d2 = t.pooled_stats()
+    assert c2 == 2 and d2 == 1
+    del b
+
+
+@skip_on_pypy
+def test55_pooled_churn():
+    # A hot alloc/free loop should keep reusing a tiny working set of objects
+    # while construct/destruct run every iteration.
+    t.pooled_reset()
+    seen = set()
+    for i in range(1000):
+        x = t.Pooled(i)
+        assert x.get() == i
+        seen.add(id(x))
+        del x
+    c, d = t.pooled_stats()
+    assert c == 1000 and d == 1000          # full C++ lifecycle each iteration
+    assert len(seen) <= 4                   # but addresses come from the pool
+
+    # Return-by-value (operator) also flows through the pool
+    t.pooled_reset()
+    p = t.Pooled(10)
+    q = p + 5                               # returns a fresh Pooled by value
+    assert q.get() == 15 and isinstance(q, t.Pooled)
+    del p, q
+
+
+@skip_on_pypy
+def test56_pooled_bounded():
+    # Holding more live instances than the pool capacity (4) must be fine:
+    # surplus objects are freed normally instead of parked.
+    t.pooled_reset()
+    items = [t.Pooled(i) for i in range(32)]
+    assert [x.get() for x in items] == list(range(32))
+    del items
+    c, d = t.pooled_stats()
+    assert c == 32 and d == 32
+
+
+@skip_on_pypy
+def test59_pooled_threaded(n_threads=8):
+    # Per-thread instance pools must work without locking under free-threading:
+    # many threads concurrently construct/release pooled temporaries (including
+    # return-by-value), and the exact C++ lifecycle balance must be preserved.
+    n = 50000
+    t.pooled_reset()
+
+    def f():
+        for i in range(n):
+            a = t.Pooled(i)
+            assert a.get() == i
+            b = a + 5                 # return-by-value -> pool
+            assert b.get() == i + 5
+            del a, b
+
+    parallelize(f, n_threads=n_threads)
+
+    c, d = t.pooled_stats()
+    # per iteration: ctor(a) + ctor(inside __add__) + move-ctor(by value) = 3
+    expected = n_threads * n * 3
+    assert c == expected and d == expected

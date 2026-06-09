@@ -63,9 +63,10 @@ enum class type_flags : uint32_t {
 
     /// Does the type implement a custom __new__ operator that can take no args
     /// (except the type object)?
-    has_nullary_new          = (1 << 17)
+    has_nullary_new          = (1 << 17),
 
-    // One more bit available without needing a larger reorganization
+    /// Does the type opt into instance pooling? (nb::pooled)
+    pooled                   = (1 << 18)
 };
 
 /// Flags about a type that are only relevant when it is being created.
@@ -93,6 +94,14 @@ enum class type_init_flags : uint32_t {
 
 // See internals.h
 struct nb_alias_chain;
+struct nb_inst;
+
+/// LIFO Instance pool
+struct nb_inst_pool {
+    nb_inst **slots;
+    uint32_t count;
+    uint32_t capacity;
+};
 
 // Implicit conversions for C++ type bindings, used in type_data below
 struct implicit_t {
@@ -132,6 +141,15 @@ struct type_data {
     uint32_t weaklistoffset;
     /// Out-of-line heap storage for an optional nb::supplement<T>
     void *supplement;
+    /// Instance pool capacity
+    uint32_t pool_capacity;
+#if defined(NB_FREE_THREADED)
+    /// Slot of this type's pool in the packed per-thread pool array
+    uint32_t pool_index;
+#else
+    /// Per-type instance pool for non-FT builds
+    nb_inst_pool pool;
+#endif
 };
 
 /// Information about a type that is only relevant when it is being created
@@ -188,6 +206,11 @@ NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
 
 NB_INLINE void type_extra_apply(type_init_data &, never_destruct) {
     // intentionally empty
+}
+
+NB_INLINE void type_extra_apply(type_init_data &t, pooled p) {
+    t.flags |= (uint32_t) type_flags::pooled;
+    t.pool_capacity = p.capacity;
 }
 
 template <typename T>

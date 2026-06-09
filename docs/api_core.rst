@@ -2200,6 +2200,21 @@ declarations in generated :ref:`stubs <stubs>`,
 
    Disables destroying the instance.
 
+.. cpp:struct:: pooled
+
+   Opt a bound type into :ref:`instance pooling <instance_pooling>`: instead of
+   freeing the Python object of a released instance, nanobind puts it into a
+   small pool for subsequent reuse. This avoids per-instance allocation and
+   bookkeeping costs and can speed up code that creates many short-lived
+   temporaries.
+
+   .. cpp:function:: explicit pooled(uint32_t capacity = 128)
+
+      Enable pooling with up to ``capacity`` released instances (per type, and
+      per thread in free-threaded builds). A ``capacity`` of ``0`` disables
+      pooling. The annotation is silently ignored on PyPy, which does not
+      support pooling.
+
 .. _enum_binding_annotations:
 
 Enum binding annotations

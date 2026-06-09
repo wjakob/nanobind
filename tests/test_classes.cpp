@@ -11,6 +11,7 @@
 #include <memory>
 #include <cstring>
 #include <vector>
+#include <atomic>
 #include <nanobind/stl/detail/traits.h>
 #include "inter_module.h"
 #include "test_classes.h"
@@ -86,6 +87,34 @@ struct Animal {
     virtual std::string name() const { return "Animal"; }
     virtual std::string what() const = 0;
     virtual void void_ret() { }
+};
+
+// Instance pooling test type (nb::pooled). Counts constructions and
+// destructions so the Python test can verify that the C++ object lifecycle is
+// correct even though the wrapper memory is recycled. The counters are atomic so
+// that the multi-threaded free-threaded test can check exact totals.
+static std::atomic<int> pooled_constructed{0}, pooled_destructed{0};
+
+struct Pooled {
+    int value;
+    Pooled(int v = 0) : value(v) { pooled_constructed++; }
+    Pooled(const Pooled &o) : value(o.value) { pooled_constructed++; }
+    ~Pooled() { pooled_destructed++; }
+    int get() const { return value; }
+};
+
+// Benchmark types: identical, minimal shape; the only difference is whether the
+// binding opts into nb::pooled. Kept free of side effects (no counters) so
+// the measurement isolates allocation / registration cost.
+struct BenchPooled {
+    int value;
+    BenchPooled(int v = 0) : value(v) {}
+    int get() const { return value; }
+};
+struct BenchUnpooled {
+    int value;
+    BenchUnpooled(int v = 0) : value(v) {}
+    int get() const { return value; }
 };
 
 struct StaticProperties {
@@ -252,6 +281,34 @@ NB_MODULE(test_classes_ext, m) {
         pickled = 0;
         unpickled = 0;
     });
+
+    // test_pooled
+
+    nb::class_<Pooled>(m, "Pooled", nb::pooled(4))
+        .def(nb::init<int>())
+        .def("get", &Pooled::get)
+        .def_rw("value", &Pooled::value)
+        // Returns a new Pooled by value -> exercises return-by-value pooling
+        .def("__add__",
+             [](const Pooled &p, int o) { return Pooled(p.value + o); },
+             nb::is_operator());
+
+    m.def("pooled_stats", [] {
+        return std::make_pair(pooled_constructed.load(), pooled_destructed.load());
+    });
+    m.def("pooled_reset", [] { pooled_constructed = pooled_destructed = 0; });
+
+    // Benchmark pair (see benchmark_pooled.py)
+    nb::class_<BenchPooled>(m, "BenchPooled", nb::pooled(128))
+        .def(nb::init<int>())
+        .def("get", &BenchPooled::get)
+        .def("__add__", [](const BenchPooled &p, int o) { return BenchPooled(p.value + o); },
+             nb::is_operator());
+    nb::class_<BenchUnpooled>(m, "BenchUnpooled")
+        .def(nb::init<int>())
+        .def("get", &BenchUnpooled::get)
+        .def("__add__", [](const BenchUnpooled &p, int o) { return BenchUnpooled(p.value + o); },
+             nb::is_operator());
 
     // test06_big
 

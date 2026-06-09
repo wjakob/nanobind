@@ -179,6 +179,14 @@ static void nb_thread_state_destroy(void *p) noexcept {
     nb_thread_state *ts = (nb_thread_state *) p;
     if (!ts)
         return;
+
+    // Reclaim this thread's instance pools if the runtime is still alive
+    if (internals && ts->pools) {
+        for (uint32_t i = 0; i < ts->pools_size; ++i)
+            nb_pool_drain(&ts->pools[i]);
+    }
+    PyMem_Free(ts->pools);
+
     nb_thread_state_tls = nullptr;
     delete ts;
 }
@@ -366,6 +374,13 @@ static void internals_cleanup() {
        type objects. This may change in the future. */
 
     bool print_leak_warnings = p->print_leak_warnings;
+
+    // Drain per-type instance pools to avoid false leak warnings below
+    for (const auto &kv : p->type_c2p_slow) {
+        type_data *td = kv.second;
+        if (td->flags & (uint32_t) type_flags::pooled)
+            nb_pool_drain(&td->pool);
+    }
 
     size_t inst_leaks = 0, keep_alive_leaks = 0;
 

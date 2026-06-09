@@ -1179,3 +1179,85 @@ current compilation unit).
    nanobind will abort with a fatal error if it is ever put into a situation
    where an object with the :cpp:class:`nb::never_destruct <never_destruct>`
    annotation must be destructed.
+
+.. _instance_pooling:
+
+Instance pooling
+----------------
+
+Some nanobind workloads create large numbers of short-lived objects and
+bottleneck on object allocation. Constructing an object normally involves
+several steps:
+
+1. Allocating space for the object via ``PyObject_Malloc()``.
+2. Increasing the reference count of both the object and its heap type.
+3. Registering the instance in nanobind's instance hash table.
+4. Calling the C++ constructor.
+
+Releasing the instance performs the inverse of each step in reverse order. In
+free-threaded builds, the hash table in step 3 is additionally guarded by a
+sharded lock that is relatively costly to acquire and release. The C++
+constructor and destructor are unavoidable, but everything else is pure
+bookkeeping that can in principle be avoided.
+
+The :cpp:struct:`nb::pooled <pooled>` class binding annotation enables this:
+instead of freeing a released object, nanobind can stash it in a small per-type
+pool and hand it right back on the next construction. This removes steps 1–3
+from the critical path, leaving only the placement constructor and destructor:
+
+.. code-block:: cpp
+
+   nb::class_<Vec3>(m, "Vec3", nb::pooled(/* capacity = */ 128))
+       .def(nb::init<float>())
+       .def(nb::self + nb::self)
+       .def(nb::self * float());
+
+The optional ``capacity`` argument (128 by default) bounds how objects can be
+retained. Once the pool is full, further releases are freed normally. Pooled
+instances behave exactly like ordinary instances.
+
+Incidentally, this mirrors an optimization that CPython itself applies
+internally to frequently allocated built-in types such as lists, tuples, and
+dictionaries.
+
+A microbenchmark dominated by object construction runs roughly 1.42× faster on
+Python 3.14 with pooling enabled. In free-threaded builds, each thread keeps
+its own pool so that the fast path remains lock-free. Avoiding the lock is
+especially valuable under contention: on the same benchmark, the speedup ranges
+from 1.32× in the uncontended single-threaded case to 3.2× with 32 threads on a
+32-core machine.
+
+Pooling only applies to instances whose storage nanobind owns (i.e., which are
+constructed from Python or returned by value). Instances wrapping *external*
+storage (values returned by pointer or reference, or from :cpp:struct:`nb::new_
+<new_>` bindings that return a pointer) don't benefit from pooling.
+
+Pooling composes transparently with the :ref:`low-level interface <lowlevel>`:
+:cpp:func:`nb::inst_alloc() <inst_alloc>` draws a recycled object from the pool
+when one is available, and the object is returned to the pool when the Python
+wrapper's reference count finally reaches zero. :cpp:func:`nb::inst_destruct()
+<inst_destruct>` only runs the C++ destructor and resets the instance to
+non-ready status; it does not park or free the object, so the
+alloc/initialize/destruct/reinitialize cycle behaves as usual. The ``destruct``
+flag (e.g. cleared via :cpp:func:`nb::inst_set_state() <inst_set_state>`)
+continues to govern whether the C++ destructor runs when the object is later
+parked. Instances whose ownership has been transferred to C++ are not parked.
+
+.. note::
+
+   Pooling is only available for *simple* value types. A type is **ineligible**
+   (and binding will fail with an error) if it
+
+   - participates in Python's cyclic garbage collector, which includes any type
+     using :cpp:class:`nb::dynamic_attr <dynamic_attr>`,
+     :cpp:class:`nb::is_weak_referenceable <is_weak_referenceable>`, or a custom
+     ``tp_traverse`` slot, or
+
+   - uses :ref:`intrusive reference counting <intrusive>`.
+
+   Pooling is intended for types that are frequently constructed and destroyed.
+   Enabling it for a rarely-instantiated type wastes the (lazily allocated) pool
+   storage without any benefit.
+
+   Pooling isn't supported in PyPy extensions, where the annotation is simply
+   ignored.

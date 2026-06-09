@@ -125,6 +125,11 @@ struct kw_only {};
 struct lock_self {};
 struct never_destruct {};
 
+struct pooled {
+    explicit pooled(uint32_t capacity = 128) : capacity(capacity) {}
+    uint32_t capacity;
+};
+
 template <size_t /* Nurse */, size_t /* Patient */> struct keep_alive {};
 template <typename T> struct supplement {};
 template <typename T> struct intrusive_ptr {

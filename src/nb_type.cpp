@@ -64,6 +64,38 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 /// Allocate memory for a nb_type instance with internal storage
 PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
                        PyObject * /*kwd */) {
+    const type_data *t = nb_type_data(tp);
+
+    // Instance pool fast path
+    if (NB_LIKELY(t->flags & (uint32_t) type_flags::pooled)) {
+        nb_inst_pool *pool = nb_pool_lookup((type_data *) t);
+        if (pool && pool->count) {
+            nb_inst *self = pool->slots[--pool->count];
+
+            // Resurrect the dead object with a single reference.
+            nb_resurrect((PyObject *) self);
+
+            // Overwrite the status word in full. Pooled types are always
+            // co-located, internal-storage, non-intrusive.
+            self->state = nb_inst::state_uninitialized;
+            self->direct = 1;
+            self->internal = 1;
+            self->destruct = 0;
+            self->cpp_delete = 0;
+            self->intrusive = 0;
+            self->clear_keep_alive = 0;
+            self->unused = 0;
+
+            // Re-enable try_inc_ref for this object.
+            nb_enable_try_inc_ref((PyObject *) self);
+
+            // The revived object must hold a reference to its type object
+            Py_INCREF((PyObject *) tp);
+
+            return (PyObject *) self;
+        }
+    }
+
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
 
     nb_inst *self;
@@ -73,7 +105,6 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self = (nb_inst *) PyType_GenericAlloc(tp, 0);
 
     if (NB_LIKELY(self)) {
-        const type_data *t = nb_type_data(tp);
         uint32_t align = (uint32_t) t->align;
         bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
 
@@ -210,9 +241,113 @@ static void inst_register(PyObject *inst, void *value) noexcept {
 }
 
 
+// Return the instance pool associated with type `td` or allocate it.
+nb_inst_pool *nb_pool_ensure(type_data *td) noexcept {
+#if !defined(NB_FREE_THREADED)
+    // In GIL-protected Python, global pool data structure is reachable via `td`
+    nb_inst_pool *pool = &td->pool;
+#else
+    // In FT builds, the pool is per thread and stored in a packed pointer
+    // array that may need to be allocated or expanded.
+    nb_thread_state *ts = nb_thread_state_get();
+    uint32_t idx = td->pool_index;
+
+    if (NB_UNLIKELY(idx >= ts->pools_size)) {
+        uint32_t old_size = ts->pools_size,
+                 new_size = idx + 1;
+
+        nb_inst_pool *np = (nb_inst_pool *) PyMem_Realloc(
+            ts->pools, new_size * sizeof(nb_inst_pool));
+        check(np, "nb_pool_ensure(): out of memory!");
+
+        memset(np + old_size, 0, (new_size - old_size) * sizeof(nb_inst_pool));
+        ts->pools = np;
+        ts->pools_size = new_size;
+    }
+
+    nb_inst_pool *pool = &ts->pools[idx];
+#endif
+
+    // Allocate the pool if it does not yet exist
+    if (NB_UNLIKELY(!pool->slots)) {
+        pool->capacity = td->pool_capacity;
+        pool->count = 0;
+        pool->slots = (nb_inst **) PyMem_Malloc(pool->capacity * sizeof(nb_inst *));
+        check(pool->slots, "nb_pool_ensure(): out of memory!");
+    }
+
+    return pool;
+}
+
+// Release all objects stored in the pool and unmap them, then free the pool itself
+void nb_pool_drain(nb_inst_pool *pool) noexcept {
+    if (!pool || !pool->slots)
+        return;
+
+    for (uint32_t i = 0; i < pool->count; ++i) {
+        nb_inst *inst = pool->slots[i];
+        void *p = inst_ptr(inst);
+
+        nb_shard &shard = internals->shard(p);
+        lock_shard guard(shard);
+        nb_ptr_map &inst_c2p = shard.inst_c2p;
+        nb_ptr_map::iterator it = inst_c2p.find(p);
+
+        // A parked object is a dead instance whose payload is internal (co-located
+        // with the object), so its address is private to it: the c2p entry is
+        // always a direct 'p -> inst' mapping, never a 'seq'. (A 'seq' could only
+        // arise from a by-reference subobject aliasing the payload, but such an
+        // alias would pin the owner and keep it out of the pool.) Parking left
+        // this entry in place, so it must still be present and direct here.
+        check(it != inst_c2p.end() && it->second == (void *) inst,
+              "nb_pool_drain(): instance not found in the c2p map!");
+        inst_c2p.erase_fast(it);
+
+        PyObject_Free(inst);
+    }
+
+    PyMem_Free(pool->slots);
+    pool->slots = nullptr;
+    pool->count = 0;
+    pool->capacity = 0;
+}
+
 static void inst_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
     const type_data *t = nb_type_data(tp);
+    nb_inst *inst = (nb_inst *) self;
+
+    // Fast path: run the C++ destructor, then put the mapped object in the pool
+    // for reuse. The guard below admits only "clean" instances:
+    //
+    //   - 'internal': the payload is co-located and owned by nanobind.
+    //   - '!clear_keep_alive': doesn't need more complex teardown below.
+    //   - 'state != relinquished': exclude unusual ownership semantics.
+    //
+    // The remaining special cases cannot apply because pooling does not accept
+    // GCed or intrusively counted types.
+    if (NB_LIKELY((t->flags & (uint32_t) type_flags::pooled) &&
+                  inst->internal && !inst->clear_keep_alive &&
+                  inst->state != nb_inst::state_relinquished)) {
+        if (inst->destruct && (t->flags & (uint32_t) type_flags::has_destruct))
+            t->destruct(inst_ptr(inst));
+
+        // Look up the pool or create it
+        nb_inst_pool *pool = nb_pool_lookup((type_data *) t);
+        if (NB_UNLIKELY(!pool || !pool->slots))
+            pool = nb_pool_ensure((type_data *) t);
+
+        if (NB_LIKELY(pool->count < pool->capacity)) {
+            // There is space in the pool. Stash the object and release its
+            // reference to the type object.
+            pool->slots[pool->count++] = inst;
+            Py_DECREF(tp);
+            return;
+        }
+
+        // The pool is full. Release without rerunning the destructor
+        inst->destruct = 0;
+    }
 
     bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
     if (NB_UNLIKELY(gc)) {
@@ -236,7 +371,6 @@ static void inst_dealloc(PyObject *self) {
 #endif
     }
 
-    nb_inst *inst = (nb_inst *) self;
     void *p = inst_ptr(inst);
 
     if (inst->destruct) {
@@ -428,6 +562,14 @@ void nb_type_unregister(type_data *t) noexcept {
 static void nb_type_dealloc(PyObject *o) {
     type_data *t = nb_type_data((PyTypeObject *) o);
 
+#if !defined(NB_FREE_THREADED)
+    // Drain the per-type instance pool before unregistering. (In free-threaded
+    // builds, bound types are immortalized, so this is never reached; their
+    // per-thread pools are drained at thread exit instead.)
+    if (t->flags & (uint32_t) type_flags::pooled)
+        nb_pool_drain(&t->pool);
+#endif
+
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0)
         nb_type_unregister(t);
 
@@ -482,6 +624,18 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     *t = *t_b;
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
+
+    // Python subclasses are GC heap types with their own layout; they must not
+    // share or inherit the base type's instance pool.
+    t->flags &= ~((uint32_t) type_flags::pooled);
+    t->pool_capacity = 0;
+#if defined(NB_FREE_THREADED)
+    t->pool_index = 0;
+#else
+    // Clear the inlined pool copied from the base type_data (above), so the
+    // subclass never touches the base's 'slots' array.
+    t->pool = nb_inst_pool{};
+#endif
 
     PyObject *name = nb_type_name(self);
     t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
@@ -1357,6 +1511,40 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     // only access dicts/weaklists created by nanobind, not those added by Python
     to->dictoffset = (uint32_t) dictoffset;
     to->weaklistoffset = (uint32_t) weaklistoffset;
+
+    // Instance pool setup + eligibility check (nb::pooled). Decide once here
+    // so the hot paths can trust the 'pooled' flag alone.
+    to->pool_capacity = 0;
+#if defined(NB_FREE_THREADED)
+    to->pool_index = 0;
+#else
+    to->pool = nb_inst_pool{};
+#endif
+    if (to->flags & (uint32_t) type_flags::pooled) {
+#if defined(PYPY_VERSION)
+        // PyPy's cpyext object model is incompatible with park/revive step
+        to->flags &= ~(uint32_t) type_flags::pooled;
+#else
+        if (t->pool_capacity == 0) {
+            to->flags &= ~(uint32_t) type_flags::pooled;
+        } else {
+            // Pooling requires a non-GC type
+            bool eligible =
+                !PyType_HasFeature((PyTypeObject *) result, Py_TPFLAGS_HAVE_GC) &&
+                !(to->flags & (uint32_t) type_flags::intrusive_ptr);
+            if (!eligible)
+                fail("nanobind: type '%s' requested instance pooling "
+                     "(nb::pooled) but is ineligible (only non-GC, "
+                     "non-intrusive types can be pooled).", t_name);
+
+            to->pool_capacity = t->pool_capacity;
+#if defined(NB_FREE_THREADED)
+            to->pool_index = internals->pool_index_counter.fetch_add(
+                1, std::memory_order_relaxed);
+#endif
+        }
+#endif
+    }
 
     if (t->scope != nullptr)
         setattr(t->scope, t_name, result);

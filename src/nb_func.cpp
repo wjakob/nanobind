@@ -861,9 +861,9 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
-                    self_arg_nb->destruct = true;
-                    self_arg_nb->state = nb_inst::state_ready;
-                    if (NB_UNLIKELY(self_arg_nb->intrusive))
+                    self_arg_nb->state.destruct = true;
+                    self_arg_nb->state.state = nb_inst_state::state_ready;
+                    if (NB_UNLIKELY(self_arg_nb->state.intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
@@ -955,9 +955,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
                     nb_inst *self_arg_nb = (nb_inst *) self_arg;
-                    self_arg_nb->destruct = true;
-                    self_arg_nb->state = nb_inst::state_ready;
-                    if (NB_UNLIKELY(self_arg_nb->intrusive))
+                    self_arg_nb->state.destruct = true;
+                    self_arg_nb->state.state = nb_inst_state::state_ready;
+                    if (NB_UNLIKELY(self_arg_nb->state.intrusive))
                         nb_type_data(Py_TYPE(self_arg))
                             ->set_self_py(inst_ptr(self_arg_nb), self_arg);
                 }
@@ -1050,9 +1050,9 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
                 error_handler = nb_func_error_noconvert;
             } else if (is_constructor) {
                 nb_inst *arg_nb = (nb_inst *) arg;
-                arg_nb->destruct = true;
-                arg_nb->state = nb_inst::state_ready;
-                if (NB_UNLIKELY(arg_nb->intrusive))
+                arg_nb->state.destruct = true;
+                arg_nb->state.state = nb_inst_state::state_ready;
+                if (NB_UNLIKELY(arg_nb->state.intrusive))
                     nb_type_data(Py_TYPE(arg))
                         ->set_self_py(inst_ptr(arg_nb), arg);
             }
@@ -1110,9 +1110,9 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
                 error_handler = nb_func_error_noconvert;
             } else if (is_constructor) {
                 nb_inst *self_arg_nb = (nb_inst *) args_in[0];
-                self_arg_nb->destruct = true;
-                self_arg_nb->state = nb_inst::state_ready;
-                if (NB_UNLIKELY(self_arg_nb->intrusive))
+                self_arg_nb->state.destruct = true;
+                self_arg_nb->state.state = nb_inst_state::state_ready;
+                if (NB_UNLIKELY(self_arg_nb->state.intrusive))
                     nb_type_data(Py_TYPE(args_in[0]))
                         ->set_self_py(inst_ptr(self_arg_nb), args_in[0]);
             }

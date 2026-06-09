@@ -438,6 +438,7 @@ static void nb_type_dealloc(PyObject *o) {
 
     bool initialized = t->name != nullptr;
     free((char *) t->name);
+    PyMem_Free(t->supplement);
     NB_SLOT(PyType_Type, tp_dealloc)(o);
 
     if (initialized)
@@ -489,6 +490,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->implicit.cpp = nullptr;
     t->implicit.py = nullptr;
     t->alias_chain = nullptr;
+    t->supplement = nullptr;
 
 #if defined(Py_LIMITED_API)
     t->vectorcall = nullptr;
@@ -927,74 +929,55 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     }
 }
 
-
-static PyTypeObject *nb_type_tp(size_t supplement) noexcept {
-    object key = steal(PyLong_FromSize_t(supplement));
-    nb_internals *internals_ = internals;
-
-    PyTypeObject *tp =
-        (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
-
-    if (NB_UNLIKELY(!tp)) {
-        // Retry in critical section to avoid races that create the same nb_type
-        lock_internals guard(internals_);
-
-        tp = (PyTypeObject *) dict_get_item_ref_or_fail(internals_->nb_type_dict, key.ptr());
-        if (tp)
-            return tp;
-
+PyTypeObject *nb_type_create_metaclass(nb_internals *p,
+                                       PyTypeObject *nb_meta) noexcept {
 #if PY_VERSION_HEX >= 0x030C0000
-        int basicsize = -(int) (sizeof(type_data) + supplement),
-            itemsize = 0;
+    int basicsize = -(int) sizeof(type_data),
+        itemsize = 0;
 #else
-        int basicsize = (int) (PyType_Type.tp_basicsize + (sizeof(type_data) + supplement)),
-            itemsize = (int) PyType_Type.tp_itemsize;
+    int basicsize = (int) (PyType_Type.tp_basicsize + sizeof(type_data)),
+        itemsize = (int) PyType_Type.tp_itemsize;
 #endif
 
-        char name[17 + 20 + 1];
-        snprintf(name, sizeof(name), "nanobind.nb_type_%zu", supplement);
+    PyType_Slot slots[] = {
+        { Py_tp_base, &PyType_Type },
+        { Py_tp_dealloc, (void *) nb_type_dealloc },
+        { Py_tp_setattro, (void *) nb_type_setattro },
+        { Py_tp_init, (void *) nb_type_init },
+        { 0, nullptr },
+        { 0, nullptr }
+    };
 
-        PyType_Slot slots[] = {
-            { Py_tp_base, &PyType_Type },
-            { Py_tp_dealloc, (void *) nb_type_dealloc },
-            { Py_tp_setattro, (void *) nb_type_setattro },
-            { Py_tp_init, (void *) nb_type_init },
-            { 0, nullptr },
-            { 0, nullptr }
-        };
-
-        PyType_Spec spec = {
-            /* .name = */ name,
-            /* .basicsize = */ basicsize,
-            /* .itemsize = */ itemsize,
-            /* .flags = */ Py_TPFLAGS_DEFAULT | NB_TPFLAGS_IMMUTABLETYPE,
-            /* .slots = */ slots
-        };
+    PyType_Spec spec = {
+        /* .name = */ "nanobind.nb_type",
+        /* .basicsize = */ basicsize,
+        /* .itemsize = */ itemsize,
+        /* .flags = */ Py_TPFLAGS_DEFAULT | NB_TPFLAGS_IMMUTABLETYPE,
+        /* .slots = */ slots
+    };
 
 #if defined(Py_LIMITED_API)
-        PyMemberDef members[] = {
-            { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
-            { nullptr, 0, 0, 0, nullptr }
-        };
+    PyMemberDef members[] = {
+        { "__vectorcalloffset__", Py_T_PYSSIZET, 0, Py_READONLY, nullptr },
+        { nullptr, 0, 0, 0, nullptr }
+    };
 
-        // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
-        members[0].offset = internals_->type_data_offset + offsetof(type_data, vectorcall);
+    // Workaround because __vectorcalloffset__ does not support Py_RELATIVE_OFFSET
+    members[0].offset = p->type_data_offset + offsetof(type_data, vectorcall);
 
-        if (NB_DYNAMIC_VERSION < 0x030E0000) {
-            slots[4] = { Py_tp_members, (void *) members };
-            spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
-        }
+    if (NB_DYNAMIC_VERSION < 0x030E0000) {
+        slots[4] = { Py_tp_members, (void *) members };
+        spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+    }
 #endif
 
-        tp = (PyTypeObject *) nb_type_from_metaclass(
-            internals_->nb_meta, internals_->nb_module, &spec);
+    PyTypeObject *tp = (PyTypeObject *) nb_type_from_metaclass(
+        nb_meta, p->nb_module, &spec);
 
+    if (tp) {
         make_immortal((PyObject *) tp);
-
-        int rv = 1;
-        if (tp)
-            rv = PyDict_SetItem(internals_->nb_type_dict, key.ptr(), (PyObject *) tp);
-        check(rv == 0, "nb_type type creation failed!");
+        // Root the metaclass in the lifeline so it outlives every bound type.
+        new_object(p, (PyObject *) tp);
     }
 
     return tp;
@@ -1311,17 +1294,13 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     *s++ = { 0, nullptr };
 
-    PyTypeObject *metaclass = nb_type_tp(has_supplement ? t->supplement : 0);
-
-    PyObject *result = nb_type_from_metaclass(metaclass, mod, &spec);
+    PyObject *result = nb_type_from_metaclass(internals_->nb_type, mod, &spec);
     if (!result) {
         python_error err;
         check(false,
               "nanobind::detail::nb_type_new(\"%s\"): type construction "
               "failed: %s!", t_name, err.what());
     }
-
-    Py_DECREF(metaclass);
 
     make_immortal(result);
     internals_inc_ref();
@@ -1358,6 +1337,16 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     to->type_py = (PyTypeObject *) result;
     to->alias_chain = nullptr;
     to->init = nullptr;
+
+    if (has_supplement) {
+        to->supplement = PyMem_Malloc(t->supplement_size);
+        check(to->supplement,
+              "nanobind::detail::nb_type_new(\"%s\"): supplement allocation "
+              "failed!", t_name);
+        memset(to->supplement, 0, t->supplement_size);
+    } else {
+        to->supplement = nullptr;
+    }
 
     if (has_dynamic_attr)
         to->flags |= (uint32_t) type_flags::has_dynamic_attr;
@@ -2052,10 +2041,7 @@ PyObject *nb_type_lookup(const std::type_info *t) noexcept {
 }
 
 bool nb_type_check(PyObject *t) noexcept {
-    PyTypeObject *meta  = Py_TYPE(t),
-                 *meta2 = Py_TYPE((PyObject *) meta);
-
-    return meta2 == nb_meta_cache;
+    return internals->nb_type == Py_TYPE(t);
 }
 
 size_t nb_type_size(PyObject *t) noexcept {
@@ -2071,7 +2057,7 @@ const std::type_info *nb_type_info(PyObject *t) noexcept {
 }
 
 void *nb_type_supplement(PyObject *t) noexcept {
-    return nb_type_data((PyTypeObject *) t) + 1;
+    return nb_type_data((PyTypeObject *) t)->supplement;
 }
 
 PyObject *nb_inst_alloc(PyTypeObject *t) {
@@ -2234,12 +2220,6 @@ void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
     nb_inst_copy(dst, src);
     nbi->destruct = destruct;
 }
-
-#if defined(Py_LIMITED_API)
-type_data *nb_type_data_static(PyTypeObject *o) noexcept {
-    return (type_data *) PyObject_GetTypeData((PyObject *) o, Py_TYPE((PyObject *) o));
-}
-#endif
 
 PyObject *nb_type_name(PyObject *t) noexcept {
     error_scope s;

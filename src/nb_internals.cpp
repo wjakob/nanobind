@@ -162,7 +162,6 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
 
 // Initialized once when the module is loaded, no locking needed
 nb_internals *internals = nullptr;
-PyTypeObject *nb_meta_cache = nullptr;
 
 
 static const char* interned_c_strs[pyobj_name::string_count] {
@@ -222,17 +221,15 @@ static void init_internals(nb_internals *p) {
     p->nb_module = PyModule_NewObject(nb_name.ptr());
     new_object(p, p->nb_module);
 
+    // Construct nanobind's meta-meta class
     nb_meta_slots[0].pfunc = (PyObject *) &PyType_Type;
-    p->nb_meta = new_type(p, &nb_meta_spec);
-
-    p->nb_type_dict = PyDict_New();
-    new_object(p, p->nb_type_dict);
+    PyTypeObject *nb_meta = new_type(p, &nb_meta_spec);
 
     p->nb_func         = new_type(p, &nb_func_spec);
     p->nb_method       = new_type(p, &nb_method_spec);
     p->nb_bound_method = new_type(p, &nb_bound_method_spec);
 
-    check(p->nb_module && p->nb_meta && p->nb_type_dict && p->nb_func &&
+    check(p->nb_module && nb_meta && p->nb_func &&
               p->nb_method && p->nb_bound_method,
           "nanobind::detail::nb_module_exec(): initialization failed!");
 
@@ -262,11 +259,17 @@ static void init_internals(nb_internals *p) {
     };
 
     PyObject *dummy = PyType_FromMetaclass(
-        p->nb_meta, p->nb_module, &dummy_spec, nullptr);
+        nb_meta, p->nb_module, &dummy_spec, nullptr);
     p->type_data_offset =
-        (uint8_t *) PyObject_GetTypeData(dummy, p->nb_meta) - (uint8_t *) dummy;
+        (uint8_t *) PyObject_GetTypeData(dummy, nb_meta) - (uint8_t *) dummy;
     Py_DECREF(dummy);
 #endif
+
+    // Create the single metaclass shared by all bound types. This may
+    // access 'type_data_offset' defined just above.
+    p->nb_type = nb_type_create_metaclass(p, nb_meta);
+    check(p->nb_type, "nanobind::detail::nb_module_exec(): "
+                      "nb_type metaclass creation failed!");
 }
 
 void internals_inc_ref() {
@@ -282,15 +285,12 @@ void internals_dec_ref() {
     Py_CLEAR(p->lifeline);
 
     p->nb_module = nullptr;
-    p->nb_meta = nullptr;
-    p->nb_type_dict = nullptr;
+    p->nb_type = nullptr;
     p->nb_func = nullptr;
     p->nb_method = nullptr;
     p->nb_bound_method = nullptr;
     p->nb_static_property.store_release(nullptr);
     p->nb_ndarray.store_release(nullptr);
-
-    nb_meta_cache = nullptr;
 
     for (int i = 0; i < pyobj_name::total_count; ++i)
         static_pyobjects[i] = nullptr;
@@ -439,7 +439,6 @@ static void internals_cleanup() {
 
         delete p;
         internals = nullptr;
-        nb_meta_cache = nullptr;
     } else {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: this is likely caused by a reference "
@@ -458,8 +457,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
     if (internals) {
         init_internals(internals);
         init_pyobjects(internals);
-        if (nb_meta_cache != internals->nb_meta)
-            nb_meta_cache = internals->nb_meta;
         internals_inc_ref();
         return;
     }
@@ -487,8 +484,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 
         init_internals(internals);
         init_pyobjects(internals);
-        if (nb_meta_cache != internals->nb_meta)
-            nb_meta_cache = internals->nb_meta;
         internals_inc_ref();
 
         Py_DECREF(capsule);
@@ -512,8 +507,6 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 
     init_internals(p);
     init_pyobjects(p);
-    if (nb_meta_cache != p->nb_meta)
-        nb_meta_cache = p->nb_meta;
 
 #if defined(NB_FREE_THREADED)
     p->nb_static_property_disabled = PyThread_tss_alloc();

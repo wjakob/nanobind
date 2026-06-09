@@ -73,7 +73,7 @@ enum class type_flags : uint32_t {
 /// for more efficient memory layout, but could move elsewhere if we run
 /// out of flags.
 enum class type_init_flags : uint32_t {
-    /// Is the 'supplement' field of the type_init_data structure set?
+    /// Is the 'supplement_size' field of the type_init_data structure set?
     has_supplement           = (1 << 19),
 
     /// Is the 'doc' field of the type_init_data structure set?
@@ -130,6 +130,8 @@ struct type_data {
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
     uint32_t dictoffset;
     uint32_t weaklistoffset;
+    /// Out-of-line heap storage for an optional nb::supplement<T>
+    void *supplement;
 };
 
 /// Information about a type that is only relevant when it is being created
@@ -139,7 +141,7 @@ struct type_init_data : type_data {
     PyTypeObject *base_py;
     const char *doc;
     const PyType_Slot *type_slots;
-    size_t supplement;
+    size_t supplement_size;
 };
 
 NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
@@ -195,7 +197,7 @@ NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
     static_assert(alignof(T) <= alignof(void *),
                   "The alignment requirement of the supplement is too high.");
     t.flags |= (uint32_t) type_init_flags::has_supplement | (uint32_t) type_flags::is_final;
-    t.supplement = sizeof(T);
+    t.supplement_size = sizeof(T);
 }
 
 enum class enum_flags : uint32_t {

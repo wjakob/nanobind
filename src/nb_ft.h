@@ -20,6 +20,9 @@ inline bool nb_try_inc_ref(PyObject *obj) noexcept {
     }
     return false;
 }
+inline void nb_resurrect(PyObject *obj) noexcept {
+    Py_SET_REFCNT(obj, 1);
+}
 #else
 extern void make_immortal(PyObject *op) noexcept;
 
@@ -36,4 +39,7 @@ inline bool nb_try_inc_ref(PyObject *obj) noexcept {
 extern void nb_enable_try_inc_ref(PyObject *) noexcept;
 extern bool nb_try_inc_ref(PyObject *obj) noexcept;
 #endif
+inline void nb_resurrect(PyObject *obj) noexcept {
+    _Py_NewReference(obj);
+}
 #endif

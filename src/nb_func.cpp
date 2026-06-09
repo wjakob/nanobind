@@ -33,6 +33,8 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *, PyObject *const *,
                                              size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_simple_1(PyObject *, PyObject *const *,
                                              size_t, PyObject *) noexcept;
+static PyObject *nb_func_vectorcall_simple_2(PyObject *, PyObject *const *,
+                                             size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
@@ -353,6 +355,8 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
             vectorcall = nb_func_vectorcall_simple_0;
         else if (f->nargs == 1 && !prev_overloads)
             vectorcall = nb_func_vectorcall_simple_1;
+        else if (f->nargs == 2 && !prev_overloads)
+            vectorcall = nb_func_vectorcall_simple_2;
         else
             vectorcall = nb_func_vectorcall_simple;
     }
@@ -1051,6 +1055,66 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
                 if (NB_UNLIKELY(arg_nb->intrusive))
                     nb_type_data(Py_TYPE(arg))
                         ->set_self_py(inst_ptr(arg_nb), arg);
+            }
+        } catch (builtin_exception &e) {
+            if (!set_builtin_exception_status(e))
+                error_handler = nb_func_error_overload;
+        } catch (python_error &e) {
+            e.restore();
+        } catch (...) {
+            nb_func_convert_cpp_exception();
+        }
+
+        if (NB_UNLIKELY(cleanup.used()))
+            cleanup.release();
+    } else {
+        error_handler = nb_func_error_overload;
+    }
+
+    if (NB_UNLIKELY(error_handler))
+        result = error_handler(self, args_in, nargs_in, kwargs_in);
+
+    return result;
+}
+
+/// Simplified nb_func_vectorcall variant for non-overloaded functions with 2 args
+static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
+                                             PyObject *const *args_in,
+                                             size_t nargsf,
+                                             PyObject *kwargs_in) noexcept {
+    func_data *fr = nb_func_data(self);
+    const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
+    const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+
+    // Handler routine that will be invoked in case of an error condition
+    PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
+                               PyObject *) noexcept = nullptr;
+
+    PyObject *result = nullptr;
+
+    if (kwargs_in == nullptr && nargs_in == 2 &&
+        args_in[0] != Py_None && args_in[1] != Py_None) {
+        cleanup_list cleanup(is_method ? args_in[0] : nullptr);
+        uint8_t args_flags[2] = {
+            (uint8_t) (is_constructor ? (1 | (uint8_t) cast_flags::construct) : 1),
+            1
+        };
+
+        try {
+            result = fr->impl((void *) fr->capture, (PyObject **) args_in,
+                              args_flags, (rv_policy) (fr->flags & 0b111), &cleanup);
+            if (result == NB_NEXT_OVERLOAD) {
+                error_handler = nb_func_error_overload;
+            } else if (!result) {
+                error_handler = nb_func_error_noconvert;
+            } else if (is_constructor) {
+                nb_inst *self_arg_nb = (nb_inst *) args_in[0];
+                self_arg_nb->destruct = true;
+                self_arg_nb->state = nb_inst::state_ready;
+                if (NB_UNLIKELY(self_arg_nb->intrusive))
+                    nb_type_data(Py_TYPE(args_in[0]))
+                        ->set_self_py(inst_ptr(self_arg_nb), args_in[0]);
             }
         } catch (builtin_exception &e) {
             if (!set_builtin_exception_status(e))

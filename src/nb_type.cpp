@@ -90,7 +90,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
             nb_enable_try_inc_ref((PyObject *) self);
 
             // The revived object must hold a reference to its type object
-            Py_INCREF((PyObject *) tp);
+            NB_INCREF_TYPE((PyObject *) tp);
 
             return (PyObject *) self;
         }
@@ -341,7 +341,7 @@ static void inst_dealloc(PyObject *self) {
             // There is space in the pool. Stash the object and release its
             // reference to the type object.
             pool->slots[pool->count++] = inst;
-            Py_DECREF(tp);
+            NB_DECREF_TYPE(tp);
             return;
         }
 
@@ -466,7 +466,7 @@ static void inst_dealloc(PyObject *self) {
     else
         PyObject_Free(self);
 
-    Py_DECREF(tp);
+    NB_DECREF_TYPE(tp);
 }
 
 
@@ -1222,7 +1222,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
                              "nanobind: type '%s' was already registered!\n",
                              t_name);
             PyObject *tp = (PyObject *) it->second->type_py;
-            Py_INCREF(tp);
+            NB_INCREF_TYPE(tp);
             if (has_signature)
                 free((char *) t_name);
             return tp;

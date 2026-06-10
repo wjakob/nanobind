@@ -1197,8 +1197,8 @@ several steps:
 Releasing the instance performs the inverse of each step in reverse order. In
 free-threaded builds, the hash table in step 3 is additionally guarded by a
 sharded lock that is relatively costly to acquire and release. The C++
-constructor and destructor are unavoidable, but everything else is pure
-bookkeeping that can in principle be avoided.
+constructor and destructor calls and reference counting steps are unavoidable,
+but steps 1 and 3 are pure bookkeeping that can in principle be avoided.
 
 The :cpp:struct:`nb::pooled <pooled>` class binding annotation enables this:
 instead of freeing a released object, nanobind can stash it in a small per-type

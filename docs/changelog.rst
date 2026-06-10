@@ -18,10 +18,121 @@ below inherit that of the preceding release.
 Unreleased
 ----------
 
-- The implicit :cpp:func:`.none() <arg::none>` annotation now also applies to
-  ``std::nullptr_t`` and ``std::monostate``-typed arguments
+- Added the :cpp:class:`nb::pooled() <pooled>` class binding annotation, which
+  maintains a per-type pool of instances to accelerate workloads that create
+  large numbers of short-lived objects. Released objects are stashed in the
+  pool and cheaply recycled, skipping allocation and instance registration.
+  In free-threaded builds, each thread
+  has its own pool, which makes object allocation lock-free. A microbenchmark
+  exercising object construction runs 1.42x faster on Python 3.14; on
+  free-threaded Python, the improvement ranges from 1.32x (uncontended) to 3.2x
+  under contention. (PR `#1366 <https://github.com/wjakob/nanobind/pull/1366>`__,
+  commit `962cdf <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
+
+- Added type casters for ``Eigen::Tensor`` and ``Eigen::TensorMap``
+  from Eigen's *Tensor* module, available via the new
+  include file ``nanobind/eigen/tensor.h``. (PR `#1320
+  <https://github.com/wjakob/nanobind/pull/1320>`__).
+
+- Reduced the cost of thread-local storage accesses, which are needed by
+  performance-critical nanobind functions in free-threaded builds. As part of
+  this change, the CMake build system opts ``libnanobind`` into the more
+  efficient TLSDESC ABI where supported. (PR `#1365
+  <https://github.com/wjakob/nanobind/pull/1365>`__).
+
+- Free-threaded builds now altogether skip reference counting operations on
+  type, enumeration, and function objects that are known to be immortal. (PRs `#1367
+  <https://github.com/wjakob/nanobind/pull/1367>`__, `#1368
+  <https://github.com/wjakob/nanobind/pull/1368>`__).
+
+- Several other performance improvements on the critical path of function
+  calls: a specialized fast path now accelerates two-argument calls (e.g.,
+  binary operators and copy constructors). Code generation related to error
+  handling and per-instance status flag updates was improved. (PRs `#1362
+  <https://github.com/wjakob/nanobind/pull/1362>`__, `#1363
+  <https://github.com/wjakob/nanobind/pull/1363>`__, `#1369
+  <https://github.com/wjakob/nanobind/pull/1369>`__).
+
+- :cpp:class:`nb::supplement\<T\> <supplement>` data is now stored outside of
+  the Python type object, which simplifies and accelerates a
+  performance-critical function that checks if a type is a nanobind type. (PR
+  `#1364 <https://github.com/wjakob/nanobind/pull/1364>`__).
+
+- The :cpp:class:`nb::ndarray\<..\> <ndarray>` class can now import DLPack
+  arrays located on Apple Metal devices. In addition, the nd-array
+  constructors accept a new optional ``byte_offset`` parameter, and the
+  methods :cpp:func:`.data_handle() <ndarray::data_handle>` and
+  :cpp:func:`.byte_offset() <ndarray::byte_offset>` expose the underlying
+  DLPack fields. (PR `#1338
+  <https://github.com/wjakob/nanobind/pull/1338>`__).
+
+- The nd-array class can now import complex-valued arrays from Python's
+  standard library ``array`` module, and it exports half-precision complex
+  arrays using the ``Ze`` buffer protocol format code. (PRs `#1323
+  <https://github.com/wjakob/nanobind/pull/1323>`__, `#1337
+  <https://github.com/wjakob/nanobind/pull/1337>`__).
 
 - Added ndarray ``dtype_code`` enumeration ``Bcomplex`` for complex bfloat16.
+  (PR `#1352 <https://github.com/wjakob/nanobind/pull/1352>`__).
+
+- The implicit :cpp:func:`.none() <arg::none>` annotation now also applies to
+  ``std::nullptr_t`` and ``std::monostate``-typed arguments. (PR `#1322
+  <https://github.com/wjakob/nanobind/pull/1322>`__).
+
+- Classes derived from :cpp:class:`nb::def_visitor <def_visitor>` now
+  support aggregate initialization. (PR `#1310
+  <https://github.com/wjakob/nanobind/pull/1310>`__).
+
+- Fixed a crash when creating :cpp:class:`nb::capsule <capsule>` or
+  nd-array objects with a null data pointer, which, e.g., occurs when
+  returning size-0 arrays from C++. (PR `#1299
+  <https://github.com/wjakob/nanobind/pull/1299>`__).
+
+- Fixed a null pointer dereference when importing buffer objects with a
+  ``NULL`` format string (which the buffer protocol interprets as unsigned
+  bytes). (commit `971205 <https://github.com/wjakob/nanobind/commit/9712053368e2b634d235c46c5dd522b57ab8cbed>`__).
+
+- Added guards against allocation-related integer overflows in the
+  nd-array implementation and internal data structures. (commit `4bfeca <https://github.com/wjakob/nanobind/commit/4bfeca03aa67acb211a8a1355a3b11c05fbee8a9>`__).
+
+- Fixed several leaks: a reference leak in ``__qualname__`` accesses on
+  nanobind functions, a reference leak when converting flag-style
+  enumerations from Python, and a memory leak in the ``std::wstring``
+  type caster. (commits `e7e413 <https://github.com/wjakob/nanobind/commit/e7e4134c73fab9a4659094503f9d0e53dfbfc9f8>`__,
+  `13db34 <https://github.com/wjakob/nanobind/commit/13db34271842fb3c1c3a38b2ef64a571c57df43c>`__,
+  `c90dea <https://github.com/wjakob/nanobind/commit/c90deaca53c8ae831a3a012ea43080203d26417b>`__).
+
+- **Stub generation improvements**:
+
+  - ``classmethod`` and ``staticmethod`` members are now correctly
+    recognized, producing exact signatures instead of generic
+    ``*args, **kwargs`` stubs. (PR `#1302
+    <https://github.com/wjakob/nanobind/pull/1302>`__).
+
+  - Static properties are now wrapped into ``ClassVar[...]`` and
+    ``Final[...]``. (PR `#1303
+    <https://github.com/wjakob/nanobind/pull/1303>`__).
+
+  - Types from ``typing_extensions`` are now imported using ``from``-style
+    imports, consistent with the treatment of ``typing`` and
+    ``collections.abc``. (PR `#1305
+    <https://github.com/wjakob/nanobind/pull/1305>`__).
+
+  - Fixed a name prefixing issue. (PR `#1153
+    <https://github.com/wjakob/nanobind/pull/1153>`__).
+
+- Miscellaneous minor fixes and improvements. (PRs `#1301
+  <https://github.com/wjakob/nanobind/pull/1301>`__, `#1304
+  <https://github.com/wjakob/nanobind/pull/1304>`__, `#1307
+  <https://github.com/wjakob/nanobind/pull/1307>`__, `#1312
+  <https://github.com/wjakob/nanobind/pull/1312>`__, `#1325
+  <https://github.com/wjakob/nanobind/pull/1325>`__, `#1327
+  <https://github.com/wjakob/nanobind/pull/1327>`__, `#1356
+  <https://github.com/wjakob/nanobind/pull/1356>`__, commits `2deac9 <https://github.com/wjakob/nanobind/commit/2deac96697d1b304f3c973cef7de5f94cbad5a57>`__,
+  `e33dee <https://github.com/wjakob/nanobind/commit/e33deeaab36f53312512cb09fd1e8b7033e2d8a4>`__,
+  `b22f1f <https://github.com/wjakob/nanobind/commit/b22f1fe0f257d85ae0425695082115d87053173a>`__).
+
+- ABI version 20.
 
 Version 2.12.0 (Feb 25, 2026)
 -----------------------------

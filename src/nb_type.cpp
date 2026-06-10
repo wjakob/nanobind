@@ -290,47 +290,10 @@ nb_inst_pool *nb_pool_ensure(type_data *td) noexcept {
     return pool;
 }
 
-// Unregister `inst` from the shard's C++ pointer -> Python object map
-static void inst_unregister(nb_shard &shard, void *p, nb_inst *inst) noexcept {
-    nb_ptr_map &inst_c2p = shard.inst_c2p;
-    nb_ptr_map::iterator it = inst_c2p.find(p);
-
-    bool found = false;
-    if (NB_LIKELY(it != inst_c2p.end())) {
-        void *entry = it->second;
-        if (NB_LIKELY(entry == inst)) {
-            // Fast path: a direct 'p -> inst' mapping.
-            inst_c2p.erase_fast(it);
-            found = true;
-        } else if (nb_is_seq(entry)) {
-            // Multiple instances alias this address. Find and unlink the right one.
-            nb_inst_seq *seq = nb_get_seq(entry), *pred = nullptr;
-            do {
-                if ((nb_inst *) seq->inst == inst) {
-                    if (pred)
-                        pred->next = seq->next;
-                    else if (seq->next)
-                        it.value() = nb_mark_seq(seq->next);
-                    else
-                        inst_c2p.erase_fast(it);
-                    PyMem_Free(seq);
-                    found = true;
-                    break;
-                }
-                pred = seq;
-                seq = seq->next;
-            } while (seq);
-        }
-    }
-
-    check(found,
-          "nanobind::detail::inst_unregister(): attempted to remove an unknown "
-          "instance (%p) of type \"%s\"!",
-          p, nb_type_data(Py_TYPE((PyObject *) inst))->name);
-}
-
-// Release all objects stored in the pool and unmap them, then free the pool itself
-void nb_pool_drain(nb_inst_pool *pool) noexcept {
+// Unmap all parked instances of a pool from 'inst_c2p' and release them. When
+// called after interpreter shutdown it is no longer safe to release memory via
+// PyMem_Free/PyObject_Free and can_free=false must be specified.
+void nb_pool_drain(nb_inst_pool *pool, bool can_free) noexcept {
     if (!pool || !pool->slots)
         return;
 
@@ -341,11 +304,39 @@ void nb_pool_drain(nb_inst_pool *pool) noexcept {
         nb_shard &shard = internals->shard(p);
         lock_shard guard(shard);
 
-        inst_unregister(shard, p, inst);
-        PyObject_Free(inst);
+        // Unmap 'inst' from inst_c2p (former inst_unregister()).
+        nb_ptr_map &inst_c2p = shard.inst_c2p;
+        nb_ptr_map::iterator it = inst_c2p.find(p);
+        if (NB_LIKELY(it != inst_c2p.end())) {
+            void *entry = it->second;
+            if (NB_LIKELY(entry == inst)) {
+                inst_c2p.erase_fast(it);
+            } else if (nb_is_seq(entry)) {
+                nb_inst_seq *seq = nb_get_seq(entry), *pred = nullptr;
+                do {
+                    if ((nb_inst *) seq->inst == inst) {
+                        if (pred)
+                            pred->next = seq->next;
+                        else if (seq->next)
+                            it.value() = nb_mark_seq(seq->next);
+                        else
+                            inst_c2p.erase_fast(it);
+                        if (can_free)
+                            PyMem_Free(seq);
+                        break;
+                    }
+                    pred = seq;
+                    seq = seq->next;
+                } while (seq);
+            }
+        }
+
+        if (can_free)
+            PyObject_Free(inst);
     }
 
-    PyMem_Free(pool->slots);
+    if (can_free)
+        PyMem_Free(pool->slots);
     pool->slots = nullptr;
     pool->count = 0;
     pool->capacity = 0;
@@ -445,8 +436,42 @@ static void inst_dealloc(PyObject *self) {
             keep_alive.erase_fast(it);
         }
 
-        // Update hash table that maps from C++ to Python instance
-        inst_unregister(shard, p, inst);
+        // Unmap 'inst' from inst_c2p (former inst_unregister()).
+        nb_ptr_map &inst_c2p = shard.inst_c2p;
+        nb_ptr_map::iterator it = inst_c2p.find(p);
+
+        bool found = false;
+        if (NB_LIKELY(it != inst_c2p.end())) {
+            void *entry = it->second;
+            if (NB_LIKELY(entry == inst)) {
+                // Fast path: a direct 'p -> inst' mapping.
+                inst_c2p.erase_fast(it);
+                found = true;
+            } else if (nb_is_seq(entry)) {
+                // Multiple instances alias this address. Unlink the right one.
+                nb_inst_seq *seq = nb_get_seq(entry), *pred = nullptr;
+                do {
+                    if ((nb_inst *) seq->inst == inst) {
+                        if (pred)
+                            pred->next = seq->next;
+                        else if (seq->next)
+                            it.value() = nb_mark_seq(seq->next);
+                        else
+                            inst_c2p.erase_fast(it);
+                        PyMem_Free(seq);
+                        found = true;
+                        break;
+                    }
+                    pred = seq;
+                    seq = seq->next;
+                } while (seq);
+            }
+        }
+
+        check(found,
+              "nanobind::detail::inst_dealloc(): attempted to remove an unknown "
+              "instance (%p) of type \"%s\"!",
+              p, nb_type_data(Py_TYPE((PyObject *) inst))->name);
     }
 
     while (wr_seq) {
@@ -567,7 +592,7 @@ static void nb_type_dealloc(PyObject *o) {
     // builds, bound types are immortalized, so this is never reached; their
     // per-thread pools are drained at thread exit instead.)
     if (t->flags & (uint32_t) type_flags::pooled)
-        nb_pool_drain(&t->pool);
+        nb_pool_drain(&t->pool, /* can_free = */ true);
 #endif
 
     if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0)

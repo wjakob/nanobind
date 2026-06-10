@@ -183,7 +183,7 @@ static void nb_thread_state_destroy(void *p) noexcept {
     // Reclaim this thread's instance pools if the runtime is still alive
     if (internals && ts->pools) {
         for (uint32_t i = 0; i < ts->pools_size; ++i)
-            nb_pool_drain(&ts->pools[i]);
+            nb_pool_drain(&ts->pools[i], /* can_free = */ true);
     }
     PyMem_Free(ts->pools);
 
@@ -375,11 +375,11 @@ static void internals_cleanup() {
 
     bool print_leak_warnings = p->print_leak_warnings;
 
-    // Drain per-type instance pools to avoid false leak warnings below
+    // Unmap pooled instances to avoid false leaks (can_free=false: no thread state here).
     for (const auto &kv : p->type_c2p_slow) {
         type_data *td = kv.second;
         if (td->flags & (uint32_t) type_flags::pooled)
-            nb_pool_drain(&td->pool);
+            nb_pool_drain(&td->pool, /* can_free = */ false);
     }
 
     size_t inst_leaks = 0, keep_alive_leaks = 0;

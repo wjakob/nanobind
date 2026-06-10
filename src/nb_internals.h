@@ -599,7 +599,7 @@ NB_INLINE nb_inst_pool *nb_pool_lookup(type_data *td) noexcept {
 extern nb_inst_pool *nb_pool_ensure(type_data *td) noexcept;
 
 /// Release all objects kept in the given instance pool
-extern void nb_pool_drain(nb_inst_pool *pool) noexcept;
+extern void nb_pool_drain(nb_inst_pool *pool, bool can_free) noexcept;
 
 template <typename T> struct scoped_pymalloc {
     scoped_pymalloc(size_t size = 1, size_t extra_bytes = 0) {

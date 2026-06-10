@@ -290,6 +290,45 @@ nb_inst_pool *nb_pool_ensure(type_data *td) noexcept {
     return pool;
 }
 
+// Unregister `inst` from the shard's C++ pointer -> Python object map
+static void inst_unregister(nb_shard &shard, void *p, nb_inst *inst) noexcept {
+    nb_ptr_map &inst_c2p = shard.inst_c2p;
+    nb_ptr_map::iterator it = inst_c2p.find(p);
+
+    bool found = false;
+    if (NB_LIKELY(it != inst_c2p.end())) {
+        void *entry = it->second;
+        if (NB_LIKELY(entry == inst)) {
+            // Fast path: a direct 'p -> inst' mapping.
+            inst_c2p.erase_fast(it);
+            found = true;
+        } else if (nb_is_seq(entry)) {
+            // Multiple instances alias this address. Find and unlink the right one.
+            nb_inst_seq *seq = nb_get_seq(entry), *pred = nullptr;
+            do {
+                if ((nb_inst *) seq->inst == inst) {
+                    if (pred)
+                        pred->next = seq->next;
+                    else if (seq->next)
+                        it.value() = nb_mark_seq(seq->next);
+                    else
+                        inst_c2p.erase_fast(it);
+                    PyMem_Free(seq);
+                    found = true;
+                    break;
+                }
+                pred = seq;
+                seq = seq->next;
+            } while (seq);
+        }
+    }
+
+    check(found,
+          "nanobind::detail::inst_unregister(): attempted to remove an unknown "
+          "instance (%p) of type \"%s\"!",
+          p, nb_type_data(Py_TYPE((PyObject *) inst))->name);
+}
+
 // Release all objects stored in the pool and unmap them, then free the pool itself
 void nb_pool_drain(nb_inst_pool *pool) noexcept {
     if (!pool || !pool->slots)
@@ -301,19 +340,8 @@ void nb_pool_drain(nb_inst_pool *pool) noexcept {
 
         nb_shard &shard = internals->shard(p);
         lock_shard guard(shard);
-        nb_ptr_map &inst_c2p = shard.inst_c2p;
-        nb_ptr_map::iterator it = inst_c2p.find(p);
 
-        // A parked object is a dead instance whose payload is internal (co-located
-        // with the object), so its address is private to it: the c2p entry is
-        // always a direct 'p -> inst' mapping, never a 'seq'. (A 'seq' could only
-        // arise from a by-reference subobject aliasing the payload, but such an
-        // alias would pin the owner and keep it out of the pool.) Parking left
-        // this entry in place, so it must still be present and direct here.
-        check(it != inst_c2p.end() && it->second == (void *) inst,
-              "nb_pool_drain(): instance not found in the c2p map!");
-        inst_c2p.erase_fast(it);
-
+        inst_unregister(shard, p, inst);
         PyObject_Free(inst);
     }
 
@@ -418,46 +446,7 @@ static void inst_dealloc(PyObject *self) {
         }
 
         // Update hash table that maps from C++ to Python instance
-        nb_ptr_map &inst_c2p = shard.inst_c2p;
-        nb_ptr_map::iterator it = inst_c2p.find(p);
-        bool found = false;
-
-        if (NB_LIKELY(it != inst_c2p.end())) {
-            void *entry = it->second;
-            if (NB_LIKELY(entry == inst)) {
-                found = true;
-                inst_c2p.erase_fast(it);
-            } else if (nb_is_seq(entry)) {
-                // Multiple objects are associated with this address. Find the right one!
-                nb_inst_seq *seq = nb_get_seq(entry),
-                            *pred = nullptr;
-
-                do {
-                    if ((nb_inst *) seq->inst == inst) {
-                        found = true;
-
-                        if (pred) {
-                            pred->next = seq->next;
-                        } else {
-                            if (seq->next)
-                                it.value() = nb_mark_seq(seq->next);
-                            else
-                                inst_c2p.erase_fast(it);
-                        }
-
-                        PyMem_Free(seq);
-                        break;
-                    }
-
-                    pred = seq;
-                    seq = seq->next;
-                } while (seq);
-            }
-        }
-
-        check(found,
-              "nanobind::detail::inst_dealloc(\"%s\"): attempted to delete an "
-              "unknown instance (%p)!", t->name, p);
+        inst_unregister(shard, p, inst);
     }
 
     while (wr_seq) {

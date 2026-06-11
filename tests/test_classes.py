@@ -590,6 +590,21 @@ def test27_dynamic_attr(clean):
     assert_stats(value_constructed=100, destructed=100)
 
 
+@skip_on_pypy
+def test27b_bound_method_gc(clean):
+    import gc
+
+    o = t.StructWithAttr(1)
+    bound = o.value
+    assert gc.is_tracked(bound)
+
+    # Create a cycle through the bound method (which holds a ref to 'o')
+    o.cycle = bound
+    del o, bound
+
+    assert_stats(value_constructed=1, destructed=1)
+
+
 def test28_copy_rvp():
     a = t.Struct.create_reference()
     b = t.Struct.create_copy()

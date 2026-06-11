@@ -946,7 +946,7 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
         if (slot == 0) {
             break;
-        } else if (slot * sizeof(nb_slot) < (int) sizeof(type_slots)) {
+        } else if (slot * sizeof(nb_slot) <= (int) sizeof(type_slots)) {
             *(((void **) ht) + type_slots[slot - 1].direct) = ts->pfunc;
         } else {
             PyErr_Format(PyExc_RuntimeError,

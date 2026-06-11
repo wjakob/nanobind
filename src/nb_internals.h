@@ -122,12 +122,25 @@ inline void nb_inst_state_write(nb_inst *self, nb_inst_state state) noexcept {
     std::memcpy(&self->state, &w, sizeof(w));
 }
 
+/// Dispatcher needed by an overload chain; chain merging takes the maximum
+enum class call_complexity : uint8_t {
+    /// No named/default/flagged arguments: nb_func_vectorcall_simple*
+    simple = 0,
+
+    /// Named/default/'none'-accepting args or arg-mutating annotations;
+    /// keyword calls are forwarded to the complex dispatcher
+    medium = 1,
+
+    /// nb::args/nb::kwargs or more than NB_MAXARGS_SIMPLE arguments
+    complex = 2
+};
+
 /// Python object representing a bound C++ function
 struct nb_func {
     PyObject_VAR_HEAD
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
-    bool complex_call;
+    call_complexity complexity;
     bool doc_uniform;
 };
 

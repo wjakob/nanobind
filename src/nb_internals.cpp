@@ -224,6 +224,7 @@ static const char* interned_c_strs[pyobj_name::string_count] {
     "__dlpack__",
     "max_version",
     "dl_device",
+    "__module__",
 };
 
 PyObject *static_pyobjects[pyobj_name::total_count] = {};

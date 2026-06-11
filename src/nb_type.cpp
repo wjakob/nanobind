@@ -1006,6 +1006,8 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
     if (modname_o && !fail) {
         tp->tp_dict = PyDict_New();
+        // Can't use NB_INTERNED(__module__) here: this code runs during the
+        // creation of the internals, before init_pyobjects() has populated it
         if (!tp->tp_dict ||
             PyDict_SetItemString(tp->tp_dict, "__module__", modname_o) < 0)
             fail = true;
@@ -1259,7 +1261,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             mod = t->scope;
             modname = getattr(t->scope, "__name__", handle());
         } else {
-            modname = getattr(t->scope, "__module__", handle());
+            modname = getattr(t->scope,
+                              static_pyobjects[pyobj_name::module_str],
+                              handle());
 
             object scope_qualname = getattr(t->scope, "__qualname__", handle());
             if (scope_qualname.is_valid())
@@ -1577,7 +1581,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     setattr(result, "__qualname__", qualname.ptr());
 
     if (modname.is_valid())
-        setattr(result, "__module__", modname.ptr());
+        setattr(result, static_pyobjects[pyobj_name::module_str],
+                modname.ptr());
 
     {
         lock_internals guard(internals_);
@@ -2438,17 +2443,29 @@ PyObject *nb_type_name(PyObject *t) noexcept {
     error_scope s;
 
 #if PY_VERSION_HEX >= 0x030B0000
+    // PyType_GetName() reads the name slot directly and always yields a 'str'
     PyObject *result = PyType_GetName((PyTypeObject *) t);
+    if (NB_UNLIKELY(!result))
+        return PyUnicode_FromString("<unknown type>");
 #else
+    // The '__name__' attribute may be missing or not a string
     PyObject *result = PyObject_GetAttrString(t, "__name__");
+    if (NB_UNLIKELY(!result || !PyUnicode_Check(result))) {
+        Py_XDECREF(result);
+        return PyUnicode_FromString("<unknown type>");
+    }
 #endif
 
     if (PyType_HasFeature((PyTypeObject *) t, Py_TPFLAGS_HEAPTYPE)) {
-        PyObject *mod = PyObject_GetAttrString(t, "__module__");
-        PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);
-        Py_DECREF(mod);
-        Py_DECREF(result);
-        result = combined;
+        PyObject *mod =
+            PyObject_GetAttr(t, static_pyobjects[pyobj_name::module_str]);
+        // Tolerate a missing or non-string '__module__' attribute
+        if (NB_LIKELY(mod && PyUnicode_Check(mod))) {
+            PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);
+            Py_DECREF(result);
+            result = combined;
+        }
+        Py_XDECREF(mod);
     }
 
     return result;

@@ -797,3 +797,24 @@ def test_55_memoryview():
     assert bytes(memview[0:3]) == b'123'
     with pytest.raises(TypeError):
         t.test_bad_memview()
+
+
+def test_56_unusual_module_in_overload_error():
+    # Formatting an overload-dispatch error must not crash when an argument's
+    # type has a non-string or raising '__module__' (nb_type_name fallback).
+    class BadNone:
+        __module__ = None
+
+    with pytest.raises(TypeError, match="BadNone"):
+        t.test_05(BadNone())
+
+    class Meta(type):
+        @property
+        def __module__(cls):
+            raise RuntimeError("boom")
+
+    class BadRaise(metaclass=Meta):
+        pass
+
+    with pytest.raises(TypeError):
+        t.test_05(BadRaise())

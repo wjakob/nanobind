@@ -515,6 +515,7 @@ struct pyobj_name {
         dunder_dlpack_str,  // string "__dlpack__"
         max_version_str,    // string "max_version"
         dl_device_str,      // string "dl_device"
+        module_str,         // string "__module__"
         string_count,
 
         copy_tpl = string_count,  // tuple ("copy")

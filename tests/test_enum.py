@@ -179,6 +179,11 @@ def test06_enum_flag():
     assert t.to_flag(4) == t.Flag.C
     assert t.to_flag(5) == (t.Flag.A | t.Flag.C)
 
+    # Returning a flag value with bits outside the registered mask must raise
+    # a catchable Python exception rather than aborting the process.
+    with pytest.raises(ValueError):
+        t.to_flag(8)
+
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1
     assert t.Item1.get_value() == 0 and t.Item2.get_value() == 1

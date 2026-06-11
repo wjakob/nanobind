@@ -828,3 +828,27 @@ def test_56_unusual_module_in_overload_error():
 
     with pytest.raises(TypeError):
         t.test_05(BadRaise())
+
+
+@pytest.mark.skipif(not hasattr(sys, "getrefcount"),
+                    reason="No reference counting")
+def test_57_accessor_inplace_refleak():
+    class C:
+        pass
+
+    o = C()
+    o.x = []
+    lst = o.x
+    refs_before = sys.getrefcount(lst)
+    for _ in range(5):
+        t.test_accessor_inplace_attr(o, [1])
+    assert sys.getrefcount(lst) == refs_before
+    assert o.x == [1, 1, 1, 1, 1]
+
+    d = {"x": []}
+    lst = d["x"]
+    refs_before = sys.getrefcount(lst)
+    for _ in range(5):
+        t.test_accessor_inplace_item(d, [1])
+    assert sys.getrefcount(lst) == refs_before
+    assert d["x"] == [1, 1, 1, 1, 1]

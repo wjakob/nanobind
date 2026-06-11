@@ -16,8 +16,8 @@ NAMESPACE_BEGIN(detail)
 #define NB_IMPL_ACCESSOR_OP_I(name, op)                                        \
     template <typename Impl> template <typename T>                             \
     accessor<Impl>& accessor<Impl>::name(const api<T> &o) {                    \
-        PyObject *res = obj_op_2(ptr(), o.derived().ptr(), op);                \
-        Impl::set(m_base, m_key, res);                                         \
+        object tmp = steal(obj_op_2(ptr(), o.derived().ptr(), op));            \
+        Impl::set(m_base, m_key, tmp.ptr());                                   \
         return *this;                                                          \
     }
 

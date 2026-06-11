@@ -501,6 +501,10 @@ struct nb_internals {
     /// PyList keeping managed PyObjects alive. Cleared when shared_ref_count
     /// reaches 0.
     PyObject *lifeline = nullptr;
+
+    /// Incremented whenever 'lifeline' is destroyed; used to detect stale
+    /// per-library 'static_pyobjects' arrays (see init_pyobjects())
+    uint32_t lifeline_generation = 0;
 };
 
 // Names for the PyObject* entries in the per-module state array.

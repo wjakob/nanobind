@@ -234,10 +234,17 @@ static void new_constant(nb_internals *p, int index, PyObject *o) {
     new_object(p, o);
 }
 
+/// Lifeline generation against which this library's static_pyobjects[] was
+/// populated; a mismatch indicates stale entries from a destroyed lifeline.
+static uint32_t static_pyobjects_generation = 0;
+
 /// Populate this library's static_pyobjects[]
 static void init_pyobjects(nb_internals *p) {
-    if (static_pyobjects[0])
+    if (static_pyobjects[0] &&
+        static_pyobjects_generation == p->lifeline_generation)
         return;
+
+    static_pyobjects_generation = p->lifeline_generation;
 
     NB_NOUNROLL
     for (int i = 0; i < pyobj_name::string_count; ++i)
@@ -333,6 +340,10 @@ void internals_dec_ref() {
     auto value = --p->shared_ref_count.value;
     if (value != 0)
         return;
+
+    // Invalidate every library's cached 'static_pyobjects' array: destroying
+    // the lifeline frees the objects that these arrays reference.
+    p->lifeline_generation++;
 
     Py_CLEAR(p->lifeline);
 

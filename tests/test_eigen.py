@@ -288,6 +288,26 @@ def test08_sparse():
 
 
 @needs_numpy_and_eigen
+def test08b_sparse_noconvert():
+    scipy = pytest.importorskip("scipy")
+    import scipy.sparse
+
+    dense = np.asfortranarray(np.eye(3, dtype=np.float32))
+
+    # A '.noconvert()' sparse parameter must reject a dense array, but still
+    # accept an exact csc_matrix instance.
+    with pytest.raises(TypeError):
+        t.sparse_noconvert_c(dense)
+    csc = scipy.sparse.csc_matrix(dense)
+    assert_array_equal(t.sparse_noconvert_c(csc).toarray(), dense)
+
+    # A dense array must not be greedily claimed by an earlier sparse overload
+    # during the dispatcher's no-convert pass; it should reach the dense one.
+    assert t.sparse_or_dense(dense) == 2
+    assert t.sparse_or_dense(csc) == 1
+
+
+@needs_numpy_and_eigen
 def test09_sparse_failures():
     sp = pytest.importorskip("scipy.sparse")
 

@@ -183,6 +183,15 @@ NB_MODULE(test_eigen_ext, m) {
         for (int i = 0; i < r.nonZeros(); ++i) { r.valuePtr()[i] = 0; }
     });
 
+    // A sparse-matrix parameter that disallows implicit conversion
+    m.def("sparse_noconvert_c", [](const SparseMatrixC &m) -> SparseMatrixC { return m; },
+          nb::arg().noconvert());
+
+    // Two overloads: a dense argument must not be claimed by the sparse
+    // overload during the dispatcher's no-convert pass
+    m.def("sparse_or_dense", [](const SparseMatrixC &) { return 1; });
+    m.def("sparse_or_dense", [](const Eigen::MatrixXf &) { return 2; });
+
     /// issue #166
     using Matrix1d = Eigen::Matrix<double,1,1>;
     try {

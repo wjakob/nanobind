@@ -202,6 +202,35 @@ def test21_tuple_pair_basic():
     assert t.swap_pair((1, 2.5)) == (2.5, 1)
 
 
+def test21b_seq_getitem_raises():
+    # A custom sequence with a valid __len__ but a __getitem__ that raises
+    # must fail cleanly (overload resolution reports a TypeError) without
+    # leaking the original exception. Regression test for a missing
+    # PyErr_Clear() in the Py_LIMITED_API path of seq_get*.
+    class BadSeq:
+        def __init__(self, n):
+            self.n = n
+
+        def __len__(self):
+            return self.n
+
+        def __getitem__(self, i):
+            raise ValueError("boom from __getitem__")
+
+    # std::pair / std::tuple use seq_get_with_size, std::array likewise.
+    for fn, n in ((t.swap_pair, 2), (t.swap_tuple, 2), (t.array_in, 3)):
+        with pytest.raises(TypeError) as excinfo:
+            fn(BadSeq(n))
+        assert "incompatible function arguments" in str(excinfo.value)
+
+        # The error indicator must not have leaked: raising a fresh
+        # exception here must not pick up the ValueError as its context.
+        try:
+            raise RuntimeError("fresh")
+        except RuntimeError as e:
+            assert e.__context__ is None
+
+
 # ------------------------------------------------------------------
 
 

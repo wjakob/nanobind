@@ -470,6 +470,10 @@ def test18_static_properties():
     assert t.StaticProperties2.get() == 50
     assert t.StaticProperties.get() == 50
 
+    # Deleting a static property without a deleter must raise
+    with pytest.raises(AttributeError):
+        del t.StaticProperties.value
+
 
 @skip_on_pypy
 def test19_static_properties_doc():

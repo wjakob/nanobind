@@ -491,7 +491,14 @@ static void inst_dealloc(PyObject *self) {
     else
         PyObject_Free(self);
 
-    NB_DECREF_TYPE(tp);
+    // Release the type reference acquired at allocation. On free-threaded
+    // builds, nanobind types are immortal but Python subclasses are not.
+#if defined(Py_GIL_DISABLED)
+    if (t->flags & (uint32_t) type_flags::is_python_type)
+        Py_DECREF(tp);
+#else
+    Py_DECREF(tp);
+#endif
 }
 
 

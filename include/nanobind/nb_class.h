@@ -867,7 +867,8 @@ template <typename Source, typename Target> void implicitly_convertible() {
     if constexpr (!std::is_same_v<Source, Target>) {
         using Caster = detail::make_caster<Source>;
         static_assert(
-            !std::is_enum_v<Target> || !detail::is_base_caster_v<Target>,
+            !std::is_enum_v<Target> ||
+                detail::is_base_caster_v<detail::make_caster<Target>>,
             "implicitly_convertible(): 'Target' cannot be an enumeration "
             "unless it is opaque.");
 

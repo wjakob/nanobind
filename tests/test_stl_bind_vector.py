@@ -91,6 +91,23 @@ def test01_vector_int(capfd):
     assert len(v_int2) == 0
 
 
+def test01b_vector_self_extend():
+    # Self-extension must double the contents (and not be UB). Use a size that
+    # forces a reallocation mid-operation to exercise the aliased path.
+    v = t.VectorInt(range(100))
+    v.extend(v)
+    assert list(v) == list(range(100)) + list(range(100))
+
+    # Also check the small / empty cases
+    v0 = t.VectorInt()
+    v0.extend(v0)
+    assert list(v0) == []
+
+    v1 = t.VectorInt([7])
+    v1.extend(v1)
+    assert list(v1) == [7, 7]
+
+
 def test02_vector_bool():
     vv_c = t.VectorBool()
     for i in range(9):

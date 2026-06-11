@@ -128,6 +128,12 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
         });
 
         cl.def("update", [](Map &m, const Map &m2) {
+            // Updating a map with itself would be a no-op, but the underlying
+            // map_set() may erase and re-emplace nodes; doing so while
+            // iterating m2 == m leaves kv referencing freed storage (a
+            // dangling-reference for non-copy-assignable values). Skip it.
+            if (&m2 == &m)
+                return;
             for (auto &kv : m2)
                 detail::map_set<Map, Key, Value>(m, kv.first, kv.second);
         },

@@ -46,7 +46,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     if (PyModule_Check(ed->scope)) {
         modname = getattr(scope, "__name__", handle());
     } else {
-        modname = getattr(scope, "__module__", handle());
+        modname = getattr(scope, static_pyobjects[pyobj_name::module_str],
+                          handle());
 
         object scope_qualname = getattr(scope, "__qualname__", handle());
         if (scope_qualname.is_valid())

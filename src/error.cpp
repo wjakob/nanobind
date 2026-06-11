@@ -220,7 +220,8 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
     if (PyModule_Check(scope))
         modname = getattr(scope, "__name__", handle());
     else
-        modname = getattr(scope, "__module__", handle());
+        modname = getattr(scope, static_pyobjects[pyobj_name::module_str],
+                          handle());
 
     if (!modname.is_valid())
         raise("nanobind::detail::exception_new(): could not determine module "

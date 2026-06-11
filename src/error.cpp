@@ -238,11 +238,9 @@ builtin_exception::~builtin_exception() { }
 NAMESPACE_BEGIN(detail)
 
 void register_exception_translator(exception_translator t, void *payload) {
-    nb_translator_seq *cur  = &internals->translators,
-                      *next = new nb_translator_seq(*cur);
-    cur->next = next;
-    cur->payload = payload;
-    cur->translator = t;
+    nb_translator_seq *head = new nb_translator_seq{ t, payload,
+                                                     internals->translators.load_acquire() };
+    internals->translators.store_release(head);
 }
 
 NB_CORE PyObject *exception_new(PyObject *scope, const char *name,

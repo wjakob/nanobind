@@ -584,16 +584,24 @@ class dict : public object {
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
     object get(handle key, handle def) const {
-        PyObject *o = PyDict_GetItem(m_ptr, key.ptr());
-        if (!o)
-            o = def.ptr();
-        return borrow(o);
+        PyObject *value;
+#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
+        int rv = detail::dict_get_item_ref(m_ptr, key.ptr(), &value);
+#else
+        int rv = PyDict_GetItemRef(m_ptr, key.ptr(), &value);
+#endif
+        if (rv < 0)
+            detail::raise_python_error();
+        if (rv == 0)
+            return borrow(def);
+        return steal(value);
     }
     object get(const char *key, handle def) const {
-        PyObject *o = PyDict_GetItemString(m_ptr, key);
-        if (!o)
-            o = def.ptr();
-        return borrow(o);
+        PyObject *k = PyUnicode_FromString(key);
+        if (!k)
+            detail::raise_python_error();
+        object key_o = steal(k);
+        return get(key_o, def);
     }
     template <typename T> bool contains(T&& key) const;
     void clear() { PyDict_Clear(m_ptr); }

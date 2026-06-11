@@ -573,6 +573,11 @@ NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 
 NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
 
+#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
+/// Emulates PyDict_GetItemRef() when targeting Python < 3.13
+NB_CORE int dict_get_item_ref(PyObject *d, PyObject *k, PyObject **value);
+#endif
+
 NB_CORE const char *abi_tag();
 
 NAMESPACE_END(detail)

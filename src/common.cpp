@@ -1279,16 +1279,27 @@ bool issubclass(PyObject *a, PyObject *b) {
 
 // ========================================================================
 
+#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
+/// Emulates PyDict_GetItemRef() when targeting Python < 3.13
+int dict_get_item_ref(PyObject *d, PyObject *k, PyObject **value) {
+    PyObject *v = PyDict_GetItemWithError(d, k);
+    if (v) {
+        Py_INCREF(v);
+        *value = v;
+        return 1;
+    } else {
+        *value = nullptr;
+        return PyErr_Occurred() ? -1 : 0;
+    }
+}
+#endif
+
 PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k) {
     PyObject *value;
     bool error = false;
 
-#if PY_VERSION_HEX < 0x030D00A1 || defined(Py_LIMITED_API)
-    value = PyDict_GetItemWithError(d, k);
-    if (value)
-        Py_INCREF(value);
-    else
-        error = PyErr_Occurred();
+#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
+    error = dict_get_item_ref(d, k, &value) == -1;
 #else
     error = PyDict_GetItemRef(d, k, &value) == -1;
 #endif

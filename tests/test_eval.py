@@ -42,3 +42,8 @@ def test_write_globals():
     assert "b" not in globals()
     m.globals_add_b()
     assert globals()["b"] == 123
+
+
+def test_default_scope():
+    assert m.eval_default_scope() == 2
+    assert m.exec_default_scope() == 17

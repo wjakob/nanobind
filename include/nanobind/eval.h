@@ -27,6 +27,12 @@ enum eval_mode {
 
 template <eval_mode start = eval_expr>
 object eval(const str &expr, handle global = handle(), handle local = handle()) {
+    dict global_default;
+    if (!global.is_valid()) {
+        global_default = globals();
+        global = global_default;
+    }
+
     if (!local.is_valid())
         local = global;
 

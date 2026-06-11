@@ -558,12 +558,14 @@ T cast_impl(handle h) {
         rv = caster.from_python(h.ptr(),
                                 ((uint8_t) cast_flags::convert) |
                                 ((uint8_t) cast_flags::manual),
-                                &cleanup.list);
+                                &cleanup.list) &&
+             caster.template can_cast<T>();
         if (!rv)
             detail::raise_python_or_cast_error();
         return caster.operator cast_t<T>();
     } else {
-        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr);
+        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr) &&
+             caster.template can_cast<T>();
         if (!rv)
             detail::raise_python_or_cast_error();
         return caster.operator cast_t<T>();

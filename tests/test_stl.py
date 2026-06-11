@@ -682,6 +682,14 @@ def test64_set_in_failure():
     assert "incompatible function arguments" in str(excinfo.value)
 
 
+def test64b_set_of_temporaries():
+    # The source is a generator yielding fresh bound objects whose only
+    # reference is held by the iterator; the set caster must not drop that
+    # reference before constructing the set element (use-after-free).
+    assert sorted(t.set_of_ordered_values(t.Ordered(i) for i in range(5))) == \
+        [0, 1, 2, 3, 4]
+
+
 def test65_class_with_movable_field(clean):
     cwmf = t.ClassWithMovableField()
     m1 = t.Movable(1)

@@ -59,6 +59,17 @@ struct NonDefaultConstructible : Movable {
     NonDefaultConstructible(int v) : Movable(v) {}
 };
 
+// Ordered type whose destructor poisons its payload, used to detect
+// use-after-free in the set caster when the source yields fresh objects.
+struct Ordered {
+    int value;
+    Ordered(int v) : value(v) {}
+    Ordered(const Ordered &s) : value(s.value) {}
+    Ordered(Ordered &&s) noexcept : value(s.value) {}
+    ~Ordered() { value = -999; }
+    bool operator<(const Ordered &o) const { return value < o.value; }
+};
+
 struct StructWithReadonlyMap {
     std::map<std::string, uint64_t> map;
 };
@@ -396,6 +407,16 @@ NB_MODULE(test_stl_ext, m) {
     // test58
     m.def("array_out", [](){ return std::array<int, 3>{1, 2, 3}; });
     m.def("array_in", [](std::array<int, 3> x) { return x[0] + x[1] + x[2]; });
+
+    nb::class_<Ordered>(m, "Ordered")
+        .def(nb::init<int>())
+        .def_ro("value", &Ordered::value);
+    m.def("set_of_ordered_values", [](std::set<Ordered> x) {
+        std::vector<int> out;
+        for (auto &k : x)
+            out.push_back(k.value);
+        return out;
+    });
 
     // ----- test60-test64 ------
     m.def("set_return_value", []() {

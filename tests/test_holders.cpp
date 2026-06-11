@@ -13,9 +13,13 @@ namespace nb = nanobind;
 static int created = 0;
 static int deleted = 0;
 
+// A type that is implicitly convertible to 'Example' below
+struct ExampleSrc { int value; };
+
 struct Example {
     int value;
     Example(int value) : value(value) { created++; }
+    Example(ExampleSrc src) : value(src.value) { created++; }
     ~Example() { deleted++; }
 
     static Example *make(int value) { return new Example(value); }
@@ -66,8 +70,13 @@ namespace nanobind::detail {
 } // namespace nanobind::detail
 
 NB_MODULE(test_holders_ext, m) {
+    nb::class_<ExampleSrc>(m, "ExampleSrc")
+        .def(nb::init<>())
+        .def_rw("value", &ExampleSrc::value);
+
     nb::class_<Example>(m, "Example")
         .def(nb::init<int>())
+        .def(nb::init_implicit<ExampleSrc>())
         .def_rw("value", &Example::value)
         .def_static("make", &Example::make)
         .def_static("make_shared", &Example::make_shared);
@@ -90,6 +99,15 @@ NB_MODULE(test_holders_ext, m) {
           [](std::shared_ptr<Example> shared) { return shared; });
     m.def("passthrough_2",
           [](std::shared_ptr<const Example> shared) { return shared; });
+
+    // Implicit conversions must not produce a dangling shared_ptr that is
+    // tied to the wrong (pre-conversion) Python object.
+    static std::shared_ptr<Example> shared_storage;
+    m.def("store_shared", [](std::shared_ptr<Example> shared) {
+        shared_storage = std::move(shared);
+    });
+    m.def("stored_shared_value", []() { return shared_storage->value; });
+    m.def("clear_stored_shared", []() { shared_storage.reset(); });
 
     // ------- enable_shared_from_this -------
 

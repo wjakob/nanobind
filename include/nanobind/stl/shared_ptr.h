@@ -72,6 +72,8 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
 
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {
+        flags &= ~((uint8_t) cast_flags::convert);
+
         Caster caster;
         if (!caster.from_python(src, flags, cleanup))
             return false;

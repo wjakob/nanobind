@@ -75,6 +75,33 @@ def test03_sharedptr_from_cpp(clean):
     collect()
     assert t.stats() == (2, 2)
 
+
+def test03b_sharedptr_implicit(clean):
+    # An implicit conversion to a 'shared_ptr<T>' parameter must not produce a
+    # dangling shared_ptr that is tied to the wrong (pre-conversion) object.
+    # The conversion should instead cleanly fail overload resolution.
+    src = t.ExampleSrc()
+    src.value = 42
+    with pytest.raises(TypeError):
+        t.store_shared(src)
+    collect()
+    # No implicit conversion is performed, hence no Example is created; nothing
+    # remains stored.
+    assert t.stats() == (0, 0)
+
+    # A real Example is stored and kept alive (no premature destruction).
+    t.reset()
+    e = t.Example(7)
+    t.store_shared(e)
+    assert t.stats() == (1, 0)
+    assert t.stored_shared_value() == 7
+    del e
+    collect()
+    assert t.stats() == (1, 0)
+    t.clear_stored_shared()
+    collect()
+    assert t.stats() == (1, 1)
+
 # ------------------------------------------------------------------
 
 def test04_uniqueptr_from_cpp(clean):

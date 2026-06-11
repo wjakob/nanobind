@@ -92,9 +92,14 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
 
         cl.def("__init__", [](Vector *v, typed<iterable, Value> seq) {
             new (v) Vector();
-            v->reserve(len_hint(seq));
-            for (handle h : seq)
-                v->push_back(cast<Value>(h));
+            try {
+                v->reserve(len_hint(seq));
+                for (handle h : seq)
+                    v->push_back(cast<Value>(h));
+            } catch (...) {
+                v->~Vector();
+                throw;
+            }
         }, "Construct from an iterable object");
 
         implicitly_convertible<iterable, Vector>();

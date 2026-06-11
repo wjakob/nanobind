@@ -2,6 +2,7 @@ import pytest
 import platform
 
 import test_stl_bind_vector_ext as t
+from common import collect
 
 def test01_vector_int(capfd):
     v_int = t.VectorInt([0, 0])
@@ -186,3 +187,17 @@ def test07_vector_noncopyable():
     q = next(iter(vnc))
     q.value = 5
     assert vnc[0].value == 5
+
+
+def test08_vector_init_partial_cleanup():
+    # When the iterable constructor throws partway through, the partially
+    # constructed vector must still be destroyed (no leaked elements).
+    keep = t.Cnt()
+    collect()
+    base = t.cnt_alive()
+    for _ in range(100):
+        with pytest.raises(Exception):
+            t.VectorCnt([t.Cnt(), t.Cnt(), "not a Cnt"])
+    collect()
+    assert t.cnt_alive() == base
+    del keep

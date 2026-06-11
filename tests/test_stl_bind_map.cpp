@@ -22,6 +22,17 @@ public:
     int value;
 };
 
+// Counts how often it is alive, to detect leaks of partially constructed maps
+struct MapCnt {
+    static inline int alive = 0;
+    MapCnt() { alive++; }
+    MapCnt(const MapCnt &) { alive++; }
+    MapCnt(MapCnt &&) { alive++; }
+    MapCnt &operator=(const MapCnt &) = default;
+    MapCnt &operator=(MapCnt &&) = default;
+    ~MapCnt() { alive--; }
+};
+
 template <class Map>
 Map *times_ten(int n) {
     auto *m = new Map();
@@ -52,6 +63,13 @@ NB_MODULE(test_stl_bind_map_ext, m) {
                                                                 "UnorderedMapStringDoubleConst");
 
     nb::class_<E_nc>(m, "ENC").def(nb::init<int>()).def_rw("value", &E_nc::value);
+
+    // test_map_leak: count live MapCnt instances to detect that a partially
+    // constructed map is cleaned up when its dict constructor throws partway
+    // through.
+    nb::class_<MapCnt>(m, "MapCnt").def(nb::init<>());
+    nb::bind_map<std::map<int, MapCnt>>(m, "MapIntCnt");
+    m.def("cnt_alive", [] { return MapCnt::alive; });
 
     // On Windows, NVCC has difficulties with the following code. My guess is that
     // decltype() in the iterator_value_access macro used in bind_map.h loses a reference.

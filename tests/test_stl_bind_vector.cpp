@@ -3,6 +3,18 @@
 
 namespace nb = nanobind;
 
+// Counts how many instances are alive, to detect leaks of partially
+// constructed vectors
+struct Cnt {
+    static inline int alive = 0;
+    Cnt() { alive++; }
+    Cnt(const Cnt &) { alive++; }
+    Cnt(Cnt &&) { alive++; }
+    Cnt &operator=(const Cnt &) = default;
+    Cnt &operator=(Cnt &&) = default;
+    ~Cnt() { alive--; }
+};
+
 NB_MODULE(test_stl_bind_vector_ext, m) {
     nb::bind_vector<std::vector<unsigned int>>(m, "VectorInt");
     nb::bind_vector<std::vector<bool>>(m, "VectorBool");
@@ -23,6 +35,13 @@ NB_MODULE(test_stl_bind_vector_ext, m) {
 
     // test_vector_shared_ptr
     nb::bind_vector<std::vector<std::shared_ptr<El>>>(m, "VectorElShared");
+
+    // test_vector_leak: count live Cnt instances to detect that a partially
+    // constructed container is cleaned up when its iterable constructor throws
+    // partway through.
+    nb::class_<Cnt>(m, "Cnt").def(nb::init<>());
+    nb::bind_vector<std::vector<Cnt>>(m, "VectorCnt");
+    m.def("cnt_alive", [] { return Cnt::alive; });
 
     struct E_nc {
         explicit E_nc(int i) : value{i} {}

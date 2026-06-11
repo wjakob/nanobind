@@ -108,8 +108,13 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
 
         cl.def("__init__", [](Map *m, typed<dict, Key, Value> d) {
             new (m) Map();
-            for (auto [k, v] : borrow<dict>(std::move(d)))
-                m->emplace(cast<Key>(k), cast<Value>(v));
+            try {
+                for (auto [k, v] : borrow<dict>(std::move(d)))
+                    m->emplace(cast<Key>(k), cast<Value>(v));
+            } catch (...) {
+                m->~Map();
+                throw;
+            }
         }, "Construct from a dictionary");
 
         implicitly_convertible<dict, Map>();

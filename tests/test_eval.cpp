@@ -84,4 +84,13 @@ NB_MODULE(test_eval_ext, m) {
         globals["b"] = 123;
         return globals;
     });
+
+    m.def("eval_default_scope", []() {
+        return nb::cast<int>(nb::eval("1 + 1"));
+    });
+
+    m.def("exec_default_scope", []() {
+        nb::exec("c = 17");
+        return nb::cast<int>(nb::globals()["c"]);
+    });
 }

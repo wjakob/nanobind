@@ -412,6 +412,10 @@ class int_ : public object {
     explicit int_(T value) {
         if constexpr (std::is_floating_point_v<T>)
             m_ptr = PyLong_FromDouble((double) value);
+        else if constexpr (detail::is_std_char_v<T>)
+            // Treat character types as integers rather than (single-char) strings
+            m_ptr = detail::type_caster<std::make_signed_t<T>>::from_cpp(
+                (std::make_signed_t<T>) value, rv_policy::copy, nullptr).ptr();
         else
             m_ptr = detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr).ptr();
 

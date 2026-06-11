@@ -296,6 +296,12 @@ def test25_int():
     assert type(t.test_21_g()) is int
     assert t.test_21_h() == int(1e50)
     assert type(t.test_21_h()) is int
+    # nb::int_ of character types must yield an integer, not a 1-char string
+    for f in (t.test_21_char, t.test_21_schar, t.test_21_uchar):
+        assert f() == 97
+        assert type(f()) is int
+    assert t.test_21_short() == -5 and type(t.test_21_short()) is int
+    assert t.test_21_bool() is True
     assert t.test_19.__doc__ == "test_19(arg: int, /) -> object"
 
 

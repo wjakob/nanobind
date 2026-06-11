@@ -272,6 +272,11 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_21_f", [](nb::float_ f) { return nb::int_(f); });
     m.def("test_21_g", []() { return nb::int_(1.5); });
     m.def("test_21_h", []() { return nb::int_(1e50); });
+    m.def("test_21_char",  []() { return nb::int_((char) 'a'); });
+    m.def("test_21_schar", []() { return nb::int_((signed char) 'a'); });
+    m.def("test_21_uchar", []() { return nb::int_((unsigned char) 'a'); });
+    m.def("test_21_short", []() { return nb::int_((short) -5); });
+    m.def("test_21_bool",  []() { return nb::int_(true); });
 
     // Test floating-point
     m.def("test_21_dnc", [](double d) { return d + 1.0; }, nb::arg().noconvert());

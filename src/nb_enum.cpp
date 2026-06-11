@@ -22,17 +22,23 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     bool success;
     nb_type_map_slow::iterator it;
 
+    PyObject *existing = nullptr;
     {
         lock_internals guard(internals_);
         std::tie(it, success) = internals_->type_c2p_slow.try_emplace(ed->type, nullptr);
         if (!success) {
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: type '%s' was already registered!\n",
-                             ed->name);
-            PyObject *tp = (PyObject *) it->second->type_py;
-            NB_INCREF_ENUM(tp);
-            return tp;
+            existing = (PyObject *) it->second->type_py;
+            NB_INCREF_ENUM(existing);
         }
+    }
+
+    if (!success) {
+        // Warn only after releasing the lock: PyErr_WarnFormat can run
+        // arbitrary Python code, and the internals mutex is non-reentrant
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                         "nanobind: type '%s' was already registered!\n",
+                         ed->name);
+        return existing;
     }
 
     handle scope(ed->scope);

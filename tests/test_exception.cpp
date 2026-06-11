@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
 namespace nb = nanobind;
 
@@ -57,6 +58,19 @@ NB_MODULE(test_exception_ext, m) {
             } catch (nb::python_error &e) {
                 nb::raise_from(e, PyExc_RuntimeError, "Call with value %i failed", arg);
             }
+        }
+    );
+
+    // Invoke a callable that is expected to raise, then return the C++-side
+    // 'what()' message of the resulting nb::python_error. Used to exercise
+    // python_error::what() (including the case of a buggy __str__).
+    m.def("call_and_report_what", [](nb::callable c) -> std::string {
+            try {
+                c();
+            } catch (nb::python_error &e) {
+                return e.what();
+            }
+            return "(no exception raised)";
         }
     );
 }

@@ -217,6 +217,24 @@ def test10_implicit_conversion():
         t.noimplicit(np.zeros((2, 2, 10), dtype=np.float32)[:, :, 4])
 
 
+@needs_numpy
+def test10b_implicit_conversion_unusual_module():
+    # The implicit-conversion path in ndarray_import() inspects the array
+    # type's '__module__' attribute. Make sure it deals gracefully with an
+    # attribute whose value is computed dynamically (so that the underlying
+    # string is a freshly created temporary), matching a known framework.
+    class DynMeta(type):
+        @property
+        def __module__(cls):
+            return "".join(["nu", "mpy", ".dyn"])  # fresh 'numpy*' string
+
+    class DynModArray(np.ndarray, metaclass=DynMeta):
+        pass
+
+    a = np.zeros((2, 2), dtype=np.uint32).view(DynModArray)
+    assert t.implicit(a) == 0
+
+
 @needs_torch
 def test11_implicit_conversion_pytorch():
     with warnings.catch_warnings():

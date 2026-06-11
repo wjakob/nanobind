@@ -614,16 +614,24 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         if (!mt_unique_ptr && !capsule.is_valid()) {
             PyTypeObject *tp = Py_TYPE(src);
             try {
+                object mod = steal(PyObject_GetAttr(
+                    (PyObject *) tp, static_pyobjects[pyobj_name::module_str]));
                 const char *module_name =
-                    borrow<str>(handle(tp).attr("__module__")).c_str();
+                    mod.is_valid()
+                        ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr)
+                        : nullptr;
+                if (!module_name)
+                    PyErr_Clear();
 
                 object package;
-                if (strncmp(module_name, "tensorflow.", 11) == 0)
-                    package = module_::import_("tensorflow.experimental.dlpack");
-                else if (strncmp(module_name, "torch", 5) == 0)
-                    package = module_::import_("torch.utils.dlpack");
-                else if (strncmp(module_name, "jaxlib", 6) == 0)
-                    package = module_::import_("jax.dlpack");
+                if (module_name) {
+                    if (strncmp(module_name, "tensorflow.", 11) == 0)
+                        package = module_::import_("tensorflow.experimental.dlpack");
+                    else if (strncmp(module_name, "torch", 5) == 0)
+                        package = module_::import_("torch.utils.dlpack");
+                    else if (strncmp(module_name, "jaxlib", 6) == 0)
+                        package = module_::import_("jax.dlpack");
+                }
 
                 if (package.is_valid())
                     capsule = package.attr("to_dlpack")(handle(src));
@@ -741,8 +749,14 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     // Support implicit conversion of dtype and order.
     if (convert && (!pass_dtype || !pass_order) && !src_is_pycapsule) {
         PyTypeObject *tp = Py_TYPE(src);
-        str module_name_o = borrow<str>(handle(tp).attr("__module__"));
-        const char *module_name = module_name_o.c_str();
+
+        object mod = steal(PyObject_GetAttr(
+            (PyObject *) tp, static_pyobjects[pyobj_name::module_str]));
+        const char *module_name =
+            mod.is_valid() ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr)
+                           : nullptr;
+        if (!module_name)
+            PyErr_Clear();
 
         char order = 'K'; // for NumPy. 'K' means 'keep'
         if (c->order)
@@ -784,19 +798,21 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
         object converted;
         try {
-            if (strncmp(module_name, "numpy", 5) == 0
-                || strncmp(module_name, "cupy", 4) == 0) {
-                converted = handle(src).attr("astype")(dtype, order);
-            } else if (strncmp(module_name, "torch", 5) == 0) {
-                module_ torch = module_::import_("torch");
-                converted = handle(src).attr("to")(torch.attr(dtype));
-                if (c->order == 'C')
-                    converted = converted.attr("contiguous")();
-            } else if (strncmp(module_name, "tensorflow.", 11) == 0) {
-                module_ tensorflow = module_::import_("tensorflow");
-                converted = tensorflow.attr("cast")(handle(src), dtype);
-            } else if (strncmp(module_name, "jaxlib", 6) == 0) {
-                converted = handle(src).attr("astype")(dtype);
+            if (module_name) {
+                if (strncmp(module_name, "numpy", 5) == 0
+                    || strncmp(module_name, "cupy", 4) == 0) {
+                    converted = handle(src).attr("astype")(dtype, order);
+                } else if (strncmp(module_name, "torch", 5) == 0) {
+                    module_ torch = module_::import_("torch");
+                    converted = handle(src).attr("to")(torch.attr(dtype));
+                    if (c->order == 'C')
+                        converted = converted.attr("contiguous")();
+                } else if (strncmp(module_name, "tensorflow.", 11) == 0) {
+                    module_ tensorflow = module_::import_("tensorflow");
+                    converted = tensorflow.attr("cast")(handle(src), dtype);
+                } else if (strncmp(module_name, "jaxlib", 6) == 0) {
+                    converted = handle(src).attr("astype")(dtype);
+                }
             }
         } catch (...) { converted.reset(); }
 

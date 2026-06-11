@@ -568,6 +568,10 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
                      *value = args_in[nargs_in + j];
 
             const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
+            if (!key_cstr) {
+                PyErr_Clear();
+                key_cstr = "?";
+            }
             buf.put_dstr(key_cstr);
             buf.put(": ");
             str name = steal<str>(nb_inst_name(value));

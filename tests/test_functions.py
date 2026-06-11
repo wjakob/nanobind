@@ -104,6 +104,20 @@ def test06_signature_error():
     )
 
 
+def test06_signature_error_unencodable_kwarg():
+    # A keyword name that cannot be encoded to UTF-8 (lone surrogate) must not
+    # crash the error message formatter; it is rendered as a placeholder.
+    with pytest.raises(TypeError) as excinfo:
+        t.test_05("x", **{"\udc80": 4})
+    assert str(excinfo.value) == (
+        "test_05(): incompatible function arguments. The "
+        "following argument types are supported:\n"
+        "    1. test_05(arg: int, /) -> int\n"
+        "    2. test_05(arg: float, /) -> int\n\n"
+        "Invoked with types: str, kwargs = { ?: int }"
+    )
+
+
 def test07_raises():
     with pytest.raises(RuntimeError) as excinfo:
         t.test_06()

@@ -31,6 +31,9 @@ template <typename T> struct deleter {
     /// Perform the requested deletion operation
     void operator()(void *p) noexcept {
         if (o) {
+            // Don't run the deleter if the interpreter has been shut down
+            if (!is_alive())
+                return;
             gil_scoped_acquire guard;
             Py_DECREF(o);
         } else {

@@ -12,6 +12,10 @@
 #include "buffer.h"
 #include "nb_internals.h"
 
+#if defined(_MSC_VER)
+#  include <intrin.h>
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -124,8 +128,6 @@ const char *python_error::what() const noexcept {
         return m_what;
 
     gil_scoped_acquire acq;
-    // 'buf' is protected by internals->mutex in free-threaded builds
-    lock_internals guard(internals);
 
     // Try again with GIL held
     if (m_what)
@@ -148,11 +150,17 @@ const char *python_error::what() const noexcept {
     object exc_traceback = traceback();
 
 #if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
-    object mod = module_::import_("traceback"),
-           result = mod.attr("format_exception")(exc_type, exc_value, exc_traceback);
-    m_what = strdup_check(borrow<str>(str("\n").attr("join")(result)).c_str());
+    char *tmp;
+    try {
+        object mod = module_::import_("traceback"),
+               result = mod.attr("format_exception")(exc_type, exc_value, exc_traceback);
+        tmp = strdup_check(borrow<str>(str("\n").attr("join")(result)).c_str());
+    } catch (...) {
+        PyErr_Clear();
+        tmp = strdup_check("<error while formatting exception>");
+    }
 #else
-    buf.clear();
+    Buffer buf(128);
     if (exc_traceback.is_valid()) {
         PyTracebackObject *to = (PyTracebackObject *) exc_traceback.ptr();
 
@@ -187,17 +195,40 @@ const char *python_error::what() const noexcept {
     }
 
     if (exc_type.is_valid()) {
-        object name = exc_type.attr("__name__");
-        buf.put_dstr(borrow<str>(name).c_str());
-        buf.put(": ");
+        try {
+            object name = exc_type.attr("__name__");
+            buf.put_dstr(borrow<str>(name).c_str());
+            buf.put(": ");
+        } catch (...) { PyErr_Clear(); }
     }
 
-    if (exc_value.is_valid())
-        buf.put_dstr(str(m_value).c_str());
-    m_what = buf.copy();
+    if (exc_value.is_valid()) {
+        try {
+            buf.put_dstr(str(exc_value).c_str());
+        } catch (...) {
+            PyErr_Clear();
+            buf.put("<exception str() failed>");
+        }
+    }
+
+    char *tmp = buf.copy();
 #endif
 
-    return m_what;
+    // Publish the message with a CAS; if a concurrent call raced us to it,
+    // free our copy and return the winner's message instead.
+    char *expected = nullptr;
+#if defined(_MSC_VER)
+    expected = (char *) _InterlockedCompareExchangePointer(
+        (void *volatile *) &m_what, tmp, nullptr);
+    if (!expected)
+        return tmp;
+#else
+    if (__atomic_compare_exchange_n(&m_what, &expected, tmp, false,
+                                    __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
+        return tmp;
+#endif
+    free(tmp);
+    return expected;
 }
 
 builtin_exception::builtin_exception(exception_type type, const char *what)

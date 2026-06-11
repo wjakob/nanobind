@@ -1248,19 +1248,25 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool success;
     nb_internals *internals_ = internals;
 
+    PyObject *existing = nullptr;
     {
         lock_internals guard(internals_);
         std::tie(it, success) = internals_->type_c2p_slow.try_emplace(t->type, nullptr);
         if (!success) {
-            PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                             "nanobind: type '%s' was already registered!\n",
-                             t_name);
-            PyObject *tp = (PyObject *) it->second->type_py;
-            NB_INCREF_TYPE(tp);
-            if (has_signature)
-                free((char *) t_name);
-            return tp;
+            existing = (PyObject *) it->second->type_py;
+            NB_INCREF_TYPE(existing);
         }
+    }
+
+    if (!success) {
+        // Warn only after releasing the lock: PyErr_WarnFormat can run
+        // arbitrary Python code, and the internals mutex is non-reentrant
+        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                         "nanobind: type '%s' was already registered!\n",
+                         t_name);
+        if (has_signature)
+            free((char *) t_name);
+        return existing;
     }
 
     if (t->scope != nullptr) {

@@ -102,3 +102,28 @@ def test20_nested():
     assert str(excinfo.value) == 'Call with value 123 failed'
     assert str(excinfo.value.__cause__) == 'division by zero'
 
+def test21_what():
+    # python_error::what() renders a well-behaved exception as usual
+    def raises():
+        raise ValueError("a well-behaved error")
+    what = t.call_and_report_what(raises)
+    assert what.rstrip().endswith("ValueError: a well-behaved error")
+    assert "Traceback (most recent call last):" in what
+
+def test22_what_bad_str():
+    # A buggy '__str__' must not abort the process (python_error::what() is
+    # noexcept); it falls back to a degraded but still-useful message.
+    class BadStr(Exception):
+        def __str__(self):
+            raise RuntimeError("boom in __str__")
+
+    def raises():
+        raise BadStr()
+
+    what = t.call_and_report_what(raises)
+    # Stable-ABI/PyPy builds format via the 'traceback' module and use a
+    # different (coarser) fallback message
+    if "<error while formatting exception>" not in what:
+        assert "BadStr" in what
+        assert "<exception str() failed>" in what
+

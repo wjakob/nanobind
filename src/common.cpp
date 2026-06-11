@@ -744,6 +744,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
                     if (o) {
                         result[i] = o;
                     } else {
+                        PyErr_Clear();
                         for (Py_ssize_t j = 0; j < i; ++j)
                             Py_DECREF(result[j]);
 
@@ -846,6 +847,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
                     if (o) {
                         result[i] = o;
                     } else {
+                        PyErr_Clear();
                         for (Py_ssize_t j = 0; j < i; ++j)
                             Py_DECREF(result[j]);
 

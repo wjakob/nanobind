@@ -406,6 +406,11 @@ struct func_extra_info<arg_locked, Ts...> : func_extra_info<Ts...> {
 };
 
 template <typename... Ts>
+struct func_extra_info<arg_locked_v, Ts...> : func_extra_info<Ts...> {
+    static constexpr size_t nargs_locked = 1 + func_extra_info<Ts...>::nargs_locked;
+};
+
+template <typename... Ts>
 struct func_extra_info<lock_self, Ts...> : func_extra_info<Ts...> {
     static constexpr size_t nargs_locked = 1 + func_extra_info<Ts...>::nargs_locked;
 };

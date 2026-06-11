@@ -198,6 +198,20 @@ def test_maps_with_noncopyable_values():
     assert vsum == 7500
 
 
+def test_map_self_update():
+    # Regression: m.update(m) must be a correct no-op even for a
+    # non-copy-assignable value type ('double const' exercises the
+    # emplace/erase/re-emplace path in map_set and previously dangled).
+    m = t.MapStringDoubleConst()
+    for i in range(1, 6):
+        m[str(i)] = 10.0 * i
+
+    m.update(m)
+    assert sorted(k for k in m) == ["1", "2", "3", "4", "5"]
+    for i in range(1, 6):
+        assert m[str(i)] == 10.0 * i
+
+
 def test_map_delitem():
     mm = t.MapStringDouble()
     mm["a"] = 1

@@ -130,7 +130,18 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
 
           .def("extend",
                [](Vector &v, const Vector &src) {
-                   v.insert(v.end(), src.begin(), src.end());
+                   if (&src == &v) {
+                       // Self-extension: inserting [v.begin(), v.end()) into v
+                       // itself violates the standard's precondition (the
+                       // source range must not lie inside the container) and
+                       // is undefined behavior. Reserve and append by index.
+                       size_t n = v.size();
+                       v.reserve(2 * n);
+                       for (size_t i = 0; i < n; ++i)
+                           v.push_back(v[i]);
+                   } else {
+                       v.insert(v.end(), src.begin(), src.end());
+                   }
                },
                "Extend `self` by appending elements from `arg`.")
 

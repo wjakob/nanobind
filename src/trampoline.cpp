@@ -73,85 +73,91 @@ static void trampoline_enter_internal(void **data, size_t size,
         }
     }
 
-    // Nothing found -- retry, now with lock held
+    // Nothing found -- retry, now with lock held. The object critical section
+    // must end (on every path) before PyGILState_Release() is called, since the
+    // latter may detach the thread state and suspend the critical section. We
+    // therefore enclose the guarded region in a block scope and defer any GIL
+    // release or error reporting until after it.
     state = PyGILState_Ensure();
-    ft_object_guard guard(self);
+    {
+        ft_object_guard guard(self);
 
-    if (error)
-        goto fail;
+        if (error)
+            goto fail;
 
-    for (size_t i = 0; i < size; i++) {
-        void *d_name  = data[2*i + 1],
-             *d_value = data[2*i + 2];
-        if (name == d_name && d_value) {
-            if (d_value != None) {
-                t->state = state;
-                t->key = (PyObject *) d_value;
-                return;
-            } else {
-                if (pure) {
-                    error = "tried to call a pure virtual function";
-                    goto fail;
-                } else {
-                    PyGILState_Release(state);
+        for (size_t i = 0; i < size; i++) {
+            void *d_name  = data[2*i + 1],
+                 *d_value = data[2*i + 2];
+            if (name == d_name && d_value) {
+                if (d_value != None) {
+                    t->state = state;
+                    t->key = (PyObject *) d_value;
                     return;
+                } else {
+                    if (pure) {
+                        error = "tried to call a pure virtual function";
+                        goto fail;
+                    } else {
+                        goto release;
+                    }
                 }
             }
         }
-    }
 
-    // Sill no luck -- perform a lookup and populate the trampoline
-    for (; offset < size; offset++) {
-        if (data[2 * offset + 1] == nullptr &&
-            data[2 * offset + 2] == nullptr)
-            break;
-    }
+        // Sill no luck -- perform a lookup and populate the trampoline
+        for (; offset < size; offset++) {
+            if (data[2 * offset + 1] == nullptr &&
+                data[2 * offset + 2] == nullptr)
+                break;
+        }
 
-    if (offset == size) {
-        error = "the trampoline ran out of slots (you will need to increase "
-                "the value provided to the NB_TRAMPOLINE() macro)";
-        goto fail;
-    }
-
-    key = PyUnicode_InternFromString(name);
-    if (!key) {
-        error = "could not intern string";
-        goto fail;
-    }
-
-    value = PyObject_GetAttr(self, key);
-    if (!value) {
-        error = "lookup failed";
-        goto fail;
-    }
-
-    value_tp = Py_TYPE(value);
-    Py_CLEAR(value);
-
-    if (value_tp == internals->nb_func || value_tp == internals->nb_method ||
-        value_tp == internals->nb_bound_method) {
-        Py_DECREF(key);
-
-        if (pure) {
-            error = "tried to call a pure virtual function";
+        if (offset == size) {
+            error = "the trampoline ran out of slots (you will need to increase "
+                    "the value provided to the NB_TRAMPOLINE() macro)";
             goto fail;
         }
 
-        Py_INCREF(Py_None);
-        key = Py_None;
+        key = PyUnicode_InternFromString(name);
+        if (!key) {
+            error = "could not intern string";
+            goto fail;
+        }
+
+        value = PyObject_GetAttr(self, key);
+        if (!value) {
+            error = "lookup failed";
+            goto fail;
+        }
+
+        value_tp = Py_TYPE(value);
+        Py_CLEAR(value);
+
+        if (value_tp == internals->nb_func || value_tp == internals->nb_method ||
+            value_tp == internals->nb_bound_method) {
+            Py_DECREF(key);
+
+            if (pure) {
+                error = "tried to call a pure virtual function";
+                goto fail;
+            }
+
+            Py_INCREF(Py_None);
+            key = Py_None;
+        }
+
+        data[2 * offset + 1] = (void *) name;
+        data[2 * offset + 2] = key;
+
+        if (key != None) {
+            t->state = state;
+            t->key = key;
+            return;
+        }
     }
 
-    data[2 * offset + 1] = (void *) name;
-    data[2 * offset + 2] = key;
-
-    if (key != None) {
-        t->state = state;
-        t->key = key;
-        return;
-    } else {
-        PyGILState_Release(state);
-        return;
-    }
+release:
+    PyGILState_Release(state);
+    return;
 
 fail:
     type_data *td = nb_type_data(Py_TYPE(self));

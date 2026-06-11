@@ -39,12 +39,14 @@ template <typename Set, typename Key> struct set_caster {
         while ((key = PyIter_Next(iter)) != nullptr) {
             success &= (key_caster.from_python(key, flags, cleanup) &&
                         key_caster.template can_cast<Key>());
-            Py_DECREF(key);
 
-            if (!success)
+            if (!success) {
+                Py_DECREF(key);
                 break;
+            }
 
             value.emplace(key_caster.operator cast_t<Key>());
+            Py_DECREF(key);
         }
 
         if (PyErr_Occurred()) {

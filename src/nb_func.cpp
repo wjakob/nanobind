@@ -146,8 +146,11 @@ int nb_bound_method_clear(PyObject *self) {
 void nb_bound_method_dealloc(PyObject *self) {
     nb_bound_method *mb = (nb_bound_method *) self;
     PyObject_GC_UnTrack(self);
-    NB_DECREF_FUNC((PyObject *) mb->func);
-    Py_DECREF(mb->self);
+    // The fields may already have been cleared by nb_bound_method_clear()
+    // if the bound method was part of a collected reference cycle
+    if (mb->func)
+        NB_DECREF_FUNC((PyObject *) mb->func);
+    Py_XDECREF(mb->self);
     PyObject_GC_Del(self);
 }
 
@@ -1330,6 +1333,8 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 
         NB_INCREF_FUNC(self);
         Py_INCREF(inst);
+
+        PyObject_GC_Track((PyObject *) mb);
 
         return (PyObject *) mb;
     } else {

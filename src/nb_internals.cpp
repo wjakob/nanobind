@@ -644,9 +644,11 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
                 "python extension library, you can ignore this warning.");
 
     capsule = PyCapsule_New(p, "nb_internals", nullptr);
-    int rv = PyDict_SetItem(dict, key, capsule);
-    check(!rv && capsule,
+    check(capsule,
           "nanobind::detail::nb_module_exec(): capsule creation failed!");
+    check(PyDict_SetItem(dict, key, capsule) == 0,
+          "nanobind::detail::nb_module_exec(): could not register the "
+          "internals capsule!");
     Py_DECREF(capsule);
     Py_DECREF(key);
 }

@@ -445,6 +445,9 @@ def test20_return_array_api():
     if (hasattr(np, '__array_api_version__') and
         np.__array_api_version__ >= '2024'):
         obj = t.ret_array_api()
+        # copy=True is surfaced as a BufferError by NumPy
+        with pytest.raises(BufferError):
+            np.from_dlpack(obj, copy=True)
         x = np.from_dlpack(obj)
         del obj
         collect()
@@ -481,6 +484,37 @@ def test20_return_array_api():
         del x
         collect()
         assert t.destruct_count() - dc == 1
+
+
+def test20a_dlpack_copy_device_kwargs():
+    obj = t.ret_array_api()
+
+    # copy=False/None are honored, copy=True cannot be satisfied (aliasing)
+    assert 'dltensor' in repr(obj.__dlpack__(copy=False))
+    assert 'dltensor' in repr(obj.__dlpack__(copy=None))
+    with pytest.raises(BufferError):
+        obj.__dlpack__(copy=True)
+    with pytest.raises(BufferError):
+        obj.__dlpack__(max_version=(1, 0), copy=True)
+
+    # malformed max_version values are rejected
+    with pytest.raises(TypeError) as excinfo:
+        obj.__dlpack__(max_version=("1", "0"))  # not an integer
+    assert 'max_version must be None or tuple[int, int]' in str(excinfo.value)
+
+    # dl_device matching the array's own device is fine, others are rejected
+    assert 'dltensor' in repr(obj.__dlpack__(dl_device=None))
+    assert 'dltensor' in repr(obj.__dlpack__(dl_device=(1, 0)))
+    with pytest.raises(BufferError):
+        obj.__dlpack__(dl_device=(99, 0))
+
+    # Keyword names passed via f(**d) need not be interned/identical to the
+    # internal references; equal-but-distinct strings must behave identically.
+    with pytest.raises(BufferError):
+        obj.__dlpack__(**{''.join(['co', 'py']): True})
+    with pytest.raises(BufferError):
+        obj.__dlpack__(**{''.join(['dl_', 'device']): (99, 0)})
+    assert 'dltensor' in repr(obj.__dlpack__(**{''.join(['co', 'py']): False}))
 
 
 def test20b_import_metal_dlpack():

@@ -283,32 +283,66 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
     }
     Py_ssize_t nkwargs = (kwnames) ? NB_TUPLE_GET_SIZE(kwnames) : 0;
 
+    // Match a keyword name against an interned reference, falling back to a
+    // string comparison since kwnames passed via f(**d) are not guaranteed to
+    // be identical to the interned objects.
+    auto key_is = [](PyObject *key, int ref) -> bool {
+        PyObject *r = static_pyobjects[ref];
+        return key == r || PyObject_RichCompareBool(key, r, Py_EQ) == 1;
+    };
+
+    // Extract a 2-tuple of integers; returns false (with no error set) for
+    // any other input
+    auto get_int_pair = [](PyObject *value, long *a, long *b) -> bool {
+        if (!PyTuple_Check(value) || NB_TUPLE_GET_SIZE(value) != 2)
+            return false;
+        *a = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 0));
+        *b = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 1));
+        if (PyErr_Occurred()) {
+            PyErr_Clear();
+            return false;
+        }
+        return true;
+    };
+
+    ndarray_handle *th = ((nb_ndarray *) self)->th;
+    dlpack::dltensor &t = (th->versioned) ? th->mt_versioned->dltensor
+                                          : th->mt_unversioned->dltensor;
+
     long max_major_version = 0;
     for (Py_ssize_t i = 0; i < nkwargs; ++i) {
         PyObject* key = NB_TUPLE_GET_ITEM(kwnames, i);
-        if (key == static_pyobjects[pyobj_name::dl_device_str] ||
-            key == static_pyobjects[pyobj_name::copy_str])
-            // These keyword arguments are ignored.  This branch of the code
-            // is here to avoid a Python call to RichCompare if these kwargs
-            // are provided by the caller.
-            continue;
-        if (key == static_pyobjects[pyobj_name::max_version_str] ||
-            PyObject_RichCompareBool(key,
-                static_pyobjects[pyobj_name::max_version_str], Py_EQ) == 1) {
-            PyObject* value = args[i];
-            if (value == Py_None)
-                break;
-            if (!PyTuple_Check(value) || NB_TUPLE_GET_SIZE(value) != 2) {
-                PyErr_SetString(PyExc_TypeError,
-                        "max_version must be None or tuple[int, int]");
+        PyObject* value = args[i];
+        long a, b;
+        if (key_is(key, pyobj_name::copy_str)) {
+            // The capsule aliases C++-owned storage; a copy cannot be made
+            if (value == Py_True) {
+                PyErr_SetString(PyExc_BufferError,
+                        "__dlpack__(): copy=True is not supported.");
                 return nullptr;
             }
-            max_major_version = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 0));
-            break;
+        } else if (key_is(key, pyobj_name::dl_device_str)) {
+            // Reject requests for a device other than the array's own
+            if (value != Py_None &&
+                (!get_int_pair(value, &a, &b) ||
+                 a != (long) t.device.device_type ||
+                 b != (long) t.device.device_id)) {
+                PyErr_SetString(PyExc_BufferError,
+                        "__dlpack__(): unsupported dl_device.");
+                return nullptr;
+            }
+        } else if (key_is(key, pyobj_name::max_version_str)) {
+            if (value != Py_None) {
+                if (!get_int_pair(value, &a, &b)) {
+                    PyErr_SetString(PyExc_TypeError,
+                            "max_version must be None or tuple[int, int]");
+                    return nullptr;
+                }
+                max_major_version = a;
+            }
         }
     }
 
-    ndarray_handle *th = ((nb_ndarray *) self)->th;
     PyObject *capsule;
     if (max_major_version >= (long)dlpack::major_version)
         capsule = th->make_capsule_versioned();

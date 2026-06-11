@@ -38,13 +38,11 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         PyObject *temp; // always initialized by the following line
         PyObject **o = seq_get_with_size(src.ptr(), 2, &temp);
 
-        bool success = o &&
-                       caster1.from_python(o[0], flags, cleanup) &&
-                       caster2.from_python(o[1], flags, cleanup);
+        temp_ref = steal(temp);
 
-        Py_XDECREF(temp);
-
-        return success;
+        return o &&
+               caster1.from_python(o[0], flags, cleanup) &&
+               caster2.from_python(o[1], flags, cleanup);
     }
 
     template <typename T>
@@ -86,6 +84,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
 
     Caster1 caster1;
     Caster2 caster2;
+    object temp_ref;
 };
 
 NAMESPACE_END(detail)

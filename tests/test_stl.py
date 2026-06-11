@@ -231,6 +231,24 @@ def test21b_seq_getitem_raises():
             assert e.__context__ is None
 
 
+def test21c_tuple_pair_generic_sequence():
+    # A generic sequence (not a tuple) whose __getitem__ creates fresh items
+    # is converted via a temporary tuple that solely owns those items. The
+    # caster must keep that tuple alive until the elements are copied out.
+    class Seq:
+        def __init__(self, *vals):
+            self.vals = vals
+
+        def __len__(self):
+            return len(self.vals)
+
+        def __getitem__(self, i):
+            return t.Poisoned(self.vals[i])
+
+    assert t.pair_of_poisoned(Seq(1, 2)) == 102
+    assert t.tuple_of_poisoned(Seq(3, 4, 5)) == 30405
+
+
 # ------------------------------------------------------------------
 
 

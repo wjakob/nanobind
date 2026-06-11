@@ -795,6 +795,11 @@ def test53_fallback():
 def test54_dict_default():
     assert t.test_get_dict_default({'key': 100}) == 100
     assert t.test_get_dict_default({'key2': 100}) == 123
+    assert t.test_get_dict_default_2({'key': 100}, 'key') == 100
+    assert t.test_get_dict_default_2({'key2': 100}, 'key') == 123
+    # An unhashable key must raise TypeError, matching Python's dict.get
+    with pytest.raises(TypeError):
+        t.test_get_dict_default_2({'key': 100}, [1, 2, 3])
 
 def test_55_memoryview():
     memview = t.test_memoryview()

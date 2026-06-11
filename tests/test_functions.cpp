@@ -531,4 +531,5 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_fallback_2", [](nb::fallback){ return 1; });
 
     m.def("test_get_dict_default", [](nb::dict l) { return l.get("key", nb::int_(123)); });
+    m.def("test_get_dict_default_2", [](nb::dict l, nb::handle key) { return l.get(key, nb::int_(123)); });
 }

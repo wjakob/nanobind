@@ -86,8 +86,6 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;
 
-    it.value() = t;
-
     {
         lock_internals guard(internals_);
         internals_->type_c2p_slow[ed->type] = t;

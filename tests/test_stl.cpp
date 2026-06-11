@@ -170,6 +170,25 @@ NB_MODULE(test_stl_ext, m) {
         return std::pair<float, int>(std::get<1>(v), std::get<0>(v));
     });
 
+    // Regression test: a generic (non-tuple) sequence input is converted to a
+    // temporary tuple that solely owns the freshly produced items. The pair /
+    // tuple casters must keep this temporary alive until the elements have been
+    // copied out, else they read from destroyed objects. 'Poisoned' makes such
+    // a use-after-free observable by overwriting its value on destruction.
+    struct Poisoned {
+        int value;
+        Poisoned(int value) : value(value) { }
+        ~Poisoned() { value = -1; }
+    };
+    nb::class_<Poisoned>(m, "Poisoned").def(nb::init<int>());
+    m.def("pair_of_poisoned", [](std::pair<Poisoned, Poisoned> v) {
+        return v.first.value * 100 + v.second.value;
+    });
+    m.def("tuple_of_poisoned", [](std::tuple<Poisoned, Poisoned, Poisoned> v) {
+        return std::get<0>(v).value * 10000 + std::get<1>(v).value * 100 +
+               std::get<2>(v).value;
+    });
+
     // ----- test22 ------
     m.def("vec_return_movable", [](){
         std::vector<Movable> x;

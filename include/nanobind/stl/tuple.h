@@ -46,13 +46,10 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         PyObject *temp; // always initialized by the following line
         PyObject **o = seq_get_with_size(src.ptr(), N, &temp);
 
-        bool success =
-            (o && ... &&
-             std::get<Is>(casters).from_python(o[Is], flags, cleanup));
+        temp_ref = steal(temp);
 
-        Py_XDECREF(temp);
-
-        return success;
+        return (o && ... &&
+                std::get<Is>(casters).from_python(o[Is], flags, cleanup));
     }
 
     template <typename T>
@@ -103,6 +100,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     }
 
     std::tuple<make_caster<Ts>...> casters;
+    object temp_ref;
 };
 
 NAMESPACE_END(detail)

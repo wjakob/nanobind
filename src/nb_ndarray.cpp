@@ -1052,8 +1052,8 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
 
     if (framework == numpy::value) {
         try {
-            PyObject* pkg_mod = module_import("numpy");
-            PyObject* args[] = {pkg_mod, o.ptr(),
+            object pkg_mod = steal(module_import("numpy"));
+            PyObject* args[] = {pkg_mod.ptr(), o.ptr(),
                                 (copy) ? Py_True : Py_False};
             Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             return PyObject_VectorcallMethod(
@@ -1088,8 +1088,8 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
                 pkg_name = nullptr;
         }
         if (pkg_name) {
-            PyObject* pkg_mod = module_import(pkg_name);
-            PyObject* args[] = {pkg_mod, o.ptr()};
+            object pkg_mod = steal(module_import(pkg_name));
+            PyObject* args[] = {pkg_mod.ptr(), o.ptr()};
             Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             o = steal(PyObject_VectorcallMethod(
                           static_pyobjects[pyobj_name::from_dlpack_str],

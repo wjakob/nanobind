@@ -3,6 +3,7 @@ import sys
 import platform
 
 import test_stl_bind_map_ext as t
+from common import collect
 
 
 def test_map_string_double(capfd):
@@ -217,3 +218,17 @@ def test_map_delitem():
     del um["ua"]
     assert sorted(list(um)) == ["ub"]
     assert sorted(list(um.items())) == [("ub", 2.6)]
+
+
+def test_map_init_partial_cleanup():
+    # When the dict constructor throws partway through, the partially
+    # constructed map must still be destroyed (no leaked elements).
+    keep = t.MapCnt()
+    collect()
+    base = t.cnt_alive()
+    for _ in range(100):
+        with pytest.raises(Exception):
+            t.MapIntCnt({1: t.MapCnt(), 2: t.MapCnt(), 3: "not a MapCnt"})
+    collect()
+    assert t.cnt_alive() == base
+    del keep

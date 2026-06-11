@@ -588,6 +588,11 @@ def test41_kw_only():
     val = t.kw_only_methods(v=42)
     assert val.v == 42
 
+    # The implicit 'self' of a constructor may be passed as a keyword argument
+    val2 = t.kw_only_methods.__new__(t.kw_only_methods)
+    t.kw_only_methods.__init__(self=val2, v=43)
+    assert val2.v == 43
+
     # (self, *, i, j)
     assert val.method_2k() == (1, 2)
     assert val.method_2k(i=3) == (3, 2)

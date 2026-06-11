@@ -849,8 +849,13 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             }
 
 
-            if (is_constructor)
+            // A constructor's 'self' may also arrive as a keyword argument,
+            // so it must be read back from args[0] rather than from args_in[0]
+            PyObject *self_arg_constructor = nullptr;
+            if (is_constructor) {
                 args_flags[0] |= (uint8_t) cast_flags::construct;
+                self_arg_constructor = args[0];
+            }
 
             rv_policy policy = (rv_policy) (f->flags & 0b111);
 
@@ -874,12 +879,12 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
             if (result != NB_NEXT_OVERLOAD) {
                 if (is_constructor && result != nullptr) {
-                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    nb_inst *self_arg_nb = (nb_inst *) self_arg_constructor;
                     self_arg_nb->state.destruct = true;
                     self_arg_nb->state.state = nb_inst_state::state_ready;
                     if (NB_UNLIKELY(self_arg_nb->state.intrusive))
-                        nb_type_data(Py_TYPE(self_arg))
-                            ->set_self_py(inst_ptr(self_arg_nb), self_arg);
+                        nb_type_data(Py_TYPE(self_arg_constructor))
+                            ->set_self_py(inst_ptr(self_arg_nb), self_arg_constructor);
                 }
 
                 goto done;

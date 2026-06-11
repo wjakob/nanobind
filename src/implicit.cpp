@@ -33,6 +33,7 @@ void implicitly_convertible(const std::type_info *src,
     }
 
     void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
+    check(data, "nanobind::detail::implicitly_convertible(): out of memory!");
 
     if (size)
         memcpy(data, t->implicit.cpp, size * sizeof(void *));
@@ -63,6 +64,8 @@ void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
     }
 
     void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
+    check(data, "nanobind::detail::implicitly_convertible(): out of memory!");
+
     if (size)
         memcpy(data, t->implicit.py, size * sizeof(void *));
     data[size] = (void *) predicate;

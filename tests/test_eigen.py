@@ -495,4 +495,12 @@ def test18_zero_size_vec():
     c = np.zeros(0, dtype=np.int32)
     assert_array_equal(t.castToRefVXi(c), c)
     assert_array_equal(t.castToMapCnstVXi(c), c)
+    assert_array_equal(t.castToDRefCnstVXi(c), c)
+
+    # Empty 1-D arrays with a dynamic-stride Map/Ref caster must not produce an
+    # invalid (Eigen::Dynamic) inner stride.
+    d = np.zeros(0, dtype=np.float32)
+    assert_array_equal(t.passDMapCnstVXf(d), d)
+    assert_array_equal(t.passDMapCnstVXf(np.array([1, 2, 3], dtype=np.float32)),
+                       np.array([1, 2, 3], dtype=np.float32))
 

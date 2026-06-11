@@ -245,6 +245,9 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("castToDRefCnstVXi", [](nb::object obj) -> Eigen::VectorXi {
         return nb::cast<nb::DRef<const Eigen::VectorXi>>(obj);
     });
+    m.def("passDMapCnstVXf", [](nb::DMap<const Eigen::VectorXf> a) -> Eigen::VectorXf {
+        return a;
+    });
     m.def("castToRef03CnstVXi", [](nb::object obj) -> Eigen::VectorXi {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi, Eigen::Unaligned, Eigen::InnerStride<3>>>(obj);
     });

@@ -296,6 +296,33 @@ NB_MODULE(test_ndarray_ext, m) {
         return nb::ndarray<float, nb::shape<2, 4>>(f, 2, shape, deleter);
     });
 
+    m.def("ret_memview_ro", []() {
+        float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+
+        nb::capsule deleter(f, [](void *data) noexcept {
+            destruct_count++;
+            delete[] (float *) data;
+        });
+
+        return nb::ndarray<nb::memview, const float, nb::shape<2, 4>>(
+            f, 2, shape, deleter);
+    });
+
+    m.def("ret_memview_f", []() {
+        float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+        int64_t strides[2] = { 1, 2 };
+
+        nb::capsule deleter(f, [](void *data) noexcept {
+            destruct_count++;
+            delete[] (float *) data;
+        });
+
+        return nb::ndarray<nb::memview, float, nb::shape<2, 4>, nb::f_contig>(
+            f, 2, shape, deleter, strides);
+    });
+
     m.def("passthrough", [](nb::ndarray<> a) { return a; }, nb::rv_policy::none);
     m.def("passthrough_copy", [](nb::ndarray<> a) { return a; }, nb::rv_policy::copy);
 

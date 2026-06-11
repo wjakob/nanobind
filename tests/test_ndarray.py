@@ -364,6 +364,45 @@ def test19_return_memview():
     assert t.destruct_count() - dc == 1
 
 
+@skip_on_pypy
+def test19b_buffer_protocol_flags():
+    import struct
+    import tempfile
+    import os
+
+    # The buffer-protocol exporter must honor the request flags.
+
+    # (a) A writable request against a read-only ndarray must be refused.
+    ro = t.ret_memview_ro().obj
+    assert memoryview(ro).readonly
+    assert memoryview(ro).tolist() == [[1, 2, 3, 4], [5, 6, 7, 8]]
+
+    data = struct.pack("8f", 100, 200, 300, 400, 500, 600, 700, 800)
+    fd, path = tempfile.mkstemp()
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        # readinto() requests a writable buffer; this must not mutate the
+        # read-only array (the request is rejected during getbuffer()).
+        with open(path, "rb") as f:
+            with pytest.raises((BufferError, TypeError)):
+                f.readinto(ro)
+    finally:
+        os.remove(path)
+    assert memoryview(ro).tolist() == [[1, 2, 3, 4], [5, 6, 7, 8]]
+
+    # (b) A non-strided request against an F-contiguous (non-C-contiguous)
+    # ndarray must be refused -- otherwise the consumer reads wrong elements.
+    fobj = t.ret_memview_f().obj
+    assert memoryview(fobj).tolist() == [[1, 3, 5, 7], [2, 4, 6, 8]]
+    with pytest.raises(BufferError):
+        struct.unpack_from("8f", fobj)
+
+    # A non-strided request on C-contiguous data still works.
+    cobj = t.ret_memview().obj
+    assert struct.unpack_from("8d", cobj) == (1, 2, 3, 4, 5, 6, 7, 8)
+
+
 @needs_numpy
 def test20_return_array_api():
     collect()

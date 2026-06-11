@@ -144,7 +144,11 @@ static void nb_ndarray_dealloc(PyObject *self) {
     Py_DECREF(tp);
 }
 
-static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
+static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int flags) {
+    // The buffer protocol requires that 'view->obj' be set to NULL whenever
+    // the exporter signals failure by returning -1.
+    view->obj = nullptr;
+
     ndarray_handle *th = ((nb_ndarray *) self)->th;
     dlpack::dltensor &t = (th->versioned) ? th->mt_versioned->dltensor
                                           : th->mt_unversioned->dltensor;
@@ -152,6 +156,13 @@ static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
     if (t.device.device_type != device::cpu::value) {
         PyErr_SetString(PyExc_BufferError, "Only CPU-allocated ndarrays can be "
                                            "accessed via the buffer protocol!");
+        return -1;
+    }
+
+    // Honor a writable request: refuse to expose read-only memory as writable.
+    if ((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE && th->ro) {
+        PyErr_SetString(PyExc_BufferError,
+            "Cannot provide writable access to a read-only ndarray!");
         return -1;
     }
 
@@ -205,29 +216,53 @@ static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int) {
         return -1;
     }
 
-    view->buf = (void *) ((uintptr_t) t.data + t.byte_offset);
-    view->obj = self;
-    Py_INCREF(self);
+    const Py_ssize_t itemsize = t.dtype.bits / 8;
+    Py_ssize_t len = itemsize, size = 1;
+    for (size_t i = 0; i < (size_t) t.ndim; ++i) {
+        len *= (Py_ssize_t) t.shape[i];
+        size *= (Py_ssize_t) t.shape[i];
+    }
+
+    // When the consumer cannot handle strides, only C-contiguous data may be
+    // exported -- otherwise it would interpret 'buf'..'buf + len' as a packed
+    // C-contiguous block and silently read the wrong elements. Arrays with one
+    // or fewer elements are trivially contiguous.
+    if ((flags & PyBUF_STRIDES) != PyBUF_STRIDES && size > 1) {
+        bool c_contig = true;
+        for (int64_t i = t.ndim - 1, accum = 1; i >= 0; --i) {
+            c_contig &= t.shape[i] == 1 || t.strides[i] == accum;
+            accum *= t.shape[i];
+        }
+
+        if (!c_contig) {
+            PyErr_SetString(PyExc_BufferError,
+                "Cannot provide a contiguous buffer for a non-C-contiguous "
+                "ndarray!");
+            return -1;
+        }
+    }
 
     scoped_pymalloc<Py_ssize_t> shape_and_strides(2 * (size_t) t.ndim);
     Py_ssize_t* shape = shape_and_strides.get();
     Py_ssize_t* strides = shape + t.ndim;
 
-    const Py_ssize_t itemsize = t.dtype.bits / 8;
-    Py_ssize_t len = itemsize;
     for (size_t i = 0; i < (size_t) t.ndim; ++i) {
-        len *= (Py_ssize_t) t.shape[i];
         shape[i] = (Py_ssize_t) t.shape[i];
         strides[i] = (Py_ssize_t) t.strides[i] * itemsize;
     }
 
+    view->buf = (void *) ((uintptr_t) t.data + t.byte_offset);
+    view->obj = self;
+    Py_INCREF(self);
     view->len = len;
     view->itemsize = itemsize;
     view->readonly = th->ro;
     view->ndim = t.ndim;
-    view->format = (char *) format;
-    view->shape = shape;
-    view->strides = strides;
+    view->format =
+        ((flags & PyBUF_FORMAT) == PyBUF_FORMAT) ? (char *) format : nullptr;
+    view->shape = ((flags & PyBUF_ND) == PyBUF_ND) ? shape : nullptr;
+    view->strides =
+        ((flags & PyBUF_STRIDES) == PyBUF_STRIDES) ? strides : nullptr;
     view->suboffsets = nullptr;
     view->internal = shape_and_strides.release();
 

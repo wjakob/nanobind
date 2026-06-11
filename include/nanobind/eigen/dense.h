@@ -328,8 +328,11 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         // This also includes when shape=(0,0), when numpy reports the stride to be zero.
         // This creates an incompatibility with Eigen compile-time vectors, which expect
         // runtime and compile-time strides to be identical (e.g. for Eigen::VectorXi, equal to 1).
-        if (ndim_v<T> == 1 && caster.value.shape(0) == 0)
-            inner = IS;
+        // For dynamic strides (IS == Eigen::Dynamic), substitute a unit inner stride
+        if constexpr (ndim_v<T> == 1) {
+            if (caster.value.shape(0) == 0)
+                inner = IS == Eigen::Dynamic ? 1 : IS;
+        }
 
         if constexpr (OS == 0)
             outer = 0;

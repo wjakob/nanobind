@@ -437,12 +437,22 @@ def test35_return_capture():
 def test36_test_char():
     assert t.test_cast_char("c") == "c"
     assert t.test_cast_char("\x00") == "\x00"
-    with pytest.raises(TypeError):
+    # A failing nb::cast<char>() must raise cast_error (a RuntimeError),
+    # not leak the internal 'next_overload' exception as a bogus TypeError.
+    with pytest.raises(RuntimeError):
         assert t.test_cast_char("abc")
-    with pytest.raises(TypeError):
+    with pytest.raises(RuntimeError):
         assert t.test_cast_char("")
     with pytest.raises(RuntimeError):
         assert t.test_cast_char(123)
+
+
+def test36b_test_cast_failure():
+    # A failing nb::cast<>() inside an overloaded function body must surface
+    # as cast_error and must not silently re-dispatch to another overload.
+    assert t.test_cast_redispatch("x") == "x"
+    with pytest.raises(RuntimeError):
+        t.test_cast_redispatch("abc")
 
 
 def test37_test_str():

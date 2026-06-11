@@ -364,6 +364,15 @@ NB_MODULE(test_functions_ext, m) {
         return nb::cast<const char *>(h);
     });
 
+    // Two overloads where the first matches any object and internally performs
+    // a 'nb::cast<char>' that fails for multi-character strings. A failing cast
+    // must surface as cast_error rather than silently re-dispatching to the
+    // second (string) overload.
+    m.def("test_cast_redispatch", [](nb::handle h) {
+        return std::string(1, nb::cast<char>(h));
+    });
+    m.def("test_cast_redispatch", [](const char *s) { return std::string(s); });
+
     m.def("test_set", []() {
         nb::set s;
         s.add("123");

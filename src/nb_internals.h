@@ -520,6 +520,7 @@ struct pyobj_name {
         max_version_str,    // string "max_version"
         dl_device_str,      // string "dl_device"
         module_str,         // string "__module__"
+        dunder_new_str,     // string "__new__"
         string_count,
 
         copy_tpl = string_count,  // tuple ("copy")

@@ -278,15 +278,24 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
 
     uint32_t flags = t->flags;
     if ((flags & (uint32_t) enum_flags::is_flag) != 0) {
-        handle enum_tp(t->type_py);
+        PyObject *enum_tp = (PyObject *) t->type_py;
 
         object val;
         if (flags & (uint32_t) enum_flags::is_signed)
             val = steal(PyLong_FromLongLong((long long) key));
         else
             val = steal(PyLong_FromUnsignedLongLong((unsigned long long) key));
+        if (!val.is_valid())
+            return nullptr;
 
-        return enum_tp.attr("__new__")(enum_tp, val).release().ptr();
+        object new_fn = steal(PyObject_GetAttr(
+            enum_tp, static_pyobjects[pyobj_name::dunder_new_str]));
+        if (!new_fn.is_valid())
+            return nullptr;
+
+        // May fail, e.g. for out-of-range bits with a STRICT flag boundary
+        PyObject *args[2] = { enum_tp, val.ptr() };
+        return PyObject_Vectorcall(new_fn.ptr(), args, 2, nullptr);
     }
 
     if (flags & (uint32_t) enum_flags::is_signed)

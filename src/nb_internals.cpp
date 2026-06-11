@@ -480,7 +480,7 @@ static void internals_cleanup() {
     }
 
     if (!leak) {
-        nb_translator_seq* t = p->translators.next;
+        nb_translator_seq* t = p->translators.load_relaxed();
         while (t) {
             nb_translator_seq *next = t->next;
             delete t;
@@ -581,7 +581,8 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
     PyThread_tss_create(p->nb_static_property_disabled);
 #endif
 
-    p->translators = { default_exception_translator, nullptr, nullptr };
+    p->translators.store_release(
+        new nb_translator_seq{ default_exception_translator, nullptr, nullptr });
 
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;

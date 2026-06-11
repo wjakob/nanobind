@@ -605,7 +605,7 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
 static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
     std::exception_ptr e = std::current_exception();
 
-    for (nb_translator_seq *cur = &internals->translators; cur;
+    for (nb_translator_seq *cur = internals->translators.load_acquire(); cur;
          cur = cur->next) {
         try {
             // Try exception translator & forward payload

@@ -466,7 +466,7 @@ struct nb_internals {
 #endif
 
     /// Registered C++ -> Python exception translators
-    nb_translator_seq translators;
+    nb_maybe_atomic<nb_translator_seq *> translators = nullptr;
 
     /// Should nanobind print leak warnings on exit?
     bool print_leak_warnings = true;

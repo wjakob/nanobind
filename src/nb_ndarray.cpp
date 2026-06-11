@@ -458,7 +458,7 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
         format_c = *++format_str;
 
     dlpack::dtype dt { };
-    bool fail = format_str && format_str[1] != '\0';
+    bool fail = format_str && format_str[0] != '\0' && format_str[1] != '\0';
 
     if (!fail) {
         switch (format_c) {

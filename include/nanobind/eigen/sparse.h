@@ -59,8 +59,11 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
             object matrix_type =
                 module_::import_("scipy.sparse")
                     .attr(RowMajor ? "csr_matrix" : "csc_matrix");
-            if (!obj.type().is(matrix_type))
+            if (!obj.type().is(matrix_type)) {
+                if (!(flags & (uint8_t) cast_flags::convert))
+                    return false;
                 obj = matrix_type(obj);
+            }
 
             if (!cast<bool>(obj.attr("has_sorted_indices")))
                 obj.attr("sort_indices")();
@@ -185,7 +188,7 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     Index rows, cols, nnz;
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        flags = ~(uint8_t) cast_flags::convert;
+        flags &= ~(uint8_t) cast_flags::convert;
 
         try {
             object matrix_type =

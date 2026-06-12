@@ -899,3 +899,20 @@ def test_57_accessor_inplace_refleak():
         t.test_accessor_inplace_item(d, [1])
     assert sys.getrefcount(lst) == refs_before
     assert d["x"] == [1, 1, 1, 1, 1]
+
+
+def test_58_concat_adl():
+    # Binding types from a namespace that also declares a function named
+    # 'concat' (e.g. nlohmann::detail) must not interfere with nanobind's
+    # internal signature concatenation (regression test for an ADL issue)
+    a = t.ConcatADLPayload(1)
+    b = t.ConcatADLPayload(2)
+    r = t.concat_adl_pair(a, b)
+    assert isinstance(r, tuple) and len(r) == 2
+    assert r[0].value == 1 and r[1].value == 2
+    assert t.concat_adl_pair.__doc__ == (
+        "concat_adl_pair(arg0: test_functions_ext.ConcatADLPayload, "
+        "arg1: test_functions_ext.ConcatADLPayload, /) "
+        "-> tuple[test_functions_ext.ConcatADLPayload, "
+        "test_functions_ext.ConcatADLPayload]"
+    )

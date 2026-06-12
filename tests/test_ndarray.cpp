@@ -383,6 +383,27 @@ NB_MODULE(test_ndarray_ext, m) {
                                                                  deleter);
     });
 
+    // No owner and automatic policy: the requested copy is unsupported for
+    // these frameworks, so the export must refuse (rather than return a view
+    // aliasing the soon-to-be-freed local buffer).
+    m.def("ret_memview_noowner", []() {
+        double d[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+        return nb::ndarray<nb::memview, double, nb::shape<2, 4>>(d, 2, shape);
+    });
+
+    m.def("ret_array_api_noowner", []() {
+        double d[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+        return nb::ndarray<nb::array_api, double, nb::shape<2, 4>>(d, 2, shape);
+    });
+
+    m.def("ret_noframework_noowner", []() {
+        double d[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+        return nb::ndarray<double, nb::shape<2, 4>>(d, 2, shape);
+    });
+
     m.def("ret_array_api", []() {
         double *d = new double[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };

@@ -1048,6 +1048,21 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         }
     }
 
+    // These frameworks export a raw DLPack capsule or buffer view rather than
+    // a framework array with a copy method, so the requested copy cannot be
+    // performed. Refuse the cast rather than returning a view that would
+    // alias (and possibly outlive) the original storage.
+    if (copy && !th->self &&
+        (framework == no_framework::value || framework == tensorflow::value ||
+         framework == memview::value || framework == array_api::value)) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "nanobind::detail::ndarray_export(): copying the "
+                        "array contents is not supported for this framework; "
+                        "please specify an 'owner' so that the array can be "
+                        "returned without a copy.");
+        return nullptr;
+    }
+
     object o;
     if (copy && framework == no_framework::value && th->self) {
         o = borrow(th->self);

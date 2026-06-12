@@ -15,6 +15,7 @@
 #include <nanobind/stl/detail/traits.h>
 #include <vector>
 #include <algorithm>
+#include <memory>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -158,7 +159,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
           .def("__getitem__",
                [](const Vector &v, const slice &slice) -> Vector * {
                    auto [start, stop, step, length] = slice.compute(v.size());
-                   auto *seq = new Vector();
+                   auto seq = std::make_unique<Vector>();
                    seq->reserve(length);
 
                    for (size_t i = 0; i < length; ++i) {
@@ -166,7 +167,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
                        start += step;
                    }
 
-                   return seq;
+                   return seq.release();
                })
 
           .def("__setitem__",

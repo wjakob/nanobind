@@ -571,7 +571,7 @@ class list : public object {
             raise_python_error();
     }
 
-#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
     detail::fast_iterator begin() const;
     detail::fast_iterator end() const;
 #endif
@@ -1014,6 +1014,7 @@ inline detail::fast_iterator tuple::end() const {
     PyTupleObject *v = (PyTupleObject *) m_ptr;
     return v->ob_item + v->ob_base.ob_size;
 }
+#if !defined(NB_FREE_THREADED)
 inline detail::fast_iterator list::begin() const {
     return ((PyListObject *) m_ptr)->ob_item;
 }
@@ -1021,6 +1022,7 @@ inline detail::fast_iterator list::end() const {
     PyListObject *v = (PyListObject *) m_ptr;
     return v->ob_item + v->ob_base.ob_size;
 }
+#endif
 #endif
 
 template <typename T> void del(detail::accessor<T> &a) { a.del(); }

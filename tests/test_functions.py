@@ -358,6 +358,23 @@ def test29_traceback():
     assert len(matches) == 1
 
 
+def test29_traceback_surrogate_filename():
+    # A traceback frame whose filename/function name contains lone surrogates
+    # (e.g. a script on a path with bytes undecodable in the filesystem
+    # encoding) must not crash python_error::what().
+    code = compile("def g():\n raise RuntimeError('Foo')\ng()",
+                   "bad\udc80name.py", "exec")
+
+    def fn():
+        exec(code, {})
+
+    result = t.test_30(fn)
+    assert "RuntimeError: Foo" in result
+    # Rendered as a placeholder (default build) or a backslash escape (when
+    # formatting via the 'traceback' module on stable-ABI/PyPy builds)
+    assert "unencodable" in result or "\\udc80" in result
+
+
 def test30_noexcept():
     assert t.test_31(123) == 123
     assert t.test_32(123) == 123

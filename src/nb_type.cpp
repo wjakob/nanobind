@@ -176,6 +176,7 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
                 (nb_inst *) PyObject_Realloc(self, sizeof(nb_inst) + sizeof(void *));
 
             if (NB_UNLIKELY(!self_2)) {
+                NB_DECREF_TYPE(tp);
                 PyObject_Free(self);
                 return PyErr_NoMemory();
             }
@@ -1831,6 +1832,8 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     } else {
         PyObject *callback =
             PyCFunction_New(&keep_alive_callback_def, patient);
+        check(callback,
+              "nanobind::detail::keep_alive(): callback creation failed!");
 
         PyObject *weakref = PyWeakref_NewRef(nurse, callback);
         if (!weakref) {
@@ -1840,8 +1843,6 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
                   "reference! Likely, the 'nurse' argument you specified is not "
                   "a weak-referenceable type!");
         }
-        check(callback,
-              "nanobind::detail::keep_alive(): callback creation failed!");
 
         // Increase patient reference count, leak weak reference
         Py_INCREF(patient);

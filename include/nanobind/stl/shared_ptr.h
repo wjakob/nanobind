@@ -81,15 +81,20 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         Td *ptr = caster.operator Td *();
         if constexpr (has_shared_from_this_v<T>) {
             if (ptr) {
+                // Guard against concurrent conversions of the same object,
+                // which would race on its internal 'weak_this' member
+                ft_object_guard guard(src);
                 if (auto sp = ptr->weak_from_this().lock()) {
                     // There is already a C++ shared_ptr for this object. Use it.
                     value = std::static_pointer_cast<T>(std::move(sp));
                     return true;
                 }
+                // Otherwise create a new one. Use shared_from_python<T>(...)
+                // so that future calls to ptr->shared_from_this() can share
+                // ownership with it.
+                value = shared_from_python(ptr, src);
+                return true;
             }
-            // Otherwise create a new one. Use shared_from_python<T>(...)
-            // so that future calls to ptr->shared_from_this() can share
-            // ownership with it.
             value = shared_from_python(ptr, src);
         } else {
             value = std::static_pointer_cast<T>(

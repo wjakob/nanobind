@@ -1,4 +1,6 @@
+import collections.abc as cabc
 from collections.abc import Iterable
+import logging
 import py_stub_test
 from typing import (
     Any,
@@ -89,5 +91,7 @@ def tweak_me(arg: int):
     prior docstring
     remains preserved
     """
+
+def import_me(arg: logging.Logger) -> cabc.Iterable[int]: ...
 
 # a suffix

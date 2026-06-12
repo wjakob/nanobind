@@ -179,10 +179,21 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
                            "The left and right hand side of the slice "
                            "assignment have mismatched sizes!");
 
-                   for (size_t i = 0; i < length; ++i) {
-                       v[start] = value[i];
-                       start += step;
-                    }
+                   // Copy the RHS first when assigning a slice from the
+                   // container itself; otherwise the loop would read elements
+                   // it has already overwritten (e.g. ``v[::-1] = v``).
+                   if (&value == &v) {
+                       Vector copy(value);
+                       for (size_t i = 0; i < length; ++i) {
+                           v[start] = copy[i];
+                           start += step;
+                       }
+                   } else {
+                       for (size_t i = 0; i < length; ++i) {
+                           v[start] = value[i];
+                           start += step;
+                       }
+                   }
                })
 
           .def("__delitem__",

@@ -159,6 +159,22 @@ def test04_vector_slicing():
     check_del(slice(200, 10, -3))
 
 
+def test04b_vector_self_slice_assign():
+    # Assigning a slice from the container itself must match list semantics,
+    # which copy the source first (e.g. ``v[::-1] = v`` reverses in place).
+    l = list(range(100))
+    v = t.VectorInt(l)
+    l[::-1] = l
+    v[::-1] = v
+    assert list(v) == l
+
+    l2 = [1, 2, 3]
+    v2 = t.VectorInt(l2)
+    l2[::-1] = l2
+    v2[::-1] = v2
+    assert list(v2) == l2 == [3, 2, 1]
+
+
 def test05_vector_non_shared():
     v = t.VectorEl()
     v.append(t.El(1))

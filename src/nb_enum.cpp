@@ -53,7 +53,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     if (PyModule_Check(ed->scope)) {
         modname = getattr(scope, "__name__", handle());
     } else {
-        modname = getattr(scope, static_pyobjects[pyobj_name::module_str],
+        modname = getattr(scope, NB_INTERNED(__module__),
                           handle());
 
         object scope_qualname = getattr(scope, "__qualname__", handle());
@@ -160,13 +160,13 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
 
     object el;
     if (issubclass(tp, val_tp))
-        el = val_tp.attr("__new__")(tp, val);
+        el = val_tp.attr(NB_INTERNED(__new__))(tp, val);
     else
-        el = obj_tp.attr("__new__")(tp);
+        el = obj_tp.attr(NB_INTERNED(__new__))(tp);
 
     el.attr("_name_") = name;
     el.attr("__objclass__") = tp;
-    el.attr("__init__")(val);
+    el.attr(NB_INTERNED(__init__))(val);
     el.attr("_sort_order_") = len(member_names);
     el.attr("_value_") = val;
     el.attr("__doc__") = doc ? str(doc) : none();
@@ -197,7 +197,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
 
     if ((t->flags & (uint32_t) enum_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
         PyObject *value_o =
-                PyObject_GetAttr(o, static_pyobjects[pyobj_name::value_str]);
+                PyObject_GetAttr(o, NB_INTERNED(value));
         if (value_o == nullptr) {
             PyErr_Clear();
             return false;
@@ -290,7 +290,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
             return nullptr;
 
         object new_fn = steal(PyObject_GetAttr(
-            enum_tp, static_pyobjects[pyobj_name::dunder_new_str]));
+            enum_tp, NB_INTERNED(__new__)));
         if (!new_fn.is_valid())
             return nullptr;
 

@@ -1532,10 +1532,11 @@ static uint32_t nb_func_render_signature(const func_data *f,
 
                     if (it != internals_->type_c2p_slow.end()) {
                         handle th((PyObject *) it->second->type_py);
-                        buf.put_dstr((borrow<str>(th.attr(
-                            static_pyobjects[pyobj_name::module_str]))).c_str());
+                        buf.put_dstr((borrow<str>(
+                            th.attr(NB_INTERNED(__module__)))).c_str());
                         buf.put('.');
-                        buf.put_dstr((borrow<str>(th.attr("__qualname__"))).c_str());
+                        buf.put_dstr((borrow<str>(
+                            th.attr(NB_INTERNED(__qualname__)))).c_str());
                         found = true;
                     }
                     if (!found) {
@@ -1584,7 +1585,8 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
     func_data *f = nb_func_data(self);
     if ((f->flags & (uint32_t) func_flags::has_scope) &&
         (f->flags & (uint32_t) func_flags::has_name)) {
-        PyObject *scope_name = PyObject_GetAttrString(f->scope, "__qualname__");
+        PyObject *scope_name =
+            PyObject_GetAttr(f->scope, NB_INTERNED(__qualname__));
         if (scope_name) {
             PyObject *result = PyUnicode_FromFormat("%U.%s", scope_name, f->name);
             Py_DECREF(scope_name);
@@ -1602,10 +1604,9 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
 static PyObject *nb_func_get_module(PyObject *self) {
     func_data *f = nb_func_data(self);
     if (f->flags & (uint32_t) func_flags::has_scope) {
-        return PyModule_Check(f->scope)
-                   ? PyObject_GetAttrString(f->scope, "__name__")
-                   : PyObject_GetAttr(f->scope,
-                                      static_pyobjects[pyobj_name::module_str]);
+        return PyObject_GetAttr(f->scope, PyModule_Check(f->scope)
+                                               ? NB_INTERNED(__name__)
+                                               : NB_INTERNED(__module__));
     } else {
         Py_INCREF(Py_None);
         return Py_None;

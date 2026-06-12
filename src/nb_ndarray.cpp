@@ -292,8 +292,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
     // Match a keyword name against an interned reference, falling back to a
     // string comparison since kwnames passed via f(**d) are not guaranteed to
     // be identical to the interned objects.
-    auto key_is = [](PyObject *key, int ref) -> bool {
-        PyObject *r = static_pyobjects[ref];
+    auto key_is = [](PyObject *key, PyObject *r) -> bool {
         return key == r || PyObject_RichCompareBool(key, r, Py_EQ) == 1;
     };
 
@@ -320,14 +319,14 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
         PyObject* key = NB_TUPLE_GET_ITEM(kwnames, i);
         PyObject* value = args[i];
         long a, b;
-        if (key_is(key, pyobj_name::copy_str)) {
+        if (key_is(key, NB_INTERNED(copy))) {
             // The capsule aliases C++-owned storage; a copy cannot be made
             if (value == Py_True) {
                 PyErr_SetString(PyExc_BufferError,
                         "__dlpack__(): copy=True is not supported.");
                 return nullptr;
             }
-        } else if (key_is(key, pyobj_name::dl_device_str)) {
+        } else if (key_is(key, NB_INTERNED(dl_device))) {
             // Reject requests for a device other than the array's own
             if (value != Py_None &&
                 (!get_int_pair(value, &a, &b) ||
@@ -337,7 +336,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
                         "__dlpack__(): unsupported dl_device.");
                 return nullptr;
             }
-        } else if (key_is(key, pyobj_name::max_version_str)) {
+        } else if (key_is(key, NB_INTERNED(max_version))) {
             if (value != Py_None) {
                 if (!get_int_pair(value, &a, &b)) {
                     PyErr_SetString(PyExc_TypeError,
@@ -550,7 +549,7 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
 }
 
 bool ndarray_check(PyObject *o) noexcept {
-    if (PyObject_HasAttr(o, static_pyobjects[pyobj_name::dunder_dlpack_str]) ||
+    if (PyObject_HasAttr(o, NB_INTERNED(__dlpack__)) ||
         PyObject_CheckBuffer(o))
         return true;
 
@@ -597,7 +596,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         PyObject* args[] = {src, static_pyobjects[pyobj_name::dl_version_tpl]};
         Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
         capsule = steal(PyObject_VectorcallMethod(
-                          static_pyobjects[pyobj_name::dunder_dlpack_str],
+                          NB_INTERNED(__dlpack__),
                           args, nargsf,
                           static_pyobjects[pyobj_name::max_version_tpl]));
 
@@ -606,7 +605,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         if (!capsule.is_valid() && PyErr_ExceptionMatches(PyExc_TypeError)) {
             PyErr_Clear();
             capsule = steal(PyObject_VectorcallMethod(
-                              static_pyobjects[pyobj_name::dunder_dlpack_str],
+                              NB_INTERNED(__dlpack__),
                               args, nargsf, nullptr));
         }
 
@@ -621,7 +620,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
             PyTypeObject *tp = Py_TYPE(src);
             try {
                 object mod = steal(PyObject_GetAttr(
-                    (PyObject *) tp, static_pyobjects[pyobj_name::module_str]));
+                    (PyObject *) tp, NB_INTERNED(__module__)));
                 const char *module_name =
                     mod.is_valid()
                         ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr)
@@ -757,7 +756,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         PyTypeObject *tp = Py_TYPE(src);
 
         object mod = steal(PyObject_GetAttr(
-            (PyObject *) tp, static_pyobjects[pyobj_name::module_str]));
+            (PyObject *) tp, NB_INTERNED(__module__)));
         const char *module_name =
             mod.is_valid() ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr)
                            : nullptr;
@@ -1097,7 +1096,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
                                 (copy) ? Py_True : Py_False};
             Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             return PyObject_VectorcallMethod(
-                        static_pyobjects[pyobj_name::array_str], args, nargsf,
+                        NB_INTERNED(array), args, nargsf,
                         static_pyobjects[pyobj_name::copy_tpl]);
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_TypeError,
@@ -1132,7 +1131,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
             PyObject* args[] = {pkg_mod.ptr(), o.ptr()};
             Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             o = steal(PyObject_VectorcallMethod(
-                          static_pyobjects[pyobj_name::from_dlpack_str],
+                          NB_INTERNED(from_dlpack),
                           args, nargsf, nullptr));
         }
     } catch (const std::exception &e) {
@@ -1143,9 +1142,9 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     }
 
     if (copy) {
-        PyObject* copy_function_name = static_pyobjects[pyobj_name::copy_str];
+        PyObject* copy_function_name = NB_INTERNED(copy);
         if (framework == pytorch::value)
-            copy_function_name = static_pyobjects[pyobj_name::clone_str];
+            copy_function_name = NB_INTERNED(clone);
 
         try {
             o = o.attr(copy_function_name)();

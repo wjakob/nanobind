@@ -507,20 +507,32 @@ struct nb_internals {
     uint32_t lifeline_generation = 0;
 };
 
+// Pre-interned strings in the per-module state array, alphabetically
+// sorted. Use NB_INTERNED(name) below to access an entry.
+#define NB_INTERNED_STRINGS(X)                                                 \
+    X(__complex__)                                                             \
+    X(__dlpack__)                                                              \
+    X(__init__)                                                                \
+    X(__length_hint__)                                                         \
+    X(__module__)                                                              \
+    X(__name__)                                                                \
+    X(__new__)                                                                 \
+    X(__qualname__)                                                            \
+    X(array)                                                                   \
+    X(clone)                                                                   \
+    X(copy)                                                                    \
+    X(dl_device)                                                               \
+    X(from_dlpack)                                                             \
+    X(max_version)                                                             \
+    X(value)
+
 // Names for the PyObject* entries in the per-module state array.
 // These names are scoped, but will implicitly convert to int.
 struct pyobj_name {
     enum : int {
-        value_str = 0,      // string "value"
-        copy_str,           // string "copy"
-        clone_str,          // string "clone"
-        array_str,          // string "array"
-        from_dlpack_str,    // string "from_dlpack"
-        dunder_dlpack_str,  // string "__dlpack__"
-        max_version_str,    // string "max_version"
-        dl_device_str,      // string "dl_device"
-        module_str,         // string "__module__"
-        dunder_new_str,     // string "__new__"
+        #define NB_INTERNED_ENTRY(name) interned_##name,
+        NB_INTERNED_STRINGS(NB_INTERNED_ENTRY)
+        #undef NB_INTERNED_ENTRY
         string_count,
 
         copy_tpl = string_count,  // tuple ("copy")
@@ -532,6 +544,9 @@ struct pyobj_name {
 };
 
 extern PyObject *static_pyobjects[];
+
+/// Access the pre-interned string constant 'name', e.g. NB_INTERNED(__name__)
+#define NB_INTERNED(name) static_pyobjects[pyobj_name::interned_##name]
 
 extern void internals_inc_ref();
 extern void internals_dec_ref();

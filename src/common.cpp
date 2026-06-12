@@ -238,7 +238,7 @@ size_t obj_len_hint(PyObject *o) noexcept {
     }
 
     try {
-        return cast<size_t>(handle(o).attr("__length_hint__")());
+        return cast<size_t>(handle(o).attr(NB_INTERNED(__length_hint__))());
     } catch (...) {
         return 0;
     }
@@ -968,7 +968,7 @@ NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
     // functions PyComplex_{Real,Imag}AsDouble(), so we do so ourselves.
     if (!is_complex && convert
             && !PyType_IsSubtype(Py_TYPE(ob), &PyComplex_Type)
-            && PyObject_HasAttrString(ob, "__complex__")) {
+            && PyObject_HasAttr(ob, NB_INTERNED(__complex__))) {
         PyObject* tmp = PyObject_CallFunctionObjArgs(
                 (PyObject*) &PyComplex_Type, ob, NULL);
         if (tmp) {

@@ -87,7 +87,7 @@ struct str_attr {
 
 struct obj_attr {
     static constexpr bool cache_dec_ref = true;
-    using key_type = handle;
+    using key_type = object;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
         detail::getattr_or_raise(obj, key.ptr(), cache);
@@ -122,7 +122,7 @@ struct str_item {
 
 struct obj_item {
     static constexpr bool cache_dec_ref = true;
-    using key_type = handle;
+    using key_type = object;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
         detail::getitem_or_raise(obj, key.ptr(), cache);

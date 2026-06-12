@@ -13,6 +13,10 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+// Note: nb_type_get_implicit() reads the conversion arrays grown below without
+// holding the internals lock. This is safe because conversions are registered
+// while binding a type, which never overlaps with concurrent use of that type.
+
 void implicitly_convertible(const std::type_info *src,
                             const std::type_info *dst) noexcept {
     nb_internals *internals_ = internals;

@@ -41,6 +41,9 @@ struct managed_dltensor_versioned {
 };
 
 static void mt_from_buffer_delete(managed_dltensor_versioned* self) {
+    // Don't run the cleanup if the interpreter has been shut down
+    if (!is_alive())
+        return;
     gil_scoped_acquire guard;
     Py_buffer *buf = (Py_buffer *) self->manager_ctx;
     PyBuffer_Release(buf);
@@ -53,6 +56,9 @@ struct ndarray_handle;
 
 template<typename MT>
 static void mt_from_handle_delete(MT* self) {
+    // Don't run the cleanup if the interpreter has been shut down
+    if (!is_alive())
+        return;
     gil_scoped_acquire guard;
     ndarray_handle* th = (ndarray_handle *) self->manager_ctx;
     PyMem_Free(self);
@@ -892,6 +898,9 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
     if (rc_value == 0) {
         check(false, "ndarray_dec_ref(): reference count became negative!");
     } else if (rc_value == 1) {
+        // Don't run the cleanup if the interpreter has been shut down
+        if (!is_alive())
+            return;
         gil_scoped_acquire guard;
 
         Py_XDECREF(th->owner);

@@ -875,10 +875,12 @@ void *type_get_slot(PyTypeObject *t, int slot_id) {
     if (PyType_HasFeature(t, Py_TPFLAGS_HEAPTYPE)) {
         return ((void **) t)[slot.direct];
     } else {
-        if (slot.indirect_1)
-            return ((void ***) t)[slot.indirect_1][slot.indirect_2];
-        else
+        if (slot.indirect_1) {
+            void **group = ((void ***) t)[slot.indirect_1];
+            return group ? group[slot.indirect_2] : nullptr;
+        } else {
             return ((void **) t)[slot.indirect_2];
+        }
     }
 }
 #endif

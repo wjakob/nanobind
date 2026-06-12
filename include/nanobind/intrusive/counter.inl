@@ -123,11 +123,16 @@ void intrusive_counter::set_self_py(PyObject *o) noexcept {
     uintptr_t v = NB_ATOMIC_LOAD(&m_state);
 
     if (v & 1) {
-        v >>= 1;
-        for (uintptr_t i = 0; i < v; ++i)
-            intrusive_inc_ref_py(o);
+        // Transfer the C++ reference count to the Python object. The CAS loop
+        // accounts for concurrent inc_ref()/dec_ref() calls modifying the count.
+        uintptr_t transferred = 0;
+        do {
+            for (uintptr_t count = v >> 1; transferred < count; ++transferred)
+                intrusive_inc_ref_py(o);
+        } while (!NB_ATOMIC_CMPXCHG(&m_state, &v, (uintptr_t) o));
 
-        NB_ATOMIC_STORE(&m_state, (uintptr_t) o);
+        for (uintptr_t count = v >> 1; transferred > count; --transferred)
+            intrusive_dec_ref_py(o);
     } else {
         fprintf(stderr,
                 "intrusive_counter::set_self_py(%p): a Python object was "

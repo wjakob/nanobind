@@ -165,6 +165,8 @@ struct num_item_list {
 
     NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
         #if defined(Py_GIL_DISABLED)
+            if (*cache)
+                return;
             *cache = PyList_GetItemRef(obj, index);
         #else
             *cache = NB_LIST_GET_ITEM(obj, index);

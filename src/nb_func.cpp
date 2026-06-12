@@ -1176,7 +1176,8 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
     const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
-    bool is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+    const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -1186,7 +1187,7 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
 
     if (kwargs_in == nullptr && nargs_in == 1 && args_in[0] != Py_None) {
         PyObject *arg = args_in[0];
-        cleanup_list cleanup(arg);
+        cleanup_list cleanup(is_method ? arg : nullptr);
         uint8_t args_flags[1] = {
             (uint8_t) (is_constructor ? (1 | (uint8_t) cast_flags::construct) : 1)
         };

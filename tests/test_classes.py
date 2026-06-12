@@ -127,6 +127,17 @@ def test06_reference_internal(clean):
     del s
 
 
+def test06b_reference_internal_free(clean):
+    # A free function with reference_internal has no 'self' to keep-alive the
+    # result on. It must fail consistently regardless of arity (the 1-arg case
+    # is dispatched via the 'simple_1' vectorcall path, which previously
+    # mistakenly used its sole argument as the cleanup 'self').
+    with pytest.raises(TypeError):
+        t.create_reference_internal_free()
+    with pytest.raises(TypeError):
+        t.create_reference_internal_free_1arg(0)
+
+
 def test07_big():
     x = [t.Big() for i in range(1024)]
     x2 = [t.BigAligned() for i in range(1024)]

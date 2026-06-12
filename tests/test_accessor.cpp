@@ -36,4 +36,18 @@ NB_MODULE(test_accessor_ext, m) {
         d[key] += nb::int_(1);
         return d;
     });
+
+    // Regression test for a dangling/non-owning accessor key: an accessor
+    // created from a handle key must keep that key alive for its own lifetime.
+    m.def("test_obj_item_accessor_owns_key", []() {
+        nb::dict d;
+        // Use a freshly constructed (hence non-immortal) key so that
+        // refcount changes are observable.
+        nb::object key = nb::make_tuple(nb::int_(0xdead), nb::int_(0xbeef));
+        d[key] = nb::int_(7);
+        Py_ssize_t before = Py_REFCNT(key.ptr());
+        auto acc = d[key];
+        Py_ssize_t during = Py_REFCNT(key.ptr());
+        return nb::cast<int>(acc) == 7 && during == before + 1;
+    });
 }

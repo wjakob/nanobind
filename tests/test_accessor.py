@@ -39,3 +39,11 @@ def test_04_obj_item_inplace_mutation():
     assert len(d) == 1
     assert d.keys() == {0}
     assert d[0] == 1  # dict lookup
+
+
+def test_05_obj_item_accessor_owns_key():
+    """
+    An accessor created from a handle key (obj[h] on the C++ side) must keep
+    a reference to that key alive for its own lifetime.
+    """
+    assert t.test_obj_item_accessor_owns_key()

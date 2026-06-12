@@ -12,6 +12,7 @@ enum class UnsignedFlag : uint64_t {
      All = (uint64_t) -1,
 };
 enum class SEnum : int32_t { A, B, C = (int32_t) -1 };
+enum class Color { Red, Green, Blue };
 enum ClassicEnum { Item1, Item2 };
 
 struct EnumProperty { Enum get_enum() { return Enum::A; } };
@@ -127,4 +128,13 @@ NB_MODULE(test_enum_ext, m) {
     ew.def(nb::init_implicit<EnumWrapper::Value>())
       .def(nb::self == EnumWrapper::Value())
       .def("get_value", &EnumWrapper::get_value);
+
+    nb::enum_<Color>(m, "Color", "string-valued enum", nb::is_str())
+        .str_value("Red",   Color::Red,   "red")
+        .str_value("Green", Color::Green, "green")
+        .str_value("Blue",  Color::Blue,  "blue");
+
+    m.def("from_color", [](Color c) { return (int) c; }, nb::arg().noconvert());
+    m.def("from_color_implicit", [](Color c) { return (int) c; });
+    m.def("to_color", [](int v) { return (Color) v; });
 }

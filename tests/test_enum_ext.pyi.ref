@@ -149,3 +149,18 @@ class EnumWrapper:
     def __eq__(self, arg: Value, /) -> bool: ...
 
     def get_value(self) -> Value: ...
+
+class Color(enum.StrEnum):
+    """string-valued enum"""
+
+    Red = 'red'
+
+    Green = 'green'
+
+    Blue = 'blue'
+
+def from_color(arg: Color) -> int: ...
+
+def from_color_implicit(arg: Color, /) -> int: ...
+
+def to_color(arg: int, /) -> Color: ...

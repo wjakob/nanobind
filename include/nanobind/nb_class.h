@@ -231,7 +231,10 @@ enum class enum_flags : uint32_t {
     is_signed                = (1 << 2),
 
     /// Is the underlying enumeration type Flag?
-    is_flag                = (1 << 3)
+    is_flag                = (1 << 3),
+
+    /// Is this a string-valued enumeration (StrEnum)?
+    is_str                 = (1 << 4)
 };
 
 struct enum_init_data {
@@ -248,6 +251,10 @@ NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, is_flag) {
     e.flags |= (uint32_t) enum_flags::is_flag;
+}
+
+NB_INLINE void enum_extra_apply(enum_init_data &e, is_str) {
+    e.flags |= (uint32_t) enum_flags::is_str;
 }
 
 NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {
@@ -812,7 +819,13 @@ public:
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
-        detail::enum_append(m_ptr, name, (int64_t) value, doc);
+        detail::enum_append(m_ptr, name, (int64_t) value, nullptr, doc);
+        return *this;
+    }
+
+    NB_INLINE enum_ &str_value(const char *name, T value, const char *str_val,
+                               const char *doc = nullptr) {
+        detail::enum_append(m_ptr, name, (int64_t) value, str_val, doc);
         return *this;
     }
 

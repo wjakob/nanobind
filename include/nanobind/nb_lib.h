@@ -446,9 +446,10 @@ struct enum_init_data;
 /// Create a new enumeration type
 NB_CORE PyObject *enum_create(enum_init_data *) noexcept;
 
-/// Append an entry to an enumeration
-NB_CORE void enum_append(PyObject *tp, const char *name,
-                         int64_t value, const char *doc) noexcept;
+/// Append an entry to an enumeration. For StrEnum members, 'str_value' carries
+/// the string value; for all other enumerations it must be nullptr.
+NB_CORE void enum_append(PyObject *tp, const char *name, int64_t value,
+                         const char *str_value, const char *doc) noexcept;
 
 // Query an enumeration's Python object -> integer value map
 NB_CORE bool enum_from_python(const std::type_info *, PyObject *, int64_t *,

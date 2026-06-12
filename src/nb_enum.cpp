@@ -46,6 +46,11 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
 
     bool is_arithmetic = ed->flags & (uint32_t) enum_flags::is_arithmetic;
     bool is_flag = ed->flags & (uint32_t) enum_flags::is_flag;
+    bool is_str = ed->flags & (uint32_t) enum_flags::is_str;
+
+    if (is_str && (is_flag || is_arithmetic))
+        fail("nanobind: is_str cannot be combined with is_flag or "
+             "is_arithmetic (enumeration \"%s\")", ed->name);
 
     str name(ed->name), qualname = name;
     object modname;
@@ -70,12 +75,28 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
         factory_name = "Flag";
     else if (is_arithmetic)
         factory_name = "IntEnum";
+    else if (is_str)
+        factory_name = "StrEnum";
 
-    object enum_mod = module_::import_("enum"),
-           factory = enum_mod.attr(factory_name),
-           result = factory(name, nanobind::tuple(),
-                            arg("module") = modname,
-                            arg("qualname") = qualname);
+    object enum_mod = module_::import_("enum");
+    object result;
+
+#if PY_VERSION_HEX < 0x030B0000
+    // enum.StrEnum was added in Python 3.11. On earlier versions, fall back to
+    // bare Enum with type=str, which produces an equivalent class derived from (str, Enum).
+    if (is_str) {
+        handle str_tp((PyObject *) &PyUnicode_Type);
+        result = enum_mod.attr("Enum")(name, nanobind::tuple(),
+                                       arg("module") = modname,
+                                       arg("qualname") = qualname,
+                                       arg("type") = str_tp);
+    } else
+#endif
+    {
+        result = enum_mod.attr(factory_name)(name, nanobind::tuple(),
+                                             arg("module") = modname,
+                                             arg("qualname") = qualname);
+    }
 
     scope.attr(name) = result;
     result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();
@@ -121,18 +142,35 @@ static type_init_data *enum_get_type_data(handle tp) {
 }
 
 void enum_append(PyObject *tp_, const char *name_, int64_t value_,
-                 const char *doc) noexcept {
+                 const char *str_value_, const char *doc) noexcept {
     handle tp(tp_),
            val_tp(&PyLong_Type),
+           str_tp((PyObject *) &PyUnicode_Type),
            obj_tp((PyObject *) &PyBaseObject_Type);
 
     type_data *t = enum_get_type_data(tp);
+    bool is_str = (t->flags & (uint32_t) enum_flags::is_str);
+
+    if (is_str && !str_value_)
+        fail("enum_append(): StrEnum member \"%s.%s\" must be added with "
+             "str_value() instead of value().", t->name, name_);
+
+    if (!is_str && str_value_)
+        fail("enum_append(): str_value() can only be used on enumerations "
+             "declared with nb::is_str() (member \"%s.%s\").",
+             t->name, name_);
 
     object val;
-    if (t->flags & (uint32_t) enum_flags::is_signed)
+    if (is_str) {
+        val = steal(PyUnicode_InternFromString(str_value_));
+        if (!val.is_valid())
+            fail("enum_append(): unable to intern string value for \"%s.%s\"",
+                 t->name, name_);
+    } else if (t->flags & (uint32_t) enum_flags::is_signed) {
         val = steal(PyLong_FromLongLong((long long) value_));
-    else
+    } else {
         val = steal(PyLong_FromUnsignedLongLong((unsigned long long) value_));
+    }
 
     dict value_map = tp.attr("_value2member_map_"),
          member_map = tp.attr("_member_map_");
@@ -159,7 +197,9 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     #endif
 
     object el;
-    if (issubclass(tp, val_tp))
+    if (issubclass(tp, str_tp))
+        el = str_tp.attr(NB_INTERNED(__new__))(tp, val);
+    else if (issubclass(tp, val_tp))
         el = val_tp.attr(NB_INTERNED(__new__))(tp, val);
     else
         el = obj_tp.attr(NB_INTERNED(__new__))(tp);
@@ -234,6 +274,30 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     if (flags & (uint8_t) cast_flags::convert) {
         enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
 
+        if (t->flags & (uint32_t) enum_flags::is_str) {
+            if (!isinstance<str>(o))
+                return false;
+            PyObject *vmap = PyObject_GetAttrString(
+                (PyObject *) t->type_py, "_value2member_map_");
+            if (vmap) {
+                PyObject *member = PyDict_GetItemWithError(vmap, o);
+                Py_DECREF(vmap);
+                if (member) {
+                    enum_map::iterator it3 =
+                        rev->find((int64_t) (uintptr_t) member);
+                    if (it3 != rev->end()) {
+                        *out = it3->second;
+                        return true;
+                    }
+                } else if (PyErr_Occurred()) {
+                    PyErr_Clear();
+                }
+            } else {
+                PyErr_Clear();
+            }
+            return false;
+        }
+
         if (t->flags & (uint32_t) enum_flags::is_signed) {
             long long value = PyLong_AsLongLong(o);
             if (value == -1 && PyErr_Occurred()) {
@@ -300,7 +364,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
     }
 
     if (flags & (uint32_t) enum_flags::is_signed)
-        PyErr_Format(PyExc_ValueError, "%lli is not a valid %s.",
+        PyErr_Format(PyExc_ValueError, "%lld is not a valid %s.",
                      (long long) key, t->name);
     else
         PyErr_Format(PyExc_ValueError, "%llu is not a valid %s.",

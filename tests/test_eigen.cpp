@@ -269,6 +269,14 @@ NB_MODULE(test_eigen_ext, m) {
         return nb::cast<Eigen::Ref<const Eigen::VectorXi, Eigen::Unaligned, Eigen::InnerStride<3>>>(obj);
     });
 
+    // Single-argument nb::cast() with reference_internal has no parent/cleanup;
+    // this must fail gracefully instead of crashing.
+    m.def("castRefInternalNoParent", []() -> nb::object {
+        Eigen::MatrixXf m(2, 2);
+        m << 1, 2, 3, 4;
+        return nb::cast(m, nb::rv_policy::reference_internal);
+    });
+
     struct Base {
         virtual ~Base() = default;
         virtual void modRefData(Eigen::Ref<Eigen::VectorXd>) {}

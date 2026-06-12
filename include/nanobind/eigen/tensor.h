@@ -201,7 +201,10 @@ struct type_caster<
             });
             ptr = tmp->data();
             policy = rv_policy::reference;
-        } else if (policy == rv_policy::reference_internal && cleanup->self()) {
+        } else if (policy == rv_policy::reference_internal) {
+            // reference_internal needs a self pointer; give up if unavailable
+            if (!cleanup || !cleanup->self())
+                return handle();
             owner = borrow(cleanup->self());
             policy = rv_policy::reference;
         }

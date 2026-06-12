@@ -631,6 +631,16 @@ NB_MODULE(test_classes_ext, m) {
     m.def("none_3", [](Struct *s) { return s == nullptr; }, nb::arg().none());
     m.def("none_4", [](Struct *s) { return s == nullptr; }, nb::arg("arg").none());
 
+    // A single-argument free function (dispatched via the 'simple_1'
+    // vectorcall path) must not treat its sole argument as the cleanup-list
+    // 'self'. With reference_internal and no self, the call must fail rather
+    // than silently keep-aliving the result on the argument.
+    m.def("create_reference_internal_free", []() { return struct_tmp.get(); },
+          nb::rv_policy::reference_internal);
+    m.def("create_reference_internal_free_1arg",
+          [](int) { return struct_tmp.get(); },
+          nb::rv_policy::reference_internal);
+
     // test25_is_final
     struct FinalType { };
     nb::class_<FinalType>(m, "FinalType", nb::is_final())

@@ -171,6 +171,23 @@ NB_MODULE(test_eigen_ext, m) {
     m.def("sparse_complex", [](Eigen::SparseMatrix<std::complex<double>> x) -> Eigen::SparseMatrix<std::complex<double>> { return x; });
     m.def("sparse_complex_map_c", [](Eigen::Map<Eigen::SparseMatrix<std::complex<double>>> x) { return x; });
 
+    // A holder owning a sparse matrix. `data_ptr()` reports the address of its
+    // value buffer; `move_out()` returns the matrix by value (move path). The
+    // test verifies that the buffer is *moved* into the resulting scipy array
+    // (its data pointer matches data_ptr()) rather than deep-copied.
+    struct SparseHolder {
+        SparseMatrixR mat;
+        SparseHolder() : mat(Eigen::SparseView<Eigen::MatrixXf>(Eigen::MatrixXf::Identity(64, 64))) {
+            mat.makeCompressed();
+        }
+        uintptr_t data_ptr() const { return (uintptr_t) mat.valuePtr(); }
+        SparseMatrixR move_out() { return mat.markAsRValue(); }
+    };
+    nb::class_<SparseHolder>(m, "SparseHolder")
+        .def(nb::init<>())
+        .def("data_ptr", &SparseHolder::data_ptr)
+        .def("move_out", &SparseHolder::move_out);
+
     m.def("sparse_map_c", [](const Eigen::Map<const SparseMatrixC> &c) { return c; }, nb::rv_policy::reference);
     m.def("sparse_map_r", [](const Eigen::Map<const SparseMatrixR> &r) { return r; }, nb::rv_policy::reference);
 

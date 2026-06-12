@@ -394,6 +394,13 @@ def test12_cast():
             t.castToRef03CnstVXi(v)
 
 @needs_numpy_and_eigen
+def test12b_cast_reference_internal_no_parent():
+    # Single-argument nb::cast() with reference_internal lacks a parent;
+    # this must fail gracefully rather than crash.
+    with pytest.raises(RuntimeError, match='bad[_ ]cast'):
+        t.castRefInternalNoParent()
+
+@needs_numpy_and_eigen
 def test13_mutate_python():
     class Derived(t.Base):
         def modRefData(self, input):

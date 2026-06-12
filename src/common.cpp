@@ -278,15 +278,16 @@ PyObject *obj_op_2(PyObject *a, PyObject *b,
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
     PyObject *res = nullptr;
-    bool gil_error = false, cast_error = false;
+    bool cast_error = false;
 
     size_t nargs_total = (size_t) (PyVectorcall_NARGS(nargsf) +
                          (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
 
 #if !defined(Py_LIMITED_API)
     if (!PyGILState_Check()) {
-        gil_error = true;
-        goto end;
+        // Deliberately leak the argument references: decref'ing them without
+        // holding the GIL would be undefined behavior, and we are about to raise.
+        raise("nanobind::detail::obj_vectorcall(): PyGILState_Check() failure.");
     }
 #endif
 
@@ -309,8 +310,6 @@ end:
     if (!res) {
         if (cast_error)
             raise_python_or_cast_error();
-        else if (gil_error)
-            raise("nanobind::detail::obj_vectorcall(): PyGILState_Check() failure.");
         else
             raise_python_error();
     }

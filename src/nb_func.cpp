@@ -37,6 +37,8 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *, PyObject *const *,
                                              size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_simple(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
+static PyObject *nb_func_vectorcall_medium(PyObject *, PyObject *const *,
+                                           size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
 static uint32_t nb_func_render_signature(const func_data *f,
@@ -302,16 +304,24 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     make_immortal((PyObject *) func);
     internals_inc_ref();
 
-    // Check if the complex dispatch loop is needed
-    bool complex_call = can_mutate_args || has_var_kwargs || has_var_args ||
-                        f->nargs > NB_MAXARGS_SIMPLE;
+    // Determine which dispatcher this overload needs
+    call_complexity complexity = call_complexity::simple;
 
-    if (has_args) {
-        for (size_t i = is_method; i < f->nargs; ++i) {
-            arg_data &a = args_in[i - is_method];
-            complex_call |= a.name != nullptr || a.value != nullptr ||
-                            a.flag != cast_flags::convert;
+    if (has_var_kwargs || has_var_args || f->nargs > NB_MAXARGS_SIMPLE) {
+        complexity = call_complexity::complex;
+    } else {
+        bool medium_call = can_mutate_args;
+
+        if (has_args) {
+            for (size_t i = is_method; i < f->nargs; ++i) {
+                arg_data &a = args_in[i - is_method];
+                medium_call |= a.name != nullptr || a.value != nullptr ||
+                               a.flag != cast_flags::convert;
+            }
         }
+
+        if (medium_call)
+            complexity = call_complexity::medium;
     }
 
     uint32_t max_nargs = f->nargs;
@@ -320,7 +330,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     if (func_prev) {
         nb_func *nb_func_prev = (nb_func *) func_prev;
-        complex_call |= nb_func_prev->complex_call;
+        complexity = std::max(complexity, nb_func_prev->complexity);
         max_nargs = std::max(max_nargs, nb_func_prev->max_nargs);
 
         func_data *cur  = nb_func_data(func),
@@ -344,12 +354,13 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     }
 
     func->max_nargs = max_nargs;
-    func->complex_call = complex_call;
-
+    func->complexity = complexity;
 
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
-    if (complex_call) {
+    if (complexity == call_complexity::complex) {
         vectorcall = nb_func_vectorcall_complex;
+    } else if (complexity == call_complexity::medium) {
+        vectorcall = nb_func_vectorcall_medium;
     } else {
         if (f->nargs == 0 && !prev_overloads)
             vectorcall = nb_func_vectorcall_simple_0;
@@ -883,6 +894,133 @@ done:
         result = error_handler(self, args_in, nargs_in, kwargs_in);
 
     return result;
+}
+
+/// Positional-only part of nb_func_vectorcall_medium below. NB_NOINLINE keeps
+/// the wrapper frameless so that both of its branches become tail calls.
+static NB_NOINLINE PyObject *
+nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
+                              size_t nargsf, PyObject *kwargs_in) noexcept {
+    const size_t count    = (size_t) Py_SIZE(self),
+                 nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
+
+    func_data *fr = nb_func_data(self);
+
+    const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
+               is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
+
+    PyObject *result = nullptr,
+             *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
+
+    // Handler routine that will be invoked in case of an error condition
+    PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
+                               PyObject *) noexcept = nullptr;
+
+    // Small array holding temporaries (implicit conversion etc.)
+    cleanup_list cleanup(self_arg);
+
+    PyObject *args[NB_MAXARGS_SIMPLE];
+    uint8_t args_flags[NB_MAXARGS_SIMPLE];
+
+    for (size_t pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
+        for (size_t k = 0; k < count; ++k) {
+            const func_data *f = fr + k;
+            const bool has_args = f->flags & (uint32_t) func_flags::has_args;
+            const size_t nargs = f->nargs;
+
+            if (nargs_in > f->nargs_pos)
+                continue; // Too many positional arguments given for this overload
+
+            if (nargs_in < nargs && !has_args)
+                continue; // Not enough positional arguments, no defaults available
+
+            // Copy positional arguments, substitute defaults for the rest.
+            // Parameters at index >= nargs_pos (keyword-only) always take the
+            // default branch here since nargs_in <= nargs_pos was checked above.
+            size_t i = 0;
+            for (; i < nargs; ++i) {
+                PyObject *arg = i < nargs_in ? args_in[i] : nullptr;
+                uint8_t arg_flag = (uint8_t) cast_flags::convert;
+
+                if (has_args) {
+                    const arg_data &ad = f->args[i];
+                    if (!arg)
+                        arg = ad.value;
+                    arg_flag = ad.flag;
+                }
+
+                if (!arg || (arg == Py_None &&
+                             (arg_flag & cast_flags::accepts_none) == 0))
+                    break;
+
+                args_flags[i] = arg_flag & ~uint8_t(pass == 0);
+                args[i] = arg;
+            }
+
+            // Skip this overload if any arguments were unavailable
+            if (i != nargs)
+                continue;
+
+            if (is_constructor)
+                args_flags[0] |= (uint8_t) cast_flags::construct;
+
+            rv_policy policy = (rv_policy) (f->flags & 0b111);
+
+            try {
+                result = nullptr;
+
+                // Found a suitable overload, let's try calling it
+                result = f->impl((void *) f->capture, args, args_flags,
+                                 policy, &cleanup);
+
+                if (NB_UNLIKELY(!result))
+                    error_handler = nb_func_error_noconvert;
+            } catch (builtin_exception &e) {
+                if (!set_builtin_exception_status(e))
+                    result = NB_NEXT_OVERLOAD;
+            } catch (python_error &e) {
+                e.restore();
+            } catch (...) {
+                nb_func_convert_cpp_exception();
+            }
+
+            if (result != NB_NEXT_OVERLOAD) {
+                if (is_constructor && result != nullptr) {
+                    nb_inst *self_arg_nb = (nb_inst *) self_arg;
+                    self_arg_nb->state.destruct = true;
+                    self_arg_nb->state.state = nb_inst_state::state_ready;
+                    if (NB_UNLIKELY(self_arg_nb->state.intrusive))
+                        nb_type_data(Py_TYPE(self_arg))
+                            ->set_self_py(inst_ptr(self_arg_nb), self_arg);
+                }
+
+                goto done;
+            }
+        }
+    }
+
+    error_handler = nb_func_error_overload;
+
+done:
+    if (NB_UNLIKELY(cleanup.used()))
+        cleanup.release();
+
+    if (NB_UNLIKELY(error_handler))
+        result = error_handler(self, args_in, nargs_in, kwargs_in);
+
+    return result;
+}
+
+/// Dispatcher for functions with named/default/flagged arguments. Calls that
+/// pass keyword arguments are forwarded to the complex dispatcher. This thin
+/// frameless wrapper lets both branches compile into tail calls.
+static PyObject *nb_func_vectorcall_medium(PyObject *self,
+                                           PyObject *const *args_in,
+                                           size_t nargsf,
+                                           PyObject *kwargs_in) noexcept {
+    if (NB_UNLIKELY(kwargs_in))
+        return nb_func_vectorcall_complex(self, args_in, nargsf, kwargs_in);
+    return nb_func_vectorcall_medium_pos(self, args_in, nargsf, kwargs_in);
 }
 
 /// Simplified nb_func_vectorcall variant for functions w/o keyword arguments,

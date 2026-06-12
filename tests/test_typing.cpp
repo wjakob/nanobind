@@ -135,4 +135,5 @@ NB_MODULE(test_typing_ext, m) {
     // Some statements that will be modified by the pattern file
     m.def("remove_me", []{});
     m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");
+    m.def("import_me", []{});
 }

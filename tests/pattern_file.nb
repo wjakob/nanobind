@@ -8,6 +8,12 @@ tweak_me:
     def tweak_me(arg: int):
         \doc
 
+# Rewrite a signature with whole-module imports (both plain and with 'as' name)
+import_me:
+    \import logging
+    \import collections.abc as cabc
+    def import_me(arg: logging.Logger) -> cabc.Iterable[int]: ...
+
 # Apply a pattern to multiple places
 __(lt|gt)__:
     def __\1__(self, arg: int, /) -> bool: ...

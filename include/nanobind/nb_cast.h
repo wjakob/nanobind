@@ -192,7 +192,8 @@ struct type_caster<T, enable_if_t<std::is_enum_v<T>>> {
     NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         int64_t result;
         bool rv = enum_from_python(&typeid(T), src.ptr(), &result, flags);
-        value = (T) result;
+        if (rv)
+            value = (T) result;
         return rv;
     }
 

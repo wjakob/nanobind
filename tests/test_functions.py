@@ -358,6 +358,23 @@ def test29_traceback():
     assert len(matches) == 1
 
 
+def test29_traceback_surrogate_filename():
+    # A traceback frame whose filename/function name contains lone surrogates
+    # (e.g. a script on a path with bytes undecodable in the filesystem
+    # encoding) must not crash python_error::what().
+    code = compile("def g():\n raise RuntimeError('Foo')\ng()",
+                   "bad\udc80name.py", "exec")
+
+    def fn():
+        exec(code, {})
+
+    result = t.test_30(fn)
+    # Default builds substitute a placeholder for the affected frame fields;
+    # stable-ABI/PyPy builds give up on formatting the traceback altogether
+    assert ("RuntimeError: Foo" in result and "unencodable" in result) or \
+           result == "<error while formatting exception>"
+
+
 def test30_noexcept():
     assert t.test_31(123) == 123
     assert t.test_32(123) == 123

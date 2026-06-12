@@ -154,7 +154,11 @@ const char *python_error::what() const noexcept {
     try {
         object mod = module_::import_("traceback"),
                result = mod.attr("format_exception")(exc_type, exc_value, exc_traceback);
-        tmp = strdup_check(borrow<str>(str("\n").attr("join")(result)).c_str());
+        str s = borrow<str>(str("\n").attr("join")(result));
+        const char *cstr = s.c_str();
+        if (!cstr) // e.g. lone surrogates from an unencodable file name
+            raise_python_error();
+        tmp = strdup_check(cstr);
     } catch (...) {
         PyErr_Clear();
         tmp = strdup_check("<error while formatting exception>");
@@ -182,12 +186,22 @@ const char *python_error::what() const noexcept {
         for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
             frame = *it;
             PyCodeObject *f_code = PyFrame_GetCode(frame);
+            const char *filename = borrow<str>(f_code->co_filename).c_str();
+            if (!filename) {
+                PyErr_Clear();
+                filename = "<unencodable filename>";
+            }
+            const char *name = borrow<str>(f_code->co_name).c_str();
+            if (!name) {
+                PyErr_Clear();
+                name = "<unencodable name>";
+            }
             buf.put("  File \"");
-            buf.put_dstr(borrow<str>(f_code->co_filename).c_str());
+            buf.put_dstr(filename);
             buf.put("\", line ");
             buf.put_uint32(PyFrame_GetLineNumber(frame));
             buf.put(", in ");
-            buf.put_dstr(borrow<str>(f_code->co_name).c_str());
+            buf.put_dstr(name);
             buf.put('\n');
             Py_DECREF(f_code);
             Py_DECREF(frame);

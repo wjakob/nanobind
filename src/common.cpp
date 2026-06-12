@@ -1242,30 +1242,39 @@ bool iterable_check(PyObject *o) noexcept {
 // ========================================================================
 
 NB_CORE PyObject *repr_list(PyObject *o) {
-    object s = steal(nb_inst_name(o));
-    s += str("([");
+    object name = steal(nb_inst_name(o));
     size_t len = obj_len(o);
-    for (size_t i = 0; i < len; ++i) {
-        s += repr(handle(o)[i]);
-        if (i + 1 < len)
-            s += str(", ");
-    }
-    s += str("])");
-    return s.release().ptr();
+    list items;
+    for (size_t i = 0; i < len; ++i)
+        items.append(repr(handle(o)[i]));
+    object body = steal(PyUnicode_Join(str(", ").ptr(), items.ptr()));
+    if (!body.is_valid())
+        raise_python_error();
+    PyObject *result =
+        PyUnicode_FromFormat("%U([%U])", name.ptr(), body.ptr());
+    if (!result)
+        raise_python_error();
+    return result;
 }
 
 NB_CORE PyObject *repr_map(PyObject *o) {
-    object s = steal(nb_inst_name(o));
-    s += str("({");
-    bool first = true;
+    object name = steal(nb_inst_name(o));
+    list items;
     for (handle kv : handle(o).attr("items")()) {
-        if (!first)
-            s += str(", ");
-        s += repr(kv[0]) + str(": ") + repr(kv[1]);
-        first = false;
+        object k = kv[0], v = kv[1],
+               item = steal(PyUnicode_FromFormat("%R: %R", k.ptr(), v.ptr()));
+        if (!item.is_valid())
+            raise_python_error();
+        items.append(item);
     }
-    s += str("})");
-    return s.release().ptr();
+    object body = steal(PyUnicode_Join(str(", ").ptr(), items.ptr()));
+    if (!body.is_valid())
+        raise_python_error();
+    PyObject *result =
+        PyUnicode_FromFormat("%U({%U})", name.ptr(), body.ptr());
+    if (!result)
+        raise_python_error();
+    return result;
 }
 
 // ========================================================================

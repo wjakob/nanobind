@@ -956,6 +956,30 @@ def test47_inconstructible():
     with pytest.raises(TypeError, match="no constructor defined"):
         t.Foo()
 
+def test47b_state_warning_as_error():
+    # When warnings are turned into errors, the state-error warning emitted
+    # while casting an invalid instance must not leak a pending exception into
+    # the dispatcher (which previously surfaced as a spurious SystemError).
+    # The warning is instead reported through sys.unraisablehook.
+    import warnings
+    a = t.Int.__new__(t.Int)  # uninitialized
+    b = t.Int(3)
+    unraised = []
+    old_hook = sys.unraisablehook
+    sys.unraisablehook = lambda arg: unraised.append(arg.exc_value)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            # '__add__' fails to cast 'a' and must report NotImplemented cleanly
+            with pytest.raises(TypeError, match="unsupported operand"):
+                a + b
+    finally:
+        sys.unraisablehook = old_hook
+    assert sys.exc_info() == (None, None, None)
+    assert len(unraised) == 1
+    assert isinstance(unraised[0], RuntimeWarning)
+    assert "uninitialized instance" in str(unraised[0])
+
 def test48_monekypatchable():
     # issue 750: how to monkeypatch __init__
     q = t.MonkeyPatchable()

@@ -1264,9 +1264,10 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     if (!success) {
         // Warn only after releasing the lock: PyErr_WarnFormat can run
         // arbitrary Python code, and the internals mutex is non-reentrant
-        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                         "nanobind: type '%s' was already registered!\n",
-                         t_name);
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                             "nanobind: type '%s' was already registered!\n",
+                             t_name) != 0)
+            PyErr_WriteUnraisable(nullptr);
         if (has_signature)
             free((char *) t_name);
         return existing;
@@ -1705,8 +1706,9 @@ NB_NOINLINE static bool nb_type_get_state_error(uint8_t state,
         /* 2 = ready   */ "attempted to initialize an already-initialized instance",
         /* 3 = invalid */ "instance state has become corrupted",
     };
-    PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
-                     errors[state & 3], name);
+    if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
+                         errors[state & 3], name) != 0)
+        PyErr_WriteUnraisable(nullptr);
     return false;
 }
 

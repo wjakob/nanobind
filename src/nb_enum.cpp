@@ -35,9 +35,10 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     if (!success) {
         // Warn only after releasing the lock: PyErr_WarnFormat can run
         // arbitrary Python code, and the internals mutex is non-reentrant
-        PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
-                         "nanobind: type '%s' was already registered!\n",
-                         ed->name);
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
+                             "nanobind: type '%s' was already registered!\n",
+                             ed->name) != 0)
+            PyErr_WriteUnraisable(nullptr);
         return existing;
     }
 

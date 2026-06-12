@@ -218,3 +218,17 @@ def test08_vector_init_partial_cleanup():
     collect()
     assert t.cnt_alive() == base
     del keep
+
+
+def test09_vector_getitem_slice_leak():
+    # When a slice __getitem__ fails partway through (here the element copy
+    # constructor throws), the partially constructed result vector must be
+    # destroyed rather than leaked.
+    v = t.VectorCnt([t.Cnt(), t.Cnt(), t.Cnt(), t.Cnt()])
+    base = t.cnt_alive()
+    for _ in range(100):
+        t.cnt_throw_after(2)
+        with pytest.raises(Exception):
+            v[::1]
+    t.cnt_throw_after(-1)
+    assert t.cnt_alive() == base

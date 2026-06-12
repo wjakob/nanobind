@@ -4,11 +4,19 @@
 namespace nb = nanobind;
 
 // Counts how many instances are alive, to detect leaks of partially
-// constructed vectors
+// constructed vectors. The copy constructor can be made to throw after a
+// given number of copies to exercise error paths.
 struct Cnt {
     static inline int alive = 0;
+    static inline int throw_after = -1;
     Cnt() { alive++; }
-    Cnt(const Cnt &) { alive++; }
+    Cnt(const Cnt &) {
+        if (throw_after == 0)
+            throw std::runtime_error("Cnt copy");
+        if (throw_after > 0)
+            throw_after--;
+        alive++;
+    }
     Cnt(Cnt &&) { alive++; }
     Cnt &operator=(const Cnt &) = default;
     Cnt &operator=(Cnt &&) = default;
@@ -37,11 +45,13 @@ NB_MODULE(test_stl_bind_vector_ext, m) {
     nb::bind_vector<std::vector<std::shared_ptr<El>>>(m, "VectorElShared");
 
     // test_vector_leak: count live Cnt instances to detect that a partially
-    // constructed container is cleaned up when its iterable constructor throws
-    // partway through.
+    // constructed container is cleaned up when an operation (e.g. a slice
+    // __getitem__ whose element copy throws, or an iterable constructor that
+    // throws) fails partway through.
     nb::class_<Cnt>(m, "Cnt").def(nb::init<>());
     nb::bind_vector<std::vector<Cnt>>(m, "VectorCnt");
     m.def("cnt_alive", [] { return Cnt::alive; });
+    m.def("cnt_throw_after", [](int n) { Cnt::throw_after = n; });
 
     struct E_nc {
         explicit E_nc(int i) : value{i} {}

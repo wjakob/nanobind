@@ -155,6 +155,26 @@ nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
 
+add_library(lib_path_dep SHARED lib_path_dep.cpp)
+target_compile_definitions(lib_path_dep PRIVATE -DLIB_PATH_DEP_BUILD)
+target_include_directories(lib_path_dep PRIVATE ${NB_DIR}/include)
+set_target_properties(lib_path_dep PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib_path
+  LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib_path
+)
+
+nanobind_add_module(test_lib_path_ext test_lib_path.cpp ${NB_EXTRA_ARGS})
+target_link_libraries(test_lib_path_ext PRIVATE lib_path_dep)
+
+nanobind_add_stub(
+  lib_path_ext_stub
+  MODULE test_lib_path_ext
+  OUTPUT ${PYI_PREFIX}test_lib_path_ext.pyi
+  PYTHON_PATH $<TARGET_FILE_DIR:test_lib_path_ext>
+  LIB_PATH $<TARGET_FILE_DIR:lib_path_dep>
+  DEPENDS test_lib_path_ext lib_path_dep
+)
+
 set(TEST_FILES
   common.py
   conftest.py
@@ -186,6 +206,7 @@ set(TEST_FILES
   # Stub reference files
   test_classes_ext.pyi.ref
   test_functions_ext.pyi.ref
+  test_lib_path_ext.pyi.ref
   test_make_iterator_ext.pyi.ref
   test_ndarray_ext.pyi.ref
   test_jax_ext.pyi.ref

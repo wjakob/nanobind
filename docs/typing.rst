@@ -714,6 +714,18 @@ you may use the special ``\from`` escape code to import them:
        def lookup(array: Array[T], index: Literal[0] = 0) -> _Opt[T]:
            \doc
 
+If a replacement rule instead refers to a *whole module* (for example because
+the only use of that module in the stub is a qualified attribute access),
+use the ``\import`` escape code. It mirrors Python's ``import`` statement and
+accepts a comma-separated list of modules, with an optional ``as`` alias:
+
+.. code-block:: text
+
+   my_ext.import_me:
+       \import logging
+       \import collections.abc as cabc
+       def import_me(arg: logging.Logger) -> cabc.Iterable[int]: ...
+
 You may also add free-form text the beginning or the end of the generated stub
 module or of a class. To do so, add an entry that matches on ``name.__prefix__``
 or ``name.__suffix__`` where ``name`` is the name of the module or class.

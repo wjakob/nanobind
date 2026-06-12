@@ -177,6 +177,18 @@ jobs:
           mingw-w64-x86_64-python-pip
           mingw-w64-x86_64-python-pytest
 
+    # The GCC 16.1 compiler that rolled out in MSYS2 in June 2026 produces
+    # objects with unresolvable references to std::string's move constructor
+    # (a re-run of a previously green master commit fails identically).
+    # Downgrade the compiler only: the GCC 16 runtime (gcc-libs) must stay,
+    # since the other MSYS2 packages were rebuilt against it, and it is
+    # backward-compatible with GCC 15-compiled code.
+    - name: Downgrade GCC to 15.2
+      shell: msys2 {0}
+      run: |
+        pacman -U --noconfirm --nodeps --nodeps \
+          https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-15.2.0-13-any.pkg.tar.zst
+
     - name: Install Python packages
       shell: msys2 {0}
       run: |

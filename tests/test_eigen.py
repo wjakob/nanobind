@@ -504,3 +504,32 @@ def test18_zero_size_vec():
     assert_array_equal(t.passDMapCnstVXf(np.array([1, 2, 3], dtype=np.float32)),
                        np.array([1, 2, 3], dtype=np.float32))
 
+
+@needs_numpy_and_eigen
+def test19_sparse_move():
+    # Returning a sparse matrix by value should move (steal) its buffers into
+    # the resulting scipy array rather than performing a deep copy.
+    pytest.importorskip("scipy")
+
+    h = t.SparseHolder()
+    ptr = h.data_ptr()
+    mat = h.move_out()
+    assert mat.data.__array_interface__["data"][0] == ptr
+
+
+@needs_numpy_and_eigen
+def test20_sparse_bad_attr():
+    # An object whose 'has_sorted_indices' is not a strict bool must be rejected
+    # cleanly (TypeError) rather than aborting the process. nb::cast<bool>()
+    # raises cast_error, which the noexcept from_python() must also handle.
+    scipy = pytest.importorskip("scipy")
+
+    m = scipy.sparse.csr_matrix(np.eye(2, dtype=np.float32))
+    orig = type(m).has_sorted_indices
+    type(m).has_sorted_indices = property(lambda self: np.bool_(True))
+    try:
+        with pytest.raises(TypeError):
+            t.sparse_map_r(m)
+    finally:
+        type(m).has_sorted_indices = orig
+

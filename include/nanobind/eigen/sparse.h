@@ -93,7 +93,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
                               indices_caster.value.data(),
                               data_caster.value.data());
             return true;
-        } catch (const python_error &) {
+        } catch (const std::exception &) {
             return false;
         }
     }
@@ -138,7 +138,10 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
         T *src = std::addressof(const_cast<T &>(v));
         object owner;
         if (policy == rv_policy::move) {
-            src = new T(std::move(v));
+            // Eigen sparse matrices lack a move constructor; copy-constructing
+            // from a matrix flagged as an rvalue performs a cheap pointer swap.
+            const_cast<T &>(v).markAsRValue();
+            src = new T(v);
             owner = capsule(src, [](void *p) noexcept { delete (T *) p; });
         }
 
@@ -219,7 +222,7 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
             rows = cast<Index>(shape_o[0]);
             cols = cast<Index>(shape_o[1]);
             nnz = cast<Index>(src.attr("nnz"));
-        } catch (const python_error &) {
+        } catch (const std::exception &) {
             return false;
         }
 

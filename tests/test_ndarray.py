@@ -421,6 +421,16 @@ def test19b_buffer_protocol_flags():
     assert struct.unpack_from("8d", cobj) == (1, 2, 3, 4, 5, 6, 7, 8)
 
 
+def test19c_export_ownerless_refused():
+    # Returning an ownerless ndarray under a policy that requires a copy is
+    # refused for frameworks without a copy method, instead of silently
+    # returning a view of freed memory.
+    for fn in (t.ret_memview_noowner, t.ret_array_api_noowner,
+               t.ret_noframework_noowner):
+        with pytest.raises(RuntimeError, match="not supported for this framework"):
+            fn()
+
+
 @needs_numpy
 def test20_return_array_api():
     collect()

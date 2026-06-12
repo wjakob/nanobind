@@ -48,3 +48,10 @@ class AClass:
 
     @overload
     def overloaded_2(self, x: str) -> None: ...
+
+class _PrivateClass:
+    pass
+
+_PrivateTypeVar = TypeVar("_PrivateTypeVar")
+
+def func_using_private(a: _PrivateClass) -> _PrivateTypeVar: ...

@@ -67,3 +67,15 @@ class AClass:
 
     def overloaded_2(self, x):
         "docstr 3"
+
+class _UnusedPrivateClass:
+    pass
+
+class _PrivateClass:
+    pass
+
+_PrivateTypeVar = typing.TypeVar("_PrivateTypeVar")
+_UnusedPrivateTypeVar = typing.TypeVar("_UnusedPrivateTypeVar")
+
+def func_using_private(a: _PrivateClass) -> _PrivateTypeVar:
+    pass

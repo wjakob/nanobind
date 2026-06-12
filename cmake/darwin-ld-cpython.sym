@@ -970,6 +970,7 @@
 -U __Py_DecRefSharedDebug
 -U __Py_DECREF_DecRefTotal
 -U __Py_INCREF_IncRefTotal
+-U __Py_NewReference
 -U __PyObject_GetDictPtr
 -U _PyList_GetItemRef
 -U _PyDict_GetItemRef

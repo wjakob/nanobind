@@ -1278,9 +1278,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
             mod = t->scope;
             modname = getattr(t->scope, "__name__", handle());
         } else {
-            modname = getattr(t->scope,
-                              static_pyobjects[pyobj_name::module_str],
-                              handle());
+            modname =
+                getattr(t->scope, NB_INTERNED(__module__), handle());
 
             object scope_qualname = getattr(t->scope, "__qualname__", handle());
             if (scope_qualname.is_valid())
@@ -1598,8 +1597,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     setattr(result, "__qualname__", qualname.ptr());
 
     if (modname.is_valid())
-        setattr(result, static_pyobjects[pyobj_name::module_str],
-                modname.ptr());
+        setattr(result, NB_INTERNED(__module__), modname.ptr());
 
     {
         lock_internals guard(internals_);
@@ -2467,7 +2465,7 @@ PyObject *nb_type_name(PyObject *t) noexcept {
         return PyUnicode_FromString("<unknown type>");
 #else
     // The '__name__' attribute may be missing or not a string
-    PyObject *result = PyObject_GetAttrString(t, "__name__");
+    PyObject *result = PyObject_GetAttr(t, NB_INTERNED(__name__));
     if (NB_UNLIKELY(!result || !PyUnicode_Check(result))) {
         Py_XDECREF(result);
         return PyUnicode_FromString("<unknown type>");
@@ -2475,8 +2473,7 @@ PyObject *nb_type_name(PyObject *t) noexcept {
 #endif
 
     if (PyType_HasFeature((PyTypeObject *) t, Py_TPFLAGS_HEAPTYPE)) {
-        PyObject *mod =
-            PyObject_GetAttr(t, static_pyobjects[pyobj_name::module_str]);
+        PyObject *mod = PyObject_GetAttr(t, NB_INTERNED(__module__));
         // Tolerate a missing or non-string '__module__' attribute
         if (NB_LIKELY(mod && PyUnicode_Check(mod))) {
             PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);

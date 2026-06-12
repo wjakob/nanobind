@@ -210,7 +210,7 @@ const char *python_error::what() const noexcept {
 
     if (exc_type.is_valid()) {
         try {
-            object name = exc_type.attr("__name__");
+            object name = exc_type.attr(NB_INTERNED(__name__));
             buf.put_dstr(borrow<str>(name).c_str());
             buf.put(": ");
         } catch (...) { PyErr_Clear(); }
@@ -263,8 +263,7 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
     if (PyModule_Check(scope))
         modname = getattr(scope, "__name__", handle());
     else
-        modname = getattr(scope, static_pyobjects[pyobj_name::module_str],
-                          handle());
+        modname = getattr(scope, NB_INTERNED(__module__), handle());
 
     if (!modname.is_valid())
         raise("nanobind::detail::exception_new(): could not determine module "

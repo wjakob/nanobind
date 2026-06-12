@@ -216,16 +216,9 @@ nb_thread_state *nb_thread_state_alloc() noexcept {
 
 
 static const char* interned_c_strs[pyobj_name::string_count] {
-    "value",
-    "copy",
-    "clone",
-    "array",
-    "from_dlpack",
-    "__dlpack__",
-    "max_version",
-    "dl_device",
-    "__module__",
-    "__new__",
+    #define NB_INTERNED_ENTRY(name) #name,
+    NB_INTERNED_STRINGS(NB_INTERNED_ENTRY)
+    #undef NB_INTERNED_ENTRY
 };
 
 PyObject *static_pyobjects[pyobj_name::total_count] = {};
@@ -252,9 +245,9 @@ static void init_pyobjects(nb_internals *p) {
         new_constant(p, i, PyUnicode_InternFromString(interned_c_strs[i]));
 
     new_constant(p, pyobj_name::copy_tpl,
-                 PyTuple_Pack(1, static_pyobjects[pyobj_name::copy_str]));
+                 PyTuple_Pack(1, NB_INTERNED(copy)));
     new_constant(p, pyobj_name::max_version_tpl,
-                 PyTuple_Pack(1, static_pyobjects[pyobj_name::max_version_str]));
+                 PyTuple_Pack(1, NB_INTERNED(max_version)));
 
     PyObject *one = PyLong_FromLong(1), *zero = PyLong_FromLong(0);
     new_constant(p, pyobj_name::dl_cpu_tpl, PyTuple_Pack(2, one, zero));

@@ -214,7 +214,11 @@ enum cast_flags : uint8_t {
     // This implies that objects added to the cleanup list may be
     // released immediately after the caster's final output value is
     // obtained, i.e., before it is used.
-    manual = (1 << 3)
+    manual = (1 << 3),
+
+    /// Indicate that a type is being constructed by nb_type_vectorcall. The
+    /// call dispatcher uses this hint to avoid type-checking ``self``
+    trusted = (1 << 4)
 };
 
 

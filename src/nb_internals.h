@@ -34,11 +34,18 @@
 #  define NB_THREAD_LOCAL __thread
 #endif
 
-// Decodes the call argument count to avoid all use of ``PyVectorcall_NARGS()``.
-// The latter requires an indirect PLT call in the stable ABI, which is
-// unnecessary as its behavior is fully frozen by the stable ABI contract.
+// When forwarding vector calls between functions that are known to be implemented by
+// nanobind, it uses an extended ABI that may set one additional bit to communicate
+// that the implicit 'self' argument is trusted and does not need to be type-checked.
+#define NB_VECTORCALL_TRUSTED_SELF (PY_VECTORCALL_ARGUMENTS_OFFSET >> 1)
+
+// Decodes the call argument count to avoid all use of ``PyVectorcall_NARGS()``
+// in nanobind. The an official function requires a (costly) indirect PLT call
+// in the stable ABI, which is unnecessary as its behavior is fully frozen by
+// the stable ABI contract.
 #define NB_VECTORCALL_NARGS(n)                                                  \
-    ((Py_ssize_t) ((n) & ~PY_VECTORCALL_ARGUMENTS_OFFSET))
+    ((Py_ssize_t) ((n) & ~(PY_VECTORCALL_ARGUMENTS_OFFSET |                     \
+                           NB_VECTORCALL_TRUSTED_SELF)))
 
 #if PY_VERSION_HEX >= 0x030A0000
 #  define NB_TPFLAGS_IMMUTABLETYPE Py_TPFLAGS_IMMUTABLETYPE

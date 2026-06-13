@@ -324,6 +324,12 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
     NB_TYPE_CASTER(T2, Caster::Name)
 
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+        // Fast path for implicit ``self`` argument from ``nb_type_vectorcall()``
+        if (flags & (uint8_t) cast_flags::trusted) {
+            value.h = src;
+            value.p = (T *) nb_inst_ptr(src.ptr());
+            return true;
+        }
         Caster c;
         if (!c.from_python(src, flags_for_local_caster<T*>(flags), cleanup) ||
             !c.template can_cast<T*>())
@@ -463,6 +469,10 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
 
     NB_INLINE bool from_python(handle src, uint8_t flags,
                                cleanup_list *cleanup) noexcept {
+        // The 'trusted' fast path lives in the pointer_and_handle caster (the
+        // only one that is ever trusted) and, as a fallback, in nb_type_get.
+        // The generic base caster therefore need not test for it here, which
+        // would only add a never-taken branch to every bound-type argument.
         return nb_type_get(&typeid(Type), src.ptr(), flags, cleanup,
                            (void **) &value);
     }

@@ -631,7 +631,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
     const size_t count      = (size_t) Py_SIZE(self),
-                 nargs_in   = (size_t) PyVectorcall_NARGS(nargsf),
+                 nargs_in   = (size_t) NB_VECTORCALL_NARGS(nargsf),
                  nkwargs_in = kwargs_in ? (size_t) NB_TUPLE_GET_SIZE(kwargs_in) : 0;
 
     func_data *fr = nb_func_data(self);
@@ -914,7 +914,7 @@ static NB_NOINLINE PyObject *
 nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
                               size_t nargsf, PyObject *kwargs_in) noexcept {
     const size_t count    = (size_t) Py_SIZE(self),
-                 nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
+                 nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
     func_data *fr = nb_func_data(self);
 
@@ -1045,7 +1045,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
     func_data *fr = nb_func_data(self);
 
     const size_t count         = (size_t) Py_SIZE(self),
-                 nargs_in      = (size_t) PyVectorcall_NARGS(nargsf);
+                 nargs_in      = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
     const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
@@ -1135,7 +1135,7 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
+    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -1175,7 +1175,7 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
+    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
     const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
@@ -1234,7 +1234,7 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
                                              size_t nargsf,
                                              PyObject *kwargs_in) noexcept {
     func_data *fr = nb_func_data(self);
-    const size_t nargs_in = (size_t) PyVectorcall_NARGS(nargsf);
+    const size_t nargs_in = (size_t) NB_VECTORCALL_NARGS(nargsf);
     const bool is_method      = fr->flags & (uint32_t) func_flags::is_method,
                is_constructor = fr->flags & (uint32_t) func_flags::is_constructor;
 
@@ -1293,7 +1293,7 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
                                             size_t nargsf,
                                             PyObject *kwargs_in) noexcept {
     nb_bound_method *mb = (nb_bound_method *) self;
-    size_t nargs = (size_t) PyVectorcall_NARGS(nargsf);
+    size_t nargs = (size_t) NB_VECTORCALL_NARGS(nargsf);
     const size_t buf_size = 5;
     PyObject **args, *args_buf[buf_size], *temp = nullptr, *result;
     bool alloc = false;

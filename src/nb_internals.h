@@ -34,6 +34,12 @@
 #  define NB_THREAD_LOCAL __thread
 #endif
 
+// Decodes the call argument count to avoid all use of ``PyVectorcall_NARGS()``.
+// The latter requires an indirect PLT call in the stable ABI, which is
+// unnecessary as its behavior is fully frozen by the stable ABI contract.
+#define NB_VECTORCALL_NARGS(n)                                                  \
+    ((Py_ssize_t) ((n) & ~PY_VECTORCALL_ARGUMENTS_OFFSET))
+
 #if PY_VERSION_HEX >= 0x030A0000
 #  define NB_TPFLAGS_IMMUTABLETYPE Py_TPFLAGS_IMMUTABLETYPE
 #else

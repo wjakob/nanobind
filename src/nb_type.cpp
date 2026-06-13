@@ -61,13 +61,25 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
     return -1;
 }
 
+/// Function to check (in the fastest manner) if a nb_type is garbage-collected.
+static NB_INLINE bool nb_type_has_gc(PyTypeObject *tp, uint32_t flags) {
+#if defined(Py_LIMITED_API)
+    (void) tp;
+    return flags & (uint32_t) type_flags::has_gc;
+#else
+    (void) flags;
+    return PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+#endif
+}
+
 /// Allocate memory for a nb_type instance with internal storage
 PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
                        PyObject * /*kwd */) {
     const type_data *t = nb_type_data(tp);
+    uint32_t flags = t->flags;
 
     // Instance pool fast path
-    if (NB_LIKELY(t->flags & (uint32_t) type_flags::pooled)) {
+    if (NB_LIKELY(flags & (uint32_t) type_flags::pooled)) {
         nb_inst_pool *pool = nb_pool_lookup((type_data *) t);
         if (pool && pool->count) {
             nb_inst *self = pool->slots[--pool->count];
@@ -99,7 +111,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         }
     }
 
-    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+    bool gc = nb_type_has_gc(tp, flags);
 
     nb_inst *self;
     if (NB_LIKELY(!gc))
@@ -109,7 +121,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
 
     if (NB_LIKELY(self)) {
         uint32_t align = (uint32_t) t->align;
-        bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+        bool intrusive = flags & (uint32_t) type_flags::intrusive_ptr;
 
         uintptr_t payload = (uintptr_t) (self + 1);
 
@@ -147,7 +159,9 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
 /// 'inst_new_int()', this does not yet register the instance in the internal
 /// data structures. The function 'inst_register()' must be used to do so.
 PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
-    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+    const type_data *t = nb_type_data(tp);
+    uint32_t flags = t->flags;
+    bool gc = nb_type_has_gc(tp, flags);
 
     nb_inst *self;
     if (NB_LIKELY(!gc)) {
@@ -188,8 +202,7 @@ PyObject *inst_new_ext(PyTypeObject *tp, void *value) {
         offset = (int32_t) sizeof(nb_inst);
     }
 
-    const type_data *t = nb_type_data(tp);
-    bool intrusive = t->flags & (uint32_t) type_flags::intrusive_ptr;
+    bool intrusive = flags & (uint32_t) type_flags::intrusive_ptr;
 
     self->offset = offset;
 
@@ -347,6 +360,7 @@ static void inst_dealloc(PyObject *self) {
     PyTypeObject *tp = Py_TYPE(self);
     const type_data *t = nb_type_data(tp);
     nb_inst *inst = (nb_inst *) self;
+    uint32_t flags = t->flags;
 
     // Fast path: run the C++ destructor, then put the mapped object in the pool
     // for reuse. The guard below admits only "clean" instances:
@@ -357,10 +371,10 @@ static void inst_dealloc(PyObject *self) {
     //
     // The remaining special cases cannot apply because pooling does not accept
     // GCed or intrusively counted types.
-    if (NB_LIKELY((t->flags & (uint32_t) type_flags::pooled) &&
+    if (NB_LIKELY((flags & (uint32_t) type_flags::pooled) &&
                   inst->state.internal && !inst->state.clear_keep_alive &&
                   inst->state.state != nb_inst_state::state_relinquished)) {
-        if (inst->state.destruct && (t->flags & (uint32_t) type_flags::has_destruct))
+        if (inst->state.destruct && (flags & (uint32_t) type_flags::has_destruct))
             t->destruct(inst_ptr(inst));
 
         // Look up the pool or create it
@@ -380,18 +394,18 @@ static void inst_dealloc(PyObject *self) {
         inst->state.destruct = 0;
     }
 
-    bool gc = PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
+    bool gc = nb_type_has_gc(tp, flags);
     if (NB_UNLIKELY(gc)) {
         PyObject_GC_UnTrack(self);
 
-        if (t->flags & (uint32_t) type_flags::has_dynamic_attr) {
+        if (flags & (uint32_t) type_flags::has_dynamic_attr) {
             PyObject **dict = nb_dict_ptr(self, tp);
             if (dict)
                 Py_CLEAR(*dict);
         }
     }
 
-    if (t->flags & (uint32_t) type_flags::is_weak_referenceable &&
+    if (flags & (uint32_t) type_flags::is_weak_referenceable &&
         nb_weaklist_ptr(self, tp) != nullptr) {
 #if defined(PYPY_VERSION)
         PyObject **weaklist = nb_weaklist_ptr(self, tp);
@@ -405,10 +419,10 @@ static void inst_dealloc(PyObject *self) {
     void *p = inst_ptr(inst);
 
     if (inst->state.destruct) {
-        check(t->flags & (uint32_t) type_flags::is_destructible,
+        check(flags & (uint32_t) type_flags::is_destructible,
               "nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
               "the destructor of a non-destructible type!", t->name);
-        if (t->flags & (uint32_t) type_flags::has_destruct)
+        if (flags & (uint32_t) type_flags::has_destruct)
             t->destruct(p);
     }
 
@@ -495,7 +509,7 @@ static void inst_dealloc(PyObject *self) {
     // Release the type reference acquired at allocation. On free-threaded
     // builds, nanobind types are immortal but Python subclasses are not.
 #if defined(Py_GIL_DISABLED)
-    if (t->flags & (uint32_t) type_flags::is_python_type)
+    if (flags & (uint32_t) type_flags::is_python_type)
         Py_DECREF(tp);
 #else
     Py_DECREF(tp);
@@ -658,15 +672,15 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= ~((uint32_t) type_flags::has_implicit_conversions);
 
-    // Python subclasses are GC heap types with their own layout; they must not
-    // share or inherit the base type's instance pool.
+    // A Python subclass is always a GC heap type
+    t->flags |= (uint32_t) type_flags::has_gc;
+
+    // Sublclasses do not inherit the pooling feature as a consequence
     t->flags &= ~((uint32_t) type_flags::pooled);
     t->pool_capacity = 0;
 #if defined(NB_FREE_THREADED)
     t->pool_index = 0;
 #else
-    // Clear the inlined pool copied from the base type_data (above), so the
-    // subclass never touches the base's 'slots' array.
     t->pool = nb_inst_pool{};
 #endif
 
@@ -1590,6 +1604,13 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     to->dictoffset = (uint32_t) dictoffset;
     to->weaklistoffset = (uint32_t) weaklistoffset;
 
+    // Cache the type's GC-ness (also covers GC-ness inherited from a base) so
+    // the allocation/deallocation hot paths avoid a PyType_GetFlags() call.
+    bool have_gc =
+        PyType_HasFeature((PyTypeObject *) result, Py_TPFLAGS_HAVE_GC);
+    if (have_gc)
+        to->flags |= (uint32_t) type_flags::has_gc;
+
     // Instance pool setup + eligibility check (nb::pooled). Decide once here
     // so the hot paths can trust the 'pooled' flag alone.
     to->pool_capacity = 0;
@@ -1608,7 +1629,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         } else {
             // Pooling requires a non-GC type
             bool eligible =
-                !PyType_HasFeature((PyTypeObject *) result, Py_TPFLAGS_HAVE_GC) &&
+                !have_gc &&
                 !(to->flags & (uint32_t) type_flags::intrusive_ptr);
             if (!eligible)
                 fail("nanobind: type '%s' requested instance pooling "

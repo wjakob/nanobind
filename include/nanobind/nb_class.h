@@ -21,6 +21,9 @@ enum class type_flags : uint32_t {
     /// Does the type provide a C++ move constructor?
     is_move_constructible    = (1 << 2),
 
+    /// Cached copy of Py_TPFLAGS_HAVE_GC
+    has_gc                   = (1 << 3),
+
     /// Is the 'destruct' field of the type_data structure set?
     has_destruct             = (1 << 4),
 

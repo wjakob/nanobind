@@ -1035,6 +1035,53 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
 extern int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value);
 
+// Fallback path for nb_type_vectorcall (caller did not provision space)
+NB_NOINLINE static PyObject *
+nb_type_vectorcall_fixup(nb_func *func, PyObject *self, PyObject *const *args_in,
+                         Py_ssize_t nargs, PyObject *kwargs_in,
+                         bool is_init) noexcept {
+    const size_t buf_size = 5;
+    PyObject **args, *buf[buf_size];
+    bool alloc = false;
+
+    size_t size = (size_t) nargs + 1;
+    if (kwargs_in)
+        size += NB_TUPLE_GET_SIZE(kwargs_in);
+
+    if (size < buf_size) {
+        args = buf;
+    } else {
+        args = (PyObject **) PyMem_Malloc(size * sizeof(PyObject *));
+        if (!args) {
+            if (is_init)
+                Py_DECREF(self);
+            return PyErr_NoMemory();
+        }
+        alloc = true;
+    }
+
+    memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
+    args[0] = self;
+
+    PyObject *rv = func->vectorcall((PyObject *) func, args,
+                                    (size_t) (nargs + 1), kwargs_in);
+
+    if (NB_UNLIKELY(alloc))
+        PyMem_Free(args);
+
+    if (is_init) {
+        if (!rv) {
+            Py_DECREF(self);
+            return nullptr;
+        }
+#if !NB_IMMORTAL_SINGLETONS
+        Py_DECREF(rv);
+#endif
+        return self;
+    }
+    return rv;
+}
+
 // Implements the vector call protocol directly on type objects to construct
 // instances more efficiently.
 static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
@@ -1068,42 +1115,18 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
         return func->vectorcall((PyObject *) func, nullptr, 0, nullptr);
     }
 
-    const size_t buf_size = 5;
-    PyObject **args, *buf[buf_size], *temp = nullptr;
-    bool alloc = false;
+    if (NB_UNLIKELY(!(nargsf & PY_VECTORCALL_ARGUMENTS_OFFSET)))
+        return nb_type_vectorcall_fixup(func, self, args_in, nargs, kwargs_in,
+                                        is_init);
 
-    if (NB_LIKELY(nargsf & PY_VECTORCALL_ARGUMENTS_OFFSET)) {
-        args = (PyObject **) (args_in - 1);
-        temp = args[0];
-    } else {
-        size_t size = nargs + 1;
-        if (kwargs_in)
-            size += NB_TUPLE_GET_SIZE(kwargs_in);
-
-        if (size < buf_size) {
-            args = buf;
-        } else {
-            args = (PyObject **) PyMem_Malloc(size * sizeof(PyObject *));
-            if (!args) {
-                if (is_init)
-                    Py_DECREF(self);
-                return PyErr_NoMemory();
-            }
-            alloc = true;
-        }
-
-        memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
-    }
-
+    PyObject **args = (PyObject **) (args_in - 1);
+    PyObject *temp = args[0];
     args[0] = self;
 
     PyObject *rv =
         func->vectorcall((PyObject *) func, args, nargs + 1, kwargs_in);
 
     args[0] = temp;
-
-    if (NB_UNLIKELY(alloc))
-        PyMem_Free(args);
 
     if (NB_LIKELY(is_init)) {
         if (!rv) {

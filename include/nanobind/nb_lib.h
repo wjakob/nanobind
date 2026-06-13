@@ -581,6 +581,10 @@ NB_CORE int dict_get_item_ref(PyObject *d, PyObject *k, PyObject **value);
 
 NB_CORE const char *abi_tag();
 
+NB_INLINE PyObject *none_ref() noexcept { Py_RETURN_NONE; }
+NB_INLINE PyObject *true_ref() noexcept { Py_RETURN_TRUE; }
+NB_INLINE PyObject *false_ref() noexcept { Py_RETURN_FALSE; }
+
 NAMESPACE_END(detail)
 
 using detail::raise;

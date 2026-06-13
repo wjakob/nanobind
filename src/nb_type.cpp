@@ -1112,7 +1112,9 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
         }
 
         // __init__ constructor: 'rv' is None
+#if !NB_IMMORTAL_SINGLETONS
         Py_DECREF(rv);
+#endif
         return self;
     } else {
         // __new__ constructor
@@ -1787,8 +1789,7 @@ static PyObject *keep_alive_callback(PyObject *self, PyObject *const *args,
           "nanobind::detail::keep_alive_callback(): invalid input!");
     Py_DECREF(args[0]); // self
     Py_DECREF(self); // patient
-    Py_INCREF(Py_None);
-    return Py_None;
+    return none_ref();
 }
 
 static PyMethodDef keep_alive_callback_def = {
@@ -1976,10 +1977,8 @@ PyObject *nb_type_put(const std::type_info *cpp_type,
                       cleanup_list *cleanup,
                       bool *is_new) noexcept {
     // Convert nullptr -> None
-    if (!value) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    if (!value)
+        return none_ref();
 
     nb_internals *internals_ = internals;
     type_data *td = nullptr;
@@ -2052,10 +2051,8 @@ PyObject *nb_type_put_p(const std::type_info *cpp_type,
                         cleanup_list *cleanup,
                         bool *is_new) noexcept {
     // Convert nullptr -> None
-    if (!value) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
+    if (!value)
+        return none_ref();
 
     // Check if the instance is already registered with nanobind
     nb_internals *internals_ = internals;

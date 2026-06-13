@@ -269,7 +269,7 @@ template <> struct type_caster<bool> {
     }
 
     static handle from_cpp(bool src, rv_policy, cleanup_list *) noexcept {
-        return handle(src ? Py_True : Py_False).inc_ref();
+        return src ? true_ref() : false_ref();
     }
 
     NB_TYPE_CASTER(bool, const_name("bool"))
@@ -294,11 +294,8 @@ template <> struct type_caster<char> {
 
     static handle from_cpp(const char *value, rv_policy,
                            cleanup_list *) noexcept {
-        if (value == nullptr) {
-            PyObject* result = Py_None;
-            Py_INCREF(result);
-            return result;
-        }
+        if (value == nullptr)
+            return none_ref();
         return PyUnicode_FromString(value);
     }
 

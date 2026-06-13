@@ -395,7 +395,8 @@ class bool_ : public object {
         : object(detail::bool_from_obj(h.ptr()), detail::borrow_t{}) { }
 
     explicit bool_(bool value)
-        : object(value ? Py_True : Py_False, detail::borrow_t{}) { }
+        : object(value ? detail::true_ref() : detail::false_ref(),
+                 detail::steal_t{}) { }
 
     explicit operator bool() const {
         return m_ptr == Py_True;

@@ -1596,8 +1596,7 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
             return PyUnicode_FromString(f->name);
         }
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        return none_ref();
     }
 }
 
@@ -1608,8 +1607,7 @@ static PyObject *nb_func_get_module(PyObject *self) {
                                                ? NB_INTERNED(__name__)
                                                : NB_INTERNED(__module__));
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        return none_ref();
     }
 }
 

@@ -1188,9 +1188,10 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
     if (kwargs_in == nullptr && nargs_in == 1 && args_in[0] != Py_None) {
         PyObject *arg = args_in[0];
         cleanup_list cleanup(is_method ? arg : nullptr);
-        uint8_t args_flags[1] = {
-            (uint8_t) (is_constructor ? (1 | (uint8_t) cast_flags::construct) : 1)
-        };
+        uint8_t self_flag = 1 | (uint8_t) cast_flags::construct;
+        if (nargsf & NB_VECTORCALL_TRUSTED_SELF)
+            self_flag |= (uint8_t) cast_flags::trusted;
+        uint8_t args_flags[1] = { (uint8_t) (is_constructor ? self_flag : 1) };
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,
@@ -1247,8 +1248,11 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
     if (kwargs_in == nullptr && nargs_in == 2 &&
         args_in[0] != Py_None && args_in[1] != Py_None) {
         cleanup_list cleanup(is_method ? args_in[0] : nullptr);
+        uint8_t self_flag = 1 | (uint8_t) cast_flags::construct;
+        if (nargsf & NB_VECTORCALL_TRUSTED_SELF)
+            self_flag |= (uint8_t) cast_flags::trusted;
         uint8_t args_flags[2] = {
-            (uint8_t) (is_constructor ? (1 | (uint8_t) cast_flags::construct) : 1),
+            (uint8_t) (is_constructor ? self_flag : 1),
             1
         };
 

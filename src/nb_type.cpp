@@ -1063,8 +1063,12 @@ nb_type_vectorcall_fixup(nb_func *func, PyObject *self, PyObject *const *args_in
     memcpy(args + 1, args_in, sizeof(PyObject *) * (size - 1));
     args[0] = self;
 
-    PyObject *rv = func->vectorcall((PyObject *) func, args,
-                                    (size_t) (nargs + 1), kwargs_in);
+    size_t call_nargsf = (size_t) (nargs + 1);
+    if (is_init)
+        call_nargsf |= NB_VECTORCALL_TRUSTED_SELF;
+
+    PyObject *rv =
+        func->vectorcall((PyObject *) func, args, call_nargsf, kwargs_in);
 
     if (NB_UNLIKELY(alloc))
         PyMem_Free(args);
@@ -1123,8 +1127,12 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     PyObject *temp = args[0];
     args[0] = self;
 
+    size_t call_nargsf = (size_t) (nargs + 1);
+    if (NB_LIKELY(is_init))
+        call_nargsf |= NB_VECTORCALL_TRUSTED_SELF;
+
     PyObject *rv =
-        func->vectorcall((PyObject *) func, args, nargs + 1, kwargs_in);
+        func->vectorcall((PyObject *) func, args, call_nargsf, kwargs_in);
 
     args[0] = temp;
 
@@ -1745,6 +1753,13 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     // Convert None -> nullptr
     if (src == Py_None) {
         *out = nullptr;
+        return true;
+    }
+
+    // Trusted 'self' from nb_type_vectorcall: a freshly allocated instance of
+    // exactly this type, so skip verification and read the pointer directly.
+    if (NB_UNLIKELY(flags & (uint8_t) cast_flags::trusted)) {
+        *out = inst_ptr((nb_inst *) src);
         return true;
     }
 

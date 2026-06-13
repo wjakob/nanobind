@@ -141,8 +141,7 @@ static void trampoline_enter_internal(void **data, size_t size,
                 goto fail;
             }
 
-            Py_INCREF(Py_None);
-            key = Py_None;
+            key = none_ref();
         }
 
         data[2 * offset + 1] = (void *) name;

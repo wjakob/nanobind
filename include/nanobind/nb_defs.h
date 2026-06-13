@@ -87,6 +87,13 @@
 #  define NB_TYPING_CAPSULE "types.CapsuleType"
 #endif
 
+// Singletons (True, False, None) are immortal on 3.12+ / 3.12 stable ABI
+#if defined(Py_LIMITED_API) || PY_VERSION_HEX >= 0x030C0000
+#  define NB_IMMORTAL_SINGLETONS 1
+#else
+#  define NB_IMMORTAL_SINGLETONS 0
+#endif
+
 #if defined(Py_LIMITED_API)
 #  if PY_VERSION_HEX < 0x030C0000 || defined(PYPY_VERSION)
 #    error "nanobind can target Python's limited API, but this requires CPython >= 3.12"

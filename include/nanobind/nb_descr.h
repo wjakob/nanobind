@@ -85,26 +85,6 @@ constexpr auto io_name(char const (&text1)[N1], char const (&text2)[N2]) {
            const_name(text2) + const_name('@');
 }
 
-#if PY_VERSION_HEX < 0x030A0000
-template <typename T> constexpr auto optional_name(const T &v) {
-    return const_name("typing.Optional[") + v + const_name("]");
-}
-template <typename... Ts> constexpr auto union_name(const Ts&... vs) {
-    return const_name("typing.Union[") + concat(vs...) + const_name("]");
-}
-#else
-template <typename T> constexpr auto optional_name(const T &v) {
-    return v + const_name(" | None");
-}
-template <typename T> constexpr auto union_name(const T &v) {
-    return v;
-}
-template <typename T1, typename T2, typename... Ts>
-constexpr auto union_name(const T1 &v1, const T2 &v2, const Ts &...vs) {
-    return v1 + const_name(" | ") + union_name(v2, vs...);
-}
-#endif
-
 template <size_t Size>
 auto constexpr const_name() -> std::remove_cv_t<decltype(int_to_str<Size / 10, Size % 10>::digits)> {
     return int_to_str<Size / 10, Size % 10>::digits;
@@ -121,11 +101,49 @@ constexpr descr<N, Ts...> concat(const descr<N, Ts...> &descr) { return descr; }
 template <size_t N, typename... Ts>
 constexpr descr<N, Ts...> concat_maybe(const descr<N, Ts...> &descr) { return descr; }
 
+// Note: the multi-argument ``concat`` is intentionally written as a fold over
+// ``operator+`` rather than as a self-recursive call. A ``descr<N, Ts...>``
+// carries the bound C++ types ``Ts...`` as template arguments, so the
+// associated namespaces of a ``descr`` value (for argument-dependent lookup)
+// include the namespaces of those types. A recursive unqualified call
+// ``concat(args...)`` is resolved at instantiation time with ADL; if a bound
+// type lives in a namespace that also declares a function named ``concat``
+// (e.g., ``nlohmann::detail::concat`` in nlohmann/json), that overload enters
+// the candidate set and the call fails to compile deep inside nanobind's
+// headers. The fold avoids the recursive name lookup entirely (``descr``'s
+// ``operator+`` is declared in ``nanobind::detail`` and is not subject to
+// being shadowed by such foreign overloads). For the same reason,
+// internal unqualified calls to ``concat``/``concat_maybe`` elsewhere in the
+// headers are parenthesized, which suppresses ADL.
 template <size_t N, typename... Ts, typename... Args>
-constexpr auto concat(const descr<N, Ts...> &d, const Args &...args)
-    -> decltype(std::declval<descr<N + 2, Ts...>>() + concat(args...)) {
-    return d + const_name(", ") + concat(args...);
+constexpr auto concat(const descr<N, Ts...> &d, const Args &...args) {
+    return (d + ... + (const_name(", ") + args));
 }
+
+// optional_name/union_name follow ``concat`` deliberately: the Python < 3.10
+// branch invokes ``(concat)``, and the parenthesized (ADL-suppressed) callee
+// must be visible to ordinary lookup at this point. This branch is only
+// compiled against Python 3.9 headers.
+#if PY_VERSION_HEX < 0x030A0000
+template <typename T> constexpr auto optional_name(const T &v) {
+    return const_name("typing.Optional[") + v + const_name("]");
+}
+template <typename... Ts> constexpr auto union_name(const Ts&... vs) {
+    return const_name("typing.Union[") + (concat)(vs...) + const_name("]");
+}
+#else
+template <typename T> constexpr auto optional_name(const T &v) {
+    return v + const_name(" | None");
+}
+template <typename T> constexpr auto union_name(const T &v) {
+    return v;
+}
+template <typename T1, typename T2, typename... Ts>
+constexpr auto union_name(const T1 &v1, const T2 &v2, const Ts &...vs) {
+    return v1 + const_name(" | ") + union_name(v2, vs...);
+}
+#endif
+
 
 template <typename... Args>
 constexpr auto concat_maybe(const descr<0> &, const descr<0> &, const Args &...args)

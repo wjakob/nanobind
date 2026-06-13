@@ -87,6 +87,24 @@ template <> struct nb::detail::type_caster<numeric_string> {
 
 int test_31(int i) noexcept { return i; }
 
+// Regression test for ADL interference with nanobind's internal 'concat'
+// helper (see nb_descr.h): binding functions whose signatures involve types
+// from a namespace that also declares a function named 'concat' used to fail
+// to compile, because such types become associated namespaces of the
+// generated 'descr<...>' signature objects. The declaration below mirrors the
+// shape of nlohmann::detail::concat (from nlohmann/json), where this was
+// observed in practice; it only needs to be declared, not defined, to be
+// picked up by ADL.
+namespace concat_adl {
+    struct Payload {
+        Payload(int value) : value(value) { }
+        int value;
+    };
+
+    template <typename OutStringType = std::string, typename... Args>
+    OutStringType concat(Args &&...args);
+}
+
 NB_MODULE(test_functions_ext, m) {
     m.doc() = "function testcase";
 
@@ -549,4 +567,17 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_accessor_inplace_attr", [](nb::object o, nb::object v) { o.attr("x") += v; });
     m.def("test_accessor_inplace_item", [](nb::object o, nb::object v) { o["x"] += v; });
+
+    // Bind a type from a namespace that declares its own 'concat' function
+    // (see the comment on 'namespace concat_adl' above). The two-parameter
+    // function and the pair return value instantiate the variadic signature
+    // concatenation paths in nb_func.h and stl/pair.h.
+    nb::class_<concat_adl::Payload>(m, "ConcatADLPayload")
+        .def(nb::init<int>())
+        .def_rw("value", &concat_adl::Payload::value);
+
+    m.def("concat_adl_pair",
+          [](const concat_adl::Payload &a, const concat_adl::Payload &b) {
+              return std::make_pair(a, b);
+          });
 }

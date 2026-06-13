@@ -1044,7 +1044,7 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     type_data *td = nb_type_data(tp);
     nb_func *func = (nb_func *) td->init;
     bool is_init = (td->flags & (uint32_t) type_flags::has_new) == 0;
-    Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+    Py_ssize_t nargs = NB_VECTORCALL_NARGS(nargsf);
 
     if (NB_UNLIKELY(!func)) {
         PyErr_Format(PyExc_TypeError, "%s: no constructor defined!", td->name);

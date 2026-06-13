@@ -679,6 +679,11 @@ def test41_any():
     assert t.test_any(s) is s
     assert t.test_any.__doc__ == "test_any(arg: typing.Any, /) -> typing.Any"
 
+def test41b_self():
+    s = "hello"
+    assert t.test_typing_self(s) is s
+    assert t.test_typing_self.__doc__ == "test_typing_self(arg: object, /) -> typing.Self"
+
 def test42_wrappers_list():
     assert t.test_wrappers_list()
 

@@ -536,13 +536,24 @@ def test20a_dlpack_copy_device_kwargs():
     with pytest.raises(BufferError):
         obj.__dlpack__(dl_device=(99, 0))
 
+    # stream=None is fine, other values are rejected
+    assert 'dltensor' in repr(obj.__dlpack__(stream=None))
+    with pytest.raises(RuntimeError):
+        obj.__dlpack__(stream=0)
+
     # Keyword names passed via f(**d) need not be interned/identical to the
     # internal references; equal-but-distinct strings must behave identically.
     with pytest.raises(BufferError):
         obj.__dlpack__(**{''.join(['co', 'py']): True})
     with pytest.raises(BufferError):
         obj.__dlpack__(**{''.join(['dl_', 'device']): (99, 0)})
+    with pytest.raises(RuntimeError):
+        obj.__dlpack__(**{''.join(['str', 'eam']): "0"})
     assert 'dltensor' in repr(obj.__dlpack__(**{''.join(['co', 'py']): False}))
+
+    # Unrecognized keyword names (e.g., misspellings) are rejected
+    with pytest.raises(TypeError):
+        obj.__dlpack__(version=1)
 
 
 def test20b_import_metal_dlpack():

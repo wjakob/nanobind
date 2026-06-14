@@ -289,25 +289,16 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
     }
     Py_ssize_t nkwargs = (kwnames) ? NB_TUPLE_GET_SIZE(kwnames) : 0;
 
+    // Match a keyword name against an interned reference.
+    auto key_is = [](PyObject *key, PyObject *r) -> bool {
+        return key == r;
+    };
+
     // Match a keyword name against an interned reference, falling back to a
     // string comparison since kwnames passed via f(**d) are not guaranteed to
     // be identical to the interned objects.
-    auto key_is = [](PyObject *key, PyObject *r) -> bool {
+    auto key_equals = [](PyObject *key, PyObject *r) -> bool {
         return key == r || PyObject_RichCompareBool(key, r, Py_EQ) == 1;
-    };
-
-    // Extract a 2-tuple of integers; returns false (with no error set) for
-    // any other input
-    auto get_int_pair = [](PyObject *value, long *a, long *b) -> bool {
-        if (!PyTuple_Check(value) || NB_TUPLE_GET_SIZE(value) != 2)
-            return false;
-        *a = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 0));
-        *b = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 1));
-        if (PyErr_Occurred()) {
-            PyErr_Clear();
-            return false;
-        }
-        return true;
     };
 
     ndarray_handle *th = ((nb_ndarray *) self)->th;
@@ -315,36 +306,79 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
                                           : th->mt_unversioned->dltensor;
 
     long max_major_version = 0;
-    for (Py_ssize_t i = 0; i < nkwargs; ++i) {
-        PyObject* key = NB_TUPLE_GET_ITEM(kwnames, i);
-        PyObject* value = args[i];
-        long a, b;
-        if (key_is(key, NB_INTERNED(copy))) {
-            // The capsule aliases C++-owned storage; a copy cannot be made
-            if (value == Py_True) {
-                PyErr_SetString(PyExc_BufferError,
-                        "__dlpack__(): copy=True is not supported.");
-                return nullptr;
+
+    // Return nkwargs on success, -1 on error, else index of unmatched kwarg.
+    auto parse_kwargs = [&kwnames, &nkwargs, &args, &t, &max_major_version](
+                                Py_ssize_t begin, auto compare) -> Py_ssize_t {
+        // Extract a 2-tuple of integers; returns false (with no error set)
+        // for any other input.
+        auto get_int_pair = [](PyObject *value, long *a, long *b) -> bool {
+            if (!PyTuple_Check(value) || NB_TUPLE_GET_SIZE(value) != 2)
+                return false;
+            *a = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 0));
+            *b = PyLong_AsLong(NB_TUPLE_GET_ITEM(value, 1));
+            if (PyErr_Occurred()) {
+                PyErr_Clear();
+                return false;
             }
-        } else if (key_is(key, NB_INTERNED(dl_device))) {
-            // Reject requests for a device other than the array's own
-            if (value != Py_None &&
-                (!get_int_pair(value, &a, &b) ||
-                 a != (long) t.device.device_type ||
-                 b != (long) t.device.device_id)) {
-                PyErr_SetString(PyExc_BufferError,
-                        "__dlpack__(): unsupported dl_device.");
-                return nullptr;
-            }
-        } else if (key_is(key, NB_INTERNED(max_version))) {
-            if (value != Py_None) {
-                if (!get_int_pair(value, &a, &b)) {
-                    PyErr_SetString(PyExc_TypeError,
-                            "max_version must be None or tuple[int, int]");
-                    return nullptr;
+            return true;
+        };
+
+        for (Py_ssize_t i = begin; i < nkwargs; ++i) {
+            PyObject* key = NB_TUPLE_GET_ITEM(kwnames, i);
+            PyObject* value = args[i];
+            long a, b;
+            if (compare(key, NB_INTERNED(copy))) {
+                // The capsule aliases C++-owned storage; a copy cannot be made
+                if (value == Py_True) {
+                    PyErr_SetString(PyExc_BufferError,
+                            "__dlpack__(): copy=True is not supported.");
+                    return -1;
                 }
-                max_major_version = a;
+            } else if (compare(key, NB_INTERNED(dl_device))) {
+                // Reject requests for a device other than the array's own
+                if (value != Py_None &&
+                        (!get_int_pair(value, &a, &b) ||
+                         a != (long) t.device.device_type ||
+                         b != (long) t.device.device_id)) {
+                    PyErr_SetString(PyExc_BufferError,
+                            "__dlpack__(): unsupported dl_device.");
+                    return -1;
+                }
+            } else if (compare(key, NB_INTERNED(max_version))) {
+                if (value != Py_None) {
+                    if (!get_int_pair(value, &a, &b)) {
+                        PyErr_SetString(PyExc_TypeError,
+                                "max_version must be None or tuple[int, int]");
+                        return -1;
+                    }
+                    max_major_version = a;
+                }
+            } else if (compare(key, NB_INTERNED(stream))) {
+                if (value != Py_None) {
+                    PyErr_SetString(PyExc_RuntimeError,
+                            "nanobind only supports stream=None.");
+                    return -1;
+                }
+            } else {
+                return i;
             }
+        }
+        return nkwargs;
+    };
+
+    Py_ssize_t result = parse_kwargs(0, key_is);
+    if (NB_UNLIKELY(result < 0))
+        return nullptr;
+    if (NB_UNLIKELY(result < nkwargs)) {
+        result = parse_kwargs(result, key_equals);
+        if (NB_UNLIKELY(result < 0))
+            return nullptr;
+        if (NB_UNLIKELY(result < nkwargs)) {
+            PyErr_Format(PyExc_TypeError,
+                    "__dlpack__(): unsupported keyword argument '%S'",
+                    NB_TUPLE_GET_ITEM(kwnames, result));
+            return nullptr;
         }
     }
 

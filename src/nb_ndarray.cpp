@@ -281,8 +281,8 @@ static void nb_ndarray_releasebuffer(PyObject *, Py_buffer *view) {
 
 // This function implements __dlpack__() for a nanobind.nb_ndarray.
 static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
-                                   Py_ssize_t nargsf, PyObject *kwnames) {
-    if (PyVectorcall_NARGS(nargsf) != 0) {
+                                   Py_ssize_t nargs, PyObject *kwnames) {
+    if (nargs != 0) {
         PyErr_SetString(PyExc_TypeError,
                 "__dlpack__() does not accept positional arguments");
         return nullptr;
@@ -512,11 +512,11 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     }
 
     static_assert(alignof(managed_dltensor_versioned) >= alignof(int64_t));
-    scoped_pymalloc<managed_dltensor_versioned> mt(1, 2 * sizeof(int64_t)*ndim);
+    scoped_pymalloc<managed_dltensor_versioned> mt(1, 2 * sizeof(int64_t) * (size_t) ndim);
     int64_t* shape = nullptr;
     int64_t* strides = nullptr;
     if (ndim > 0) {
-        shape = new ((void*) (mt.get() + 1)) int64_t[2 * ndim];
+        shape = new ((void*) (mt.get() + 1)) int64_t[2 * (size_t) ndim];
         strides = shape + ndim;
     }
 
@@ -594,7 +594,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     } else {
         // Try calling src.__dlpack__()
         PyObject* args[] = {src, static_pyobjects[pyobj_name::dl_version_tpl]};
-        Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+        size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
         capsule = steal(PyObject_VectorcallMethod(
                           NB_INTERNED(__dlpack__),
                           args, nargsf,
@@ -861,8 +861,9 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         result->free_strides = true;
 
         scoped_pymalloc<int64_t> strides((size_t) t.ndim);
-        for (int64_t i = t.ndim - 1, accum = 1; i >= 0; --i) {
-            strides[i] = accum;
+        int64_t accum = 1;
+        for (int32_t i = t.ndim - 1; i >= 0; --i) {
+            strides[(size_t) i] = accum;
             accum *= t.shape[i];
         }
         t.strides = strides.release();
@@ -1094,7 +1095,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
             object pkg_mod = steal(module_import("numpy"));
             PyObject* args[] = {pkg_mod.ptr(), o.ptr(),
                                 (copy) ? Py_True : Py_False};
-            Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+            size_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             return PyObject_VectorcallMethod(
                         NB_INTERNED(array), args, nargsf,
                         static_pyobjects[pyobj_name::copy_tpl]);
@@ -1129,7 +1130,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         if (pkg_name) {
             object pkg_mod = steal(module_import(pkg_name));
             PyObject* args[] = {pkg_mod.ptr(), o.ptr()};
-            Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+            size_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             o = steal(PyObject_VectorcallMethod(
                           NB_INTERNED(from_dlpack),
                           args, nargsf, nullptr));

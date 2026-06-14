@@ -827,13 +827,13 @@ NB_MODULE(test_classes_ext, m) {
         .def_ro("value", &NewDflt::value);
     nb::class_<NewStarPosOnly>(m, "NewStarPosOnly")
         .def(nb::new_([](nb::args a, int value) {
-            return NewStarPosOnly{nb::len(a) + value};
+            return NewStarPosOnly{nb::len(a) + (size_t) value};
         }),
             "args"_a, "value"_a = 42)
         .def_ro("value", &NewStarPosOnly::value);
     nb::class_<NewStar>(m, "NewStar")
         .def(nb::new_([](nb::args a, int value, nb::kwargs k) {
-            return NewStar{nb::len(a) + value + 10 * nb::len(k)};
+            return NewStar{nb::len(a) + (size_t) value + 10 * nb::len(k)};
         }),
             "args"_a, "value"_a = 42, "kwargs"_a)
         .def_ro("value", &NewStar::value);

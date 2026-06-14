@@ -87,7 +87,7 @@ NB_MODULE(test_thread_ext, m) {
         shared_ints.push_back(std::make_shared<AnInt>(i));
     }
     m.def("fetch_shared_int", [shared_ints](int i) {
-        return shared_ints.at(i);
+        return shared_ints.at((size_t) i);
     });
     m.def("consume_an_int", [](AnInt* p) { return p->value; });
 }

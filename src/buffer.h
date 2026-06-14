@@ -136,7 +136,7 @@ public:
 
 private:
     NB_NOINLINE void expand(size_t minval = 2) {
-        size_t old_alloc_size = m_end - m_start,
+        size_t old_alloc_size = (size_t) (m_end - m_start),
                new_alloc_size = 2 * old_alloc_size + minval,
                used_size      = (size_t) (m_cur - m_start),
                copy_size      = used_size + 1;

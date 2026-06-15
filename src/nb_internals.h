@@ -524,6 +524,7 @@ struct nb_internals {
     X(dl_device)                                                               \
     X(from_dlpack)                                                             \
     X(max_version)                                                             \
+    X(stream)                                                                  \
     X(value)
 
 // Names for the PyObject* entries in the per-module state array.

@@ -575,7 +575,8 @@ def test20b_import_metal_dlpack():
 
     rec = Recorder(obj)
     assert t.check_metal_contig(rec) == (8, 0, 2, 2, 4, True, 0)
-    assert "max_version" in rec.kwargs
+    # A read-only import uses the cheaper unversioned __dlpack__() (no kwargs).
+    assert rec.kwargs == {}
 
     obj = t.ret_array_api_metal_byte_offset()
     assert t.check_metal_contig(obj) == (8, 0, 2, 2, 3, True, 4)

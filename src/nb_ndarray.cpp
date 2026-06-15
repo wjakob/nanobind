@@ -622,24 +622,38 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     const bool src_is_pycapsule = PyCapsule_CheckExact(src);
     mt_unique_ptr_t mt_unique_ptr(nullptr, &mt_from_buffer_delete);
 
+    // Capsule flavor (versioned or not) to probe for first during extraction.
+    // Defaults to unversioned: the right guess for an unknown user capsule.
+    bool expect_versioned = false;
+
     if (src_is_pycapsule) {
         capsule = borrow(src);
     } else {
-        // Try calling src.__dlpack__()
         PyObject* args[] = {src, NB_INTERNED(dl_version_tpl)};
         Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-        capsule = steal(PyObject_VectorcallMethod(
-                          NB_INTERNED(__dlpack__),
-                          args, nargsf,
-                          NB_INTERNED(max_version_tpl)));
 
-        // Python array API standard v2023 introduced max_version.
-        // Try calling src.__dlpack__() without any kwargs.
-        if (!capsule.is_valid() && PyErr_ExceptionMatches(PyExc_TypeError)) {
+        // Call src.__dlpack__(): max_version_kw requests a versioned capsule
+        // nullptr the cheaper unversioned one.
+        PyObject *max_version_kw = NB_INTERNED(max_version_tpl);
+        auto dlpack = [&](PyObject *kwnames) {
+            return steal(PyObject_VectorcallMethod(NB_INTERNED(__dlpack__),
+                                                   args, nargsf, kwnames));
+        };
+
+        // The unversioned path is generally faster to handle for the target
+        // framework. Try that first if the user only requested readonly input.
+        capsule = dlpack(c->ro ? nullptr : max_version_kw);
+        expect_versioned = !c->ro;
+
+        // Fall back to the other variant on failure: a read-only source
+        // refusing unversioned export raises BufferError, and producers
+        // predating max_version (array API < v2023) raise TypeError.
+        if (!capsule.is_valid() &&
+            (PyErr_ExceptionMatches(PyExc_BufferError) ||
+             PyErr_ExceptionMatches(PyExc_TypeError))) {
             PyErr_Clear();
-            capsule = steal(PyObject_VectorcallMethod(
-                              NB_INTERNED(__dlpack__),
-                              args, nargsf, nullptr));
+            capsule = dlpack(c->ro ? max_version_kw : nullptr);
+            expect_versioned = c->ro;
         }
 
         // Try creating an ndarray via the buffer protocol
@@ -682,16 +696,19 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     }
 
     void* mt;  // can be versioned or unversioned
-    bool versioned = true;
+    bool versioned;
     if (mt_unique_ptr) {
         mt = mt_unique_ptr.get();
+        versioned = true;
     } else {
-        // Extract the managed_dltensor{_versioned} pointer from the capsule.
-        mt = PyCapsule_GetPointer(capsule.ptr(), "dltensor_versioned");
+        // Probe the expected capsule name first
+        static const char *names[2] = { "dltensor", "dltensor_versioned" };
+        versioned = expect_versioned;
+        mt = PyCapsule_GetPointer(capsule.ptr(), names[(int) versioned]);
         if (!mt) {
             PyErr_Clear();
-            versioned = false;
-            mt = PyCapsule_GetPointer(capsule.ptr(), "dltensor");
+            versioned = !versioned;
+            mt = PyCapsule_GetPointer(capsule.ptr(), names[(int) versioned]);
             if (!mt) {
                 PyErr_Clear();
                 return nullptr;

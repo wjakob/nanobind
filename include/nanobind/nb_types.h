@@ -86,7 +86,7 @@ template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
 template <typename Impl> class accessor;
 struct str_attr; struct obj_attr;
-struct str_item; struct obj_item; struct num_item;
+struct str_item; struct obj_item; struct num_item; struct dict_item;
 struct num_item_list; struct num_item_tuple;
 class args_proxy; class kwargs_proxy;
 struct borrow_t { };
@@ -589,24 +589,13 @@ class dict : public object {
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyDict_Items)); }
     object get(handle key, handle def) const {
-        PyObject *value;
-#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
-        int rv = detail::dict_get_item_ref(m_ptr, key.ptr(), &value);
-#else
-        int rv = PyDict_GetItemRef(m_ptr, key.ptr(), &value);
-#endif
-        if (rv < 0)
-            detail::raise_python_error();
-        if (rv == 0)
-            return borrow(def);
-        return steal(value);
+        return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
-    object get(const char *key, handle def) const {
-        PyObject *k = PyUnicode_FromString(key);
-        if (!k)
-            detail::raise_python_error();
-        object key_o = steal(k);
-        return get(key_o, def);
+    object get(const char *key_, handle def) const {
+        object key = steal(PyUnicode_FromString(key_));
+        if (!key.is_valid())
+            raise_python_error();
+        return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
     template <typename T> bool contains(T&& key) const;
     void clear() { PyDict_Clear(m_ptr); }
@@ -615,6 +604,9 @@ class dict : public object {
             raise_python_error();
     }
     bool empty() const { return size() == 0; }
+
+    using object::operator[];
+    detail::accessor<detail::dict_item> operator[](handle key) const;
 };
 
 class set : public object {

@@ -848,6 +848,15 @@ def test54_dict_default():
     with pytest.raises(TypeError):
         t.test_get_dict_default_2({'key': 100}, [1, 2, 3])
 
+def test54_dict_getitem():
+    assert t.test_getitem_dict({'key': 100}, 'key') == 100
+    # A missing key must raise KeyError, matching Python's d[key]
+    with pytest.raises(KeyError):
+        t.test_getitem_dict({'key': 100}, 'missing')
+    # An unhashable key must raise TypeError
+    with pytest.raises(TypeError):
+        t.test_getitem_dict({'key': 100}, [1, 2, 3])
+
 def test_55_memoryview():
     memview = t.test_memoryview()
     assert isinstance(memview, memoryview)

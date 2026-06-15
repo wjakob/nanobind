@@ -1282,32 +1282,57 @@ bool issubclass(PyObject *a, PyObject *b) {
 
 // ========================================================================
 
-#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
-/// Emulates PyDict_GetItemRef() when targeting Python < 3.13
-int dict_get_item_ref(PyObject *d, PyObject *k, PyObject **value) {
-    PyObject *v = PyDict_GetItemWithError(d, k);
-    if (v) {
-        Py_INCREF(v);
-        *value = v;
-        return 1;
-    } else {
-        *value = nullptr;
-        return PyErr_Occurred() ? -1 : 0;
-    }
-}
-#endif
-
-PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k) {
+// Look up 'k' in the dictionary 'd', returning a *new* reference
+static PyObject *dict_lookup_ref(PyObject *d, PyObject *k, bool *error) {
     PyObject *value;
-    bool error = false;
-
-#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
-    error = dict_get_item_ref(d, k, &value) == -1;
+#if (defined(Py_LIMITED_API) ? Py_LIMITED_API : PY_VERSION_HEX) < 0x030D0000
+    value = PyDict_GetItemWithError(d, k);
+    if (value)
+        Py_INCREF(value);
+    *error = !value && PyErr_Occurred() != nullptr;
 #else
-    error = PyDict_GetItemRef(d, k, &value) == -1;
+    *error = PyDict_GetItemRef(d, k, &value) == -1;
 #endif
-    check(!error, "nanobind::detail::dict_get_item_ref_or_fail(): dictionary lookup failed!");
     return value;
+}
+
+void dict_getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
+    if (*out)
+        return;
+
+    bool error;
+    PyObject *value = dict_lookup_ref(obj, key, &error);
+    if (error)
+        raise_python_error();
+
+    if (!value) {
+        PyErr_SetObject(PyExc_KeyError, key);
+        raise_python_error();
+    }
+
+    *out = value;
+}
+
+PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def) {
+    bool error;
+    PyObject *value = dict_lookup_ref(d, k, &error);
+    if (error)
+        raise_python_error();
+    if (!value) {
+        Py_XINCREF(def);
+        value = def;
+    }
+    return value;
+}
+
+void dict_setitem(PyObject *obj, PyObject *key, PyObject *value) {
+    if (PyDict_SetItem(obj, key, value))
+        raise_python_error();
+}
+
+void dict_delitem(PyObject *obj, PyObject *key) {
+    if (PyDict_DelItem(obj, key))
+        raise_python_error();
 }
 
 NAMESPACE_END(detail)

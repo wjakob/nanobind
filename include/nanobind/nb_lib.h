@@ -213,6 +213,12 @@ NB_CORE void delitem(PyObject *obj, Py_ssize_t);
 NB_CORE void delitem(PyObject *obj, const char *key);
 NB_CORE void delitem(PyObject *obj, PyObject *key);
 
+/// Dict-specialized item access
+NB_CORE void dict_getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out);
+NB_CORE PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def);
+NB_CORE void dict_setitem(PyObject *obj, PyObject *key, PyObject *value);
+NB_CORE void dict_delitem(PyObject *obj, PyObject *key);
+
 // ========================================================================
 
 /// Determine the length of a Python object
@@ -567,13 +573,6 @@ NB_CORE bool is_alive() noexcept;
 
 #if NB_TYPE_GET_SLOT_IMPL
 NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
-#endif
-
-NB_CORE PyObject *dict_get_item_ref_or_fail(PyObject *d, PyObject *k);
-
-#if PY_VERSION_HEX < 0x030D00A1 || (defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030D0000)
-/// Emulates PyDict_GetItemRef() when targeting Python < 3.13
-NB_CORE int dict_get_item_ref(PyObject *d, PyObject *k, PyObject **value);
 #endif
 
 NB_CORE const char *abi_tag();

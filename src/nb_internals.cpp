@@ -538,7 +538,7 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
     check(key, "nanobind::detail::nb_module_exec(): "
                "could not create dictionary key!");
 
-    PyObject *capsule = dict_get_item_ref_or_fail(dict, key);
+    PyObject *capsule = dict_getitem_or_default(dict, key, nullptr);
     if (capsule) {
         Py_DECREF(key);
         internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");

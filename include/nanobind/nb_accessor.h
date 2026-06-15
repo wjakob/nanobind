@@ -137,6 +137,28 @@ struct obj_item {
     }
 };
 
+struct dict_item {
+    static constexpr bool cache_dec_ref = true;
+    using key_type = object;
+
+    NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
+        detail::dict_getitem_or_raise(obj, key.ptr(), cache);
+    }
+
+    NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
+        dict_setitem(obj, key.ptr(), v);
+    }
+
+    NB_INLINE static void del(PyObject *obj, handle key) {
+        dict_delitem(obj, key.ptr());
+    }
+
+    NB_INLINE static PyObject *key(handle key) {
+        Py_INCREF(key.ptr());
+        return key.ptr();
+    }
+};
+
 struct num_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = Py_ssize_t;
@@ -250,6 +272,10 @@ detail::accessor<detail::num_item_list> list::operator[](T index) const {
 template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>>>
 detail::accessor<detail::num_item_tuple> tuple::operator[](T index) const {
     return { derived(), (Py_ssize_t) index };
+}
+
+inline detail::accessor<detail::dict_item> dict::operator[](handle key) const {
+    return { *this, borrow(key) };
 }
 
 template <typename... Args> str str::format(Args&&... args) const {

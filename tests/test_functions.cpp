@@ -546,6 +546,7 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_get_dict_default", [](nb::dict l) { return l.get("key", nb::int_(123)); });
     m.def("test_get_dict_default_2", [](nb::dict l, nb::handle key) { return l.get(key, nb::int_(123)); });
+    m.def("test_getitem_dict", [](nb::dict l, nb::handle key) -> nb::object { return l[key]; });
 
     m.def("test_accessor_inplace_attr", [](nb::object o, nb::object v) { o.attr("x") += v; });
     m.def("test_accessor_inplace_item", [](nb::object o, nb::object v) { o["x"] += v; });

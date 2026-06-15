@@ -83,7 +83,7 @@ void fail(const char *fmt, ...) noexcept {
 PyObject *capsule_new(const void *ptr, const char *name,
         void (*cleanup)(void *) noexcept) noexcept {
     if (!ptr)
-        Py_RETURN_NONE;
+        return none_ref();
 
     auto capsule_cleanup = [](PyObject *o) {
         auto cleanup_2 = (void (*)(void *))(PyCapsule_GetContext(o));
@@ -621,9 +621,11 @@ PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
 
 PyObject *bool_from_obj(PyObject *o) {
     int rv = PyObject_IsTrue(o);
-    if (rv == -1)
-        raise_python_error();
-    return rv == 1 ? Py_True : Py_False;
+    if (rv == 1)
+        return true_ref();
+    if (rv == 0)
+        return false_ref();
+    raise_python_error();
 }
 
 PyObject *int_from_obj(PyObject *o) {

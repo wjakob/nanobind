@@ -49,7 +49,8 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         temp_ref = steal(temp);
 
         return (o && ... &&
-                std::get<Is>(casters).from_python(o[Is], flags, cleanup));
+                std::get<Is>(casters).from_python(
+                    o[Is], flags_for_local_caster<Ts>(flags), cleanup));
     }
 
     template <typename T>

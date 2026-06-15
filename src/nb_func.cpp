@@ -318,8 +318,10 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         if (has_args) {
             for (size_t i = is_method; i < f->nargs; ++i) {
                 arg_data &a = args_in[i - is_method];
+                uint8_t dispatch_flags =
+                    a.flag & ~(uint8_t) cast_flags::none_disallowed;
                 medium_call |= a.name != nullptr || a.value != nullptr ||
-                               a.flag != cast_flags::convert;
+                               dispatch_flags != cast_flags::convert;
             }
         }
 

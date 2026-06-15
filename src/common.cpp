@@ -108,11 +108,6 @@ void raise_python_error() {
     throw python_error();
 }
 
-void raise_next_overload_if_null(void *p) {
-    if (NB_UNLIKELY(!p))
-        throw next_overload();
-}
-
 void raise_python_or_cast_error() {
     if (PyErr_Occurred())
         throw python_error();

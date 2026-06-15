@@ -332,6 +332,18 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                      (uint8_t) cast_flags::accepts_none, true)), ...);
     }
 
+    // Record 'none_disallowed' (nonzero only for value/reference bound-type
+    // targets) in the per-argument flag at bind time. The dispatcher carries
+    // it into the call via 'args_flags', so the heavily-inlined function
+    // trampoline need not OR it in at every from_python() invocation. Simple
+    // overloads ignore the per-argument flags but reject 'None' up front, so
+    // the bit is only consulted where 'None' can actually reach a caster.
+    if constexpr (has_arg_annotations) {
+        ((void)(Is >= (size_t)is_method_det &&
+                (f.args[Is - is_method_det].flag |=
+                     none_disallowed_flag<Args>, true)), ...);
+    }
+
     return nb_func_new(&f);
 }
 

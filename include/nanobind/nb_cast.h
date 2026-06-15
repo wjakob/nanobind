@@ -75,6 +75,13 @@ using precise_cast_t =
                        std::conditional_t<std::is_rvalue_reference_v<T>,
                                           intrinsic_t<T> &&, intrinsic_t<T> &>>;
 
+/// Type trait to detect arguments where a value/reference cast excludes ``None``
+template <typename T>
+inline constexpr uint8_t none_disallowed_flag =
+    (is_base_caster_v<make_caster<T>> &&
+     !std::is_pointer_v<std::remove_reference_t<T>>)
+        ? (uint8_t) cast_flags::none_disallowed : 0;
+
 /// Many type casters delegate to another caster using the pattern:
 /// ~~~ .cc
 /// bool from_python(handle src, uint8_t flags, cleanup_list *cl) noexcept {
@@ -105,6 +112,7 @@ NB_INLINE uint8_t flags_for_local_caster(uint8_t flags) noexcept {
             if (flags & ((uint8_t) cast_flags::manual))
                 flags &= ~((uint8_t) cast_flags::convert);
         }
+        flags |= none_disallowed_flag<T>;
     } else {
         /* Any pointer produced by a non-base caster will generally point
            into storage owned by the caster, which won't live long enough.
@@ -509,16 +517,9 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
     }
 
     operator Type*() { return value; }
-
-    operator Type&() {
-        raise_next_overload_if_null(value);
-        return *value;
-    }
-
-    operator Type&&() {
-        raise_next_overload_if_null(value);
-        return (Type &&) *value;
-    }
+    // Code using this cast operator must ensure it is safe (see none_disallowed)
+    operator Type&() { return *value; }
+    operator Type&&() { return (Type &&) *value; }
 
 private:
     Type *value;

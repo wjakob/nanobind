@@ -879,9 +879,10 @@ class StubGen:
     def put(self, value: object, name: Optional[str] = None, parent: Optional[object] = None) -> None:
         old_prefix = self.prefix
 
-        if value in self.stack:
-            # Avoid infinite recursion due to cycles
-            return
+        # Avoid infinite recursion due to cycles
+        for item in self.stack:
+             if value is item:
+                return
 
         try:
             self.stack.append(value)

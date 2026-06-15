@@ -919,11 +919,20 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     }
 
     if (capsule.is_valid()) {
-        // Mark the dltensor capsule as used, i.e., "consumed".
-        const char* used_name = (versioned) ? "used_dltensor_versioned"
-                                            : "used_dltensor";
-        if (PyCapsule_SetName(capsule.ptr(), used_name) ||
-            PyCapsule_SetDestructor(capsule.ptr(), nullptr))
+        // Neutralize the producer's capsule so its destructor won't free the
+        // DLManagedTensor that nanobind now owns. Clearing the destructor is
+        // sufficient and is the only step the common __dlpack__() path needs:
+        // nanobind holds the sole reference to that capsule and never re-reads
+        // its name. A user-supplied raw capsule, by contrast, is still
+        // referenced by the caller, so it is additionally renamed to the
+        // conventional "used" name to stop a second import from re-consuming it.
+        bool fail = PyCapsule_SetDestructor(capsule.ptr(), nullptr);
+        if (src_is_pycapsule && !fail) {
+            const char* used_name = (versioned) ? "used_dltensor_versioned"
+                                                : "used_dltensor";
+            fail = PyCapsule_SetName(capsule.ptr(), used_name);
+        }
+        if (fail)
             check(false, "ndarray_import(): could not mark capsule as used");
     }
 

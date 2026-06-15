@@ -180,7 +180,7 @@ The high-level interface consists of just one CMake command:
      This defense is especially costly for nanobind-based bindings, where it
      instruments every function binding wrapper and all ndarray-related code.
      In the test suite, it increases binary size by ~9-12% while adding 1-2%
-     runtime cost. The thread model is questionable in this context, since
+     runtime cost. The threat model is questionable in this context, since
      the arrays being processed are either controlled by Python or validated
      by nanobind.
 

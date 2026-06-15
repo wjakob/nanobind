@@ -392,7 +392,7 @@ class bool_ : public object {
     NB_OBJECT_DEFAULT(bool_, object, "bool", PyBool_Check)
 
     explicit bool_(handle h)
-        : object(detail::bool_from_obj(h.ptr()), detail::borrow_t{}) { }
+        : object(detail::bool_from_obj(h.ptr()), detail::steal_t{}) { }
 
     explicit bool_(bool value)
         : object(value ? detail::true_ref() : detail::false_ref(),
@@ -732,7 +732,7 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
-inline object none() { return borrow(Py_None); }
+inline object none() { return steal(detail::none_ref()); }
 inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 
 inline iterator iter(handle h) {

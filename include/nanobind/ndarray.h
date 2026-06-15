@@ -409,16 +409,16 @@ public:
     }
 
     ndarray(ndarray &&t) noexcept : m_handle(t.m_handle), m_dltensor(t.m_dltensor) {
+        // Only reset m_handle, it's safe to leave m_dltensor as-is
         t.m_handle = nullptr;
-        t.m_dltensor = dlpack::dltensor();
     }
 
     ndarray &operator=(ndarray &&t) noexcept {
         detail::ndarray_dec_ref(m_handle);
         m_handle = t.m_handle;
         m_dltensor = t.m_dltensor;
+        // Only reset t.m_handle, it's safe to leave t.m_dltensor as-is
         t.m_handle = nullptr;
-        t.m_dltensor = dlpack::dltensor();
         return *this;
     }
 

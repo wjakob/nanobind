@@ -176,7 +176,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Compile-time function signature
     static constexpr auto descr =
         const_name("(") +
-        concat(type_descr(
+        (concat)(type_descr(
             make_caster<remove_opt_mono_t<intrinsic_t<Args>>>::Name)...) +
         const_name(") -> ") + cast_out::Name;
 

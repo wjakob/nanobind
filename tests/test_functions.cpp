@@ -87,6 +87,16 @@ template <> struct nb::detail::type_caster<numeric_string> {
 
 int test_31(int i) noexcept { return i; }
 
+// Regression test for ADL hijacking nanobind's internal 'concat' helper: a
+// namespace that declares its own 'concat' (the shape of nlohmann/json's
+// nlohmann::detail::concat) must not break binding of its types.
+namespace concat_adl {
+    struct Payload { int value; Payload(int value) : value(value) {} };
+
+    template <typename OutStringType = std::string, typename... Args>
+    OutStringType concat(Args &&...args);
+}
+
 NB_MODULE(test_functions_ext, m) {
     m.doc() = "function testcase";
 
@@ -549,4 +559,13 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_accessor_inplace_attr", [](nb::object o, nb::object v) { o.attr("x") += v; });
     m.def("test_accessor_inplace_item", [](nb::object o, nb::object v) { o["x"] += v; });
+
+    nb::class_<concat_adl::Payload>(m, "ConcatADLPayload")
+        .def(nb::init<int>())
+        .def_rw("value", &concat_adl::Payload::value);
+
+    m.def("concat_adl_pair",
+          [](const concat_adl::Payload &a, const concat_adl::Payload &b) {
+              return std::make_pair(a, b);
+          });
 }

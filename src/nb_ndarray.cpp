@@ -922,6 +922,35 @@ dlpack::dltensor *ndarray_inc_ref(ndarray_handle *th) noexcept {
                            : &th->mt_unversioned->dltensor;
 }
 
+// Final teardown of a handle whose refcount reached zero.
+static void ndarray_dec_ref_free(ndarray_handle *th) noexcept {
+    Py_XDECREF(th->owner);
+    Py_XDECREF(th->self);
+    if (th->versioned) {
+        managed_dltensor_versioned *mt = th->mt_versioned;
+        if (th->free_strides) {
+            PyMem_Free(mt->dltensor.strides);
+            mt->dltensor.strides = nullptr;
+        }
+        if (th->call_deleter) {
+            if (mt->deleter)
+                mt->deleter(mt);
+        } else {
+            PyMem_Free(mt);  // This also frees shape and size arrays.
+        }
+    } else {
+        managed_dltensor *mt = th->mt_unversioned;
+        if (th->free_strides) {
+            PyMem_Free(mt->dltensor.strides);
+            mt->dltensor.strides = nullptr;
+        }
+        assert(th->call_deleter);
+        if (mt->deleter)
+            mt->deleter(mt);
+    }
+    PyMem_Free(th);
+}
+
 void ndarray_dec_ref(ndarray_handle *th) noexcept {
     if (!th)
         return;
@@ -933,33 +962,16 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
         // Don't run the cleanup if the interpreter has been shut down
         if (!is_alive())
             return;
-        gil_scoped_acquire guard;
 
-        Py_XDECREF(th->owner);
-        Py_XDECREF(th->self);
-        if (th->versioned) {
-            managed_dltensor_versioned *mt = th->mt_versioned;
-            if (th->free_strides) {
-                PyMem_Free(mt->dltensor.strides);
-                mt->dltensor.strides = nullptr;
-            }
-            if (th->call_deleter) {
-                if (mt->deleter)
-                    mt->deleter(mt);
-            } else {
-                PyMem_Free(mt);  // This also frees shape and size arrays.
-            }
-        } else {
-            managed_dltensor *mt = th->mt_unversioned;
-            if (th->free_strides) {
-                PyMem_Free(mt->dltensor.strides);
-                mt->dltensor.strides = nullptr;
-            }
-            assert(th->call_deleter);
-            if (mt->deleter)
-                mt->deleter(mt);
+#if !defined(Py_LIMITED_API)
+        // Avoid further GIL calls if we already hold it. (Slightly faster)
+        if (PyGILState_Check()) {
+            ndarray_dec_ref_free(th);
+            return;
         }
-        PyMem_Free(th);
+#endif
+        gil_scoped_acquire guard;
+        ndarray_dec_ref_free(th);
     }
 }
 

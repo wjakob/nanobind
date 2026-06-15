@@ -244,8 +244,6 @@ static void init_pyobjects(nb_internals *p) {
     for (int i = 0; i < pyobj_name::string_count; ++i)
         new_constant(p, i, PyUnicode_InternFromString(interned_c_strs[i]));
 
-    new_constant(p, pyobj_name::interned_copy_tpl,
-                 PyTuple_Pack(1, NB_INTERNED(copy)));
     new_constant(p, pyobj_name::interned_max_version_tpl,
                  PyTuple_Pack(1, NB_INTERNED(max_version)));
 

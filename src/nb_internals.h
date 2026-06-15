@@ -349,6 +349,18 @@ struct nb_maybe_atomic {
 };
 #endif
 
+/// Cache slots for `nb_internals::ndarray_export`: cached callables that build a
+/// framework's array from nanobind's DLPack/buffer wrapper.
+enum ndarray_export_slot {
+    nd_export_numpy_view, // numpy.asarray
+    nd_export_numpy_copy, // numpy.copy
+    nd_export_pytorch,    // torch.utils.dlpack.from_dlpack
+    nd_export_tensorflow, // tensorflow.experimental.dlpack.from_dlpack
+    nd_export_jax,        // jax.dlpack.from_dlpack
+    nd_export_cupy,       // cupy.from_dlpack
+    nd_export_count
+};
+
 /**
  * `nb_internals` is the central data structure storing information related to
  * function/type bindings and instances. Separate nanobind extensions within the
@@ -411,7 +423,6 @@ struct nb_maybe_atomic {
  * - `print_leak_warnings`, `print_implicit_cast_warnings`: simple boolean
  *   flags. No protection against concurrent conflicting updates.
  */
-
 struct nb_internals {
     /// Internal nanobind module
     PyObject *nb_module;
@@ -435,8 +446,9 @@ struct nb_internals {
     /// N-dimensional array wrapper (created on demand)
     nb_maybe_atomic<PyTypeObject *> nb_ndarray = nullptr;
 
-    /// Cached callables used to export an ndarray to a framework
-    nb_maybe_atomic<PyObject *> ndarray_export[8] {};
+    /// Cached callables used to export an ndarray to a framework, indexed by
+    /// `ndarray_export_slot`.
+    nb_maybe_atomic<PyObject *> ndarray_export[nd_export_count] {};
 
 #if defined(NB_FREE_THREADED)
     nb_shard *shards = nullptr;
@@ -551,8 +563,7 @@ struct pyobj_name {
         string_count,
 
         // Cached constant tuples using the same interning machinery
-        interned_copy_tpl = string_count, // tuple ("copy")
-        interned_max_version_tpl,         // tuple ("max_version")
+        interned_max_version_tpl = string_count, // tuple ("max_version")
         interned_dl_cpu_tpl,              // tuple (1, 0) == nb::device::cpu
         interned_dl_version_tpl,          // tuple (dlpack major, minor)
         total_count

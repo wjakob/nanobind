@@ -1043,31 +1043,34 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     return result.release();
 }
 
-/// Resolve (and cache) the callable that exports an ndarray a given framework.
-static PyObject *ndarray_export_fn(nb_internals *internals_, int framework) {
-    PyObject *fn = internals_->ndarray_export[framework].load_acquire();
+/// Module + attribute of export callables, indexed by `ndarray_export_slot`.
+static constexpr struct { const char *pkg, *attr; }
+    ndarray_export_spec[nd_export_count] = {
+        { "numpy",                          "asarray"     },
+        { "numpy",                          "copy"        },
+        { "torch.utils.dlpack",             "from_dlpack" },
+        { "tensorflow.experimental.dlpack", "from_dlpack" },
+        { "jax.dlpack",                     "from_dlpack" },
+        { "cupy",                           "from_dlpack" },
+    };
+
+/// Resolve (and cache) the callable for an ``ndarray_export`` cache slot.
+static PyObject *ndarray_export_fn(nb_internals *internals_,
+                                   ndarray_export_slot slot) {
+    PyObject *fn = internals_->ndarray_export[slot].load_acquire();
     if (NB_LIKELY(fn))
         return fn;
 
     lock_internals guard(internals_);
-    fn = internals_->ndarray_export[framework].load_relaxed();
+    fn = internals_->ndarray_export[slot].load_relaxed();
     if (fn)
         return fn;
 
-    const char *pkg_name, *attr;
-    switch (framework) {
-        case numpy::value:      pkg_name = "numpy";                          attr = "array";       break;
-        case pytorch::value:    pkg_name = "torch.utils.dlpack";             attr = "from_dlpack"; break;
-        case tensorflow::value: pkg_name = "tensorflow.experimental.dlpack"; attr = "from_dlpack"; break;
-        case jax::value:        pkg_name = "jax.dlpack";                     attr = "from_dlpack"; break;
-        case cupy::value:       pkg_name = "cupy";                           attr = "from_dlpack"; break;
-        default:                fail("ndarray_export_fn(): unsupported framework!");
-    }
-
-    object obj = steal(module_import(pkg_name)).attr(attr);
+    object obj = steal(module_import(ndarray_export_spec[slot].pkg))
+                     .attr(ndarray_export_spec[slot].attr);
     fn = obj.release().ptr();
     new_object(internals_, fn);
-    internals_->ndarray_export[framework].store_release(fn);
+    internals_->ndarray_export[slot].store_release(fn);
     return fn;
 }
 
@@ -1154,40 +1157,39 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
 
     if (framework == numpy::value) {
         try {
-            // Evaluates numpy.array(o, copy=...)
-            PyObject *array_fn = ndarray_export_fn(internals_, numpy::value);
-            PyObject *stack[] = {nullptr, o.ptr(), copy ? Py_True : Py_False};
+            // Call nump.asarray(o) to create a view, and numpy.copy(o) to copy
+            PyObject *export_fn = ndarray_export_fn(
+                internals_, copy ? nd_export_numpy_copy : nd_export_numpy_view);
+            PyObject *stack[] = {nullptr, o.ptr()};
             Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-            return PyObject_Vectorcall(array_fn, stack + 1, nargsf,
-                                       NB_INTERNED(copy_tpl));
+            return PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr);
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_TypeError,
-                         "could not export nanobind::ndarray: %s",
-                         e.what());
+                         "could not export nanobind::ndarray: %s", e.what());
             return nullptr;
         }
     }
 
+    // The DLPack frameworks build a view via <pkg>.from_dlpack(o); no_framework
+    // and array_api leave `o` as-is; memview returns a memoryview directly.
     try {
-        bool use_dlpack;
+        ndarray_export_slot slot;
         switch (framework) {
-            case pytorch::value:
-            case tensorflow::value:
-            case jax::value:
-            case cupy::value:
-                use_dlpack = true;
-                break;
-            case memview::value:
-                return PyMemoryView_FromObject(o.ptr());
-            default:
-                use_dlpack = false;
+            case pytorch::value:    slot = nd_export_pytorch;    break;
+            case tensorflow::value: slot = nd_export_tensorflow; break;
+            case jax::value:        slot = nd_export_jax;        break;
+            case cupy::value:       slot = nd_export_cupy;       break;
+            case memview::value:    return PyMemoryView_FromObject(o.ptr());
+            default:                slot = nd_export_count;  // no export call
         }
-        if (use_dlpack) {
-            // Evaluates <pkg>.from_dlpack(o).
-            PyObject *from_dlpack_fn = ndarray_export_fn(internals_, framework);
+
+        if (slot != nd_export_count) {
+            PyObject *export_fn = ndarray_export_fn(internals_, slot);
             PyObject *stack[] = {nullptr, o.ptr()};
             Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-            o = steal(PyObject_Vectorcall(from_dlpack_fn, stack + 1, nargsf, nullptr));
+            o = steal(PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr));
+            if (!o.is_valid())
+                return nullptr;
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_TypeError,
@@ -1197,12 +1199,14 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     }
 
     if (copy) {
-        PyObject* copy_function_name = NB_INTERNED(copy);
+        PyObject* copy_fn_name = NB_INTERNED(copy);
         if (framework == pytorch::value)
-            copy_function_name = NB_INTERNED(clone);
+            copy_fn_name = NB_INTERNED(clone);
+        else
+            copy_fn_name = NB_INTERNED(copy);
 
         try {
-            o = o.attr(copy_function_name)();
+            o = o.attr(copy_fn_name)();
         } catch (std::exception &e) {
             PyErr_Format(PyExc_RuntimeError,
                          "copying nanobind::ndarray failed: %s",

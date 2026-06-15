@@ -328,6 +328,7 @@ private:
 template <typename... Args> class ndarray {
 public:
     template <typename...> friend class ndarray;
+    template <typename, typename> friend struct detail::type_caster;
 
     using Config = detail::ndarray_config_t<int, Args...>;
     using Scalar = typename Config::Scalar;
@@ -572,11 +573,15 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
             (void) shape_buf;
         }
 
-        value = Value(ndarray_import(src.ptr(), &config,
-                                     flags & (uint8_t) cast_flags::convert,
-                                     cleanup));
+        detail::ndarray_handle *h = ndarray_import(
+            src.ptr(), &config, flags & (uint8_t) cast_flags::convert, cleanup);
 
-        return value.is_valid();
+        if (NB_UNLIKELY(value.m_handle))
+            detail::ndarray_dec_ref(value.m_handle);
+        if (NB_LIKELY(h))
+            value.m_dltensor = *detail::ndarray_inc_ref(h);
+        value.m_handle = h;
+        return h != nullptr;
     }
 
     static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,

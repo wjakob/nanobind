@@ -41,8 +41,8 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         temp_ref = steal(temp);
 
         return o &&
-               caster1.from_python(o[0], flags, cleanup) &&
-               caster2.from_python(o[1], flags, cleanup);
+               caster1.from_python(o[0], flags_for_local_caster<T1>(flags), cleanup) &&
+               caster2.from_python(o[1], flags_for_local_caster<T2>(flags), cleanup);
     }
 
     template <typename T>

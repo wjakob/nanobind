@@ -210,15 +210,19 @@ enum cast_flags : uint8_t {
     // Indicates that the function dispatcher should accept 'None' arguments
     accepts_none = (1 << 2),
 
+    /// The target binds the value by reference or value (not as a pointer), so
+    /// a 'None' argument has no valid mapping.
+    none_disallowed = (1 << 3),
+
     // Indicates that this cast is performed by nb::cast or nb::try_cast.
     // This implies that objects added to the cleanup list may be
     // released immediately after the caster's final output value is
     // obtained, i.e., before it is used.
-    manual = (1 << 3),
+    manual = (1 << 4),
 
     /// Indicate that a type is being constructed by nb_type_vectorcall. The
     /// call dispatcher uses this hint to avoid type-checking ``self``
-    trusted = (1 << 4)
+    trusted = (1 << 5)
 };
 
 

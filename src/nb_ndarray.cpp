@@ -399,7 +399,7 @@ static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyObject *) {
                               : th->mt_unversioned->dltensor;
     PyObject *r;
     if (t.device.device_type == 1 && t.device.device_id == 0) {
-        r = static_pyobjects[pyobj_name::dl_cpu_tpl];
+        r = NB_INTERNED(dl_cpu_tpl);
         Py_INCREF(r);
     } else {
         r = PyTuple_New(2);
@@ -424,8 +424,7 @@ static PyMethodDef nb_ndarray_methods[] = {
    { nullptr, nullptr, 0, nullptr }
 };
 
-static PyTypeObject *nb_ndarray_tp() noexcept {
-    nb_internals *internals_ = internals;
+static PyTypeObject *nb_ndarray_tp(nb_internals *internals_) noexcept {
     PyTypeObject *tp = internals_->nb_ndarray.load_acquire();
 
     if (NB_UNLIKELY(!tp)) {
@@ -627,12 +626,12 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         capsule = borrow(src);
     } else {
         // Try calling src.__dlpack__()
-        PyObject* args[] = {src, static_pyobjects[pyobj_name::dl_version_tpl]};
+        PyObject* args[] = {src, NB_INTERNED(dl_version_tpl)};
         Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
         capsule = steal(PyObject_VectorcallMethod(
                           NB_INTERNED(__dlpack__),
                           args, nargsf,
-                          static_pyobjects[pyobj_name::max_version_tpl]));
+                          NB_INTERNED(max_version_tpl)));
 
         // Python array API standard v2023 introduced max_version.
         // Try calling src.__dlpack__() without any kwargs.
@@ -1044,6 +1043,34 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     return result.release();
 }
 
+/// Resolve (and cache) the callable that exports an ndarray a given framework.
+static PyObject *ndarray_export_fn(nb_internals *internals_, int framework) {
+    PyObject *fn = internals_->ndarray_export[framework].load_acquire();
+    if (NB_LIKELY(fn))
+        return fn;
+
+    lock_internals guard(internals_);
+    fn = internals_->ndarray_export[framework].load_relaxed();
+    if (fn)
+        return fn;
+
+    const char *pkg_name, *attr;
+    switch (framework) {
+        case numpy::value:      pkg_name = "numpy";                          attr = "array";       break;
+        case pytorch::value:    pkg_name = "torch.utils.dlpack";             attr = "from_dlpack"; break;
+        case tensorflow::value: pkg_name = "tensorflow.experimental.dlpack"; attr = "from_dlpack"; break;
+        case jax::value:        pkg_name = "jax.dlpack";                     attr = "from_dlpack"; break;
+        case cupy::value:       pkg_name = "cupy";                           attr = "from_dlpack"; break;
+        default:                fail("ndarray_export_fn(): unsupported framework!");
+    }
+
+    object obj = steal(module_import(pkg_name)).attr(attr);
+    fn = obj.release().ptr();
+    new_object(internals_, fn);
+    internals_->ndarray_export[framework].store_release(fn);
+    return fn;
+}
+
 PyObject *ndarray_export(ndarray_handle *th, int framework,
                          rv_policy policy, cleanup_list *cleanup) noexcept {
     if (!th)
@@ -1105,6 +1132,8 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         return nullptr;
     }
 
+    nb_internals *internals_ = internals;
+
     object o;
     if (copy && framework == no_framework::value && th->self) {
         o = borrow(th->self);
@@ -1115,7 +1144,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     } else {
         // Make a Python object providing the buffer interface and having
         // the two DLPack methods __dlpack__() and __dlpack_device__().
-        nb_ndarray *h = PyObject_New(nb_ndarray, nb_ndarray_tp());
+        nb_ndarray *h = PyObject_New(nb_ndarray, nb_ndarray_tp(internals_));
         if (!h)
             return nullptr;
         h->th = th;
@@ -1125,13 +1154,12 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
 
     if (framework == numpy::value) {
         try {
-            object pkg_mod = steal(module_import("numpy"));
-            PyObject* args[] = {pkg_mod.ptr(), o.ptr(),
-                                (copy) ? Py_True : Py_False};
-            Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-            return PyObject_VectorcallMethod(
-                        NB_INTERNED(array), args, nargsf,
-                        static_pyobjects[pyobj_name::copy_tpl]);
+            // Evaluates numpy.array(o, copy=...)
+            PyObject *array_fn = ndarray_export_fn(internals_, numpy::value);
+            PyObject *stack[] = {nullptr, o.ptr(), copy ? Py_True : Py_False};
+            Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+            return PyObject_Vectorcall(array_fn, stack + 1, nargsf,
+                                       NB_INTERNED(copy_tpl));
         } catch (const std::exception &e) {
             PyErr_Format(PyExc_TypeError,
                          "could not export nanobind::ndarray: %s",
@@ -1141,32 +1169,25 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     }
 
     try {
-        const char* pkg_name;
+        bool use_dlpack;
         switch (framework) {
             case pytorch::value:
-                pkg_name = "torch.utils.dlpack";
-                break;
             case tensorflow::value:
-                pkg_name = "tensorflow.experimental.dlpack";
-                break;
             case jax::value:
-                pkg_name = "jax.dlpack";
-                break;
             case cupy::value:
-                pkg_name = "cupy";
+                use_dlpack = true;
                 break;
             case memview::value:
                 return PyMemoryView_FromObject(o.ptr());
             default:
-                pkg_name = nullptr;
+                use_dlpack = false;
         }
-        if (pkg_name) {
-            object pkg_mod = steal(module_import(pkg_name));
-            PyObject* args[] = {pkg_mod.ptr(), o.ptr()};
-            Py_ssize_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-            o = steal(PyObject_VectorcallMethod(
-                          NB_INTERNED(from_dlpack),
-                          args, nargsf, nullptr));
+        if (use_dlpack) {
+            // Evaluates <pkg>.from_dlpack(o).
+            PyObject *from_dlpack_fn = ndarray_export_fn(internals_, framework);
+            PyObject *stack[] = {nullptr, o.ptr()};
+            Py_ssize_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+            o = steal(PyObject_Vectorcall(from_dlpack_fn, stack + 1, nargsf, nullptr));
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_TypeError,

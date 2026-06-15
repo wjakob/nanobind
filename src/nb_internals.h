@@ -330,7 +330,7 @@ struct NB_SHARD_ALIGNMENT nb_shard {
 #if defined(NB_FREE_THREADED)
 template<typename T>
 struct nb_maybe_atomic {
-  nb_maybe_atomic(T v) : value(v) {}
+  nb_maybe_atomic(T v = T()) : value(v) {}
 
   std::atomic<T> value;
   T load_acquire() { return value.load(std::memory_order_acquire); }
@@ -340,7 +340,7 @@ struct nb_maybe_atomic {
 #else
 template<typename T>
 struct nb_maybe_atomic {
-  nb_maybe_atomic(T v) : value(v) {}
+  nb_maybe_atomic(T v = T()) : value(v) {}
 
   T value;
   T load_acquire() { return value; }
@@ -434,6 +434,9 @@ struct nb_internals {
 
     /// N-dimensional array wrapper (created on demand)
     nb_maybe_atomic<PyTypeObject *> nb_ndarray = nullptr;
+
+    /// Cached callables used to export an ndarray to a framework
+    nb_maybe_atomic<PyObject *> ndarray_export[8] {};
 
 #if defined(NB_FREE_THREADED)
     nb_shard *shards = nullptr;
@@ -531,11 +534,9 @@ struct nb_internals {
     X(__name__)                                                                \
     X(__new__)                                                                 \
     X(__qualname__)                                                            \
-    X(array)                                                                   \
     X(clone)                                                                   \
     X(copy)                                                                    \
     X(dl_device)                                                               \
-    X(from_dlpack)                                                             \
     X(max_version)                                                             \
     X(stream)                                                                  \
     X(value)
@@ -549,17 +550,19 @@ struct pyobj_name {
         #undef NB_INTERNED_ENTRY
         string_count,
 
-        copy_tpl = string_count,  // tuple ("copy")
-        max_version_tpl, // tuple ("max_version")
-        dl_cpu_tpl,      // tuple (1, 0), which corresponds to nb::device::cpu
-        dl_version_tpl,  // tuple (dlpack::major_version, dlpack::minor_version)
+        // Cached constant tuples using the same interning machinery
+        interned_copy_tpl = string_count, // tuple ("copy")
+        interned_max_version_tpl,         // tuple ("max_version")
+        interned_dl_cpu_tpl,              // tuple (1, 0) == nb::device::cpu
+        interned_dl_version_tpl,          // tuple (dlpack major, minor)
         total_count
     };
 };
 
 extern PyObject *static_pyobjects[];
 
-/// Access the pre-interned string constant 'name', e.g. NB_INTERNED(__name__)
+/// Access a cached static PyObject (interned string or constant tuple) by name,
+/// e.g. NB_INTERNED(__name__) or NB_INTERNED(copy_tpl)
 #define NB_INTERNED(name) static_pyobjects[pyobj_name::interned_##name]
 
 extern void internals_inc_ref();

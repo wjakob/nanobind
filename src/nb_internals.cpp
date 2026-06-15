@@ -244,19 +244,19 @@ static void init_pyobjects(nb_internals *p) {
     for (int i = 0; i < pyobj_name::string_count; ++i)
         new_constant(p, i, PyUnicode_InternFromString(interned_c_strs[i]));
 
-    new_constant(p, pyobj_name::copy_tpl,
+    new_constant(p, pyobj_name::interned_copy_tpl,
                  PyTuple_Pack(1, NB_INTERNED(copy)));
-    new_constant(p, pyobj_name::max_version_tpl,
+    new_constant(p, pyobj_name::interned_max_version_tpl,
                  PyTuple_Pack(1, NB_INTERNED(max_version)));
 
     PyObject *one = PyLong_FromLong(1), *zero = PyLong_FromLong(0);
-    new_constant(p, pyobj_name::dl_cpu_tpl, PyTuple_Pack(2, one, zero));
+    new_constant(p, pyobj_name::interned_dl_cpu_tpl, PyTuple_Pack(2, one, zero));
     Py_DECREF(zero);
     Py_DECREF(one);
 
     PyObject *major = PyLong_FromLong(dlpack::major_version),
              *minor = PyLong_FromLong(dlpack::minor_version);
-    new_constant(p, pyobj_name::dl_version_tpl, PyTuple_Pack(2, major, minor));
+    new_constant(p, pyobj_name::interned_dl_version_tpl, PyTuple_Pack(2, major, minor));
     Py_DECREF(minor);
     Py_DECREF(major);
 }
@@ -348,6 +348,8 @@ void internals_dec_ref() {
     p->nb_bound_method = nullptr;
     p->nb_static_property.store_release(nullptr);
     p->nb_ndarray.store_release(nullptr);
+    for (auto &entry : p->ndarray_export)
+        entry.store_release(nullptr);
 
     for (int i = 0; i < pyobj_name::total_count; ++i)
         static_pyobjects[i] = nullptr;

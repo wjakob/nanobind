@@ -23,6 +23,11 @@ using DStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>;
 template <typename T> using DRef = Eigen::Ref<T, 0, DStride>;
 template <typename T> using DMap = Eigen::Map<T, 0, DStride>;
 
+/// Variants with a fixed unit inner stride
+using DStride1 = Eigen::Stride<Eigen::Dynamic, 1>;
+template <typename T> using DRef1 = Eigen::Ref<T, 0, DStride1>;
+template <typename T> using DMap1 = Eigen::Map<T, 0, DStride1>;
+
 NAMESPACE_BEGIN(detail)
 
 /// Determine the number of dimensions of the given Eigen type

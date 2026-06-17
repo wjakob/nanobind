@@ -1785,7 +1785,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
                   "cast_flags::construct == nb_inst_state::state_ready");
 
     // Convert None -> nullptr, unless the target binds by value/reference and
-    // therefore has no valid mapping for None (then reject -> next overload).
+    // therefore has no valid mapping for None
     if (NB_UNLIKELY(src == Py_None)) {
         if (flags & (uint8_t) cast_flags::none_disallowed)
             return false;

@@ -35,8 +35,10 @@ corner cases, and free-threading.
     registration, and locking (on free-threaded builds). A microbenchmark
     exercising object construction runs 1.42× faster on Python 3.14; on
     free-threaded Python, the improvement ranges from 1.32× (uncontended) to
-    3.2× under contention. (PR `#1366
-    <https://github.com/wjakob/nanobind/pull/1366>`__, commit `962cdf <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
+    3.2× under contention. (PRs `#1366
+    <https://github.com/wjakob/nanobind/pull/1366>`__, `#1382
+    <https://github.com/wjakob/nanobind/pull/1382>`__, commit `962cdf
+    <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
 
   - A new "medium" function dispatcher accelerates calls to functions whose
     arguments are merely named or carry default values (and that use neither
@@ -63,9 +65,7 @@ corner cases, and free-threading.
     path. On NumPy microbenchmarks, returning an array to a framework becomes
     up to ~58% faster (430.4 to 178.8 ns/op) and consuming one up to ~21%
     faster (109.1 to 85.7 ns/op). (PR `#1375
-    <https://github.com/wjakob/nanobind/pull/1375>`__). Separately, improved
-    ``__dlpack__()`` keyword parsing speeds ``numpy.from_dlpack()`` by a
-    further ~8% (PR `#1373 <https://github.com/wjakob/nanobind/pull/1373>`__).
+    <https://github.com/wjakob/nanobind/pull/1375>`__).
 
   - Reduced the cost of thread-local storage (TLS) accesses, which are needed
     by performance-critical nanobind functions in free-threaded builds.
@@ -339,7 +339,10 @@ corner cases, and free-threading.
   <https://github.com/wjakob/nanobind/pull/1327>`__, `#1356
   <https://github.com/wjakob/nanobind/pull/1356>`__, `#1351
   <https://github.com/wjakob/nanobind/pull/1351>`__, `#1379
-  <https://github.com/wjakob/nanobind/pull/1379>`__, commits `b238ff <https://github.com/wjakob/nanobind/commit/b238ffa52eb6e9d3e4aacbc58e14c3fd44b4e873>`__,
+  <https://github.com/wjakob/nanobind/pull/1379>`__, `#1373
+  <https://github.com/wjakob/nanobind/pull/1373>`__, `#1383
+  <https://github.com/wjakob/nanobind/pull/1383>`__,
+  commits `b238ff <https://github.com/wjakob/nanobind/commit/b238ffa52eb6e9d3e4aacbc58e14c3fd44b4e873>`__,
   `2deac9 <https://github.com/wjakob/nanobind/commit/2deac96697d1b304f3c973cef7de5f94cbad5a57>`__,
   `e33dee <https://github.com/wjakob/nanobind/commit/e33deeaab36f53312512cb09fd1e8b7033e2d8a4>`__,
   `b22f1f <https://github.com/wjakob/nanobind/commit/b22f1fe0f257d85ae0425695082115d87053173a>`__,

@@ -355,11 +355,8 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
                     max_major_version = a;
                 }
             } else if (compare(key, NB_INTERNED(stream))) {
-                if (value != Py_None) {
-                    PyErr_SetString(PyExc_RuntimeError,
-                            "nanobind only supports stream=None.");
-                    return -1;
-                }
+                // Accepted but ignored: nanobind tracks no producer stream and
+                // has no backend dependency, so it cannot synchronize. See docs.
             } else {
                 return i;
             }

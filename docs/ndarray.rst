@@ -281,7 +281,8 @@ desired Python type.
   and also has the DLPack attributes  ``__dlpack__`` and ``__dlpack_device__``
   (i.e., it is accepted as an argument to a framework's ``from_dlpack()``
   function).
-- No framework annotation. In this case, nanobind will create a raw Python
+- :cpp:class:`nb::no_framework <no_framework>` (the default when no framework
+  annotation is given). In this case, nanobind will create a raw Python
   ``dltensor`` `capsule <https://docs.python.org/3/c-api/capsule.html>`__
   representing the `DLPack <https://github.com/dmlc/dlpack>`__ metadata of
   a ``DLManagedTensor``.
@@ -762,6 +763,25 @@ used to support additional parameters (e.g., to allow the caller to request a
 copy).  See
 `__dlpack__() <https://data-apis.org/array-api/latest/API_specification/generated/array_api.array.__dlpack__.html>`__
 in the Python array API standard for details.
+
+**Stream synchronization.** The array API's ``__dlpack__`` accepts a ``stream``
+argument through which a *consumer* asks the *producer* to make the array safe
+to access on a particular compute stream (for example, via a cross-stream wait
+on CUDA or ROCm). The object nanobind returns for :cpp:class:`nb::array_api
+<array_api>` accepts this argument but performs no synchronization. nanobind has
+no build-time dependency on CUDA, ROCm, or any other backend and treats the
+device as mere metadata, so it knows neither the stream that produced the data
+nor the runtime needed to act on it. This is harmless when the memory is
+host-resident or when the producing computations are inherently serialized with
+respect to the consumer (for example, by running on CUDA's default "null"
+stream). If you instead export device memory still being produced asynchronously
+on a separate stream, you must handle synchronization yourself. Expose your own
+object providing ``__dlpack__`` and ``__dlpack_device__`` methods. The
+``__dlpack__`` method should inspect ``stream``, perform the wait via your
+backend's API, and then return a DLPack capsule, which can be obtained by
+casting an :cpp:class:`nb::ndarray\<\> <ndarray>` that has no framework
+annotation. The ``__dlpack_device__`` method should report the device as a
+``(device_type, device_id)`` pair.
 
 
 Frequently asked questions

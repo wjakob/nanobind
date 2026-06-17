@@ -370,6 +370,19 @@ NB_MODULE(test_ndarray_ext, m) {
                                                                 deleter);
     });
 
+    m.def("ret_mlx", []() {
+        float *f = new float[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        size_t shape[2] = { 2, 4 };
+
+        nb::capsule deleter(f, [](void *data) noexcept {
+           destruct_count++;
+           delete[] (float *) data;
+        });
+
+        return nb::ndarray<nb::mlx, float, nb::shape<2, 4>>(f, 2, shape,
+                                                            deleter);
+    });
+
     m.def("ret_memview", []() {
         double *d = new double[8] { 1, 2, 3, 4, 5, 6, 7, 8 };
         size_t shape[2] = { 2, 4 };

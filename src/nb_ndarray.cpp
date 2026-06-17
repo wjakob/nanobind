@@ -1151,6 +1151,7 @@ static constexpr struct { const char *pkg, *attr; }
         { "tensorflow.experimental.dlpack", "from_dlpack" },
         { "jax.dlpack",                     "from_dlpack" },
         { "cupy",                           "from_dlpack" },
+        { "mlx.core",                       "array"       },
     };
 
 /// Resolve (and cache) the callable for an ``ndarray_export`` cache slot.
@@ -1278,6 +1279,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
             case tensorflow::value: slot = nd_export_tensorflow; break;
             case jax::value:        slot = nd_export_jax;        break;
             case cupy::value:       slot = nd_export_cupy;       break;
+            case mlx::value:        slot = nd_export_mlx;        break;
             case memview::value:    return PyMemoryView_FromObject(o.ptr());
             default:                slot = nd_export_count;  // no export call
         }
@@ -1297,13 +1299,11 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         return nullptr;
     }
 
-    if (copy) {
-        PyObject* copy_fn_name = NB_INTERNED(copy);
-        if (framework == pytorch::value)
-            copy_fn_name = NB_INTERNED(clone);
-        else
-            copy_fn_name = NB_INTERNED(copy);
-
+    // MLX has no copy()/clone() method; mlx.core.array() already returned an
+    // owned copy, so the copy policy is satisfied without an extra step.
+    if (copy && framework != mlx::value) {
+        PyObject* copy_fn_name = framework == pytorch::value ? NB_INTERNED(clone)
+                                                             : NB_INTERNED(copy);
         try {
             o = o.attr(copy_fn_name)();
         } catch (std::exception &e) {

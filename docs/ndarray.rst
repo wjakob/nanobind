@@ -8,7 +8,8 @@ The ``nb::ndarray<..>`` class
 nanobind can exchange n-dimensional arrays (henceforth "**nd-arrays**") with
 popular array programming frameworks including `NumPy <https://numpy.org>`__,
 `PyTorch <https://pytorch.org>`__, `TensorFlow <https://www.tensorflow.org>`__,
-`JAX <https://jax.readthedocs.io>`__, and `CuPy <https://cupy.dev>`_. It
+`JAX <https://jax.readthedocs.io>`__, `CuPy <https://cupy.dev>`__, and
+`MLX <https://ml-explore.github.io/mlx>`__. It
 supports *zero-copy* exchange using two protocols:
 
 -  The classic `buffer
@@ -275,6 +276,7 @@ desired Python type.
 - :cpp:class:`nb::tensorflow <tensorflow>`: create a ``tensorflow.python.framework.ops.EagerTensor``.
 - :cpp:class:`nb::jax <jax>`: create a ``jaxlib._jax.ArrayImpl``.
 - :cpp:class:`nb::cupy <cupy>`: create a ``cupy.ndarray``.
+- :cpp:class:`nb::mlx <mlx>`: create an Apple ``mlx.core.array``.
 - :cpp:class:`nb::memview <memview>`: create a Python ``memoryview``.
 - :cpp:class:`nb::array_api <array_api>`: create an object that supports the
   Python buffer protocol (i.e., is accepted as an argument to ``memoryview()``)
@@ -471,6 +473,9 @@ nanobind itself.
 For example, ``numpy.array()`` is passed the keyword argument ``copy`` with
 value ``True``, or the PyTorch tensor's ``clone()`` method is immediately
 called to create the copy.
+MLX is a special case: ``mlx.core.array()`` always copies into a unified-memory
+buffer (and provides no ``copy()``/``clone()`` method), so a requested copy is
+satisfied inherently without an extra step.
 This design has a couple of advantages.
 First, nanobind does not have a build-time dependency on the libraries and
 frameworks (NumPy, PyTorch, CUDA, etc.) that would otherwise be necessary

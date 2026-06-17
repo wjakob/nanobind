@@ -31,6 +31,13 @@ try:
 except:
     needs_cupy = pytest.mark.skip(reason="CuPy is required")
 
+try:
+    import mlx.core as mx
+    def needs_mlx(x):
+        return x
+except:
+    needs_mlx = pytest.mark.skip(reason="MLX is required")
+
 
 @needs_numpy
 def test01_metadata():
@@ -361,6 +368,25 @@ def test18_return_pytorch():
     x = t.ret_pytorch()
     assert x.shape == (2, 4)
     assert torch.all(x == torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]]))
+    del x
+    collect()
+    assert t.destruct_count() - dc == 1
+
+
+@needs_mlx
+def test18b_return_mlx():
+    collect()
+    dc = t.destruct_count()
+    x = t.ret_mlx()
+    assert isinstance(x, mx.array)
+    assert x.shape == (2, 4)
+    assert x.dtype == mx.float32
+    expect = mx.array([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=mx.float32)
+    assert bool(mx.all(x == expect))
+    # mlx.core.array() copies, so the source buffer is released immediately
+    # rather than on `del` (as with the zero-copy dlpack frameworks).
+    collect()
+    assert t.destruct_count() - dc == 1
     del x
     collect()
     assert t.destruct_count() - dc == 1

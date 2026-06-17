@@ -1,5 +1,6 @@
 from typing import Annotated, overload
 
+import mlx.core
 import numpy
 from numpy.typing import NDArray
 
@@ -127,6 +128,8 @@ def ret_numpy_const_ref_f() -> Annotated[NDArray[numpy.float32], dict(shape=(2, 
 def ret_numpy_const() -> Annotated[NDArray[numpy.float32], dict(shape=(2, 4), writable=False)]: ...
 
 def ret_pytorch() -> Annotated[NDArray[numpy.float32], dict(shape=(2, 4))]: ...
+
+def ret_mlx() -> mlx.core.array[dtype=float32, shape=(2, 4)]: ...
 
 def ret_memview() -> memoryview[dtype=float64, shape=(2, 4)]: ...
 

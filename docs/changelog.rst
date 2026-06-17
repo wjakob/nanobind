@@ -325,7 +325,8 @@ corner cases, and free-threading.
   (issue `#1263 <https://github.com/wjakob/nanobind/issues/1263>`__, PR `#1378
   <https://github.com/wjakob/nanobind/pull/1378>`__).
 
-- Miscellaneous minor fixes and improvements. (PRs `#1301
+- Miscellaneous minor fixes and improvements. (issues `#1335
+  <https://github.com/wjakob/nanobind/issues/1335>`__, PRs `#1301
   <https://github.com/wjakob/nanobind/pull/1301>`__, `#1304
   <https://github.com/wjakob/nanobind/pull/1304>`__, `#1307
   <https://github.com/wjakob/nanobind/pull/1307>`__, `#1312

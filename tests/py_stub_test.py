@@ -16,6 +16,19 @@ del sys
 C = 123
 T = typing.TypeVar("T")
 
+
+class ArrayLike:
+    # Mimics a NumPy array: comparisons return an object whose truth value is
+    # ambiguous. This used to crash the stub generator's cycle check (#1335).
+    def __eq__(self, other):
+        return self
+
+    def __bool__(self):
+        raise ValueError("ambiguous truth value")
+
+
+ARRAY_LIKE = ArrayLike()
+
 def f1(a, b, c, /):
     """docstring"""
 

@@ -8,6 +8,15 @@ C: int = 123
 
 T = TypeVar("T")
 
+class ArrayLike:
+    def __eq__(self, other): ...
+
+    def __bool__(self): ...
+
+    __hash__: None = None
+
+ARRAY_LIKE: ArrayLike = ...
+
 def f1(a, b, c, /):
     """docstring"""
 

@@ -126,6 +126,11 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_05c", [](int) -> int { return 1; }, "doc_1");
     m.def("test_05c", [](float) -> int { return 2; }, "");
 
+    // Test a partially repeated docstring followed by a distinct one
+    m.def("test_05d", [](int) -> int { return 1; }, "doc_1");
+    m.def("test_05d", [](float) -> int { return 2; }, "doc_1");
+    m.def("test_05d", [](const char *) -> int { return 3; }, "doc_2");
+
     /// Function raising an exception
     m.def("test_06", []() { throw std::runtime_error("oops!"); });
 

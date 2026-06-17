@@ -426,9 +426,20 @@ class StubGen:
             # No overloads write directly
             self.put_nb_overload(fn, sigs[0], name, is_classmethod=is_classmethod)
         else:
-            # Render an @overload-decorated chain
+            # Render an @overload-decorated chain. When several overloads share
+            # a docstring, keep it only on the last one: type checkers resolve
+            # to the first non-empty docstring regardless of position, while
+            # tools that read the final declaration (e.g. sphinx-autoapi) expect
+            # it there. This also avoids duplicating the text.
             overload = self.import_object("typing", "overload")
-            for s in sigs:
+            last_idx: Dict[str, int] = {}
+            for i, s in enumerate(sigs):
+                if s[1] is not None:
+                    last_idx[s[1]] = i
+            for i, s in enumerate(sigs):
+                docstr = s[1]
+                if docstr is not None and last_idx[docstr] != i:
+                    s = (s[0], None, s[2])
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name, is_classmethod=is_classmethod)
 

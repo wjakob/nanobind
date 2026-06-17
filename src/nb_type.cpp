@@ -1183,6 +1183,7 @@ PyTypeObject *nb_type_create_metaclass(nb_internals *p,
         { Py_tp_setattro, (void *) nb_type_setattro },
         { Py_tp_init, (void *) nb_type_init },
         { 0, nullptr },
+        { 0, nullptr },
         { 0, nullptr }
     };
 
@@ -1205,6 +1206,7 @@ PyTypeObject *nb_type_create_metaclass(nb_internals *p,
 
     if (NB_DYNAMIC_VERSION < 0x030E0000) {
         slots[4] = { Py_tp_members, (void *) members };
+        slots[5] = { Py_tp_call, PyType_GetSlot(&PyType_Type, Py_tp_call) };
         spec.flags |= Py_TPFLAGS_HAVE_VECTORCALL;
     }
 #endif

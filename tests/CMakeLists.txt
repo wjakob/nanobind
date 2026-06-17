@@ -24,7 +24,12 @@ if (MSVC)
     add_compile_options(/W4)
   endif()
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
-  add_compile_options(-Wall -Wextra)
+  # Not enabling -Werror on CUDA compiler because of many visibility attribute warnings in tests
+  add_compile_options(
+      $<$<COMPILE_LANGUAGE:CXX>:-Werror>
+      # $<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=-Werror>
+      -Wall -Wextra -Wconversion
+  )
 endif()
 
 if (UNIX AND (CMAKE_SIZEOF_VOID_P EQUAL 4) AND (CMAKE_SYSTEM_PROCESSOR STREQUAL i686))

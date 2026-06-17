@@ -228,6 +228,37 @@ def test07_mutate_arg():
     assert_array_equal(A, 2*A2)
 
 
+@needs_numpy_and_eigen
+def test07b_dref1():
+    # DRef1 fixes the inner stride to 1. It binds zero-copy when the layout
+    # matches the storage order, copies (const) or rejects (mutable) otherwise.
+    base = np.uint32(np.vander(np.arange(10)))
+    A_c = np.ascontiguousarray(base)   # C-contiguous  -> row-major
+    A_f = np.asfortranarray(base)      # F-contiguous  -> column-major
+    A_s = base[:, ::2]                 # strided inner  -> neither
+    expected = base + base
+
+    # const: correct for every layout (copying where needed)
+    assert_array_equal(t.addDRef1MXuRR(A_c, A_c), expected)
+    assert_array_equal(t.addDRef1MXuCC(A_f, A_f), expected)
+    assert_array_equal(t.addDRef1MXuRR(A_f, A_f), expected)        # copy fallback
+    assert_array_equal(t.addDRef1MXuRR(A_s, A_s), base[:, ::2] * 2)  # copy fallback
+
+    # mutable: zero-copy write-back on a matching layout
+    M = A_c.copy()
+    t.mutate_DRef1MXuR(M)
+    assert_array_equal(M, 2 * A_c)
+    Mf = A_f.copy(order='F')
+    t.mutate_DRef1MXuC(Mf)
+    assert_array_equal(Mf, 2 * A_f)
+
+    # mutable: a mismatched layout is rejected rather than silently copied
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.mutate_DRef1MXuR(A_f)
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.mutate_DRef1MXuC(A_c)
+
+
 def create_spmat_unsorted():
     import scipy.sparse as sparse
     # Create a small matrix with explicit indices and indptr

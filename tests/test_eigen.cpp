@@ -139,6 +139,18 @@ NB_MODULE(test_eigen_ext, m) {
 
     m.def("mutate_DRefMXuC", [](nb::DRef<MatrixXuC> a) { a *= 2; }, nb::arg().noconvert());
 
+    // DRef1: fixed unit inner stride (keeps Eigen vectorization enabled).
+    // The const variants copy when the layout has a non-unit inner stride.
+    m.def("addDRef1MXuRR",
+          [](const nb::DRef1<const MatrixXuR> &a,
+             const nb::DRef1<const MatrixXuR> &b) -> MatrixXuR { return a + b; });
+    m.def("addDRef1MXuCC",
+          [](const nb::DRef1<const MatrixXuC> &a,
+             const nb::DRef1<const MatrixXuC> &b) -> MatrixXuC { return a + b; });
+    // The mutable variants reject a non-unit inner stride instead.
+    m.def("mutate_DRef1MXuR", [](nb::DRef1<MatrixXuR> a) { a *= 2; }, nb::arg().noconvert());
+    m.def("mutate_DRef1MXuC", [](nb::DRef1<MatrixXuC> a) { a *= 2; }, nb::arg().noconvert());
+
     m.def("updateRefV3i", [](Eigen::Ref<Eigen::Vector3i> a) { a[2] = 123; });
     m.def("updateRefV3i_nc", [](Eigen::Ref<Eigen::Vector3i> a) { a[2] = 123; }, nb::arg().noconvert());
     m.def("updateRefVXi", [](Eigen::Ref<Eigen::VectorXi> a) { a[2] = 123; });

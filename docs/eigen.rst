@@ -145,6 +145,38 @@ apply:
 
      void f4(nb::DRef<Eigen::MatrixXf> x) { x *= 2; }
 
+.. _eigen_vectorization:
+
+Auto-vectorization
+------------------
+
+The flexibility of :cpp:type:`nb::DRef <DRef>` comes at a cost: because its
+inner stride is only known at runtime, Eigen conservatively turns off its
+``PacketAccessBit`` and falls back to a non-vectorized evaluation of
+operations involving such arguments, which can lead to reduced performance.
+
+If a function operates on contiguous data and performance matters, prefer
+:cpp:type:`nb::DRef1 <DRef1>` instead. It fixes the inner stride to ``1`` at
+compile time, which re-enables Eigen's vectorization, while still accepting an
+arbitrary *outer* stride (e.g. a row-padded matrix or a sliced row range).
+
+.. code-block:: cpp
+
+   // NumPy's default (C-contiguous) layout needs a *row-major* Eigen type:
+   using RowMatrixXf =
+       Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+   void f5(nb::DRef1<RowMatrixXf> x) { ... }
+
+   // Eigen's default (column-major) type matches *F-contiguous* input instead:
+   void f6(nb::DRef1<Eigen::MatrixXf> x) { ... }
+
+The Eigen type's storage order must match the input layout: *row-major* for
+C-contiguous arrays (the NumPy default), *column-major* for F-contiguous ones.
+A writable ``nb::DRef1<T>`` (as in ``f5``/``f6``) only binds inputs that already
+have a unit inner stride and otherwise raises a ``TypeError``. For a read-only
+argument that should accept any layout, use ``nb::DRef1<const T>``, which copies
+when needed.
+
 Maps
 ----
 

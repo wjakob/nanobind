@@ -1152,6 +1152,26 @@ The following helper type aliases require an additional include directive:
    This templated type alias creates an ``Eigen::Map<..>`` with flexible strides for
    zero-copy data exchange between Eigen and NumPy.
 
+.. cpp:type:: DStride1 = Eigen::Stride<Eigen::Dynamic, 1>
+
+   Like :cpp:type:`DStride`, but with a *unit inner stride* fixed at compile
+   time. It accepts an arbitrary outer stride while requiring a contiguous inner
+   dimension. Fixing the inner stride this way preserves Eigen's vectorization,
+   which is otherwise disabled when the inner stride is dynamic. See the section
+   on :ref:`auto-vectorization <eigen_vectorization>` for details.
+
+.. cpp:type:: template <typename T> DRef1 = Eigen::Ref<T, 0, DStride1>
+
+   Variant of :cpp:type:`DRef` that uses :cpp:type:`DStride1`. Use it instead of
+   :cpp:type:`DRef` in performance-critical bindings to retain Eigen's
+   vectorization. The contiguous inner dimension must match the storage order of
+   ``T`` (a row-major ``T`` for C-contiguous arrays, a column-major ``T`` for
+   F-contiguous arrays).
+
+.. cpp:type:: template <typename T> DMap1 = Eigen::Map<T, 0, DStride1>
+
+   Variant of :cpp:type:`DMap` that uses :cpp:type:`DStride1`.
+
 .. _chrono_conversions:
 
 Timestamp and duration conversions

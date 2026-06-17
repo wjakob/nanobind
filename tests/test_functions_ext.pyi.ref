@@ -22,11 +22,11 @@ def test_05(arg: float, /) -> int:
     """doc_2"""
 
 @overload
-def test_05b(arg: int, /) -> int:
-    """doc_1"""
+def test_05b(arg: int, /) -> int: ...
 
 @overload
-def test_05b(arg: float, /) -> int: ...
+def test_05b(arg: float, /) -> int:
+    """doc_1"""
 
 @overload
 def test_05c(arg: int, /) -> int:
@@ -34,6 +34,17 @@ def test_05c(arg: int, /) -> int:
 
 @overload
 def test_05c(arg: float, /) -> int: ...
+
+@overload
+def test_05d(arg: int, /) -> int: ...
+
+@overload
+def test_05d(arg: float, /) -> int:
+    """doc_1"""
+
+@overload
+def test_05d(arg: str, /) -> int:
+    """doc_2"""
 
 def test_06() -> None: ...
 

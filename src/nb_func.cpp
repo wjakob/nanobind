@@ -1631,8 +1631,8 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         docstr = item = sigstr = defaults = nullptr;
 
         const func_data *fi = f + i;
-        if ((fi->flags & (uint32_t) func_flags::has_doc) &&
-            (!((nb_func *) self)->doc_uniform || i == 0)) {
+        // Expose each overload's docstring faithfully; stubgen deduplicates.
+        if (fi->flags & (uint32_t) func_flags::has_doc) {
             docstr = PyUnicode_FromString(fi->doc);
         } else {
             docstr = Py_None;

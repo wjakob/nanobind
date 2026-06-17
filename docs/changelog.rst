@@ -277,6 +277,10 @@ corner cases, and free-threading.
 
 - **Stub generation improvements**:
 
+  - Docstrings repeated across a function's overloads are now emitted only
+    once, on the last overload. (issue `#1357
+    <https://github.com/wjakob/nanobind/issues/1357>`__).
+
   - ``classmethod`` and ``staticmethod`` members are now correctly
     recognized, producing exact signatures instead of generic
     ``*args, **kwargs`` stubs. (PR `#1302

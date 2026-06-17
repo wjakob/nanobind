@@ -529,6 +529,17 @@ def test40_nb_signature():
         (r"def test_05(arg: int, /) -> int", "doc_1", None),
         (r"def test_05(arg: float, /) -> int", "doc_2", None),
     )
+    # Uniform and partially-repeated docstrings are exposed faithfully here;
+    # deduplication for stubs happens in stubgen (see issue #1357).
+    assert t.test_05b.__nb_signature__ == (
+        (r"def test_05b(arg: int, /) -> int", "doc_1", None),
+        (r"def test_05b(arg: float, /) -> int", "doc_1", None),
+    )
+    assert t.test_05d.__nb_signature__ == (
+        (r"def test_05d(arg: int, /) -> int", "doc_1", None),
+        (r"def test_05d(arg: float, /) -> int", "doc_1", None),
+        (r"def test_05d(arg: str, /) -> int", "doc_2", None),
+    )
     assert t.test_07.__nb_signature__ == (
         (
             r"def test_07(arg0: int, arg1: int, /, *args, **kwargs) -> tuple[int, int]",

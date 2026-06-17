@@ -65,15 +65,15 @@ static void mt_from_handle_delete(MT* self) {
     ndarray_dec_ref(th);
 }
 
-template<bool versioned>
+template<bool Versioned>
 static void capsule_delete(PyObject *capsule) {
     const char* capsule_name;
-    if constexpr (versioned)
+    if constexpr (Versioned)
         capsule_name = "dltensor_versioned";
     else
         capsule_name = "dltensor";
 
-    using MT = std::conditional_t<versioned, managed_dltensor_versioned,
+    using MT = std::conditional_t<Versioned, managed_dltensor_versioned,
                                              managed_dltensor>;
     error_scope scope; // temporarily save any existing errors
     MT* mt = (MT*) PyCapsule_GetPointer(capsule, capsule_name);
@@ -96,46 +96,43 @@ struct ndarray_handle {
     bool call_deleter;  // True if tensor was imported, else PyMem_Free(mt).
     bool ro;            // Whether tensor is read-only.
 
-    PyObject* make_capsule_unversioned() {
-        PyObject* capsule;
-        if (!versioned && mt_unversioned->manager_ctx == this) {
-            capsule = PyCapsule_New(mt_unversioned, "dltensor",
-                                    capsule_delete</*versioned=*/false>);
-        } else {
-            scoped_pymalloc<managed_dltensor> mt;
-            memcpy(&mt->dltensor,
-                   (versioned) ? &mt_versioned->dltensor
-                               : &mt_unversioned->dltensor,
-                   sizeof(dlpack::dltensor));
-            mt->manager_ctx = this;
-            mt->deleter = mt_from_handle_delete<managed_dltensor>;
-            capsule = PyCapsule_New(mt.release(), "dltensor",
-                                    capsule_delete</*versioned=*/false>);
-        }
-        check(capsule, "Could not make unversioned capsule");
-        refcount++;
-        return capsule;
+    dlpack::dltensor &tensor() {
+        return versioned ? mt_versioned->dltensor : mt_unversioned->dltensor;
     }
 
-    PyObject* make_capsule_versioned() {
-        PyObject* capsule;
-        if (versioned && mt_versioned->manager_ctx == this) {
-            capsule = PyCapsule_New(mt_versioned, "dltensor_versioned",
-                                    capsule_delete</*versioned=*/true>);
-        } else {
-            scoped_pymalloc<managed_dltensor_versioned> mt;
-            mt->version = {dlpack::major_version, dlpack::minor_version};
-            mt->manager_ctx = this;
-            mt->deleter = mt_from_handle_delete<managed_dltensor_versioned>;
-            mt->flags = (ro) ? dlpack::flag_bitmask_read_only : 0;
-            memcpy(&mt->dltensor,
-                   (versioned) ? &mt_versioned->dltensor
-                               : &mt_unversioned->dltensor,
-                   sizeof(dlpack::dltensor));
-            capsule = PyCapsule_New(mt.release(), "dltensor_versioned",
-                                    capsule_delete</*versioned=*/true>);
+    template <bool Versioned> PyObject *make_capsule() {
+        using MT = std::conditional_t<Versioned, managed_dltensor_versioned,
+                                                 managed_dltensor>;
+        const char *name = Versioned ? "dltensor_versioned" : "dltensor";
+
+        // Reuse nanobind's own managed tensor if its flavor already matches;
+        // otherwise allocate a fresh one wrapping a copy of the DLTensor.
+        MT *mt = nullptr;
+        if (versioned == Versioned) {
+            if constexpr (Versioned)
+                mt = mt_versioned;
+            else
+                mt = mt_unversioned;
+            if (mt->manager_ctx != this)
+                mt = nullptr;
         }
-        check(capsule, "Could not make versioned capsule");
+
+        PyObject *capsule;
+        if (mt) {
+            capsule = PyCapsule_New(mt, name, capsule_delete<Versioned>);
+        } else {
+            scoped_pymalloc<MT> fresh;
+            if constexpr (Versioned) {
+                fresh->version = {dlpack::major_version, dlpack::minor_version};
+                fresh->flags = ro ? dlpack::flag_bitmask_read_only : 0;
+            }
+            fresh->manager_ctx = this;
+            fresh->deleter = mt_from_handle_delete<MT>;
+            memcpy(&fresh->dltensor, &tensor(), sizeof(dlpack::dltensor));
+            capsule = PyCapsule_New(fresh.release(), name,
+                                    capsule_delete<Versioned>);
+        }
+        check(capsule, "Could not make capsule");
         refcount++;
         return capsule;
     }
@@ -156,8 +153,7 @@ static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int flags) {
     view->obj = nullptr;
 
     ndarray_handle *th = ((nb_ndarray *) self)->th;
-    dlpack::dltensor &t = (th->versioned) ? th->mt_versioned->dltensor
-                                          : th->mt_unversioned->dltensor;
+    dlpack::dltensor &t = th->tensor();
 
     if (t.device.device_type != device::cpu::value) {
         PyErr_SetString(PyExc_BufferError, "Only CPU-allocated ndarrays can be "
@@ -302,8 +298,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
     };
 
     ndarray_handle *th = ((nb_ndarray *) self)->th;
-    dlpack::dltensor &t = (th->versioned) ? th->mt_versioned->dltensor
-                                          : th->mt_unversioned->dltensor;
+    dlpack::dltensor &t = th->tensor();
 
     long max_major_version = 0;
 
@@ -381,9 +376,9 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
 
     PyObject *capsule;
     if (max_major_version >= (long)dlpack::major_version)
-        capsule = th->make_capsule_versioned();
+        capsule = th->make_capsule<true>();
     else
-        capsule = th->make_capsule_unversioned();
+        capsule = th->make_capsule<false>();
 
     return capsule;
 }
@@ -391,9 +386,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
 // This function implements __dlpack_device__() for a nanobind.nb_ndarray.
 static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyObject *) {
     ndarray_handle *th = ((nb_ndarray *) self)->th;
-    dlpack::dltensor& t = (th->versioned)
-                              ? th->mt_versioned->dltensor
-                              : th->mt_unversioned->dltensor;
+    dlpack::dltensor& t = th->tensor();
     PyObject *r;
     if (t.device.device_type == 1 && t.device.device_id == 0) {
         r = NB_INTERNED(dl_cpu_tpl);
@@ -578,12 +571,116 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     return mt_unique_ptr;
 }
 
+// Per-framework import data for the source-detectable frameworks. Indexed by
+// the framework `value` from ndarray.h; rows only exist for frameworks that can
+// be detected as an incoming object (numpy..cupy), everything else is empty.
+struct import_info {
+    const char *module_prefix; // __module__ prefix, for detection
+    const char *type_name;     // exact Py_TYPE name, for ndarray_check
+    const char *to_dlpack_pkg; // legacy to_dlpack() module, or nullptr
+};
+
+static constexpr import_info importers[] = {
+    /* no_framework */ { nullptr, nullptr, nullptr },
+    /* numpy        */ { "numpy", "numpy.ndarray", nullptr },
+    /* pytorch      */ { "torch", "torch.Tensor", "torch.utils.dlpack" },
+    /* tensorflow   */ { "tensorflow.",
+                         "tensorflow.python.framework.ops.EagerTensor",
+                         "tensorflow.experimental.dlpack" },
+    /* jax          */ { "jaxlib", "jaxlib._jax.ArrayImpl", "jax.dlpack" },
+    /* cupy         */ { "cupy", "cupy.ndarray", nullptr }
+};
+
+static constexpr int importer_count = sizeof(importers) / sizeof(importers[0]);
+
+// Detect the source framework from __module__, returning its ndarray.h `value`
+// (no_framework::value if unrecognized). Never raises.
+static int detect_framework(PyTypeObject *tp) noexcept {
+    object mod = steal(PyObject_GetAttr((PyObject *) tp,
+                                        NB_INTERNED(__module__)));
+    const char *name =
+        mod.is_valid() ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr) : nullptr;
+    if (!name) {
+        PyErr_Clear();
+        return no_framework::value;
+    }
+    for (int i = 1; i < importer_count; ++i) {
+        const char *p = importers[i].module_prefix;
+        if (strncmp(name, p, strlen(p)) == 0)
+            return i;
+    }
+    return no_framework::value;
+}
+
+// Convert to the requested dtype (and order, where the framework supports it).
+static object convert_array(int framework, PyObject *src, const char *dtype,
+                            char order) {
+    object converted;
+    try {
+        switch (framework) {
+            case numpy::value:
+            case cupy::value:
+                converted = handle(src).attr(NB_INTERNED(astype))(dtype, order);
+                break;
+
+            case pytorch::value: {
+                module_ torch = module_::import_("torch");
+                converted = handle(src).attr(NB_INTERNED(to))(torch.attr(dtype));
+                if (order == 'C')
+                    converted = converted.attr(NB_INTERNED(contiguous))();
+                break;
+            }
+
+            case tensorflow::value: {
+                module_ tensorflow = module_::import_("tensorflow");
+                converted =
+                    tensorflow.attr(NB_INTERNED(cast))(handle(src), dtype);
+                break;
+            }
+
+            case jax::value:
+                converted = handle(src).attr(NB_INTERNED(astype))(dtype);
+                break;
+
+            default:
+                break;
+        }
+    } catch (...) {
+        converted.reset();
+    }
+    return converted;
+}
+
+// True if `src` supports the buffer protocol. Non-raising.
+static bool obj_has_buffer(PyObject *src, PyTypeObject *tp) noexcept {
+#if !defined(Py_LIMITED_API)
+    (void) src;
+    return tp->tp_as_buffer && tp->tp_as_buffer->bf_getbuffer;
+#else
+    (void) tp;
+    return PyObject_CheckBuffer(src);
+#endif
+}
+
+// Fetch __dlpack__ as an unbound descriptor (callable with self at args[0]), or
+// an invalid object if absent. Avoids exception-related costs if possible.
+static object dlpack_method(PyTypeObject *tp) noexcept {
+#if !defined(Py_LIMITED_API)
+    return borrow(_PyType_Lookup(tp, NB_INTERNED(__dlpack__)));
+#else
+    object descr =
+        steal(PyObject_GetAttr((PyObject *) tp, NB_INTERNED(__dlpack__)));
+    if (!descr.is_valid()) // can raise
+        PyErr_Clear();
+    return descr;
+#endif
+}
+
 bool ndarray_check(PyObject *o) noexcept {
-    if (PyObject_HasAttr(o, NB_INTERNED(__dlpack__)) ||
-        PyObject_CheckBuffer(o))
+    PyTypeObject *tp = Py_TYPE(o);
+    if (dlpack_method(tp).is_valid() || obj_has_buffer(o, tp))
         return true;
 
-    PyTypeObject *tp = Py_TYPE(o);
     if (tp == &PyCapsule_Type)
         return true;
 
@@ -593,15 +690,13 @@ bool ndarray_check(PyObject *o) noexcept {
     const char *tp_name = PyUnicode_AsUTF8AndSize(name, nullptr);
     check(tp_name, "Could not obtain type name! (2)");
 
-    bool result =
-        // PyTorch
-        strcmp(tp_name, "torch.Tensor") == 0 ||
-        // XLA
-        strcmp(tp_name, "jaxlib.xla_extension.ArrayImpl") == 0 ||
-        // Tensorflow
-        strcmp(tp_name, "tensorflow.python.framework.ops.EagerTensor") == 0 ||
-        // Cupy
-        strcmp(tp_name, "cupy.ndarray") == 0;
+    bool result = false;
+    for (int i = 1; i < importer_count; ++i) {
+        if (strcmp(tp_name, importers[i].type_name) == 0) {
+            result = true;
+            break;
+        }
+    }
 
     Py_DECREF(name);
     return result;
@@ -616,76 +711,69 @@ static NB_INLINE bool dtype_code_is_complex(uint8_t code) {
 ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
                                bool convert, cleanup_list *cleanup) noexcept {
     object capsule;
-    const bool src_is_pycapsule = PyCapsule_CheckExact(src);
     mt_unique_ptr_t mt_unique_ptr(nullptr, &mt_from_buffer_delete);
 
     // Capsule flavor (versioned or not) to probe for first during extraction.
     // Defaults to unversioned: the right guess for an unknown user capsule.
     bool expect_versioned = false;
 
+    PyTypeObject *tp = Py_TYPE(src);
+    const bool src_is_pycapsule = tp == &PyCapsule_Type;
+
     if (src_is_pycapsule) {
         capsule = borrow(src);
     } else {
-        PyObject* args[] = {src, NB_INTERNED(dl_version_tpl)};
-        size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+        // __dlpack__ is by contract a plain method, so call the looked-up
+        // descriptor directly (args[0] is self) rather than re-resolving it.
+        object dlpack_descr = dlpack_method(tp);
 
-        // Call src.__dlpack__(): max_version_kw requests a versioned capsule
-        // nullptr the cheaper unversioned one.
-        PyObject *max_version_kw = NB_INTERNED(max_version_tpl);
-        auto dlpack = [&](PyObject *kwnames) {
-            return steal(PyObject_VectorcallMethod(NB_INTERNED(__dlpack__),
-                                                   args, nargsf, kwnames));
-        };
+        if (dlpack_descr.is_valid()) {
+            PyObject* args[] = {src, NB_INTERNED(dl_version_tpl)};
+            size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
 
-        // The unversioned path is generally faster to handle for the target
-        // framework. Try that first if the user only requested readonly input.
-        capsule = dlpack(c->ro ? nullptr : max_version_kw);
-        expect_versioned = !c->ro;
+            // max_version_kw requests a versioned capsule, nullptr the cheaper
+            // unversioned one.
+            PyObject *max_version_kw = NB_INTERNED(max_version_tpl);
+            auto dlpack = [&](PyObject *kwnames) {
+                return steal(PyObject_Vectorcall(dlpack_descr.ptr(), args,
+                                                 nargsf, kwnames));
+            };
 
-        // Fall back to the other variant on failure: a read-only source
-        // refusing unversioned export raises BufferError, and producers
-        // predating max_version (array API < v2023) raise TypeError.
-        if (!capsule.is_valid() &&
-            (PyErr_ExceptionMatches(PyExc_BufferError) ||
-             PyErr_ExceptionMatches(PyExc_TypeError))) {
-            PyErr_Clear();
-            capsule = dlpack(c->ro ? max_version_kw : nullptr);
-            expect_versioned = c->ro;
+            // The unversioned path is generally faster to handle for the target
+            // framework. Try that first if the user only requested readonly input.
+            capsule = dlpack(c->ro ? nullptr : max_version_kw);
+            expect_versioned = !c->ro;
+
+            // Fall back to the other variant on failure: a read-only source
+            // refusing unversioned export raises BufferError, and producers
+            // predating max_version (array API < v2023) raise TypeError.
+            if (!capsule.is_valid() &&
+                (PyErr_ExceptionMatches(PyExc_BufferError) ||
+                 PyErr_ExceptionMatches(PyExc_TypeError))) {
+                PyErr_Clear();
+                capsule = dlpack(c->ro ? max_version_kw : nullptr);
+                expect_versioned = c->ro;
+            }
+
+            if (!capsule.is_valid())
+                PyErr_Clear();
         }
 
-        // Try creating an ndarray via the buffer protocol
-        if (!capsule.is_valid()) {
-            PyErr_Clear();
+        // Fall back to the buffer protocol, again gated on a non-raising probe.
+        if (!capsule.is_valid() && obj_has_buffer(src, tp))
             mt_unique_ptr = make_mt_from_buffer_protocol(src, c->ro);
-        }
 
         // Try the function to_dlpack(), already obsolete in array API v2021
         if (!mt_unique_ptr && !capsule.is_valid()) {
-            PyTypeObject *tp = Py_TYPE(src);
-            try {
-                object mod = steal(PyObject_GetAttr(
-                    (PyObject *) tp, NB_INTERNED(__module__)));
-                const char *module_name =
-                    mod.is_valid()
-                        ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr)
-                        : nullptr;
-                if (!module_name)
-                    PyErr_Clear();
-
-                object package;
-                if (module_name) {
-                    if (strncmp(module_name, "tensorflow.", 11) == 0)
-                        package = module_::import_("tensorflow.experimental.dlpack");
-                    else if (strncmp(module_name, "torch", 5) == 0)
-                        package = module_::import_("torch.utils.dlpack");
-                    else if (strncmp(module_name, "jaxlib", 6) == 0)
-                        package = module_::import_("jax.dlpack");
+            const char *pkg = importers[detect_framework(tp)].to_dlpack_pkg;
+            if (pkg) {
+                try {
+                    object package = module_::import_(pkg);
+                    if (package.is_valid())
+                        capsule = package.attr("to_dlpack")(handle(src));
+                } catch (...) {
+                    capsule.reset();
                 }
-
-                if (package.is_valid())
-                    capsule = package.attr("to_dlpack")(handle(src));
-            } catch (...) {
-                capsule.reset();
             }
             if (!capsule.is_valid())
                 return nullptr;
@@ -752,9 +840,11 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         }
     }
 
+    // Only the order check below needs the element count, so skip it otherwise.
     int64_t size = 1;
-    for (int32_t i = 0; i < t.ndim; ++i)
-        size *= t.shape[i];
+    if (has_order)
+        for (int32_t i = 0; i < t.ndim; ++i)
+            size *= t.shape[i];
 
     // Tolerate any strides if the array has 1 or fewer elements
     if (pass_shape && has_order && size > 1) {
@@ -800,15 +890,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
     // Support implicit conversion of dtype and order.
     if (convert && (!pass_dtype || !pass_order) && !src_is_pycapsule) {
-        PyTypeObject *tp = Py_TYPE(src);
-
-        object mod = steal(PyObject_GetAttr(
-            (PyObject *) tp, NB_INTERNED(__module__)));
-        const char *module_name =
-            mod.is_valid() ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr)
-                           : nullptr;
-        if (!module_name)
-            PyErr_Clear();
+        int fw = detect_framework(tp);
 
         char order = 'K'; // for NumPy. 'K' means 'keep'
         if (c->order)
@@ -848,25 +930,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
             snprintf(dtype, sizeof(dtype), "%s%u", prefix, dt.bits);
         }
 
-        object converted;
-        try {
-            if (module_name) {
-                if (strncmp(module_name, "numpy", 5) == 0
-                    || strncmp(module_name, "cupy", 4) == 0) {
-                    converted = handle(src).attr("astype")(dtype, order);
-                } else if (strncmp(module_name, "torch", 5) == 0) {
-                    module_ torch = module_::import_("torch");
-                    converted = handle(src).attr("to")(torch.attr(dtype));
-                    if (c->order == 'C')
-                        converted = converted.attr("contiguous")();
-                } else if (strncmp(module_name, "tensorflow.", 11) == 0) {
-                    module_ tensorflow = module_::import_("tensorflow");
-                    converted = tensorflow.attr("cast")(handle(src), dtype);
-                } else if (strncmp(module_name, "jaxlib", 6) == 0) {
-                    converted = handle(src).attr("astype")(dtype);
-                }
-            }
-        } catch (...) { converted.reset(); }
+        object converted = convert_array(fw, src, dtype, order);
 
         // Potentially try once again, recursively
         if (converted.is_valid()) {
@@ -942,8 +1006,7 @@ dlpack::dltensor *ndarray_inc_ref(ndarray_handle *th) noexcept {
     if (!th)
         return nullptr;
     ++th->refcount;
-    return (th->versioned) ? &th->mt_versioned->dltensor
-                           : &th->mt_unversioned->dltensor;
+    return &th->tensor();
 }
 
 // Final teardown of a handle whose refcount reached zero.
@@ -1179,7 +1242,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     } else if (framework == no_framework::value ||
                framework == tensorflow::value) {
         // Make a new capsule wrapping an unversioned managed_dltensor.
-        o = steal(th->make_capsule_unversioned());
+        o = steal(th->make_capsule<false>());
     } else {
         // Make a Python object providing the buffer interface and having
         // the two DLPack methods __dlpack__() and __dlpack_device__().

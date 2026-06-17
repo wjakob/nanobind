@@ -546,11 +546,15 @@ struct nb_internals {
     X(__name__)                                                                \
     X(__new__)                                                                 \
     X(__qualname__)                                                            \
+    X(astype)                                                                  \
+    X(cast)                                                                    \
     X(clone)                                                                   \
+    X(contiguous)                                                              \
     X(copy)                                                                    \
     X(dl_device)                                                               \
     X(max_version)                                                             \
     X(stream)                                                                  \
+    X(to)                                                                      \
     X(value)
 
 // Names for the PyObject* entries in the per-module state array.

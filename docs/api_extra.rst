@@ -1128,6 +1128,13 @@ convert into an equivalent representation in one of the following frameworks:
    An object that both implements the buffer protocol and also has the
    ``__dlpack__`` and ``__dlpack_device__`` attributes.
 
+.. cpp:class:: no_framework
+
+   The default when no framework annotation is given. Instead of a
+   framework-specific array, the :cpp:class:`nb::ndarray <ndarray>` converts
+   into a raw `DLPack <https://github.com/dmlc/dlpack>`__ capsule wrapping a
+   ``DLManagedTensor``.
+
 Eigen convenience type aliases
 ------------------------------
 

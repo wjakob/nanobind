@@ -127,6 +127,12 @@ def test06_reference_internal(clean):
     del s
 
 
+def test06c_init_not_list_initialization():
+    # Issue #1074: nb::init must use direct- rather than list-initialization, so
+    # that a std::initializer_list constructor is not spuriously preferred.
+    assert t.InitListTest(1).value == 1
+
+
 def test06b_reference_internal_free(clean):
     # A free function with reference_internal has no 'self' to keep-alive the
     # result on. It must fail consistently regardless of arity (the 1-arg case

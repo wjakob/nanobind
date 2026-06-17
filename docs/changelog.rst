@@ -279,7 +279,8 @@ corner cases, and free-threading.
 
   - Docstrings repeated across a function's overloads are now emitted only
     once, on the last overload. (issue `#1357
-    <https://github.com/wjakob/nanobind/issues/1357>`__).
+    <https://github.com/wjakob/nanobind/issues/1357>`__, PR `#1381
+    <https://github.com/wjakob/nanobind/pull/1381>`__).
 
   - ``classmethod`` and ``staticmethod`` members are now correctly
     recognized, producing exact signatures instead of generic
@@ -329,8 +330,7 @@ corner cases, and free-threading.
   (issue `#1263 <https://github.com/wjakob/nanobind/issues/1263>`__, PR `#1378
   <https://github.com/wjakob/nanobind/pull/1378>`__).
 
-- Miscellaneous minor fixes and improvements. (issues `#1335
-  <https://github.com/wjakob/nanobind/issues/1335>`__, PRs `#1301
+- Miscellaneous minor fixes and improvements. (PRs `#1301
   <https://github.com/wjakob/nanobind/pull/1301>`__, `#1304
   <https://github.com/wjakob/nanobind/pull/1304>`__, `#1307
   <https://github.com/wjakob/nanobind/pull/1307>`__, `#1312
@@ -339,7 +339,8 @@ corner cases, and free-threading.
   <https://github.com/wjakob/nanobind/pull/1327>`__, `#1356
   <https://github.com/wjakob/nanobind/pull/1356>`__, `#1351
   <https://github.com/wjakob/nanobind/pull/1351>`__, `#1379
-  <https://github.com/wjakob/nanobind/pull/1379>`__, commits `2deac9 <https://github.com/wjakob/nanobind/commit/2deac96697d1b304f3c973cef7de5f94cbad5a57>`__,
+  <https://github.com/wjakob/nanobind/pull/1379>`__, commits `b238ff <https://github.com/wjakob/nanobind/commit/b238ffa52eb6e9d3e4aacbc58e14c3fd44b4e873>`__,
+  `2deac9 <https://github.com/wjakob/nanobind/commit/2deac96697d1b304f3c973cef7de5f94cbad5a57>`__,
   `e33dee <https://github.com/wjakob/nanobind/commit/e33deeaab36f53312512cb09fd1e8b7033e2d8a4>`__,
   `b22f1f <https://github.com/wjakob/nanobind/commit/b22f1fe0f257d85ae0425695082115d87053173a>`__,
   `96cc36 <https://github.com/wjakob/nanobind/commit/96cc36bfa666306428e27d27111cfa6c203a966d>`__, `279947 <https://github.com/wjakob/nanobind/commit/27994734f66c647347d5ee2218b464a6fbd8e953>`__, `bc6bf8 <https://github.com/wjakob/nanobind/commit/bc6bf8a4e82355b59784920a966726586b2eaa42>`__, `3408c6 <https://github.com/wjakob/nanobind/commit/3408c6623133ecf54afcef1c002414094aa16d67>`__, `7c9e94 <https://github.com/wjakob/nanobind/commit/7c9e94ad77c60ad7b15e336367cbfab9fec2f285>`__, `ef1266 <https://github.com/wjakob/nanobind/commit/ef12667c1bd8fc0aa5110400ed4b7a206a95f594>`__, `0528ff <https://github.com/wjakob/nanobind/commit/0528ff7bca4155bd7214114dc864a091c9554220>`__).

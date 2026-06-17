@@ -358,6 +358,7 @@ enum ndarray_export_slot {
     nd_export_tensorflow, // tensorflow.experimental.dlpack.from_dlpack
     nd_export_jax,        // jax.dlpack.from_dlpack
     nd_export_cupy,       // cupy.from_dlpack
+    nd_export_mlx,        // mlx.core.array (constructor, not from_dlpack)
     nd_export_count
 };
 

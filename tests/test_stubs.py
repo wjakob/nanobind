@@ -17,6 +17,9 @@ def remove_platform_dependent(s):
         v = s[i]
         if v.strip().startswith('float16'):
             i += 1
+        elif v == 'import mlx.core':
+            s2.append('import mlx')
+            i += 1
         elif v.startswith('def ret_numpy_half()') or \
            v.startswith('def test_slots()') or \
            v.startswith('TypeAlias'):

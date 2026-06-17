@@ -1119,6 +1119,11 @@ convert into an equivalent representation in one of the following frameworks:
 
 .. cpp:class:: cupy
 
+.. cpp:class:: mlx
+
+   Apple ``mlx.core.array``. The constructor always copies into a
+   unified-memory buffer, so a requested copy is performed inherently.
+
 .. cpp:class:: memview
 
    Builtin Python ``memoryview`` for CPU-resident data.

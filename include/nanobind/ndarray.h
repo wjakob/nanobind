@@ -93,6 +93,7 @@ NB_FRAMEWORK(jax, 4, "jaxlib.xla_extension.DeviceArray");
 NB_FRAMEWORK(cupy, 5, "cupy.ndarray");
 NB_FRAMEWORK(memview, 6, "memoryview");
 NB_FRAMEWORK(array_api, 7, "ArrayLike");
+NB_FRAMEWORK(mlx, 8, "mlx.core.array");
 
 NAMESPACE_BEGIN(device)
 NB_DEVICE(none, 0); NB_DEVICE(cpu, 1); NB_DEVICE(cuda, 2);

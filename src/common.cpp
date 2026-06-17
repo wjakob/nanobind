@@ -728,8 +728,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
         Py_ssize_t size_seq = PySequence_Length(seq);
 
         if (size_seq >= 0) {
-            result = (PyObject **) PyMem_Malloc(sizeof(PyObject *) *
-                                                (size_seq + 1));
+            result = (PyObject **) PyMem_Malloc(sizeof(PyObject *) * (size_t) (size_seq + 1));
 
             if (result) {
                 result[size_seq] = nullptr;
@@ -919,7 +918,7 @@ void property_install_static(PyObject *scope, const char *name,
 
 void tuple_check(PyObject *tuple, size_t nargs) {
     for (size_t i = 0; i < nargs; ++i) {
-        if (!NB_TUPLE_GET_ITEM(tuple, i))
+        if (!NB_TUPLE_GET_ITEM(tuple, (Py_ssize_t) i))
             raise_python_or_cast_error();
     }
 }

@@ -564,10 +564,10 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             buf.put(", ");
         buf.put("kwargs = { ");
 
-        size_t nkwargs_in = (size_t) NB_TUPLE_GET_SIZE(kwargs_in);
-        for (size_t j = 0; j < nkwargs_in; ++j) {
+        Py_ssize_t nkwargs_in = NB_TUPLE_GET_SIZE(kwargs_in);
+        for (Py_ssize_t j = 0; j < nkwargs_in; ++j) {
             PyObject *key   = NB_TUPLE_GET_ITEM(kwargs_in, j),
-                     *value = args_in[nargs_in + j];
+                     *value = args_in[nargs_in + (size_t) j];
 
             const char *key_cstr = PyUnicode_AsUTF8AndSize(key, nullptr);
             if (!key_cstr) {
@@ -677,7 +677,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 #if !defined(PYPY_VERSION) && !defined(Py_LIMITED_API)
     bool kwnames_interned = true;
     for (size_t i = 0; i < nkwargs_in; ++i) {
-        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
+        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, (Py_ssize_t) i);
         kwnames_interned &= ((PyASCIIObject *) key)->state.interned != 0;
     }
     if (kwargs_in && NB_LIKELY(kwnames_interned)) {
@@ -688,7 +688,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
     kwnames = (PyObject **) alloca(nkwargs_in * sizeof(PyObject *));
     for (size_t i = 0; i < nkwargs_in; ++i) {
-        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, i);
+        PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, (Py_ssize_t) i);
         Py_INCREF(key);
 
         kwnames[i] = key;
@@ -810,7 +810,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     break;
 
                 // Implicit conversion only active in the 2nd pass
-                args_flags[i] = arg_flag & ~uint8_t(pass == 0);
+                // Have to cast to uint8_t because of integer promotion (uint8_t promoted to int before ~ and & operations)
+                args_flags[i] = (uint8_t) (arg_flag & ~uint8_t(pass == 0));
                 args[i] = arg;
             }
 
@@ -967,7 +968,8 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
                              (arg_flag & cast_flags::accepts_none) == 0))
                     break;
 
-                args_flags[i] = arg_flag & ~uint8_t(pass == 0);
+                // Have to cast to uint8_t because of integer promotion (uint8_t promoted to int before ~ and & operations)
+                args_flags[i] = (uint8_t) (arg_flag & ~uint8_t(pass == 0));
                 args[i] = arg;
             }
 

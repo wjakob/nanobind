@@ -312,7 +312,7 @@ static void init_internals(nb_internals *p) {
     PyObject *dummy = PyType_FromMetaclass(
         nb_meta, p->nb_module, &dummy_spec, nullptr);
     p->type_data_offset =
-        (uint8_t *) PyObject_GetTypeData(dummy, nb_meta) - (uint8_t *) dummy;
+        ((uint8_t *) PyObject_GetTypeData(dummy, nb_meta) - (uint8_t *) dummy);
     Py_DECREF(dummy);
 #endif
 

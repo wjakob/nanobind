@@ -500,7 +500,7 @@ NB_MODULE(test_classes_ext, m) {
     struct Int {
         int i;
         Int operator+(Int o) const { return {i + o.i}; }
-        Int operator-(float j) const { return {int(i - j)}; }
+        Int operator-(float j) const { return {int((float)i - j)}; }
         bool operator==(Int o) const { return i == o.i; }
         Int &operator+=(Int o) {
             i += o.i;

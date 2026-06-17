@@ -1054,80 +1054,100 @@ def test53_never_destruct():
     assert r.var() == 5
 
 
+# Run the pooling lifecycle tests against both a plain type (gc=0) and a
+# GC-tracked one (gc=1, dynamic_attr + weak-referenceable).
+def _pooled(gc):
+    if gc:
+        return t.PooledGC, t.pooled_gc_reset, t.pooled_gc_stats
+    return t.Pooled, t.pooled_reset, t.pooled_stats
+
+
 # Object pooling relies on reference counting: releasing an instance parks the
 # object immediately in 'tp_dealloc'. PyPy uses a tracing GC, so 'del' does not
 # deterministically run the C++ destructor, breaking the lifecycle assertions.
 @skip_on_pypy
-def test54_pooled():
+@pytest.mark.parametrize("gc", [0, 1])
+def test54_pooled(gc):
+    cls, reset, stats = _pooled(gc)
+
     # Basic correctness through the pool fast path
-    t.pooled_reset()
-    a = t.Pooled(3)
+    reset()
+    a = cls(3)
     assert a.get() == 3 and a.value == 3
-    c0, d0 = t.pooled_stats()
+    c0, d0 = stats()
     assert c0 == 1 and d0 == 0
 
     # Releasing 'a' parks the object (capacity 4): the C++ destructor runs...
     addr = id(a)
     del a
-    c1, d1 = t.pooled_stats()
+    c1, d1 = stats()
     assert c1 == 1 and d1 == 1
 
     # ...and the next construction revives the SAME object (no realloc),
     # running a fresh C++ constructor. Identity (address) is reused.
-    b = t.Pooled(7)
+    b = cls(7)
     assert id(b) == addr
     assert b.get() == 7   # no stale data from the previous occupant
-    c2, d2 = t.pooled_stats()
+    c2, d2 = stats()
     assert c2 == 2 and d2 == 1
     del b
 
 
 @skip_on_pypy
-def test55_pooled_churn():
+@pytest.mark.parametrize("gc", [0, 1])
+def test55_pooled_churn(gc):
+    cls, reset, stats = _pooled(gc)
+
     # A hot alloc/free loop should keep reusing a tiny working set of objects
     # while construct/destruct run every iteration.
-    t.pooled_reset()
+    reset()
     seen = set()
     for i in range(1000):
-        x = t.Pooled(i)
+        x = cls(i)
         assert x.get() == i
         seen.add(id(x))
         del x
-    c, d = t.pooled_stats()
+    c, d = stats()
     assert c == 1000 and d == 1000          # full C++ lifecycle each iteration
     assert len(seen) <= 4                   # but addresses come from the pool
 
     # Return-by-value (operator) also flows through the pool
-    t.pooled_reset()
-    p = t.Pooled(10)
-    q = p + 5                               # returns a fresh Pooled by value
-    assert q.get() == 15 and isinstance(q, t.Pooled)
+    reset()
+    p = cls(10)
+    q = p + 5                               # returns a fresh instance by value
+    assert q.get() == 15 and isinstance(q, cls)
     del p, q
 
 
 @skip_on_pypy
-def test56_pooled_bounded():
+@pytest.mark.parametrize("gc", [0, 1])
+def test56_pooled_bounded(gc):
+    cls, reset, stats = _pooled(gc)
+
     # Holding more live instances than the pool capacity (4) must be fine:
     # surplus objects are freed normally instead of parked.
-    t.pooled_reset()
-    items = [t.Pooled(i) for i in range(32)]
+    reset()
+    items = [cls(i) for i in range(32)]
     assert [x.get() for x in items] == list(range(32))
     del items
-    c, d = t.pooled_stats()
+    c, d = stats()
     assert c == 32 and d == 32
 
 
 @skip_on_pypy
-def test59_pooled_threaded(n_threads=8):
+@pytest.mark.parametrize("gc", [0, 1])
+def test59_pooled_threaded(gc, n_threads=8):
+    cls, reset, stats = _pooled(gc)
+
     # Per-thread instance pools must work without locking under free-threading:
     # many threads concurrently construct/release pooled temporaries (including
     # return-by-value), and the exact C++ lifecycle balance must be preserved.
     n = 50000
-    t.pooled_reset()
+    reset()
 
     def f():
         for i in range(n):
-            a = t.Pooled(i)
+            a = cls(i)
             assert a.get() == i
             b = a + 5                 # return-by-value -> pool
             assert b.get() == i + 5
@@ -1135,7 +1155,67 @@ def test59_pooled_threaded(n_threads=8):
 
     parallelize(f, n_threads=n_threads)
 
-    c, d = t.pooled_stats()
+    c, d = stats()
     # per iteration: ctor(a) + ctor(inside __add__) + move-ctor(by value) = 3
     expected = n_threads * n * 3
     assert c == expected and d == expected
+
+
+# GC-specific guarantees the plain type can't exercise.
+@skip_on_pypy
+def test60_pooled_gc():
+    import weakref, gc
+
+    # A recycled instance must not inherit the previous occupant's __dict__
+    t.pooled_gc_reset()
+    p = t.PooledGC(1)
+    p.extra = ["payload"]
+    addr = id(p)
+    del p
+    q = t.PooledGC(2)
+    assert id(q) == addr and not hasattr(q, "extra")
+    del q
+
+    # Parking an instance invalidates weak references to it
+    r = t.PooledGC(5)
+    wr = weakref.ref(r)
+    assert wr() is r
+    del r
+    assert wr() is None
+
+    # A reference cycle (via dynamic attrs) is still collected, not leaked
+    t.pooled_gc_reset()
+    x, y = t.PooledGC(1), t.PooledGC(2)
+    x.peer, y.peer = y, x
+    del x, y
+    gc.collect()
+    c, d = t.pooled_gc_stats()
+    assert c == 2 and d == 2
+
+
+# The only path where the collector traverses into a pooled object's C++ payload
+# (PooledGC's built-in traverse only visits __dict__).
+@skip_on_pypy
+def test61_pooled_custom_traverse():
+    import gc
+
+    # Custom traverse reports the held reference; a revival starts clean
+    t.pooled_tr_reset()
+    sentinel = ["payload"]
+    a = t.PooledTraverse(sentinel)
+    assert sentinel in gc.get_referents(a)
+    addr = id(a)
+    del a
+    b = t.PooledTraverse()
+    assert id(b) == addr and b.get() is None
+    del b
+
+    # A cycle routed through the C++ payload is collected
+    t.pooled_tr_reset()
+    box = []
+    q = t.PooledTraverse(box)
+    box.append(q)
+    del q, box
+    gc.collect()
+    c, d = t.pooled_tr_stats()
+    assert c == 1 and d == 1

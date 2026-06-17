@@ -112,6 +112,51 @@ struct Pooled {
     int get() const { return value; }
 };
 
+// Like 'Pooled', but bound as a GC type (dynamic_attr + weak-referenceable).
+static std::atomic<int> pooled_gc_constructed{0}, pooled_gc_destructed{0};
+
+struct PooledGC {
+    int value;
+    PooledGC(int v = 0) : value(v) { pooled_gc_constructed++; }
+    PooledGC(const PooledGC &o) : value(o.value) { pooled_gc_constructed++; }
+    ~PooledGC() { pooled_gc_destructed++; }
+    int get() const { return value; }
+};
+
+// A pooled GC type with a custom tp_traverse/tp_clear that reads the C++ payload
+// (a held Python reference).
+static std::atomic<int> pooled_tr_constructed{0}, pooled_tr_destructed{0};
+
+struct PooledTraverse {
+    PyObject *ref;
+    PooledTraverse(nb::object o) : ref(o.ptr()) {
+        Py_XINCREF(ref);
+        pooled_tr_constructed++;
+    }
+    ~PooledTraverse() { Py_XDECREF(ref); pooled_tr_destructed++; }
+    nb::object get() const { return nb::borrow(ref); }
+};
+
+int pooled_tr_traverse(PyObject *self, visitproc visit, void *arg) {
+    Py_VISIT(Py_TYPE(self));
+    if (!nb::inst_ready(self))  // payload not valid until the constructor runs
+        return 0;
+    Py_VISIT(nb::inst_ptr<PooledTraverse>(self)->ref);
+    return 0;
+}
+
+int pooled_tr_clear(PyObject *self) {
+    PyObject *&ref = nb::inst_ptr<PooledTraverse>(self)->ref;
+    Py_CLEAR(ref);
+    return 0;
+}
+
+PyType_Slot pooled_tr_slots[] = {
+    { Py_tp_traverse, (void *) pooled_tr_traverse },
+    { Py_tp_clear, (void *) pooled_tr_clear },
+    { 0, nullptr }
+};
+
 // Benchmark types: identical, minimal shape; the only difference is whether the
 // binding opts into nb::pooled. Kept free of side effects (no counters) so
 // the measurement isolates allocation / registration cost.
@@ -311,6 +356,36 @@ NB_MODULE(test_classes_ext, m) {
         return std::make_pair(pooled_constructed.load(), pooled_destructed.load());
     });
     m.def("pooled_reset", [] { pooled_constructed = pooled_destructed = 0; });
+
+    nb::class_<PooledGC>(m, "PooledGC", nb::pooled(4), nb::dynamic_attr(),
+                         nb::is_weak_referenceable())
+        .def(nb::init<int>())
+        .def("get", &PooledGC::get)
+        .def_rw("value", &PooledGC::value)
+        .def("__add__",
+             [](const PooledGC &p, int o) { return PooledGC(p.value + o); },
+             nb::is_operator());
+
+    m.def("pooled_gc_stats", [] {
+        return std::make_pair(pooled_gc_constructed.load(),
+                              pooled_gc_destructed.load());
+    });
+    m.def("pooled_gc_reset", [] {
+        pooled_gc_constructed = pooled_gc_destructed = 0;
+    });
+
+    nb::class_<PooledTraverse>(m, "PooledTraverse", nb::pooled(4),
+                               nb::type_slots(pooled_tr_slots))
+        .def(nb::init<nb::object>(), nb::arg("obj") = nb::none())
+        .def("get", &PooledTraverse::get);
+
+    m.def("pooled_tr_stats", [] {
+        return std::make_pair(pooled_tr_constructed.load(),
+                              pooled_tr_destructed.load());
+    });
+    m.def("pooled_tr_reset", [] {
+        pooled_tr_constructed = pooled_tr_destructed = 0;
+    });
 
     // Benchmark pair (see benchmark_pooled.py)
     nb::class_<BenchPooled>(m, "BenchPooled", nb::pooled(128))

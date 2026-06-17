@@ -182,8 +182,10 @@ static void nb_thread_state_destroy(void *p) noexcept {
 
     // Reclaim this thread's instance pools if the runtime is still alive
     if (internals && ts->pools) {
+        PyGILState_STATE state = PyGILState_Ensure();
         for (uint32_t i = 0; i < ts->pools_size; ++i)
             nb_pool_drain(&ts->pools[i], /* can_free = */ true);
+        PyGILState_Release(state);
     }
     PyMem_Free(ts->pools);
 

@@ -107,6 +107,10 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
             // The revived object must hold a reference to its type object
             NB_INCREF_TYPE((PyObject *) tp);
 
+            // Re-track GC instances
+            if (NB_UNLIKELY(nb_type_has_gc(tp, flags)))
+                PyObject_GC_Track((PyObject *) self);
+
             return (PyObject *) self;
         }
     }
@@ -311,6 +315,13 @@ void nb_pool_drain(nb_inst_pool *pool, bool can_free) noexcept {
     if (!pool || !pool->slots)
         return;
 
+    // Check if this is a GCed type once
+    bool gc = false;
+    if (can_free && pool->count) {
+        PyTypeObject *tp = Py_TYPE((PyObject *) pool->slots[0]);
+        gc = nb_type_has_gc(tp, nb_type_data(tp)->flags);
+    }
+
     for (uint32_t i = 0; i < pool->count; ++i) {
         nb_inst *inst = pool->slots[i];
         void *p = inst_ptr(inst);
@@ -318,7 +329,7 @@ void nb_pool_drain(nb_inst_pool *pool, bool can_free) noexcept {
         nb_shard &shard = internals->shard(p);
         lock_shard guard(shard);
 
-        // Unmap 'inst' from inst_c2p (former inst_unregister()).
+        // Unmap 'inst' from inst_c2p
         nb_ptr_map &inst_c2p = shard.inst_c2p;
         nb_ptr_map::iterator it = inst_c2p.find(p);
         if (NB_LIKELY(it != inst_c2p.end())) {
@@ -345,8 +356,12 @@ void nb_pool_drain(nb_inst_pool *pool, bool can_free) noexcept {
             }
         }
 
-        if (can_free)
-            PyObject_Free(inst);
+        if (can_free) {
+            if (NB_UNLIKELY(gc))
+                PyObject_GC_Del(inst);
+            else
+                PyObject_Free(inst);
+        }
     }
 
     if (can_free)
@@ -362,15 +377,36 @@ static void inst_dealloc(PyObject *self) {
     nb_inst *inst = (nb_inst *) self;
     uint32_t flags = t->flags;
 
+    bool gc = nb_type_has_gc(tp, flags);
+
+    // For GC types, untrack the instance and clear its dict and weak references
+    if (NB_UNLIKELY(gc)) {
+        PyObject_GC_UnTrack(self);
+
+        if (flags & (uint32_t) type_flags::has_dynamic_attr) {
+            PyObject **dict = nb_dict_ptr(self, tp);
+            if (dict)
+                Py_CLEAR(*dict);
+        }
+
+        // Clear weak references if needed
+        if (flags & (uint32_t) type_flags::is_weak_referenceable) {
+            PyObject **weaklist = nb_weaklist_ptr(self, tp);
+            if (weaklist && *weaklist)
+#if defined(PYPY_VERSION)
+                Py_CLEAR(*weaklist);
+#else
+                PyObject_ClearWeakRefs(self);
+#endif
+        }
+    }
+
     // Fast path: run the C++ destructor, then put the mapped object in the pool
     // for reuse. The guard below admits only "clean" instances:
     //
     //   - 'internal': the payload is co-located and owned by nanobind.
     //   - '!clear_keep_alive': doesn't need more complex teardown below.
     //   - 'state != relinquished': exclude unusual ownership semantics.
-    //
-    // The remaining special cases cannot apply because pooling does not accept
-    // GCed or intrusively counted types.
     if (NB_LIKELY((flags & (uint32_t) type_flags::pooled) &&
                   inst->state.internal && !inst->state.clear_keep_alive &&
                   inst->state.state != nb_inst_state::state_relinquished)) {
@@ -392,28 +428,6 @@ static void inst_dealloc(PyObject *self) {
 
         // The pool is full. Release without rerunning the destructor
         inst->state.destruct = 0;
-    }
-
-    bool gc = nb_type_has_gc(tp, flags);
-    if (NB_UNLIKELY(gc)) {
-        PyObject_GC_UnTrack(self);
-
-        if (flags & (uint32_t) type_flags::has_dynamic_attr) {
-            PyObject **dict = nb_dict_ptr(self, tp);
-            if (dict)
-                Py_CLEAR(*dict);
-        }
-    }
-
-    if (flags & (uint32_t) type_flags::is_weak_referenceable &&
-        nb_weaklist_ptr(self, tp) != nullptr) {
-#if defined(PYPY_VERSION)
-        PyObject **weaklist = nb_weaklist_ptr(self, tp);
-        if (weaklist)
-            Py_CLEAR(*weaklist);
-#else
-        PyObject_ClearWeakRefs(self);
-#endif
     }
 
     void *p = inst_ptr(inst);
@@ -451,7 +465,7 @@ static void inst_dealloc(PyObject *self) {
             keep_alive.erase_fast(it);
         }
 
-        // Unmap 'inst' from inst_c2p (former inst_unregister()).
+        // Unmap 'inst' from inst_c2p
         nb_ptr_map &inst_c2p = shard.inst_c2p;
         nb_ptr_map::iterator it = inst_c2p.find(p);
 
@@ -1629,14 +1643,11 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
         if (t->pool_capacity == 0) {
             to->flags &= ~(uint32_t) type_flags::pooled;
         } else {
-            // Pooling requires a non-GC type
             bool eligible =
-                !have_gc &&
                 !(to->flags & (uint32_t) type_flags::intrusive_ptr);
             if (!eligible)
-                fail("nanobind: type '%s' requested instance pooling "
-                     "(nb::pooled) but is ineligible (only non-GC, "
-                     "non-intrusive types can be pooled).", t_name);
+                fail("nanobind: type '%s': instance pooling is incompatible "
+                     "with intrusive reference counting!", t_name);
 
             to->pool_capacity = t->pool_capacity;
 #if defined(NB_FREE_THREADED)

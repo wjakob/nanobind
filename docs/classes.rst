@@ -1253,15 +1253,10 @@ pool.
 
 .. note::
 
-   Pooling is only available for *simple* value types. A type is **ineligible**
-   (and binding will fail with an error) if it
-
-   - participates in Python's cyclic garbage collector, which includes any type
-     using :cpp:class:`nb::dynamic_attr <dynamic_attr>`,
-     :cpp:class:`nb::is_weak_referenceable <is_weak_referenceable>`, or a custom
-     ``tp_traverse`` slot, or
-
-   - uses :ref:`intrusive reference counting <intrusive>`.
+   Pooling is *incompatible* with :ref:`intrusive reference counting
+   <intrusive>`. That corner case aside, everything else works:
+   garbage-collected types with custom type slots, weak-reference types, or
+   types with instance dictionaries, etc.
 
    Pooling is intended for types that are frequently constructed and destroyed.
    Enabling it for a rarely-instantiated type wastes the (lazily allocated) pool

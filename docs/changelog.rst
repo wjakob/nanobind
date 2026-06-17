@@ -316,7 +316,14 @@ corner cases, and free-threading.
   The previous behavior could spuriously select a constructor taking
   ``std::initializer_list`` over the intended overload. Aggregates without a
   matching constructor continue to use list-initialization. (issue `#1074
-  <https://github.com/wjakob/nanobind/issues/1074>`__).
+  <https://github.com/wjakob/nanobind/issues/1074>`__, PR `#1377
+  <https://github.com/wjakob/nanobind/pull/1377>`__).
+
+- Added :cpp:type:`nb::DRef1 <DRef1>` and :cpp:type:`nb::DMap1 <DMap1>`, Eigen
+  ``Ref``/``Map`` variants with a compile-time unit inner stride that can
+  improve :ref:`auto-vectorization <eigen_vectorization>` of Eigen code.
+  (issue `#1263 <https://github.com/wjakob/nanobind/issues/1263>`__, PR `#1378
+  <https://github.com/wjakob/nanobind/pull/1378>`__).
 
 - Miscellaneous minor fixes and improvements. (PRs `#1301
   <https://github.com/wjakob/nanobind/pull/1301>`__, `#1304
@@ -326,7 +333,8 @@ corner cases, and free-threading.
   <https://github.com/wjakob/nanobind/pull/1325>`__, `#1327
   <https://github.com/wjakob/nanobind/pull/1327>`__, `#1356
   <https://github.com/wjakob/nanobind/pull/1356>`__, `#1351
-  <https://github.com/wjakob/nanobind/pull/1351>`__, commits `2deac9 <https://github.com/wjakob/nanobind/commit/2deac96697d1b304f3c973cef7de5f94cbad5a57>`__,
+  <https://github.com/wjakob/nanobind/pull/1351>`__, `#1379
+  <https://github.com/wjakob/nanobind/pull/1379>`__, commits `2deac9 <https://github.com/wjakob/nanobind/commit/2deac96697d1b304f3c973cef7de5f94cbad5a57>`__,
   `e33dee <https://github.com/wjakob/nanobind/commit/e33deeaab36f53312512cb09fd1e8b7033e2d8a4>`__,
   `b22f1f <https://github.com/wjakob/nanobind/commit/b22f1fe0f257d85ae0425695082115d87053173a>`__,
   `96cc36 <https://github.com/wjakob/nanobind/commit/96cc36bfa666306428e27d27111cfa6c203a966d>`__, `279947 <https://github.com/wjakob/nanobind/commit/27994734f66c647347d5ee2218b464a6fbd8e953>`__, `bc6bf8 <https://github.com/wjakob/nanobind/commit/bc6bf8a4e82355b59784920a966726586b2eaa42>`__, `3408c6 <https://github.com/wjakob/nanobind/commit/3408c6623133ecf54afcef1c002414094aa16d67>`__, `7c9e94 <https://github.com/wjakob/nanobind/commit/7c9e94ad77c60ad7b15e336367cbfab9fec2f285>`__, `ef1266 <https://github.com/wjakob/nanobind/commit/ef12667c1bd8fc0aa5110400ed4b7a206a95f594>`__, `0528ff <https://github.com/wjakob/nanobind/commit/0528ff7bca4155bd7214114dc864a091c9554220>`__).

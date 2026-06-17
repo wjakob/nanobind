@@ -394,11 +394,15 @@ private:
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Args...>) {
                     if (!detail::nb_inst_python_derived(v.h.ptr())) {
-                        new (v.p) Type{ (detail::forward_t<Args>) args... };
+                        new (v.p) Type((detail::forward_t<Args>) args...);
                         return;
                     }
                 }
-                new ((void *) v.p) Alias{ (detail::forward_t<Args>) args... };
+                // Prefer direct- over list-initialization
+                if constexpr (std::is_constructible_v<Alias, Args...>)
+                    new ((void *) v.p) Alias((detail::forward_t<Args>) args...);
+                else
+                    new ((void *) v.p) Alias{(detail::forward_t<Args>) args...};
             },
             extra...);
     }
@@ -420,11 +424,15 @@ private:
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Arg>) {
                     if (!detail::nb_inst_python_derived(v.h.ptr())) {
-                        new ((Type *) v.p) Type{ (detail::forward_t<Arg>) arg };
+                        new ((Type *) v.p) Type((detail::forward_t<Arg>) arg);
                         return;
                     }
                 }
-                new ((Alias *) v.p) Alias{ (detail::forward_t<Arg>) arg };
+                // Prefer direct- over list-initialization
+                if constexpr (std::is_constructible_v<Alias, Arg>)
+                    new ((Alias *) v.p) Alias((detail::forward_t<Arg>) arg);
+                else
+                    new ((Alias *) v.p) Alias{ (detail::forward_t<Arg>) arg };
             }, is_implicit(), extra...);
 
         using Caster = detail::make_caster<Arg>;

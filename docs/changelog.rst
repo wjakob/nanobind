@@ -311,6 +311,13 @@ corner cases, and free-threading.
     introduced by a pattern is the only use of that module.
     (PR `#1347 <https://github.com/wjakob/nanobind/pull/1347>`__).
 
+- :cpp:class:`nb::init\<...\> <init>` now constructs instances using
+  direct-initialization (parentheses) instead of list-initialization (braces).
+  The previous behavior could spuriously select a constructor taking
+  ``std::initializer_list`` over the intended overload. Aggregates without a
+  matching constructor continue to use list-initialization. (issue `#1074
+  <https://github.com/wjakob/nanobind/issues/1074>`__).
+
 - Miscellaneous minor fixes and improvements. (PRs `#1301
   <https://github.com/wjakob/nanobind/pull/1301>`__, `#1304
   <https://github.com/wjakob/nanobind/pull/1304>`__, `#1307

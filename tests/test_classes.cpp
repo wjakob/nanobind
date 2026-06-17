@@ -12,6 +12,7 @@
 #include <cstring>
 #include <vector>
 #include <atomic>
+#include <initializer_list>
 #include <nanobind/stl/detail/traits.h>
 #include "inter_module.h"
 #include "test_classes.h"
@@ -59,6 +60,14 @@ struct Struct {
 struct PairStruct {
     Struct s1;
     Struct s2;
+};
+
+// Test case for issue #1074: nb::init must not use list-initialization, which
+// would spuriously prefer the std::initializer_list constructor.
+struct InitListTest {
+    int value;
+    InitListTest(int count) : value(count) { }
+    InitListTest(std::initializer_list<int>) : value(-1) { }
 };
 
 // Test case for issue #1280
@@ -249,6 +258,11 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init<>())
         .def_rw("s1", &PairStruct::s1, "A documented property")
         .def_rw("s2", &PairStruct::s2);
+
+    // Test case for issue #1074
+    nb::class_<InitListTest>(m, "InitListTest")
+        .def(nb::init<int>())
+        .def_ro("value", &InitListTest::value);
 
     // Test case for issue #1280
     nb::class_<OptionalNoneTest>(m, "OptionalNoneTest")

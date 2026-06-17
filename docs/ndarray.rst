@@ -273,7 +273,7 @@ desired Python type.
 - :cpp:class:`nb::numpy <numpy>`: create a ``numpy.ndarray``.
 - :cpp:class:`nb::pytorch <pytorch>`: create a ``torch.Tensor``.
 - :cpp:class:`nb::tensorflow <tensorflow>`: create a ``tensorflow.python.framework.ops.EagerTensor``.
-- :cpp:class:`nb::jax <jax>`: create a ``jaxlib.xla_extension.DeviceArray``.
+- :cpp:class:`nb::jax <jax>`: create a ``jaxlib._jax.ArrayImpl``.
 - :cpp:class:`nb::cupy <cupy>`: create a ``cupy.ndarray``.
 - :cpp:class:`nb::memview <memview>`: create a Python ``memoryview``.
 - :cpp:class:`nb::array_api <array_api>`: create an object that supports the

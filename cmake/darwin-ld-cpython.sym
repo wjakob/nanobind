@@ -943,6 +943,7 @@
 -U __PyTrash_destroy_chain
 -U __PyTrash_thread_deposit_object
 -U __PyTrash_thread_destroy_chain
+-U __PyType_Lookup
 -U __PyWeakref_CallableProxyType
 -U __PyWeakref_ProxyType
 -U __PyWeakref_RefType

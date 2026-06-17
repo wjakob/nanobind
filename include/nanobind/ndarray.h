@@ -89,7 +89,7 @@ NB_FRAMEWORK(no_framework, 0, "ndarray");
 NB_FRAMEWORK(numpy, 1, "numpy.ndarray");
 NB_FRAMEWORK(pytorch, 2, "torch.Tensor");
 NB_FRAMEWORK(tensorflow, 3, "tensorflow.python.framework.ops.EagerTensor");
-NB_FRAMEWORK(jax, 4, "jaxlib.xla_extension.DeviceArray");
+NB_FRAMEWORK(jax, 4, "jaxlib._jax.ArrayImpl");
 NB_FRAMEWORK(cupy, 5, "cupy.ndarray");
 NB_FRAMEWORK(memview, 6, "memoryview");
 NB_FRAMEWORK(array_api, 7, "ArrayLike");

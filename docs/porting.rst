@@ -86,12 +86,6 @@ It is also possible to set a ``None`` default value, in which case the
 
    m.def("func", &func, "arg"_a = nb::none());
 
-``None``-valued arguments are only supported by two of the three parameter
-passing styles described in the section on :ref:`information exchange
-<exchange>`. In particular, they are supported by :ref:`bindings <bindings>`
-and :ref:`wrappers <wrappers>`, *but not* by :ref:`type casters
-<type_casters>`.
-
 Shared pointers and holders
 ---------------------------
 

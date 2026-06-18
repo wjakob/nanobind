@@ -23,7 +23,8 @@ template <typename List, typename Entry> struct list_caster {
 
     template <typename T> using has_reserve = decltype(std::declval<T>().reserve(0));
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         size_t size;
         PyObject *temp;
 
@@ -42,7 +43,7 @@ template <typename List, typename Entry> struct list_caster {
         flags = flags_for_local_caster<Entry>(flags);
 
         for (size_t i = 0; i < size; ++i) {
-            if (!caster.from_python(o[i], flags, cleanup) ||
+            if (!caster.from_python(o[i], flags, internals, cleanup) ||
                 !caster.template can_cast<Entry>()) {
                 success = false;
                 break;
@@ -57,14 +58,16 @@ template <typename List, typename Entry> struct list_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         object ret = steal(PyList_New((Py_ssize_t) src.size()));
 
         if (ret.is_valid()) {
             Py_ssize_t index = 0;
 
             for (auto &&value : src) {
-                handle h = Caster::from_cpp(forward_like_<T>(value), policy, cleanup);
+                handle h = Caster::from_cpp(forward_like_<T>(value), internals,
+                                            policy, cleanup);
 
                 if (!h.is_valid()) {
                     ret.reset();

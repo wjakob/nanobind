@@ -39,7 +39,7 @@ NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
                   "nb::arg().lock() may be used only when defining functions, "
                   "not when calling them");
 
-    if constexpr (std::is_same_v<D, arg_v>)
+    if constexpr (is_arg_default_annotation_v<D>)
         nkwargs++;
     else if constexpr (std::is_same_v<D, args_proxy>)
         nargs += len(value);
@@ -52,13 +52,13 @@ NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
 }
 
 /// Implementation detail of api<T>::operator() (call operator)
-template <rv_policy policy, typename T>
+template <rv_policy::value policy, typename T>
 NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
                          size_t &nkwargs, const size_t kwargs_offset,
                          T &&value) {
     using D = std::decay_t<T>;
 
-    if constexpr (std::is_same_v<D, arg_v>) {
+    if constexpr (is_arg_default_annotation_v<D>) {
         args[kwargs_offset + nkwargs] = value.value.release().ptr();
         NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkwargs++,
                          PyUnicode_InternFromString(value.name_));
@@ -78,7 +78,9 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         }
     } else {
         args[nargs++] =
-            make_caster<T>::from_cpp((forward_t<T>) value, policy, nullptr).ptr();
+            make_caster<T>::from_cpp((forward_t<T>) value, nb_abi_internals,
+                                      policy, nullptr)
+                .ptr();
     }
     (void) args; (void) kwnames; (void) nargs;
     (void) nkwargs; (void) kwargs_offset;
@@ -100,13 +102,13 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
     return steal(nb_abi->obj_vectorcall(base, args_p, nargs, kwnames, method_call))
 
 template <typename Derived>
-template <rv_policy policy, typename... Args>
+template <rv_policy::value policy, typename... Args>
 object api<Derived>::operator()(Args &&...args_) const {
     static constexpr bool method_call =
         std::is_same_v<Derived, accessor<obj_attr>> ||
         std::is_same_v<Derived, accessor<str_attr>>;
 
-    if constexpr (((std::is_same_v<Args, arg_v> ||
+    if constexpr (((is_arg_default_annotation_v<Args> ||
                     std::is_same_v<Args, args_proxy> ||
                     std::is_same_v<Args, kwargs_proxy>) || ...)) {
         // Complex call with keyword arguments, *args/**kwargs expansion, etc.
@@ -134,7 +136,8 @@ object api<Derived>::operator()(Args &&...args_) const {
 
         ((args[1 + nargs++] =
               detail::make_caster<Args>::from_cpp(
-                  (detail::forward_t<Args>) args_, policy, nullptr)
+                  (detail::forward_t<Args>) args_, nb_abi_internals, policy,
+                  nullptr)
                   .ptr()),
          ...);
 

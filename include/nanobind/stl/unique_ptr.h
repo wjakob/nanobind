@@ -93,27 +93,28 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
             nb_abi->nb_type_restore_ownership(src.ptr(), IsDefaultDeleter);
     }
 
-    bool from_python(handle src_, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src_, uint8_t, nb_internals *internals,
+                     cleanup_list *) noexcept {
         // Stash source python object
         src = src_;
 
         /* Try casting to a pointer of the underlying type. We pass flags=0 and
            cleanup=nullptr to prevent implicit type conversions (they are
            problematic since the instance then wouldn't be owned by 'src') */
-        return caster.from_python(src_, 0, nullptr);
+        return caster.from_python(src_, 0, internals, nullptr);
     }
 
     template <typename T2>
-    static handle from_cpp(T2 *value, rv_policy policy,
+    static handle from_cpp(T2 *value, nb_internals *internals, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
         if (!value)
             return handle();
 
-        return from_cpp(*value, policy, cleanup);
+        return from_cpp(*value, internals, policy, cleanup);
     }
 
     template <typename T2>
-    static handle from_cpp(T2 &&value,
+    static handle from_cpp(T2 &&value, nb_internals *internals,
                            rv_policy, cleanup_list *cleanup) noexcept {
 
         bool cpp_delete = true;
@@ -132,12 +133,14 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
 
         handle result;
         if constexpr (!std::is_polymorphic_v<Td>) {
-            result = nb_type_put_unique(type, ptr, cleanup, cpp_delete);
+            result = nb_abi->nb_type_put_unique(internals, type, ptr, cleanup,
+                                                cpp_delete);
         } else {
             const std::type_info *type_p =
                 (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-            result = nb_type_put_unique_p(type, type_p, ptr, cleanup, cpp_delete);
+            result = nb_abi->nb_type_put_unique_p(internals, type, type_p, ptr,
+                                                  cleanup, cpp_delete);
         }
 
         if (result.is_valid()) {

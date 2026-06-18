@@ -39,7 +39,7 @@ NAMESPACE_END(detail)
 
 
 template <typename Vector,
-          rv_policy Policy = rv_policy::automatic_reference,
+          rv_policy::value Policy = rv_policy::automatic_reference,
           typename... Args>
 class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
     using ValueRef = typename detail::iterator_access<typename Vector::iterator>::result_type;
@@ -82,7 +82,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
         .def("__getitem__",
              [](Vector &v, Py_ssize_t i) -> ValueRef {
                  return v[detail::wrap(i, v.size())];
-             }, Policy)
+             }, rv_policy::policy_tag<Policy>{})
 
         .def("clear", [](Vector &v) { v.clear(); },
              "Remove all items from list.");

@@ -32,7 +32,7 @@ inline void map_set(Map &m, const Key &k, const Value &v) {
 NAMESPACE_END(detail)
 
 template <typename Map,
-          rv_policy Policy = rv_policy::automatic_reference,
+          rv_policy::value Policy = rv_policy::automatic_reference,
           typename... Args>
 class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Key = typename Map::key_type;
@@ -89,7 +89,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                  if (it == m.end())
                      throw key_error();
                  return (*it).second;
-             }, Policy)
+             }, rv_policy::policy_tag<Policy>{})
 
         .def("__delitem__",
             [](Map &m, const Key &k) {

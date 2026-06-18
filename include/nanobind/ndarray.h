@@ -558,7 +558,8 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
                                     dtype_const_name<Scalar>::name) +
                    const_name("]"))
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *,
+                     cleanup_list *cleanup) noexcept {
         if (src.is_none() && flags & (uint8_t) cast_flags::accepts_none) {
             value = ndarray<Args...>();
             return true;
@@ -585,9 +586,12 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         return h != nullptr;
     }
 
-    static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,
+    static handle from_cpp(const ndarray<Args...> &tensor,
+                           nb_internals *internals, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return ndarray_export(tensor.handle(), Config::Framework::value, policy, cleanup);
+        return nb_abi->ndarray_export(internals, tensor.handle(),
+                                      Config::Framework::value, policy,
+                                      cleanup);
     }
 };
 

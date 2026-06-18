@@ -21,7 +21,8 @@ template <typename Set, typename Key> struct set_caster {
 
     using Caster = make_caster<Key>;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         value.clear();
 
         PyObject *iter = nb_abi->try_iter(src.ptr());
@@ -35,7 +36,7 @@ template <typename Set, typename Key> struct set_caster {
         flags = flags_for_local_caster<Key>(flags);
 
         while ((key = PyIter_Next(iter)) != nullptr) {
-            success &= (key_caster.from_python(key, flags, cleanup) &&
+            success &= (key_caster.from_python(key, flags, internals, cleanup) &&
                         key_caster.template can_cast<Key>());
 
             if (!success) {
@@ -58,13 +59,15 @@ template <typename Set, typename Key> struct set_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         object ret = steal(PySet_New(nullptr));
 
         if (ret.is_valid()) {
             for (auto& key : src) {
                 object k = steal(
-                    Caster::from_cpp(forward_like_<T>(key), policy, cleanup));
+                    Caster::from_cpp(forward_like_<T>(key), internals, policy,
+                                     cleanup));
 
                 if (!k.is_valid() || PySet_Add(ret.ptr(), k.ptr()) != 0) {
                     ret.reset();

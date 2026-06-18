@@ -19,7 +19,8 @@ NAMESPACE_BEGIN(detail)
 template <>
 struct type_caster<std::filesystem::path> {
 
-    static handle from_cpp(const std::filesystem::path &path, rv_policy,
+    static handle from_cpp(const std::filesystem::path &path, nb_internals *,
+                           rv_policy,
                            cleanup_list *) noexcept {
         str py_str = to_py_str(path.native());
         if (py_str.is_valid()) {
@@ -35,7 +36,8 @@ struct type_caster<std::filesystem::path> {
     }
 
     template <typename Char = typename std::filesystem::path::value_type>
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *,
+                     cleanup_list *) noexcept {
         bool success = false;
 
         /* PyUnicode_FSConverter and PyUnicode_FSDecoder normally take care of

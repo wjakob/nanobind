@@ -125,7 +125,7 @@ public:
     accessor<num_item> operator[](T key) const;
     args_proxy operator*() const;
 
-    template <rv_policy policy = rv_policy::automatic_reference,
+    template <rv_policy::value policy = rv_policy::automatic_reference,
               typename... Args>
     object operator()(Args &&...args) const;
 
@@ -416,9 +416,11 @@ class int_ : public object {
         else if constexpr (detail::is_std_char_v<T>)
             // Treat character types as integers rather than (single-char) strings
             m_ptr = detail::type_caster<std::make_signed_t<T>>::from_cpp(
-                (std::make_signed_t<T>) value, rv_policy::copy, nullptr).ptr();
+                    (std::make_signed_t<T>) value, detail::nb_abi_internals,
+                    rv_policy::copy, nullptr).ptr();
         else
-            m_ptr = detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr).ptr();
+            m_ptr = detail::type_caster<T>::from_cpp(
+                value, detail::nb_abi_internals, rv_policy::copy, nullptr).ptr();
 
         if (!m_ptr)
             raise_python_error();
@@ -427,7 +429,7 @@ class int_ : public object {
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
     explicit operator T() const {
         detail::type_caster<T> tc;
-        if (!tc.from_python(m_ptr, 0, nullptr))
+        if (!tc.from_python(m_ptr, 0, detail::nb_abi_internals, nullptr))
             throw std::out_of_range("Conversion of nanobind::int_ failed");
         return tc.value;
     }
@@ -708,8 +710,10 @@ NB_INLINE bool isinstance(handle h) noexcept {
         return T::check_(h);
     else if constexpr (detail::is_base_caster_v<detail::make_caster<T>>)
         return detail::nb_type_isinstance(h.ptr(), &typeid(detail::intrinsic_t<T>));
-    else
-        return detail::make_caster<T>().from_python(h, 0, nullptr);
+    else {
+        auto caster = detail::make_caster<T>();
+        return caster.from_python(h, 0, detail::nb_abi_internals, nullptr);
+    }
 }
 
 NB_INLINE bool issubclass(handle h1, handle h2) {

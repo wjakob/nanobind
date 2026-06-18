@@ -77,7 +77,8 @@ struct nb_inst_pool {
 // Implicit conversions for C++ type bindings, used in type_data below
 struct implicit_t {
     const std::type_info **cpp;
-    bool (**py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
+    bool (**py)(nb_internals *, PyTypeObject *, PyObject *,
+                cleanup_list *) noexcept;
 };
 
 // Forward and reverse mappings for enumerations, used in type_data below
@@ -729,7 +730,9 @@ extern void implicitly_convertible_cpp(nb_internals *internals,
                                        const std::type_info *src,
                                        const std::type_info *dst) noexcept;
 extern void implicitly_convertible_py(nb_internals *internals,
-                                      bool (*predicate)(PyTypeObject *, PyObject *,
+                                      bool (*predicate)(nb_internals *,
+                                                        PyTypeObject *,
+                                                        PyObject *,
                                                         cleanup_list *),
                                       const std::type_info *dst) noexcept;
 extern PyObject *enum_create(nb_internals *internals, enum_data_init *ed) noexcept;

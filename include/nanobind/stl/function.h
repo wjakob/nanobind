@@ -71,7 +71,8 @@ struct type_caster<std::function<Return(Args...)>> {
         }
     };
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *,
+                     cleanup_list *) noexcept {
         if (src.is_none())
             return flags & cast_flags::convert;
 
@@ -83,7 +84,7 @@ struct type_caster<std::function<Return(Args...)>> {
         return true;
     }
 
-    static handle from_cpp(const Value &value, rv_policy rvp,
+    static handle from_cpp(const Value &value, nb_internals *, rv_policy rvp,
                            cleanup_list *) noexcept {
         const pyfunc_wrapper_t *wrapper = value.template target<pyfunc_wrapper_t>();
         if (wrapper)

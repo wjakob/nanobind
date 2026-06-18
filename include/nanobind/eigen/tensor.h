@@ -98,13 +98,14 @@ struct type_caster<
 
     NDArrayCaster caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         // Disable implicit conversions
         flags &= ~(uint8_t)cast_flags::convert;
         // Do not accept None
         flags &= ~(uint8_t)cast_flags::accepts_none;
 
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags, internals, cleanup))
             return false;
         if(IsAligned && !is_tensor_aligned(caster.value.data()))
             return false;
@@ -112,7 +113,8 @@ struct type_caster<
         return true;
     }
 
-    static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const MapType &v, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[NumIndices];
         for (size_t i = 0 ; i < NumIndices; i++) {
             shape[i] = (size_t) v.dimension((Eigen::Index) i);
@@ -123,8 +125,7 @@ struct type_caster<
             policy = rv_policy::reference;
         return NDArrayCaster::from_cpp(
             NDArray {ptr, NumIndices, shape, handle()},
-            policy,
-            cleanup);
+            internals, policy, cleanup);
     }
 
     operator MapType() {
@@ -155,11 +156,13 @@ struct type_caster<
     // PlainTensor value;
     NB_TYPE_CASTER(PlainTensor, NDArrayCaster::Name);
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         using NDArrayConst = ndarray_for_eigen_tensor_t<PlainTensor, const Scalar>;
         make_caster<NDArrayConst> caster;
         // Do not accept None
-        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none,
+                                internals, cleanup))
             return false;
 
         const NDArrayConst &array = caster.value;
@@ -176,15 +179,20 @@ struct type_caster<
     }
 
     template<typename T2>
-    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(T2 &&v, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         policy = infer_policy<T2>(policy);
         if constexpr (std::is_pointer_v<T2>)
-            return from_cpp_internal((const PlainTensor &) *v, policy, cleanup);
+            return from_cpp_internal((const PlainTensor &) *v, internals,
+                                     policy, cleanup);
         else
-            return from_cpp_internal((const PlainTensor &) v, policy, cleanup);
+            return from_cpp_internal((const PlainTensor &) v, internals, policy,
+                                     cleanup);
     }
 
-    static handle from_cpp_internal(const PlainTensor &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp_internal(const PlainTensor &v,
+                                    nb_internals *internals, rv_policy policy,
+                                    cleanup_list *cleanup) noexcept {
         size_t shape[NumIndices];
 
         for (size_t i = 0 ; i < NumIndices; i++) {
@@ -210,7 +218,7 @@ struct type_caster<
         }
         return NDArrayCaster::from_cpp(
             NDArray {ptr, NumIndices, shape, owner},
-            policy, cleanup);
+            internals, policy, cleanup);
     }
 };
 
@@ -230,11 +238,14 @@ struct type_caster<T, enable_if_t<is_eigen_tensor_xpr_v<T> && is_ndarray_scalar_
     template<typename T_> static constexpr bool can_cast() { return true; }
 
     /// Generating an expression template from a Python object is impossible.
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept = delete;
 
     template <typename T2>
-    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
-        return Caster::from_cpp(std::forward<T2>(v), policy, cleanup);
+    static handle from_cpp(T2 &&v, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(std::forward<T2>(v), internals, policy,
+                                cleanup);
     }
 };
 
@@ -277,13 +288,14 @@ struct type_caster<
     struct Empty {};
     std::conditional_t<MaybeConvert, PlainCaster, Empty> plain_caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         // no conversion for mutable Ref
         if constexpr (!std::is_const_v<T>)
             flags &= ~(uint8_t) cast_flags::convert;
 
         // Try direct cast
-        if (caster.from_python(src, flags, cleanup))
+        if (caster.from_python(src, flags, internals, cleanup))
             return true;
 
         // if const T, attempt leveraging PlainTensor conversion
@@ -293,14 +305,15 @@ struct type_caster<
             // for manual conversion, disable conversion.
             if ((flags & (uint8_t) cast_flags::manual))
                 flags &= ~(uint8_t) cast_flags::convert;
-            if (plain_caster.from_python(src, flags, cleanup))
+            if (plain_caster.from_python(src, flags, internals, cleanup))
                 return true;
         }
 
         return false;
     }
 
-    static handle from_cpp(const RefType &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const RefType &v, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[NumIndices];
 
         for (size_t i = 0; i < NumIndices; i++) {
@@ -309,9 +322,10 @@ struct type_caster<
     
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), NumIndices, shape, handle()),
+            internals,
             (policy == rv_policy::automatic ||
              policy == rv_policy::automatic_reference)
-                ? rv_policy::reference
+                ? rv_policy(rv_policy::reference)
                 : policy,
             cleanup);
     }

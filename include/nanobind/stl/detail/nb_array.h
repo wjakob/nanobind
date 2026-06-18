@@ -12,7 +12,8 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
 
     using Caster = make_caster<Entry>;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         PyObject *temp;
 
         /* Will initialize 'temp' (NULL in the case of a failure.) */
@@ -25,7 +26,7 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
 
         if (success) {
             for (size_t i = 0; i < Size; ++i) {
-                if (!caster.from_python(o[i], flags, cleanup) ||
+                if (!caster.from_python(o[i], flags, internals, cleanup) ||
                     !caster.template can_cast<Entry>()) {
                     success = false;
                     break;
@@ -41,14 +42,16 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         object ret = steal(PyList_New(Size));
 
         if (ret.is_valid()) {
             Py_ssize_t index = 0;
 
             for (auto &value : src) {
-                handle h = Caster::from_cpp(forward_like_<T>(value), policy, cleanup);
+                handle h = Caster::from_cpp(forward_like_<T>(value), internals,
+                                            policy, cleanup);
 
                 if (!h.is_valid()) {
                     ret.reset();

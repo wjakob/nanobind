@@ -19,7 +19,8 @@ NAMESPACE_BEGIN(detail)
 template <typename T> struct type_caster<std::complex<T>> {
     NB_TYPE_CASTER(std::complex<T>, const_name("complex"))
 
-    bool from_python(handle src, uint8_t flags, cleanup_list*) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *,
+                     cleanup_list*) noexcept {
         double re, im;
         if (!nb_abi->load_cmplx(src.ptr(), flags, &re, &im))
             return false;
@@ -42,7 +43,8 @@ template <typename T> struct type_caster<std::complex<T>> {
         }
     }
 
-    static handle from_cpp(const std::complex<T>& value, rv_policy,
+    static handle from_cpp(const std::complex<T>& value, nb_internals *,
+                           rv_policy,
                            cleanup_list*) noexcept {
         return PyComplex_FromDoubles((double) value.real(),
                                      (double) value.imag());

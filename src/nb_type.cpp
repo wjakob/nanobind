@@ -1737,12 +1737,14 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
     }
 
     if (dst_type->implicit.py) {
-        bool (**it)(PyTypeObject *, PyObject *, cleanup_list *) noexcept =
+        bool (**it)(nb_internals *, PyTypeObject *, PyObject *,
+                    cleanup_list *) noexcept =
             dst_type->implicit.py;
-        bool (*v2)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
+        bool (*v2)(nb_internals *, PyTypeObject *, PyObject *,
+                   cleanup_list *) noexcept;
 
         while ((v2 = *it++)) {
-            if (v2(dst_type->type_py, src, cleanup))
+            if (v2(internals, dst_type->type_py, src, cleanup))
                 goto found;
         }
     }
@@ -2254,7 +2256,8 @@ static void nb_type_put_unique_finalize(PyObject *o,
 PyObject *nb_type_put_unique(nb_internals *internals, const std::type_info *cpp_type,
                              void *value,
                              cleanup_list *cleanup, bool cpp_delete) noexcept {
-    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+    rv_policy policy = cpp_delete ? rv_policy(rv_policy::take_ownership)
+                                  : rv_policy(rv_policy::none);
 
     bool is_new = false;
     PyObject *o = nb_type_put(internals, cpp_type, value, policy, cleanup, &is_new);
@@ -2269,7 +2272,8 @@ PyObject *nb_type_put_unique_p(nb_internals *internals, const std::type_info *cp
                                const std::type_info *cpp_type_p,
                                void *value,
                                cleanup_list *cleanup, bool cpp_delete) noexcept {
-    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+    rv_policy policy = cpp_delete ? rv_policy(rv_policy::take_ownership)
+                                  : rv_policy(rv_policy::none);
 
     bool is_new = false;
     PyObject *o =

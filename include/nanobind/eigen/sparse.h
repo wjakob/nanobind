@@ -52,7 +52,8 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
     ScalarCaster data_caster;
     StorageIndexCaster indices_caster, indptr_caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         object obj = borrow(src);
 
         try {
@@ -69,15 +70,15 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
                 obj.attr("sort_indices")();
 
             if (object data_o = obj.attr("data");
-                !data_caster.from_python(data_o, flags, cleanup))
+                !data_caster.from_python(data_o, flags, internals, cleanup))
                 return false;
 
             if (object indices_o = obj.attr("indices");
-                !indices_caster.from_python(indices_o, flags, cleanup))
+                !indices_caster.from_python(indices_o, flags, internals, cleanup))
                 return false;
 
             if (object indptr_o = obj.attr("indptr");
-                !indptr_caster.from_python(indptr_o, flags, cleanup))
+                !indptr_caster.from_python(indptr_o, flags, internals, cleanup))
                 return false;
 
             object shape_o = obj.attr("shape");
@@ -98,24 +99,27 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
         }
     }
 
-    static handle from_cpp(T &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(T &&v, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         if (policy == rv_policy::automatic ||
             policy == rv_policy::automatic_reference)
             policy = rv_policy::move;
 
-        return from_cpp((const T &) v, policy, cleanup);
+        return from_cpp((const T &) v, internals, policy, cleanup);
     }
 
     template <typename T2>
-    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(T2 &&v, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         policy = infer_policy<T2>(policy);
         if constexpr (std::is_pointer_v<T2>)
-            return from_cpp_internal((const T &) *v, policy, cleanup);
+            return from_cpp_internal((const T &) *v, internals, policy, cleanup);
         else
-            return from_cpp_internal((const T &) v, policy, cleanup);
+            return from_cpp_internal((const T &) v, internals, policy, cleanup);
     }
 
-    static handle from_cpp_internal(const T &v, rv_policy policy, cleanup_list *) noexcept {
+    static handle from_cpp_internal(const T &v, nb_internals *, rv_policy policy,
+                                    cleanup_list *) noexcept {
         if (!v.isCompressed()) {
             PyErr_SetString(PyExc_ValueError,
                             "nanobind: unable to return an Eigen sparse matrix that is not in a compressed format. "
@@ -190,7 +194,8 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     StorageIndexCaster indices_caster, indptr_caster;
     Index rows, cols, nnz;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         flags &= ~(uint8_t) cast_flags::convert;
 
         try {
@@ -204,15 +209,15 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
                 src.attr("sort_indices")();
 
             if (object data_o = src.attr("data");
-                !data_caster.from_python(data_o, flags, cleanup))
+                !data_caster.from_python(data_o, flags, internals, cleanup))
                 return false;
 
             if (object indices_o = src.attr("indices");
-                !indices_caster.from_python(indices_o, flags, cleanup))
+                !indices_caster.from_python(indices_o, flags, internals, cleanup))
                 return false;
 
             if (object indptr_o = src.attr("indptr");
-                !indptr_caster.from_python(indptr_o, flags, cleanup))
+                !indptr_caster.from_python(indptr_o, flags, internals, cleanup))
                 return false;
 
             object shape_o = src.attr("shape");
@@ -229,7 +234,8 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(const Map &v, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         if (!v.isCompressed()) {
             PyErr_SetString(
                 PyExc_ValueError,
@@ -286,9 +292,11 @@ struct type_caster<Eigen::Ref<T, Options>, enable_if_t<is_eigen_sparse_matrix_v<
     template <typename T_> using Cast = Ref;
     template <typename T_> static constexpr bool can_cast() { return true; }
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept = delete;
 
-    static handle from_cpp(const Ref &v, rv_policy policy, cleanup_list *cleanup) noexcept = delete;
+    static handle from_cpp(const Ref &v, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept = delete;
 };
 
 NAMESPACE_END(detail)

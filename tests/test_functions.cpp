@@ -69,9 +69,10 @@ struct numeric_string {
 template <> struct nb::detail::type_caster<numeric_string> {
     NB_TYPE_CASTER(numeric_string, const_name("str"))
 
-    bool from_python(handle h, uint8_t flags, cleanup_list* cleanup) noexcept {
+    bool from_python(handle h, uint8_t flags, nb_internals *internals,
+                     cleanup_list* cleanup) noexcept {
         make_caster<const char*> str_caster;
-        if (!str_caster.from_python(h, flags, cleanup))
+        if (!str_caster.from_python(h, flags, internals, cleanup))
             return false;
         const char* str = str_caster.operator cast_t<const char*>();
         if (!str)
@@ -80,7 +81,8 @@ template <> struct nb::detail::type_caster<numeric_string> {
         value.number = strtoul(str, &endp, 10);
         return *str && !*endp;
     }
-    static handle from_cpp(numeric_string, rv_policy, handle) noexcept {
+    static handle from_cpp(numeric_string, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         return nullptr;
     }
 };

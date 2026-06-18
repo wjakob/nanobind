@@ -127,24 +127,25 @@ template <typename T> struct type_caster<nanobind::ref<T>> {
     static constexpr bool IsClass = true;
     NB_TYPE_CASTER(ref<T>, Caster::Name)
 
-    bool from_python(handle src, uint8_t flags,
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
                      cleanup_list *cleanup) noexcept {
         Caster caster;
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags, internals, cleanup))
             return false;
 
         value = Value(caster.operator T *());
         return true;
     }
 
-    static handle from_cpp(const ref<T> &value, rv_policy policy,
+    static handle from_cpp(const ref<T> &value, nb_internals *internals,
+                           rv_policy policy,
                            cleanup_list *cleanup) noexcept {
         if constexpr (std::is_base_of_v<intrusive_base, T>)
             if (policy != rv_policy::copy && policy != rv_policy::move && value.get())
                 if (PyObject* obj = value->self_py())
                     return handle(obj).inc_ref();
 
-        return Caster::from_cpp(value.get(), policy, cleanup);
+        return Caster::from_cpp(value.get(), internals, policy, cleanup);
     }
 };
 NAMESPACE_END(detail)

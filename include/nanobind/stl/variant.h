@@ -69,12 +69,14 @@ struct type_caster<std::variant<Ts...>>
     explicit operator Value&&() { return (Value &&) this->get(); }
 
     template <typename T>
-    bool try_variant(const handle &src, uint8_t flags, cleanup_list *cleanup) {
+    bool try_variant(const handle &src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) {
         using CasterT = make_caster<T>;
 
         CasterT caster;
 
-        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
+        if (!caster.from_python(src, flags_for_local_caster<T>(flags), internals,
+                                cleanup) ||
             !caster.template can_cast<T>())
             return false;
 
@@ -83,28 +85,32 @@ struct type_caster<std::variant<Ts...>>
         return true;
     }
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         if (flags & (uint8_t) cast_flags::convert) {
-            if ((try_variant<Ts>(src, flags & ~(uint8_t)cast_flags::convert, cleanup) || ...)){
+            if ((try_variant<Ts>(src, flags & ~(uint8_t)cast_flags::convert,
+                                 internals, cleanup) || ...)){
                 return true;
             }
         }
-        return (try_variant<Ts>(src, flags, cleanup) || ...);
+        return (try_variant<Ts>(src, flags, internals, cleanup) || ...);
     }
 
     template <typename T>
-    static handle from_cpp(T *value, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T *value, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         if (!value)
             return none().release();
-        return from_cpp(*value, policy, cleanup);
+        return from_cpp(*value, internals, policy, cleanup);
     }
 
     template <typename T>
-    static handle from_cpp(T &&value, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(T &&value, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         return std::visit(
             [&](auto &&v) {
                 return make_caster<decltype(v)>::from_cpp(
-                    std::forward<decltype(v)>(v), policy, cleanup);
+                    std::forward<decltype(v)>(v), internals, policy, cleanup);
             },
             std::forward<T>(value));
     }

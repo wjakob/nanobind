@@ -17,7 +17,7 @@ NAMESPACE_BEGIN(detail)
 
 /* There are a large number of apparently unused template arguments because
    each combination requires a separate nb::class_ registration. */
-template <typename Access, rv_policy Policy, typename Iterator,
+template <typename Access, rv_policy::value Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
 struct iterator_state {
     Iterator it;
@@ -56,7 +56,7 @@ template <typename Iterator> struct iterator_value_access {
     result_type operator()(Iterator &it) const { return (*it).second; }
 };
 
-template <typename Access, rv_policy Policy, typename Iterator,
+template <typename Access, rv_policy::value Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
 typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
                                               Iterator first, Sentinel last,
@@ -92,7 +92,7 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
                         return Access()(s.it);
                     },
                     std::forward<Extra>(extra)...,
-                    Policy);
+                    rv_policy::policy_tag<Policy>{});
         }
     }
     return borrow<typed<iterator, ValueType>>(cast(State{
@@ -102,7 +102,7 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
 NAMESPACE_END(detail)
 
 /// Makes a python iterator from a first and past-the-end C++ InputIterator.
-template <rv_policy Policy = rv_policy::automatic_reference,
+template <rv_policy::value Policy = rv_policy::automatic_reference,
           typename Iterator,
           typename Sentinel,
           typename ValueType = typename detail::iterator_access<Iterator>::result_type,
@@ -117,7 +117,7 @@ auto make_iterator(handle scope, const char *name, Iterator first, Sentinel last
 
 /// Makes an iterator over the keys (`.first`) of a iterator over pairs from a
 /// first and past-the-end InputIterator.
-template <rv_policy Policy = rv_policy::automatic_reference, typename Iterator,
+template <rv_policy::value Policy = rv_policy::automatic_reference, typename Iterator,
           typename Sentinel,
           typename KeyType =
               typename detail::iterator_key_access<Iterator>::result_type,
@@ -133,7 +133,7 @@ auto make_key_iterator(handle scope, const char *name, Iterator first,
 
 /// Makes an iterator over the values (`.second`) of a iterator over pairs from a
 /// first and past-the-end InputIterator.
-template <rv_policy Policy = rv_policy::automatic_reference,
+template <rv_policy::value Policy = rv_policy::automatic_reference,
           typename Iterator,
           typename Sentinel,
           typename ValueType = typename detail::iterator_value_access<Iterator>::result_type,
@@ -147,7 +147,7 @@ auto make_value_iterator(handle scope, const char *name, Iterator first, Sentine
 }
 
 /// Makes an iterator over values of a container supporting `std::begin()`/`std::end()`
-template <rv_policy Policy = rv_policy::automatic_reference,
+template <rv_policy::value Policy = rv_policy::automatic_reference,
           typename Type,
           typename... Extra,
           typename = decltype(std::begin(std::declval<Type&>()))>

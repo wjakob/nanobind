@@ -23,7 +23,8 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
     using KeyCaster = make_caster<Key>;
     using ValCaster = make_caster<Val>;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         value.clear();
 
         if (!PyDict_CheckExact(src.ptr()) && !PyMapping_Check(src.ptr()))
@@ -50,13 +51,13 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
             PyObject *key = NB_TUPLE_GET_ITEM(item, 0);
             PyObject *val = NB_TUPLE_GET_ITEM(item, 1);
 
-            if (!key_caster.from_python(key, flags_key, cleanup) ||
+            if (!key_caster.from_python(key, flags_key, internals, cleanup) ||
                 !key_caster.template can_cast<Key>()) {
                 success = false;
                 break;
             }
 
-            if (!val_caster.from_python(val, flags_val, cleanup) ||
+            if (!val_caster.from_python(val, flags_val, internals, cleanup) ||
                 !val_caster.template can_cast<Val>()) {
                 success = false;
                 break;
@@ -72,15 +73,16 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         dict ret;
 
         if (ret.is_valid()) {
             for (auto &item : src) {
                 object k = steal(KeyCaster::from_cpp(
-                    forward_like_<T>(item.first), policy, cleanup));
+                    forward_like_<T>(item.first), internals, policy, cleanup));
                 object e = steal(ValCaster::from_cpp(
-                    forward_like_<T>(item.second), policy, cleanup));
+                    forward_like_<T>(item.second), internals, policy, cleanup));
 
                 if (!k.is_valid() || !e.is_valid() ||
                     PyDict_SetItem(ret.ptr(), k.ptr(), e.ptr()) != 0) {

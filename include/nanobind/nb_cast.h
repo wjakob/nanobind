@@ -14,10 +14,11 @@
     template <typename T_> static constexpr bool can_cast() { return true; }   \
     template <typename T_,                                                     \
               enable_if_t<std::is_same_v<std::remove_cv_t<T_>, Value>> = 0>    \
-    static handle from_cpp(T_ *p, rv_policy policy, cleanup_list *list) {      \
+    static handle from_cpp(T_ *p, nb_internals *internals, rv_policy policy,   \
+                           cleanup_list *list) {                               \
         if (!p)                                                                \
             return none().release();                                           \
-        return from_cpp(*p, policy, list);                                     \
+        return from_cpp(*p, internals, policy, list);                          \
     }                                                                          \
     explicit operator Value*() { return &value; }                              \
     explicit operator Value&() { return (Value &) value; }                     \
@@ -84,9 +85,10 @@ inline constexpr uint8_t none_disallowed_flag =
 
 /// Many type casters delegate to another caster using the pattern:
 /// ~~~ .cc
-/// bool from_python(handle src, uint8_t flags, cleanup_list *cl) noexcept {
+/// bool from_python(handle src, uint8_t flags, nb_internals *internals,
+///                  cleanup_list *cl) noexcept {
 ///     SomeCaster c;
-///     if (!c.from_python(src, flags, cl)) return false;
+///     if (!c.from_python(src, flags, internals, cl)) return false;
 ///     /* do something with */ c.operator T();
 ///     return true;
 /// }
@@ -95,7 +97,7 @@ inline constexpr uint8_t none_disallowed_flag =
 /// refers into storage that will dangle after SomeCaster is destroyed, and
 /// causes a static assertion failure if that's not sufficient. Use it like:
 /// ~~~ .cc
-///     if (!c.from_python(src, flags_for_local_caster<T>(flags), cl))
+///     if (!c.from_python(src, flags_for_local_caster<T>(flags), internals, cl))
 ///         return false;
 /// ~~~
 /// where the template argument T is the type you plan to extract.
@@ -132,7 +134,8 @@ NB_INLINE uint8_t flags_for_local_caster(uint8_t flags) noexcept {
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
-    NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    NB_INLINE bool from_python(handle src, uint8_t flags, nb_internals *,
+                               cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
             if constexpr (std::is_same_v<T, double>) {
                 return detail::nb_abi->load_f64(src.ptr(), flags, &value);
@@ -174,7 +177,8 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
         }
     }
 
-    NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
+    NB_INLINE static handle from_cpp(T src, nb_internals *, rv_policy,
+                                     cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
             return PyFloat_FromDouble((double) src);
         } else {
@@ -197,16 +201,19 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_enum_v<T>>> {
-    NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    NB_INLINE bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                               cleanup_list *) noexcept {
         int64_t result;
-        bool rv = enum_from_python(&typeid(T), src.ptr(), &result, flags);
+        bool rv = nb_abi->enum_from_python(internals, &typeid(T), src.ptr(),
+                                           &result, flags);
         if (rv)
             value = (T) result;
         return rv;
     }
 
-    NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
-        return enum_from_cpp(&typeid(T), (int64_t) src);
+    NB_INLINE static handle from_cpp(T src, nb_internals *internals, rv_policy,
+                                     cleanup_list *) noexcept {
+        return nb_abi->enum_from_cpp(internals, &typeid(T), (int64_t) src);
     }
 
     NB_TYPE_CASTER(T, const_name<T>())
@@ -224,7 +231,7 @@ template <> struct type_caster<void> {
     explicit operator void *() { return value; }
     Value value;
 
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *, cleanup_list *) noexcept {
         if (src.is_none()) {
             value = nullptr;
             return true;
@@ -240,7 +247,8 @@ template <> struct type_caster<void> {
         }
     }
 
-    static handle from_cpp(void *ptr, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(void *ptr, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         if (ptr)
             return PyCapsule_New(ptr, "nb_handle", nullptr);
         else
@@ -249,13 +257,13 @@ template <> struct type_caster<void> {
 };
 
 template <typename T> struct none_caster {
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *, cleanup_list *) noexcept {
         if (src.is_none())
             return true;
         return false;
     }
 
-    static handle from_cpp(T, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(T, nb_internals *, rv_policy, cleanup_list *) noexcept {
         return none().release();
     }
 
@@ -266,7 +274,7 @@ template <> struct type_caster<std::nullptr_t> : none_caster<std::nullptr_t> { }
 template <> struct has_arg_defaults<std::nullptr_t> : std::true_type {};
 
 template <> struct type_caster<bool> {
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *, cleanup_list *) noexcept {
         if (src.ptr() == Py_True) {
             value = true;
             return true;
@@ -278,7 +286,8 @@ template <> struct type_caster<bool> {
         }
     }
 
-    static handle from_cpp(bool src, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(bool src, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         return src ? true_ref() : false_ref();
     }
 
@@ -293,7 +302,7 @@ template <> struct type_caster<char> {
     template <typename T_>
     using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
 
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *, cleanup_list *) noexcept {
         if (!PyUnicode_Check(src.ptr()))
             return false;
         value = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
@@ -304,14 +313,15 @@ template <> struct type_caster<char> {
         return true;
     }
 
-    static handle from_cpp(const char *value, rv_policy,
+    static handle from_cpp(const char *value, nb_internals *, rv_policy,
                            cleanup_list *) noexcept {
         if (value == nullptr)
             return none_ref();
         return PyUnicode_FromString(value);
     }
 
-    static handle from_cpp(char value, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(char value, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         return PyUnicode_FromStringAndSize(&value, 1);
     }
 
@@ -335,7 +345,8 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
     using T2 = pointer_and_handle<T>;
     NB_TYPE_CASTER(T2, Caster::Name)
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         // Fast path for implicit ``self`` argument from ``nb_type_vectorcall()``
         if (flags & (uint8_t) cast_flags::trusted) {
             value.h = src;
@@ -343,18 +354,21 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
             return true;
         }
         Caster c;
-        if (!c.from_python(src, flags_for_local_caster<T*>(flags), cleanup) ||
+        if (!c.from_python(src, flags_for_local_caster<T*>(flags), internals,
+                           cleanup) ||
             !c.template can_cast<T*>())
             return false;
         value.h = src;
         value.p = c.operator T*();
         return true;
     }
+
 };
 
 template <> struct type_caster<fallback> {
     NB_TYPE_CASTER(fallback, const_name("object"))
-    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *,
+                     cleanup_list *) noexcept {
         if (!(flags & (uint8_t) cast_flags::convert))
             return false;
         value = src;
@@ -407,17 +421,20 @@ template <typename T, typename... Ts> struct type_caster<typed<T, Ts...>> {
 
     NB_TYPE_CASTER(Typed, (typed_name<T, Ts...>::Name))
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         Caster caster;
-        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
+        if (!caster.from_python(src, flags_for_local_caster<T>(flags), internals,
+                                cleanup) ||
             !caster.template can_cast<T>())
             return false;
         value = caster.operator cast_t<T>();
         return true;
     }
 
-    static handle from_cpp(const Value &src, rv_policy policy, cleanup_list *cleanup) noexcept {
-        return Caster::from_cpp(src, policy, cleanup);
+    static handle from_cpp(const Value &src, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(src, internals, policy, cleanup);
     }
 };
 
@@ -428,7 +445,7 @@ public:
 
     type_caster() : value(nullptr, ::nanobind::detail::steal_t()) { }
 
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *, cleanup_list *) noexcept {
         if (!isinstance<T>(src))
             return false;
 
@@ -440,14 +457,16 @@ public:
         return true;
     }
 
-    static handle from_cpp(T&& src, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(T&& src, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         if constexpr (std::is_base_of_v<object, T>)
             return src.release();
         else
             return src.inc_ref();
     }
 
-    static handle from_cpp(const T &src, rv_policy, cleanup_list *) noexcept {
+    static handle from_cpp(const T &src, nb_internals *, rv_policy,
+                           cleanup_list *) noexcept {
         return src.inc_ref();
     }
 };
@@ -480,17 +499,19 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
     template <typename T> using Cast = precise_cast_t<T>;
 
     NB_INLINE bool from_python(handle src, uint8_t flags,
+                               nb_internals *internals,
                                cleanup_list *cleanup) noexcept {
         // The 'trusted' fast path lives in the pointer_and_handle caster (the
         // only one that is ever trusted) and, as a fallback, in nb_type_get.
         // The generic base caster therefore need not test for it here, which
         // would only add a never-taken branch to every bound-type argument.
-        return nb_type_get(&typeid(Type), src.ptr(), flags, cleanup,
-                           (void **) &value);
+        return nb_abi->nb_type_get(internals, &typeid(Type), src.ptr(), flags,
+                                   cleanup, (void **) &value);
     }
 
     template <typename T>
-    NB_INLINE static handle from_cpp(T &&value, rv_policy policy,
+    NB_INLINE static handle from_cpp(T &&value, nb_internals *internals,
+                                     rv_policy policy,
                                      cleanup_list *cleanup) noexcept {
         Type *ptr;
         if constexpr (is_pointer_v<T>)
@@ -507,11 +528,13 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
             type = type_hook<Type>::get(ptr);
 
         if constexpr (!std::is_polymorphic_v<Type>) {
-            return nb_type_put(type, ptr, policy, cleanup);
+            return nb_abi->nb_type_put(internals, type, ptr, policy, cleanup,
+                                       nullptr);
         } else {
             const std::type_info *type_p =
                 (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
-            return nb_type_put_p(type, type_p, ptr, policy, cleanup);
+            return nb_abi->nb_type_put_p(internals, type, type_p, ptr, policy,
+                                         cleanup, nullptr);
         }
     }
 
@@ -568,16 +591,17 @@ T cast_impl(handle h) {
             cleanup_list list{nullptr};
             ~raii_cleanup() { list.release(); }
         } cleanup;
-        rv = caster.from_python(h.ptr(),
+        rv = caster.from_python(h,
                                 ((uint8_t) cast_flags::convert) |
                                 ((uint8_t) cast_flags::manual),
-                                &cleanup.list) &&
+                                nb_abi_internals, &cleanup.list) &&
              caster.template can_cast<T>();
         if (!rv)
             detail::raise_python_or_cast_error();
         return caster.operator cast_t<T>();
     } else {
-        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr) &&
+        rv = caster.from_python(h, (uint8_t) cast_flags::manual,
+                                nb_abi_internals, nullptr) &&
              caster.template can_cast<T>();
         if (!rv)
             detail::raise_python_or_cast_error();
@@ -601,17 +625,18 @@ bool try_cast_impl(handle h, T &out) noexcept {
     bool rv;
     if constexpr (Convert && !is_ref) {
         cleanup_list cleanup(nullptr);
-        rv = caster.from_python(h.ptr(),
+        rv = caster.from_python(h,
                                 ((uint8_t) cast_flags::convert) |
                                 ((uint8_t) cast_flags::manual),
-                                &cleanup) &&
+                                nb_abi_internals, &cleanup) &&
              caster.template can_cast<T>();
         if (rv) {
             out = caster.operator cast_t<T>();
         }
         cleanup.release(); // 'from_python' is 'noexcept', so this always runs
     } else {
-        rv = caster.from_python(h.ptr(), (uint8_t) cast_flags::manual, nullptr) &&
+        rv = caster.from_python(h, (uint8_t) cast_flags::manual,
+                                nb_abi_internals, nullptr) &&
              caster.template can_cast<T>();
         if (rv) {
             out = caster.operator cast_t<T>();
@@ -646,8 +671,9 @@ NB_INLINE bool try_cast(const detail::api<Derived> &value, T &out, bool convert 
 
 template <typename T>
 object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
-    handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
-                                                policy, nullptr);
+    handle h = detail::make_caster<T>::from_cpp(
+        (detail::forward_t<T>) value, detail::nb_abi_internals, policy,
+        nullptr);
     if (!h.is_valid())
         detail::raise_python_or_cast_error();
 
@@ -657,8 +683,9 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
 template <typename T>
 object cast(T &&value, rv_policy policy, handle parent) {
     detail::cleanup_list cleanup(parent.ptr());
-    handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
-                                                policy, &cleanup);
+    handle h = detail::make_caster<T>::from_cpp(
+        (detail::forward_t<T>) value, detail::nb_abi_internals, policy,
+        &cleanup);
 
     cleanup.release();
 
@@ -669,10 +696,11 @@ object cast(T &&value, rv_policy policy, handle parent) {
 }
 
 template <typename T> object find(const T &value) noexcept {
-    return steal(detail::make_caster<T>::from_cpp(value, rv_policy::none, nullptr));
+    return steal(detail::make_caster<T>::from_cpp(
+        value, detail::nb_abi_internals, rv_policy::none, nullptr));
 }
 
-template <rv_policy policy = rv_policy::automatic, typename... Args>
+template <rv_policy::value policy = rv_policy::automatic, typename... Args>
 tuple make_tuple(Args &&...args) {
     tuple result = steal<tuple>(PyTuple_New((Py_ssize_t) sizeof...(Args)));
 
@@ -681,7 +709,8 @@ tuple make_tuple(Args &&...args) {
 
     (NB_TUPLE_SET_ITEM(o, nargs++,
                        detail::make_caster<Args>::from_cpp(
-                           (detail::forward_t<Args>) args, policy, nullptr)
+                           (detail::forward_t<Args>) args,
+                           detail::nb_abi_internals, policy, nullptr)
                            .ptr()),
      ...);
 
@@ -693,8 +722,24 @@ tuple make_tuple(Args &&...args) {
 template <typename T> arg_v arg::operator=(T &&value) const {
     return arg_v(*this, cast((detail::forward_t<T>) value));
 }
+
+template <uint8_t Flags>
+template <typename T>
+arg_v_tag<Flags>
+arg_tag<Flags>::operator=(T &&value) const {
+    return arg_v_tag<Flags>(*this, cast((detail::forward_t<T>) value));
+}
+
 template <typename T> arg_locked_v arg_locked::operator=(T &&value) const {
     return arg_locked_v(*this, cast((detail::forward_t<T>) value));
+}
+
+template <uint8_t Flags>
+template <typename T>
+arg_locked_v_tag<Flags>
+arg_locked_tag<Flags>::operator=(T &&value) const {
+    return arg_locked_v_tag<Flags>(
+        *this, cast((detail::forward_t<T>) value));
 }
 
 template <typename Impl> template <typename T>

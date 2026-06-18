@@ -47,7 +47,8 @@ struct enum_data_init;
 struct type_data_init;
 struct ticket;
 
-// Highest table revision these headers target. Bumped when a slot is appended.
+// Highest table revision these headers target. Keep this at 1 while the ABI
+// split is still under development.
 #define NB_ABI_VERSION 1
 
 // Single source of truth for the table layout. Each entry expands to a struct
@@ -63,8 +64,9 @@ struct ticket;
     F(implicitly_convertible_cpp, void,                                        \
       (nb_internals *, const std::type_info *, const std::type_info *) noexcept)\
     F(implicitly_convertible_py, void,                                         \
-      (nb_internals *, bool (*)(PyTypeObject *, PyObject *, cleanup_list *),    \
-       const std::type_info *) noexcept)                                       \
+      (nb_internals *, bool (*)(nb_internals *, PyTypeObject *, PyObject *,    \
+                                cleanup_list *), const std::type_info *)       \
+       noexcept)                                                              \
     F(enum_create, PyObject *, (nb_internals *, enum_data_init *) noexcept)    \
     F(enum_from_python, bool,                                                  \
       (nb_internals *, const std::type_info *, PyObject *, int64_t *, uint8_t) \
@@ -479,7 +481,8 @@ inline void implicitly_convertible(const std::type_info *src,
 }
 
 /// Register a callback to check if implicit conversion to 'dst' is possible
-inline void implicitly_convertible(bool (*predicate)(PyTypeObject *,
+inline void implicitly_convertible(bool (*predicate)(nb_internals *,
+                                                     PyTypeObject *,
                                                      PyObject *,
                                                      cleanup_list *),
                                    const std::type_info *dst) noexcept {

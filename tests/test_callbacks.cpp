@@ -41,17 +41,19 @@ template <> struct nanobind::detail::type_caster<callback> {
     static void wrap_call(void *context, int arg) {
         borrow<callable>((PyObject *) context)(arg);
     }
-    bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *,
+                     cleanup_list*) noexcept {
         if (!isinstance<callable>(src)) return false;
         value = {(void *) src.ptr(), &wrap_call};
         return true;
     }
-    static handle from_cpp(callback cb, rv_policy policy, cleanup_list*) noexcept {
+    static handle from_cpp(callback cb, nb_internals *, rv_policy policy,
+                           cleanup_list*) noexcept {
         if (cb.func == &wrap_call)
             return handle((PyObject *) cb.context).inc_ref();
         if (policy == rv_policy::none)
             return handle();
-        return cpp_function(cb, policy).release();
+        return cpp_function(cb).release();
     }
     NB_TYPE_CASTER(callback, const_name("Callable[[int], None]"))
 };

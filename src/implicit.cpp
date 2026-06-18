@@ -48,8 +48,8 @@ void implicitly_convertible_cpp(nb_internals *internals,
 }
 
 void implicitly_convertible_py(nb_internals *internals,
-                               bool (*predicate)(PyTypeObject *, PyObject *,
-                                                 cleanup_list *),
+                               bool (*predicate)(nb_internals *, PyTypeObject *,
+                                                 PyObject *, cleanup_list *),
                                const std::type_info *dst) noexcept {
     type_data *t = nb_type_c2p(internals, dst);
     check(t, "nanobind::detail::implicitly_convertible(src=<predicate>, dst=%s): "

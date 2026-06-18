@@ -33,15 +33,16 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     /// alias below informs users of this class of this fact.
     template <typename T> using Cast = Value;
 
-    bool from_python(handle src, uint8_t flags,
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
                      cleanup_list *cleanup) noexcept {
-        return from_python_impl(src, flags, cleanup, Indices{});
+        return from_python_impl(src, flags, internals, cleanup, Indices{});
     }
 
     template <size_t... Is>
-    bool from_python_impl(handle src, uint8_t flags, cleanup_list *cleanup,
+    bool from_python_impl(handle src, uint8_t flags, nb_internals *internals,
+                          cleanup_list *cleanup,
                           std::index_sequence<Is...>) noexcept {
-        (void) src; (void) flags; (void) cleanup;
+        (void) src; (void) flags; (void) internals; (void) cleanup;
 
         PyObject *temp; // always initialized by the following line
         PyObject **o = nb_abi->seq_get_with_size(src.ptr(), N, &temp);
@@ -50,33 +51,38 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
 
         return (o && ... &&
                 std::get<Is>(casters).from_python(
-                    o[Is], flags_for_local_caster<Ts>(flags), cleanup));
+                    o[Is], flags_for_local_caster<Ts>(flags), internals,
+                    cleanup));
     }
 
     template <typename T>
-    static handle from_cpp(T&& value, rv_policy policy,
+    static handle from_cpp(T&& value, nb_internals *internals, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return from_cpp_impl((forward_t<T>) value, policy, cleanup, Indices{});
+        return from_cpp_impl((forward_t<T>) value, internals, policy, cleanup,
+                             Indices{});
     }
 
     template <typename T>
-    static handle from_cpp(T *value, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T *value, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         if (!value)
             return none().release();
-        return from_cpp_impl(*value, policy, cleanup, Indices{});
+        return from_cpp_impl(*value, internals, policy, cleanup, Indices{});
     }
 
     template <typename T, size_t... Is>
-    static handle from_cpp_impl(T &&value, rv_policy policy,
+    static handle from_cpp_impl(T &&value, nb_internals *internals,
+                                rv_policy policy,
                                 cleanup_list *cleanup,
                                 std::index_sequence<Is...>) noexcept {
-        (void) value; (void) policy; (void) cleanup;
+        (void) value; (void) internals; (void) policy; (void) cleanup;
         object o[N1];
 
         bool success =
             (... &&
              ((o[Is] = steal(make_caster<Ts>::from_cpp(
-                   forward_like_<T>(std::get<Is>(value)), policy, cleanup))),
+                   forward_like_<T>(std::get<Is>(value)), internals, policy,
+                   cleanup))),
               o[Is].is_valid()));
 
         if (!success)

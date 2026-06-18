@@ -12,11 +12,13 @@ template <>
 struct type_caster<NestedClass> {
     NB_TYPE_CASTER(NestedClass, const_name("py_stub_test.AClass.NestedClass"))
 
-    bool from_python(handle /*src*/, uint8_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle /*src*/, uint8_t /*flags*/, nb_internals *,
+                     cleanup_list*) noexcept {
         return true;
     }
 
-    static handle from_cpp(const NestedClass&, rv_policy, cleanup_list*) noexcept {
+    static handle from_cpp(const NestedClass&, nb_internals *, rv_policy,
+                           cleanup_list*) noexcept {
         nanobind::object py_class =
             nanobind::module_::import_("py_stub_test").attr("AClass").attr("NestedClass");
         return py_class().release();

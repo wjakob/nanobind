@@ -70,12 +70,12 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                   "However, a type caster was registered to intercept this "
                   "particular type, which is not allowed.");
 
-    bool from_python(handle src, uint8_t flags,
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
                      cleanup_list *cleanup) noexcept {
         flags &= ~((uint8_t) cast_flags::convert);
 
         Caster caster;
-        if (!caster.from_python(src, flags, cleanup))
+        if (!caster.from_python(src, flags, internals, cleanup))
             return false;
 
         Td *ptr = caster.operator Td *();
@@ -103,7 +103,8 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         return true;
     }
 
-    static handle from_cpp(const Value &value, rv_policy,
+    static handle from_cpp(const Value &value, nb_internals *internals,
+                           rv_policy,
                            cleanup_list *cleanup) noexcept {
         bool is_new = false;
         handle result;
@@ -117,14 +118,16 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
             type = type_hook<Td>::get(ptr);
 
         if constexpr (!std::is_polymorphic_v<Td>) {
-            result = nb_type_put(type, ptr, rv_policy::reference,
-                                 cleanup, &is_new);
+            result = nb_abi->nb_type_put(internals, type, ptr,
+                                         rv_policy::reference, cleanup,
+                                         &is_new);
         } else {
             const std::type_info *type_p =
                 (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-            result = nb_type_put_p(type, type_p, ptr, rv_policy::reference,
-                                   cleanup, &is_new);
+            result = nb_abi->nb_type_put_p(internals, type, type_p, ptr,
+                                           rv_policy::reference, cleanup,
+                                           &is_new);
         }
 
         if (is_new) {

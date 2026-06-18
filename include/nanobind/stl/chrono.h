@@ -32,7 +32,8 @@ public:
     using period = typename type::period;
     using duration_t = std::chrono::duration<rep, period>;
 
-    bool from_python(handle src, uint8_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle src, uint8_t /*flags*/, nb_internals *,
+                     cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         if (!src) return false;
@@ -80,7 +81,8 @@ public:
         return src.time_since_epoch();
     }
 
-    static handle from_cpp(const type& src, rv_policy, cleanup_list*) noexcept {
+    static handle from_cpp(const type& src, nb_internals *, rv_policy,
+                           cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         // Use overloaded function to get our duration from our source
@@ -138,7 +140,8 @@ template <typename Duration>
 class type_caster<std::chrono::time_point<std::chrono::system_clock, Duration>> {
 public:
     using type = std::chrono::time_point<std::chrono::system_clock, Duration>;
-    bool from_python(handle src, uint8_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle src, uint8_t /*flags*/, nb_internals *,
+                     cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         if (!src)
@@ -169,7 +172,8 @@ public:
         return true;
     }
 
-    static handle from_cpp(const type& src, rv_policy, cleanup_list*) noexcept {
+    static handle from_cpp(const type& src, nb_internals *, rv_policy,
+                           cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         // Get out microseconds, and make sure they are positive, to

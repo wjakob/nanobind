@@ -18,7 +18,8 @@ NAMESPACE_BEGIN(detail)
 template <> struct type_caster<std::wstring> {
     NB_TYPE_CASTER(std::wstring, const_name("str"))
 
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint8_t, nb_internals *,
+                     cleanup_list *) noexcept {
         if (!PyUnicode_Check(src.ptr()))
             return false;
         Py_ssize_t size;
@@ -32,7 +33,7 @@ template <> struct type_caster<std::wstring> {
         return true;
     }
 
-    static handle from_cpp(const std::wstring &value, rv_policy,
+    static handle from_cpp(const std::wstring &value, nb_internals *, rv_policy,
                            cleanup_list *) noexcept {
         return PyUnicode_FromWideChar(value.c_str(), (Py_ssize_t) value.size());
     }

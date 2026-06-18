@@ -11,10 +11,11 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Caster>
-bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t *args_flags,
-                               cleanup_list *cleanup, size_t index) {
+bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t flags,
+                               nb_internals *internals, cleanup_list *cleanup,
+                               size_t index) {
     size_t size_before = cleanup->size();
-    if (!c.from_python(args[index], args_flags[index], cleanup))
+    if (!c.from_python(args[index], flags, internals, cleanup))
         return false;
 
     // If an implicit conversion took place, update the 'args' array so that
@@ -32,7 +33,80 @@ bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t *args_flags,
 template <size_t I, typename... Ts, size_t... Is>
 constexpr size_t count_args_before_index(std::index_sequence<Is...>) {
     static_assert(sizeof...(Is) == sizeof...(Ts));
-    return ((Is < I && std::is_base_of_v<arg, Ts>) + ... + 0);
+    return ((Is < I && is_arg_annotation_v<Ts>) + ... + 0);
+}
+
+template <size_t Target, typename... Ts>
+constexpr uint8_t arg_flags_at() {
+    size_t seen = 0;
+    uint8_t result = arg::flags;
+    ((void) (is_arg_annotation_v<Ts> &&
+             (seen++ == Target
+                  ? (result = arg_flags_v<Ts>, true)
+                  : false)), ...);
+    return result;
+}
+
+template <size_t Target, typename... Ts>
+inline constexpr uint8_t arg_flags_at_v =
+    arg_flags_at<Target, Ts...>();
+
+template <size_t I, bool IsMethod>
+inline constexpr size_t arg_annotation_index_v =
+    I >= (size_t) IsMethod ? I - (size_t) IsMethod : 0;
+
+template <size_t I, bool IsMethod, typename Arg, typename... Extra>
+struct func_arg_info {
+    static constexpr uint8_t flag_convert = (uint8_t) cast_flags::convert;
+    static constexpr uint8_t flag_accepts_none =
+        (uint8_t) cast_flags::accepts_none;
+    static constexpr uint8_t flag_construct =
+        (uint8_t) call_flags::dispatch_construct;
+    static constexpr uint8_t flag_trusted =
+        (uint8_t) call_flags::dispatch_trusted;
+
+    static constexpr bool is_self = IsMethod && I == 0;
+    static constexpr bool is_first_arg = I == 0;
+    static constexpr uint8_t annotation_flags =
+        arg_flags_at_v<arg_annotation_index_v<I, IsMethod>, Extra...>;
+    static constexpr bool converts =
+        !is_self && (annotation_flags & flag_convert);
+    static constexpr bool accepts_none =
+        !is_self &&
+        ((annotation_flags & flag_accepts_none) || has_arg_defaults_v<Arg>);
+
+    static constexpr uint8_t static_flags =
+        none_disallowed_flag<Arg> | (accepts_none ? flag_accepts_none : 0);
+
+    static constexpr uint8_t dispatch_mask =
+        (converts ? (uint8_t) call_flags::dispatch_convert : 0) |
+        (is_first_arg ? (uint8_t) (flag_construct | flag_trusted) : 0);
+
+    static constexpr bool copy_ctor_source = IsMethod && I == 1;
+};
+
+template <size_t I, bool IsMethod, typename Arg, typename... Extra>
+NB_INLINE uint8_t func_arg_flags(uint8_t dispatch_flags) {
+    using Info = func_arg_info<I, IsMethod, Arg, Extra...>;
+    uint8_t flags = Info::static_flags | (dispatch_flags & Info::dispatch_mask);
+
+    if constexpr (Info::copy_ctor_source)
+        if (dispatch_flags & (uint8_t) call_flags::dispatch_copy_constructor)
+            flags &= ~(uint8_t) cast_flags::convert;
+
+    return flags;
+}
+
+template <bool RememberConversions, size_t I, bool IsMethod, typename Arg,
+          typename... Extra>
+NB_INLINE bool func_load_arg(make_caster<Arg> &c, PyObject **args,
+                             uint8_t dispatch_flags, nb_internals *internals,
+                             cleanup_list *cleanup) {
+    uint8_t flags = func_arg_flags<I, IsMethod, Arg, Extra...>(dispatch_flags);
+    if constexpr (RememberConversions)
+        return from_python_remember_conv(c, args, flags, internals, cleanup, I);
+    else
+        return c.from_python(args[I], flags, internals, cleanup);
 }
 
 #if defined(NB_FREE_THREADED)
@@ -99,7 +173,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
-        (std::is_base_of_v<arg, Extra> + ... + 0);
+        (is_arg_annotation_v<Extra> + ... + 0);
     constexpr bool is_method_det =
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
@@ -197,7 +271,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     if constexpr (has_arg_defaults) {
         ((void)(Is < (size_t)is_method_det ||
                 (f.args[Is - is_method_det] = { nullptr, nullptr, nullptr, nullptr,
-                    (uint8_t) cast_flags::convert }, true)), ...);
+                    arg::flags }, true)), ...);
     } else if constexpr (nargs_provided > 0) {
         for (size_t i = 0; i < nargs_provided; ++i)
             f.args[i].flag = 0;
@@ -230,9 +304,14 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         };
     }
 
-    f.impl = [](void *p, PyObject **args, uint8_t *args_flags, rv_policy policy,
-                cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
-        (void) p; (void) args; (void) args_flags; (void) policy; (void) cleanup;
+    auto set_impl = [&f](auto policy_c) {
+        using policy_tag = decltype(policy_c);
+
+        f.impl = [](void *p, PyObject **args, uint8_t dispatch_flags,
+                    nb_internals *internals,
+                    cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
+        constexpr rv_policy policy = rv_policy(policy_tag::value);
+        (void) p; (void) args; (void) dispatch_flags; (void) internals; (void) cleanup;
 
         const capture *cap;
         if constexpr (sizeof(capture) <= sizeof(f.capture))
@@ -261,14 +340,13 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         if constexpr (Info::pre_post_hooks) {
             std::integral_constant<size_t, nargs> nargs_c;
             (process_precall(args, nargs_c, cleanup, (Extra *) nullptr), ...);
-            if ((!from_python_remember_conv(in.template get<Is>(), args,
-                                            args_flags, cleanup, Is) || ...))
-                return NB_NEXT_OVERLOAD;
-        } else {
-            if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
-                                                    cleanup) || ...))
-                return NB_NEXT_OVERLOAD;
         }
+
+        if ((!func_load_arg<Info::pre_post_hooks, Is, is_method_det, Args,
+                            Extra...>(in.template get<Is>(), args,
+                                      dispatch_flags, internals, cleanup) ||
+             ...))
+            return NB_NEXT_OVERLOAD;
 
         PyObject *result;
         if constexpr (std::is_void_v<Return>) {
@@ -282,12 +360,12 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 #if defined(_WIN32) && !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
             result = cast_out::from_cpp(
                        cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...),
-                       policy, cleanup).ptr();
+                       internals, policy, cleanup).ptr();
 #else
             result = cast_out::from_cpp(
                        cap->func((in.template get<Is>())
                                      .operator cast_t<Args>()...),
-                       policy, cleanup).ptr();
+                       internals, policy, cleanup).ptr();
 #endif
         }
 
@@ -297,6 +375,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         }
 
         return result;
+        };
     };
 
     f.descr = descr.text;
@@ -324,24 +403,16 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     (void) arg_index;
 
+    set_impl(std::integral_constant<rv_policy::value, Info::policy>{});
+
     // Apply implicit accepts_none for std::optional<> typed arguments
     // after func_extra_apply, so that explicit nb::arg().noconvert() works.
     if constexpr (has_arg_defaults) {
-        ((void)(Is >= (size_t)is_method_det && has_arg_defaults_v<Args> &&
-                (f.args[Is - is_method_det].flag |=
-                     (uint8_t) cast_flags::accepts_none, true)), ...);
-    }
-
-    // Record 'none_disallowed' (nonzero only for value/reference bound-type
-    // targets) in the per-argument flag at bind time. The dispatcher carries
-    // it into the call via 'args_flags', so the heavily-inlined function
-    // trampoline need not OR it in at every from_python() invocation. Simple
-    // overloads ignore the per-argument flags but reject 'None' up front, so
-    // the bit is only consulted where 'None' can actually reach a caster.
-    if constexpr (has_arg_annotations) {
-        ((void)(Is >= (size_t)is_method_det &&
-                (f.args[Is - is_method_det].flag |=
-                     none_disallowed_flag<Args>, true)), ...);
+        ([&] {
+            if constexpr (Is >= (size_t) is_method_det && has_arg_defaults_v<Args>)
+                f.args[Is - is_method_det].flag |=
+                    (uint8_t) cast_flags::accepts_none;
+        }(), ...);
     }
 
     return nb_func_new(&f);

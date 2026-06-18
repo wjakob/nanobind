@@ -134,11 +134,13 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
 
     NB_TYPE_CASTER(T, NDArrayCaster::Name)
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         // We're in any case making a copy, so non-writable inputs area also okay
         using NDArrayConst = array_for_eigen_t<T, const typename T::Scalar>;
         make_caster<NDArrayConst> caster;
-        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none,
+                                internals, cleanup))
             return false;
 
         const NDArrayConst &array = caster.value;
@@ -155,15 +157,18 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
     }
 
     template <typename T2>
-    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(T2 &&v, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         policy = infer_policy<T2>(policy);
         if constexpr (std::is_pointer_v<T2>)
-            return from_cpp_internal((const T &) *v, policy, cleanup);
+            return from_cpp_internal((const T &) *v, internals, policy, cleanup);
         else
-            return from_cpp_internal((const T &) v, policy, cleanup);
+            return from_cpp_internal((const T &) v, internals, policy, cleanup);
     }
 
-    static handle from_cpp_internal(const T &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp_internal(const T &v, nb_internals *internals,
+                                    rv_policy policy,
+                                    cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -202,7 +207,7 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
 
         object o = steal(NDArrayCaster::from_cpp(
             NDArray(ptr, ndim_v<T>, shape, owner, strides),
-            policy, cleanup));
+            internals, policy, cleanup));
 
         return o.release();
     }
@@ -220,11 +225,14 @@ struct type_caster<T, enable_if_t<is_eigen_xpr_v<T> &&
     template <typename T_> static constexpr bool can_cast() { return true; }
 
     /// Generating an expression template from a Python object is, of course, not possible
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept = delete;
 
     template <typename T2>
-    static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
-        return Caster::from_cpp(std::forward<T2>(v), policy, cleanup);
+    static handle from_cpp(T2 &&v, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        return Caster::from_cpp(std::forward<T2>(v), internals, policy,
+                                cleanup);
     }
 };
 
@@ -252,13 +260,17 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
     NDArrayCaster caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         // Disable implicit conversions
-        return from_python_(src, flags & ~(uint8_t)cast_flags::convert, cleanup);
+        return from_python_(src, flags & ~(uint8_t)cast_flags::convert,
+                            internals, cleanup);
     }
 
-    bool from_python_(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
+    bool from_python_(handle src, uint8_t flags, nb_internals *internals,
+                      cleanup_list* cleanup) noexcept {
+        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none,
+                                internals, cleanup))
             return false;
 
         // Check for memory layout compatibility of non-contiguous 'Map' types
@@ -290,7 +302,8 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         return true;
     }
 
-    static handle from_cpp(const Map &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const Map &v, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[ndim_v<T>];
         int64_t strides[ndim_v<T>];
 
@@ -306,9 +319,10 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
 
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
+            internals,
             (policy == rv_policy::automatic ||
              policy == rv_policy::automatic_reference)
-                ? rv_policy::reference
+                ? rv_policy(rv_policy::reference)
                 : policy,
             cleanup);
     }
@@ -425,9 +439,10 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
     struct Empty { };
     std::conditional_t<MaybeConvert, DMapCaster, Empty> dcaster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list *cleanup) noexcept {
         // Try a direct cast without implicit conversion first
-        if (caster.from_python(src, flags, cleanup))
+        if (caster.from_python(src, flags, internals, cleanup))
             return true;
 
         // Potentially convert strides/dtype when casting constant references
@@ -447,14 +462,15 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
                 !DMapConstructorOwnsData)
                 flags &= ~(uint8_t) cast_flags::convert;
 
-            if (dcaster.from_python_(src, flags, cleanup))
+            if (dcaster.from_python_(src, flags, internals, cleanup))
                 return true;
         }
 
         return false;
     }
 
-    static handle from_cpp(const Ref &v, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(const Ref &v, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept {
         // Copied from the Eigen::Map caster
 
         size_t shape[ndim_v<T>];
@@ -472,9 +488,10 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
 
         return NDArrayCaster::from_cpp(
             NDArray((void *) v.data(), ndim_v<T>, shape, handle(), strides),
+            internals,
             (policy == rv_policy::automatic ||
              policy == rv_policy::automatic_reference)
-                ? rv_policy::reference
+                ? rv_policy(rv_policy::reference)
                 : policy,
             cleanup);
     }

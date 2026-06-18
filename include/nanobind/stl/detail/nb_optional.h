@@ -20,14 +20,16 @@ struct optional_caster {
 
     NB_TYPE_CASTER(Optional, optional_name(Caster::Name))
 
-    bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
+                     cleanup_list* cleanup) noexcept {
         if (src.is_none()) {
             value.reset();
             return true;
         }
 
         Caster caster;
-        if (!caster.from_python(src, flags_for_local_caster<T>(flags), cleanup) ||
+        if (!caster.from_python(src, flags_for_local_caster<T>(flags), internals,
+                                cleanup) ||
             !caster.template can_cast<T>())
             return false;
 
@@ -37,11 +39,13 @@ struct optional_caster {
     }
 
     template <typename T_>
-    static handle from_cpp(T_ &&value, rv_policy policy, cleanup_list *cleanup) noexcept {
+    static handle from_cpp(T_ &&value, nb_internals *internals,
+                           rv_policy policy, cleanup_list *cleanup) noexcept {
         if (!value)
             return none().release();
 
-        return Caster::from_cpp(forward_like_<T_>(*value), policy, cleanup);
+        return Caster::from_cpp(forward_like_<T_>(*value), internals, policy,
+                                cleanup);
     }
 };
 

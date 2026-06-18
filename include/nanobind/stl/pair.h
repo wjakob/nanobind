@@ -33,7 +33,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         const_name("tuple[") + concat(Caster1::Name, Caster2::Name) + const_name("]");
 
     /// Python -> C++ caster, populates `caster1` and `caster2` upon success
-    bool from_python(handle src, uint8_t flags,
+    bool from_python(handle src, uint8_t flags, nb_internals *internals,
                      cleanup_list *cleanup) noexcept {
         PyObject *temp; // always initialized by the following line
         PyObject **o = nb_abi->seq_get_with_size(src.ptr(), 2, &temp);
@@ -41,27 +41,32 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
         temp_ref = steal(temp);
 
         return o &&
-               caster1.from_python(o[0], flags_for_local_caster<T1>(flags), cleanup) &&
-               caster2.from_python(o[1], flags_for_local_caster<T2>(flags), cleanup);
+               caster1.from_python(o[0], flags_for_local_caster<T1>(flags),
+                                   internals, cleanup) &&
+               caster2.from_python(o[1], flags_for_local_caster<T2>(flags),
+                                   internals, cleanup);
     }
 
     template <typename T>
-    static handle from_cpp(T *value, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T *value, nb_internals *internals, rv_policy policy,
+                           cleanup_list *cleanup) {
         if (!value)
             return none().release();
-        return from_cpp(*value, policy, cleanup);
+        return from_cpp(*value, internals, policy, cleanup);
     }
 
     template <typename T>
-    static handle from_cpp(T &&value, rv_policy policy,
+    static handle from_cpp(T &&value, nb_internals *internals, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
         object o1 = steal(
-            Caster1::from_cpp(forward_like_<T>(value.first), policy, cleanup));
+            Caster1::from_cpp(forward_like_<T>(value.first), internals, policy,
+                              cleanup));
         if (!o1.is_valid())
             return {};
 
         object o2 = steal(
-            Caster2::from_cpp(forward_like_<T>(value.second), policy, cleanup));
+            Caster2::from_cpp(forward_like_<T>(value.second), internals, policy,
+                              cleanup));
         if (!o2.is_valid())
             return {};
 

@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Unreleased
-----------
+Version 2.13.0 (Jun 18, 2026)
+-----------------------------
 
 This release bundles a large set of performance improvements on nanobind's
 critical paths. With an optional object pool, construction runs up to 1.42×

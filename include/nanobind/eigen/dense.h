@@ -143,9 +143,10 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
 
         const NDArrayConst &array = caster.value;
         if constexpr (ndim_v<T> == 1)
-            value.resize(array.shape(0));
+            value.resize((Eigen::Index) array.shape(0));
         else
-            value.resize(array.shape(0), array.shape(1));
+            value.resize((Eigen::Index) array.shape(0),
+                         (Eigen::Index) array.shape(1));
 
         // The layout is contiguous & compatible thanks to array_for_eigen_t<T>
         memcpy(value.data(), array.data(), array.size() * sizeof(Scalar));
@@ -167,11 +168,11 @@ struct type_caster<T, enable_if_t<is_eigen_plain_v<T> &&
         int64_t strides[ndim_v<T>];
 
         if constexpr (ndim_v<T> == 1) {
-            shape[0] = v.size();
+            shape[0] = (size_t) v.size();
             strides[0] = v.innerStride();
         } else {
-            shape[0] = v.rows();
-            shape[1] = v.cols();
+            shape[0] = (size_t) v.rows();
+            shape[1] = (size_t) v.cols();
             strides[0] = v.rowStride();
             strides[1] = v.colStride();
         }
@@ -294,11 +295,11 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         int64_t strides[ndim_v<T>];
 
         if constexpr (ndim_v<T> == 1) {
-            shape[0] = v.size();
+            shape[0] = (size_t) v.size();
             strides[0] = v.innerStride();
         } else {
-            shape[0] = v.rows();
-            shape[1] = v.cols();
+            shape[0] = (size_t) v.rows();
+            shape[1] = (size_t) v.cols();
             strides[0] = v.rowStride();
             strides[1] = v.colStride();
         }
@@ -320,7 +321,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
                 outer;
 
         if constexpr (ndim_v<T> == 1)
-            outer = caster.value.shape(0);
+            outer = (int64_t) caster.value.shape(0);
         else
             outer = caster.value.stride(1);
 
@@ -356,9 +357,10 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     operator Map() {
         NDArray &t = caster.value;
         if constexpr (ndim_v<T> == 1)
-            return Map(t.data(), t.shape(0), strides());
+            return Map(t.data(), (Eigen::Index) t.shape(0), strides());
         else
-            return Map(t.data(), t.shape(0), t.shape(1), strides());
+            return Map(t.data(), (Eigen::Index) t.shape(0),
+                       (Eigen::Index) t.shape(1), strides());
     }
 };
 
@@ -459,11 +461,11 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
         int64_t strides[ndim_v<T>];
 
         if constexpr (ndim_v<T> == 1) {
-            shape[0] = v.size();
+            shape[0] = (size_t) v.size();
             strides[0] = v.innerStride();
         } else {
-            shape[0] = v.rows();
-            shape[1] = v.cols();
+            shape[0] = (size_t) v.rows();
+            shape[1] = (size_t) v.cols();
             strides[0] = v.rowStride();
             strides[1] = v.colStride();
         }

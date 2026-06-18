@@ -115,7 +115,7 @@ struct type_caster<
     static handle from_cpp(const MapType &v, rv_policy policy, cleanup_list *cleanup) noexcept {
         size_t shape[NumIndices];
         for (size_t i = 0 ; i < NumIndices; i++) {
-            shape[i] = (size_t) v.dimension(i);
+            shape[i] = (size_t) v.dimension((Eigen::Index) i);
         }
 
         void* ptr = (void *)v.data();
@@ -131,7 +131,7 @@ struct type_caster<
         NDArray &t = caster.value;
         std::array<long, NumIndices> shape;
         for (size_t i = 0 ; i < NumIndices; i++) {
-            shape[i] = t.shape(i);
+            shape[i] = (long) t.shape(i);
         }
         return MapType(t.data(), shape);
     }
@@ -166,7 +166,7 @@ struct type_caster<
         // copy tensor dims
         std::array<long, NumIndices> out_dims;
         for(size_t i = 0; i < NumIndices; i++) {
-            out_dims[i] = array.shape(i);
+            out_dims[i] = (long) array.shape(i);
         }
         value.resize(out_dims);
 
@@ -190,7 +190,7 @@ struct type_caster<
         for (size_t i = 0 ; i < NumIndices; i++) {
             shape[i] = (size_t) v.dimension(i);
         }
-        
+
         void *ptr = (void *)v.data();
 
         object owner;
@@ -304,7 +304,7 @@ struct type_caster<
         size_t shape[NumIndices];
 
         for (size_t i = 0; i < NumIndices; i++) {
-            shape[i] = (size_t) v.dimension(i);
+            shape[i] = (size_t) v.dimension((Eigen::Index) i);
         }
     
         return NDArrayCaster::from_cpp(

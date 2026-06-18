@@ -298,6 +298,9 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
             return false;
         }
 
+        if (!PyLong_CheckExact(o) && !PyIndex_Check(o))
+            return false;
+
         if (t->flags & (uint32_t) enum_flags::is_signed) {
             long long value = PyLong_AsLongLong(o);
             if (value == -1 && PyErr_Occurred()) {

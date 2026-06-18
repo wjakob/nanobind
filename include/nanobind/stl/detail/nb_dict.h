@@ -26,6 +26,9 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
     bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
+        if (!PyDict_CheckExact(src.ptr()) && !PyMapping_Check(src.ptr()))
+            return false;
+
         PyObject *items = PyMapping_Items(src.ptr());
         if (items == nullptr) {
             PyErr_Clear();

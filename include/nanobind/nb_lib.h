@@ -554,6 +554,9 @@ NB_CORE void set_implicit_cast_warnings(bool value) noexcept;
 
 NB_CORE bool iterable_check(PyObject *o) noexcept;
 
+/// Return a new reference to an iterator for 'o', or nullptr
+NB_CORE PyObject *try_iter(PyObject *o) noexcept;
+
 // ========================================================================
 
 NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,

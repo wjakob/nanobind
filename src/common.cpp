@@ -1220,18 +1220,22 @@ void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
 }
 
 bool iterable_check(PyObject *o) noexcept {
+    PyTypeObject *tp = Py_TYPE(o);
 #if !defined(Py_LIMITED_API)
-    return Py_TYPE(o)->tp_iter != nullptr || PySequence_Check(o);
+    bool has_iter = tp->tp_iter != nullptr;
 #else
-    PyObject *it = PyObject_GetIter(o);
-    if (it) {
-        Py_DECREF(it);
-        return true;
-    } else {
-        PyErr_Clear();
-        return false;
-    }
+    bool has_iter = PyType_GetSlot(tp, Py_tp_iter) != nullptr;
 #endif
+    return has_iter || PySequence_Check(o);
+}
+
+PyObject *try_iter(PyObject *o) noexcept {
+    if (!iterable_check(o))
+        return nullptr;
+    PyObject *it = PyObject_GetIter(o);
+    if (!it)
+        PyErr_Clear();
+    return it;
 }
 
 // ========================================================================

@@ -119,7 +119,7 @@ inline bool isinstance(handle inst, handle cls) {
 }
 
 inline bool is_alive() noexcept {
-    return detail::is_alive();
+    return detail::nb_abi->is_alive();
 }
 
 NAMESPACE_END(NB_NAMESPACE)

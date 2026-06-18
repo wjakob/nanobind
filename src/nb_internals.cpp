@@ -168,8 +168,18 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
     }
 }
 
-// Initialized once when the module is loaded, no locking needed
-nb_internals *internals = nullptr;
+
+// The backend's instance of the nb_abi function table (see nb_lib.h). Populated
+// from the same NB_ABI_FUNCTIONS list that defines the struct, so slot order and
+// signatures cannot drift. Each slot's target carries the exception
+// specification declared in that list.
+static const struct nb_abi nb_abi_storage = {
+    /* struct_size */ (uint32_t) sizeof(struct nb_abi),
+    /* version     */ NB_ABI_VERSION,
+#define NB_ABI_POPULATE(name, ret, args) &name,
+    NB_ABI_FUNCTIONS(NB_ABI_POPULATE)
+#undef NB_ABI_POPULATE
+};
 
 #if defined(NB_FREE_THREADED)
 NB_THREAD_LOCAL nb_thread_state *nb_thread_state_tls = nullptr;
@@ -181,10 +191,10 @@ static void nb_thread_state_destroy(void *p) noexcept {
         return;
 
     // Reclaim this thread's instance pools if the runtime is still alive
-    if (internals && ts->pools) {
+    if (nb_abi_internals && ts->pools) {
         PyGILState_STATE state = PyGILState_Ensure();
         for (uint32_t i = 0; i < ts->pools_size; ++i)
-            nb_pool_drain(&ts->pools[i], /* can_free = */ true);
+            nb_pool_drain(nb_abi_internals, &ts->pools[i], /* can_free = */ true);
         PyGILState_Release(state);
     }
     PyMem_Free(ts->pools);
@@ -196,14 +206,14 @@ static void nb_thread_state_destroy(void *p) noexcept {
 // Slow path for nb_thread_state_get(): allocate the per-thread state with a cleanup callback
 nb_thread_state *nb_thread_state_alloc() noexcept {
 #if defined(_WIN32)
-    DWORD key = internals->thread_state_key;
+    DWORD key = nb_abi_internals->thread_state_key;
     nb_thread_state *ts = (nb_thread_state *) FlsGetValue(key);
     if (!ts) {
         ts = new nb_thread_state();
         check(FlsSetValue(key, ts), "nanobind: FlsSetValue() failed!");
     }
 #else
-    pthread_key_t key = internals->thread_state_key;
+    pthread_key_t key = nb_abi_internals->thread_state_key;
     nb_thread_state *ts = (nb_thread_state *) pthread_getspecific(key);
     if (!ts) {
         ts = new nb_thread_state();
@@ -326,11 +336,11 @@ static void init_internals(nb_internals *p) {
 }
 
 void internals_inc_ref() {
-    internals->shared_ref_count.value++;
+    nb_abi_internals->shared_ref_count.value++;
 }
 
 void internals_dec_ref() {
-    nb_internals *p = internals;
+    nb_internals *p = nb_abi_internals;
     auto value = --p->shared_ref_count.value;
     if (value != 0)
         return;
@@ -367,7 +377,7 @@ bool is_alive() noexcept { return *is_alive_ptr; }
 const char *abi_tag() { return NB_ABI_TAG; }
 
 static void internals_cleanup() {
-    nb_internals *p = internals;
+    nb_internals *p = nb_abi_internals;
     if (!p)
         return;
 
@@ -387,7 +397,7 @@ static void internals_cleanup() {
     for (const auto &kv : p->type_c2p_slow) {
         type_data *td = kv.second;
         if (td->flags & (uint32_t) type_flags::pooled)
-            nb_pool_drain(&td->pool, /* can_free = */ false);
+            nb_pool_drain(p, &td->pool, /* can_free = */ false);
     }
 
     size_t inst_leaks = 0, keep_alive_leaks = 0;
@@ -504,7 +514,7 @@ static void internals_cleanup() {
 #endif
 
         delete p;
-        internals = nullptr;
+        nb_abi_internals = nullptr;
     } else {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: this is likely caused by a reference "
@@ -520,9 +530,12 @@ static void internals_cleanup() {
 }
 
 NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
-    if (internals) {
-        init_internals(internals);
-        init_pyobjects(internals);
+    // Point this DSO at the backend table (statically linked for now).
+    nb_abi = &nb_abi_storage;
+
+    if (nb_abi_internals) {
+        init_internals(nb_abi_internals);
+        init_pyobjects(nb_abi_internals);
         internals_inc_ref();
         return;
     }
@@ -543,13 +556,13 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
     PyObject *capsule = dict_getitem_or_default(dict, key, nullptr);
     if (capsule) {
         Py_DECREF(key);
-        internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
-        check(internals, "nanobind::detail::nb_module_exec(): "
-                         "capsule pointer is NULL!");
-        is_alive_ptr = internals->is_alive_ptr;
+        nb_abi_internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
+        check(nb_abi_internals, "nanobind::detail::nb_module_exec(): "
+                               "capsule pointer is NULL!");
+        is_alive_ptr = nb_abi_internals->is_alive_ptr;
 
-        init_internals(internals);
-        init_pyobjects(internals);
+        init_internals(nb_abi_internals);
+        init_pyobjects(nb_abi_internals);
         internals_inc_ref();
 
         Py_DECREF(capsule);
@@ -578,7 +591,7 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 #endif
     p->shard_count = shard_count;
 
-    internals = p;
+    nb_abi_internals = p;
 
     init_internals(p);
     init_pyobjects(p);

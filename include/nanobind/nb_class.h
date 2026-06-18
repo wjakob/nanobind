@@ -10,7 +10,11 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-/// Flags about a type that persist throughout its lifetime
+/// Construction flags supplied while binding a type. These travel in the frozen
+/// 'type_data_init' record and occupy the low bits 0..13 of its packed 'flags'
+/// field. Bits 14..18 are reserved construction-flag headroom, and bits 19..23
+/// are owned by 'type_init_flags' below; binding code never supplies the latter.
+/// New construction flags append within the 14..18 range.
 enum class type_flags : uint32_t {
     /// Does the type provide a C++ destructor?
     is_destructible          = (1 << 0),
@@ -21,72 +25,56 @@ enum class type_flags : uint32_t {
     /// Does the type provide a C++ move constructor?
     is_move_constructible    = (1 << 2),
 
-    /// Cached copy of Py_TPFLAGS_HAVE_GC
-    has_gc                   = (1 << 3),
-
     /// Is the 'destruct' field of the type_data structure set?
-    has_destruct             = (1 << 4),
+    has_destruct             = (1 << 3),
 
     /// Is the 'copy' field of the type_data structure set?
-    has_copy                 = (1 << 5),
+    has_copy                 = (1 << 4),
 
     /// Is the 'move' field of the type_data structure set?
-    has_move                 = (1 << 6),
-
-    /// Internal: does the type maintain a list of implicit conversions?
-    has_implicit_conversions = (1 << 7),
-
-    /// Is this a python type that extends a bound C++ type?
-    is_python_type           = (1 << 8),
+    has_move                 = (1 << 5),
 
     /// This type does not permit subclassing from Python
-    is_final                 = (1 << 9),
+    is_final                 = (1 << 6),
 
     /// Instances of this type support dynamic attribute assignment
-    has_dynamic_attr         = (1 << 10),
+    has_dynamic_attr         = (1 << 7),
 
     /// The class uses an intrusive reference counting approach
-    intrusive_ptr            = (1 << 11),
+    intrusive_ptr            = (1 << 8),
 
     /// Is this a class that inherits from enable_shared_from_this?
     /// If so, type_data::keep_shared_from_this_alive is also set.
-    has_shared_from_this     = (1 << 12),
+    has_shared_from_this     = (1 << 9),
 
     /// Instances of this type can be referenced by 'weakref'
-    is_weak_referenceable    = (1 << 13),
+    is_weak_referenceable    = (1 << 10),
 
     /// A custom signature override was specified
-    has_signature            = (1 << 14),
+    has_signature            = (1 << 11),
 
     /// The class implements __class_getitem__ similar to typing.Generic
-    is_generic               = (1 << 15),
-
-    /// Does the type implement a custom __new__ operator?
-    has_new                  = (1 << 16),
-
-    /// Does the type implement a custom __new__ operator that can take no args
-    /// (except the type object)?
-    has_nullary_new          = (1 << 17),
+    is_generic               = (1 << 12),
 
     /// Does the type opt into instance pooling? (nb::pooled)
-    pooled                   = (1 << 18)
+    pooled                   = (1 << 13)
 };
 
-/// Flags about a type that are only relevant when it is being created.
-/// These are currently stored in type_data::flags alongside the type_flags
-/// for more efficient memory layout, but could move elsewhere if we run
-/// out of flags.
+/// Flags that are only relevant while a type is being created. They occupy the
+/// high bits 19..23 of the 'type_data_init' record's packed 'flags' field. The
+/// backend strips them when copying construction flags into private storage, so
+/// they never appear in 'type_data'.
 enum class type_init_flags : uint32_t {
-    /// Is the 'supplement_size' field of the type_init_data structure set?
+    /// Is the 'supplement_size' field of the type_data_init structure set?
     has_supplement           = (1 << 19),
 
-    /// Is the 'doc' field of the type_init_data structure set?
+    /// Is the 'doc' field of the type_data_init structure set?
     has_doc                  = (1 << 20),
 
-    /// Is the 'base' field of the type_init_data structure set?
+    /// Is the 'base' field of the type_data_init structure set?
     has_base                 = (1 << 21),
 
-    /// Is the 'base_py' field of the type_init_data structure set?
+    /// Is the 'base_py' field of the type_data_init structure set?
     has_base_py              = (1 << 22),
 
     /// This type provides extra PyType_Slot fields
@@ -95,68 +83,23 @@ enum class type_init_flags : uint32_t {
     all_init_flags           = (0x1f << 19)
 };
 
-// See internals.h
-struct nb_alias_chain;
-struct nb_inst;
-
-/// LIFO Instance pool
-struct nb_inst_pool {
-    nb_inst **slots;
-    uint32_t count;
-    uint32_t capacity;
-};
-
-// Implicit conversions for C++ type bindings, used in type_data below
-struct implicit_t {
-    const std::type_info **cpp;
-    bool (**py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
-};
-
-// Forward and reverse mappings for enumerations, used in type_data below
-struct enum_tbl_t {
-    void *fwd;
-    void *rev;
-};
-
-/// Information about a type that persists throughout its lifetime
-struct type_data {
+// Frozen construction record passed to nb_type_new(). It carries only the
+// inputs supplied while binding a type; the backend translates it into the
+// private 'type_data' storage (src/nb_internals.h). Append-only.
+struct type_data_init {
     uint32_t size;
     uint32_t align : 8;
     uint32_t flags : 24;
     const char *name;
     const std::type_info *type;
-    PyTypeObject *type_py;
-    nb_alias_chain *alias_chain;
-#if defined(Py_LIMITED_API)
-    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
-#endif
-    void *init; // Constructor nb_func
     void (*destruct)(void *);
     void (*copy)(void *, const void *);
     void (*move)(void *, void *) noexcept;
-    union {
-        implicit_t implicit;  // for C++ type bindings
-        enum_tbl_t enum_tbl;  // for enumerations
-    };
     void (*set_self_py)(void *, PyObject *) noexcept;
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
-    uint32_t dictoffset;
-    uint32_t weaklistoffset;
-    /// Out-of-line heap storage for an optional nb::supplement<T>
-    void *supplement;
-    /// Instance pool capacity
     uint32_t pool_capacity;
-#if defined(NB_FREE_THREADED)
-    /// Slot of this type's pool in the packed per-thread pool array
-    uint32_t pool_index;
-#else
-    /// Per-type instance pool for non-FT builds
-    nb_inst_pool pool;
-#endif
-};
 
-/// Information about a type that is only relevant when it is being created
-struct type_init_data : type_data {
+    // ------- Fields only consulted while the type is being created -------
     PyObject *scope;
     const std::type_info *base;
     PyTypeObject *base_py;
@@ -165,59 +108,59 @@ struct type_init_data : type_data {
     size_t supplement_size;
 };
 
-NB_INLINE void type_extra_apply(type_init_data &t, const handle &h) {
+NB_INLINE void type_extra_apply(type_data_init &t, const handle &h) {
     t.flags |= (uint32_t) type_init_flags::has_base_py;
     t.base_py = (PyTypeObject *) h.ptr();
 }
 
-NB_INLINE void type_extra_apply(type_init_data &t, const char *doc) {
+NB_INLINE void type_extra_apply(type_data_init &t, const char *doc) {
     t.flags |= (uint32_t) type_init_flags::has_doc;
     t.doc = doc;
 }
 
-NB_INLINE void type_extra_apply(type_init_data &t, type_slots c) {
+NB_INLINE void type_extra_apply(type_data_init &t, type_slots c) {
     t.flags |= (uint32_t) type_init_flags::has_type_slots;
     t.type_slots = c.value;
 }
 
 template <typename T>
-NB_INLINE void type_extra_apply(type_init_data &t, intrusive_ptr<T> ip) {
+NB_INLINE void type_extra_apply(type_data_init &t, intrusive_ptr<T> ip) {
     t.flags |= (uint32_t) type_flags::intrusive_ptr;
     t.set_self_py = (void (*)(void *, PyObject *) noexcept) ip.set_self_py;
 }
 
-NB_INLINE void type_extra_apply(type_init_data &t, is_final) {
+NB_INLINE void type_extra_apply(type_data_init &t, is_final) {
     t.flags |= (uint32_t) type_flags::is_final;
 }
 
-NB_INLINE void type_extra_apply(type_init_data &t, dynamic_attr) {
+NB_INLINE void type_extra_apply(type_data_init &t, dynamic_attr) {
     t.flags |= (uint32_t) type_flags::has_dynamic_attr;
 }
 
-NB_INLINE void type_extra_apply(type_init_data & t, is_weak_referenceable) {
+NB_INLINE void type_extra_apply(type_data_init & t, is_weak_referenceable) {
     t.flags |= (uint32_t) type_flags::is_weak_referenceable;
 }
 
-NB_INLINE void type_extra_apply(type_init_data & t, is_generic) {
+NB_INLINE void type_extra_apply(type_data_init & t, is_generic) {
     t.flags |= (uint32_t) type_flags::is_generic;
 }
 
-NB_INLINE void type_extra_apply(type_init_data & t, const sig &s) {
+NB_INLINE void type_extra_apply(type_data_init & t, const sig &s) {
     t.flags |= (uint32_t) type_flags::has_signature;
     t.name = s.value;
 }
 
-NB_INLINE void type_extra_apply(type_init_data &, never_destruct) {
+NB_INLINE void type_extra_apply(type_data_init &, never_destruct) {
     // intentionally empty
 }
 
-NB_INLINE void type_extra_apply(type_init_data &t, pooled p) {
+NB_INLINE void type_extra_apply(type_data_init &t, pooled p) {
     t.flags |= (uint32_t) type_flags::pooled;
     t.pool_capacity = p.capacity;
 }
 
 template <typename T>
-NB_INLINE void type_extra_apply(type_init_data &t, supplement<T>) {
+NB_INLINE void type_extra_apply(type_data_init &t, supplement<T>) {
     static_assert(std::is_trivially_default_constructible_v<T>,
                   "The supplement must be a POD (plain old data) type");
     static_assert(alignof(T) <= alignof(void *),
@@ -240,7 +183,7 @@ enum class enum_flags : uint32_t {
     is_str                 = (1 << 4)
 };
 
-struct enum_init_data {
+struct enum_data_init {
     const std::type_info *type;
     PyObject *scope;
     const char *name;
@@ -248,24 +191,56 @@ struct enum_init_data {
     uint32_t flags;
 };
 
-NB_INLINE void enum_extra_apply(enum_init_data &e, is_arithmetic) {
+// Freeze guards: type_data_init / enum_data_init are baked into compiled
+// extensions and may only grow by appending fields. Pin the 64-bit layout so an
+// accidental reorder or resize fails the build (other ABIs are not constrained).
+#define NB_FROZEN_OFF(S, F, V)                                                  \
+    static_assert(sizeof(void *) != 8 || offsetof(S, F) == (V),                \
+                  "frozen ABI layout of " #S "::" #F " changed")
+static_assert(sizeof(void *) != 8 || sizeof(type_data_init) == 120,
+              "frozen ABI size of type_data_init changed");
+NB_FROZEN_OFF(type_data_init, size, 0);
+NB_FROZEN_OFF(type_data_init, name, 8);
+NB_FROZEN_OFF(type_data_init, type, 16);
+NB_FROZEN_OFF(type_data_init, destruct, 24);
+NB_FROZEN_OFF(type_data_init, copy, 32);
+NB_FROZEN_OFF(type_data_init, move, 40);
+NB_FROZEN_OFF(type_data_init, set_self_py, 48);
+NB_FROZEN_OFF(type_data_init, keep_shared_from_this_alive, 56);
+NB_FROZEN_OFF(type_data_init, pool_capacity, 64);
+NB_FROZEN_OFF(type_data_init, scope, 72);
+NB_FROZEN_OFF(type_data_init, base, 80);
+NB_FROZEN_OFF(type_data_init, base_py, 88);
+NB_FROZEN_OFF(type_data_init, doc, 96);
+NB_FROZEN_OFF(type_data_init, type_slots, 104);
+NB_FROZEN_OFF(type_data_init, supplement_size, 112);
+static_assert(sizeof(void *) != 8 || sizeof(enum_data_init) == 40,
+              "frozen ABI size of enum_data_init changed");
+NB_FROZEN_OFF(enum_data_init, type, 0);
+NB_FROZEN_OFF(enum_data_init, scope, 8);
+NB_FROZEN_OFF(enum_data_init, name, 16);
+NB_FROZEN_OFF(enum_data_init, docstr, 24);
+NB_FROZEN_OFF(enum_data_init, flags, 32);
+#undef NB_FROZEN_OFF
+
+NB_INLINE void enum_extra_apply(enum_data_init &e, is_arithmetic) {
     e.flags |= (uint32_t) enum_flags::is_arithmetic;
 }
 
-NB_INLINE void enum_extra_apply(enum_init_data &e, is_flag) {
+NB_INLINE void enum_extra_apply(enum_data_init &e, is_flag) {
     e.flags |= (uint32_t) enum_flags::is_flag;
 }
 
-NB_INLINE void enum_extra_apply(enum_init_data &e, is_str) {
+NB_INLINE void enum_extra_apply(enum_data_init &e, is_str) {
     e.flags |= (uint32_t) enum_flags::is_str;
 }
 
-NB_INLINE void enum_extra_apply(enum_init_data &e, const char *doc) {
+NB_INLINE void enum_extra_apply(enum_data_init &e, const char *doc) {
     e.docstr = doc;
 }
 
 template <typename T>
-NB_INLINE void enum_extra_apply(enum_init_data &, T) {
+NB_INLINE void enum_extra_apply(enum_data_init &, T) {
     static_assert(
         std::is_void_v<T>,
         "Invalid enum binding annotation. The implementation of "
@@ -322,45 +297,46 @@ NAMESPACE_END(detail)
 
 // Low level access to nanobind type objects
 inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }
-inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }
-inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
-inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
+inline size_t type_size(handle h) { return detail::nb_abi->nb_type_size(h.ptr()); }
+inline size_t type_align(handle h) { return detail::nb_abi->nb_type_align(h.ptr()); }
+inline const std::type_info& type_info(handle h) { return *detail::nb_abi->nb_type_info(h.ptr()); }
 template <typename T>
-inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
-inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())); }
+inline T &type_supplement(handle h) { return *(T *) detail::nb_abi->nb_type_supplement(h.ptr()); }
+inline str type_name(handle h) { return steal<str>(detail::nb_abi->nb_type_name(h.ptr())); }
 
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) {
-    return steal<str>(detail::nb_inst_name(h.ptr()));
+    return steal<str>(detail::nb_abi->nb_inst_name(h.ptr()));
 }
 inline object inst_alloc(handle h) {
-    return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr()));
+    return steal(detail::nb_abi->nb_inst_alloc((PyTypeObject *) h.ptr()));
 }
 inline object inst_alloc_zero(handle h) {
-    return steal(detail::nb_inst_alloc_zero((PyTypeObject *) h.ptr()));
+    return steal(detail::nb_abi->nb_inst_alloc_zero((PyTypeObject *) h.ptr()));
 }
 inline object inst_take_ownership(handle h, void *p) {
-    return steal(detail::nb_inst_take_ownership((PyTypeObject *) h.ptr(), p));
+    return steal(detail::nb_abi->nb_inst_take_ownership((PyTypeObject *) h.ptr(), p));
 }
 inline object inst_reference(handle h, void *p, handle parent = handle()) {
-    return steal(detail::nb_inst_reference((PyTypeObject *) h.ptr(), p, parent.ptr()));
+    return steal(detail::nb_abi->nb_inst_reference((PyTypeObject *) h.ptr(), p, parent.ptr()));
 }
-inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
+inline void inst_zero(handle h) { detail::nb_abi->nb_inst_zero(h.ptr()); }
 inline void inst_set_state(handle h, bool ready, bool destruct) {
-    detail::nb_inst_set_state(h.ptr(), ready, destruct);
+    detail::nb_abi->nb_inst_set_state(h.ptr(), ready, destruct);
 }
 inline std::pair<bool, bool> inst_state(handle h) {
-    return detail::nb_inst_state_read(h.ptr());
+    uint8_t s = detail::nb_abi->nb_inst_state_read(h.ptr());
+    return { (s & 1) != 0, (s & 2) != 0 };
 }
 inline void inst_mark_ready(handle h) { inst_set_state(h, true, true); }
 inline bool inst_ready(handle h) { return inst_state(h).first; }
-inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
-inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
-inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
-inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_replace_copy(dst.ptr(), src.ptr()); }
-inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_replace_move(dst.ptr(), src.ptr()); }
-template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
+inline void inst_destruct(handle h) { detail::nb_abi->nb_inst_destruct(h.ptr()); }
+inline void inst_copy(handle dst, handle src) { detail::nb_abi->nb_inst_copy(dst.ptr(), src.ptr()); }
+inline void inst_move(handle dst, handle src) { detail::nb_abi->nb_inst_move(dst.ptr(), src.ptr()); }
+inline void inst_replace_copy(handle dst, handle src) { detail::nb_abi->nb_inst_replace_copy(dst.ptr(), src.ptr()); }
+inline void inst_replace_move(handle dst, handle src) { detail::nb_abi->nb_inst_replace_move(dst.ptr(), src.ptr()); }
+template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_abi->nb_inst_ptr(h.ptr()); }
 inline void *type_get_slot(handle h, int slot_id) {
 #if NB_TYPE_GET_SLOT_IMPL
     return detail::type_get_slot((PyTypeObject *) h.ptr(), slot_id);
@@ -393,7 +369,7 @@ private:
             [](pointer_and_handle<Type> v, Args... args) {
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Args...>) {
-                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                    if (!detail::nb_abi->nb_inst_python_derived(v.h.ptr())) {
                         new (v.p) Type((detail::forward_t<Args>) args...);
                         return;
                     }
@@ -423,7 +399,7 @@ private:
             [](pointer_and_handle<Type> v, Arg arg) {
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Arg>) {
-                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                    if (!detail::nb_abi->nb_inst_python_derived(v.h.ptr())) {
                         new ((Type *) v.p) Type((detail::forward_t<Arg>) arg);
                         return;
                     }
@@ -600,7 +576,7 @@ public:
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
-        detail::type_init_data d;
+        detail::type_data_init d;
 
         d.flags = 0;
         d.align = (uint8_t) alignof(Alias);
@@ -818,7 +794,7 @@ public:
 
     template <typename... Extra>
     NB_INLINE enum_(handle scope, const char *name, const Extra &... extra) {
-        detail::enum_init_data ed { };
+        detail::enum_data_init ed { };
         ed.type = &typeid(T);
         ed.scope = scope.ptr();
         ed.name = name;
@@ -830,17 +806,17 @@ public:
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
-        detail::enum_append(m_ptr, name, (int64_t) value, nullptr, doc);
+        detail::nb_abi->enum_append(m_ptr, name, (int64_t) value, nullptr, doc);
         return *this;
     }
 
     NB_INLINE enum_ &str_value(const char *name, T value, const char *str_val,
                                const char *doc = nullptr) {
-        detail::enum_append(m_ptr, name, (int64_t) value, str_val, doc);
+        detail::nb_abi->enum_append(m_ptr, name, (int64_t) value, str_val, doc);
         return *this;
     }
 
-    NB_INLINE enum_ &export_values() { detail::enum_export(m_ptr); return *this; }
+    NB_INLINE enum_ &export_values() { detail::nb_abi->enum_export(m_ptr); return *this; }
 
     template <typename Func, typename... Extra>
     NB_INLINE enum_ &def(const char *name_, Func &&f, const Extra &... extra) {

@@ -67,7 +67,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
 
         .def("__repr__",
              [](handle_t<Map> h) {
-                return steal<str>(detail::repr_map(h.ptr()));
+                return steal<str>(detail::nb_abi->repr_map(h.ptr()));
              })
 
         .def("__contains__",

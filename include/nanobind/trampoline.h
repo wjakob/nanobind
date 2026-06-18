@@ -17,11 +17,19 @@ NAMESPACE_BEGIN(detail)
 
 struct ticket;
 
-NB_CORE void trampoline_new(void **data, size_t size, void *ptr) noexcept;
-NB_CORE void trampoline_release(void **data, size_t size) noexcept;
-NB_CORE void trampoline_enter(void **data, size_t size, const char *name,
-                              bool pure, ticket *ticket);
-NB_CORE void trampoline_leave(ticket *ticket) noexcept;
+inline void trampoline_new(void **data, size_t size, void *ptr) noexcept {
+    nb_abi->trampoline_new(nb_abi_internals, data, size, ptr);
+}
+inline void trampoline_release(void **data, size_t size) noexcept {
+    nb_abi->trampoline_release_impl(data, size);
+}
+inline void trampoline_enter(void **data, size_t size, const char *name,
+                             bool pure, ticket *ticket) {
+    nb_abi->trampoline_enter(nb_abi_internals, data, size, name, pure, ticket);
+}
+inline void trampoline_leave(ticket *ticket) noexcept {
+    nb_abi->trampoline_leave_impl(ticket);
+}
 
 template <size_t Size> struct trampoline {
     mutable void *data[2 * Size + 1];

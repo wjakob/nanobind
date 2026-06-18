@@ -342,7 +342,7 @@ public:
 
     explicit ndarray(detail::ndarray_handle *handle) : m_handle(handle) {
         if (handle)
-            m_dltensor = *detail::ndarray_inc_ref(handle);
+            m_dltensor = *detail::nb_abi->ndarray_inc_ref(handle);
     }
 
     template <typename... Args2>
@@ -359,11 +359,11 @@ public:
             char order = Order,
             uint64_t byte_offset = 0) {
 
-        m_handle = detail::ndarray_create(
+        m_handle = detail::nb_abi->ndarray_create(
             (void *) data, ndim, shape, owner.ptr(), strides, dtype,
             ReadOnly, device_type, device_id, order, byte_offset);
 
-        m_dltensor = *detail::ndarray_inc_ref(m_handle);
+        m_dltensor = *detail::nb_abi->ndarray_inc_ref(m_handle);
     }
 
     ndarray(VoidPtr data,
@@ -394,20 +394,20 @@ public:
             (void) shape_buf;
         }
 
-        m_handle = detail::ndarray_create(
+        m_handle = detail::nb_abi->ndarray_create(
             (void *) data, shape_size, shape_ptr, owner.ptr(),
             (strides.size() == 0) ? nullptr : strides.begin(), dtype,
             ReadOnly, device_type, device_id, order, byte_offset);
 
-        m_dltensor = *detail::ndarray_inc_ref(m_handle);
+        m_dltensor = *detail::nb_abi->ndarray_inc_ref(m_handle);
     }
 
     ~ndarray() {
-        detail::ndarray_dec_ref(m_handle);
+        detail::nb_abi->ndarray_dec_ref(m_handle);
     }
 
     ndarray(const ndarray &t) : m_handle(t.m_handle), m_dltensor(t.m_dltensor) {
-        detail::ndarray_inc_ref(m_handle);
+        detail::nb_abi->ndarray_inc_ref(m_handle);
     }
 
     ndarray(ndarray &&t) noexcept : m_handle(t.m_handle), m_dltensor(t.m_dltensor) {
@@ -416,7 +416,7 @@ public:
     }
 
     ndarray &operator=(ndarray &&t) noexcept {
-        detail::ndarray_dec_ref(m_handle);
+        detail::nb_abi->ndarray_dec_ref(m_handle);
         m_handle = t.m_handle;
         m_dltensor = t.m_dltensor;
         // Only reset t.m_handle, it's safe to leave t.m_dltensor as-is
@@ -425,8 +425,8 @@ public:
     }
 
     ndarray &operator=(const ndarray &t) {
-        detail::ndarray_inc_ref(t.m_handle);
-        detail::ndarray_dec_ref(m_handle);
+        detail::nb_abi->ndarray_inc_ref(t.m_handle);
+        detail::nb_abi->ndarray_dec_ref(m_handle);
         m_handle = t.m_handle;
         m_dltensor = t.m_dltensor;
         return *this;
@@ -529,7 +529,7 @@ private:
     dlpack::dltensor m_dltensor;
 };
 
-inline bool ndarray_check(handle h) { return detail::ndarray_check(h.ptr()); }
+inline bool ndarray_check(handle h) { return detail::nb_abi->ndarray_check(h.ptr()); }
 
 NAMESPACE_BEGIN(detail)
 
@@ -574,13 +574,13 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
             (void) shape_buf;
         }
 
-        detail::ndarray_handle *h = ndarray_import(
+        detail::ndarray_handle *h = nb_abi->ndarray_import(
             src.ptr(), &config, flags & (uint8_t) cast_flags::convert, cleanup);
 
         if (NB_UNLIKELY(value.m_handle))
-            detail::ndarray_dec_ref(value.m_handle);
+            detail::nb_abi->ndarray_dec_ref(value.m_handle);
         if (NB_LIKELY(h))
-            value.m_dltensor = *detail::ndarray_inc_ref(h);
+            value.m_dltensor = *detail::nb_abi->ndarray_inc_ref(h);
         value.m_handle = h;
         return h != nullptr;
     }

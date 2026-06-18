@@ -190,7 +190,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_prelim<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
+    func_data_init<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
 
     // Pre-initialize argument flags with 'convert'. The 'accepts_none' flag
     // for std::optional<> args is applied after func_extra_apply (see below).
@@ -208,7 +208,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
               (has_arg_annotations  ? (uint32_t) func_flags::has_args       : 0);
 
-    /* Store captured function inside 'func_data_prelim' if there is space. Issues
+    /* Store captured function inside 'func_data_init' if there is space. Issues
        with aliasing are resolved via separate compilation of libnanobind. */
     if constexpr (sizeof(capture) <= sizeof(f.capture)) {
         capture *cap = (capture *) f.capture;

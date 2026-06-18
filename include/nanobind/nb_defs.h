@@ -53,6 +53,16 @@
 #  define NB_NAMESPACE nanobind
 #endif
 
+// Marks a point as unreachable (e.g. right after calling a [[noreturn]] backend
+// function through the nb_abi table, whose pointer type can't carry [[noreturn]]).
+#if defined(__GNUC__)
+#  define NB_UNREACHABLE() __builtin_unreachable()
+#elif defined(_MSC_VER)
+#  define NB_UNREACHABLE() __assume(0)
+#else
+#  define NB_UNREACHABLE() ((void) 0)
+#endif
+
 #if defined(__GNUC__)
 #  define NB_UNLIKELY(x) __builtin_expect(bool(x), 0)
 #  define NB_LIKELY(x)   __builtin_expect(bool(x), 1)

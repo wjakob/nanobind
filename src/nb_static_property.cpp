@@ -5,6 +5,7 @@ NAMESPACE_BEGIN(detail)
 
 /// `nb_static_property.__get__()`: Always pass the class instead of the instance.
 static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObject *cls) {
+    nb_internals *internals = nb_abi_internals;
 
     // Flag to avoid infinite recursion during static attribute assignment
     bool static_property_disabled;
@@ -28,14 +29,13 @@ static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject 
     return NB_SLOT(PyProperty_Type, tp_descr_set)(self, cls, value);
 }
 
-PyTypeObject *nb_static_property_tp() noexcept {
-    nb_internals *internals_ = internals;
-    PyTypeObject *tp = internals_->nb_static_property.load_acquire();
+PyTypeObject *nb_static_property_tp(nb_internals *internals) noexcept {
+    PyTypeObject *tp = internals->nb_static_property.load_acquire();
 
     if (NB_UNLIKELY(!tp)) {
-        lock_internals guard(internals_);
+        lock_internals guard(internals);
 
-        tp = internals_->nb_static_property.load_relaxed();
+        tp = internals->nb_static_property.load_relaxed();
         if (tp)
             return tp;
 
@@ -62,11 +62,11 @@ PyTypeObject *nb_static_property_tp() noexcept {
             /* .slots = */ slots
         };
 
-        tp = new_type(internals_, &spec);
+        tp = new_type(internals, &spec);
         check(tp, "nb_static_property type creation failed!");
 
-        internals_->nb_static_property_descr_set = nb_static_property_descr_set;
-        internals_->nb_static_property.store_release(tp);
+        internals->nb_static_property_descr_set = nb_static_property_descr_set;
+        internals->nb_static_property.store_release(tp);
     }
 
     return tp;

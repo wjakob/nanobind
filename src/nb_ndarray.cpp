@@ -414,12 +414,12 @@ static PyMethodDef nb_ndarray_methods[] = {
    { nullptr, nullptr, 0, nullptr }
 };
 
-static PyTypeObject *nb_ndarray_tp(nb_internals *internals_) noexcept {
-    PyTypeObject *tp = internals_->nb_ndarray.load_acquire();
+static PyTypeObject *nb_ndarray_tp(nb_internals *internals) noexcept {
+    PyTypeObject *tp = internals->nb_ndarray.load_acquire();
 
     if (NB_UNLIKELY(!tp)) {
-        lock_internals guard(internals_);
-        tp = internals_->nb_ndarray.load_relaxed();
+        lock_internals guard(internals);
+        tp = internals->nb_ndarray.load_relaxed();
         if (tp)
             return tp;
 
@@ -439,10 +439,10 @@ static PyTypeObject *nb_ndarray_tp(nb_internals *internals_) noexcept {
             /* .slots = */ slots
         };
 
-        tp = new_type(internals_, &spec);
+        tp = new_type(internals, &spec);
         check(tp, "nb_ndarray type creation failed!");
 
-        internals_->nb_ndarray.store_release(tp);
+        internals->nb_ndarray.store_release(tp);
     }
 
     return tp;
@@ -1155,26 +1155,26 @@ static constexpr struct { const char *pkg, *attr; }
     };
 
 /// Resolve (and cache) the callable for an ``ndarray_export`` cache slot.
-static PyObject *ndarray_export_fn(nb_internals *internals_,
+static PyObject *ndarray_export_fn(nb_internals *internals,
                                    ndarray_export_slot slot) {
-    PyObject *fn = internals_->ndarray_export[slot].load_acquire();
+    PyObject *fn = internals->ndarray_export[slot].load_acquire();
     if (NB_LIKELY(fn))
         return fn;
 
-    lock_internals guard(internals_);
-    fn = internals_->ndarray_export[slot].load_relaxed();
+    lock_internals guard(internals);
+    fn = internals->ndarray_export[slot].load_relaxed();
     if (fn)
         return fn;
 
-    object obj = steal(module_import(ndarray_export_spec[slot].pkg))
+    object obj = steal(module_import_cstr(ndarray_export_spec[slot].pkg))
                      .attr(ndarray_export_spec[slot].attr);
     fn = obj.release().ptr();
-    new_object(internals_, fn);
-    internals_->ndarray_export[slot].store_release(fn);
+    new_object(internals, fn);
+    internals->ndarray_export[slot].store_release(fn);
     return fn;
 }
 
-PyObject *ndarray_export(ndarray_handle *th, int framework,
+PyObject *ndarray_export(nb_internals *internals, ndarray_handle *th, int framework,
                          rv_policy policy, cleanup_list *cleanup) noexcept {
     if (!th)
         return none().release().ptr();
@@ -1235,8 +1235,6 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         return nullptr;
     }
 
-    nb_internals *internals_ = internals;
-
     object o;
     if (copy && framework == no_framework::value && th->self) {
         o = borrow(th->self);
@@ -1247,7 +1245,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
     } else {
         // Make a Python object providing the buffer interface and having
         // the two DLPack methods __dlpack__() and __dlpack_device__().
-        nb_ndarray *h = PyObject_New(nb_ndarray, nb_ndarray_tp(internals_));
+        nb_ndarray *h = PyObject_New(nb_ndarray, nb_ndarray_tp(internals));
         if (!h)
             return nullptr;
         h->th = th;
@@ -1259,7 +1257,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         try {
             // Call nump.asarray(o) to create a view, and numpy.copy(o) to copy
             PyObject *export_fn = ndarray_export_fn(
-                internals_, copy ? nd_export_numpy_copy : nd_export_numpy_view);
+                internals, copy ? nd_export_numpy_copy : nd_export_numpy_view);
             PyObject *stack[] = {nullptr, o.ptr()};
             size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             return PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr);
@@ -1285,7 +1283,7 @@ PyObject *ndarray_export(ndarray_handle *th, int framework,
         }
 
         if (slot != nd_export_count) {
-            PyObject *export_fn = ndarray_export_fn(internals_, slot);
+            PyObject *export_fn = ndarray_export_fn(internals, slot);
             PyObject *stack[] = {nullptr, o.ptr()};
             size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
             o = steal(PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr));

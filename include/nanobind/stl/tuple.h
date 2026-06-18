@@ -44,7 +44,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
         (void) src; (void) flags; (void) cleanup;
 
         PyObject *temp; // always initialized by the following line
-        PyObject **o = seq_get_with_size(src.ptr(), N, &temp);
+        PyObject **o = nb_abi->seq_get_with_size(src.ptr(), N, &temp);
 
         temp_ref = steal(temp);
 

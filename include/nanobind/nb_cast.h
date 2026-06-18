@@ -135,12 +135,12 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
     NB_INLINE bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
             if constexpr (std::is_same_v<T, double>) {
-                return detail::load_f64(src.ptr(), flags, &value);
+                return detail::nb_abi->load_f64(src.ptr(), flags, &value);
             } else if constexpr (std::is_same_v<T, float>) {
-                return detail::load_f32(src.ptr(), flags, &value);
+                return detail::nb_abi->load_f32(src.ptr(), flags, &value);
             } else {
                 double d;
-                if (!detail::load_f64(src.ptr(), flags, &d))
+                if (!detail::nb_abi->load_f64(src.ptr(), flags, &d))
                     return false;
                 T result = (T) d;
                 if ((flags & (uint8_t) cast_flags::convert)
@@ -154,22 +154,22 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
         } else {
             if constexpr (std::is_signed_v<T>) {
                 if constexpr (sizeof(T) == 8)
-                    return detail::load_i64(src.ptr(), flags, (int64_t *) &value);
+                    return detail::nb_abi->load_i64(src.ptr(), flags, (int64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    return detail::load_i32(src.ptr(), flags, (int32_t *) &value);
+                    return detail::nb_abi->load_i32(src.ptr(), flags, (int32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    return detail::load_i16(src.ptr(), flags, (int16_t *) &value);
+                    return detail::nb_abi->load_i16(src.ptr(), flags, (int16_t *) &value);
                 else
-                    return detail::load_i8(src.ptr(), flags, (int8_t *) &value);
+                    return detail::nb_abi->load_i8(src.ptr(), flags, (int8_t *) &value);
             } else {
                 if constexpr (sizeof(T) == 8)
-                    return detail::load_u64(src.ptr(), flags, (uint64_t *) &value);
+                    return detail::nb_abi->load_u64(src.ptr(), flags, (uint64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    return detail::load_u32(src.ptr(), flags, (uint32_t *) &value);
+                    return detail::nb_abi->load_u32(src.ptr(), flags, (uint32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    return detail::load_u16(src.ptr(), flags, (uint16_t *) &value);
+                    return detail::nb_abi->load_u16(src.ptr(), flags, (uint16_t *) &value);
                 else
-                    return detail::load_u8(src.ptr(), flags, (uint8_t *) &value);
+                    return detail::nb_abi->load_u8(src.ptr(), flags, (uint8_t *) &value);
             }
         }
     }
@@ -339,7 +339,7 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
         // Fast path for implicit ``self`` argument from ``nb_type_vectorcall()``
         if (flags & (uint8_t) cast_flags::trusted) {
             value.h = src;
-            value.p = (T *) nb_inst_ptr(src.ptr());
+            value.p = (T *) nb_abi->nb_inst_ptr(src.ptr());
             return true;
         }
         Caster c;
@@ -685,7 +685,7 @@ tuple make_tuple(Args &&...args) {
                            .ptr()),
      ...);
 
-    detail::tuple_check(o, sizeof...(Args));
+    detail::nb_abi->tuple_check(o, sizeof...(Args));
 
     return result;
 }

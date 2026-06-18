@@ -145,7 +145,7 @@ struct type_slots {
 };
 
 struct type_slots_callback {
-    using cb_t = void (*)(const detail::type_init_data *t,
+    using cb_t = void (*)(const detail::type_data_init *t,
                           PyType_Slot *&slots, size_t max_slots) noexcept;
     type_slots_callback(cb_t callback) : callback(callback) { }
     cb_t callback;
@@ -189,7 +189,7 @@ enum class func_flags : uint32_t {
     is_implicit = (1 << 12),
     /// Is this function an arithmetic operator?
     is_operator = (1 << 13),
-    /// When the function is GCed, do we need to call func_data_prelim::free_capture?
+    /// When the function is GCed, do we need to call func_data_init::free_capture?
     has_free = (1 << 14),
     /// Should the func_new() call return a new reference?
     return_ref = (1 << 15),
@@ -226,15 +226,15 @@ enum cast_flags : uint8_t {
 };
 
 
-struct arg_data {
+struct arg_data_init {
     const char *name;
     const char *signature;
     PyObject *name_py;
     PyObject *value;
-    uint8_t flag;
+    uint16_t flag;
 };
 
-struct func_data_prelim_base {
+struct func_data_init_base {
     // A small amount of space to capture data used by the function/closure
     void *capture[3];
 
@@ -256,7 +256,7 @@ struct func_data_prelim_base {
 
     /// Total number of parameters accepted by the C++ function; nb::args
     /// and nb::kwargs parameters are counted as one each. If the
-    /// 'has_args' flag is set, then there is one arg_data structure
+    /// 'has_args' flag is set, then there is one arg_data_init structure
     /// for each of these.
     uint16_t nargs;
 
@@ -276,11 +276,39 @@ struct func_data_prelim_base {
     PyObject *scope;
 };
 
-template<size_t Size> struct func_data_prelim : func_data_prelim_base {
-    arg_data args[Size];
+template<size_t Size> struct func_data_init : func_data_init_base {
+    arg_data_init args[Size];
 };
 
-template<> struct func_data_prelim<0> : func_data_prelim_base {};
+template<> struct func_data_init<0> : func_data_init_base {};
+
+// Freeze guards: arg_data_init / func_data_init_base are baked into compiled
+// extensions and may only grow by appending fields. Pin the 64-bit layout so an
+// accidental reorder or resize fails the build (other ABIs are not constrained).
+#define NB_FROZEN_OFF(S, F, V)                                                  \
+    static_assert(sizeof(void *) != 8 || offsetof(S, F) == (V),                \
+                  "frozen ABI layout of " #S "::" #F " changed")
+static_assert(sizeof(void *) != 8 || sizeof(arg_data_init) == 40,
+              "frozen ABI size of arg_data_init changed");
+NB_FROZEN_OFF(arg_data_init, name, 0);
+NB_FROZEN_OFF(arg_data_init, signature, 8);
+NB_FROZEN_OFF(arg_data_init, name_py, 16);
+NB_FROZEN_OFF(arg_data_init, value, 24);
+NB_FROZEN_OFF(arg_data_init, flag, 32);
+static_assert(sizeof(void *) != 8 || sizeof(func_data_init_base) == 88,
+              "frozen ABI size of func_data_init_base changed");
+NB_FROZEN_OFF(func_data_init_base, capture, 0);
+NB_FROZEN_OFF(func_data_init_base, free_capture, 24);
+NB_FROZEN_OFF(func_data_init_base, impl, 32);
+NB_FROZEN_OFF(func_data_init_base, descr, 40);
+NB_FROZEN_OFF(func_data_init_base, descr_types, 48);
+NB_FROZEN_OFF(func_data_init_base, flags, 56);
+NB_FROZEN_OFF(func_data_init_base, nargs, 60);
+NB_FROZEN_OFF(func_data_init_base, nargs_pos, 62);
+NB_FROZEN_OFF(func_data_init_base, name, 64);
+NB_FROZEN_OFF(func_data_init_base, doc, 72);
+NB_FROZEN_OFF(func_data_init_base, scope, 80);
+#undef NB_FROZEN_OFF
 
 
 template <typename F>
@@ -341,7 +369,7 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
     if (a.convert_)
         flag |= (uint8_t) cast_flags::convert;
 
-    arg_data &arg = f.args[index];
+    arg_data_init &arg = f.args[index];
     arg.flag = flag;
     arg.name = a.name_;
     arg.signature = a.signature_;
@@ -353,13 +381,13 @@ NB_INLINE void func_extra_apply(F &f, const arg &a, size_t &index) {
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg_v &a, size_t &index) {
-    arg_data &ad = f.args[index];
+    arg_data_init &ad = f.args[index];
     func_extra_apply(f, (const arg &) a, index);
     ad.value = a.value.ptr();
 }
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const arg_locked_v &a, size_t &index) {
-    arg_data &ad = f.args[index];
+    arg_data_init &ad = f.args[index];
     func_extra_apply(f, (const arg_locked &) a, index);
     ad.value = a.value.ptr();
 }

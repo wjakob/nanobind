@@ -16,16 +16,23 @@ struct int64_hash {
 // hold both.
 using enum_map = tsl::robin_map<int64_t, int64_t, int64_hash>;
 
-PyObject *enum_create(enum_init_data *ed) noexcept {
+// Backend-private storage for an enumeration. Enums are created via Python's
+// 'enum' factory rather than nb_type_new(), so their type_data lives on the
+// heap and is reached only through the type maps. 'scope' is retained for
+// enum_export().
+struct enum_type_data : type_data {
+    PyObject *scope;
+};
+
+PyObject *enum_create(nb_internals *internals, enum_data_init *ed) noexcept {
     // Update hash table that maps from std::type_info to Python type
-    nb_internals *internals_ = internals;
     bool success;
     nb_type_map_slow::iterator it;
 
     PyObject *existing = nullptr;
     {
-        lock_internals guard(internals_);
-        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(ed->type, nullptr);
+        lock_internals guard(internals);
+        std::tie(it, success) = internals->type_c2p_slow.try_emplace(ed->type, nullptr);
         if (!success) {
             existing = (PyObject *) it->second->type_py;
             NB_INCREF_ENUM(existing);
@@ -104,29 +111,30 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
 
-    type_init_data *t = new type_init_data();
-    memset(t, 0, sizeof(type_data));
+    enum_type_data *t = new enum_type_data();
+    memset(t, 0, sizeof(enum_type_data));
     t->name = strdup_check(ed->name);
     t->type = ed->type;
     t->type_py = (PyTypeObject *) result.ptr();
-    t->flags = ed->flags & 0xFFFFFF;
+    t->flags = ed->flags & type_data_public_flag_mask;
     t->enum_tbl.fwd = new enum_map();
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;
+    t->internals = internals;
 
     {
-        lock_internals guard(internals_);
-        internals_->type_c2p_slow[ed->type] = t;
+        lock_internals guard(internals);
+        internals->type_c2p_slow[ed->type] = t;
 
         #if !defined(NB_FREE_THREADED)
-            internals_->type_c2p_fast[(void *) ed->type] = t;
+            internals->type_c2p_fast[(void *) ed->type] = t;
         #endif
     }
 
     make_immortal(result.ptr());
 
     result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
-        type_init_data *t = (type_init_data *) p;
+        enum_type_data *t = (enum_type_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
         nb_type_unregister(t);
@@ -137,8 +145,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     return result.release().ptr();
 }
 
-static type_init_data *enum_get_type_data(handle tp) {
-    return (type_init_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
+static enum_type_data *enum_get_type_data(handle tp) {
+    return (enum_type_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
 }
 
 void enum_append(PyObject *tp_, const char *name_, int64_t value_,
@@ -230,7 +238,8 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     rev->emplace((int64_t) (uintptr_t) el.ptr(), value_);
 }
 
-bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8_t flags) noexcept {
+bool enum_from_python(nb_internals *internals, const std::type_info *tp,
+                      PyObject *o, int64_t *out, uint8_t flags) noexcept {
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return false;
@@ -330,7 +339,8 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
     return false;
 }
 
-PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
+PyObject *enum_from_cpp(nb_internals *internals, const std::type_info *tp,
+                        int64_t key) noexcept {
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return nullptr;
@@ -377,7 +387,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
 }
 
 void enum_export(PyObject *tp) {
-    type_init_data *t = enum_get_type_data(tp);
+    enum_type_data *t = enum_get_type_data(tp);
 
     handle scope = t->scope;
     for (handle item: handle(tp))

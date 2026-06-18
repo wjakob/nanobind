@@ -13,7 +13,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-void trampoline_new(void **data, size_t size, void *ptr) noexcept {
+void trampoline_new(nb_internals *internals, void **data, size_t size, void *ptr) noexcept {
     // GIL is held when the trampoline constructor runs. Lock the
     // associated instance shard in GIL-less Python.
 
@@ -29,13 +29,13 @@ void trampoline_new(void **data, size_t size, void *ptr) noexcept {
     memset(data + 1, 0, sizeof(void *) * 2 * size);
 }
 
-void trampoline_release(void **data, size_t size) noexcept {
+void trampoline_release_impl(void **data, size_t size) noexcept {
     // GIL is held when the trampoline destructor runs
     for (size_t i = 0; i < size; ++i)
         Py_XDECREF((PyObject *) data[i*2 + 2]);
 }
 
-static void trampoline_enter_internal(void **data, size_t size,
+static void trampoline_enter_internal(nb_internals *internals, void **data, size_t size,
                                       const char *name, bool pure, ticket *t) {
     const PyObject *None = Py_None;
     PyGILState_STATE state{ };
@@ -168,8 +168,8 @@ fail:
 
 static NB_THREAD_LOCAL ticket *current_ticket = nullptr;
 
-void trampoline_enter(void **data, size_t size, const char *name, bool pure, ticket *t) {
-    trampoline_enter_internal(data, size, name, pure, t);
+void trampoline_enter(nb_internals *internals, void **data, size_t size, const char *name, bool pure, ticket *t) {
+    trampoline_enter_internal(internals, data, size, name, pure, t);
 
     if (t->key) {
         t->self = (PyObject *) data[0];
@@ -190,7 +190,7 @@ void trampoline_enter(void **data, size_t size, const char *name, bool pure, tic
     }
 }
 
-void trampoline_leave(ticket *t) noexcept {
+void trampoline_leave_impl(ticket *t) noexcept {
     if (!t->key)
         return;
     current_ticket = t->prev;

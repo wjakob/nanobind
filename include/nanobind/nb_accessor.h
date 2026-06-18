@@ -16,7 +16,7 @@ NAMESPACE_BEGIN(detail)
 #define NB_IMPL_ACCESSOR_OP_I(name, op)                                        \
     template <typename Impl> template <typename T>                             \
     accessor<Impl>& accessor<Impl>::name(const api<T> &o) {                    \
-        object tmp = steal(obj_op_2(ptr(), o.derived().ptr(), op));            \
+        object tmp = steal(nb_abi->obj_op_2(ptr(), o.derived().ptr(), op));            \
         Impl::set(m_base, m_key, tmp.ptr());                                   \
         return *this;                                                          \
     }
@@ -73,11 +73,11 @@ struct str_attr {
     using key_type = const char *;
 
     NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
-        detail::getattr_or_raise(obj, key, cache);
+        nb_abi->getattr_or_raise_str(obj, key, cache);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        setattr(obj, key, v);
+        nb_abi->setattr_str(obj, key, v);
     }
 
     NB_INLINE static PyObject *key(const char *key) {
@@ -90,11 +90,11 @@ struct obj_attr {
     using key_type = object;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::getattr_or_raise(obj, key.ptr(), cache);
+        nb_abi->getattr_or_raise_obj(obj, key.ptr(), cache);
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
-        setattr(obj, key.ptr(), v);
+        nb_abi->setattr_obj(obj, key.ptr(), v);
     }
 
     NB_INLINE static PyObject *key(handle key) {
@@ -108,15 +108,15 @@ struct str_item {
     using key_type = const char *;
 
     NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
-        detail::getitem_or_raise(obj, key, cache);
+        nb_abi->getitem_or_raise_str(obj, key, cache);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        setitem(obj, key, v);
+        nb_abi->setitem_str(obj, key, v);
     }
 
     NB_INLINE static void del(PyObject *obj, const char *key) {
-        delitem(obj, key);
+        nb_abi->delitem_str(obj, key);
     }
 };
 
@@ -125,15 +125,15 @@ struct obj_item {
     using key_type = object;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::getitem_or_raise(obj, key.ptr(), cache);
+        nb_abi->getitem_or_raise_obj(obj, key.ptr(), cache);
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
-        setitem(obj, key.ptr(), v);
+        nb_abi->setitem_obj(obj, key.ptr(), v);
     }
 
     NB_INLINE static void del(PyObject *obj, handle key) {
-        delitem(obj, key.ptr());
+        nb_abi->delitem_obj(obj, key.ptr());
     }
 };
 
@@ -142,15 +142,15 @@ struct dict_item {
     using key_type = object;
 
     NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::dict_getitem_or_raise(obj, key.ptr(), cache);
+        detail::nb_abi->dict_getitem_or_raise(obj, key.ptr(), cache);
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
-        dict_setitem(obj, key.ptr(), v);
+        nb_abi->dict_setitem(obj, key.ptr(), v);
     }
 
     NB_INLINE static void del(PyObject *obj, handle key) {
-        dict_delitem(obj, key.ptr());
+        nb_abi->dict_delitem(obj, key.ptr());
     }
 
     NB_INLINE static PyObject *key(handle key) {
@@ -164,15 +164,15 @@ struct num_item {
     using key_type = Py_ssize_t;
 
     NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
-        detail::getitem_or_raise(obj, index, cache);
+        nb_abi->getitem_or_raise_index(obj, index, cache);
     }
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
-        setitem(obj, index, v);
+        nb_abi->setitem_index(obj, index, v);
     }
 
     NB_INLINE static void del(PyObject *obj, Py_ssize_t index) {
-        delitem(obj, index);
+        nb_abi->delitem_index(obj, index);
     }
 };
 
@@ -208,7 +208,7 @@ struct num_item_list {
     }
 
     NB_INLINE static void del(PyObject *obj, Py_ssize_t index) {
-        delitem(obj, index);
+        nb_abi->delitem_index(obj, index);
     }
 };
 

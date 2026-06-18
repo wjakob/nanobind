@@ -8,7 +8,6 @@
 */
 
 #include <nanobind/nanobind.h>
-#include <complex>
 #include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -36,46 +35,20 @@ create_exception(exception_type type, const char *fmt, va_list args_) {
     }
 }
 
-#if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
-#else
-    [[noreturn]]
-#endif
-void raise(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    builtin_exception err =
-        create_exception(exception_type::runtime_error, fmt, args);
-    va_end(args);
-    throw err;
+// These take a va_list (the public 'raise'/'raise_type_error'/'fail' inline
+// wrappers in nb_lib.h do the va_start/va_end and forward through the table; a
+// table pointer cannot carry the '...' or the [[noreturn]] attribute).
+[[noreturn]] void raise_v(const char *fmt, va_list args) {
+    throw create_exception(exception_type::runtime_error, fmt, args);
 }
 
-#if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
-#else
-    [[noreturn]]
-#endif
-void raise_type_error(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    builtin_exception err =
-        create_exception(exception_type::type_error, fmt, args);
-    va_end(args);
-    throw err;
+[[noreturn]] void raise_type_error_v(const char *fmt, va_list args) {
+    throw create_exception(exception_type::type_error, fmt, args);
 }
 
-/// Abort the process with a fatal error
-#if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
-#else
-    [[noreturn]]
-#endif
-void fail(const char *fmt, ...) noexcept {
-    va_list args;
+[[noreturn]] void fail_v(const char *fmt, va_list args) noexcept {
     fprintf(stderr, "Critical nanobind error: ");
-    va_start(args, fmt);
     vfprintf(stderr, fmt, args);
-    va_end(args);
     fprintf(stderr, "\n");
     abort();
 }
@@ -101,14 +74,16 @@ PyObject *capsule_new(const void *ptr, const char *name,
     return c;
 }
 
-void raise_python_error() {
+// Renamed (_impl) so the equally-signed public forwarders in nb_lib.h, which add
+// the [[noreturn]] a table pointer can't carry, do not clash with these.
+[[noreturn]] void raise_python_error_impl() {
     check(PyErr_Occurred(),
           "nanobind::detail::raise_python_error() called without "
           "an error condition!");
     throw python_error();
 }
 
-void raise_python_or_cast_error() {
+[[noreturn]] void raise_python_or_cast_error_impl() {
     if (PyErr_Occurred())
         throw python_error();
     throw cast_error();
@@ -116,37 +91,37 @@ void raise_python_or_cast_error() {
 
 // ========================================================================
 
-void cleanup_list::release() noexcept {
+void cleanup_list_release(cleanup_list *l) noexcept {
     /* Don't decrease the reference count of the first
        element, it stores the 'self' element. */
-    for (size_t i = 1; i < m_size; ++i)
-        Py_DECREF(m_data[i]);
-    if (m_capacity != Small)
-        free(m_data);
-    m_data = nullptr;
+    for (size_t i = 1; i < l->m_size; ++i)
+        Py_DECREF(l->m_data[i]);
+    if (l->m_capacity != cleanup_list::Small)
+        free(l->m_data);
+    l->m_data = nullptr;
 }
 
-void cleanup_list::expand() noexcept {
-    uint32_t new_capacity = m_capacity * 2;
+void cleanup_list_expand(cleanup_list *l) noexcept {
+    uint32_t new_capacity = l->m_capacity * 2;
     PyObject **new_data = (PyObject **) malloc(new_capacity * sizeof(PyObject *));
-    check(new_data, "nanobind::detail::cleanup_list::expand(): out of memory!");
-    memcpy(new_data, m_data, m_size * sizeof(PyObject *));
-    if (m_capacity != Small)
-        free(m_data);
-    m_data = new_data;
-    m_capacity = new_capacity;
+    check(new_data, "nanobind::detail::cleanup_list_expand(): out of memory!");
+    memcpy(new_data, l->m_data, l->m_size * sizeof(PyObject *));
+    if (l->m_capacity != cleanup_list::Small)
+        free(l->m_data);
+    l->m_data = new_data;
+    l->m_capacity = new_capacity;
 }
 
 // ========================================================================
 
-PyObject *module_import(const char *name) {
+PyObject *module_import_cstr(const char *name) {
     PyObject *res = PyImport_ImportModule(name);
     if (!res)
         throw python_error();
     return res;
 }
 
-PyObject *module_import(PyObject *o) {
+PyObject *module_import_obj(PyObject *o) {
     PyObject *res = PyImport_Import(o);
     if (!res)
         throw python_error();
@@ -219,9 +194,9 @@ size_t obj_len_hint(PyObject *o) noexcept {
     return (size_t) res;
 #else
     PyTypeObject *tp = Py_TYPE(o);
-    lenfunc l = (lenfunc) type_get_slot(tp, Py_sq_length);
+    lenfunc l = (lenfunc) type_get_slot_impl(tp, Py_sq_length);
     if (!l)
-        l = (lenfunc) type_get_slot(tp, Py_mp_length);
+        l = (lenfunc) type_get_slot_impl(tp, Py_mp_length);
 
     if (l) {
         Py_ssize_t res = l(o);
@@ -330,21 +305,21 @@ PyObject *obj_iter_next(PyObject *o) {
 
 // ========================================================================
 
-PyObject *getattr(PyObject *obj, const char *key) {
+PyObject *getattr_str(PyObject *obj, const char *key) {
     PyObject *res = PyObject_GetAttrString(obj, key);
     if (!res)
         raise_python_error();
     return res;
 }
 
-PyObject *getattr(PyObject *obj, PyObject *key) {
+PyObject *getattr_obj(PyObject *obj, PyObject *key) {
     PyObject *res = PyObject_GetAttr(obj, key);
     if (!res)
         raise_python_error();
     return res;
 }
 
-PyObject *getattr(PyObject *obj, const char *key_, PyObject *def) noexcept {
+PyObject *getattr_str_def(PyObject *obj, const char *key_, PyObject *def) noexcept {
 #if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
     str key(key_);
     if (PyObject_HasAttr(obj, key.ptr())) {
@@ -373,7 +348,7 @@ PyObject *getattr(PyObject *obj, const char *key_, PyObject *def) noexcept {
     return def;
 }
 
-PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
+PyObject *getattr_obj_def(PyObject *obj, PyObject *key, PyObject *def) noexcept {
 #if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
     if (PyObject_HasAttr(obj, key)) {
         PyObject *res = PyObject_GetAttr(obj, key);
@@ -401,7 +376,7 @@ PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
     return def;
 }
 
-void getattr_or_raise(PyObject *obj, const char *key, PyObject **out) {
+void getattr_or_raise_str(PyObject *obj, const char *key, PyObject **out) {
     if (*out)
         return;
 
@@ -412,7 +387,7 @@ void getattr_or_raise(PyObject *obj, const char *key, PyObject **out) {
     *out = res;
 }
 
-void getattr_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
+void getattr_or_raise_obj(PyObject *obj, PyObject *key, PyObject **out) {
     if (*out)
         return;
 
@@ -423,19 +398,19 @@ void getattr_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
     *out = res;
 }
 
-void setattr(PyObject *obj, const char *key, PyObject *value) {
+void setattr_str(PyObject *obj, const char *key, PyObject *value) {
     int rv = PyObject_SetAttrString(obj, key, value);
     if (rv)
         raise_python_error();
 }
 
-void setattr(PyObject *obj, PyObject *key, PyObject *value) {
+void setattr_obj(PyObject *obj, PyObject *key, PyObject *value) {
     int rv = PyObject_SetAttr(obj, key, value);
     if (rv)
         raise_python_error();
 }
 
-void delattr(PyObject *obj, const char *key) {
+void delattr_str(PyObject *obj, const char *key) {
 #if defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030D0000
     int rv = PyObject_SetAttrString(obj, key, nullptr);
 #else
@@ -446,7 +421,7 @@ void delattr(PyObject *obj, const char *key) {
         raise_python_error();
 }
 
-void delattr(PyObject *obj, PyObject *key) {
+void delattr_obj(PyObject *obj, PyObject *key) {
 #if defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030D0000
     int rv = PyObject_SetAttr(obj, key, nullptr);
 #else
@@ -459,7 +434,7 @@ void delattr(PyObject *obj, PyObject *key) {
 
 // ========================================================================
 
-void getitem_or_raise(PyObject *obj, Py_ssize_t key, PyObject **out) {
+void getitem_or_raise_index(PyObject *obj, Py_ssize_t key, PyObject **out) {
     if (*out)
         return;
 
@@ -470,7 +445,7 @@ void getitem_or_raise(PyObject *obj, Py_ssize_t key, PyObject **out) {
     *out = res;
 }
 
-void getitem_or_raise(PyObject *obj, const char *key_, PyObject **out) {
+void getitem_or_raise_str(PyObject *obj, const char *key_, PyObject **out) {
     if (*out)
         return;
 
@@ -489,7 +464,7 @@ void getitem_or_raise(PyObject *obj, const char *key_, PyObject **out) {
     *out = res;
 }
 
-void getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
+void getitem_or_raise_obj(PyObject *obj, PyObject *key, PyObject **out) {
     if (*out)
         return;
 
@@ -500,13 +475,13 @@ void getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out) {
     *out = res;
 }
 
-void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
+void setitem_index(PyObject *obj, Py_ssize_t key, PyObject *value) {
     int rv = PySequence_SetItem(obj, key, value);
     if (rv)
         raise_python_error();
 }
 
-void setitem(PyObject *obj, const char *key_, PyObject *value) {
+void setitem_str(PyObject *obj, const char *key_, PyObject *value) {
     PyObject *key = PyUnicode_FromString(key_);
     if (!key)
         raise_python_error();
@@ -518,13 +493,13 @@ void setitem(PyObject *obj, const char *key_, PyObject *value) {
         raise_python_error();
 }
 
-void setitem(PyObject *obj, PyObject *key, PyObject *value) {
+void setitem_obj(PyObject *obj, PyObject *key, PyObject *value) {
     int rv = PyObject_SetItem(obj, key, value);
     if (rv)
         raise_python_error();
 }
 
-void delitem(PyObject *obj, Py_ssize_t key_) {
+void delitem_index(PyObject *obj, Py_ssize_t key_) {
     PyObject *key = PyLong_FromSsize_t(key_);
     if (!key)
         raise_python_error();
@@ -536,7 +511,7 @@ void delitem(PyObject *obj, Py_ssize_t key_) {
         raise_python_error();
 }
 
-void delitem(PyObject *obj, const char *key_) {
+void delitem_str(PyObject *obj, const char *key_) {
     PyObject *key = PyUnicode_FromString(key_);
     if (!key)
         raise_python_error();
@@ -548,7 +523,7 @@ void delitem(PyObject *obj, const char *key_) {
         raise_python_error();
 }
 
-void delitem(PyObject *obj, PyObject *key) {
+void delitem_obj(PyObject *obj, PyObject *key) {
     int rv = PyObject_DelItem(obj, key);
     if (rv)
         raise_python_error();
@@ -882,9 +857,9 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
 // ========================================================================
 
-static void property_install_impl(PyTypeObject *tp, PyObject *scope,
-                                  const char *name, PyObject *getter,
-                                  PyObject *setter) {
+static void property_install_impl(nb_internals *internals, PyTypeObject *tp,
+                                  PyObject *scope, const char *name,
+                                  PyObject *getter, PyObject *setter) {
     PyObject *m = getter ? getter : setter;
     object doc = none();
 
@@ -903,15 +878,16 @@ static void property_install_impl(PyTypeObject *tp, PyObject *scope,
     );
 }
 
-void property_install(PyObject *scope, const char *name, PyObject *getter,
-                      PyObject *setter) noexcept {
-    property_install_impl(&PyProperty_Type, scope, name, getter, setter);
+void property_install(nb_internals *internals, PyObject *scope, const char *name,
+                      PyObject *getter, PyObject *setter) noexcept {
+    property_install_impl(internals, &PyProperty_Type, scope, name, getter, setter);
 }
 
-void property_install_static(PyObject *scope, const char *name,
-                             PyObject *getter, PyObject *setter) noexcept {
-    property_install_impl(nb_static_property_tp(), scope, name, getter,
-                          setter);
+void property_install_static(nb_internals *internals, PyObject *scope,
+                             const char *name, PyObject *getter,
+                             PyObject *setter) noexcept {
+    property_install_impl(internals, nb_static_property_tp(internals), scope,
+                          name, getter, setter);
 }
 
 // ========================================================================
@@ -944,15 +920,16 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 
 // ========================================================================
 
-NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
-                        std::complex<double> *out) noexcept {
+bool load_cmplx(PyObject *ob, uint8_t flags, double *out_re,
+                double *out_im) noexcept {
     bool is_complex = PyComplex_CheckExact(ob),
          convert = (flags & (uint8_t) cast_flags::convert);
 #if !defined(Py_LIMITED_API)
     if (is_complex || convert) {
         Py_complex result = PyComplex_AsCComplex(ob);
         if (result.real != -1.0 || !PyErr_Occurred()) {
-            *out = std::complex<double>(result.real, result.imag);
+            *out_re = result.real;
+            *out_im = result.imag;
             return true;
         } else {
             PyErr_Clear();
@@ -972,7 +949,8 @@ NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
             double im = PyComplex_ImagAsDouble(tmp);
             Py_DECREF(tmp);
             if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
-                *out = std::complex<double>(re, im);
+                *out_re = re;
+                *out_im = im;
                 return true;
             }
         }
@@ -984,7 +962,8 @@ NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
         double re = PyComplex_RealAsDouble(ob);
         double im = PyComplex_ImagAsDouble(ob);
         if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
-            *out = std::complex<double>(re, im);
+            *out_re = re;
+            *out_im = im;
             return true;
         } else {
             PyErr_Clear();
@@ -1191,19 +1170,19 @@ void decref_checked(PyObject *o) noexcept {
 
 // ========================================================================
 
-bool leak_warnings() noexcept {
+bool leak_warnings(nb_internals *internals) noexcept {
     return internals->print_leak_warnings;
 }
 
-bool implicit_cast_warnings() noexcept {
+bool implicit_cast_warnings(nb_internals *internals) noexcept {
     return internals->print_implicit_cast_warnings;
 }
 
-void set_leak_warnings(bool value) noexcept {
+void set_leak_warnings(nb_internals *internals, bool value) noexcept {
     internals->print_leak_warnings = value;
 }
 
-void set_implicit_cast_warnings(bool value) noexcept {
+void set_implicit_cast_warnings(nb_internals *internals, bool value) noexcept {
     internals->print_implicit_cast_warnings = value;
 }
 
@@ -1240,7 +1219,7 @@ PyObject *try_iter(PyObject *o) noexcept {
 
 // ========================================================================
 
-NB_CORE PyObject *repr_list(PyObject *o) {
+PyObject *repr_list(PyObject *o) {
     object name = steal(nb_inst_name(o));
     size_t len = obj_len(o);
     list items;
@@ -1256,7 +1235,7 @@ NB_CORE PyObject *repr_list(PyObject *o) {
     return result;
 }
 
-NB_CORE PyObject *repr_map(PyObject *o) {
+PyObject *repr_map(PyObject *o) {
     object name = steal(nb_inst_name(o));
     list items;
     for (handle kv : handle(o).attr("items")()) {

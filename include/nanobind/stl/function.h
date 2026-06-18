@@ -29,7 +29,7 @@ struct pyfunc_wrapper {
     pyfunc_wrapper(const pyfunc_wrapper &w) : f(w.f) {
         if (f) {
             // Don't touch the reference count if the interpreter is shut down
-            if (!is_alive()) {
+            if (!nb_abi->is_alive()) {
                 f = nullptr;
                 return;
             }
@@ -41,7 +41,7 @@ struct pyfunc_wrapper {
     ~pyfunc_wrapper() {
         if (f) {
             // Don't run the deleter if the interpreter has been shut down
-            if (!is_alive())
+            if (!nb_abi->is_alive())
                 return;
             gil_scoped_acquire acq;
             Py_DECREF(f);

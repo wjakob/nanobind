@@ -16,15 +16,14 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-NB_CORE bool load_cmplx(PyObject*, uint8_t flags, std::complex<double> *out) noexcept;
-
 template <typename T> struct type_caster<std::complex<T>> {
     NB_TYPE_CASTER(std::complex<T>, const_name("complex"))
 
     bool from_python(handle src, uint8_t flags, cleanup_list*) noexcept {
-        std::complex<double> cmplx;
-        if (!load_cmplx(src.ptr(), flags, &cmplx))
+        double re, im;
+        if (!nb_abi->load_cmplx(src.ptr(), flags, &re, &im))
             return false;
+        std::complex<double> cmplx(re, im);
         if constexpr (std::is_same_v<T, double>) {
             value = cmplx;
             return true;

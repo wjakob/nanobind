@@ -63,10 +63,106 @@ NAMESPACE_BEGIN(detail)
 #  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail(__VA_ARGS__)
 #endif
 
+struct nb_alias_chain;
+struct nb_inst;
+struct nb_internals;
+
+/// LIFO Instance pool
+struct nb_inst_pool {
+    nb_inst **slots;
+    uint32_t count;
+    uint32_t capacity;
+};
+
+// Implicit conversions for C++ type bindings, used in type_data below
+struct implicit_t {
+    const std::type_info **cpp;
+    bool (**py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
+};
+
+// Forward and reverse mappings for enumerations, used in type_data below
+struct enum_tbl_t {
+    void *fwd;
+    void *rev;
+};
+
+/// Backend-private storage describing a type throughout its lifetime. The
+/// construction inputs arrive via the frozen 'type_data_init' record; the
+/// remaining fields are filled in by nb_type_new() and friends.
+struct type_data {
+    uint32_t size;
+    uint32_t align;
+    uint32_t flags;
+    const char *name;
+    const std::type_info *type;
+    PyTypeObject *type_py;
+    nb_alias_chain *alias_chain;
+#if defined(Py_LIMITED_API)
+    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
+#endif
+    void *init; // Constructor nb_func
+    void (*destruct)(void *);
+    void (*copy)(void *, const void *);
+    void (*move)(void *, void *) noexcept;
+    union {
+        implicit_t implicit;  // for C++ type bindings
+        enum_tbl_t enum_tbl;  // for enumerations
+    };
+    void (*set_self_py)(void *, PyObject *) noexcept;
+    bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
+    uint32_t dictoffset;
+    uint32_t weaklistoffset;
+    /// Out-of-line heap storage for an optional nb::supplement<T>
+    void *supplement;
+    /// Owning domain. Lets interpreter-initiated callbacks (tp_dealloc, ...)
+    /// reach the internals without a global, via nb_type_data(type)->internals.
+    nb_internals *internals;
+    /// Instance pool capacity
+    uint32_t pool_capacity;
+#if defined(NB_FREE_THREADED)
+    /// Slot of this type's pool in the packed per-thread pool array
+    uint32_t pool_index;
+#else
+    /// Per-type instance pool for non-FT builds
+    nb_inst_pool pool;
+#endif
+};
+
+/// Low bits copied from public construction/enum records. For type bindings,
+/// init-only type_init_flags are stripped before storing the flags here.
+static constexpr uint32_t type_data_public_flag_mask = (1u << 24) - 1u;
+static constexpr uint32_t type_data_construction_flag_mask =
+    type_data_public_flag_mask & ~(uint32_t) type_init_flags::all_init_flags;
+
+/// Runtime-only type flags owned by the backend. They start above the 24-bit
+/// public 'type_data_init::flags' field so the public construction flag namespace
+/// keeps its reserved headroom. They are set while creating/using a type; binding
+/// code never supplies them, and they never appear in a 'type_data_init' record.
+enum class type_flags_internal : uint32_t {
+    /// Cached copy of Py_TPFLAGS_HAVE_GC
+    has_gc                   = (1u << 24),
+
+    /// Does the type maintain a list of implicit conversions?
+    has_implicit_conversions = (1u << 25),
+
+    /// Is this a Python type that extends a bound C++ type?
+    is_python_type           = (1u << 26),
+
+    /// Does the type implement a custom __new__ operator?
+    has_new                  = (1u << 27),
+
+    /// Does the type implement a custom __new__ operator that can take no args
+    /// (except the type object)?
+    has_nullary_new          = (1u << 28)
+};
+
 /// Nanobind function metadata (overloads, etc.)
-struct func_data : func_data_prelim_base {
-    arg_data *args;
+struct func_data : func_data_init_base {
+    arg_data_init *args;
     char *signature;
+    /// Owning domain. Lets interpreter-initiated callbacks (tp_dealloc, the
+    /// vectorcall path, ...) reach the internals via nb_func_data(self)->internals.
+    nb_internals *internals;
 };
 
 /// Packed status of a nanobind type instance.
@@ -600,12 +696,11 @@ inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
 
 /// Convenience macro to potentially access cached functions
 #if defined(Py_LIMITED_API)
-#  define NB_SLOT(type, name) internals->type##_##name
+#  define NB_SLOT(type, name) nb_abi_internals->type##_##name
 #else
 #  define NB_SLOT(type, name) type.name
 #endif
 
-extern nb_internals *internals;
 
 extern char *type_name(const std::type_info *t);
 
@@ -616,10 +711,197 @@ extern PyTypeObject *nb_type_create_metaclass(nb_internals *p,
 // Forward declarations
 extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
 extern PyObject *inst_new_int(PyTypeObject *tp, PyObject *args, PyObject *kwds);
-extern PyTypeObject *nb_static_property_tp() noexcept;
+extern PyTypeObject *nb_static_property_tp(nb_internals *internals) noexcept;
 extern type_data *nb_type_c2p(nb_internals *internals,
                               const std::type_info *type);
+
+// Backend implementations behind the nb_abi table (the matching public names in
+// nb_lib.h are inline forwarders). Declared here so the table can be populated.
+extern PyObject *nb_func_new(nb_internals *internals,
+                             const func_data_init_base *f) noexcept;
+extern bool leak_warnings(nb_internals *internals) noexcept;
+extern bool implicit_cast_warnings(nb_internals *internals) noexcept;
+extern void set_leak_warnings(nb_internals *internals, bool value) noexcept;
+extern void set_implicit_cast_warnings(nb_internals *internals, bool value) noexcept;
+extern void register_exception_translator(nb_internals *internals,
+                                          exception_translator t, void *payload);
+extern void implicitly_convertible_cpp(nb_internals *internals,
+                                       const std::type_info *src,
+                                       const std::type_info *dst) noexcept;
+extern void implicitly_convertible_py(nb_internals *internals,
+                                      bool (*predicate)(PyTypeObject *, PyObject *,
+                                                        cleanup_list *),
+                                      const std::type_info *dst) noexcept;
+extern PyObject *enum_create(nb_internals *internals, enum_data_init *ed) noexcept;
+extern bool enum_from_python(nb_internals *internals, const std::type_info *tp,
+                             PyObject *o, int64_t *out, uint8_t flags) noexcept;
+extern PyObject *enum_from_cpp(nb_internals *internals, const std::type_info *tp,
+                               int64_t value) noexcept;
+extern PyObject *ndarray_export(nb_internals *internals, ndarray_handle *h,
+                                int framework, rv_policy policy,
+                                cleanup_list *cleanup) noexcept;
+extern PyObject *nb_type_new(nb_internals *internals, const type_data_init *c) noexcept;
+extern bool nb_type_get(nb_internals *internals, const std::type_info *t,
+                        PyObject *o, uint8_t flags, cleanup_list *cleanup,
+                        void **out) noexcept;
+extern PyObject *nb_type_put(nb_internals *internals, const std::type_info *cpp_type,
+                             void *value, rv_policy rvp, cleanup_list *cleanup,
+                             bool *is_new) noexcept;
+extern PyObject *nb_type_put_p(nb_internals *internals, const std::type_info *cpp_type,
+                               const std::type_info *cpp_type_p, void *value,
+                               rv_policy rvp, cleanup_list *cleanup, bool *is_new) noexcept;
+extern PyObject *nb_type_put_unique(nb_internals *internals, const std::type_info *cpp_type,
+                                    void *value, cleanup_list *cleanup, bool cpp_delete) noexcept;
+extern PyObject *nb_type_put_unique_p(nb_internals *internals, const std::type_info *cpp_type,
+                                      const std::type_info *cpp_type_p, void *value,
+                                      cleanup_list *cleanup, bool cpp_delete) noexcept;
+extern bool nb_type_check(nb_internals *internals, PyObject *t) noexcept;
+extern bool nb_type_isinstance(nb_internals *internals, PyObject *obj,
+                               const std::type_info *t) noexcept;
+extern PyObject *nb_type_lookup(nb_internals *internals, const std::type_info *t) noexcept;
+extern void keep_alive(nb_internals *internals, PyObject *nurse, PyObject *patient);
+extern void keep_alive_cb(nb_internals *internals, PyObject *nurse, void *payload,
+                          void (*deleter)(void *) noexcept) noexcept;
+extern void property_install(nb_internals *internals, PyObject *scope,
+                             const char *name, PyObject *getter,
+                             PyObject *setter) noexcept;
+extern void property_install_static(nb_internals *internals, PyObject *scope,
+                                    const char *name, PyObject *getter,
+                                    PyObject *setter) noexcept;
+extern void trampoline_new(nb_internals *internals, void **data, size_t size,
+                           void *ptr) noexcept;
+extern void trampoline_enter(nb_internals *internals, void **data, size_t size,
+                             const char *name, bool pure, ticket *t);
 extern void nb_type_unregister(type_data *t) noexcept;
+
+// Stateless table entries: extensions reach these only through nb_abi-> (no
+// per-domain handle needed), so the backend declares them here rather than in the
+// public header. Their addresses populate the matching nb_abi slots.
+extern bool load_i8 (PyObject *, uint8_t, int8_t *) noexcept;
+extern bool load_u8 (PyObject *, uint8_t, uint8_t *) noexcept;
+extern bool load_i16(PyObject *, uint8_t, int16_t *) noexcept;
+extern bool load_u16(PyObject *, uint8_t, uint16_t *) noexcept;
+extern bool load_i32(PyObject *, uint8_t, int32_t *) noexcept;
+extern bool load_u32(PyObject *, uint8_t, uint32_t *) noexcept;
+extern bool load_i64(PyObject *, uint8_t, int64_t *) noexcept;
+extern bool load_u64(PyObject *, uint8_t, uint64_t *) noexcept;
+extern bool load_f32(PyObject *, uint8_t, float *) noexcept;
+extern bool load_f64(PyObject *, uint8_t, double *) noexcept;
+extern bool load_cmplx(PyObject *, uint8_t, double *, double *) noexcept;
+extern void incref_checked(PyObject *) noexcept;
+extern void decref_checked(PyObject *) noexcept;
+extern PyObject *str_from_obj(PyObject *);
+extern PyObject *str_from_cstr(const char *);
+extern PyObject *str_from_cstr_and_size(const char *, size_t);
+extern PyObject *bytes_from_obj(PyObject *);
+extern PyObject *bytes_from_cstr(const char *);
+extern PyObject *bytes_from_cstr_and_size(const void *, size_t);
+extern PyObject *bytearray_from_obj(PyObject *);
+extern PyObject *bytearray_from_cstr_and_size(const void *, size_t);
+extern PyObject *bool_from_obj(PyObject *);
+extern PyObject *int_from_obj(PyObject *);
+extern PyObject *float_from_obj(PyObject *);
+extern PyObject *list_from_obj(PyObject *);
+extern PyObject *tuple_from_obj(PyObject *);
+extern PyObject *set_from_obj(PyObject *);
+extern PyObject *frozenset_from_obj(PyObject *);
+extern PyObject *memoryview_from_obj(PyObject *);
+extern size_t obj_len(PyObject *);
+extern size_t obj_len_hint(PyObject *) noexcept;
+extern PyObject *obj_repr(PyObject *);
+extern bool obj_comp(PyObject *, PyObject *, int);
+extern PyObject *obj_op_1(PyObject *, PyObject *(*)(PyObject *));
+extern PyObject *obj_op_2(PyObject *, PyObject *, PyObject *(*)(PyObject *, PyObject *));
+extern PyObject *obj_vectorcall(PyObject *, PyObject *const *, size_t, PyObject *, bool);
+extern PyObject *obj_iter(PyObject *);
+extern PyObject *obj_iter_next(PyObject *);
+extern void tuple_check(PyObject *, size_t);
+extern PyObject *capsule_new(const void *, const char *, void (*)(void *) noexcept) noexcept;
+extern void print(PyObject *, PyObject *, PyObject *);
+extern PyObject *exception_new(PyObject *, const char *, PyObject *);
+extern bool iterable_check(PyObject *) noexcept;
+extern PyObject *try_iter(PyObject *) noexcept;
+extern bool issubclass(PyObject *, PyObject *);
+extern PyObject *repr_list(PyObject *);
+extern PyObject *repr_map(PyObject *);
+extern void slice_compute(PyObject *, Py_ssize_t, Py_ssize_t &, Py_ssize_t &, Py_ssize_t &, size_t &);
+extern PyObject **seq_get_with_size(PyObject *, size_t, PyObject **) noexcept;
+extern PyObject **seq_get(PyObject *, size_t *, PyObject **) noexcept;
+extern PyObject *module_new_submodule(PyObject *, const char *, const char *) noexcept;
+extern void dict_getitem_or_raise(PyObject *, PyObject *, PyObject **);
+extern PyObject *dict_getitem_or_default(PyObject *, PyObject *, PyObject *);
+extern void dict_setitem(PyObject *, PyObject *, PyObject *);
+extern void dict_delitem(PyObject *, PyObject *);
+extern bool nb_type_relinquish_ownership(PyObject *, bool) noexcept;
+extern void nb_type_restore_ownership(PyObject *, bool) noexcept;
+extern void *nb_type_supplement(PyObject *) noexcept;
+extern size_t nb_type_size(PyObject *) noexcept;
+extern size_t nb_type_align(PyObject *) noexcept;
+extern PyObject *nb_type_name(PyObject *) noexcept;
+extern PyObject *nb_inst_name(PyObject *) noexcept;
+extern const std::type_info *nb_type_info(PyObject *) noexcept;
+extern void *type_get_slot_impl(PyTypeObject *, int);
+extern void *nb_inst_ptr(PyObject *) noexcept;
+extern PyObject *nb_inst_alloc(PyTypeObject *);
+extern PyObject *nb_inst_alloc_zero(PyTypeObject *);
+extern PyObject *nb_inst_reference(PyTypeObject *, void *, PyObject *);
+extern PyObject *nb_inst_take_ownership(PyTypeObject *, void *);
+extern void nb_inst_destruct(PyObject *) noexcept;
+extern void nb_inst_zero(PyObject *) noexcept;
+extern void nb_inst_copy(PyObject *, const PyObject *) noexcept;
+extern void nb_inst_move(PyObject *, const PyObject *) noexcept;
+extern void nb_inst_replace_copy(PyObject *, const PyObject *) noexcept;
+extern void nb_inst_replace_move(PyObject *, const PyObject *) noexcept;
+extern bool nb_inst_python_derived(PyObject *) noexcept;
+extern void nb_inst_set_state(PyObject *, bool, bool) noexcept;
+// Packed state: bit 0 = ready, bit 1 = destruct
+extern uint8_t nb_inst_state_read(PyObject *) noexcept;
+extern PyObject *getattr_str(PyObject *, const char *);
+extern PyObject *getattr_obj(PyObject *, PyObject *);
+extern PyObject *getattr_str_def(PyObject *, const char *, PyObject *) noexcept;
+extern PyObject *getattr_obj_def(PyObject *, PyObject *, PyObject *) noexcept;
+extern void getattr_or_raise_str(PyObject *, const char *, PyObject **);
+extern void getattr_or_raise_obj(PyObject *, PyObject *, PyObject **);
+extern void setattr_str(PyObject *, const char *, PyObject *);
+extern void setattr_obj(PyObject *, PyObject *, PyObject *);
+extern void delattr_str(PyObject *, const char *);
+extern void delattr_obj(PyObject *, PyObject *);
+extern void getitem_or_raise_index(PyObject *, Py_ssize_t, PyObject **);
+extern void getitem_or_raise_str(PyObject *, const char *, PyObject **);
+extern void getitem_or_raise_obj(PyObject *, PyObject *, PyObject **);
+extern void setitem_index(PyObject *, Py_ssize_t, PyObject *);
+extern void setitem_str(PyObject *, const char *, PyObject *);
+extern void setitem_obj(PyObject *, PyObject *, PyObject *);
+extern void delitem_index(PyObject *, Py_ssize_t);
+extern void delitem_str(PyObject *, const char *);
+extern void delitem_obj(PyObject *, PyObject *);
+extern PyObject *module_import_cstr(const char *);
+extern PyObject *module_import_obj(PyObject *);
+extern void enum_append(PyObject *, const char *, int64_t, const char *, const char *) noexcept;
+extern void enum_export(PyObject *);
+extern ndarray_handle *ndarray_import(PyObject *, const ndarray_config *, bool, cleanup_list *) noexcept;
+extern ndarray_handle *ndarray_create(void *, size_t, const size_t *, PyObject *, const int64_t *, dlpack::dtype, bool, int, int, char, uint64_t);
+extern dlpack::dltensor *ndarray_inc_ref(ndarray_handle *) noexcept;
+extern void ndarray_dec_ref(ndarray_handle *) noexcept;
+extern bool ndarray_check(PyObject *) noexcept;
+extern bool is_alive() noexcept;
+extern const char *abi_tag();
+[[noreturn]] extern void raise_v(const char *, va_list);
+[[noreturn]] extern void raise_type_error_v(const char *, va_list);
+[[noreturn]] extern void fail_v(const char *, va_list) noexcept;
+[[noreturn]] extern void raise_python_error_impl();
+[[noreturn]] extern void raise_python_or_cast_error_impl();
+extern void chain_error_v(PyObject *, const char *, va_list) noexcept;
+extern void python_error_init(python_error *);
+extern void python_error_copy(python_error *, const python_error *);
+extern void python_error_move(python_error *, python_error *) noexcept;
+extern void python_error_destroy(python_error *) noexcept;
+extern void python_error_restore(python_error *) noexcept;
+extern const char *python_error_what(const python_error *) noexcept;
+extern void cleanup_list_expand(cleanup_list *) noexcept;
+extern void cleanup_list_release(cleanup_list *) noexcept;
+extern void trampoline_release_impl(void **, size_t) noexcept;
+extern void trampoline_leave_impl(ticket *) noexcept;
 
 extern PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept;
 
@@ -635,7 +917,7 @@ NB_INLINE type_data *nb_type_data(PyTypeObject *o) noexcept{
     #else
         #if 1
             // Fast path that can be inlines without spilling registers
-            return (type_data *) ((char *) o + internals->type_data_offset);
+            return (type_data *) ((char *) o + nb_abi_internals->type_data_offset);
         #else
             // Equivalent non-inlined reference version:
             return (type_data *) PyObject_GetTypeData((PyObject *) o, Py_TYPE((PyObject *) o));
@@ -666,7 +948,7 @@ NB_INLINE nb_inst_pool *nb_pool_lookup(type_data *td) noexcept {
 extern nb_inst_pool *nb_pool_ensure(type_data *td) noexcept;
 
 /// Release all objects kept in the given instance pool
-extern void nb_pool_drain(nb_inst_pool *pool, bool can_free) noexcept;
+extern void nb_pool_drain(nb_internals *internals, nb_inst_pool *pool, bool can_free) noexcept;
 
 template <typename T> struct scoped_pymalloc {
     scoped_pymalloc(size_t size = 1, size_t extra_bytes = 0) {

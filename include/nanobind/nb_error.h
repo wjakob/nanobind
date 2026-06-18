@@ -9,6 +9,17 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
+class python_error;
+
+NAMESPACE_BEGIN(detail)
+extern void python_error_init(python_error *);
+extern void python_error_copy(python_error *, const python_error *);
+extern void python_error_move(python_error *, python_error *) noexcept;
+extern void python_error_destroy(python_error *) noexcept;
+extern void python_error_restore(python_error *) noexcept;
+extern const char *python_error_what(const python_error *) noexcept;
+NAMESPACE_END(detail)
+
 /// RAII wrapper that temporarily clears any Python error state
 #if PY_VERSION_HEX >= 0x030C0000
 struct error_scope {
@@ -29,10 +40,14 @@ private:
 /// Wraps a Python error state as a C++ exception
 class NB_EXPORT python_error : public std::exception {
 public:
-    NB_EXPORT_SHARED python_error();
-    NB_EXPORT_SHARED python_error(const python_error &);
-    NB_EXPORT_SHARED python_error(python_error &&) noexcept;
-    NB_EXPORT_SHARED ~python_error() override;
+    python_error() { detail::nb_abi->python_error_init(this); }
+    python_error(const python_error &e) : std::exception(e) {
+        detail::nb_abi->python_error_copy(this, &e);
+    }
+    python_error(python_error &&e) noexcept : std::exception(e) {
+        detail::nb_abi->python_error_move(this, &e);
+    }
+    ~python_error() override { detail::nb_abi->python_error_destroy(this); }
 
     bool matches(handle exc) const noexcept {
 #if PY_VERSION_HEX < 0x030C0000
@@ -44,7 +59,7 @@ public:
 
     /// Move the error back into the Python domain. This may only be called
     /// once, and you should not reraise the exception in C++ afterward.
-    NB_EXPORT_SHARED void restore() noexcept;
+    void restore() noexcept { detail::nb_abi->python_error_restore(this); }
 
     /// Pass the error to Python's `sys.unraisablehook`, which prints
     /// a traceback to `sys.stderr` by default but may be overridden.
@@ -73,9 +88,18 @@ public:
     [[deprecated]]
     object trace() const { return traceback(); }
 
-    NB_EXPORT_SHARED const char *what() const noexcept override;
+    const char *what() const noexcept override {
+        return detail::nb_abi->python_error_what(this);
+    }
 
 private:
+    friend void detail::python_error_init(python_error *);
+    friend void detail::python_error_copy(python_error *, const python_error *);
+    friend void detail::python_error_move(python_error *, python_error *) noexcept;
+    friend void detail::python_error_destroy(python_error *) noexcept;
+    friend void detail::python_error_restore(python_error *) noexcept;
+    friend const char *detail::python_error_what(const python_error *) noexcept;
+
 #if PY_VERSION_HEX < 0x030C0000
     mutable PyObject *m_type = nullptr;
     mutable PyObject *m_value = nullptr;
@@ -97,11 +121,12 @@ enum class exception_type {
 // Base interface used to expose common Python exceptions in C++
 class NB_EXPORT builtin_exception : public std::runtime_error {
 public:
-    NB_EXPORT_SHARED builtin_exception(exception_type type, const char *what);
-    NB_EXPORT_SHARED builtin_exception(builtin_exception &&) = default;
-    NB_EXPORT_SHARED builtin_exception(const builtin_exception &) = default;
-    NB_EXPORT_SHARED ~builtin_exception();
-    NB_EXPORT_SHARED exception_type type() const { return m_type; }
+    builtin_exception(exception_type type, const char *what)
+        : std::runtime_error(what ? what : ""), m_type(type) { }
+    builtin_exception(builtin_exception &&) = default;
+    builtin_exception(const builtin_exception &) = default;
+    ~builtin_exception() override = default;
+    exception_type type() const { return m_type; }
 private:
     exception_type m_type;
 };
@@ -133,7 +158,7 @@ class exception : public object {
     NB_OBJECT_DEFAULT(exception, object, "Exception", PyExceptionClass_Check)
 
     exception(handle scope, const char *name, handle base = PyExc_Exception)
-        : object(detail::exception_new(scope.ptr(), name, base.ptr()),
+        : object(detail::nb_abi->exception_new(scope.ptr(), name, base.ptr()),
                  detail::steal_t()) {
         detail::register_exception_translator(
             [](const std::exception_ptr &p, void *payload) {
@@ -146,7 +171,30 @@ class exception : public object {
     }
 };
 
-NB_CORE void chain_error(handle type, const char *fmt, ...) noexcept;
-[[noreturn]] NB_CORE void raise_from(python_error &e, handle type, const char *fmt, ...);
+#if defined(__GNUC__)
+    __attribute__((__format__ (__printf__, 2, 3)))
+#endif
+inline void chain_error(handle type, const char *fmt, ...) noexcept {
+    va_list args;
+    va_start(args, fmt);
+    detail::nb_abi->chain_error_v(type.ptr(), fmt, args);
+    va_end(args);
+}
+
+#if defined(__GNUC__)
+    __attribute__((noreturn, __format__ (__printf__, 3, 4)))
+#else
+    [[noreturn]]
+#endif
+inline void raise_from(python_error &e, handle type, const char *fmt, ...) {
+    e.restore();
+
+    va_list args;
+    va_start(args, fmt);
+    detail::nb_abi->chain_error_v(type.ptr(), fmt, args);
+    va_end(args);
+
+    detail::raise_python_error();
+}
 
 NAMESPACE_END(NB_NAMESPACE)

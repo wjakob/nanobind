@@ -16,7 +16,7 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
         PyObject *temp;
 
         /* Will initialize 'temp' (NULL in the case of a failure.) */
-        PyObject **o = seq_get_with_size(src.ptr(), Size, &temp);
+        PyObject **o = nb_abi->seq_get_with_size(src.ptr(), Size, &temp);
 
         Caster caster;
         bool success = o != nullptr;

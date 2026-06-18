@@ -36,7 +36,7 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     bool from_python(handle src, uint8_t flags,
                      cleanup_list *cleanup) noexcept {
         PyObject *temp; // always initialized by the following line
-        PyObject **o = seq_get_with_size(src.ptr(), 2, &temp);
+        PyObject **o = nb_abi->seq_get_with_size(src.ptr(), 2, &temp);
 
         temp_ref = steal(temp);
 

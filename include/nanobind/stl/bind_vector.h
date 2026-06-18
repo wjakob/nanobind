@@ -70,7 +70,7 @@ class_<Vector> bind_vector(handle scope, const char *name, Args &&...args) {
 
         .def("__repr__",
              [](handle_t<Vector> h) {
-                return steal<str>(detail::repr_list(h.ptr()));
+                return steal<str>(detail::nb_abi->repr_list(h.ptr()));
              })
 
         .def("__iter__",

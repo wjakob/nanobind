@@ -29,7 +29,7 @@ template <typename List, typename Entry> struct list_caster {
 
         /* Will initialize 'size' and 'temp'. All return values and
            return parameters are zero/NULL in the case of a failure. */
-        PyObject **o = seq_get(src.ptr(), &size, &temp);
+        PyObject **o = nb_abi->seq_get(src.ptr(), &size, &temp);
 
         value.clear();
 

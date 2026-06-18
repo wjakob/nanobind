@@ -32,7 +32,7 @@ template <typename T> struct deleter {
     void operator()(void *p) noexcept {
         if (o) {
             // Don't run the deleter if the interpreter has been shut down
-            if (!is_alive())
+            if (!detail::nb_abi->is_alive())
                 return;
             gil_scoped_acquire guard;
             Py_DECREF(o);
@@ -78,7 +78,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     /* If true, the Python object has relinquished ownership but we have
        not yet yielded a unique_ptr that holds ownership on the C++ side.
 
-       `nb_type_relinquish_ownership()` can fail, so we must check it in
+       `nb_abi->nb_type_relinquish_ownership()` can fail, so we must check it in
        `can_cast()`. If we do so, but then wind up not executing the cast
        operator, we must remember to undo our relinquishment and push the
        ownership back onto the Python side. For example, this might be
@@ -90,7 +90,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
 
     ~type_caster() {
         if (inflight)
-            nb_type_restore_ownership(src.ptr(), IsDefaultDeleter);
+            nb_abi->nb_type_restore_ownership(src.ptr(), IsDefaultDeleter);
     }
 
     bool from_python(handle src_, uint8_t, cleanup_list *) noexcept {
@@ -154,7 +154,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     bool can_cast() const noexcept {
         if (src.is_none() || inflight)
             return true;
-        else if (!nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+        else if (!nb_abi->nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
             return false;
         inflight = true;
         return true;
@@ -162,7 +162,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
 
     explicit operator Value() {
         if (!inflight && !src.is_none() &&
-            !nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+            !nb_abi->nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
             throw next_overload();
 
         Td *p = caster.operator Td *();

@@ -41,6 +41,7 @@
 #include <typeinfo>
 #include <utility>
 #include <new>
+#include <cstdarg>
 
 // Implementation. The nb_*.h files should only be included through nanobind.h
 // IWYU pragma: begin_exports

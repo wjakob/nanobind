@@ -67,6 +67,12 @@ corner cases, and free-threading.
     ``__dlpack__()`` keyword parsing speeds ``numpy.from_dlpack()`` by a
     further ~8% (PR `#1373 <https://github.com/wjakob/nanobind/pull/1373>`__).
 
+  - :cpp:class:`nb::ndarray <ndarray>` argument detection now probes for the
+    ``__dlpack__`` method and buffer protocol without raising and catching a
+    Python exception, which greatly speeds up rejecting non-array inputs during
+    overload resolution. (PR `#1385
+    <https://github.com/wjakob/nanobind/pull/1385>`__).
+
   - Reduced the cost of thread-local storage (TLS) accesses, which are needed
     by performance-critical nanobind functions in free-threaded builds.
     Consolidating the per-thread state into a single structure cut the number
@@ -329,6 +335,11 @@ corner cases, and free-threading.
   improve :ref:`auto-vectorization <eigen_vectorization>` of Eigen code.
   (issue `#1263 <https://github.com/wjakob/nanobind/issues/1263>`__, PR `#1378
   <https://github.com/wjakob/nanobind/pull/1378>`__).
+
+- :cpp:class:`nb::ndarray <ndarray>` can now return arrays to Apple's
+  `MLX <https://github.com/ml-explore/mlx>`__ array framework via the new
+  :cpp:class:`nb::mlx <mlx>` framework annotation. (PR `#1386
+  <https://github.com/wjakob/nanobind/pull/1386>`__).
 
 - Miscellaneous minor fixes and improvements. (PRs `#1301
   <https://github.com/wjakob/nanobind/pull/1301>`__, `#1304

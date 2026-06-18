@@ -149,7 +149,8 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
                                         int *hour, int *minute, int *second,
                                         int *usec) {
     datetime_types.ensure_ready();
-    if (PyType_IsSubtype(Py_TYPE(o),
+    PyTypeObject *tp = Py_TYPE(o);
+    if (PyType_IsSubtype(tp,
                          (PyTypeObject *) datetime_types.datetime.ptr())) {
         if (!set_from_int_attr(usec, o, "microsecond") ||
             !set_from_int_attr(second, o, "second") ||
@@ -162,7 +163,7 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
         }
         return true;
     }
-    if (PyType_IsSubtype(Py_TYPE(o),
+    if (PyType_IsSubtype(tp,
                          (PyTypeObject *) datetime_types.date.ptr())) {
         *usec = *second = *minute = *hour = 0;
         if (!set_from_int_attr(day, o, "day") ||
@@ -172,7 +173,7 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
         }
         return true;
     }
-    if (PyType_IsSubtype(Py_TYPE(o),
+    if (PyType_IsSubtype(tp,
                          (PyTypeObject *) datetime_types.time.ptr())) {
         *day = 1;
         *month = 1;

@@ -1697,6 +1697,7 @@ PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept {
 
 /// Encapsulates the implicit conversion part of nb_type_get()
 static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
+                                             PyTypeObject *src_type,
                                              const std::type_info *cpp_type_src,
                                              const type_data *dst_type,
                                              nb_internals *internals_,
@@ -1713,7 +1714,7 @@ static NB_NOINLINE bool nb_type_get_implicit(PyObject *src,
         it = dst_type->implicit.cpp;
         while ((v = *it++)) {
             const type_data *d = nb_type_c2p(internals_, v);
-            if (d && PyType_IsSubtype(Py_TYPE(src), d->type_py))
+            if (d && PyType_IsSubtype(src_type, d->type_py))
                 goto found;
         }
     }
@@ -1743,7 +1744,7 @@ found:
 
         if (internals->print_implicit_cast_warnings) {
 #if !defined(Py_LIMITED_API)
-            const char *name = Py_TYPE(src)->tp_name;
+            const char *name = src_type->tp_name;
 #else
             PyObject *name_py = nb_inst_name(src);
             const char *name = PyUnicode_AsUTF8AndSize(name_py, nullptr);
@@ -1851,8 +1852,8 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
         if (dst_type &&
             (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions))
-            return nb_type_get_implicit(src, cpp_type_src, dst_type, internals_,
-                                        cleanup, out);
+            return nb_type_get_implicit(src, src_type, cpp_type_src, dst_type,
+                                        internals_, cleanup, out);
     }
 
     return false;

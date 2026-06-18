@@ -246,8 +246,9 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
         func_prev = PyObject_GetAttr(f->scope, name);
         if (func_prev) {
-            if (Py_TYPE(func_prev) == internals_->nb_func ||
-                Py_TYPE(func_prev) == internals_->nb_method) {
+            PyTypeObject *func_prev_tp = Py_TYPE(func_prev);
+            if (func_prev_tp == internals_->nb_func ||
+                func_prev_tp == internals_->nb_method) {
                 func_data *fp = nb_func_data(func_prev);
 
                 check((fp->flags & (uint32_t) func_flags::is_method) ==

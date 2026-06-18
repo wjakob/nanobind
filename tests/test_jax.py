@@ -6,6 +6,7 @@ import importlib
 from common import collect
 
 try:
+    import jax
     import jax.numpy as jnp
     def needs_jax(x):
         return x
@@ -87,7 +88,8 @@ def test06_ro_array():
     if (not hasattr(jnp, '__array_api_version__')
         or jnp.__array_api_version__ < '2024'):
         pytest.skip('jax version is too old')
-    a = jnp.array([1, 2], dtype=jnp.float32)  # JAX arrays are immutable.
+    with jax.default_device(jax.devices("cpu")[0]):
+        a = jnp.array([1, 2], dtype=jnp.float32)  # JAX arrays are immutable.
     assert t.accept_ro(a) == 1
     # If the next line fails, delete it, update the array_api_version above,
     # and uncomment the three lines below.

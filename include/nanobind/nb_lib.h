@@ -115,28 +115,9 @@ struct ticket;
     F(load_cmplx, bool, (PyObject *, uint8_t, double *, double *) noexcept)     \
     F(incref_checked, void, (PyObject *) noexcept)                              \
     F(decref_checked, void, (PyObject *) noexcept)                              \
-    F(str_from_obj, PyObject *, (PyObject *))                                   \
-    F(str_from_cstr, PyObject *, (const char *))                                \
-    F(str_from_cstr_and_size, PyObject *, (const char *, size_t))               \
-    F(bytes_from_obj, PyObject *, (PyObject *))                                 \
-    F(bytes_from_cstr, PyObject *, (const char *))                              \
-    F(bytes_from_cstr_and_size, PyObject *, (const void *, size_t))             \
-    F(bytearray_from_obj, PyObject *, (PyObject *))                             \
-    F(bytearray_from_cstr_and_size, PyObject *, (const void *, size_t))         \
-    F(list_from_obj, PyObject *, (PyObject *))                                  \
-    F(tuple_from_obj, PyObject *, (PyObject *))                                 \
-    F(set_from_obj, PyObject *, (PyObject *))                                   \
-    F(frozenset_from_obj, PyObject *, (PyObject *))                             \
-    F(memoryview_from_obj, PyObject *, (PyObject *))                            \
     F(obj_len_hint, size_t, (PyObject *) noexcept)                              \
-    F(obj_repr, PyObject *, (PyObject *))                                       \
-    F(obj_op_1, PyObject *, (PyObject *, PyObject *(*)(PyObject *)))            \
-    F(obj_op_2, PyObject *, (PyObject *, PyObject *,                            \
-                             PyObject *(*)(PyObject *, PyObject *)))            \
     F(obj_vectorcall, PyObject *, (PyObject *, PyObject *const *, size_t,       \
                                    PyObject *, bool))                           \
-    F(obj_iter, PyObject *, (PyObject *))                                       \
-    F(obj_iter_next, PyObject *, (PyObject *))                                  \
     F(tuple_check, void, (PyObject *, size_t))                                  \
     F(capsule_new, PyObject *, (const void *, const char *,                     \
                                 void (*)(void *) noexcept) noexcept)            \
@@ -146,8 +127,6 @@ struct ticket;
     F(try_iter, PyObject *, (PyObject *) noexcept)                              \
     F(repr_list, PyObject *, (PyObject *))                                      \
     F(repr_map, PyObject *, (PyObject *))                                       \
-    F(slice_compute, void, (PyObject *, Py_ssize_t, Py_ssize_t &, Py_ssize_t &,\
-                            Py_ssize_t &, size_t &))                            \
     F(seq_get_with_size, PyObject **, (PyObject *, size_t, PyObject **) noexcept)\
     F(seq_get, PyObject **, (PyObject *, size_t *, PyObject **) noexcept)       \
     F(module_new_submodule, PyObject *, (PyObject *, const char *,              \
@@ -177,27 +156,10 @@ struct ticket;
     F(nb_inst_python_derived, bool, (PyObject *) noexcept)                      \
     F(nb_inst_set_state, void, (PyObject *, bool, bool) noexcept)               \
     F(nb_inst_state_read, uint8_t, (PyObject *) noexcept)                       \
-    F(getattr_str, PyObject *, (PyObject *, const char *))                      \
-    F(getattr_obj, PyObject *, (PyObject *, PyObject *))                        \
     F(getattr_str_def, PyObject *, (PyObject *, const char *, PyObject *) noexcept) \
     F(getattr_obj_def, PyObject *, (PyObject *, PyObject *, PyObject *) noexcept) \
-    F(getattr_or_raise_str, void, (PyObject *, const char *, PyObject **))      \
-    F(getattr_or_raise_obj, void, (PyObject *, PyObject *, PyObject **))        \
-    F(setattr_str, void, (PyObject *, const char *, PyObject *))                \
-    F(setattr_obj, void, (PyObject *, PyObject *, PyObject *))                  \
     F(delattr_str, void, (PyObject *, const char *))                            \
     F(delattr_obj, void, (PyObject *, PyObject *))                              \
-    F(getitem_or_raise_index, void, (PyObject *, Py_ssize_t, PyObject **))      \
-    F(getitem_or_raise_str, void, (PyObject *, const char *, PyObject **))      \
-    F(getitem_or_raise_obj, void, (PyObject *, PyObject *, PyObject **))        \
-    F(setitem_index, void, (PyObject *, Py_ssize_t, PyObject *))               \
-    F(setitem_str, void, (PyObject *, const char *, PyObject *))                \
-    F(setitem_obj, void, (PyObject *, PyObject *, PyObject *))                  \
-    F(delitem_index, void, (PyObject *, Py_ssize_t))                            \
-    F(delitem_str, void, (PyObject *, const char *))                            \
-    F(delitem_obj, void, (PyObject *, PyObject *))                              \
-    F(module_import_cstr, PyObject *, (const char *))                           \
-    F(module_import_obj, PyObject *, (PyObject *))                              \
     F(enum_append, void, (PyObject *, const char *, int64_t, const char *,      \
                           const char *) noexcept)                               \
     F(enum_export, void, (PyObject *))                                          \
@@ -351,8 +313,10 @@ inline void fail(const char *fmt, ...) noexcept {
     NB_UNREACHABLE();
 }
 
-/// Raise nanobind::python_error after an error condition was found
-[[noreturn]] inline void raise_python_error() {
+/// Raise nanobind::python_error after an error condition was found. Kept out of
+/// line (NB_NOINLINE): it is the cold target of the many inlined raise_if_*
+/// checks, so each call site emits just a call rather than the load+indirect+trap.
+[[noreturn]] NB_NOINLINE inline void raise_python_error() {
     nb_abi->raise_python_error_impl();
     NB_UNREACHABLE();
 }
@@ -363,38 +327,27 @@ inline void fail(const char *fmt, ...) noexcept {
     NB_UNREACHABLE();
 }
 
-// Trivial conversion/comparison helpers. These touch only stable C-API plus
-// the retained raise_* slots, so they stay inline here instead of occupying an
-// nb_abi slot: the indirect call would cost more than the body itself.
+// Shared error-check helpers. The CPython calls themselves are inlined at the
+// call sites; these only fold in the cold raise path (raise_python_error is a
+// table slot), so no 1:1 CPython wrapper needs to live in detail::.
+inline PyObject *raise_if_null(PyObject *p) {
+    if (NB_UNLIKELY(!p))
+        raise_python_error();
+    return p;
+}
+
+inline void raise_if_nonzero(int rc) {
+    if (NB_UNLIKELY(rc))
+        raise_python_error();
+}
+
+// Helpers that are NOT 1:1 CPython wrappers (each folds a non-pass-through
+// check or a second call), so they stay inline here rather than at call sites.
 inline bool obj_comp(PyObject *a, PyObject *b, int op) {
     int rv = PyObject_RichCompareBool(a, b, op);
     if (NB_UNLIKELY(rv == -1))
         raise_python_error();
     return rv == 1;
-}
-
-inline PyObject *int_from_obj(PyObject *o) {
-    PyObject *result = PyNumber_Long(o);
-    if (NB_UNLIKELY(!result))
-        raise_python_error();
-    return result;
-}
-
-inline PyObject *float_from_obj(PyObject *o) {
-    PyObject *result = PyNumber_Float(o);
-    if (NB_UNLIKELY(!result))
-        raise_python_error();
-    return result;
-}
-
-inline void dict_setitem(PyObject *d, PyObject *key, PyObject *value) {
-    if (NB_UNLIKELY(PyDict_SetItem(d, key, value)))
-        raise_python_error();
-}
-
-inline void dict_delitem(PyObject *d, PyObject *key) {
-    if (NB_UNLIKELY(PyDict_DelItem(d, key)))
-        raise_python_error();
 }
 
 inline size_t obj_len(PyObject *o) {
@@ -411,6 +364,14 @@ inline PyObject *bool_from_obj(PyObject *o) {
     if (NB_UNLIKELY(rv == -1))
         raise_python_error();
     return PyBool_FromLong(rv);
+}
+
+// PyIter_Next returns null both on exhaustion (no error set) and on error, so
+// this is not a raise_if_null wrapper; it stays inline as a small shared helper.
+inline PyObject *obj_iter_next(PyObject *o) {
+    PyObject *r = PyIter_Next(o);
+    if (NB_UNLIKELY(!r && PyErr_Occurred())) raise_python_error();
+    return r;
 }
 
 // ========================================================================

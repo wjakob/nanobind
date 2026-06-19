@@ -114,19 +114,7 @@ void cleanup_list_expand(cleanup_list *l) noexcept {
 
 // ========================================================================
 
-PyObject *module_import_cstr(const char *name) {
-    PyObject *res = PyImport_ImportModule(name);
-    if (!res)
-        throw python_error();
-    return res;
-}
 
-PyObject *module_import_obj(PyObject *o) {
-    PyObject *res = PyImport_Import(o);
-    if (!res)
-        throw python_error();
-    return res;
-}
 
 PyObject *module_new_submodule(PyObject *base, const char *name,
                                const char *doc) noexcept {
@@ -208,28 +196,8 @@ size_t obj_len_hint(PyObject *o) noexcept {
 #endif
 }
 
-PyObject *obj_repr(PyObject *o) {
-    PyObject *res = PyObject_Repr(o);
-    if (!res)
-        raise_python_error();
-    return res;
-}
 
-PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
-    PyObject *res = op(a);
-    if (!res)
-        raise_python_error();
-    return res;
-}
 
-PyObject *obj_op_2(PyObject *a, PyObject *b,
-                   PyObject *(*op)(PyObject *, PyObject *) ) {
-    PyObject *res = op(a, b);
-    if (!res)
-        raise_python_error();
-
-    return res;
-}
 
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          PyObject *kwnames, bool method_call) {
@@ -274,36 +242,12 @@ end:
 }
 
 
-PyObject *obj_iter(PyObject *o) {
-    PyObject *result = PyObject_GetIter(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *obj_iter_next(PyObject *o) {
-    PyObject *result = PyIter_Next(o);
-    if (!result && PyErr_Occurred())
-        raise_python_error();
-    return result;
-}
 
 
 // ========================================================================
 
-PyObject *getattr_str(PyObject *obj, const char *key) {
-    PyObject *res = PyObject_GetAttrString(obj, key);
-    if (!res)
-        raise_python_error();
-    return res;
-}
 
-PyObject *getattr_obj(PyObject *obj, PyObject *key) {
-    PyObject *res = PyObject_GetAttr(obj, key);
-    if (!res)
-        raise_python_error();
-    return res;
-}
 
 PyObject *getattr_str_def(PyObject *obj, const char *key_, PyObject *def) noexcept {
 #if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
@@ -362,39 +306,9 @@ PyObject *getattr_obj_def(PyObject *obj, PyObject *key, PyObject *def) noexcept 
     return def;
 }
 
-void getattr_or_raise_str(PyObject *obj, const char *key, PyObject **out) {
-    if (*out)
-        return;
 
-    PyObject *res = PyObject_GetAttrString(obj, key);
-    if (!res)
-        raise_python_error();
 
-    *out = res;
-}
 
-void getattr_or_raise_obj(PyObject *obj, PyObject *key, PyObject **out) {
-    if (*out)
-        return;
-
-    PyObject *res = PyObject_GetAttr(obj, key);
-    if (!res)
-        raise_python_error();
-
-    *out = res;
-}
-
-void setattr_str(PyObject *obj, const char *key, PyObject *value) {
-    int rv = PyObject_SetAttrString(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void setattr_obj(PyObject *obj, PyObject *key, PyObject *value) {
-    int rv = PyObject_SetAttr(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
 
 void delattr_str(PyObject *obj, const char *key) {
 #if defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030D0000
@@ -420,202 +334,38 @@ void delattr_obj(PyObject *obj, PyObject *key) {
 
 // ========================================================================
 
-void getitem_or_raise_index(PyObject *obj, Py_ssize_t key, PyObject **out) {
-    if (*out)
-        return;
 
-    PyObject *res = PySequence_GetItem(obj, key);
-    if (!res)
-        raise_python_error();
 
-    *out = res;
-}
 
-void getitem_or_raise_str(PyObject *obj, const char *key_, PyObject **out) {
-    if (*out)
-        return;
 
-    PyObject *key, *res;
 
-    key = PyUnicode_FromString(key_);
-    if (!key)
-        raise_python_error();
 
-    res = PyObject_GetItem(obj, key);
-    Py_DECREF(key);
 
-    if (!res)
-        raise_python_error();
 
-    *out = res;
-}
-
-void getitem_or_raise_obj(PyObject *obj, PyObject *key, PyObject **out) {
-    if (*out)
-        return;
-
-    PyObject *res = PyObject_GetItem(obj, key);
-    if (!res)
-        raise_python_error();
-
-    *out = res;
-}
-
-void setitem_index(PyObject *obj, Py_ssize_t key, PyObject *value) {
-    int rv = PySequence_SetItem(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void setitem_str(PyObject *obj, const char *key_, PyObject *value) {
-    PyObject *key = PyUnicode_FromString(key_);
-    if (!key)
-        raise_python_error();
-
-    int rv = PyObject_SetItem(obj, key, value);
-    Py_DECREF(key);
-
-    if (rv)
-        raise_python_error();
-}
-
-void setitem_obj(PyObject *obj, PyObject *key, PyObject *value) {
-    int rv = PyObject_SetItem(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void delitem_index(PyObject *obj, Py_ssize_t key_) {
-    PyObject *key = PyLong_FromSsize_t(key_);
-    if (!key)
-        raise_python_error();
-
-    int rv = PyObject_DelItem(obj, key);
-    Py_DECREF(key);
-
-    if (rv)
-        raise_python_error();
-}
-
-void delitem_str(PyObject *obj, const char *key_) {
-    PyObject *key = PyUnicode_FromString(key_);
-    if (!key)
-        raise_python_error();
-
-    int rv = PyObject_DelItem(obj, key);
-    Py_DECREF(key);
-
-    if (rv)
-        raise_python_error();
-}
-
-void delitem_obj(PyObject *obj, PyObject *key) {
-    int rv = PyObject_DelItem(obj, key);
-    if (rv)
-        raise_python_error();
-}
 
 // ========================================================================
 
-PyObject *str_from_obj(PyObject *o) {
-    PyObject *result = PyObject_Str(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *str_from_cstr(const char *str) {
-    PyObject *result = PyUnicode_FromString(str);
-    if (!result)
-        raise("nanobind::detail::str_from_cstr(): conversion error!");
-    return result;
-}
 
-PyObject *str_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyUnicode_FromStringAndSize(str, (Py_ssize_t) size);
-    if (!result)
-        raise("nanobind::detail::str_from_cstr_and_size(): conversion error!");
-    return result;
-}
 
 // ========================================================================
 
-PyObject *bytes_from_obj(PyObject *o) {
-    PyObject *result = PyBytes_FromObject(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *bytes_from_cstr(const char *str) {
-    PyObject *result = PyBytes_FromString(str);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
-    PyObject *result = PyBytes_FromStringAndSize((const char *) str, (Py_ssize_t) size);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
 // ========================================================================
 
-PyObject *bytearray_from_obj(PyObject *o) {
-    PyObject *result = PyByteArray_FromObject(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
-    PyObject *result = PyByteArray_FromStringAndSize((const char *) str, (Py_ssize_t) size);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
 
 // ========================================================================
 
 // ========================================================================
 
-PyObject *tuple_from_obj(PyObject *o) {
-    PyObject *result = PySequence_Tuple(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *list_from_obj(PyObject *o) {
-    PyObject *result = PySequence_List(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *set_from_obj(PyObject *o) {
-    PyObject *result = PySet_New(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *frozenset_from_obj(PyObject *o) {
-    PyObject *result = PyFrozenSet_New(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
-PyObject *memoryview_from_obj(PyObject *o) {
-    PyObject *result = PyMemoryView_FromObject(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
 // ========================================================================
 
@@ -1151,15 +901,6 @@ void set_implicit_cast_warnings(nb_internals *internals, bool value) noexcept {
 
 // ========================================================================
 
-void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
-                   Py_ssize_t &stop, Py_ssize_t &step,
-                   size_t &slice_length) {
-    if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
-        detail::raise_python_error();
-    Py_ssize_t slice_length_ =
-        PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
-    slice_length = (size_t) slice_length_;
-}
 
 bool iterable_check(PyObject *o) noexcept {
     PyTypeObject *tp = Py_TYPE(o);

@@ -1166,7 +1166,7 @@ static PyObject *ndarray_export_fn(nb_internals *internals,
     if (fn)
         return fn;
 
-    object obj = steal(module_import_cstr(ndarray_export_spec[slot].pkg))
+    object obj = module_::import_(ndarray_export_spec[slot].pkg)
                      .attr(ndarray_export_spec[slot].attr);
     fn = obj.release().ptr();
     new_object(internals, fn);

@@ -42,7 +42,7 @@ public:                                                                        \
 
 #define NB_IMPL_OP_1(name, op)                                                 \
     template <typename T> NB_INLINE object api<T>::name() const {              \
-        return steal(detail::nb_abi->obj_op_1(derived().ptr(), op));                   \
+        return steal(detail::raise_if_null(op(derived().ptr())));              \
     }
 
 /// Helper macros to create detail::api binary operators
@@ -53,7 +53,7 @@ public:                                                                        \
     template <typename T1> template <typename T2>                              \
     NB_INLINE object api<T1>::name(const api<T2> &o) const {                   \
         return steal(                                                          \
-            detail::nb_abi->obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
+            detail::raise_if_null(op(derived().ptr(), o.derived().ptr())));    \
     }
 
 #define NB_DECL_OP_2_I(name)                                                   \
@@ -63,7 +63,7 @@ public:                                                                        \
     template <typename T1> template <typename T2>                              \
     NB_INLINE object api<T1>::name(const api<T2> &o) {                         \
         return steal(                                                          \
-            detail::nb_abi->obj_op_2(derived().ptr(), o.derived().ptr(), op));         \
+            detail::raise_if_null(op(derived().ptr(), o.derived().ptr())));    \
     }
 
 #define NB_IMPL_OP_2_IO(name)                                                  \
@@ -308,11 +308,11 @@ inline bool hasattr(handle h, handle key) noexcept {
 }
 
 inline object getattr(handle h, const char *key) {
-    return steal(detail::nb_abi->getattr_str(h.ptr(), key));
+    return steal(detail::raise_if_null(PyObject_GetAttrString(h.ptr(), key)));
 }
 
 inline object getattr(handle h, handle key) {
-    return steal(detail::nb_abi->getattr_obj(h.ptr(), key.ptr()));
+    return steal(detail::raise_if_null(PyObject_GetAttr(h.ptr(), key.ptr())));
 }
 
 inline object getattr(handle h, const char *key, handle def) noexcept {
@@ -324,11 +324,11 @@ inline object getattr(handle h, handle key, handle value) noexcept {
 }
 
 inline void setattr(handle h, const char *key, handle value) {
-    detail::nb_abi->setattr_str(h.ptr(), key, value.ptr());
+    detail::raise_if_nonzero(PyObject_SetAttrString(h.ptr(), key, value.ptr()));
 }
 
 inline void setattr(handle h, handle key, handle value) {
-    detail::nb_abi->setattr_obj(h.ptr(), key.ptr(), value.ptr());
+    detail::raise_if_nonzero(PyObject_SetAttr(h.ptr(), key.ptr(), value.ptr()));
 }
 
 inline void delattr(handle h, const char *key) {
@@ -347,11 +347,11 @@ public:
     module_ &def(const char *name_, Func &&f, const Extra &...extra);
 
     static NB_INLINE module_ import_(const char *name) {
-        return steal<module_>(detail::nb_abi->module_import_cstr(name));
+        return steal<module_>(detail::raise_if_null(PyImport_ImportModule(name)));
     }
 
     static NB_INLINE module_ import_(handle name) {
-        return steal<module_>(detail::nb_abi->module_import_obj(name.ptr()));
+        return steal<module_>(detail::raise_if_null(PyImport_Import(name.ptr())));
     }
 
     NB_INLINE module_ def_submodule(const char *name,
@@ -407,7 +407,7 @@ class int_ : public object {
     NB_OBJECT_DEFAULT(int_, object, "int", PyLong_Check)
 
     explicit int_(handle h)
-        : object(detail::int_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyNumber_Long(h.ptr())), detail::steal_t{}) { }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
     explicit int_(T value) {
@@ -439,7 +439,7 @@ class float_ : public object {
     NB_OBJECT_DEFAULT(float_, object, "float", PyFloat_Check)
 
     explicit float_(handle h)
-        : object(detail::float_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyNumber_Float(h.ptr())), detail::steal_t{}) { }
 
     explicit float_(double value)
         : object(PyFloat_FromDouble(value), detail::steal_t{}) {
@@ -458,13 +458,14 @@ class str : public object {
     NB_OBJECT_DEFAULT(str, object, "str", PyUnicode_Check)
 
     explicit str(handle h)
-        : object(detail::nb_abi->str_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyObject_Str(h.ptr())), detail::steal_t{}) { }
 
     explicit str(const char *s)
-        : object(detail::nb_abi->str_from_cstr(s), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyUnicode_FromString(s)), detail::steal_t{}) { }
 
     explicit str(const char *s, size_t n)
-        : object(detail::nb_abi->str_from_cstr_and_size(s, n), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyUnicode_FromStringAndSize(s, (Py_ssize_t) n)),
+                 detail::steal_t{}) { }
 
     template <typename... Args> str format(Args&&... args) const;
 
@@ -475,13 +476,14 @@ class bytes : public object {
     NB_OBJECT_DEFAULT(bytes, object, "bytes", PyBytes_Check)
 
     explicit bytes(handle h)
-        : object(detail::nb_abi->bytes_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyBytes_FromObject(h.ptr())), detail::steal_t{}) { }
 
     explicit bytes(const char *s)
-        : object(detail::nb_abi->bytes_from_cstr(s), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyBytes_FromString(s)), detail::steal_t{}) { }
 
     explicit bytes(const void *s, size_t n)
-        : object(detail::nb_abi->bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyBytes_FromStringAndSize((const char *) s, (Py_ssize_t) n)),
+                 detail::steal_t{}) { }
 
     const char *c_str() const { return PyBytes_AsString(m_ptr); }
 
@@ -503,10 +505,11 @@ class bytearray : public object {
         : object(PyObject_CallNoArgs((PyObject *)&PyByteArray_Type), detail::steal_t{}) { }
 
     explicit bytearray(handle h)
-        : object(detail::nb_abi->bytearray_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyByteArray_FromObject(h.ptr())), detail::steal_t{}) { }
 
     explicit bytearray(const void *s, size_t n)
-        : object(detail::nb_abi->bytearray_from_cstr_and_size(s, n), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyByteArray_FromStringAndSize((const char *) s, (Py_ssize_t) n)),
+                 detail::steal_t{}) { }
 
     const char *c_str() const { return PyByteArray_AsString(m_ptr); }
 
@@ -525,7 +528,7 @@ class tuple : public object {
     NB_OBJECT(tuple, object, "tuple", PyTuple_Check)
     tuple() : object(PyTuple_New(0), detail::steal_t()) { }
     explicit tuple(handle h)
-        : object(detail::nb_abi->tuple_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PySequence_Tuple(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_TUPLE_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
@@ -545,7 +548,7 @@ class list : public object {
     NB_OBJECT(list, object, "list", PyList_Check)
     list() : object(PyList_New(0), detail::steal_t()) { }
     explicit list(handle h)
-        : object(detail::nb_abi->list_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PySequence_List(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_LIST_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);
@@ -587,9 +590,9 @@ class dict : public object {
     size_t size() const { return (size_t) NB_DICT_GET_SIZE(m_ptr); }
     detail::dict_iterator begin() const;
     detail::dict_iterator end() const;
-    list keys() const { return steal<list>(detail::nb_abi->obj_op_1(m_ptr, PyDict_Keys)); }
-    list values() const { return steal<list>(detail::nb_abi->obj_op_1(m_ptr, PyDict_Values)); }
-    list items() const { return steal<list>(detail::nb_abi->obj_op_1(m_ptr, PyDict_Items)); }
+    list keys() const { return steal<list>(detail::raise_if_null(PyDict_Keys(m_ptr))); }
+    list values() const { return steal<list>(detail::raise_if_null(PyDict_Values(m_ptr))); }
+    list items() const { return steal<list>(detail::raise_if_null(PyDict_Items(m_ptr))); }
     object get(handle key, handle def) const {
         return steal(detail::nb_abi->dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
@@ -615,7 +618,7 @@ class set : public object {
     NB_OBJECT(set, object, "set", PySet_Check)
     set() : object(PySet_New(nullptr), detail::steal_t()) { }
     explicit set(handle h)
-        : object(detail::nb_abi->set_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PySet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     template <typename T> void add(T &&value);
@@ -631,7 +634,7 @@ class frozenset : public object {
     NB_OBJECT(frozenset, object, "frozenset", PyFrozenSet_Check)
     frozenset() : object(PyFrozenSet_New(nullptr), detail::steal_t()) { }
     explicit frozenset(handle h)
-        : object(detail::nb_abi->frozenset_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyFrozenSet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     bool empty() const { return size() == 0; }
@@ -643,9 +646,9 @@ class sequence : public object {
 
 class mapping : public object {
     NB_OBJECT_DEFAULT(mapping, object, "collections.abc.Mapping", PyMapping_Check)
-    list keys() const { return steal<list>(detail::nb_abi->obj_op_1(m_ptr, PyMapping_Keys)); }
-    list values() const { return steal<list>(detail::nb_abi->obj_op_1(m_ptr, PyMapping_Values)); }
-    list items() const { return steal<list>(detail::nb_abi->obj_op_1(m_ptr, PyMapping_Items)); }
+    list keys() const { return steal<list>(detail::raise_if_null(PyMapping_Keys(m_ptr))); }
+    list values() const { return steal<list>(detail::raise_if_null(PyMapping_Values(m_ptr))); }
+    list items() const { return steal<list>(detail::raise_if_null(PyMapping_Items(m_ptr))); }
     template <typename T> bool contains(T&& key) const;
 };
 
@@ -667,19 +670,19 @@ public:
     NB_OBJECT_DEFAULT(iterator, object, "collections.abc.Iterator", PyIter_Check)
 
     iterator& operator++() {
-        m_value = steal(detail::nb_abi->obj_iter_next(m_ptr));
+        m_value = steal(detail::obj_iter_next(m_ptr));
         return *this;
     }
 
     iterator operator++(int) {
         iterator rv = *this;
-        m_value = steal(detail::nb_abi->obj_iter_next(m_ptr));
+        m_value = steal(detail::obj_iter_next(m_ptr));
         return rv;
     }
 
     handle operator*() const {
         if (is_valid() && !m_value.is_valid())
-            m_value = steal(detail::nb_abi->obj_iter_next(m_ptr));
+            m_value = steal(detail::obj_iter_next(m_ptr));
         return m_value;
     }
 
@@ -723,7 +726,7 @@ NB_INLINE bool issubclass(handle h1, handle h2) {
     return rv != 0;
 }
 
-NB_INLINE str repr(handle h) { return steal<str>(detail::nb_abi->obj_repr(h.ptr())); }
+NB_INLINE str repr(handle h) { return steal<str>(detail::raise_if_null(PyObject_Repr(h.ptr()))); }
 NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
 NB_INLINE size_t len_hint(handle h) { return detail::nb_abi->obj_len_hint(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
@@ -743,7 +746,7 @@ inline object none() { return steal(detail::none_ref()); }
 inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 
 inline iterator iter(handle h) {
-    return steal<iterator>(detail::nb_abi->obj_iter(h.ptr()));
+    return steal<iterator>(detail::raise_if_null(PyObject_GetIter(h.ptr())));
 }
 
 class slice : public object {
@@ -764,8 +767,10 @@ public:
 
     detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const {
         Py_ssize_t start, stop, step;
-        size_t slice_length;
-        detail::nb_abi->slice_compute(m_ptr, (Py_ssize_t) size, start, stop, step, slice_length);
+        if (NB_UNLIKELY(PySlice_Unpack(m_ptr, &start, &stop, &step) < 0))
+            detail::raise_python_error();
+        size_t slice_length =
+            (size_t) PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
         return detail::tuple(start, stop, step, slice_length);
     }
 };
@@ -773,7 +778,7 @@ public:
 class memoryview : public object {
     NB_OBJECT(memoryview, object, "memoryview", PyMemoryView_Check)
     explicit memoryview(handle h)
-        : object(detail::nb_abi->memoryview_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyMemoryView_FromObject(h.ptr())), detail::steal_t{}) { }
 };
 
 class ellipsis : public object {

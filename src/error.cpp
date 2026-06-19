@@ -248,15 +248,8 @@ const char *python_error_what(const python_error *self) noexcept {
     return expected;
 }
 
-void register_exception_translator(nb_internals *internals,
-                                   exception_translator t, void *payload) {
-    nb_translator_seq *head = new nb_translator_seq{ t, payload,
-                                                     internals->translators.load_acquire() };
-    internals->translators.store_release(head);
-}
-
 PyObject *exception_new(PyObject *scope, const char *name,
-                                PyObject *base) {
+                        PyObject *base) {
     object modname;
     if (PyModule_Check(scope))
         modname = getattr(scope, "__name__", handle());
@@ -271,7 +264,7 @@ PyObject *exception_new(PyObject *scope, const char *name,
         steal<str>(PyUnicode_FromFormat("%U.%s", modname.ptr(), name));
 
     object result = steal(PyErr_NewException(combined.c_str(), base, nullptr));
-    check(result, "nanobind::detail::exception_new(): creation failed!");
+    check(result.is_valid(), "nanobind::detail::exception_new(): creation failed!");
 
     if (hasattr(scope, name))
         raise("nanobind::detail::exception_new(): an object of the same name "
@@ -280,6 +273,14 @@ PyObject *exception_new(PyObject *scope, const char *name,
     setattr(scope, name, result);
     return result.release().ptr();
 }
+
+void register_exception_translator(nb_internals *internals,
+                                   exception_translator t, void *payload) {
+    nb_translator_seq *head = new nb_translator_seq{ t, payload,
+                                                     internals->translators.load_acquire() };
+    internals->translators.store_release(head);
+}
+
 
 void chain_error_v(PyObject *type, const char *fmt, va_list args) noexcept {
 #if PY_VERSION_HEX >= 0x030C0000

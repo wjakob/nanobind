@@ -177,13 +177,6 @@ fail:
 
 // ========================================================================
 
-size_t obj_len(PyObject *o) {
-    Py_ssize_t res = PyObject_Size(o);
-    if (res < 0)
-        raise_python_error();
-    return (size_t) res;
-}
-
 size_t obj_len_hint(PyObject *o) noexcept {
 #if !defined(Py_LIMITED_API)
     Py_ssize_t res = PyObject_LengthHint(o, 0);
@@ -220,13 +213,6 @@ PyObject *obj_repr(PyObject *o) {
     if (!res)
         raise_python_error();
     return res;
-}
-
-bool obj_comp(PyObject *a, PyObject *b, int value) {
-    int rv = PyObject_RichCompareBool(a, b, value);
-    if (rv == -1)
-        raise_python_error();
-    return rv == 1;
 }
 
 PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
@@ -593,29 +579,6 @@ PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
 
 
 // ========================================================================
-
-PyObject *bool_from_obj(PyObject *o) {
-    int rv = PyObject_IsTrue(o);
-    if (rv == 1)
-        return true_ref();
-    if (rv == 0)
-        return false_ref();
-    raise_python_error();
-}
-
-PyObject *int_from_obj(PyObject *o) {
-    PyObject *result = PyNumber_Long(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *float_from_obj(PyObject *o) {
-    PyObject *result = PyNumber_Float(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
 // ========================================================================
 
@@ -1257,15 +1220,6 @@ PyObject *repr_map(PyObject *o) {
 
 // ========================================================================
 
-bool issubclass(PyObject *a, PyObject *b) {
-    int rv = PyObject_IsSubclass(a, b);
-    if (rv == -1)
-        raise_python_error();
-    return bool(rv);
-}
-
-// ========================================================================
-
 // Look up 'k' in the dictionary 'd', returning a *new* reference
 static PyObject *dict_lookup_ref(PyObject *d, PyObject *k, bool *error) {
     PyObject *value;
@@ -1307,16 +1261,6 @@ PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def) {
         value = def;
     }
     return value;
-}
-
-void dict_setitem(PyObject *obj, PyObject *key, PyObject *value) {
-    if (PyDict_SetItem(obj, key, value))
-        raise_python_error();
-}
-
-void dict_delitem(PyObject *obj, PyObject *key) {
-    if (PyDict_DelItem(obj, key))
-        raise_python_error();
 }
 
 NAMESPACE_END(detail)

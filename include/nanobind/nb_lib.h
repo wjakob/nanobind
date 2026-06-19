@@ -123,18 +123,13 @@ struct ticket;
     F(bytes_from_cstr_and_size, PyObject *, (const void *, size_t))             \
     F(bytearray_from_obj, PyObject *, (PyObject *))                             \
     F(bytearray_from_cstr_and_size, PyObject *, (const void *, size_t))         \
-    F(bool_from_obj, PyObject *, (PyObject *))                                  \
-    F(int_from_obj, PyObject *, (PyObject *))                                   \
-    F(float_from_obj, PyObject *, (PyObject *))                                 \
     F(list_from_obj, PyObject *, (PyObject *))                                  \
     F(tuple_from_obj, PyObject *, (PyObject *))                                 \
     F(set_from_obj, PyObject *, (PyObject *))                                   \
     F(frozenset_from_obj, PyObject *, (PyObject *))                             \
     F(memoryview_from_obj, PyObject *, (PyObject *))                            \
-    F(obj_len, size_t, (PyObject *))                                            \
     F(obj_len_hint, size_t, (PyObject *) noexcept)                              \
     F(obj_repr, PyObject *, (PyObject *))                                       \
-    F(obj_comp, bool, (PyObject *, PyObject *, int))                            \
     F(obj_op_1, PyObject *, (PyObject *, PyObject *(*)(PyObject *)))            \
     F(obj_op_2, PyObject *, (PyObject *, PyObject *,                            \
                              PyObject *(*)(PyObject *, PyObject *)))            \
@@ -149,7 +144,6 @@ struct ticket;
     F(exception_new, PyObject *, (PyObject *, const char *, PyObject *))        \
     F(iterable_check, bool, (PyObject *) noexcept)                              \
     F(try_iter, PyObject *, (PyObject *) noexcept)                              \
-    F(issubclass, bool, (PyObject *, PyObject *))                               \
     F(repr_list, PyObject *, (PyObject *))                                      \
     F(repr_map, PyObject *, (PyObject *))                                       \
     F(slice_compute, void, (PyObject *, Py_ssize_t, Py_ssize_t &, Py_ssize_t &,\
@@ -160,8 +154,6 @@ struct ticket;
                                          const char *) noexcept)                \
     F(dict_getitem_or_raise, void, (PyObject *, PyObject *, PyObject **))       \
     F(dict_getitem_or_default, PyObject *, (PyObject *, PyObject *, PyObject *))\
-    F(dict_setitem, void, (PyObject *, PyObject *, PyObject *))                 \
-    F(dict_delitem, void, (PyObject *, PyObject *))                             \
     F(nb_type_relinquish_ownership, bool, (PyObject *, bool) noexcept)          \
     F(nb_type_restore_ownership, void, (PyObject *, bool) noexcept)             \
     F(nb_type_supplement, void *, (PyObject *) noexcept)                        \
@@ -369,6 +361,56 @@ inline void fail(const char *fmt, ...) noexcept {
 [[noreturn]] inline void raise_python_or_cast_error() {
     nb_abi->raise_python_or_cast_error_impl();
     NB_UNREACHABLE();
+}
+
+// Trivial conversion/comparison helpers. These touch only stable C-API plus
+// the retained raise_* slots, so they stay inline here instead of occupying an
+// nb_abi slot: the indirect call would cost more than the body itself.
+inline bool obj_comp(PyObject *a, PyObject *b, int op) {
+    int rv = PyObject_RichCompareBool(a, b, op);
+    if (NB_UNLIKELY(rv == -1))
+        raise_python_error();
+    return rv == 1;
+}
+
+inline PyObject *int_from_obj(PyObject *o) {
+    PyObject *result = PyNumber_Long(o);
+    if (NB_UNLIKELY(!result))
+        raise_python_error();
+    return result;
+}
+
+inline PyObject *float_from_obj(PyObject *o) {
+    PyObject *result = PyNumber_Float(o);
+    if (NB_UNLIKELY(!result))
+        raise_python_error();
+    return result;
+}
+
+inline void dict_setitem(PyObject *d, PyObject *key, PyObject *value) {
+    if (NB_UNLIKELY(PyDict_SetItem(d, key, value)))
+        raise_python_error();
+}
+
+inline void dict_delitem(PyObject *d, PyObject *key) {
+    if (NB_UNLIKELY(PyDict_DelItem(d, key)))
+        raise_python_error();
+}
+
+inline size_t obj_len(PyObject *o) {
+    Py_ssize_t res = PyObject_Size(o);
+    if (NB_UNLIKELY(res < 0))
+        raise_python_error();
+    return (size_t) res;
+}
+
+// object -> Python bool: PyObject_IsTrue gives truthiness, PyBool_FromLong the
+// singleton (no single 'object -> bool object' C-API exists).
+inline PyObject *bool_from_obj(PyObject *o) {
+    int rv = PyObject_IsTrue(o);
+    if (NB_UNLIKELY(rv == -1))
+        raise_python_error();
+    return PyBool_FromLong(rv);
 }
 
 // ========================================================================

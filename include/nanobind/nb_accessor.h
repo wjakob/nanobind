@@ -146,11 +146,11 @@ struct dict_item {
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
-        nb_abi->dict_setitem(obj, key.ptr(), v);
+        detail::dict_setitem(obj, key.ptr(), v);
     }
 
     NB_INLINE static void del(PyObject *obj, handle key) {
-        nb_abi->dict_delitem(obj, key.ptr());
+        detail::dict_delitem(obj, key.ptr());
     }
 
     NB_INLINE static PyObject *key(handle key) {

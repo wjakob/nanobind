@@ -304,13 +304,10 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         };
     }
 
-    auto set_impl = [&f](auto policy_c) {
-        using policy_tag = decltype(policy_c);
-
-        f.impl = [](void *p, PyObject **args, uint8_t dispatch_flags,
-                    nb_internals *internals,
-                    cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
-        constexpr rv_policy policy = rv_policy(policy_tag::value);
+    f.impl = [](void *p, PyObject **args, uint8_t dispatch_flags,
+                nb_internals *internals,
+                cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
+        constexpr rv_policy policy = rv_policy(Info::policy);
         (void) p; (void) args; (void) dispatch_flags; (void) internals; (void) cleanup;
 
         const capture *cap;
@@ -375,7 +372,6 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         }
 
         return result;
-        };
     };
 
     f.descr = descr.text;
@@ -402,8 +398,6 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     (func_extra_apply(f, extra, arg_index), ...);
 
     (void) arg_index;
-
-    set_impl(std::integral_constant<rv_policy::value, Info::policy>{});
 
     // Apply implicit accepts_none for std::optional<> typed arguments
     // after func_extra_apply, so that explicit nb::arg().noconvert() works.

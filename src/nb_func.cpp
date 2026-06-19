@@ -290,6 +290,12 @@ PyObject *nb_func_new(nb_internals *internals, const func_data_init_base *f) noe
         if (is_constructor && f->nargs == 2 && f->descr_types[0] &&
             f->descr_types[0] == f->descr_types[1]) {
             is_copy_constructor = true;
+            // Render the unnamed copy source as a normal positional argument
+            // instead of emitting a '/' positional-only marker.
+            if (!has_args) {
+                args_in = method_args + 1;
+                has_args = true;
+            }
         }
     }
 
@@ -626,6 +632,19 @@ static NB_NOINLINE void nb_func_convert_cpp_exception(nb_internals *internals) n
                     "could not be translated!");
 }
 
+/// Assemble the per-call dispatch flag byte passed to func_data::impl.
+static NB_INLINE uint8_t func_dispatch_flags(const func_data *f, bool convert,
+                                             bool is_constructor, bool trusted) {
+    uint8_t flags = convert ? (uint8_t) call_flags::dispatch_convert : 0;
+    if (is_constructor)
+        flags |= (uint8_t) call_flags::dispatch_construct;
+    if (trusted)
+        flags |= (uint8_t) call_flags::dispatch_trusted;
+    if (f->flags & (uint32_t) func_flags::is_copy_constructor)
+        flags |= (uint8_t) call_flags::dispatch_copy_constructor;
+    return flags;
+}
+
 /// Dispatch loop that is used to invoke functions created by nb_func_new
 static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                             PyObject *const *args_in,
@@ -852,14 +871,10 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             // A constructor's 'self' may also arrive as a keyword argument,
             // so it must be read back from args[0] rather than from args_in[0]
             PyObject *self_arg_constructor = nullptr;
-            uint8_t dispatch_flags =
-                pass ? (uint8_t) call_flags::dispatch_convert : 0;
-            if (is_constructor) {
-                dispatch_flags |= (uint8_t) call_flags::dispatch_construct;
+            if (is_constructor)
                 self_arg_constructor = args[0];
-            }
-            if (f->flags & (uint32_t) func_flags::is_copy_constructor)
-                dispatch_flags |= (uint8_t) call_flags::dispatch_copy_constructor;
+            uint8_t dispatch_flags =
+                func_dispatch_flags(f, pass != 0, is_constructor, false);
 
             try {
                 result = nullptr;
@@ -970,11 +985,7 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
                 continue;
 
             uint8_t dispatch_flags =
-                pass ? (uint8_t) call_flags::dispatch_convert : 0;
-            if (is_constructor)
-                dispatch_flags |= (uint8_t) call_flags::dispatch_construct;
-            if (f->flags & (uint32_t) func_flags::is_copy_constructor)
-                dispatch_flags |= (uint8_t) call_flags::dispatch_copy_constructor;
+                func_dispatch_flags(f, pass != 0, is_constructor, false);
 
             try {
                 result = nullptr;
@@ -1075,11 +1086,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                 continue;
 
             uint8_t dispatch_flags =
-                pass ? (uint8_t) call_flags::dispatch_convert : 0;
-            if (is_constructor)
-                dispatch_flags |= (uint8_t) call_flags::dispatch_construct;
-            if (f->flags & (uint32_t) func_flags::is_copy_constructor)
-                dispatch_flags |= (uint8_t) call_flags::dispatch_copy_constructor;
+                func_dispatch_flags(f, pass != 0, is_constructor, false);
 
             try {
                 result = nullptr;
@@ -1186,13 +1193,8 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
     if (kwargs_in == nullptr && nargs_in == 1 && args_in[0] != Py_None) {
         PyObject *arg = args_in[0];
         cleanup_list cleanup(is_method ? arg : nullptr);
-        uint8_t dispatch_flags = (uint8_t) call_flags::dispatch_convert;
-        if (is_constructor)
-            dispatch_flags |= (uint8_t) call_flags::dispatch_construct;
-        if (nargsf & NB_VECTORCALL_TRUSTED_SELF)
-            dispatch_flags |= (uint8_t) call_flags::dispatch_trusted;
-        if (fr->flags & (uint32_t) func_flags::is_copy_constructor)
-            dispatch_flags |= (uint8_t) call_flags::dispatch_copy_constructor;
+        uint8_t dispatch_flags = func_dispatch_flags(
+            fr, true, is_constructor, nargsf & NB_VECTORCALL_TRUSTED_SELF);
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,
@@ -1249,13 +1251,8 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
     if (kwargs_in == nullptr && nargs_in == 2 &&
         args_in[0] != Py_None && args_in[1] != Py_None) {
         cleanup_list cleanup(is_method ? args_in[0] : nullptr);
-        uint8_t dispatch_flags = (uint8_t) call_flags::dispatch_convert;
-        if (is_constructor)
-            dispatch_flags |= (uint8_t) call_flags::dispatch_construct;
-        if (nargsf & NB_VECTORCALL_TRUSTED_SELF)
-            dispatch_flags |= (uint8_t) call_flags::dispatch_trusted;
-        if (fr->flags & (uint32_t) func_flags::is_copy_constructor)
-            dispatch_flags |= (uint8_t) call_flags::dispatch_copy_constructor;
+        uint8_t dispatch_flags = func_dispatch_flags(
+            fr, true, is_constructor, nargsf & NB_VECTORCALL_TRUSTED_SELF);
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,

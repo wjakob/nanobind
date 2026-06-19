@@ -33,7 +33,7 @@ public:                                                                        \
 #define NB_IMPL_COMP(name, op)                                                 \
     template <typename T1> template <typename T2>                              \
     NB_INLINE bool api<T1>::name(const api<T2> &o) const {                     \
-        return detail::nb_abi->obj_comp(derived().ptr(), o.derived().ptr(), op);       \
+        return detail::obj_comp(derived().ptr(), o.derived().ptr(), op);               \
     }
 
 /// Helper macros to create detail::api unary operators
@@ -392,7 +392,7 @@ class bool_ : public object {
     NB_OBJECT_DEFAULT(bool_, object, "bool", PyBool_Check)
 
     explicit bool_(handle h)
-        : object(detail::nb_abi->bool_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::bool_from_obj(h.ptr()), detail::steal_t{}) { }
 
     explicit bool_(bool value)
         : object(value ? detail::true_ref() : detail::false_ref(),
@@ -407,7 +407,7 @@ class int_ : public object {
     NB_OBJECT_DEFAULT(int_, object, "int", PyLong_Check)
 
     explicit int_(handle h)
-        : object(detail::nb_abi->int_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::int_from_obj(h.ptr()), detail::steal_t{}) { }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
     explicit int_(T value) {
@@ -439,7 +439,7 @@ class float_ : public object {
     NB_OBJECT_DEFAULT(float_, object, "float", PyFloat_Check)
 
     explicit float_(handle h)
-        : object(detail::nb_abi->float_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::float_from_obj(h.ptr()), detail::steal_t{}) { }
 
     explicit float_(double value)
         : object(PyFloat_FromDouble(value), detail::steal_t{}) {
@@ -717,11 +717,14 @@ NB_INLINE bool isinstance(handle h) noexcept {
 }
 
 NB_INLINE bool issubclass(handle h1, handle h2) {
-    return detail::nb_abi->issubclass(h1.ptr(), h2.ptr());
+    int rv = PyObject_IsSubclass(h1.ptr(), h2.ptr());
+    if (NB_UNLIKELY(rv == -1))
+        detail::raise_python_error();
+    return rv != 0;
 }
 
 NB_INLINE str repr(handle h) { return steal<str>(detail::nb_abi->obj_repr(h.ptr())); }
-NB_INLINE size_t len(handle h) { return detail::nb_abi->obj_len(h.ptr()); }
+NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
 NB_INLINE size_t len_hint(handle h) { return detail::nb_abi->obj_len_hint(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &l) { return (size_t) NB_LIST_GET_SIZE(l.ptr()); }

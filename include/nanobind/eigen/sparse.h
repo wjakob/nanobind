@@ -10,7 +10,6 @@
 #pragma once
 
 #include <nanobind/ndarray.h>
-#include <nanobind/eigen/dense.h>
 #include <Eigen/SparseCore>
 
 #include <memory>
@@ -23,7 +22,7 @@ NAMESPACE_BEGIN(detail)
 
 /// Detect Eigen::SparseMatrix
 template <typename T> constexpr bool is_eigen_sparse_matrix_v =
-    is_eigen_sparse_v<T> &&
+    is_base_of_template_v<T, Eigen::SparseMatrixBase> &&
     !std::is_base_of_v<Eigen::SparseMapBase<T, Eigen::ReadOnlyAccessors>, T>;
 
 

@@ -19,12 +19,10 @@ Version 2.13.0 (Jun 18, 2026)
 -----------------------------
 
 This release bundles a large set of performance improvements on nanobind's
-critical paths. With an optional object pool, construction runs up to 1.42×
-faster, or 3.2× on free-threaded extensions via a lock-free allocation path.
-Named- and default-argument calls run about 1.5× faster, stable-ABI dispatch
-about 1.2× faster, and ndarray exchange with frameworks such as NumPy up to
-2.4× faster. A second set of changes hardens nanobind against error conditions,
-corner cases, and free-threading.
+critical paths. It makes object construction 1.42×-3.2× faster, accelerates
+function dispatch 1.2×-1.5× and accelerates exchange of ndarrays by up to 2.4×.
+The release also hardens nanobind against error conditions, and fixes race
+conditions in free-threaded Python builds.
 
 - Performance improvements:
 

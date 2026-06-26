@@ -87,7 +87,8 @@ def test05_passthrough():
 def test06_ro_array():
     if tf.__version__ < '2.19':
         pytest.skip('tensorflow version is too old')
-    a = tf.constant([1, 2], dtype=tf.float32)  # immutable
+    with tf.device("/CPU:0"):
+        a = tf.constant([1, 2], dtype=tf.float32)  # immutable
     assert t.accept_ro(a) == 1
     # If the next line fails, delete it, update the version above,
     # and uncomment the three lines below.

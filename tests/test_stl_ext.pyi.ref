@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping, Sequence, Set
 import os
 import pathlib
-from typing import ClassVar, Final, overload
+from typing import Final, overload
 
 
 def stats() -> dict: ...
@@ -151,7 +151,7 @@ class FuncWrapper:
     @f.setter
     def f(self, arg: Callable[[], None], /) -> None: ...
 
-    alive: ClassVar[Final[int]] = ...
+    alive: Final[int] = ...
     """static read-only property"""
 
 def identity_string(arg: str, /) -> str: ...

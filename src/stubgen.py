@@ -539,16 +539,34 @@ class StubGen:
             self.put(prop.fset, name=name)
             self.include_docstrings = docstrings_backup
 
-    def put_nb_static_property(self, name: Optional[str], prop: NbStaticProperty):
+    def put_nb_static_property(
+        self,
+        name: Optional[str],
+        prop: NbStaticProperty,
+        parent: Optional[object] = None,
+    ):
         """Append a 'nb_static_property' object"""
+        # Read-only static properties are annotated as 'Final', which a type
+        # checker forbids redeclaring in a subclass. If a base class already
+        # declares a static property of the same name, the subclass inherits
+        # it, so skip re-emitting it here (it would add nothing typing-wise).
+        if prop.fset is None and isinstance(parent, type) and any(
+            isinstance(base.__dict__.get(name), type(prop))
+            for base in parent.__mro__[1:]
+        ):
+            return
+
         getter_sig = prop.fget.__nb_signature__[0][0]
         pos = getter_sig.find("/) -> ")
         if pos == -1:
             raise RuntimeError(f"Static property '{name}' ({getter_sig}) has an invalid signature!")
         tp = self.simplify_types(getter_sig[pos + 6 :])
+        # 'Final' at class scope already implies 'ClassVar', and per PEP 591
+        # the two must not be combined (e.g. 'ClassVar[Final[int]]' is invalid).
         if prop.fset is None:
             tp = f"{self.import_object('typing', 'Final')}[{tp}]"
-        tp = f"{self.import_object('typing', 'ClassVar')}[{tp}]"
+        else:
+            tp = f"{self.import_object('typing', 'ClassVar')}[{tp}]"
         self.write_ln(f"{name}: {tp} = ...")
         if prop.__doc__ and self.include_docstrings:
             self.put_docstr(prop.__doc__)
@@ -989,7 +1007,7 @@ class StubGen:
                     self.put_function(value, name)
                 elif tp_name == "nb_static_property":
                     value = cast(NbStaticProperty, value)
-                    self.put_nb_static_property(name, value)
+                    self.put_nb_static_property(name, value, parent)
             elif tp_mod == "builtins":
                 if tp is property:
                     value = cast(property, value)

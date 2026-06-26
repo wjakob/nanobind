@@ -597,13 +597,14 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 
     internals_inc_ref();
 
-#if PY_VERSION_HEX < 0x030C0000 && !defined(PYPY_VERSION)
-    /* The implementation of typing.py on CPython <3.12 tends to introduce
-       spurious reference leaks that upset nanobind's leak checker. The
-       following band-aid, installs an 'atexit' handler that clears LRU caches
-       used in typing.py. To be resilient to potential future changes in
-       typing.py, the implementation fails silently if any step goes wrong. For
-       context, see https://github.com/python/cpython/issues/98253. */
+#if !defined(PYPY_VERSION)
+    // typing.py on CPython introduces spurious reference leaks that upset
+    // nanobind's leak checker. The following band-aid installs an 'atexit'
+    // handler that clears LRU caches used in typing.py. To be resilient to
+    // potential future changes in typing.py, the implementation fails silently
+    // if any step goes wrong. For context, see
+    // https://github.com/python/cpython/issues/98253 and
+    // https://github.com/python/cpython/issues/151728. */
 
     const char *str =
         "def cleanup():\n"

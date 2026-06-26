@@ -320,6 +320,15 @@ checkers). nanobind provides a :py:class:`nb::any <any>` wrapper type that is
 equivalent to :py:class:`nb::object <object>` except that its type signature
 renders as ``typing.Any`` to facilitate this.
 
+Self-typed return values
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Factory methods or other functions that return an instance of the enclosing
+class can use :py:class:`nb::typing_self <typing_self>` as a return type.
+It is equivalent to :py:class:`nb::object <object>` but renders as
+``typing.Self`` in type signatures. This enables static type checkers to
+correctly infer the return type when such methods are called on subclasses.
+
 .. _stubs:
 
 Stub generation

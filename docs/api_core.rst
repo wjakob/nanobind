@@ -1321,6 +1321,15 @@ Wrapper classes
    difference is the type signature when used in function arguments and return
    values.
 
+.. cpp:class:: typing_self : public object
+
+   This wrapper class represents Python ``typing.Self``-typed values. On the
+   C++ end, this type is interchangeable with :py:class:`object`. The only
+   difference is the type signature, which renders as ``typing.Self`` when used
+   in function arguments and return values. This is useful for factory methods
+   and other functions whose return type should match the (sub)class they are
+   called on.
+
 .. cpp:class:: fallback : public object
 
    Instances of this wrapper class behave just like :cpp:class:`handle`. When

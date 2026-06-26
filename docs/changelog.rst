@@ -19,12 +19,10 @@ Version 2.13.0 (Jun 18, 2026)
 -----------------------------
 
 This release bundles a large set of performance improvements on nanobind's
-critical paths. With an optional object pool, construction runs up to 1.42×
-faster, or 3.2× on free-threaded extensions via a lock-free allocation path.
-Named- and default-argument calls run about 1.5× faster, stable-ABI dispatch
-about 1.2× faster, and ndarray exchange with frameworks such as NumPy up to
-2.4× faster. A second set of changes hardens nanobind against error conditions,
-corner cases, and free-threading.
+critical paths. It makes object construction 1.42×-3.2× faster, accelerates
+function dispatch 1.2×-1.5× and accelerates exchange of ndarrays by up to 2.4×.
+The release also hardens nanobind against error conditions, and fixes race
+conditions in free-threaded Python builds.
 
 - Performance improvements:
 
@@ -33,10 +31,10 @@ corner cases, and free-threading.
     create large numbers of short-lived objects. Released objects are stashed
     in the pool and cheaply recycled, skipping allocation, instance
     registration, and locking (on free-threaded builds). A microbenchmark
-    exercising object construction runs 1.42× faster on Python 3.14; on
-    free-threaded Python, the improvement ranges from 1.32× (uncontended) to
-    3.2× under contention. (PR `#1366
-    <https://github.com/wjakob/nanobind/pull/1366>`__, commit `962cdf <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
+    exercising object construction runs between 1.42× (regular Python) to 3.2×
+    (free-threading with contention) faster. (PR `#1366
+    <https://github.com/wjakob/nanobind/pull/1366>`__, commit `962cdf
+    <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
 
   - A new "medium" function dispatcher accelerates calls to functions whose
     arguments are merely named or carry default values (and that use neither
@@ -50,22 +48,25 @@ corner cases, and free-threading.
     binary operators and copy constructors. (PR `#1362
     <https://github.com/wjakob/nanobind/pull/1362>`__).
 
-  - Optimized the critical path of function calls and object construction, with
-    the largest gains on stable-ABI (abi3) builds. A simple benchmark that
-    exercises object construction and method calls by repeatedly evaluating
-    ``Number(1) + Number(2)``  drops from 79.7 to 74.8 ns/op (-6.2%) on regular
-    builds and from 96.1 to 80.3 ns/op (-16.4%) on abi3 builds. The stable ABI
-    is now nearly as fast as a regular build was before these changes. (PR
-    `#1374 <https://github.com/wjakob/nanobind/pull/1374>`__, with a further
-    immortal-type optimization in commit `82f0ce <https://github.com/wjakob/nanobind/commit/82f0ce42905419979a48349883ae945017ab5803>`__).
+  - A careful tuning pass on the critical path of function calls and object
+    construction led to speedups ranging from 6.2% on regular builds to 16.4%
+    on stable ABI builds.  (PR `#1374
+    <https://github.com/wjakob/nanobind/pull/1374>`__, with a further
+    immortal-type optimization in commit `82f0ce
+    <https://github.com/wjakob/nanobind/commit/82f0ce42905419979a48349883ae945017ab5803>`__).
+  - Optimized the :cpp:class:`nb::ndarray <ndarray>` import and export critical
+    path. Returning an array becomes up to ~58% faster, and consuming one up to
+    ~21% faster. (PR `#1375 <https://github.com/wjakob/nanobind/pull/1375>`__).
+    Separately, improved ``__dlpack__()`` keyword parsing speeds
+    ``numpy.from_dlpack()`` by a further ~8% (PR `#1373
+    <https://github.com/wjakob/nanobind/pull/1373>`__).
 
   - Optimized the :cpp:class:`nb::ndarray <ndarray>` import and export critical
-    path. On NumPy microbenchmarks, returning an array to a framework becomes
-    up to ~58% faster (430.4 to 178.8 ns/op) and consuming one up to ~21%
-    faster (109.1 to 85.7 ns/op). (PR `#1375
-    <https://github.com/wjakob/nanobind/pull/1375>`__). Separately, improved
-    ``__dlpack__()`` keyword parsing speeds ``numpy.from_dlpack()`` by a
-    further ~8% (PR `#1373 <https://github.com/wjakob/nanobind/pull/1373>`__).
+    path. Returning an array becomes up to ~58% faster, and consuming one up to
+    ~21% faster. (PR `#1375 <https://github.com/wjakob/nanobind/pull/1375>`__).
+    Separately, improved ``__dlpack__()`` keyword parsing speeds
+    ``numpy.from_dlpack()`` by a further ~8% (PR `#1373
+    <https://github.com/wjakob/nanobind/pull/1373>`__).
 
   - :cpp:class:`nb::ndarray <ndarray>` argument detection now probes for the
     ``__dlpack__`` method and buffer protocol without raising and catching a
@@ -74,22 +75,17 @@ corner cases, and free-threading.
     <https://github.com/wjakob/nanobind/pull/1385>`__).
 
   - Reduced the cost of thread-local storage (TLS) accesses, which are needed
-    by performance-critical nanobind functions in free-threaded builds.
-    Consolidating the per-thread state into a single structure cut the number
-    of costly ``__tls_get_addr()`` calls on the hot ``nb_type_c2p()`` path from
-    5 to 1. The CMake build system additionally opts ``libnanobind``
-    into the more efficient TLSDESC ABI where supported to remove the last one.
-    On a worst-case benchmark that returns a bound object by value on every
-    call, TLS resolution drops from about 2.8% of runtime to about 0.9% after
-    the consolidation and to about 0.3% with TLSDESC. (PR `#1365
+    by performance-critical nanobind functions in free-threaded builds. In a
+    function calling microbenchmark, the relative cost spent on TLS lookups
+    drops from about 2.8% to about 0.3%. (PR `#1365
     <https://github.com/wjakob/nanobind/pull/1365>`__).
 
   - Added a specialized :cpp:class:`nb::dict <dict>` accessor that provides
     more efficient read, write, and delete operations on dictionaries. (commit
     `033754 <https://github.com/wjakob/nanobind/commit/03375492b42648f5b2ad87a5ed998dcbfe288543>`__).
 
-  - Free-threaded builds now altogether skip reference counting operations on
-    type, enumeration, and function objects that are known to be immortal. (PRs
+  - Free-threaded builds now skip reference counting operations on
+    type, enumeration, and function objects known to be immortal. (PRs
     `#1367 <https://github.com/wjakob/nanobind/pull/1367>`__, `#1368
     <https://github.com/wjakob/nanobind/pull/1368>`__).
 
@@ -100,8 +96,7 @@ corner cases, and free-threading.
 
   - ``repr()`` of :cpp:func:`nb::bind_vector <bind_vector>` /
     :cpp:func:`nb::bind_map <bind_map>` containers is now linear rather than
-    quadratic in the output size (e.g. ~620 ms to ~5 ms for an 80k-element
-    vector). (commit
+    quadratic in the output size. (commit
     `e9f3c4 <https://github.com/wjakob/nanobind/commit/e9f3c4a9831c3e4653a917658b21cc4fb647711a>`__).
 
   - Hot-path accesses of well-known attributes (``__name__``,

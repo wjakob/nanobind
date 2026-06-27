@@ -154,7 +154,7 @@ template <typename T> struct dtype_traits<const T> {
 template <ssize_t... Is> struct shape {
     static constexpr auto name =
         const_name("shape=(") +
-        concat(const_name<Is == -1>(const_name("*"),
+        (concat)(const_name<Is == -1>(const_name("*"),
                                     const_name<(size_t) Is>())...) + const_name(")");
     static_assert(
         ((Is >= 0 || Is == -1) && ...),
@@ -551,7 +551,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
     NB_TYPE_CASTER(ndarray<Args...>,
                    Config::Framework::name +
                    const_name("[") +
-                       concat_maybe(dtype_name<Scalar>::name,
+                       (concat_maybe)(dtype_name<Scalar>::name,
                                     Config::Shape::name,
                                     Config::Order::name,
                                     Config::DeviceType::name,

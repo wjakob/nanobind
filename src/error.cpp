@@ -164,7 +164,7 @@ const char *python_error::what() const noexcept {
         tmp = strdup_check("<error while formatting exception>");
     }
 #else
-    Buffer buf(128);
+    Buffer exc_buf(128);
     if (exc_traceback.is_valid()) {
         PyTracebackObject *to = (PyTracebackObject *) exc_traceback.ptr();
 
@@ -182,7 +182,7 @@ const char *python_error::what() const noexcept {
             frame = PyFrame_GetBack(frame);
         }
 
-        buf.put("Traceback (most recent call last):\n");
+        exc_buf.put("Traceback (most recent call last):\n");
         for (auto it = frames.rbegin(); it != frames.rend(); ++it) {
             frame = *it;
             PyCodeObject *f_code = PyFrame_GetCode(frame);
@@ -196,13 +196,13 @@ const char *python_error::what() const noexcept {
                 PyErr_Clear();
                 name = "<unencodable name>";
             }
-            buf.put("  File \"");
-            buf.put_dstr(filename);
-            buf.put("\", line ");
-            buf.put_uint32((uint32_t) PyFrame_GetLineNumber(frame));
-            buf.put(", in ");
-            buf.put_dstr(name);
-            buf.put('\n');
+            exc_buf.put("  File \"");
+            exc_buf.put_dstr(filename);
+            exc_buf.put("\", line ");
+            exc_buf.put_uint32((uint32_t) PyFrame_GetLineNumber(frame));
+            exc_buf.put(", in ");
+            exc_buf.put_dstr(name);
+            exc_buf.put('\n');
             Py_DECREF(f_code);
             Py_DECREF(frame);
         }
@@ -211,21 +211,21 @@ const char *python_error::what() const noexcept {
     if (exc_type.is_valid()) {
         try {
             object name = exc_type.attr(NB_INTERNED(__name__));
-            buf.put_dstr(borrow<str>(name).c_str());
-            buf.put(": ");
+            exc_buf.put_dstr(borrow<str>(name).c_str());
+            exc_buf.put(": ");
         } catch (...) { PyErr_Clear(); }
     }
 
     if (exc_value.is_valid()) {
         try {
-            buf.put_dstr(str(exc_value).c_str());
+            exc_buf.put_dstr(str(exc_value).c_str());
         } catch (...) {
             PyErr_Clear();
-            buf.put("<exception str() failed>");
+            exc_buf.put("<exception str() failed>");
         }
     }
 
-    char *tmp = buf.copy();
+    char *tmp = exc_buf.copy();
 #endif
 
     // Publish the message with a CAS; if a concurrent call raced us to it,

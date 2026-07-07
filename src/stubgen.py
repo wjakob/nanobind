@@ -1568,8 +1568,7 @@ def main(args: Optional[List[str]] = None) -> None:
                 )
             file = Path(str(file_s))
 
-            ext_loader = importlib.machinery.ExtensionFileLoader
-            if isinstance(mod_imported.__loader__, ext_loader):
+            if file.suffix in importlib.machinery.EXTENSION_SUFFIXES:
                 # Splitting on "." (module nesting qualifier) handles the case
                 # of invoking stubgen on a module that's not in the current
                 # working directory - in that case, we still only want the Python

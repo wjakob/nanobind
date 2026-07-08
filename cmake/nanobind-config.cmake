@@ -230,7 +230,7 @@ function (nanobind_build_library TARGET_NAME)
     nanobind_lto(${TARGET_NAME})
 
     nanobind_strip(${TARGET_NAME})
-  elseif(NOT WIN32 AND NOT APPLE)
+  elseif(NOT WIN32 AND NOT APPLE AND NOT AIX)
     target_compile_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}:-ffunction-sections -fdata-sections>)
     target_link_options(${TARGET_NAME} PUBLIC $<${NB_OPT_SIZE}:-Wl,--gc-sections>)
   endif()

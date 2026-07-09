@@ -1,4 +1,5 @@
 import sys
+import warnings
 import test_classes_ext as t
 import pytest
 from common import skip_on_pypy, collect, parallelize
@@ -236,6 +237,29 @@ def test10_trampoline(clean):
     d = GenericDog("GenericDog")
     assert t.dog_passthrough(d) is d
     assert t.animal_passthrough(d) is d
+
+
+def test10b_missing_super_init_hint():
+    class MissingInit(t.Struct):
+        def __init__(self):
+            pass
+
+    s = MissingInit()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        with pytest.raises(TypeError) as excinfo:
+            s.value()
+
+    assert "instance is not initialized" in str(excinfo.value)
+    assert "super().__init__()" in str(excinfo.value)
+
+
+def test10c_constructor_error_no_missing_super_hint():
+    with pytest.raises(TypeError) as excinfo:
+        t.Struct("bad")
+
+    assert "instance is not initialized" not in str(excinfo.value)
+    assert "super().__init__()" not in str(excinfo.value)
 
 
 def test11_trampoline_failures():

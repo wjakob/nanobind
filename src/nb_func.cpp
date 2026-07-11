@@ -520,24 +520,14 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     }
 }
 
-static void nb_func_put_uninitialized_arg_hint(PyObject *const *args,
-                                                size_t nargs,
-                                                size_t start) noexcept {
-    for (size_t i = start; i < nargs; ++i) {
-        PyObject *arg = args[i];
-        if (!nb_type_check((PyObject *) Py_TYPE(arg)))
-            continue;
+static void nb_func_put_arg_type(PyObject *arg) noexcept {
+    str name = steal<str>(nb_inst_name(arg));
+    buf.put_dstr(name.c_str());
 
+    if (nb_type_check((PyObject *) Py_TYPE(arg))) {
         nb_inst *inst = (nb_inst *) arg;
-        if (inst->state.state != nb_inst_state::state_uninitialized)
-            continue;
-
-        str name = steal<str>(nb_inst_name(arg));
-        buf.put("\n\nHint: instance is not initialized (of type ");
-        buf.put_dstr(name.c_str());
-        buf.put("). This can happen when a Python subclass overrides ");
-        buf.put("`__init__` but does not call `super().__init__()`.");
-        return;
+        if (inst->state.state == nb_inst_state::state_uninitialized)
+            buf.put(" (__init__() not called)");
     }
 }
 
@@ -575,8 +565,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
 
     buf.put("\nInvoked with types: ");
     for (size_t i = 0; i < nargs_in; ++i) {
-        str name = steal<str>(nb_inst_name(args_in[i]));
-        buf.put_dstr(name.c_str());
+        nb_func_put_arg_type(args_in[i]);
         if (i + 1 < nargs_in)
             buf.put(", ");
     }
@@ -598,19 +587,12 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             }
             buf.put_dstr(key_cstr);
             buf.put(": ");
-            str name = steal<str>(nb_inst_name(value));
-            buf.put_dstr(name.c_str());
+            nb_func_put_arg_type(value);
             buf.put(", ");
         }
         buf.rewind(2);
         buf.put(" }");
     }
-
-    size_t nargs_total = nargs_in;
-    if (kwargs_in)
-        nargs_total += (size_t) NB_TUPLE_GET_SIZE(kwargs_in);
-    size_t hint_start = (f->flags & (uint32_t) func_flags::is_constructor) ? 1 : 0;
-    nb_func_put_uninitialized_arg_hint(args_in, nargs_total, hint_start);
 
     PyErr_SetString(PyExc_TypeError, buf.get());
     return nullptr;

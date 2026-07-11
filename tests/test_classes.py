@@ -250,16 +250,28 @@ def test10b_missing_super_init_hint():
         with pytest.raises(TypeError) as excinfo:
             s.value()
 
-    assert "instance is not initialized" in str(excinfo.value)
-    assert "super().__init__()" in str(excinfo.value)
+    msg = str(excinfo.value)
+    assert "test_classes.MissingInit (__init__() not called)" in msg
+    assert "instance is not initialized" not in msg
+    assert "super().__init__()" not in msg
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        with pytest.raises(TypeError) as excinfo:
+            t.none_2(arg=s)
+
+    msg = str(excinfo.value)
+    assert "arg: test_classes.MissingInit (__init__() not called)" in msg
 
 
-def test10c_constructor_error_no_missing_super_hint():
+def test10c_constructor_error_reports_uninitialized_self():
     with pytest.raises(TypeError) as excinfo:
         t.Struct("bad")
 
-    assert "instance is not initialized" not in str(excinfo.value)
-    assert "super().__init__()" not in str(excinfo.value)
+    msg = str(excinfo.value)
+    assert "test_classes_ext.Struct (__init__() not called)" in msg
+    assert "instance is not initialized" not in msg
+    assert "super().__init__()" not in msg
 
 
 def test11_trampoline_failures():

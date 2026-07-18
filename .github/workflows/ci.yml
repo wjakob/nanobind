@@ -37,6 +37,9 @@ jobs:
         python-version: ${{ matrix.python }}
         cache: 'pip'
 
+    - name: Setup fortran
+      uses: fortran-lang/setup-fortran@v1
+
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest
 

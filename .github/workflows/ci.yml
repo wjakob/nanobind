@@ -42,7 +42,7 @@ jobs:
     - run: python -m pip install scipy-openblas32
 
     - name: Install the latest CMake
-      uses: lukka/get-cmake@latest
+      uses: lukka/get-cmake@v4.3.4
 
     - name: Install Eigen
       if: matrix.os == 'ubuntu-latest'

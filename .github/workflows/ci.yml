@@ -117,7 +117,7 @@ jobs:
         submodules: true
 
     - name: Setup Python 3.14t (free-threaded)
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.14t'
 
@@ -139,6 +139,7 @@ jobs:
     - name: Check ABI tag
       run: >
         cd build/tests;
+        ls -alh ;
         python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
 
     - name: Run tests

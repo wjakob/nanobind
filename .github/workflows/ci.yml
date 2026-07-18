@@ -39,6 +39,7 @@ jobs:
 
     - name: Setup fortran
       uses: fortran-lang/setup-fortran@v1
+    - run: python -m pip install scipy-openblas32
 
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest

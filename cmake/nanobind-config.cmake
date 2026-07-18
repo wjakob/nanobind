@@ -90,9 +90,16 @@ if(NOT DEFINED NB_SUFFIX OR NOT DEFINED NB_SUFFIX_S)
   endif()
 endif()
 
+# Derive the free-threaded stable ABI suffix (PEP 803 "abi3t", CPython >= 3.15)
+# from the abi3 suffix by tagging it with a trailing 't'.
+if(NOT DEFINED NB_SUFFIX_ST)
+  string(REPLACE "abi3" "abi3t" NB_SUFFIX_ST "${NB_SUFFIX_S}")
+endif()
+
 # Stash these for later use
 set(NB_SUFFIX         ${NB_SUFFIX}         CACHE INTERNAL "")
 set(NB_SUFFIX_S       ${NB_SUFFIX_S}       CACHE INTERNAL "")
+set(NB_SUFFIX_ST      ${NB_SUFFIX_ST}      CACHE INTERNAL "")
 set(NB_ABI            ${NB_ABI}            CACHE INTERNAL "")
 set(NB_FREE_THREADED  ${NB_FREE_THREADED} CACHE INTERNAL "")
 
@@ -336,6 +343,10 @@ function(nanobind_extension_abi3 name)
   set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX "${NB_SUFFIX_S}")
 endfunction()
 
+function(nanobind_extension_abi3t name)
+  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX "${NB_SUFFIX_ST}")
+endfunction()
+
 function (nanobind_lto name)
   set_target_properties(${name} PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
@@ -394,9 +405,12 @@ function(nanobind_add_module name)
   endif()
 
   if (NB_ABI MATCHES "[0-9]t")
-    # Free-threaded Python interpreters don't support building a nanobind
-    # module that uses the stable ABI.
-    set(ARG_STABLE_ABI FALSE)
+    # The stable ABI for free-threaded builds ("abi3t", PEP 803) is only
+    # available starting with CPython 3.15. On older free-threaded
+    # interpreters the stable ABI cannot be targeted at all.
+    if (Python_VERSION VERSION_LESS 3.15)
+      set(ARG_STABLE_ABI FALSE)
+    endif()
   else()
     # A free-threaded Python interpreter is required to build a free-threaded
     # nanobind module.
@@ -436,7 +450,13 @@ function(nanobind_add_module name)
     target_compile_definitions(${name} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
   endif()
 
-  if (ARG_STABLE_ABI)
+  if (ARG_STABLE_ABI AND ARG_FREE_THREADED)
+    # PEP 803 "abi3t": free-threaded stable ABI (CPython >= 3.15). Defining
+    # Py_TARGET_ABI3T=v is equivalent to defining Py_LIMITED_API=v together
+    # with Py_GIL_DISABLED, and yields an extension tagged 'abi3t'.
+    target_compile_definitions(${libname} PUBLIC -DPy_TARGET_ABI3T=0x030F0000)
+    nanobind_extension_abi3t(${name})
+  elseif (ARG_STABLE_ABI)
     target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
     nanobind_extension_abi3(${name})
   else()

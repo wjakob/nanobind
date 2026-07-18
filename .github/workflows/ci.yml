@@ -132,8 +132,13 @@ jobs:
         python -m pip install pytest pytest-github-actions-annotate-failures
 
     - name: Configure
+      # By default CMake's FindPython rejects the free-threaded ABI and would
+      # silently fall back to a regular (non-free-threaded) interpreter on PATH,
+      # building modules for the wrong Python. Passing Python_FIND_ABI=ANY for
+      # every slot lets it accept the free-threaded 't' build set up above.
       run: >
         cmake -S . -B build -DNB_TEST_FREE_THREADED=ON
+        -DPython_FIND_ABI="ANY;ANY;ANY;ANY"
 
     - name: Build C++
       run: >

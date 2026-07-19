@@ -520,6 +520,17 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     }
 }
 
+static void nb_func_put_arg_type(PyObject *arg) noexcept {
+    str name = steal<str>(nb_inst_name(arg));
+    buf.put_dstr(name.c_str());
+
+    if (nb_type_check((PyObject *) Py_TYPE(arg))) {
+        nb_inst *inst = (nb_inst *) arg;
+        if (inst->state.state == nb_inst_state::state_uninitialized)
+            buf.put(" (__init__() not called)");
+    }
+}
+
 /// Used by nb_func_vectorcall: generate an error when overload resolution fails
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
@@ -554,8 +565,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
 
     buf.put("\nInvoked with types: ");
     for (size_t i = 0; i < nargs_in; ++i) {
-        str name = steal<str>(nb_inst_name(args_in[i]));
-        buf.put_dstr(name.c_str());
+        nb_func_put_arg_type(args_in[i]);
         if (i + 1 < nargs_in)
             buf.put(", ");
     }
@@ -577,8 +587,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             }
             buf.put_dstr(key_cstr);
             buf.put(": ");
-            str name = steal<str>(nb_inst_name(value));
-            buf.put_dstr(name.c_str());
+            nb_func_put_arg_type(value);
             buf.put(", ");
         }
         buf.rewind(2);

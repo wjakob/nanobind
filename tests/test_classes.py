@@ -1,4 +1,5 @@
 import sys
+import warnings
 import test_classes_ext as t
 import pytest
 from common import skip_on_pypy, collect, parallelize
@@ -236,6 +237,41 @@ def test10_trampoline(clean):
     d = GenericDog("GenericDog")
     assert t.dog_passthrough(d) is d
     assert t.animal_passthrough(d) is d
+
+
+def test10b_missing_super_init_hint():
+    class MissingInit(t.Struct):
+        def __init__(self):
+            pass
+
+    s = MissingInit()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        with pytest.raises(TypeError) as excinfo:
+            s.value()
+
+    msg = str(excinfo.value)
+    assert "test_classes.MissingInit (__init__() not called)" in msg
+    assert "instance is not initialized" not in msg
+    assert "super().__init__()" not in msg
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        with pytest.raises(TypeError) as excinfo:
+            t.none_2(arg=s)
+
+    msg = str(excinfo.value)
+    assert "arg: test_classes.MissingInit (__init__() not called)" in msg
+
+
+def test10c_constructor_error_reports_uninitialized_self():
+    with pytest.raises(TypeError) as excinfo:
+        t.Struct("bad")
+
+    msg = str(excinfo.value)
+    assert "test_classes_ext.Struct (__init__() not called)" in msg
+    assert "instance is not initialized" not in msg
+    assert "super().__init__()" not in msg
 
 
 def test11_trampoline_failures():

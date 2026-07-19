@@ -98,6 +98,39 @@ SKIP_LIST = [
     "_unhashable_values_map_", "_value_repr_",
 ]
 
+# Python version in which various ``typing.*`` members were first introduced
+TYPING_INTRODUCED: Dict[str, Tuple[int, int]] = {
+    "Annotated": (3, 9),
+    "Concatenate": (3, 10),
+    "ParamSpec": (3, 10),
+    "ParamSpecArgs": (3, 10),
+    "ParamSpecKwargs": (3, 10),
+    "TypeAlias": (3, 10),
+    "TypeGuard": (3, 10),
+    "is_typeddict": (3, 10),
+    "LiteralString": (3, 11),
+    "Never": (3, 11),
+    "NotRequired": (3, 11),
+    "Required": (3, 11),
+    "Self": (3, 11),
+    "TypeVarTuple": (3, 11),
+    "Unpack": (3, 11),
+    "assert_never": (3, 11),
+    "assert_type": (3, 11),
+    "clear_overloads": (3, 11),
+    "dataclass_transform": (3, 11),
+    "get_overloads": (3, 11),
+    "reveal_type": (3, 11),
+    "TypeAliasType": (3, 12),
+    "override": (3, 12),
+    "NoDefault": (3, 13),
+    "ReadOnly": (3, 13),
+    "TypeIs": (3, 13),
+    "get_protocol_members": (3, 13),
+    "is_protocol": (3, 13),
+    "evaluate_forward_ref": (3, 14),
+}
+
 # Interpreter-internal types.
 TYPES_TYPES = {
     getattr(types, name): name for name in [
@@ -212,7 +245,8 @@ class StubGen:
         max_expr_length: int = 50,
         patterns: List[ReplacePattern] = [],
         quiet: bool = True,
-        output_file: Optional[Path] = None
+        output_file: Optional[Path] = None,
+        min_python: Optional[Tuple[int, int]] = None
     ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
@@ -243,6 +277,9 @@ class StubGen:
 
         # Target filename, only needed for recursive stub generation
         self.output_file = output_file
+
+        # Oldest target Python version (e.g. ``(3, 9)``)
+        self.min_python = min_python
 
         # ---------- Internal fields ----------
 
@@ -583,10 +620,7 @@ class StubGen:
 
             if same_module:
                 # This is an alias of a type in the same module or same top-level module
-                if sys.version_info >= (3, 10, 0):
-                    alias_tp = self.import_object("typing", "TypeAlias")
-                else:
-                    alias_tp = self.import_object("typing_extensions", "TypeAlias")
+                alias_tp = self.import_object(self.typing_module((3, 10)), "TypeAlias")
                 self.write_ln(f"{name}: {alias_tp} = {tp.__qualname__}\n")
             elif self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # Import from a different module
@@ -608,6 +642,14 @@ class StubGen:
                     if tp_bases is None:
                         tp_bases = tp.__bases__
                     tp_bases = [self.type_str(base) for base in tp_bases]
+
+                # 'enum.StrEnum' only exists on Python 3.11+. When targeting
+                # older versions, emit the equivalent bases that nanobind
+                # itself uses there for string-valued enumerations
+                if self.min_python and self.min_python < (3, 11) \
+                        and "enum.StrEnum" in tp_bases:
+                    pos = tp_bases.index("enum.StrEnum")
+                    tp_bases[pos:pos + 1] = ["str", "enum.Enum"]
 
                 if tp_bases != ["object"]:
                     self._replace_tail(2, "(")
@@ -690,10 +732,7 @@ class StubGen:
             if self.is_type_var(tp):
                 types = ""
             elif typing.get_origin(value):
-                if sys.version_info >= (3, 10, 0):
-                    types = ": " + self.import_object("typing", "TypeAlias")
-                else:
-                    types = ": " + self.import_object("typing_extensions", "TypeAlias")
+                types = ": " + self.import_object(self.typing_module((3, 10)), "TypeAlias")
             else:
                 types = f": {self.type_str(tp)}"
 
@@ -747,6 +786,15 @@ class StubGen:
         s = self.ndarray_re.sub(lambda m: self._format_ndarray(m.group(2)), s)
 
         s = self.abc_re.sub(r'collections.abc.\1', s)
+
+        # Normalize 'CapsuleType', it's baked into extension signatures
+        if self.min_python:
+            if self.min_python < (3, 13):
+                s = s.replace("types.CapsuleType", "typing_extensions.CapsuleType")
+            else:
+                s = s.replace("typing_extensions.CapsuleType", "types.CapsuleType")
+            if self.min_python < (3, 10):
+                s = s.replace("types.EllipsisType", "ellipsis")
 
         # Process other type names and add suitable import statements
         def process_general(m: Match[str]) -> str:
@@ -1023,6 +1071,15 @@ class StubGen:
             self.stack.pop()
             self.prefix = old_prefix
 
+    def typing_module(self, introduced: Tuple[int, int]) -> str:
+        """
+        Return ``typing`` or ``typing_extensions`` depending on the minimum 
+        Python version (defaults to currently executing Python version).
+
+        """
+        version = self.min_python or sys.version_info[:2]
+        return "typing" if version >= introduced else "typing_extensions"
+
     def import_object(
         self, module: str, name: Optional[str], as_name: Optional[str] = None
     ) -> str:
@@ -1035,6 +1092,28 @@ class StubGen:
         """
         if module == "builtins" and name and (not as_name or name == as_name):
             return name
+
+        # When targeting an explicit minimum Python version, import members
+        # that ``typing`` does not provide from ``typing_extensions``
+        if self.min_python and module == "typing" and name:
+            introduced = TYPING_INTRODUCED.get(name)
+            module = module if not introduced else self.typing_module(introduced)
+
+        # ``typing_extensions`` re-exports the ``typing`` API. Avoid conflicts by
+        # moving the import to ``typing_extensions`` if it was already imported
+        if name and not as_name:
+            if module == "typing":
+                te_name = self.imports.get("typing_extensions", {}).get((name, None))
+                if te_name:
+                    return te_name
+            elif module == "typing_extensions":
+                # Check if this was already imported from ``typing``
+                # and move it to ``typing_extensions`` if so                
+                t_imports = self.imports.get("typing", None)
+                if t_imports and (name, None) in t_imports:
+                    moved = t_imports.pop((name, None))
+                    self.imports.setdefault("typing_extensions", {})[(name, None)] = moved
+                    return moved if moved else ""
 
         # Rewrite module name if this is relative import from a submodule
         if module.startswith(self.module.__name__ + '.') and module != self.module.__name__:
@@ -1113,12 +1192,13 @@ class StubGen:
             return self.type_str(tp) + '.' + e._name_
         elif (sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.ParamSpec)):
-            tv = self.import_object(tp.__module__, "ParamSpec")
+            mod = tp.__module__ if tp.__module__ != "typing" else self.typing_module((3, 10))
+            tv = self.import_object(mod, "ParamSpec")
             return f'{tv}("{e.__name__}")'
         elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
-            tv = self.import_object(tp.__module__, "TypeVarTuple")
-            s = f'{tv}("{e.__name__}"'
+            introduced = (3, 11)
+            s = f'("{e.__name__}"'
             if sys.version_info >= (3, 13):
                 v = e.__default__
                 if v is not typing.NoDefault:
@@ -1126,10 +1206,13 @@ class StubGen:
                     if v is None:
                         return None
                     s += ", default=" + v
-            return s + ')'
+                    introduced = (3, 13)
+            mod = tp.__module__ if tp.__module__ != "typing" else self.typing_module(introduced)
+            tv = self.import_object(mod, "TypeVarTuple")
+            return tv + s + ')'
         elif issubclass(tp, typing.TypeVar):
-            tv = self.import_object("typing", "TypeVar")
-            s = f'{tv}("{e.__name__}"'
+            introduced = (3, 0)
+            s = f'("{e.__name__}"'
             for v in getattr(e, "__constraints__", ()):
                 v = self.type_str(v)
                 assert v
@@ -1145,6 +1228,8 @@ class StubGen:
                     if v is None:
                         return None
                     s += f", {k}=" + v
+                    if k == "infer_variance":
+                        introduced = (3, 12)
             if sys.version_info >= (3, 13):
                 v = e.__default__
                 if v is not typing.NoDefault:
@@ -1152,8 +1237,10 @@ class StubGen:
                     if v is None:
                         return None
                     s += ", default=" + v
+                    introduced = (3, 13)
             s += ")"
-            return s
+            tv = self.import_object(self.typing_module(introduced), "TypeVar")
+            return tv + s
         elif issubclass(tp, str):
             s = repr(e)
             if len(s) < self.max_expr_length or not abbrev:
@@ -1451,6 +1538,15 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--min-python-version",
+        metavar="VERSION",
+        dest="min_python",
+        default=None,
+        help="ensure that generated stubs are valid for Python >= VERSION "
+        "(e.g. '3.9') independent of the interpreter running stubgen",
+    )
+
+    parser.add_argument(
         "-q",
         "--quiet",
         default=False,
@@ -1469,6 +1565,11 @@ def parse_options(args: List[str]) -> argparse.Namespace:
         parser.error(
             "The -o option is not compatible with recursive stub generation (-r)."
         )
+    if opt.min_python is not None:
+        version_match = re.match(r"^3\.(\d+)$", opt.min_python)
+        if not version_match:
+            parser.error("--min-python-version: expected a version of the form '3.X'.")
+        opt.min_python = (3, int(version_match.group(1)))
     return opt
 
 
@@ -1595,7 +1696,8 @@ def main(args: Optional[List[str]] = None) -> None:
             include_private=opt.include_private,
             max_expr_length=0 if opt.exclude_values else 50,
             patterns=patterns,
-            output_file=file
+            output_file=file,
+            min_python=opt.min_python
         )
 
         if not opt.quiet:

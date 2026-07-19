@@ -131,6 +131,7 @@ jobs:
     - name: Configure
       run: >
         cmake -S . -B build -DNB_TEST_FREE_THREADED=ON
+        -DPython_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')"
 
     - name: Build C++
       run: >

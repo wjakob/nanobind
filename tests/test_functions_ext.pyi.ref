@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 import types
-from typing import Annotated, Any, overload
+from typing import Annotated, Any, Self, overload
 
 
 def test_01() -> None: ...
@@ -256,6 +256,8 @@ class kw_only_methods:
     def method_1p1k(self, i: int = 1, *, j: int = 2) -> tuple: ...
 
 def test_any(arg: Any, /) -> Any: ...
+
+def test_typing_self(arg: object, /) -> Self: ...
 
 def test_wrappers_list() -> bool: ...
 

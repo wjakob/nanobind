@@ -809,6 +809,13 @@ public:
     static constexpr auto Name = detail::const_name("typing.Any");
 };
 
+class typing_self : public object {
+public:
+  using object::object;
+  using object::operator=;
+  static constexpr auto Name = detail::const_name("typing.Self");
+};
+
 template <typename T> class handle_t : public handle {
 public:
     static constexpr auto Name = detail::make_caster<T>::Name;

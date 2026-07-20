@@ -465,6 +465,9 @@ NB_MODULE(test_functions_ext, m) {
 
     m.def("test_any", [](nb::any a) { return a; } );
 
+    m.def("test_typing_self",
+          [](nb::object self) { return nb::borrow<nb::typing_self>(self); });
+
     m.def("test_wrappers_list", []{
         nb::list l1, l2;
         l1.append(1);

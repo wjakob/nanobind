@@ -140,8 +140,15 @@ def test04_matrix():
 @pytest.mark.parametrize("rowStep", (1, 2, -2))
 @pytest.mark.parametrize("colStep", (1, 3, -3))
 @pytest.mark.parametrize("transpose", (False, True))
-def test05_matrix_large_nonsymm(rowStart, colStart, rowStep, colStep, transpose):
-    A = np.uint32(np.vander(np.arange(80)))
+@pytest.mark.parametrize("vector", (False, True))
+def test05_matrix_large_nonsymm(rowStart, colStart, rowStep, colStep, transpose, vector):
+    if vector:
+        if colStart != 0 or colStep != 1:
+            pytest.skip("This test permutation is not sensible.")
+        # Use ndim=2 but with shape=(80, 1) -- suitable for any Ref storage order.
+        A = np.uint32(np.arange(80).reshape((-1, 1)))
+    else:
+        A = np.uint32(np.vander(np.arange(80)))
     if rowStep < 0:
         rowStart = -rowStart - 1
     if colStep < 0:
@@ -200,6 +207,12 @@ def test05_matrix_large_nonsymm(rowStart, colStart, rowStep, colStep, transpose)
     A = np.asfortranarray(A)
     assert A.flags['F_CONTIGUOUS']
     assert_array_equal(t.addMXuCC_nc(A, A), A2)
+
+
+def test05b_mutable_matrix_ref_given_row_vector_at_runtime():
+    A = np.array([[1, 2, 3]], dtype=np.uint32)
+    assert A.flags['F_CONTIGUOUS']
+    assert_array_equal(t.addRefMXuCC(A, A), A + A)
 
 
 @needs_numpy_and_eigen

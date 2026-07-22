@@ -11,3 +11,4 @@ Python and C++.
 
    ndarray
    eigen
+   xtensor

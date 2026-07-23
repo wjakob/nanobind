@@ -370,7 +370,7 @@ template <typename T> struct typed_base_name {
 template <typename T, typename... Ts> struct typed_name {
     static constexpr auto Name =
             typed_base_name<intrinsic_t<T>>::Name + const_name("[") +
-            concat(const_name<std::is_same_v<Ts, ellipsis>>(const_name("..."),
+            (concat)(const_name<std::is_same_v<Ts, ellipsis>>(const_name("..."),
                     make_caster<Ts>::Name)...) + const_name("]");
 };
 
@@ -389,7 +389,7 @@ struct typed_name<callable, R(Args...)> {
     using Ret = std::conditional_t<std::is_void_v<R>, void_type, R>;
     static constexpr auto Name =
             const_name("collections.abc.Callable[[") +
-            concat(make_caster<Args>::Name...) + const_name("], ") +
+            (concat)(make_caster<Args>::Name...) + const_name("], ") +
             make_caster<Ret>::Name + const_name("]");
 };
 // typed<callable, R(...)> renders as Callable[..., R]

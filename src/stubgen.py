@@ -131,6 +131,9 @@ TYPING_INTRODUCED: Dict[str, Tuple[int, int]] = {
     "evaluate_forward_ref": (3, 14),
 }
 
+# Oldest Python version that stubgen supports targeting.
+MIN_PYTHON_VERSION = (3, 9)
+
 # Interpreter-internal types.
 TYPES_TYPES = {
     getattr(types, name): name for name in [
@@ -1440,6 +1443,9 @@ class StubGen:
         return s.rstrip() + "\n"
 
 def parse_options(args: List[str]) -> argparse.Namespace:
+    # Render a ``(major, minor)`` version tuple as e.g. ``'3.9'``.
+    format_version: Callable[[Tuple[int, int]], str] = lambda v: f"{v[0]}.{v[1]}"
+
     parser = argparse.ArgumentParser(
         prog="python -m nanobind.stubgen",
         description="Generate stubs for nanobind-based extensions.",
@@ -1540,9 +1546,10 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--min-python-version",
         metavar="VERSION",
-        default="3.9",
+        default=format_version(MIN_PYTHON_VERSION),
         help="ensure that generated stubs are valid for Python >= VERSION "
-        "(e.g. '3.9') independent of the interpreter running stubgen",
+        f"(e.g. '{format_version(MIN_PYTHON_VERSION)}') independent of the "
+        "interpreter running stubgen",
     )
 
     parser.add_argument(
@@ -1565,14 +1572,20 @@ def parse_options(args: List[str]) -> argparse.Namespace:
             "The -o option is not compatible with recursive stub generation (-r)."
         )
 
-    # determine if have the correct version
+    # determine if it's a supported python version
     version_match = re.match(r"^(\d+)\.(\d+)$", opt.min_python_version)
     if not version_match:
-        parser.error("--min-python-version: expected a version of the form '3.X'.")
-    major, minor = int(version_match.group(1)), int(version_match.group(2))
-    if major != 3 or minor < 9:
-        parser.error("--min-python-version: the oldest supported version is '3.9'.")
-    opt.min_python_version = (major, minor)
+        parser.error(
+            f"--min-python-version: expected a version of the form "
+            f"'{MIN_PYTHON_VERSION[0]}.X'."
+        )
+    version = (int(version_match.group(1)), int(version_match.group(2)))
+    if version[0] != MIN_PYTHON_VERSION[0] or version < MIN_PYTHON_VERSION:
+        parser.error(
+            f"--min-python-version: the oldest supported version is "
+            f"'{format_version(MIN_PYTHON_VERSION)}'."
+        )
+    opt.min_python_version = version
 
     return opt
 

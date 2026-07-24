@@ -246,7 +246,7 @@ class StubGen:
         patterns: List[ReplacePattern] = [],
         quiet: bool = True,
         output_file: Optional[Path] = None,
-        min_python: Optional[Tuple[int, int]] = None
+        min_python_version: Optional[Tuple[int, int]] = None
     ) -> None:
         # Module to check for name conflicts when adding helper imports
         self.module = module
@@ -279,7 +279,7 @@ class StubGen:
         self.output_file = output_file
 
         # Oldest target Python version (e.g. ``(3, 9)``)
-        self.min_python = min_python
+        self.min_python_version = min_python_version
 
         # ---------- Internal fields ----------
 
@@ -646,7 +646,7 @@ class StubGen:
                 # 'enum.StrEnum' only exists on Python 3.11+. When targeting
                 # older versions, emit the equivalent bases that nanobind
                 # itself uses there for string-valued enumerations
-                if self.min_python and self.min_python < (3, 11) \
+                if self.min_python_version < (3, 11) \
                         and "enum.StrEnum" in tp_bases:
                     pos = tp_bases.index("enum.StrEnum")
                     tp_bases[pos:pos + 1] = ["str", "enum.Enum"]
@@ -788,12 +788,12 @@ class StubGen:
         s = self.abc_re.sub(r'collections.abc.\1', s)
 
         # Normalize 'CapsuleType', it's baked into extension signatures
-        if self.min_python:
-            if self.min_python < (3, 13):
+        if self.min_python_version:
+            if self.min_python_version < (3, 13):
                 s = s.replace("types.CapsuleType", "typing_extensions.CapsuleType")
             else:
                 s = s.replace("typing_extensions.CapsuleType", "types.CapsuleType")
-            if self.min_python < (3, 10):
+            if self.min_python_version < (3, 10):
                 s = s.replace("types.EllipsisType", "ellipsis")
 
         # Process other type names and add suitable import statements
@@ -1077,7 +1077,7 @@ class StubGen:
         Python version (defaults to currently executing Python version).
 
         """
-        version = self.min_python or sys.version_info[:2]
+        version = self.min_python_version or sys.version_info[:2]
         return "typing" if version >= introduced else "typing_extensions"
 
     def import_object(
@@ -1095,7 +1095,7 @@ class StubGen:
 
         # When targeting an explicit minimum Python version, import members
         # that ``typing`` does not provide from ``typing_extensions``
-        if self.min_python and module == "typing" and name:
+        if self.min_python_version and module == "typing" and name:
             introduced = TYPING_INTRODUCED.get(name)
             module = module if not introduced else self.typing_module(introduced)
 
@@ -1540,8 +1540,7 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--min-python-version",
         metavar="VERSION",
-        dest="min_python",
-        default=None,
+        default="3.9",
         help="ensure that generated stubs are valid for Python >= VERSION "
         "(e.g. '3.9') independent of the interpreter running stubgen",
     )
@@ -1565,11 +1564,16 @@ def parse_options(args: List[str]) -> argparse.Namespace:
         parser.error(
             "The -o option is not compatible with recursive stub generation (-r)."
         )
-    if opt.min_python is not None:
-        version_match = re.match(r"^3\.(\d+)$", opt.min_python)
-        if not version_match:
-            parser.error("--min-python-version: expected a version of the form '3.X'.")
-        opt.min_python = (3, int(version_match.group(1)))
+
+    # determine if have the correct version
+    version_match = re.match(r"^(\d+)\.(\d+)$", opt.min_python_version)
+    if not version_match:
+        parser.error("--min-python-version: expected a version of the form '3.X'.")
+    major, minor = int(version_match.group(1)), int(version_match.group(2))
+    if major != 3 or minor < 9:
+        parser.error("--min-python-version: the oldest supported version is '3.9'.")
+    opt.min_python_version = (major, minor)
+
     return opt
 
 
@@ -1697,7 +1701,7 @@ def main(args: Optional[List[str]] = None) -> None:
             max_expr_length=0 if opt.exclude_values else 50,
             patterns=patterns,
             output_file=file,
-            min_python=opt.min_python
+            min_python_version=opt.min_python_version
         )
 
         if not opt.quiet:

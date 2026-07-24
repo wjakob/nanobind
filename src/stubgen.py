@@ -1102,22 +1102,6 @@ class StubGen:
             introduced = TYPING_INTRODUCED.get(name)
             module = module if not introduced else self.typing_module(introduced)
 
-        # ``typing_extensions`` re-exports the ``typing`` API. Avoid conflicts by
-        # moving the import to ``typing_extensions`` if it was already imported
-        if name and not as_name:
-            if module == "typing":
-                te_name = self.imports.get("typing_extensions", {}).get((name, None))
-                if te_name:
-                    return te_name
-            elif module == "typing_extensions":
-                # Check if this was already imported from ``typing``
-                # and move it to ``typing_extensions`` if so                
-                t_imports = self.imports.get("typing", None)
-                if t_imports and (name, None) in t_imports:
-                    moved = t_imports.pop((name, None))
-                    self.imports.setdefault("typing_extensions", {})[(name, None)] = moved
-                    return moved if moved else ""
-
         # Rewrite module name if this is relative import from a submodule
         if module.startswith(self.module.__name__ + '.') and module != self.module.__name__:
             module_short = module[len(self.module.__name__) :]
@@ -1397,6 +1381,17 @@ class StubGen:
     def get(self) -> str:
         """Generate the final stub output"""
         s = ""
+
+        # ``typing_extensions`` re-exports the ``typing`` API. Keep  copy,
+        # import names are identical
+        typing_imports = self.imports.get("typing")
+        te_imports = self.imports.get("typing_extensions")
+        if typing_imports and te_imports:
+            for key in list(typing_imports):
+                name, as_name = key
+                # keep "as" import names in ``typing``
+                if name and not as_name and key in te_imports:
+                    del typing_imports[key]
 
         # Potentially add a module docstring
         doc = getattr(self.module, '__doc__', None)

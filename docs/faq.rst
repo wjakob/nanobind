@@ -388,6 +388,16 @@ litgen takes a developer-centric approach.
 The C++ API to be exposed to Python must be C++14 compatible, although the
 implementation can leverage more modern C++ features.
 
+Policy on AI-assisted contributions
+-----------------------------------
+
+AI-assisted contributions are permitted, but you must understand and review the
+output line by line before opening a pull request. The raw output of current
+models remains below the quality bar of this project. Text written for humans
+(docstrings, comments, commit/PR messages) needs careful review and will often
+have to be rewritten from scratch by a human. I close PRs when it is apparent
+that nobody reviewed the output.
+
 How to cite this project?
 -------------------------
 

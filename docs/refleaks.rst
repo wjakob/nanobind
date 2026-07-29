@@ -106,7 +106,7 @@ its elements, identify the cycle, and delete it.
 Sources of reference leaks
 --------------------------
 
-Under-defined types impede Python's ability to detect cycles, which can causes
+User-defined types impede Python's ability to detect cycles, which can cause
 leaks. However, user-defined types alone aren't enough---a specific mixture of
 ingredients is needed to cause leaks. The following subsections review several
 troublesome constructions.
@@ -307,13 +307,13 @@ practice, leaks can be significantly more complex.
 For this reason, it is recommended that you *immediately* investigate and
 squash leaks when they occur, especially while things are still under control
 (i.e., when there is only a single source of leaks). Start by building your
-extension in debug mode, in which case Dr.Jit will exhaustively print warnings
-about all leaked instances/type.
+extension in debug mode, in which case nanobind will exhaustively print warnings
+about all leaked instances/types.
 
 Look at the listed types and think about what objects they reference directly
 or indirectly. C++ code that stores Python functions (i.e., callbacks) is
 especially suspect, since functions can implicitly depend on globals and other
-state through theyr closure object. Does a simple ``import`` statement suffice to
+state through their closure object. Does a simple ``import`` statement suffice to
 cause leaks? This might implicate default function arguments.
 
 Once you have identified a type binding as likely culprit, you must tell Python

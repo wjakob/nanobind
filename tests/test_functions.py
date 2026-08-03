@@ -47,6 +47,23 @@ def test04_overloads():
     assert t.test_05(0) == 1
     assert t.test_05(0.0) == 2
 
+    # Foreign scalar types: ``__index__`` selects the integer overload,
+    # while a type that only implements ``__float__``/``__int__`` must
+    # reach the floating point overload instead of being truncated
+    class FloatLike:
+        def __float__(self): return 1.5
+        def __int__(self): return 1
+
+    class IntLike:
+        def __index__(self): return 1
+
+    assert t.test_05(FloatLike()) == 2
+    assert t.test_05(IntLike()) == 1
+
+    # Strings must not implicitly convert to an integer argument
+    with pytest.raises(TypeError):
+        t.test_11_sl("5")
+
 
 def test05_signature():
     assert t.test_01.__doc__ == "test_01() -> None"
@@ -260,6 +277,16 @@ def test21_numpy_overloads():
     assert t.test_05(np.int32(0)) == 1
     assert t.test_05(np.float64(0.1)) == 2
     assert t.test_05(np.float64(0.0)) == 2
+
+    # np.float32/np.float16 are not 'float' subclasses; they must still
+    # reach the floating point overload instead of truncating to integer
+    assert t.test_05(np.float32(0.5)) == 2
+    assert t.test_05(np.float16(0.5)) == 2
+
+    # ... and do not convert to a pure integer argument at all
+    with pytest.raises(TypeError):
+        t.test_11_sl(np.float32(0.5))
+
     assert t.test_11_sl(np.int32(5)) == 5
     assert t.test_11_ul(np.int32(5)) == 5
     assert t.test_11_sll(np.int32(5)) == 5

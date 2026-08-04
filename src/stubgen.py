@@ -108,13 +108,17 @@ TYPES_TYPES = {
     ]
 }
 
-# ndarray framework types as 2-tuples of (module, array type).
-_FRAMEWORK_STUB_TYPES = {
+# Lookup table of nb::ndarray types -> Python type annotation exports.
+_FRAMEWORK_STUB_TYPES: Dict[str, Tuple[str, str]] = {
+    "numpy.ndarray":         ("numpy.typing", "NDArray"),
+    "ndarray":               ("numpy.typing", "NDArray"),
     "jaxlib._jax.ArrayImpl": ("jax", "Array"),
     "torch.Tensor":          ("torch", "Tensor"),
     "mlx.core.array":        ("mlx.core", "array"),
     "cupy.ndarray":          ("cupy", "ndarray"),
     "tensorflow.python.framework.ops.EagerTensor": ("tensorflow", "Tensor"),
+    "memoryview": ("builtins", "memoryview"),
+    "ArrayLike": ("typing", "Any"),
 }
 
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
@@ -284,11 +288,7 @@ class StubGen:
 
         # Precompile RE to extract nanobind nd-arrays
         NDARRAY_PAT = (
-            r"(numpy\.ndarray|ndarray|torch\.Tensor"
-            r"|tensorflow\.python\.framework\.ops\.EagerTensor"
-            r"|jaxlib\._jax\.ArrayImpl|cupy\.ndarray|mlx\.core\.array"
-            r"|memoryview|ArrayLike)"
-            r"\[([^\]]*)\]"
+            "(" + "|".join(re.escape(fw) for fw in _FRAMEWORK_STUB_TYPES) + ")" + r"\[([^\]]*)\]"
         )
         self.ndarray_re = re.compile(sep_before + NDARRAY_PAT)
 
@@ -765,7 +765,9 @@ class StubGen:
 
         - "NoneType" -> "None"
 
-        - "ndarray[...]" -> "Annotated[NDArray[dtype], dict(..extras..)]"
+        - "ndarray[...]" -> "Annotated[ArrayT, dict(..extras..)]"
+          (with ArrayT as the target type specified by the framework
+           annotation given to nb::ndarray)
 
         - "collections.abc.X" -> "X"
           (with "from collections.abc import X" added at top)
@@ -848,30 +850,31 @@ class StubGen:
 
     def _format_ndarray(self, framework: str, annotation: str) -> str:
         """Improve nb::ndarray type annotations for static type checking"""
-        if framework == "memoryview":
-            result = "memoryview"
-        elif framework == "ArrayLike":
-            # In reality, this is an object implementing __dlpack{,_device}__
-            # plus the buffer protocol, but there's no good builtin type to
-            # represent this.
-            result = self.bind("typing", "Any")
-        elif framework in _FRAMEWORK_STUB_TYPES:
-            module, attr = _FRAMEWORK_STUB_TYPES[framework]
-            self.bind(module, None)
-            result = f"{module}.{attr}"
-        else:
-            # the NumPy branch.
-            dtype = None
-            m = re.search(r"dtype=(\w+)", annotation)
+        m = re.search(r"dtype=(\w+)", annotation)
+        dtype = m.group(1) if m else None
+        is_numpy = framework in ("numpy.ndarray", "ndarray")
 
+        module, attr = _FRAMEWORK_STUB_TYPES[framework]
+
+        if framework in ("memoryview", "ArrayLike"):
+            result = self.bind(module, attr)
+        elif is_numpy:
             if m:
-                dtype = "numpy."+ m.group(1)
+                dtype = "numpy." + m.group(1)
                 dtype = dtype.replace('bool', 'bool_')
                 annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
 
             # Build type while potentially preserving extra information as an annotation
-            ndarray = self.bind("numpy.typing", "NDArray")
+            ndarray = self.bind(module, attr)
             result = f"{ndarray}[{dtype}]" if dtype else ndarray
+        else:
+            self.bind(module, None)
+            result = f"{module}.{attr}"
+
+        # Non-NumPy frameworks keep dtype in the extras dict rather than folding it
+        # into the type itself, so it must be quoted to remain valid Python.
+        if m and not is_numpy:
+            annotation = re.sub(r"dtype=(\w+)", r"dtype='\1'", annotation)
 
         # Turn shape notation into a valid Python type expression
         annotation = annotation.replace("*", "None").replace("(None)", "(None,)")

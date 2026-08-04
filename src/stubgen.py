@@ -108,6 +108,14 @@ TYPES_TYPES = {
     ]
 }
 
+# ndarray framework types as 2-tuples of (module, array type).
+_FRAMEWORK_STUB_TYPES = {
+    "jaxlib._jax.ArrayImpl": ("jax", "Array"),
+    "mlx.core.array":        ("mlx.core", "array"),
+    "cupy.ndarray":          ("cupy", "ndarray"),
+    "tensorflow.python.framework.ops.EagerTensor": ("tensorflow", "Tensor"),
+}
+
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
 # It stores a function signature string, docstring, and a tuple of default function values.
 # (signature_str, doc_str, (default_arg_1, default_arg_2, ...))
@@ -274,9 +282,14 @@ class StubGen:
         )
 
         # Precompile RE to extract nanobind nd-arrays
-        self.ndarray_re = re.compile(
-            sep_before + r"(numpy\.ndarray|ndarray|torch\.Tensor)\[([^\]]*)\]"
+        NDARRAY_PAT = (
+            r"(numpy\.ndarray|ndarray|torch\.Tensor"
+            r"|tensorflow\.python\.framework\.ops\.EagerTensor"
+            r"|jaxlib\._jax\.ArrayImpl|cupy\.ndarray|mlx\.core\.array"
+            r"|memoryview|ArrayLike)"
+            r"\[([^\]]*)\]"
         )
+        self.ndarray_re = re.compile(sep_before + NDARRAY_PAT)
 
         # Types which moved from typing.* to collections.abc in Python 3.9
         self.abc_re = re.compile(
@@ -762,7 +775,9 @@ class StubGen:
         """
 
         # Process nd-array type annotations so that MyPy accepts them
-        s = self.ndarray_re.sub(lambda m: self._format_ndarray(m.group(2)), s)
+        s = self.ndarray_re.sub(
+            lambda m: self._format_ndarray(m.group(1), m.group(2)), s
+        )
 
         s = self.abc_re.sub(r'collections.abc.\1', s)
 
@@ -830,22 +845,36 @@ class StubGen:
 
         return s
 
-    def _format_ndarray(self, annotation: str) -> str:
-        """Improve NumPy type annotations for static type checking"""
-        dtype = None
-        m = re.search(r"dtype=(\w+)", annotation)
+    def _format_ndarray(self, framework: str, annotation: str) -> str:
+        """Improve nb::ndarray type annotations for static type checking"""
+        if framework == "memoryview":
+            result = "memoryview"
+        elif framework == "ArrayLike":
+            # In reality, this is an object implementing __dlpack{,_device}__
+            # plus the buffer protocol, but there's no good builtin type to
+            # represent this.
+            result = self.bind("typing", "Any")
+        elif framework in _FRAMEWORK_STUB_TYPES:
+            module, attr = _FRAMEWORK_STUB_TYPES[framework]
+            self.bind(module, None)
+            result = f"{module}.{attr}"
+        else:
+            # the NumPy branch.
+            dtype = None
+            m = re.search(r"dtype=(\w+)", annotation)
 
-        if m:
-            dtype = "numpy."+ m.group(1)
-            dtype = dtype.replace('bool', 'bool_')
-            annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
+            if m:
+                dtype = "numpy."+ m.group(1)
+                dtype = dtype.replace('bool', 'bool_')
+                annotation = re.sub(r"dtype=\w+,?\s*", "", annotation).rstrip(", ")
+
+            # Build type while potentially preserving extra information as an annotation
+            ndarray = self.bind("numpy.typing", "NDArray")
+            result = f"{ndarray}[{dtype}]" if dtype else ndarray
 
         # Turn shape notation into a valid Python type expression
         annotation = annotation.replace("*", "None").replace("(None)", "(None,)")
 
-        # Build type while potentially preserving extra information as an annotation
-        ndarray = self.bind("numpy.typing", "NDArray")
-        result = f"{ndarray}[{dtype}]" if dtype else ndarray
         if annotation:
             annotated = self.bind("typing", "Annotated")
             result = f"{annotated}[{result}, dict({annotation})]"

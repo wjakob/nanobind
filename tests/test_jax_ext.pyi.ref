@@ -1,4 +1,8 @@
-import jaxlib.xla_extension
+from typing import Annotated
+
+import jax
 
 
-def ret_jax() -> jaxlib.xla_extension.DeviceArray[dtype=float32, shape=(2, 4)]: ...
+def destruct_count() -> int: ...
+
+def ret_jax() -> Annotated[jax.Array, dict(dtype=float32, shape=(2, 4))]: ...

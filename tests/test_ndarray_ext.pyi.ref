@@ -3,6 +3,7 @@ from typing import Annotated, Any, overload
 import mlx.core
 import numpy
 from numpy.typing import NDArray
+import torch
 
 
 def get_is_valid(array: Annotated[NDArray, dict(writable=False)] | None) -> bool: ...
@@ -127,7 +128,7 @@ def ret_numpy_const_ref_f() -> Annotated[NDArray[numpy.float32], dict(shape=(2, 
 
 def ret_numpy_const() -> Annotated[NDArray[numpy.float32], dict(shape=(2, 4), writable=False)]: ...
 
-def ret_pytorch() -> Annotated[NDArray[numpy.float32], dict(shape=(2, 4))]: ...
+def ret_pytorch() -> Annotated[torch.Tensor, dict(dtype=float32, shape=(2, 4))]: ...
 
 def ret_mlx() -> Annotated[mlx.core.array, dict(dtype=float32, shape=(2, 4))]: ...
 

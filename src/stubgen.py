@@ -111,6 +111,7 @@ TYPES_TYPES = {
 # ndarray framework types as 2-tuples of (module, array type).
 _FRAMEWORK_STUB_TYPES = {
     "jaxlib._jax.ArrayImpl": ("jax", "Array"),
+    "torch.Tensor":          ("torch", "Tensor"),
     "mlx.core.array":        ("mlx.core", "array"),
     "cupy.ndarray":          ("cupy", "ndarray"),
     "tensorflow.python.framework.ops.EagerTensor": ("tensorflow", "Tensor"),

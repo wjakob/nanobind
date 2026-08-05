@@ -71,6 +71,10 @@ def test02_signed_enum():
     assert t.from_enum(t.SEnum.B) == 1
     assert t.from_enum(t.SEnum.C) == -1
 
+    # Arithmetic enums derive from 'enum.IntEnum' and must convert
+    # to a plain integer argument
+    assert t.to_enum(t.SEnum.B) is t.Enum.B
+
 
 def test03_enum_arithmetic():
     assert t.SEnum.B + 2 == 3

@@ -1,5 +1,6 @@
 import test_functions_ext as t
 import pytest
+import enum
 import sys
 import re
 
@@ -63,6 +64,13 @@ def test04_overloads():
     # Strings must not implicitly convert to an integer argument
     with pytest.raises(TypeError):
         t.test_11_sl("5")
+
+    # Subclasses of 'int' still convert
+    class IntEnum(enum.IntEnum):
+        A = 5
+
+    assert t.test_11_sl(True) == 1
+    assert t.test_11_sl(IntEnum.A) == 5
 
 
 def test05_signature():

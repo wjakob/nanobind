@@ -642,7 +642,10 @@ static void nb_type_dealloc(PyObject *o) {
     bool initialized = t->name != nullptr;
     free((char *) t->name);
     PyMem_Free(t->supplement);
+
+    PyTypeObject *meta = Py_TYPE(o);
     NB_SLOT(PyType_Type, tp_dealloc)(o);
+    NB_DECREF_TYPE(meta);
 
     if (initialized)
         internals_dec_ref();

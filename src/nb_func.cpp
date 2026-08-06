@@ -124,7 +124,9 @@ void nb_func_dealloc(PyObject *self) {
         }
     }
 
+    PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_Del(self);
+    NB_DECREF_TYPE(tp);
 
     internals_dec_ref();
 }
@@ -151,7 +153,10 @@ void nb_bound_method_dealloc(PyObject *self) {
     if (mb->func)
         NB_DECREF_FUNC((PyObject *) mb->func);
     Py_XDECREF(mb->self);
+
+    PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_Del(self);
+    Py_DECREF(tp);
 }
 
 static arg_data method_args[2] = {

@@ -31,7 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CHANGELOG = REPO_ROOT / "docs/changelog.rst"
 
 # RST link: `TEXT <URL>`__. TEXT may contain whitespace / newlines (line wrap).
-LINK_RE = re.compile(r"`([^`<]+?)\s*<([^>]+)>`__", re.DOTALL)
+LINK_RE = re.compile(r"`([^`<>]+?)\s*<([^<>]+)>`__", re.DOTALL)
 
 # Only `.../commit/<hash>` URLs are normalized. Pull-request and tag URLs are
 # left alone.

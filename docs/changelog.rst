@@ -15,6 +15,50 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.14.0 (TBA)
+--------------------
+
+- Implicit conversion to integer-typed arguments now requires that the input
+  implement Python's ``__index__`` protocol, which is reserved for lossless
+  integer conversion. The previous implementation explicitly rejected Python
+  ``float`` arguments, but mistakenly accepted (and truncated) floating point
+  types that are not ``float`` subclasses, such as ``np.float32``. It also
+  accepted strings like ``"123"``. Both are considered bugs, hence this
+  change lands in a minor release despite being observable from Python.
+  Arguments such as ``bool``, ``enum.IntEnum``, and NumPy integer scalars
+  continue to convert as before.
+  (commits `d33465 <https://github.com/wjakob/nanobind/commit/d33465e4a2d1f48e6210dbe6a7c44f7bf2b1fae2>`__,
+  `a29b10 <https://github.com/wjakob/nanobind/commit/a29b106f9eb55562d8fe749c3e94bb77621121c2>`__).
+
+- The type casters for STL sets, maps, and enumerations now check whether an
+  input is convertible up front instead of raising and immediately discarding a
+  Python exception. Since overload resolution routinely probes casters with
+  non-matching arguments, this removes exception overhead from a hot path.
+  (commit `6d130f <https://github.com/wjakob/nanobind/commit/6d130fed8e05de8f89b608570fe720406f7a578f>`__).
+
+- Fixed reference leaks reported by nanobind's leak checker: nanobind's
+  internal type objects were never deallocated, and the workaround for
+  spurious ``typing.py`` leaks is now active on all CPython versions instead
+  of only CPython < 3.12.
+  (commits `acd95d <https://github.com/wjakob/nanobind/commit/acd95d4144d169323cc6b706b957711cf9d366ba>`__,
+  `31618e <https://github.com/wjakob/nanobind/commit/31618ea0cb359f8546f2132930e26d4def29bf98>`__).
+
+- Stubgen: read-only static properties are now annotated as ``Final[T]`` and
+  read-write ones as ``ClassVar[T]``. The previous ``ClassVar[Final[T]]``
+  combination is rejected by type checkers, since ``Final`` at class scope
+  already implies a class variable (`PEP 591
+  <https://peps.python.org/pep-0591/>`__). Overriding a read-only static
+  property in a subclass now also works.
+  (commit `4a8f4f <https://github.com/wjakob/nanobind/commit/4a8f4fcfe802174d6351b91b677ffef4fb2f2e5b>`__).
+
+- Miscellaneous minor fixes and improvements.
+  (PRs `#1389 <https://github.com/wjakob/nanobind/pull/1389>`__,
+  `#1390 <https://github.com/wjakob/nanobind/pull/1390>`__,
+  `#1392 <https://github.com/wjakob/nanobind/pull/1392>`__,
+  `#1394 <https://github.com/wjakob/nanobind/pull/1394>`__,
+  commits `450d2e <https://github.com/wjakob/nanobind/commit/450d2e9290ee3e6de7befa8da5bbc75c7a013cd1>`__,
+  `341ac4 <https://github.com/wjakob/nanobind/commit/341ac459cbae37ee622c9b12c020bb3dc87db13c>`__).
+
 Version 2.13.0 (Jun 18, 2026)
 -----------------------------
 
@@ -33,8 +77,7 @@ conditions in free-threaded Python builds.
     registration, and locking (on free-threaded builds). A microbenchmark
     exercising object construction runs between 1.42× (regular Python) to 3.2×
     (free-threading with contention) faster. (PR `#1366
-    <https://github.com/wjakob/nanobind/pull/1366>`__, commit `962cdf
-    <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
+    <https://github.com/wjakob/nanobind/pull/1366>`__, commit `962cdf <https://github.com/wjakob/nanobind/commit/962cdf735984166ba13bbb5c729c2fe4aaa363be>`__).
 
   - A new "medium" function dispatcher accelerates calls to functions whose
     arguments are merely named or carry default values (and that use neither
@@ -52,8 +95,7 @@ conditions in free-threaded Python builds.
     construction led to speedups ranging from 6.2% on regular builds to 16.4%
     on stable ABI builds.  (PR `#1374
     <https://github.com/wjakob/nanobind/pull/1374>`__, with a further
-    immortal-type optimization in commit `82f0ce
-    <https://github.com/wjakob/nanobind/commit/82f0ce42905419979a48349883ae945017ab5803>`__).
+    immortal-type optimization in commit `82f0ce <https://github.com/wjakob/nanobind/commit/82f0ce42905419979a48349883ae945017ab5803>`__).
   - Optimized the :cpp:class:`nb::ndarray <ndarray>` import and export critical
     path. Returning an array becomes up to ~58% faster, and consuming one up to
     ~21% faster. (PR `#1375 <https://github.com/wjakob/nanobind/pull/1375>`__).

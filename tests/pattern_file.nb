@@ -14,6 +14,22 @@ import_me:
     \import collections.abc as cabc
     def import_me(arg: logging.Logger) -> cabc.Iterable[int]: ...
 
+# Respell an overload chain, each '\doc' takes the matching overload's docstring
+overload_me:
+    \from typing import overload
+    @overload
+    def overload_me(arg: int) -> None:
+        \doc
+
+    @overload
+    def overload_me(arg: str) -> None:
+        \doc
+
+# Collapse an overload chain, a single '\doc' falls back to the first docstring
+collapse_me:
+    def collapse_me(arg: int | str) -> None:
+        \doc
+
 # Apply a pattern to multiple places
 __(lt|gt)__:
     def __\1__(self, arg: int, /) -> bool: ...

@@ -843,6 +843,9 @@ class StubGen:
         if not match or not pattern:
             return False
 
+        # '\doc' markers are consumed in order, one per overload
+        doc_index = 0
+
         for line in pattern.lines:
             ls = line.strip()
             if ls == "\\doc":
@@ -854,10 +857,17 @@ class StubGen:
                     "nb_method",
                 ):
                     value = cast(NbFunction, value)
-                    for tp_i in value.__nb_signature__:
-                        doc = tp_i[1]
-                        if doc:
-                            break
+                    sigs = value.__nb_signature__
+                    if doc_index < len(sigs):
+                        doc = sigs[doc_index][1]
+                    # Patterns with fewer markers than overloads fall back
+                    # to the first non-empty docstring
+                    if not doc:
+                        for tp_i in sigs:
+                            doc = tp_i[1]
+                            if doc:
+                                break
+                    doc_index += 1
                 else:
                     doc = getattr(value, "__doc__", None)
                 self.depth += 1

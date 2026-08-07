@@ -10,7 +10,8 @@ from typing import (
     TypeAlias,
     TypeVar,
     TypeVarTuple,
-    Unpack
+    Unpack,
+    overload
 )
 
 from . import submodule as submodule
@@ -93,5 +94,16 @@ def tweak_me(arg: int):
     """
 
 def import_me(arg: logging.Logger) -> cabc.Iterable[int]: ...
+
+@overload
+def overload_me(arg: int) -> None:
+    """first overload"""
+
+@overload
+def overload_me(arg: str) -> None:
+    """second overload"""
+
+def collapse_me(arg: int | str) -> None:
+    """only docstring"""
 
 # a suffix

@@ -136,4 +136,8 @@ NB_MODULE(test_typing_ext, m) {
     m.def("remove_me", []{});
     m.def("tweak_me", [](nb::object o) { return o; }, "prior docstring\nremains preserved");
     m.def("import_me", []{});
+    m.def("overload_me", [](int) {}, "first overload");
+    m.def("overload_me", [](const char *) {}, "second overload");
+    m.def("collapse_me", [](int) {});
+    m.def("collapse_me", [](const char *) {}, "only docstring");
 }

@@ -1387,6 +1387,16 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-L",
+        "--lib-path",
+        action="append",
+        metavar="PATH",
+        dest="lib_paths",
+        default=[],
+        help="add directory to the DLL search path on Windows (can specify multiple times)",
+    )
+
+    parser.add_argument(
         "-m",
         "--module",
         action="append",
@@ -1527,6 +1537,7 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
 def main(args: Optional[List[str]] = None) -> None:
     import sys
+    import os
 
     # Ensure that the current directory is on the path
     if "" not in sys.path and "." not in sys.path:
@@ -1546,6 +1557,11 @@ def main(args: Optional[List[str]] = None) -> None:
 
     for i in opt.imports:
         sys.path.insert(0, i)
+
+    dll_dirs = []
+    if os.name == "nt":
+        for lib_path in opt.lib_paths:
+            dll_dirs.append(os.add_dll_directory(lib_path))
 
     for i, mod in enumerate(opt.modules):
         if not opt.quiet:

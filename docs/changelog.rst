@@ -15,8 +15,8 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
-Version 2.14.0 (TBA)
---------------------
+Version 2.14.0 (Aug 7, 2026)
+----------------------------
 
 - Implicit conversion to integer-typed arguments now requires that the input
   implement Python's ``__index__`` protocol, which is reserved for lossless

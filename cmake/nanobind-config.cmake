@@ -641,7 +641,7 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;EXCLUDE_VALUES;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL" "MODULE;COMPONENT;PATTERN_FILE;OUTPUT_PATH" "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;EXCLUDE_VALUES;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL" "MODULE;COMPONENT;OUTPUT_PATH" "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT;PATTERN_FILE")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")
@@ -677,9 +677,9 @@ function (nanobind_add_stub name)
     list(APPEND NB_STUBGEN_ARGS -i "${PYTHON_PATH}")
   endforeach()
 
-  if (ARG_PATTERN_FILE)
-    list(APPEND NB_STUBGEN_ARGS -p "${ARG_PATTERN_FILE}")
-  endif()
+  foreach (PATTERN_FILE IN LISTS ARG_PATTERN_FILE)
+    list(APPEND NB_STUBGEN_ARGS -p "${PATTERN_FILE}")
+  endforeach()
 
   if (ARG_MARKER_FILE)
     foreach (MARKER_FILE IN LISTS ARG_MARKER_FILE)
@@ -747,7 +747,7 @@ function (nanobind_add_stub name)
       OUTPUT ${NB_STUBGEN_OUTPUTS}
       COMMAND ${NB_STUBGEN_CMD}
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-      DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" "${ARG_PATTERN_FILE}"
+      DEPENDS ${ARG_DEPENDS} "${NB_STUBGEN}" ${ARG_PATTERN_FILE}
       ${NB_STUBGEN_EXTRA}
     )
     add_custom_target(${name} ALL DEPENDS ${NB_STUBGEN_OUTPUTS})

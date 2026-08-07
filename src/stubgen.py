@@ -1418,10 +1418,12 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "-p",
         "--pattern-file",
+        action="append",
         metavar="FILE",
         dest="pattern_file",
-        default=None,
-        help="apply the given patterns to the generated stub (see the docs for syntax)",
+        default=[],
+        help="apply the given patterns to the generated stub (see the docs for "
+             "syntax, can specify multiple times)",
     )
 
     parser.add_argument(
@@ -1534,15 +1536,14 @@ def main(args: Optional[List[str]] = None) -> None:
 
     opt = parse_options(sys.argv[1:] if args is None else args)
 
-    patterns: List[ReplacePattern]
-    if opt.pattern_file:
+    patterns: List[ReplacePattern] = []
+    for pattern_file in opt.pattern_file:
         if not opt.quiet:
-            print('Using pattern file "%s" ..' % opt.pattern_file)
-        patterns = load_pattern_file(opt.pattern_file)
+            print('Using pattern file "%s" ..' % pattern_file)
+        loaded = load_pattern_file(pattern_file)
         if not opt.quiet:
-            print("  - loaded %i patterns.\n" % len(patterns))
-    else:
-        patterns = []
+            print("  - loaded %i patterns.\n" % len(loaded))
+        patterns += loaded
 
     for i in opt.imports:
         sys.path.insert(0, i)

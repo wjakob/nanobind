@@ -15,6 +15,14 @@ case, both modules must use the same nanobind ABI version, or they will be
 isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
+Version 2.15.0 (unreleased)
+---------------------------
+
+- ``stubgen`` now accepts multiple pattern files: the ``-p``/``--pattern-file``
+  argument can be specified several times, and the ``PATTERN_FILE`` parameter
+  of :cmake:command:`nanobind_add_stub` accepts a list. Rules are merged in
+  the order specified, with earlier files taking precedence.
+
 Version 2.14.0 (Aug 7, 2026)
 ----------------------------
 

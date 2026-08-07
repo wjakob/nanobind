@@ -555,7 +555,8 @@ The program has the following command line options:
      -r, --recursive               recursively process submodules
      -M FILE, --marker-file FILE   generate a marker file (usually named 'py.typed')
      -p FILE, --pattern-file FILE  apply the given patterns to the generated stub
-                                   (see the docs for syntax)
+                                   (see the docs for syntax, can specify multiple
+                                   times)
      -P, --include-private         include private members (with single leading or
                                    trailing underscore)
      -D, --exclude-docstrings      exclude docstrings from the generated stub
@@ -616,9 +617,13 @@ command.
 
    nanobind_add_stub(
      ...
-     PATTERN_FILE  <PATH>
+     PATTERN_FILE  <PATH> [<PATH> ...]
      ...
    )
+
+Multiple pattern files (for example, a hand-written one alongside a generated
+one) are merged in the order specified. Since the first matching rule wins,
+rules from earlier files take precedence.
 
 A pattern file contains sequence of patterns. Each pattern consists of a query
 and an indented replacement block to be applied when the query matches.

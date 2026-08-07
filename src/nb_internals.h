@@ -158,6 +158,7 @@ struct nb_func {
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     call_complexity complexity;
+    PyObject *module_name; // '__module__' captured at definition time
     bool doc_uniform;
 };
 

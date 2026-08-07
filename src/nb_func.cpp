@@ -124,6 +124,8 @@ void nb_func_dealloc(PyObject *self) {
         }
     }
 
+    Py_XDECREF(((nb_func *) self)->module_name);
+
     PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_Del(self);
     NB_DECREF_TYPE(tp);
@@ -366,6 +368,16 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     func->max_nargs = max_nargs;
     func->complexity = complexity;
+
+    // Snapshot the current '__module__'
+    if (has_scope) {
+        func->module_name =
+            PyObject_GetAttr(f->scope, PyModule_Check(f->scope)
+                                           ? NB_INTERNED(__name__)
+                                           : NB_INTERNED(__module__));
+        if (!func->module_name)
+            PyErr_Clear();
+    }
 
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     if (complexity == call_complexity::complex) {
@@ -1615,14 +1627,11 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
 }
 
 static PyObject *nb_func_get_module(PyObject *self) {
-    func_data *f = nb_func_data(self);
-    if (f->flags & (uint32_t) func_flags::has_scope) {
-        return PyObject_GetAttr(f->scope, PyModule_Check(f->scope)
-                                               ? NB_INTERNED(__name__)
-                                               : NB_INTERNED(__module__));
-    } else {
+    PyObject *name = ((nb_func *) self)->module_name;
+    if (!name)
         return none_ref();
-    }
+    Py_INCREF(name);
+    return name;
 }
 
 PyObject *nb_func_get_nb_signature(PyObject *self, void *) {

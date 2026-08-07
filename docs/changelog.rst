@@ -36,19 +36,14 @@ Version 2.14.0 (Aug 7, 2026)
   non-matching arguments, this removes exception overhead from a hot path.
   (commit `6d130f <https://github.com/wjakob/nanobind/commit/6d130fed8e05de8f89b608570fe720406f7a578f>`__).
 
-- Fixed reference leaks reported by nanobind's leak checker: nanobind's
-  internal type objects were never deallocated, and the workaround for
-  spurious ``typing.py`` leaks is now active on all CPython versions instead
-  of only CPython < 3.12.
+- nanobind now ships a workaround for spurious leak reports caused by an issue in the ``typing`` module.
+  It also fixes an issue where references to internal types were leaked, which generated warnings in ``valgrind``.
   (commits `acd95d <https://github.com/wjakob/nanobind/commit/acd95d4144d169323cc6b706b957711cf9d366ba>`__,
   `31618e <https://github.com/wjakob/nanobind/commit/31618ea0cb359f8546f2132930e26d4def29bf98>`__).
 
 - Stubgen: read-only static properties are now annotated as ``Final[T]`` and
-  read-write ones as ``ClassVar[T]``. The previous ``ClassVar[Final[T]]``
-  combination is rejected by type checkers, since ``Final`` at class scope
-  already implies a class variable (`PEP 591
-  <https://peps.python.org/pep-0591/>`__). Overriding a read-only static
-  property in a subclass now also works.
+  read-write ones as ``ClassVar[T]``. ``ClassVar[Final[T]]`` is no longer generated.
+  Overriding a read-only static property in a subclass now also works.
   (commit `4a8f4f <https://github.com/wjakob/nanobind/commit/4a8f4fcfe802174d6351b91b677ffef4fb2f2e5b>`__).
 
 - Miscellaneous minor fixes and improvements.

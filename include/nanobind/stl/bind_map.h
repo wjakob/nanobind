@@ -137,7 +137,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
             for (auto &kv : m2)
                 detail::map_set<Map, Key, Value>(m, kv.first, kv.second);
         },
-        "Update the map with element from `arg`");
+        "Update the map with element from ``arg``");
     }
 
     if constexpr (detail::is_equality_comparable_v<Map>) {

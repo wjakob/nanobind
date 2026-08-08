@@ -19,13 +19,21 @@ below inherit that of the preceding release.
 Version 2.15.0 (TBA)
 --------------------
 
-- ``stubgen`` now accepts multiple pattern files: the ``-p``/``--pattern-file``
-  argument can be specified several times, and the ``PATTERN_FILE`` parameter
-  of :cmake:command:`nanobind_add_stub` accepts a list. Rules are merged in
-  the order specified, with earlier files taking precedence.
+- Stub generation improvements
+
+  - ``stubgen`` now accepts multiple pattern files via ``-p``, and the
+    ``PATTERN_FILE`` parameter of the CMake :cmake:command:`nanobind_add_stub`
+    command accepts a list.
+    (commit `581adb <https://github.com/wjakob/nanobind/commit/581adb8cf70ed38d4dbbeb9969113ea36fac084a>`__).
+
+  - When a pattern file adapts an overload chain with one ``\doc`` marker per
+    overload, each marker now expands to the docstring of the associated
+    overload. Previously, they all inserted the first non-empty docstring.
+    (commit `30785d <https://github.com/wjakob/nanobind/commit/30785df02e348547db15e47a9cf00a0cf0faf5ec>`__).
 
 - Miscellaneous minor fixes and improvements.
-  (commit `70cb65 <https://github.com/wjakob/nanobind/commit/70cb65c9be9ddcc3800e4af12eb11971a36371f3>`__).
+  (commits `9bb1c9 <https://github.com/wjakob/nanobind/commit/9bb1c9378e7063df9945e049824bc1648de2b921>`__,
+  `55ca3b <https://github.com/wjakob/nanobind/commit/55ca3b057bb1d91071263338247e45488c844e51>`__).
 
 - ABI version 21.
 

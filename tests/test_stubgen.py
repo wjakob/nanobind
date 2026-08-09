@@ -103,3 +103,16 @@ def test05_write_only_property_nb(sg):
     prop = property(fset=FakeSetter())
     sg.put_property(prop, "p")
     assert "p: dict[str, int]" in sg.output
+
+
+# ---------------------------------------------------------------------------
+# pattern application
+# ---------------------------------------------------------------------------
+
+def test06_doc_marker_needs_object(stubgen, fresh_module):
+    # '\doc' is meaningless in '__prefix__'/'__suffix__' patterns
+    pattern = stubgen.ReplacePattern(
+        re.compile(r"mod\.__prefix__"), ["\\doc", ""], 0)
+    sg = stubgen.StubGen(module=fresh_module, patterns=[pattern])
+    with pytest.raises(RuntimeError, match="doc"):
+        sg.apply_pattern("mod.__prefix__", None)

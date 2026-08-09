@@ -12,7 +12,7 @@ name, which will place the newly generated ``.pyi`` file directly into the
 module folder.
 
 ```
-python -m nanobind.stubgen <module name>
+python -m nanobind.stubgen -m <module name>
 ```
 
 Specify ``-o <filename>`` or ``-O <path>`` to redirect the output somewhere
@@ -896,6 +896,11 @@ class StubGen:
                             if doc:
                                 break
                     doc_index += 1
+                elif value is None:
+                    # '__[pre/suf]fix__' have no object to copy from
+                    raise RuntimeError(
+                        "'\\doc' can only be used in patterns that replace "
+                        "an object with a docstring")
                 else:
                     doc = getattr(value, "__doc__", None)
                 self.depth += 1
@@ -934,9 +939,10 @@ class StubGen:
 
             groups = match.groups()
             for i in reversed(range(len(groups))):
-                line = line.replace(f"\\{i+1}", groups[i])
+                # Non-participating groups substitute as an empty string
+                line = line.replace(f"\\{i+1}", groups[i] or "")
             for k, v in match.groupdict().items():
-                line = line.replace(f"\\{k}", v)
+                line = line.replace(f"\\{k}", v or "")
             self.write_ln(line)
 
         # Success, pattern was applied

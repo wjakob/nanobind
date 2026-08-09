@@ -316,14 +316,13 @@ class StubGen:
     def format_docstr(self, docstr: str, depth: int) -> str:
         """Format a single or multi-line docstring with given indentation"""
         docstr = textwrap.dedent(docstr).strip()
-        raw_str = ""
-        if "''" in docstr or "\\" in docstr:
-            # Escape all double quotes so that no unquoted triple quote can exist
-            docstr = docstr.replace("''", "\\'\\'")
-            raw_str = "r"
+        # Escape whatever could terminate or corrupt the triple-quoted string
+        docstr = docstr.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
+        if docstr.endswith('"'):
+            docstr = docstr[:-1] + '\\"'
         if len(docstr) > 70 or "\n" in docstr:
             docstr = "\n" + docstr + "\n"
-        docstr = f'{raw_str}"""{docstr}"""\n'
+        docstr = f'"""{docstr}"""\n'
         return textwrap.indent(docstr, "    " * depth)
 
     def put_docstr(self, docstr: str) -> None:

@@ -184,6 +184,7 @@ set(TEST_FILES
   test_jax.py
   test_tensorflow.py
   test_stubs.py
+  test_stubgen.py
   test_typing.py
   test_thread.py
   test_specialization.py
@@ -221,7 +222,12 @@ if (NOT (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR) OR MSVC)
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${IN_FILE} ${OUT_FILE})
   endforeach()
 
-  add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT})
+  # The unit tests in test_stubgen.py need a copy of stubgen.py next to them
+  add_custom_command(
+    DEPENDS ${NB_DIR}/src/stubgen.py OUTPUT ${OUT_DIR}/stubgen.py
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NB_DIR}/src/stubgen.py ${OUT_DIR}/stubgen.py)
+
+  add_custom_target(copy-tests ALL DEPENDS ${TEST_FILES_OUT} ${OUT_DIR}/stubgen.py)
   set(PY_STUB_TEST ${OUT_DIR}/py_stub_test.py)
 endif()
 

@@ -26,24 +26,38 @@ Version 2.15.0 (TBA)
     command accepts a list.
     (commit `581adb <https://github.com/wjakob/nanobind/commit/581adb8cf70ed38d4dbbeb9969113ea36fac084a>`__).
 
-  - ``stubgen`` now emits valid syntax for ``\import`` directives and automatic
-    imports of submodules. Previously, ``stubgen`` generated incorrect output
-    like ``import .sub.mod`` or ``from . import sub.mod as sub.mod``.
+  - When a pattern file modifies an overload chain with one ``\doc`` marker per
+    overload, each marker now expands to the docstring of the associated
+    overload. (commit `5031de <https://github.com/wjakob/nanobind/commit/5031dee02fdffff7486d31cb393e051d39421c50>`__).
 
   - Annotations that name a module through an alias now resolve to the real
     module name. For example, ``f(x: np.ndarray)`` is rendered as ``f(x:
     numpy.ndarray)``. When processing files with ``from __future__ import
     annotations``, ``stubgen`` previously generated incorrect output like
-    ``import np``.
+    ``import np``. (commit `23051a <https://github.com/wjakob/nanobind/commit/23051ac3420b8ce9c009843ecc1eea976ee9fecd>`__).
 
-  - When a pattern file modifies an overload chain with one ``\doc`` marker per
-    overload, each marker now expands to the docstring of the associated
-    overload. (commit `30785d
-    <https://github.com/wjakob/nanobind/commit/30785df02e348547db15e47a9cf00a0cf0faf5ec>`__).
+  - The ``stubgen`` machinery for generating ``import`` statements was
+    rewritten to fix brittleness and prevent it from generating import
+    declarations that were invalid Python syntax. It now records whether a
+    module is imported out of convenience or because it should be re-exported,
+    and it writes self-imports in absolute form. Standard library modules are
+    identified via ``sys.stdlib_module_names``, which changes how imports are
+    grouped and ordered. Parsing and escaping of type and docstring
+    text was made more robust in several places.
+    (commits `8df192 <https://github.com/wjakob/nanobind/commit/8df1920f8cd8f4a7e2dae509fe778a05988e4ad7>`__,
+    `ab446f <https://github.com/wjakob/nanobind/commit/ab446f3c058c40013377caf27b5db8eeb98bff88>`__,
+    `39af7b <https://github.com/wjakob/nanobind/commit/39af7ba928f062847ace31766f52b8fe8b7514db>`__,
+    `9a7d3d <https://github.com/wjakob/nanobind/commit/9a7d3d79ab917f286136cc0de6dd315db1b05373>`__).
+
+  - Properties with a setter but no getter are rendered as a plain annotated
+    attribute. Previous versions emitted a ``@property`` decorator without an
+    accompanying function definition.
 
 - Miscellaneous minor fixes and improvements.
-  (commits `9bb1c9 <https://github.com/wjakob/nanobind/commit/9bb1c9378e7063df9945e049824bc1648de2b921>`__,
-  `55ca3b <https://github.com/wjakob/nanobind/commit/55ca3b057bb1d91071263338247e45488c844e51>`__).
+  (commits `922a5c <https://github.com/wjakob/nanobind/commit/922a5cdaa4e6e18ecd233f9a7dd2c4b520a745d2>`__,
+  `ef993f <https://github.com/wjakob/nanobind/commit/ef993ffa28e631151ceac27746ef79da09eda783>`__,
+  `62b78c <https://github.com/wjakob/nanobind/commit/62b78c2894b40172665bbb625f6e266fbe9a8555>`__,
+  `53d546 <https://github.com/wjakob/nanobind/commit/53d546f1a3d62a4f00aff4dfd26a12cfd5df08e8>`__).
 
 - ABI version 21.
 

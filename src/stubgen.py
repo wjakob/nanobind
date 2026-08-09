@@ -440,8 +440,10 @@ class StubGen:
 
     def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None):
         """Append a function of an arbitrary type to the stub"""
-        # Don't generate a constructor for nanobind classes that aren't constructible
-        if name == "__init__" and type(parent).__name__.startswith("nb_type"):
+        # A nanobind class without a bound constructor exposes a '__init__'
+        # wrapper descriptor for its error-raising default 'tp_init'. Skip it.
+        if name == "__init__" and isinstance(fn, types.WrapperDescriptorType) \
+                and type(parent).__name__ == "nb_type":
             return
 
         fn_module = getattr(fn, "__module__", None)
@@ -658,7 +660,7 @@ class StubGen:
             or issubclass(tp, types.WrapperDescriptorType)
             or issubclass(tp, staticmethod)
             or issubclass(tp, classmethod)
-            or (tp.__module__ == "nanobind" and tp.__name__ == "nb_func")
+            or (tp.__module__ == "nanobind" and tp.__name__ in ("nb_func", "nb_method"))
         )
 
     def put_value(self, value: object, name: str, parent: Optional[object] = None, abbrev: bool = True) -> None:
@@ -1050,10 +1052,7 @@ class StubGen:
                 value = cast(NbType, value)
                 self.put_type(value, name)
             elif tp_mod == "nanobind":
-                if tp_name == "nb_method":
-                    value = cast(NbFunction, value)
-                    self.put_function(value, name)
-                elif tp_name == "nb_static_property":
+                if tp_name == "nb_static_property":
                     value = cast(NbStaticProperty, value)
                     self.put_nb_static_property(name, value, parent)
             elif tp_mod == "builtins":

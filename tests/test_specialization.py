@@ -98,6 +98,6 @@ def test_immutability():
 
     # Test metaclass immutability
     metaclass = type(t.Struct)
-    assert metaclass.__name__.startswith("nb_type")
+    assert metaclass.__name__ == "nb_type"
     with pytest.raises(TypeError, match="immutable"):
         metaclass.test_attr = 123

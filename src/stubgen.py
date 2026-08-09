@@ -107,8 +107,6 @@ TYPES_TYPES = {
     ]
 }
 
-# fmt: on
-
 # This type is used to track per-module imports (``import name as desired_name``)
 # during stub generation. The actual name in the stub is given by the value element.
 # (name, desired_as_name) -> actual_as_name
@@ -122,9 +120,6 @@ PackagesDict = Dict[str, ImportDict]
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
 # It stores a function signature string, docstring, and a tuple of default function values.
 # (signature_str, doc_str, (default_arg_1, default_arg_2, ...))
-NbSignature = Tuple[Optional[str], Optional[str]]
-
-# Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
 NbFunctionSignature = Tuple[Optional[str], Optional[str], Optional[Tuple[Any, ...]]]
 
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind getters and setters.
@@ -210,7 +205,7 @@ class StubGen:
         include_internal_imports: bool = True,
         include_external_imports: bool = False,
         max_expr_length: int = 50,
-        patterns: List[ReplacePattern] = [],
+        patterns: Optional[List[ReplacePattern]] = None,
         quiet: bool = True,
         output_file: Optional[Path] = None
     ) -> None:
@@ -236,7 +231,7 @@ class StubGen:
         self.max_expr_length = max_expr_length
 
         # Replacement patterns as produced by ``load_pattern_file()`` below
-        self.patterns = patterns
+        self.patterns = patterns if patterns is not None else []
 
         # Set this to ``True`` if output to stdout is unacceptable
         self.quiet = quiet
@@ -594,7 +589,6 @@ class StubGen:
         else:
             docstr = tp.__doc__
             tp_dict = dict(tp.__dict__)
-            tp_bases: Union[List[str], Tuple[Any, ...], None] = None
 
             if "__nb_signature__" in tp.__dict__:
                 # Types with a custom signature override
@@ -603,11 +597,8 @@ class StubGen:
                 self._replace_tail(1, ":\n")
             else:
                 self.write_ln(f"class {tp_name}:")
-                if tp_bases is None:
-                    tp_bases = getattr(tp, "__orig_bases__", None)
-                    if tp_bases is None:
-                        tp_bases = tp.__bases__
-                    tp_bases = [self.type_str(base) for base in tp_bases]
+                bases: Tuple[Any, ...] = getattr(tp, "__orig_bases__", tp.__bases__)
+                tp_bases = [self.type_str(base) for base in bases]
 
                 if tp_bases != ["object"]:
                     self._replace_tail(2, "(")
@@ -639,7 +630,6 @@ class StubGen:
         return (
             issubclass(tp, types.FunctionType)
             or issubclass(tp, types.BuiltinFunctionType)
-            or issubclass(tp, types.BuiltinMethodType)
             or issubclass(tp, types.WrapperDescriptorType)
             or issubclass(tp, staticmethod)
             or issubclass(tp, classmethod)
@@ -688,16 +678,16 @@ class StubGen:
 
             # Catch a few different typing.* constructs
             if self.is_type_var(tp):
-                types = ""
+                annotation = ""
             elif typing.get_origin(value):
                 if sys.version_info >= (3, 10, 0):
-                    types = ": " + self.import_object("typing", "TypeAlias")
+                    annotation = ": " + self.import_object("typing", "TypeAlias")
                 else:
-                    types = ": " + self.import_object("typing_extensions", "TypeAlias")
+                    annotation = ": " + self.import_object("typing_extensions", "TypeAlias")
             else:
-                types = f": {self.type_str(tp)}"
+                annotation = f": {self.type_str(tp)}"
 
-            self.write_ln(f"{name}{types} = {value_str}\n")
+            self.write_ln(f"{name}{annotation} = {value_str}\n")
 
     def is_type_var(self, tp: type) -> bool:
         if issubclass(tp, typing.TypeVar):
@@ -1116,7 +1106,7 @@ class StubGen:
         complicated.
         """
         tp = type(e)
-        if issubclass(tp, (bool, int, type(None), type(builtins.Ellipsis))):
+        if issubclass(tp, (int, type(None), type(builtins.Ellipsis))):
             s = repr(e)
             if len(s) < self.max_expr_length or not abbrev:
                 return s
@@ -1549,8 +1539,6 @@ def load_pattern_file(fname: str) -> List[ReplacePattern]:
 
 
 def main(args: Optional[List[str]] = None) -> None:
-    import sys
-
     # Ensure that the current directory is on the path
     if "" not in sys.path and "." not in sys.path:
         sys.path.insert(0, "")

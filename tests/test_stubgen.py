@@ -1,5 +1,8 @@
 """
 Unit tests that examine the behavior of the ``StubGen`` class directly.
+
+Only test aspects here that require access to stubgen internals and cannot be
+tested end-to-end via the ``.pyi.ref`` comparison in test_stubs.py.
 """
 
 import ast
@@ -59,3 +62,44 @@ def test01_format_docstr_roundtrip(sg, docstr):
     formatted = sg.format_docstr(docstr, 0)
     value = ast.literal_eval(formatted.strip())
     assert value.strip() == docstr.strip()
+
+
+# ---------------------------------------------------------------------------
+# simplify_types / is_valid_module
+# ---------------------------------------------------------------------------
+
+def test02_no_import_of_nonexistent_module(sg):
+    # 'email.NoSuchThing' does not exist, only 'email' may be imported
+    assert sg.simplify_types("email.NoSuchThing.X") == "email.NoSuchThing.X"
+    assert "email" in sg.imports
+    assert "email.NoSuchThing" not in sg.imports
+
+
+def test03_id_seq_boundaries(sg):
+    # A dotted sequence that continues an identifier is not a name reference
+    assert sg.simplify_types("3foo.bar") == "3foo.bar"
+    assert "foo" not in sg.imports
+    assert sg.simplify_types("typing.Optional") == "Optional"
+
+
+# ---------------------------------------------------------------------------
+# classmethod first-parameter rewrite
+# ---------------------------------------------------------------------------
+
+def test04_classmethod_bracketed_annotation(sg):
+    sig = ("def create(cls: GenericType[SomeOtherType[A, B]], arg: int) -> None", None, None)
+    sg.put_nb_overload(None, sig, is_classmethod=True)
+    assert "def create(cls, arg: int) -> None: ..." in sg.output
+
+
+# ---------------------------------------------------------------------------
+# write-only properties (nanobind itself cannot create a write-only property
+# with an nb_func setter, hence the test emulates one via __nb_signature__)
+# ---------------------------------------------------------------------------
+
+def test05_write_only_property_nb(sg):
+    class FakeSetter:
+        __nb_signature__ = (("def p(self, arg: dict[str, int], /) -> None", ""),)
+    prop = property(fset=FakeSetter())
+    sg.put_property(prop, "p")
+    assert "p: dict[str, int]" in sg.output

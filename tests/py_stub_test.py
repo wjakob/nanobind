@@ -80,3 +80,23 @@ class AClass:
 
     def overloaded_2(self, x):
         "docstr 3"
+
+    def _set_write_only(self, value: int) -> None:
+        pass
+
+    def _set_write_only_untyped(self, value):
+        pass
+
+    # Write-only properties are emitted as plain attributes with the setter's
+    # value type (or typing.Any if unannotated)
+    write_only = property(fset=_set_write_only)
+    write_only_untyped = property(fset=_set_write_only_untyped)
+
+
+class Sentinel:
+    pass
+
+
+# A class attribute holding an instance of the enclosing class. Stubgen used
+# to render it as an enum member and crash.
+Sentinel.INSTANCE = Sentinel()

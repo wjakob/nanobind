@@ -259,11 +259,11 @@ class StubGen:
 
         # ---------- Regular expressions ----------
 
-        # Negative lookbehind matching word boundaries except '.'
-        sep_before = r"(?<![\\B\.])"
+        # Reject matches that continue an identifier or dotted name
+        sep_before = r"(?<![\w.])"
 
-        # Negative lookforward matching word boundaries except '.'
-        sep_after = r"(?![\\B\.])"
+        # Reject matches followed by a '.' (part of a longer dotted name)
+        sep_after = r"(?!\.)"
 
         # Regexp matching a Python identifier
         identifier = r"[^\d\W]\w*"
@@ -390,8 +390,16 @@ class StubGen:
                 start = pos + len(arg_str)
 
         if is_classmethod:
-            # Rewrite the first parameter to just cls.
-            sig_str = re.sub(r'(def \w+\()[^,)]+', r'\1cls', sig_str, count=1)
+            # Rewrite the first parameter to just 'cls'. Its annotation may
+            # contain commas, so scan for its end at bracket depth zero.
+            pos = paren = sig_str.index("(") + 1
+            depth = 0
+            for pos in range(paren, len(sig_str)):
+                c = sig_str[pos]
+                if depth == 0 and c in ",)":
+                    break
+                depth += (c in "([{") - (c in ")]}")
+            sig_str = sig_str[:paren] + "cls" + sig_str[pos:]
         elif type(fn).__name__ == "nb_func" and self.depth > 0:
             self.write_ln("@staticmethod")
 
@@ -520,6 +528,31 @@ class StubGen:
     def put_property(self, prop: property, name: Optional[str]):
         """Append a Python 'property' object"""
         fget, fset = prop.fget, prop.fset
+
+        if fget is None:
+            # A stub cannot express a property without a getter. Emit a plain
+            # attribute annotated with the setter's argument type if available.
+            tp_str = None
+            if isinstance(fset, NbGetterSetter):
+                # Capture 'T' in a setter signature 'def name(self, value: T, /) -> None'
+                m = re.search(r",\s*\w+\s*:\s*(.+?)(?:,\s*/\s*)?\)\s*->",
+                              fset.__nb_signature__[0][0])
+                tp_str = self.simplify_types(m.group(1)) if m else None
+            elif fset is not None:
+                try:
+                    ann = list(signature(fset).parameters.values())[1].annotation
+                    if ann is not Parameter.empty:
+                        tp_str = self.type_str(ann)
+                except (ValueError, TypeError, IndexError):
+                    pass
+            if tp_str is None:
+                tp_str = self.import_object("typing", "Any")
+            self.write_ln(f"{name}: {tp_str}")
+            if prop.__doc__ and self.include_docstrings:
+                self.put_docstr(prop.__doc__)
+            self.write("\n")
+            return
+
         self.write_ln("@property")
         self.put(fget, name=name)
         if fset:
@@ -656,9 +689,9 @@ class StubGen:
         if tp.__module__ == '__future__':
             return
 
-        if isinstance(parent, type) and issubclass(tp, parent):
+        if isinstance(value, enum.Enum) and isinstance(parent, type) and issubclass(tp, parent):
             # This is an entry of an enumeration
-            self.write_ln(f"{name} = {typing.cast(enum.Enum, value)._value_!r}")
+            self.write_ln(f"{name} = {value._value_!r}")
             if value.__doc__ and self.include_docstrings:
                 self.put_docstr(value.__doc__)
             self.write("\n")
@@ -741,12 +774,9 @@ class StubGen:
         def process_general(m: Match[str]) -> str:
             def is_valid_module(module_name: str) -> bool:
                 try:
-                    importlib.util.find_spec(module_name)
-                    # If we get here, the module exists and has a valid spec.
-                    return True
+                    return importlib.util.find_spec(module_name) is not None
                 except ValueError:
-                    # The module exists but has no spec, `find_spec` raises a
-                    # `ValueError`, so if we get here, the module does exist.
+                    # An already-imported module without a spec (e.g. __main__)
                     return True
                 except ModuleNotFoundError:
                     return False
@@ -942,7 +972,7 @@ class StubGen:
                 not self.include_private
                 and name
                 and not is_type_alias
-                and len(name) > 2
+                and len(name) > 1
                 and (
                     (name[0] == "_" and name[1] != "_")
                     or (name[-1] == "_" and name[-2] != "_")

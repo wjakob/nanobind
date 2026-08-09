@@ -1,3 +1,6 @@
 FOO = 123
 
-from . import bar
+from . import alias, bar
+
+# Re-export a submodule that lives more than one level down
+from .sub import mod

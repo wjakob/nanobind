@@ -19,17 +19,27 @@ below inherit that of the preceding release.
 Version 2.15.0 (TBA)
 --------------------
 
-- Stub generation improvements
+- Stub generation improvements and bugfixes
 
   - ``stubgen`` now accepts multiple pattern files via ``-p``, and the
     ``PATTERN_FILE`` parameter of the CMake :cmake:command:`nanobind_add_stub`
     command accepts a list.
     (commit `581adb <https://github.com/wjakob/nanobind/commit/581adb8cf70ed38d4dbbeb9969113ea36fac084a>`__).
 
-  - When a pattern file adapts an overload chain with one ``\doc`` marker per
+  - ``stubgen`` now emits valid syntax for ``\import`` directives and automatic
+    imports of submodules. Previously, ``stubgen`` generated incorrect output
+    like ``import .sub.mod`` or ``from . import sub.mod as sub.mod``.
+
+  - Annotations that name a module through an alias now resolve to the real
+    module name. For example, ``f(x: np.ndarray)`` is rendered as ``f(x:
+    numpy.ndarray)``. When processing files with ``from __future__ import
+    annotations``, ``stubgen`` previously generated incorrect output like
+    ``import np``.
+
+  - When a pattern file modifies an overload chain with one ``\doc`` marker per
     overload, each marker now expands to the docstring of the associated
-    overload. Previously, they all inserted the first non-empty docstring.
-    (commit `30785d <https://github.com/wjakob/nanobind/commit/30785df02e348547db15e47a9cf00a0cf0faf5ec>`__).
+    overload. (commit `30785d
+    <https://github.com/wjakob/nanobind/commit/30785df02e348547db15e47a9cf00a0cf0faf5ec>`__).
 
 - Miscellaneous minor fixes and improvements.
   (commits `9bb1c9 <https://github.com/wjakob/nanobind/commit/9bb1c9378e7063df9945e049824bc1648de2b921>`__,

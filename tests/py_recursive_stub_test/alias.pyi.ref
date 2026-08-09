@@ -1,0 +1,17 @@
+"""
+PEP 563 turns the annotations below into strings that name modules by
+their local alias.
+"""
+
+from collections.abc import Sequence
+import decimal
+
+
+class Local:
+    pass
+
+def f(x: decimal.Decimal) -> None: ...
+
+def g(x: Sequence) -> Local: ...
+
+def h(x: Sequence) -> None: ...

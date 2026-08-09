@@ -767,6 +767,15 @@ class StubGen:
             if mod_name == "builtins":
                 # Simplify builtins
                 return cls_name if cls_name != "NoneType" else "None"
+
+            # Resolve module aliases (e.g. "import numpy as np"), which reach
+            # this point when PEP 563 turns annotations into strings
+            head, sep, tail = mod_name.partition(".")
+            head_mod = getattr(self.module, head, None)
+            if ismodule(head_mod) and head_mod.__name__ != head:
+                mod_name = head_mod.__name__ + sep + tail
+                full_name = mod_name + "." + cls_name
+
             if full_name.startswith(self.module.__name__ + "."):
                 # Strip away the module prefix for local classes
                 result = full_name[len(self.module.__name__) + 1 :]
@@ -1046,12 +1055,14 @@ class StubGen:
         if module == "builtins" and name and (not as_name or name == as_name):
             return name
 
-        # Rewrite module name if this is relative import from a submodule
-        if module.startswith(self.module.__name__ + '.') and module != self.module.__name__:
+        # Rewrite as a relative import when the target is a submodule. Python
+        # has no relative 'import X' form, so this needs a name to bind.
+        if module.startswith(self.module.__name__ + '.') and (name or as_name):
             module_short = module[len(self.module.__name__) :]
-            if not name and as_name and module_short[0] == ".":
-                name = as_name = module_short[1:]
-                module_short = "."
+            if not name:
+                # Bind the submodule via 'from .<parent> import <child>'
+                parent, _, name = module_short[1:].rpartition(".")
+                module_short = "." + parent
         else:
             module_short = module
 

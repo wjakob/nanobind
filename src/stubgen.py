@@ -58,6 +58,7 @@ import builtins
 import enum
 from inspect import Signature, Parameter, signature, ismodule
 import io
+import os
 import textwrap
 import importlib
 import importlib.machinery
@@ -1605,6 +1606,9 @@ def main(args: Optional[List[str]] = None) -> None:
 
     for i in opt.imports:
         sys.path.insert(0, i)
+
+    # Let modules detect that they are being imported for stub generation
+    os.environ["NB_STUBGEN"] = "1"
 
     for i, mod in enumerate(opt.modules):
         if not opt.quiet:

@@ -53,6 +53,11 @@ Version 2.15.0 (TBA)
     attribute. Previous versions emitted a ``@property`` decorator without an
     accompanying function definition.
 
+  - ``stubgen`` now sets the environment variable ``NB_STUBGEN`` to ``"1"``.
+    Extensions can query this variable to skip initialization steps that are
+    expensive or inappropriate for stub generation (see the section on
+    :ref:`detecting stub generation <stubgen_detection>` for details).
+
 - Miscellaneous minor fixes and improvements.
   (commits `922a5c <https://github.com/wjakob/nanobind/commit/922a5cdaa4e6e18ecd233f9a7dd2c4b520a745d2>`__,
   `ef993f <https://github.com/wjakob/nanobind/commit/ef993ffa28e631151ceac27746ef79da09eda783>`__,

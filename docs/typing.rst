@@ -589,6 +589,31 @@ Note that for now, the ``nanobind.stubgen.StubGen`` API is considered
 experimental and not subject to the semantic versioning policy used by the
 nanobind project.
 
+.. _stubgen_detection:
+
+Detecting stub generation
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some extensions perform steps (e.g., initializing a GPU) that may be neither
+needed nor appropriate for stub generation. ``stubgen`` sets the environment
+variable ``NB_STUBGEN`` to ``"1"`` so that modules may skip such steps.
+
+.. code-block:: cpp
+
+   NB_MODULE(my_ext, m) {
+       const char *value = std::getenv("NB_STUBGEN");
+       bool stubgen = value && value[0] == '1';
+
+       if (!stubgen)
+           initialize_device();
+
+       // ...
+   }
+
+Use ``os.environ`` to query the variable iin Python Note that it is only set by
+the ``stubgen`` command line / CMake interface. Programs that drive the
+``StubGen`` class directly must set it themselves.
+
 .. _pattern_files:
 
 Pattern files

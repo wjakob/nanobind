@@ -364,6 +364,10 @@ improvements:
     ``nb::detail::dtype_traits<T>`` is documented in the section on
     :ref:`nonstandard arithmetic types <ndarray-nonstandard>`.
 
+  - ``stubgen`` now honors a ``__nb_signature__`` string on the type of a data
+    member and emits it in place of the inferred declaration. See the section
+    on :ref:`per-member signature overrides <stubgen_member_sig>` for details.
+
 - Internal ABI version 22.
 
 Version 2.15.0 (Aug 15, 2026)

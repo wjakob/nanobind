@@ -100,3 +100,24 @@ class Sentinel:
 # A class attribute holding an instance of the enclosing class. Stubgen used
 # to render it as an enum member and crash.
 Sentinel.INSTANCE = Sentinel()
+
+
+class SigMember:
+    # A member type that dictates the stub declaration of the member holding
+    # it, which stubgen emits in place of the usual 'name: type = value'
+    __nb_signature__ = "MODULE_MEMBER: tuple[int, ...]"
+
+
+MODULE_MEMBER = SigMember()
+
+
+class LazySigMember:
+    # The declaration may also be computed on demand, and span several lines
+    @property
+    def __nb_signature__(self):
+        return "# a comment\n_private: dict[str, int]\n"
+
+
+class Holder:
+    # Providing a declaration opts an otherwise private name into the stub
+    _private = LazySigMember()

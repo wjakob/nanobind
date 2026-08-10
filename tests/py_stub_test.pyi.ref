@@ -64,3 +64,15 @@ class AClass:
 
 class Sentinel:
     INSTANCE: Sentinel = ...
+
+class SigMember:
+    pass
+
+MODULE_MEMBER: tuple[int, ...]
+
+class LazySigMember:
+    pass
+
+class Holder:
+    # a comment
+    _private: dict[str, int]

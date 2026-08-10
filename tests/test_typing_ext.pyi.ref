@@ -1,7 +1,6 @@
-import collections.abc as cabc
+from collections import abc as cabc
 from collections.abc import Iterable
 import logging
-import py_stub_test
 from typing import (
     Any,
     Generic,
@@ -14,8 +13,10 @@ from typing import (
     overload
 )
 
-from . import submodule as submodule
-from .submodule import F as F, f as f2
+import py_stub_test
+
+from test_typing_ext import submodule as submodule
+from test_typing_ext.submodule import F as F, f as f2
 
 
 # a prefix

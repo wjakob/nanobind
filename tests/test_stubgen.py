@@ -71,14 +71,14 @@ def test01_format_docstr_roundtrip(sg, docstr):
 def test02_no_import_of_nonexistent_module(sg):
     # 'email.NoSuchThing' does not exist, only 'email' may be imported
     assert sg.simplify_types("email.NoSuchThing.X") == "email.NoSuchThing.X"
-    assert "email" in sg.imports
-    assert "email.NoSuchThing" not in sg.imports
+    assert "email" in sg.module_refs
+    assert "email.NoSuchThing" not in sg.module_refs
 
 
 def test03_id_seq_boundaries(sg):
     # A dotted sequence that continues an identifier is not a name reference
     assert sg.simplify_types("3foo.bar") == "3foo.bar"
-    assert "foo" not in sg.imports
+    assert "foo" not in sg.module_refs
     assert sg.simplify_types("typing.Optional") == "Optional"
 
 
@@ -116,3 +116,42 @@ def test06_doc_marker_needs_object(stubgen, fresh_module):
     sg = stubgen.StubGen(module=fresh_module, patterns=[pattern])
     with pytest.raises(RuntimeError, match="doc"):
         sg.apply_pattern("mod.__prefix__", None)
+
+
+# ---------------------------------------------------------------------------
+# import bindings
+# ---------------------------------------------------------------------------
+
+def test07_bind_rendering(stubgen, fresh_module):
+    sg = stubgen.StubGen(module=fresh_module)
+    sg.bind("numpy")
+    sg.bind("numpy", name="numpy", export=True)
+    sg.bind("pkg.sub", name="sub", export=True)
+    sg.bind("pkg.sub", name="renamed")
+    sg.bind("a.b")
+    sg.bind("typing", "overload")
+    out = sg.get()
+    # The redundant form both binds the name and supports 'numpy.X' references
+    assert "import numpy as numpy" in out and "import numpy\n" not in out
+    assert "from pkg import sub as renamed, sub as sub" in out
+    assert "import a.b" in out
+    assert "from typing import overload" in out
+
+
+def test08_helper_import_conflict(stubgen, fresh_module):
+    fresh_module.overload = None  # unrelated attribute of the same name
+    sg = stubgen.StubGen(module=fresh_module)
+    assert sg.bind("typing", "overload") == "_overload"
+    assert "from typing import overload as _overload" in sg.get()
+
+
+def test09_flat_stub_reexports_submodule(stubgen, fresh_module):
+    child = types.ModuleType(fresh_module.__name__ + ".child")
+    fresh_module.child = child
+    sys.modules[child.__name__] = child
+    try:
+        sg = stubgen.StubGen(module=fresh_module)
+        sg.put(fresh_module)
+        assert f"from {fresh_module.__name__} import child as child" in sg.get()
+    finally:
+        del sys.modules[child.__name__]

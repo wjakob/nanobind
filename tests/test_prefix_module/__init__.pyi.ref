@@ -1,5 +1,8 @@
-from . import prefix as prefix, prefixabc as prefixabc
-from .prefixabc import Type as Type
+from test_prefix_module import (
+    prefix as prefix,
+    prefixabc as prefixabc
+)
+from test_prefix_module.prefixabc import Type as Type
 
 
 def func() -> prefixabc.Type: ...

@@ -1,4 +1,4 @@
-from . import mod as mod
+from py_recursive_stub_test.sub import mod as mod
 
 
 SUB: int = 789

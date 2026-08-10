@@ -1,5 +1,9 @@
-from . import alias as alias, bar as bar, sub as sub
-from .sub import mod as mod
+from py_recursive_stub_test import (
+    alias as alias,
+    bar as bar,
+    sub as sub
+)
+from py_recursive_stub_test.sub import mod as mod
 import py_recursive_stub_test.sub.mod
 
 

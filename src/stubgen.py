@@ -65,7 +65,7 @@ import importlib.util
 import types
 import typing
 from dataclasses import dataclass
-from typing import Dict, Sequence, List, Optional, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal
+from typing import Dict, Sequence, List, Optional, Set, Tuple, cast, Generator, Any, Callable, Union, Protocol, Literal
 from pathlib import Path
 import re
 import sys
@@ -106,16 +106,6 @@ TYPES_TYPES = {
         "ModuleType",
     ]
 }
-
-# This type is used to track per-module imports (``import name as desired_name``)
-# during stub generation. The actual name in the stub is given by the value element.
-# (name, desired_as_name) -> actual_as_name
-ImportDict = Dict[Tuple[Optional[str], Optional[str]], Optional[str]]
-
-# This type maps a module name to an `ImportDict` tuple that tracks the
-# import declarations from that module.
-# package_name -> ((name, desired_as_name) -> actual_as_name)
-PackagesDict = Dict[str, ImportDict]
 
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.
 # It stores a function signature string, docstring, and a tuple of default function values.
@@ -253,9 +243,12 @@ class StubGen:
         # An identifier associated with the top element of the stack
         self.prefix = module.__name__
 
-        # Dictionary to keep track of import directives added by the stub generator
-        # Maps package_name -> ((name, desired_as_name) -> actual_as_name)
-        self.imports: PackagesDict = {}
+        # Import bindings accumulated during stub generation
+        # Maps local name -> (module, member or None, export)
+        self.bindings: Dict[str, Tuple[str, Optional[str], bool]] = {}
+
+        # Modules referenced by qualified names in signatures ('import a.b')
+        self.module_refs: Set[str] = set()
 
         # ---------- Regular expressions ----------
 
@@ -433,7 +426,7 @@ class StubGen:
             # to the first non-empty docstring regardless of position, while
             # tools that read the final declaration (e.g. sphinx-autoapi) expect
             # it there. This also avoids duplicating the text.
-            overload = self.import_object("typing", "overload")
+            overload = self.bind("typing", "overload")
             last_idx: Dict[str, int] = {}
             for i, s in enumerate(sigs):
                 if s[1] is not None:
@@ -496,7 +489,7 @@ class StubGen:
 
         for i, fno in enumerate(overloads):
             if len(overloads) > 1:
-                overload = self.import_object("typing", "overload")
+                overload = self.bind("typing", "overload")
                 self.write_ln(f"@{overload}")
 
             try:
@@ -508,7 +501,7 @@ class StubGen:
                 sig_str = f"{name}{self.signature_str(sig)}"
             else:
                 # If inspect.signature fails, use a maximally permissive type.
-                any_type = self.import_object("typing", "Any")
+                any_type = self.bind("typing", "Any")
                 sig_str = f"{name}(*args, **kwargs) -> {any_type}"
 
             # Potentially copy docstring from the implementation function
@@ -546,7 +539,7 @@ class StubGen:
                 except (ValueError, TypeError, IndexError):
                     pass
             if tp_str is None:
-                tp_str = self.import_object("typing", "Any")
+                tp_str = self.bind("typing", "Any")
             self.write_ln(f"{name}: {tp_str}")
             if prop.__doc__ and self.include_docstrings:
                 self.put_docstr(prop.__doc__)
@@ -591,9 +584,9 @@ class StubGen:
         # 'Final' at class scope already implies 'ClassVar', and per PEP 591
         # the two must not be combined (e.g. 'ClassVar[Final[int]]' is invalid).
         if prop.fset is None:
-            tp = f"{self.import_object('typing', 'Final')}[{tp}]"
+            tp = f"{self.bind('typing', 'Final')}[{tp}]"
         else:
-            tp = f"{self.import_object('typing', 'ClassVar')}[{tp}]"
+            tp = f"{self.bind('typing', 'ClassVar')}[{tp}]"
         self.write_ln(f"{name}: {tp} = ...")
         if prop.__doc__ and self.include_docstrings:
             self.put_docstr(prop.__doc__)
@@ -611,9 +604,9 @@ class StubGen:
             if same_module:
                 # This is an alias of a type in the same module or same top-level module
                 if sys.version_info >= (3, 10, 0):
-                    alias_tp = self.import_object("typing", "TypeAlias")
+                    alias_tp = self.bind("typing", "TypeAlias")
                 else:
-                    alias_tp = self.import_object("typing_extensions", "TypeAlias")
+                    alias_tp = self.bind("typing_extensions", "TypeAlias")
                 self.write_ln(f"{name}: {alias_tp} = {tp.__qualname__}\n")
             elif self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # Import from a different module
@@ -701,7 +694,7 @@ class StubGen:
 
             if self.include_external_imports or (same_toplevel_module and self.include_internal_imports):
                 # This is a function or a type, import it from its actual source
-                self.import_object(named_value.__module__, named_value.__name__, name)
+                self.bind(named_value.__module__, named_value.__name__, name, export=True)
         else:
             value_str = self.expr_str(value, abbrev)
 
@@ -713,9 +706,9 @@ class StubGen:
                 annotation = ""
             elif typing.get_origin(value):
                 if sys.version_info >= (3, 10, 0):
-                    annotation = ": " + self.import_object("typing", "TypeAlias")
+                    annotation = ": " + self.bind("typing", "TypeAlias")
                 else:
-                    annotation = ": " + self.import_object("typing_extensions", "TypeAlias")
+                    annotation = ": " + self.bind("typing_extensions", "TypeAlias")
             else:
                 annotation = f": {self.type_str(tp)}"
 
@@ -795,21 +788,23 @@ class StubGen:
                 mod_name = head_mod.__name__ + sep + tail
                 full_name = mod_name + "." + cls_name
 
-            if full_name.startswith(self.module.__name__ + "."):
-                # Strip away the module prefix for local classes
-                result = full_name[len(self.module.__name__) + 1 :]
-                # Inside a class body, strip the immediate enclosing class
+            # Strip the module prefix from local classes, but only when the
+            # first segment is an actual runtime attribute (lazy modules)
+            mod_prefix = self.module.__name__ + "."
+            if full_name.startswith(mod_prefix) and \
+                    (result := full_name[len(mod_prefix) :]).split(".")[0] in self.module.__dict__:
+                # Inside a class body, also strip the immediate enclosing class
                 # prefix (e.g. "ErrorEnum.Value" -> "Value"). Only that scope
                 # is stripped: class scopes don't nest, so an outer class's
                 # members aren't visible by short name in a nested class body.
-                scope = self.prefix[len(self.module.__name__) + 1 :]
+                scope = self.prefix[len(mod_prefix) :]
                 enclosing = scope.rpartition(".")[0]
                 if enclosing and result.startswith(enclosing + "."):
                     result = result[len(enclosing) + 1 :]
                 return result
             elif mod_name in ("typing", "typing_extensions", "collections.abc"):
                 # Import frequently-occurring typing classes and ABCs directly
-                return self.import_object(mod_name, cls_name)
+                return self.bind(mod_name, cls_name)
             else:
                 # Handle nested names. While mod_name isn't a valid module, then
                 # move the last segment of the name from mod_name to cls_name
@@ -825,7 +820,7 @@ class StubGen:
                     search_cls_name = f"{symbol}.{search_cls_name}"
 
                 # Import the module and reference the contained class by name
-                self.import_object(mod_name, None)
+                self.bind(mod_name)
                 return full_name
 
         s = self.id_seq.sub(process_general, s)
@@ -846,10 +841,10 @@ class StubGen:
         annotation = annotation.replace("*", "None").replace("(None)", "(None,)")
 
         # Build type while potentially preserving extra information as an annotation
-        ndarray = self.import_object("numpy.typing", "NDArray")
+        ndarray = self.bind("numpy.typing", "NDArray")
         result = f"{ndarray}[{dtype}]" if dtype else ndarray
         if annotation:
-            annotated = self.import_object("typing", "Annotated")
+            annotated = self.bind("typing", "Annotated")
             result = f"{annotated}[{result}, dict({annotation})]"
 
         return result
@@ -921,7 +916,7 @@ class StubGen:
                         item_list[0].strip(),
                     )
                     import_as = item_list[1].strip() if len(item_list) > 1 else None
-                    self.import_object(import_module, import_name, import_as)
+                    self.bind(import_module, import_name, import_as)
                 continue
             elif ls.startswith("\\import "):
                 # inline module imports like "\import A, B as b"
@@ -934,7 +929,10 @@ class StubGen:
                         modname, as_name = [i.strip() for i in items]
                     else:
                         raise RuntimeError(f"Could not parse import declaration {mod}")
-                    self.import_object(modname, None, as_name=as_name)
+                    if as_name:
+                        self.bind(modname, name=as_name)
+                    else:
+                        self.bind(modname)
                 continue
 
             groups = match.groups()
@@ -993,15 +991,21 @@ class StubGen:
                 if len(self.stack) != 1:
                     value_name_s = value.__name__.split(".")
                     module_name_s = self.module.__name__.split(".")
-                    is_external = value_name_s[0] != module_name_s[0]
-                    if not self.include_external_imports and is_external:
+                    if not self.include_external_imports and value_name_s[0] != module_name_s[0]:
                         return
 
-                    # Do not include submodules in the same stub, but include a directive to import them
-                    self.import_object(value.__name__, name=None, as_name=name)
+                    # Skip bindings of ancestor modules, which the import
+                    # machinery plants into submodule namespaces
+                    if module_name_s[: len(value_name_s)] == value_name_s:
+                        return
+
+                    # Bind the module so that it stays accessible through this stub
+                    self.bind(value.__name__, name=name, export=True)
+
+                    in_recursive_mode = self.recursive and self.output_file is not None
 
                     # If the user requested this, generate recursive stub files as well
-                    if self.recursive and value_name_s[:-1] == module_name_s and self.output_file:
+                    if in_recursive_mode and value_name_s[:-1] == module_name_s and self.output_file:
                         if create_subdirectory_for_module(value):
                             # Create a new subdirectory and start with an __init__.pyi file there
                             dir_name = self.output_file.parents[0] / value_name_s[-1]
@@ -1067,71 +1071,73 @@ class StubGen:
             self.stack.pop()
             self.prefix = old_prefix
 
-    def import_object(
-        self, module: str, name: Optional[str], as_name: Optional[str] = None
+    def bind(
+        self,
+        module: str,
+        member: Optional[str] = None,
+        name: Optional[str] = None,
+        export: bool = False,
     ) -> str:
         """
-        Import a type (e.g. typing.Optional) used within the stub, ensuring
-        that this does not cause conflicts. Specify ``as_name`` to ensure that
-        the import is bound to a specified name.
+        Register an import needed by the stub and return the local name that
+        refers to the imported object.
 
-        When ``name`` is None, the entire module is imported.
+        - ``module``: the source module. ``bind(module)`` alone records a
+          plain reference (``import a.b``) that resolves qualified names.
+        - ``member``: an object within ``module`` (``from m import x``).
+          When None, the binding refers to the module itself.
+        - ``name``: the desired local name. When None, it is derived from
+          ``member``, prefixing underscores to dodge conflicting names.
+        - ``export``: declares the name to be part of the module interface.
+          The binding then renders with the redundant re-export alias
+          (``x as x``) required by PEP 484.
+
+        Members of ``builtins`` need no import and keep their name.
         """
-        if module == "builtins" and name and (not as_name or name == as_name):
-            return name
+        if module == "builtins" and member and (not name or name == member):
+            return member
 
-        # Rewrite as a relative import when the target is a submodule. Python
-        # has no relative 'import X' form, so this needs a name to bind.
-        if module.startswith(self.module.__name__ + '.') and (name or as_name):
-            module_short = module[len(self.module.__name__) :]
-            if not name:
-                # Bind the submodule via 'from .<parent> import <child>'
-                parent, _, name = module_short[1:].rpartition(".")
-                module_short = "." + parent
-        else:
-            module_short = module
+        if member is None and name is None:
+            self.module_refs.add(module)
+            return module
 
-        # Query a cache of previously imported objects
-        imports_module: Optional[ImportDict] = self.imports.get(module_short, None)
-        if not imports_module:
-            imports_module = {}
-            self.imports[module_short] = imports_module
-
-        key = (name, as_name)
-        final_name = imports_module.get(key, None)
-        if final_name:
-            return final_name
-
-        # Cache miss, import the object
-        final_name = as_name if as_name else name
-
-        # If no as_name constraint was set, potentially adjust the name to
-        # avoid conflicts with an existing object of the same name
-        if name and not as_name:
-            test_name = name
+        local = name
+        if local is None:
+            assert member is not None
+            # Find a conflict-free local name, dodging attributes of the
+            # stubbed module that refer to something else
+            local = member
             while True:
-                # Accept the name if there are no conflicts
-                if not hasattr(self.module, test_name):
-                    break
-                value = getattr(self.module, test_name)
-                try:
-                    if module == ".":
-                        mod_o = self.module
-                    else:
-                        mod_o = importlib.import_module(module)
-
-                    # If there is a conflict, accept it if it refers to the same object
-                    if getattr(mod_o, name) is value:
+                prev = self.bindings.get(local, None)
+                if prev is not None:
+                    # Reuse a matching previous binding, keeping its export flag
+                    if prev[:2] == (module, member):
+                        export = export or prev[2]
                         break
-                except ImportError:
-                    pass
-
+                elif not hasattr(self.module, local):
+                    break
+                else:
+                    # A module attribute of the same name is acceptable if
+                    # it refers to the same object
+                    try:
+                        if getattr(importlib.import_module(module), member) \
+                                is getattr(self.module, local):
+                            break
+                    except ImportError:
+                        pass
                 # Prefix with an underscore
-                test_name = "_" + test_name
-            final_name = test_name
+                local = "_" + local
+        else:
+            prev = self.bindings.get(local, None)
+            if prev is not None:
+                if prev[:2] == (module, member):
+                    export = export or prev[2]
+                elif not self.quiet:
+                    print(f"  - warning: the import of '{local}' shadows a "
+                          f"previous import from '{prev[0]}'.")
 
-        imports_module[key] = final_name
-        return final_name if final_name else ""
+        self.bindings[local] = (module, member, export)
+        return local
 
     def expr_str(self, e: Any, abbrev: bool = True) -> Optional[str]:
         """
@@ -1159,11 +1165,11 @@ class StubGen:
             return self.type_str(tp) + '.' + e._name_
         elif (sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.ParamSpec)):
-            tv = self.import_object(tp.__module__, "ParamSpec")
+            tv = self.bind(tp.__module__, "ParamSpec")
             return f'{tv}("{e.__name__}")'
         elif (sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple)) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.TypeVarTuple)):
-            tv = self.import_object(tp.__module__, "TypeVarTuple")
+            tv = self.bind(tp.__module__, "TypeVarTuple")
             s = f'{tv}("{e.__name__}"'
             if sys.version_info >= (3, 13):
                 v = e.__default__
@@ -1174,7 +1180,7 @@ class StubGen:
                     s += ", default=" + v
             return s + ')'
         elif issubclass(tp, typing.TypeVar):
-            tv = self.import_object("typing", "TypeVar")
+            tv = self.bind("typing", "TypeVar")
             s = f'{tv}("{e.__name__}"'
             for v in getattr(e, "__constraints__", ()):
                 v = self.type_str(v)
@@ -1334,19 +1340,11 @@ class StubGen:
         1 = From 3rd party package
         2 = From the package being built
         """
-        if module.startswith(".") or module.split('.')[0] == self.module.__name__.split('.')[0]:
+        top = module.split(".")[0]
+        if top == self.module.__name__.split(".")[0]:
             return 2
-
-        try:
-            spec = importlib.util.find_spec(module)
-        except (ModuleNotFoundError, ValueError):
-            return 1
-
-        if spec:
-            if spec.origin and ("site-packages" in spec.origin or "dist-packages" in spec.origin):
-                return 1
-            else:
-                return 0
+        elif top in getattr(sys, "stdlib_module_names", ()):
+            return 0
         else:
             return 1
 
@@ -1359,39 +1357,56 @@ class StubGen:
         if self.include_docstrings and doc:
             s += self.format_docstr(doc, 0) + "\n"
 
+        # Derive import statements from the binding table. Bindings of dotted
+        # modules use the 'from <parent> import <child>' form, which can also
+        # express a re-export ('as <child>'). Plain module references and
+        # bindings of top-level modules render as 'import' statements.
+        import_lines: Dict[str, List[str]] = {}
+        from_imports: Dict[str, List[str]] = {}
+
+        for local, (module, member, export) in self.bindings.items():
+            if member is None:
+                source, _, symbol = module.rpartition(".")
+                if not source:
+                    alias = "" if local == module and not export else f" as {local}"
+                    import_lines.setdefault(module, []).append(f"import {module}{alias}")
+                    continue
+            else:
+                source, symbol = module, member
+            item = symbol if local == symbol and not export else f"{symbol} as {local}"
+            from_imports.setdefault(source, []).append(item)
+
+        for ref in self.module_refs:
+            # A binding of the same top-level module already provides the name
+            b = self.bindings.get(ref, None)
+            if b is None or b[:2] != (ref, None):
+                import_lines.setdefault(ref, []).append(f"import {ref}")
+
+        sources = sorted(set(import_lines) | set(from_imports),
+                         key=lambda m: (self.check_party(m), m))
         last_party = None
 
-        for module in sorted(self.imports, key=lambda i: str(self.check_party(i)) + i):
-            imports = self.imports[module]
-            items: List[str] = []
-            party = self.check_party(module)
-
+        for source in sources:
+            party = self.check_party(source)
             if party != last_party:
                 if last_party is not None:
                     s += "\n"
                 last_party = party
 
-            for (k, v1), v2 in imports.items():
-                if k is None:
-                    if v1 and v1 != module:
-                        s += f"import {module} as {v1}\n"
-                    elif v1 is None or (k, None) not in imports:
-                        s += f"import {module}\n"
-                else:
-                    if k != v2 or v1:
-                        items.append(f"{k} as {v2}")
-                    else:
-                        items.append(k)
+            for line in sorted(import_lines.get(source, [])):
+                s += line + "\n"
 
-            items = sorted(items)
+            items = sorted(from_imports.get(source, []))
             if items:
                 items_v0 = ", ".join(items)
-                items_v0 = f"from {module} import {items_v0}\n"
+                items_v0 = f"from {source} import {items_v0}\n"
                 items_v1 = "(\n    " + ",\n    ".join(items) + "\n)"
-                items_v1 = f"from {module} import {items_v1}\n"
+                items_v1 = f"from {source} import {items_v1}\n"
                 s += items_v0 if len(items_v0) <= 70 else items_v1
 
-        s += "\n\n"
+        # Separate the import block from the module contents
+        if s:
+            s += "\n\n"
 
         # Append the main generated stub
         s += self.output

@@ -1,3 +1,4 @@
+from py_recursive_stub_test import alias as nickname, bar as bar
 
 
 MOD: int = 1011

@@ -188,7 +188,7 @@ because the primary purpose of this interface is to efficiently access existing
 memory without conversion overhead. When binding functions that return
 ``Eigen::Map<...>``, you must ensure that the mapped memory remains valid
 throughout the map's lifetime. This typically requires appropriate lifetime
-annotations (such as :cpp:enumerator:`rv_policy::reference_internal` or
+annotations (such as :cpp:member:`rv_policy::reference_internal` or
 :cpp:struct:`keep_alive`) to prevent access to memory that has been deallocated
 on the C++ side.
 

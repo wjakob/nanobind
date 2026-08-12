@@ -98,9 +98,9 @@ Shared pointers and holders
 When nanobind instantiates a C++ type within Python, the resulting instance
 data is stored *within* the created Python object ("``PyObject``").
 Alternatively, when an already existing C++ instance is transferred to Python
-via a function return value and :cpp:enumerator:`rv_policy::reference`,
-:cpp:enumerator:`rv_policy::reference_internal`, or
-:cpp:enumerator:`rv_policy::take_ownership`, nanobind creates a smaller wrapper
+via a function return value and :cpp:member:`rv_policy::reference`,
+:cpp:member:`rv_policy::reference_internal`, or
+:cpp:member:`rv_policy::take_ownership`, nanobind creates a smaller wrapper
 ``PyObject`` that only stores a pointer to the instance data.
 
 This is *very different* from pybind11, where the instance ``PyObject``

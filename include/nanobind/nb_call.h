@@ -52,7 +52,7 @@ NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
 }
 
 /// Implementation detail of api<T>::operator() (call operator)
-template <rv_policy policy, typename T>
+template <rv_policy::value policy, typename T>
 NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
                          size_t &nkwargs, const size_t kwargs_offset,
                          T &&value) {
@@ -100,7 +100,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
     return steal(obj_vectorcall(base, args_p, nargs, kwnames, method_call))
 
 template <typename Derived>
-template <rv_policy policy, typename... Args>
+template <rv_policy::value policy, typename... Args>
 object api<Derived>::operator()(Args &&...args_) const {
     static constexpr bool method_call =
         std::is_same_v<Derived, accessor<obj_attr>> ||

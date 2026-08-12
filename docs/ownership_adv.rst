@@ -368,7 +368,7 @@ Deleter>`` from Python, ownership of that object must be transferred from C++ to
   possible when the instance was originally created by a *new expression*
   within C++ and nanobind has taken over ownership (i.e., it was created by
   a function returning a raw pointer ``T *value`` with
-  :cpp:enumerator:`rv_policy::take_ownership`, or a function returning a
+  :cpp:member:`rv_policy::take_ownership`, or a function returning a
   ``std::unique_ptr<T>``). This limitation exists because the ``Deleter``
   will execute the statement ``delete value`` when the unique pointer
   expires, causing undefined behavior when the object was allocated within

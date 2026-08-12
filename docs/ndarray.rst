@@ -260,7 +260,7 @@ In this case:
 Data *ownership* is an important aspect of this two-step process: because the
 NumPy array points directly into the storage of another object, nanobind must
 keep the ``Matrix4f`` instance alive as long as the NumPy array exists, which
-the :cpp:enumerator:`reference_internal <rv_policy::reference_internal>` return
+the :cpp:member:`reference_internal <rv_policy::reference_internal>` return
 value policy signals to nanobind. More generally, wrapping an existing memory
 region without copying requires that that this memory region remains valid
 throughout the lifetime of the created array (more on this point :ref:`shortly
@@ -389,7 +389,7 @@ pass this object as the ``owner``---nanobind will make sure that this object
 isn't deleted as long as the created array exists. If the owner is a C++ object
 with an associated Python instance, you may use :cpp:func:`nb::find() <find>`
 to look up the associated Python object. When binding methods, you can use the
-:cpp:enumerator:`reference_internal <rv_policy::reference_internal>` return
+:cpp:member:`reference_internal <rv_policy::reference_internal>` return
 value policy to specify the implicit ``self`` argument as the ``owner`` upon
 return, which was done in the earlier ``Matrix4f`` :ref:`example
 <matrix4f-example>`.
@@ -397,7 +397,7 @@ return, which was done in the earlier ``Matrix4f`` :ref:`example
 .. warning::
 
    If you do not specify an owner and use a return value policy like
-   :cpp:enumerator:`rv_policy::reference` (see also the the section on
+   :cpp:member:`rv_policy::reference` (see also the the section on
    :ref:`nd-array return value policies <ndarray_rvp>`), nanobind will assume
    that the array storage **remains valid forever**.
 
@@ -448,26 +448,26 @@ Function bindings that return nd-arrays can specify return value policy
 annotations to determine whether or not a copy should be made. They are
 interpreted as follows:
 
-- The default :cpp:enumerator:`rv_policy::automatic` and
-  :cpp:enumerator:`rv_policy::automatic_reference` policies cause the array to
+- The default :cpp:member:`rv_policy::automatic` and
+  :cpp:member:`rv_policy::automatic_reference` policies cause the array to
   be copied when it has no owner and when it is not already associated with a
   Python object.
 
-- The policy :cpp:enumerator:`rv_policy::reference` references an existing
+- The policy :cpp:member:`rv_policy::reference` references an existing
   memory region and never copies.
 
-- :cpp:enumerator:`rv_policy::copy` always copies.
+- :cpp:member:`rv_policy::copy` always copies.
 
-- :cpp:enumerator:`rv_policy::none` refuses the cast unless the array is
+- :cpp:member:`rv_policy::none` refuses the cast unless the array is
   already associated with an existing Python object (e.g. a NumPy array), in
   which case that object is returned.
 
-- :cpp:enumerator:`rv_policy::reference_internal` retroactively sets the
+- :cpp:member:`rv_policy::reference_internal` retroactively sets the
   nd-array's ``owner`` field to a method's ``self`` argument. It fails with an
   error if there is already a different owner.
 
-- :cpp:enumerator:`rv_policy::move` is unsupported and demoted to
-  :cpp:enumerator:`rv_policy::copy`.
+- :cpp:member:`rv_policy::move` is unsupported and demoted to
+  :cpp:member:`rv_policy::copy`.
 
 Note that when a copy is returned, the copy is made by the framework, not by
 nanobind itself.

@@ -167,7 +167,7 @@ NAMESPACE_END(literals)
 NAMESPACE_BEGIN(detail)
 
 enum class func_flags : uint32_t {
-    /* Low 3 bits reserved for return value policy */
+    // Low 3 bits reserved for return value policy
 
     /// Did the user specify a name for this function, or is it anonymous?
     has_name = (1 << 4),
@@ -325,9 +325,17 @@ NB_INLINE void func_extra_apply(F &f, is_operator, size_t &) {
     f.flags |= (uint32_t) func_flags::is_operator;
 }
 
+template <typename F, rv_policy::value V>
+NB_INLINE void func_extra_apply(F &f, rv_policy::policy_tag<V>, size_t &) {
+    f.flags = (f.flags & (uint32_t) ~0b111) | (uint32_t) V;
+}
+
 template <typename F>
-NB_INLINE void func_extra_apply(F &f, rv_policy pol, size_t &) {
-    f.flags = (f.flags & (uint32_t) ~0b111) | (uint16_t) pol;
+NB_INLINE void func_extra_apply(F &, rv_policy, size_t &) {
+    static_assert(false_v<F>,
+                  "nb::def() and friends require a compile-time return value "
+                  "policy tag such as nb::rv_policy::move; a runtime "
+                  "rv_policy value cannot be used as a function annotation.");
 }
 
 template <typename F>

@@ -51,7 +51,7 @@ template <> struct nanobind::detail::type_caster<callback> {
             return handle((PyObject *) cb.context).inc_ref();
         if (policy == rv_policy::none)
             return handle();
-        return cpp_function(cb, policy).release();
+        return cpp_function(cb).release();
     }
     NB_TYPE_CASTER(callback, const_name("Callable[[int], None]"))
 };

@@ -882,7 +882,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                 self_arg_constructor = args[0];
             }
 
-            rv_policy policy = (rv_policy) (f->flags & 0b111);
+            rv_policy policy = (rv_policy::value) (f->flags & 0b111);
 
             try {
                 result = nullptr;
@@ -998,7 +998,7 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
             if (is_constructor)
                 args_flags[0] |= (uint8_t) cast_flags::construct;
 
-            rv_policy policy = (rv_policy) (f->flags & 0b111);
+            rv_policy policy = (rv_policy::value) (f->flags & 0b111);
 
             try {
                 result = nullptr;
@@ -1110,7 +1110,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
 
                 // Found a suitable overload, let's try calling it
                 result = f->impl((void *) f->capture, (PyObject **) args_in,
-                                 args_flags, (rv_policy) (f->flags & 0b111),
+                                 args_flags, (rv_policy::value) (f->flags & 0b111),
                                  &cleanup);
 
                 if (NB_UNLIKELY(!result))
@@ -1168,7 +1168,7 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *self,
     if (kwargs_in == nullptr && nargs_in == 0) {
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,
-                              nullptr, (rv_policy) (fr->flags & 0b111), nullptr);
+                              nullptr, (rv_policy::value) (fr->flags & 0b111), nullptr);
             if (result == NB_NEXT_OVERLOAD)
                 error_handler = nb_func_error_overload;
             else if (!result)
@@ -1217,7 +1217,7 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,
-                              args_flags, (rv_policy) (fr->flags & 0b111), &cleanup);
+                              args_flags, (rv_policy::value) (fr->flags & 0b111), &cleanup);
             if (result == NB_NEXT_OVERLOAD) {
                 error_handler = nb_func_error_overload;
             } else if (!result) {
@@ -1280,7 +1280,7 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,
-                              args_flags, (rv_policy) (fr->flags & 0b111), &cleanup);
+                              args_flags, (rv_policy::value) (fr->flags & 0b111), &cleanup);
             if (result == NB_NEXT_OVERLOAD) {
                 error_handler = nb_func_error_overload;
             } else if (!result) {

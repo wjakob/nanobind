@@ -100,7 +100,7 @@ performance improvements:
 
 - **Lifetime management**: nanobind maintains efficient internal data
   structures for lifetime management (needed for :cpp:class:`nb::keep_alive
-  <keep_alive>`, :cpp:enumerator:`nb::rv_policy::reference_internal
+  <keep_alive>`, :cpp:member:`nb::rv_policy::reference_internal
   <rv_policy::reference_internal>`, the ``std::shared_ptr`` interface, etc.).
   With these changes, bound types no longer need to be weak-referenceable,
   which saves a pointer per instance.
@@ -224,7 +224,7 @@ The following lists minor-but-useful additions relative to pybind11.
 
 - **Finding Python objects associated with a C++ instance**: In addition to all
   of the return value policies supported by pybind11, nanobind provides one
-  additional policy named :cpp:enumerator:`nb::rv_policy::none
+  additional policy named :cpp:member:`nb::rv_policy::none
   <rv_policy::none>` that *only* succeeds when the return value is already a
   known/registered Python object. In other words, this policy will never
   attempt to move, copy, or reference a C++ instance by constructing a new

@@ -25,6 +25,29 @@ This is a major release with breaking API and ABI changes, in particular:
   Python 3.9 reached its end of life in October 2025, and dropping it removes
   a number of workarounds for missing C API functionality.
 
+- **Return value policies**: policies like :cpp:member:`nb::rv_policy::move
+  <rv_policy::move>` are now compile-time tags. This is advantageous because
+  binding declarations like
+
+  .. code-block:: cpp
+
+     m.def("f", &f, nb::rv_policy::reference);
+
+  can now directly bake the policy into generated code instead of having to
+  load it from memory. In the unlikely case that your implementation computed
+  policies at runtime, this will need to be converted to ``constexpr``.
+
+  .. code-block:: cpp
+
+     auto policy = ...;
+     m.def("f", &f, policy); // <-- not allowed
+
+  The policy tag implicitly casts to a :cpp:enum:`rv_policy::value
+  <rv_policy::value>` at runtime.
+  Various non-binding functions like :cpp:func:`nb::cast() <cast>` and
+  :cpp:func:`nb::make_iterator <make_iterator>` take this form. Your code
+  may require similar adaptations.
+
 Version 2.15.0 (Aug 15, 2026)
 -----------------------------
 
@@ -367,7 +390,7 @@ conditions in free-threaded Python builds.
     semantics (commit
     `99dfbe <https://github.com/wjakob/nanobind/commit/99dfbef14879dd3838930ad8f593f46e312ddb4e>`__).
     The single-argument dispatcher fast path now applies
-    :cpp:enumerator:`nb::rv_policy::reference_internal <rv_policy::reference_internal>`
+    :cpp:member:`nb::rv_policy::reference_internal <rv_policy::reference_internal>`
     consistently with the other arities (commit
     `9c8927 <https://github.com/wjakob/nanobind/commit/9c8927fccf152bea734375c45d90e10ae3597ab9>`__).
     The stable-ABI ``seq_get*`` helpers now clear the error indicator on
@@ -1109,9 +1132,9 @@ Version 2.2.0 (October 3, 2024)
   There are two minor but potentially breaking changes:
 
   1. The nd-array type caster now interprets the
-     :cpp:enumerator:`nb::rv_policy::automatic_reference
+     :cpp:member:`nb::rv_policy::automatic_reference
      <rv_policy::automatic_reference>` return value policy analogously to the
-     :cpp:enumerator:`nb::rv_policy::automatic <rv_policy::automatic>`, which
+     :cpp:member:`nb::rv_policy::automatic <rv_policy::automatic>`, which
      means that it references a memory region when the user specifies an
      ``owner``, and it otherwise copies. This makes it safe to use the
      :cpp:func:`nb::cast() <cast>` and :cpp:func:`nb::ndarray::cast()
@@ -1150,7 +1173,7 @@ Version 2.2.0 (October 3, 2024)
   <https://github.com/wjakob/nanobind/issues/709>`__)
 
 * Casting via :cpp:func:`nb::cast <cast>` can now specify an owner object for
-  use with the :cpp:enumerator:`nb::rv_policy::reference_internal
+  use with the :cpp:member:`nb::rv_policy::reference_internal
   <rv_policy::reference_internal>` return value policy (PR `#667
   <https://github.com/wjakob/nanobind/pull/667>`__).
 
@@ -1198,7 +1221,7 @@ Version 2.1.0 (Aug 11, 2024)
   <https://github.com/wjakob/nanobind/issues/668>`__)
 
 * Ability to use :cpp:func:`nb::cast <cast>` to create object with the
-  :cpp:enumerator:`nb::rv_policy::reference_internal
+  :cpp:member:`nb::rv_policy::reference_internal
   <rv_policy::reference_internal>` return value policy (PR `#667
   <https://github.com/wjakob/nanobind/pull/667>`__).
 

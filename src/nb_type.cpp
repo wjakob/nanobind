@@ -2244,7 +2244,7 @@ static void nb_type_put_unique_finalize(PyObject *o,
 PyObject *nb_type_put_unique(const std::type_info *cpp_type,
                              void *value,
                              cleanup_list *cleanup, bool cpp_delete) noexcept {
-    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+    rv_policy policy = cpp_delete ? rv_policy::take_ownership_v : rv_policy::none_v;
 
     bool is_new = false;
     PyObject *o = nb_type_put(cpp_type, value, policy, cleanup, &is_new);
@@ -2259,7 +2259,7 @@ PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
                                const std::type_info *cpp_type_p,
                                void *value,
                                cleanup_list *cleanup, bool cpp_delete) noexcept {
-    rv_policy policy = cpp_delete ? rv_policy::take_ownership : rv_policy::none;
+    rv_policy policy = cpp_delete ? rv_policy::take_ownership_v : rv_policy::none_v;
 
     bool is_new = false;
     PyObject *o =

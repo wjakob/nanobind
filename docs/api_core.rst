@@ -136,7 +136,7 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
       type (e.g., an integer). The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
       that it can be read and written.
 
-   .. cpp:function:: template <rv_policy policy = rv_policy::automatic_reference, typename... Args> object operator()(Args &&...args) const
+   .. cpp:function:: template <rv_policy::value policy = rv_policy::automatic_reference_v, typename... Args> object operator()(Args &&...args) const
 
       Assuming the Python object is a function or implements the ``__call__``
       protocol, `operator()` invokes the underlying function, passing an
@@ -1667,7 +1667,7 @@ Casting
    such object can be found, the function it returns an invalid object
    (:cpp:func:`detail::api::is_valid()` is ``false``).
 
-.. cpp:function:: template <rv_policy policy = rv_policy::automatic, typename... Args> tuple make_tuple(Args&&... args)
+.. cpp:function:: template <rv_policy::value policy = rv_policy::automatic_v, typename... Args> tuple make_tuple(Args&&... args)
 
    Create a Python tuple from a sequence of C++ objects ``args...``. The return
    value policy `policy` is used to handle ownership-related questions when a
@@ -1899,7 +1899,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       bindings, the specified name must match the ``name`` argument of
       :cpp:class:`nb::class_ <class_>`.
 
-.. cpp:enum-class:: rv_policy
+.. cpp:class:: rv_policy
 
    A return value policy determines the question of *ownership* when a bound
    function returns a previously unknown C++ instance that must now be
@@ -1917,11 +1917,37 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
    ownership (e.g., ``std::unique_ptr<T>``, ``std::shared_ptr<T>``, a type with
    :ref:`intrusive reference counting <intrusive>`).
 
+   The named constants below are compile-time tags that convert implicitly
+   to a runtime ``rv_policy``. Templates with a policy parameter
+   (:cpp:func:`make_iterator`, :cpp:func:`bind_vector`, etc.) use the nested
+   :cpp:enum:`rv_policy::value` enumeration and accept the tags as arguments.
+
+   .. cpp:enum:: value
+
+      Runtime representation of a return value policy. Each enumerator
+      mirrors the equally named tag constant (e.g. ``move_v`` for ``move``).
+
+      .. cpp:enumerator:: automatic_v
+
+      .. cpp:enumerator:: automatic_reference_v
+
+      .. cpp:enumerator:: take_ownership_v
+
+      .. cpp:enumerator:: copy_v
+
+      .. cpp:enumerator:: move_v
+
+      .. cpp:enumerator:: reference_v
+
+      .. cpp:enumerator:: reference_internal_v
+
+      .. cpp:enumerator:: none_v
+
    The following policies are available (where `automatic` is the default).
    Please refer to the :ref:`return value policy section <rvp>` of the main
    documentation, which clarifies the list below using concrete examples.
 
-   .. cpp:enumerator:: take_ownership
+   .. cpp:member:: static constexpr auto take_ownership
 
       Create a Python object that wraps the existing C++ instance and takes
       full ownership of it. No copies are made. Python will call the C++
@@ -1930,25 +1956,25 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       and is not allowed to destruct the instance, or undefined behavior will
       ensue.
 
-   .. cpp:enumerator:: copy
+   .. cpp:member:: static constexpr auto copy
 
       Copy-construct a new Python object from the C++ instance. The new copy
       will be owned by Python, while C++ retains ownership of the original.
 
-   .. cpp:enumerator:: move
+   .. cpp:member:: static constexpr auto move
 
       Move-construct a new Python object from the C++ instance. The new object
       will be owned by Python, while C++ retains ownership of the original
       (whose contents were likely invalidated by the move operation).
 
-   .. cpp:enumerator:: reference
+   .. cpp:member:: static constexpr auto reference
 
       Create a Python object that wraps the existing C++ instance *without
       taking ownership* of it. No copies are made. Python will never call the
       destructor or ``delete`` operator, even when the Python wrapper is
       garbage collected.
 
-   .. cpp:enumerator:: reference_internal
+   .. cpp:member:: static constexpr auto reference_internal
 
       A safe extension of the `reference` policy for methods that implement
       some form of attribute access. It creates a Python object that wraps the
@@ -1956,19 +1982,19 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       adjusts reference counts to keeps the method's implicit ``self`` argument
       alive until the newly created object has been garbage collected.
 
-   .. cpp:enumerator:: none
+   .. cpp:member:: static constexpr auto none
 
       This is the most conservative policy: it simply refuses the cast unless
       the C++ instance already has a corresponding Python object, in which case
       the question of ownership becomes moot.
 
-   .. cpp:enumerator:: automatic
+   .. cpp:member:: static constexpr auto automatic
 
       This is the default return value policy, which falls back to
       `take_ownership` when the return value is a pointer, `move`  when it is a
       rvalue reference, and `copy` when it is a lvalue reference.
 
-   .. cpp:enumerator:: automatic_reference
+   .. cpp:member:: static constexpr auto automatic_reference
 
       This policy matches `automatic` but falls back to `reference` when the
       return value is a pointer.
@@ -2436,9 +2462,9 @@ Class binding
       specifically to the setter or getter part.
 
       Note that this function implicitly assigns the
-      :cpp:enumerator:`rv_policy::reference_internal` return value policy to
+      :cpp:member:`rv_policy::reference_internal` return value policy to
       `getter` (as opposed to the usual
-      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      :cpp:member:`rv_policy::automatic`). Provide an explicit return value
       policy as part of the `extra` argument to override this.
 
       **Example**: the example below uses `def_prop_rw` to expose a C++
@@ -2471,9 +2497,9 @@ Class binding
       other :ref:`function binding annotations <function_binding_annotations>`.
 
       Note that this function implicitly assigns the
-      :cpp:enumerator:`rv_policy::reference_internal` return value policy to
+      :cpp:member:`rv_policy::reference_internal` return value policy to
       `getter` (as opposed to the usual
-      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      :cpp:member:`rv_policy::automatic`). Provide an explicit return value
       policy as part of the `extra` argument to override this.
 
       **Example**: the example below uses `def_prop_ro` to expose a C++ getter
@@ -2580,9 +2606,9 @@ Class binding
       specifically to the setter or getter part.
 
       Note that this function implicitly assigns the
-      :cpp:enumerator:`rv_policy::reference` return value policy to
+      :cpp:member:`rv_policy::reference` return value policy to
       `getter` (as opposed to the usual
-      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      :cpp:member:`rv_policy::automatic`). Provide an explicit return value
       policy as part of the `extra` argument to override this.
 
       **Example**: the example below uses `def_prop_rw_static` to expose a
@@ -2613,9 +2639,9 @@ Class binding
       other :ref:`function binding annotations <function_binding_annotations>`.
 
       Note that this function implicitly assigns the
-      :cpp:enumerator:`rv_policy::reference` return value policy to
+      :cpp:member:`rv_policy::reference` return value policy to
       `getter` (as opposed to the usual
-      :cpp:enumerator:`rv_policy::automatic`). Provide an explicit return value
+      :cpp:member:`rv_policy::automatic`). Provide an explicit return value
       policy as part of the `extra` argument to override this.
 
       **Example**: the example below uses `def_prop_ro_static` to expose a
@@ -3081,12 +3107,12 @@ The documentation below refers to two per-instance flags with the following mean
    set to ``true`` and ``false``.
 
    This is analogous to casting a C++ object with return value policy
-   :cpp:enumerator:`rv_policy::reference`.
+   :cpp:member:`rv_policy::reference`.
 
    If a `parent` object is specified, the instance keeps this parent alive
    while the newly created object exists. This is analogous to casting a C++
    object with return value policy
-   :cpp:enumerator:`rv_policy::reference_internal`.
+   :cpp:member:`rv_policy::reference_internal`.
 
 .. cpp:function:: object inst_take_ownership(handle h, void * p)
 
@@ -3098,7 +3124,7 @@ The documentation below refers to two per-instance flags with the following mean
    ``true``.
 
    This is analogous to casting a C++ object with return value policy
-   :cpp:enumerator:`rv_policy::take_ownership`.
+   :cpp:member:`rv_policy::take_ownership`.
 
 .. cpp:function:: void inst_zero(handle h)
 

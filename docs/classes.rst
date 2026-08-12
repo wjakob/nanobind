@@ -736,7 +736,7 @@ invoked with incompatible arguments rather than throwing a type error.
 
 When binding *in-place* operators such as ``operator+=``, and when their
 implementation is guaranteed to end with ``return *this``, it is recommended
-that you set a return value policy of :cpp:enumerator:`rv_policy::none`, i.e.,
+that you set a return value policy of :cpp:member:`rv_policy::none`, i.e.,
 
 .. code-block:: cpp
 
@@ -1087,7 +1087,7 @@ here creates two magic methods on ``Pet``:
 * A ``__new__`` that uses the given function to produce a new ``Pet``.
   It is converted to a Python object in the same way as the return value
   of any other function you might write bindings for. In particular,
-  you can pass a :cpp:enum:`nb::rv_policy <rv_policy>` as an additional
+  you can pass a :cpp:class:`nb::rv_policy <rv_policy>` as an additional
   argument to :cpp:func:`.def() <class_::def>` to control how this conversion
   occurs.
 
@@ -1180,7 +1180,7 @@ current compilation unit).
 .. warning::
 
    Instance class marked with :cpp:class:`nb::never_destruct <never_destruct>`
-   must be returned using the :cpp:enumerator:`reference
+   must be returned using the :cpp:member:`reference
    <rv_policy::reference>` return value policy. Otherwise, nanobind will assume
    ownership, which includes the requirement of destructing the object at
    a later point.

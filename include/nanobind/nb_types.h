@@ -125,7 +125,7 @@ public:
     accessor<num_item> operator[](T key) const;
     args_proxy operator*() const;
 
-    template <rv_policy policy = rv_policy::automatic_reference,
+    template <rv_policy::value policy = rv_policy::automatic_reference_v,
               typename... Args>
     object operator()(Args &&...args) const;
 

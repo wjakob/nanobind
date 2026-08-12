@@ -78,11 +78,11 @@ Return value policies
 
 nanobind provides several *return value policy* annotations that can be
 passed to :func:`module_::def`, :func:`class_::def`, and :func:`cpp_function`.
-The default policy is :cpp:enumerator:`rv_policy::automatic`, which is usually
+The default policy is :cpp:member:`rv_policy::automatic`, which is usually
 a reasonable default (but not in this case!).
 
 In the :ref:`problematic example <ownership_problem>`, the policy
-:cpp:enumerator:`rv_policy::reference` should have been specified explicitly so
+:cpp:member:`rv_policy::reference` should have been specified explicitly so
 that the global instance is only *referenced* without any implied transfer of
 ownership, i.e.:
 
@@ -95,7 +95,7 @@ where ignoring ownership could lead to resource leaks. As a developer using
 this library, it is important that you familiarize yourself with the different
 options below. In particular, the following policies are available:
 
-- :cpp:enumerator:`rv_policy::take_ownership`:
+- :cpp:member:`rv_policy::take_ownership`:
   Create a thin Python object wrapper around the returned C++ instance without
   making a copy and transfer ownership to Python. When the
   Python wrapper is eventually garbage collected, nanobind will call the C++
@@ -109,11 +109,11 @@ options below. In particular, the following policies are available:
      m.def("make_data", []{ return new Data(); }, nb::rv_policy::take_ownership);
 
   The return value policy declaration could actually have been omitted here
-  because :cpp:enumerator:`take_ownership <rv_policy::take_ownership>` is the
-  default for *pointer return values* (see :cpp:enumerator:`automatic
+  because :cpp:member:`take_ownership <rv_policy::take_ownership>` is the
+  default for *pointer return values* (see :cpp:member:`automatic
   <rv_policy::automatic>`).
 
-- :cpp:enumerator:`rv_policy::copy`:
+- :cpp:member:`rv_policy::copy`:
   Copy-construct a new Python object from the C++ instance. The copy will be
   owned by Python, while C++ retains ownership of the original.
 
@@ -131,17 +131,17 @@ options below. In particular, the following policies are available:
         .def("b", &A::b, nb::rv_policy::copy);
 
   The return value policy declaration could actually have been omitted here
-  because :cpp:enumerator:`copy <rv_policy::copy>` is the default for *lvalue
-  reference* return values (see :cpp:enumerator:`automatic
+  because :cpp:member:`copy <rv_policy::copy>` is the default for *lvalue
+  reference* return values (see :cpp:member:`automatic
   <rv_policy::automatic>`).
 
-- :cpp:enumerator:`rv_policy::move`:
+- :cpp:member:`rv_policy::move`:
   Move-construct a new Python object from the C++ instance. The new object will
   be owned by Python, while C++ retains ownership of the original (whose
   contents were likely invalidated by the move operation).
 
   In the example below, a function uses this policy to return a C++ instance by
-  value. The :cpp:enumerator:`copy <rv_policy::copy>` operation mentioned above
+  value. The :cpp:member:`copy <rv_policy::copy>` operation mentioned above
   would also be safe to use, but move construction has the potential of being
   significantly more efficient.
 
@@ -155,11 +155,11 @@ options below. In particular, the following policies are available:
         .def("b", &A::b, nb::rv_policy::move);
 
   The return value policy declaration could actually have been omitted here
-  because :cpp:enumerator:`move <rv_policy::move>` is the default for *functions
-  that return by value* (see :cpp:enumerator:`automatic
+  because :cpp:member:`move <rv_policy::move>` is the default for *functions
+  that return by value* (see :cpp:member:`automatic
   <rv_policy::automatic>`).
 
-- :cpp:enumerator:`rv_policy::reference`:
+- :cpp:member:`rv_policy::reference`:
   Create a thin Python object wrapper around the returned C++ instance without
   making a copy, but *do not transfer ownership to Python*. nanobind will never
   call the C++ ``delete`` operator, even when the wrapper expires.
@@ -169,7 +169,7 @@ options below. In particular, the following policies are available:
   Undefined behavior will ensue when the C++ side deletes the instance while it
   is still being used by Python. If you need to use this policy, combine it with
   a :cpp:struct:`keep_alive` function binding annotation to manage the lifetime.
-  Or use the simple and safe :cpp:enumerator:`reference_internal
+  Or use the simple and safe :cpp:member:`reference_internal
   <rv_policy::reference_internal>` alternative described next.
 
   Below is an example use of this return value policy to reference a
@@ -181,11 +181,11 @@ options below. In particular, the following policies are available:
 
      m.def("get_data", []{ return &data; }, nb::rv_policy::reference)
 
-- :cpp:enumerator:`rv_policy::reference_internal`: A policy for *methods* that
+- :cpp:member:`rv_policy::reference_internal`: A policy for *methods* that
   expose an internal field. The lifetime of the field must match that of the
   parent object.
 
-  The policy resembles :cpp:enumerator:`reference <rv_policy::reference>` in
+  The policy resembles :cpp:member:`reference <rv_policy::reference>` in
   that it creates creates a thin Python object wrapper around the returned C++
   field without making a copy, and without transferring ownership to Python.
 
@@ -210,22 +210,22 @@ options below. In particular, the following policies are available:
          .def("field", &MyClass::field, nb::rv_policy::reference_internal);
 
   More advanced variations of this scheme are also possible using combinations
-  of :cpp:enumerator:`reference <rv_policy::reference>` and the
+  of :cpp:member:`reference <rv_policy::reference>` and the
   :cpp:struct:`keep_alive` function binding annotation.
 
-- :cpp:enumerator:`rv_policy::none`: This is the most conservative policy: it
+- :cpp:member:`rv_policy::none`: This is the most conservative policy: it
   simply refuses the cast unless the C++ instance already has a corresponding
   Python object, in which case the question of ownership becomes moot.
 
-- :cpp:enumerator:`rv_policy::automatic`: This is the default return value
-  policy, which falls back to :cpp:enumerator:`take_ownership
+- :cpp:member:`rv_policy::automatic`: This is the default return value
+  policy, which falls back to :cpp:member:`take_ownership
   <rv_policy::take_ownership>` when the return value is a pointer,
-  :cpp:enumerator:`move <rv_policy::move>` when it is a rvalue reference, and
-  :cpp:enumerator:`copy <rv_policy::copy>` when it is a lvalue reference.
+  :cpp:member:`move <rv_policy::move>` when it is a rvalue reference, and
+  :cpp:member:`copy <rv_policy::copy>` when it is a lvalue reference.
 
-- :cpp:enumerator:`rv_policy::automatic_reference`: This policy matches
-  :cpp:enumerator:`automatic <rv_policy::automatic>` but falls back to
-  :cpp:enumerator:`reference <rv_policy::reference>` when the return value is a
+- :cpp:member:`rv_policy::automatic_reference`: This policy matches
+  :cpp:member:`automatic <rv_policy::automatic>` but falls back to
+  :cpp:member:`reference <rv_policy::reference>` when the return value is a
   pointer. It is the default for function arguments when calling Python
   functions from C++ code via :cpp:func:`detail::api::operator()`. You probably
   won't need to use this policy in your own code.

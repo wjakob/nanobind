@@ -175,7 +175,7 @@ both of them to ``false``.
 In rare situations, the destructor should *not* be invoked when the instance is
 garbage collected, for example when working with a nanobind instance
 representing a field of a parent instance created using the
-:cpp:enumerator:`nb::rv_policy::reference_internal
+:cpp:member:`nb::rv_policy::reference_internal
 <rv_policy::reference_internal>` return value policy. The library therefore
 exposes two more functions :cpp:func:`nb::inst_state() <inst_state>` and
 :cpp:func:`nb::inst_set_state() <inst_set_state>` that can be used to access

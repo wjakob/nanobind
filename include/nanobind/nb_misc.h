@@ -82,19 +82,19 @@ private:
 };
 
 inline bool leak_warnings() noexcept {
-    return detail::read_flag(detail::nb_flag::leak_warnings) != 0;
+    return NB_CALL(read_flag)(detail::nb_flag::leak_warnings) != 0;
 }
 
 inline bool implicit_cast_warnings() noexcept {
-    return detail::read_flag(detail::nb_flag::implicit_cast_warnings) != 0;
+    return NB_CALL(read_flag)(detail::nb_flag::implicit_cast_warnings) != 0;
 }
 
 inline void set_leak_warnings(bool value) noexcept {
-    detail::write_flag(detail::nb_flag::leak_warnings, value);
+    NB_CALL(write_flag)(detail::nb_flag::leak_warnings, value);
 }
 
 inline void set_implicit_cast_warnings(bool value) noexcept {
-    detail::write_flag(detail::nb_flag::implicit_cast_warnings, value);
+    NB_CALL(write_flag)(detail::nb_flag::implicit_cast_warnings, value);
 }
 
 inline dict globals() {
@@ -119,7 +119,7 @@ inline bool isinstance(handle inst, handle cls) {
 }
 
 inline bool is_alive() noexcept {
-    return detail::is_alive();
+    return NB_CALL(is_alive)();
 }
 
 NAMESPACE_END(NB_NAMESPACE)

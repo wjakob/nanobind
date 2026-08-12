@@ -10,31 +10,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-enum cast_flags : uint32_t {
-    // Enable implicit conversions
-    convert = (1 << 0),
-
-    // Passed to the 'self' argument in a constructor call (__init__)
-    construct = (1 << 1),
-
-    // Indicates that the function dispatcher should accept 'None' arguments
-    accepts_none = (1 << 2),
-
-    /// The target binds the value by reference or value (not as a pointer), so
-    /// a 'None' argument has no valid mapping.
-    none_disallowed = (1 << 3),
-
-    // Indicates that this cast is performed by nb::cast or nb::try_cast.
-    // This implies that objects added to the cleanup list may be
-    // released immediately after the caster's final output value is
-    // obtained, i.e., before it is used.
-    manual = (1 << 4),
-
-    /// Indicate that a type is being constructed by nb_type_vectorcall. The
-    /// call dispatcher uses this hint to avoid type-checking ``self``
-    trusted = (1 << 5)
-};
-
 /// Per-argument cast flags of an argument without annotations
 constexpr uint32_t arg_flags_default = cast_flags::convert;
 
@@ -190,145 +165,6 @@ constexpr arg operator""_a(const char *name, size_t) { return arg(name); }
 NAMESPACE_END(literals)
 
 NAMESPACE_BEGIN(detail)
-
-enum class func_flags : uint32_t {
-    /// Did the user specify a name for this function, or is it anonymous?
-    has_name = (1 << 0),
-    /// Did the user specify a scope in which this function should be installed?
-    has_scope = (1 << 1),
-    /// Did the user specify a docstring?
-    has_doc = (1 << 2),
-    /// Did the user specify nb::arg/arg_v annotations for all arguments?
-    has_args = (1 << 3),
-    /// Does the function signature contain an *args-style argument?
-    has_var_args = (1 << 4),
-    /// Does the function signature contain an *kwargs-style argument?
-    has_var_kwargs = (1 << 5),
-    /// Is this function a method of a class?
-    is_method = (1 << 6),
-    /// Is this function a method called __init__? (automatically generated)
-    is_constructor = (1 << 7),
-    /// Can this constructor be used to perform an implicit conversion?
-    is_implicit = (1 << 8),
-    /// Is this function an arithmetic operator?
-    is_operator = (1 << 9),
-    /// When the function is GCed, do we need to call func_data_init::free_capture?
-    has_free = (1 << 10),
-    /// Should the func_new() call return a new reference?
-    return_ref = (1 << 11),
-    /// Does this overload specify a custom function signature (for docstrings, typing)
-    has_signature = (1 << 12),
-    /// Does this function potentially modify the elements of the PyObject*[] array
-    /// representing its arguments? (nb::keep_alive() or call_policy annotations)
-    can_mutate_args = (1 << 13),
-    /// Is this overload a copy constructor? The dispatcher then never
-    /// raises the call-wide 'convert' flag: implicit conversion of the
-    /// source argument would recurse infinitely
-    is_copy_constructor = (1 << 14)
-};
-
-/// Describes a function argument binding
-struct arg_data_init {
-    /// Argument name (nullptr if unnamed)
-    const char *name;
-
-    /// Overrides the argument type in docstrings and stubs (or nullptr)
-    const char *signature;
-
-    /// Interned Python version of 'name', filled by the backend
-    PyObject *name_py;
-
-    /// Default argument value (or nullptr)
-    PyObject *value;
-
-    /// Argument-specific cast flags (see the 'cast_flags' enumeration)
-    uint16_t flag;
-};
-
-/// Describes a function binding
-struct func_data_init_base {
-    // A small amount of space to capture data used by the function/closure
-    void *capture[3];
-
-    // Callback to clean up the 'capture' field
-    void (*free_capture)(void *);
-
-    /// Type-erased trampoline implementing the function call
-    PyObject *(*impl)(void *, PyObject **, uint32_t, cleanup_list *);
-
-    /// Function signature description
-    const char *descr;
-
-    /// C++ types referenced by 'descr'
-    const std::type_info **descr_types;
-
-    /// Supplementary flags
-    uint32_t flags;
-
-    /// Total number of parameters accepted by the C++ function; nb::args
-    /// and nb::kwargs parameters are counted as one each. If the
-    /// 'has_args' flag is set, then there is one arg_data_init structure
-    /// for each of these.
-    uint16_t nargs;
-
-    /// Number of parameters to the C++ function that may be filled from
-    /// Python positional arguments without additional ceremony.
-    /// nb::args and nb::kwargs parameters are not counted in this total, nor
-    /// are any parameters after nb::args or after a nb::kw_only annotation.
-    /// The parameters counted here may be either named (nb::arg("name")) or
-    /// unnamed (nb::arg()).  If unnamed, they are effectively positional-only.
-    /// nargs_pos is always <= nargs.
-    uint16_t nargs_pos;
-
-    /// sizeof(func_data_init_base) at the extension's compile time; the
-    /// argument array of func_data_init<N> begins at this offset
-    uint16_t base_size;
-
-    /// sizeof(arg_data_init) at the extension's compile time; the stride of
-    /// the argument array
-    uint16_t arg_stride;
-
-    /// Function name
-    const char *name;
-
-    /// Docstring
-    const char *doc;
-
-    /// Scope (e.g. module) in which the function will be installed
-    PyObject *scope;
-};
-
-/// Sized version of func_data_init_base
-template<size_t Size> struct func_data_init : func_data_init_base {
-    arg_data_init args[Size];
-};
-
-template<> struct func_data_init<0> : func_data_init_base {};
-
-static_assert(sizeof(void *) != 8 || sizeof(arg_data_init) == 40,
-              "frozen ABI layout of arg_data_init changed");
-NB_FROZEN_OFF(arg_data_init, name, 0);
-NB_FROZEN_OFF(arg_data_init, signature, 8);
-NB_FROZEN_OFF(arg_data_init, name_py, 16);
-NB_FROZEN_OFF(arg_data_init, value, 24);
-NB_FROZEN_OFF(arg_data_init, flag, 32);
-
-static_assert(sizeof(void *) != 8 || sizeof(func_data_init_base) == 96,
-              "frozen ABI layout of func_data_init_base changed");
-NB_FROZEN_OFF(func_data_init_base, capture, 0);
-NB_FROZEN_OFF(func_data_init_base, free_capture, 24);
-NB_FROZEN_OFF(func_data_init_base, impl, 32);
-NB_FROZEN_OFF(func_data_init_base, descr, 40);
-NB_FROZEN_OFF(func_data_init_base, descr_types, 48);
-NB_FROZEN_OFF(func_data_init_base, flags, 56);
-NB_FROZEN_OFF(func_data_init_base, nargs, 60);
-NB_FROZEN_OFF(func_data_init_base, nargs_pos, 62);
-NB_FROZEN_OFF(func_data_init_base, base_size, 64);
-NB_FROZEN_OFF(func_data_init_base, arg_stride, 66);
-NB_FROZEN_OFF(func_data_init_base, name, 72);
-NB_FROZEN_OFF(func_data_init_base, doc, 80);
-NB_FROZEN_OFF(func_data_init_base, scope, 88);
-
 
 template <typename F>
 NB_INLINE void func_extra_apply(F &f, const name &name, size_t &) {
@@ -501,8 +337,8 @@ process_postcall(PyObject **args, std::integral_constant<size_t, NArgs>,
     static_assert(Nurse <= NArgs && Patient <= NArgs,
                   "keep_alive template parameters must be in the range "
                   "[0, number of C++ function arguments]");
-    keep_alive(Nurse   == 0 ? result : args[Nurse - 1],
-               Patient == 0 ? result : args[Patient - 1]);
+    NB_CALL(keep_alive_py)(Nurse   == 0 ? result : args[Nurse - 1],
+                           Patient == 0 ? result : args[Patient - 1]);
 }
 
 template <size_t NArgs, typename Policy>

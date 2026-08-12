@@ -102,6 +102,9 @@ endforeach()
 
 target_sources(test_intrusive_ext PRIVATE test_intrusive_impl.cpp)
 
+# Compile-time freeze checks for the frozen ABI surface of nb_backend.h
+target_sources(test_functions_ext PRIVATE test_abi_layout.cpp)
+
 if (CMAKE_CONFIGURATION_TYPES)
   set(OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>)
 else()

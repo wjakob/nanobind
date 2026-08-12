@@ -85,6 +85,270 @@ template <typename T = object> NB_INLINE T steal(handle h);
 
 NAMESPACE_BEGIN(detail)
 
+/// Raise a runtime error with the given message
+#if defined(__GNUC__)
+    __attribute__((noreturn, noinline, __format__ (__printf__, 1, 2)))
+#else
+    [[noreturn]] NB_NOINLINE
+#endif
+inline void raise(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    NB_CALL(raise_v)(exception_type::runtime_error, fmt, args);
+    va_end(args);
+    NB_UNREACHABLE();
+}
+
+/// Raise a type error with the given message
+#if defined(__GNUC__)
+    __attribute__((noreturn, noinline, __format__ (__printf__, 1, 2)))
+#else
+    [[noreturn]] NB_NOINLINE
+#endif
+inline void raise_type_error(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    NB_CALL(raise_v)(exception_type::type_error, fmt, args);
+    va_end(args);
+    NB_UNREACHABLE();
+}
+
+/* Raise nanobind::python_error, resp. nanobind::cast_error when no Python
+   error is pending. Defined in nb_error.h, which has the complete
+   python_error type. */
+[[noreturn]] NB_NOINLINE inline void raise_python_error();
+[[noreturn]] NB_NOINLINE inline void raise_python_or_cast_error();
+
+/// Raise an exception if 'p' is null (shared cold path of the inline helpers)
+NB_INLINE PyObject *raise_if_null(PyObject *p) {
+    if (NB_UNLIKELY(!p))
+        raise_python_error();
+    return p;
+}
+
+/// Raise an exception if 'rv' is nonzero (ditto, for int-returning C API)
+NB_INLINE void raise_if_nonzero(int rv) {
+    if (NB_UNLIKELY(rv))
+        raise_python_error();
+}
+
+/// Try to import a Python extension module, raises an exception upon failure
+inline PyObject *module_import(const char *name) {
+    return raise_if_null(PyImport_ImportModule(name));
+}
+
+/// Try to import a Python extension module, raises an exception upon failure
+inline PyObject *module_import(PyObject *name) {
+    return raise_if_null(PyImport_Import(name));
+}
+
+/// Get an object attribute or raise an exception
+inline PyObject *getattr(PyObject *obj, const char *key) {
+    return raise_if_null(PyObject_GetAttrString(obj, key));
+}
+inline PyObject *getattr(PyObject *obj, PyObject *key) {
+    return raise_if_null(PyObject_GetAttr(obj, key));
+}
+
+/// Get an object attribute or return a default value (never raises)
+inline PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
+#if defined(PYPY_VERSION) || \
+    (defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000)
+    if (PyObject_HasAttr(obj, key)) {
+        PyObject *res = PyObject_GetAttr(obj, key);
+        if (res)
+            return res;
+        PyErr_Clear();
+    }
+#else
+    PyObject *res;
+    int rv;
+    #if PY_VERSION_HEX < 0x030D0000
+        rv = _PyObject_LookupAttr(obj, key, &res);
+    #else
+        rv = PyObject_GetOptionalAttr(obj, key, &res);
+    #endif
+    if (rv == 1)
+        return res;
+    else if (rv < 0)
+        PyErr_Clear();
+#endif
+    Py_XINCREF(def);
+    return def;
+}
+
+inline PyObject *getattr(PyObject *obj, const char *key,
+                         PyObject *def) noexcept {
+#if defined(PYPY_VERSION) || \
+    (defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000) || \
+    PY_VERSION_HEX < 0x030D0000
+    PyObject *key_py = PyUnicode_FromString(key);
+    if (key_py) {
+        PyObject *res = getattr(obj, key_py, def);
+        Py_DECREF(key_py);
+        return res;
+    }
+    PyErr_Clear();
+    Py_XINCREF(def);
+    return def;
+#else
+    PyObject *res;
+    int rv = PyObject_GetOptionalAttrString(obj, key, &res);
+    if (rv == 1)
+        return res;
+    else if (rv < 0)
+        PyErr_Clear();
+    Py_XINCREF(def);
+    return def;
+#endif
+}
+
+/// Set an object attribute or raise an exception
+inline void setattr(PyObject *obj, const char *key, PyObject *value) {
+    raise_if_nonzero(PyObject_SetAttrString(obj, key, value));
+}
+inline void setattr(PyObject *obj, PyObject *key, PyObject *value) {
+    raise_if_nonzero(PyObject_SetAttr(obj, key, value));
+}
+
+/// Delete an object attribute or raise an exception
+inline void delattr(PyObject *obj, const char *key) {
+#if defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000
+    raise_if_nonzero(PyObject_SetAttrString(obj, key, nullptr));
+#else
+    raise_if_nonzero(PyObject_DelAttrString(obj, key));
+#endif
+}
+inline void delattr(PyObject *obj, PyObject *key) {
+#if defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000
+    raise_if_nonzero(PyObject_SetAttr(obj, key, nullptr));
+#else
+    raise_if_nonzero(PyObject_DelAttr(obj, key));
+#endif
+}
+
+/// Set an item or raise an exception
+inline void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
+    raise_if_nonzero(PySequence_SetItem(obj, key, value));
+}
+inline void setitem(PyObject *obj, const char *key, PyObject *value) {
+    PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
+    int rv = PyObject_SetItem(obj, key_py, value);
+    Py_DECREF(key_py);
+    raise_if_nonzero(rv);
+}
+inline void setitem(PyObject *obj, PyObject *key, PyObject *value) {
+    raise_if_nonzero(PyObject_SetItem(obj, key, value));
+}
+
+/// Delete an item or raise an exception
+inline void delitem(PyObject *obj, Py_ssize_t key) {
+    raise_if_nonzero(PySequence_DelItem(obj, key));
+}
+inline void delitem(PyObject *obj, const char *key) {
+    PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
+    int rv = PyObject_DelItem(obj, key_py);
+    Py_DECREF(key_py);
+    raise_if_nonzero(rv);
+}
+inline void delitem(PyObject *obj, PyObject *key) {
+    raise_if_nonzero(PyObject_DelItem(obj, key));
+}
+
+/// Perform an unary operation on a Python object with error handling
+inline PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
+    return raise_if_null(op(a));
+}
+
+/// Perform a binary operation on Python objects with error handling
+inline PyObject *obj_op_2(PyObject *a, PyObject *b,
+                          PyObject *(*op)(PyObject *, PyObject *)) {
+    return raise_if_null(op(a, b));
+}
+
+NB_INLINE PyObject *none_ref() noexcept { Py_RETURN_NONE; }
+NB_INLINE PyObject *true_ref() noexcept { Py_RETURN_TRUE; }
+NB_INLINE PyObject *false_ref() noexcept { Py_RETURN_FALSE; }
+
+/// Cold path of the GIL assertion in handle::inc_ref/dec_ref (debug builds)
+[[noreturn]] NB_NOINLINE inline void fail_gil() noexcept {
+    fprintf(stderr, "Critical nanobind error: attempted to change the "
+                    "reference count of a Python object while the GIL was "
+                    "not held!\n");
+    abort();
+}
+
+/// Convert a Python object into a Python boolean object
+inline PyObject *bool_from_obj(PyObject *o) {
+    int rv = PyObject_IsTrue(o);
+    if (NB_UNLIKELY(rv < 0))
+        raise_python_error();
+    return rv ? true_ref() : false_ref();
+}
+
+/// Advance the iterator 'o', raise an exception in case of errors. A null
+/// return without a pending error indicates exhaustion.
+inline PyObject *obj_iter_next(PyObject *o) {
+    PyObject *result = PyIter_Next(o);
+    if (NB_UNLIKELY(!result && PyErr_Occurred()))
+        raise_python_error();
+    return result;
+}
+
+/// Raise a KeyError for the given key (cold path of dict lookups)
+[[noreturn]] NB_NOINLINE inline void raise_key_error(PyObject *key) {
+    PyErr_SetObject(PyExc_KeyError, key);
+    raise_python_error();
+}
+
+/// Look up 'k' in the dictionary 'd', returning a *new* reference
+inline PyObject *dict_getitem_ref(PyObject *d, PyObject *k, bool *error) noexcept {
+    PyObject *value;
+#if NB_PYTHON_VERSION >= 0x030D0000
+    *error = PyDict_GetItemRef(d, k, &value) == -1;
+#else
+    // GIL-protected borrowed-reference pattern; free-threaded builds never
+    // land here (NB_FREE_THREADED implies 3.13+ headers)
+    value = PyDict_GetItemWithError(d, k);
+    if (value)
+        Py_INCREF(value);
+    *error = !value && PyErr_Occurred() != nullptr;
+#endif
+    return value;
+}
+
+/// Dict lookup that returns a default value for missing keys
+inline PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def) {
+    bool error;
+    PyObject *value = dict_getitem_ref(d, k, &error);
+    if (NB_UNLIKELY(error))
+        raise_python_error();
+    if (!value) {
+        Py_XINCREF(def);
+        value = def;
+    }
+    return value;
+}
+
+/// Check whether the object can be iterated over (see nb::iterable)
+inline bool iterable_check(PyObject *o) noexcept {
+    PyTypeObject *tp = Py_TYPE(o);
+#if !defined(Py_LIMITED_API)
+    bool has_iter = tp->tp_iter != nullptr;
+#else
+    bool has_iter = PyType_GetSlot(tp, Py_tp_iter) != nullptr;
+#endif
+    return has_iter || PySequence_Check(o);
+}
+
+/// Python issubclass() check with error handling
+inline bool issubclass(PyObject *a, PyObject *b) {
+    int rv = PyObject_IsSubclass(a, b);
+    if (NB_UNLIKELY(rv < 0))
+        raise_python_error();
+    return bool(rv);
+}
+
 template <typename T, typename SFINAE = int> struct type_caster;
 template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
@@ -166,6 +430,10 @@ public:
 
 NAMESPACE_END(detail)
 
+using detail::raise;
+using detail::raise_type_error;
+using detail::raise_python_error;
+
 // *WARNING*: nanobind regularly receives requests from users who run it
 // through Clang-Tidy, or who compile with increased warnings levels, like
 //
@@ -215,7 +483,7 @@ public:
 
     const handle& inc_ref() const & noexcept {
 #if !defined(NDEBUG)
-        if (m_ptr && NB_UNLIKELY(!detail::gil_check()))
+        if (m_ptr && NB_UNLIKELY(!NB_CALL(gil_check)()))
             detail::fail_gil();
 #endif
         Py_XINCREF(m_ptr);
@@ -224,7 +492,7 @@ public:
 
     const handle& dec_ref() const & noexcept {
 #if !defined(NDEBUG)
-        if (m_ptr && NB_UNLIKELY(!detail::gil_check()))
+        if (m_ptr && NB_UNLIKELY(!NB_CALL(gil_check)()))
             detail::fail_gil();
 #endif
         Py_XDECREF(m_ptr);
@@ -360,7 +628,7 @@ public:
 
     NB_INLINE module_ def_submodule(const char *name,
                                     const char *doc = nullptr) {
-        return steal<module_>(detail::module_new_submodule(m_ptr, name, doc));
+        return steal<module_>(NB_CALL(submodule_new)(m_ptr, name, doc));
     }
 };
 
@@ -401,7 +669,7 @@ class capsule : public object {
         if (m_ptr == Py_None) return nullptr;
         void *p = PyCapsule_GetPointer(m_ptr, name);
         if (!p && PyErr_Occurred())
-            raise_python_error();
+            detail::raise_python_error();
         return p;
     }
 };
@@ -434,7 +702,7 @@ class int_ : public object {
     NB_OBJECT_DEFAULT(int_, object, "int", PyLong_Check)
 
     explicit int_(handle h)
-        : object(detail::int_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyNumber_Long(h.ptr())), detail::steal_t{}) { }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
     explicit int_(T value) {
@@ -448,7 +716,7 @@ class int_ : public object {
             m_ptr = detail::type_caster<T>::from_cpp(value, rv_policy::copy, nullptr).ptr();
 
         if (!m_ptr)
-            raise_python_error();
+            detail::raise_python_error();
     }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
@@ -464,12 +732,12 @@ class float_ : public object {
     NB_OBJECT_DEFAULT(float_, object, "float", PyFloat_Check)
 
     explicit float_(handle h)
-        : object(detail::float_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyNumber_Float(h.ptr())), detail::steal_t{}) { }
 
     explicit float_(double value)
         : object(PyFloat_FromDouble(value), detail::steal_t{}) {
         if (!m_ptr)
-            raise_python_error();
+            detail::raise_python_error();
     }
 
 #if !defined(Py_LIMITED_API)
@@ -483,13 +751,19 @@ class str : public object {
     NB_OBJECT_DEFAULT(str, object, "str", PyUnicode_Check)
 
     explicit str(handle h)
-        : object(detail::str_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyObject_Str(h.ptr())), detail::steal_t{}) { }
 
     explicit str(const char *s)
-        : object(detail::str_from_cstr(s), detail::steal_t{}) { }
+        : object(PyUnicode_FromString(s), detail::steal_t{}) {
+        if (!m_ptr)
+            detail::raise("nanobind::str(): conversion error!");
+    }
 
     explicit str(const char *s, size_t n)
-        : object(detail::str_from_cstr_and_size(s, n), detail::steal_t{}) { }
+        : object(PyUnicode_FromStringAndSize(s, (Py_ssize_t) n), detail::steal_t{}) {
+        if (!m_ptr)
+            detail::raise("nanobind::str(): conversion error!");
+    }
 
     template <typename... Args> str format(Args&&... args) const;
 
@@ -500,13 +774,14 @@ class bytes : public object {
     NB_OBJECT_DEFAULT(bytes, object, "bytes", PyBytes_Check)
 
     explicit bytes(handle h)
-        : object(detail::bytes_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyBytes_FromObject(h.ptr())), detail::steal_t{}) { }
 
     explicit bytes(const char *s)
-        : object(detail::bytes_from_cstr(s), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyBytes_FromString(s)), detail::steal_t{}) { }
 
     explicit bytes(const void *s, size_t n)
-        : object(detail::bytes_from_cstr_and_size(s, n), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyBytes_FromStringAndSize(
+              (const char *) s, (Py_ssize_t) n)), detail::steal_t{}) { }
 
     const char *c_str() const { return PyBytes_AsString(m_ptr); }
 
@@ -528,10 +803,11 @@ class bytearray : public object {
         : object(PyObject_CallNoArgs((PyObject *)&PyByteArray_Type), detail::steal_t{}) { }
 
     explicit bytearray(handle h)
-        : object(detail::bytearray_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyByteArray_FromObject(h.ptr())), detail::steal_t{}) { }
 
     explicit bytearray(const void *s, size_t n)
-        : object(detail::bytearray_from_cstr_and_size(s, n), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyByteArray_FromStringAndSize(
+              (const char *) s, (Py_ssize_t) n)), detail::steal_t{}) { }
 
     const char *c_str() const { return PyByteArray_AsString(m_ptr); }
 
@@ -550,7 +826,7 @@ class tuple : public object {
     NB_OBJECT(tuple, object, "tuple", PyTuple_Check)
     tuple() : object(PyTuple_New(0), detail::steal_t()) { }
     explicit tuple(handle h)
-        : object(detail::tuple_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PySequence_Tuple(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_TUPLE_GET_SIZE(m_ptr); }
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
@@ -570,7 +846,7 @@ class list : public object {
     NB_OBJECT(list, object, "list", PyList_Check)
     list() : object(PyList_New(0), detail::steal_t()) { }
     explicit list(handle h)
-        : object(detail::list_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PySequence_List(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_LIST_GET_SIZE(m_ptr); }
 
     template <typename T> void append(T &&value);
@@ -581,22 +857,22 @@ class list : public object {
 
     void clear() {
         if (PyList_SetSlice(m_ptr, 0, PY_SSIZE_T_MAX, nullptr))
-            raise_python_error();
+            detail::raise_python_error();
     }
 
     void extend(handle h) {
         if (PyList_SetSlice(m_ptr, PY_SSIZE_T_MAX, PY_SSIZE_T_MAX, h.ptr()))
-            raise_python_error();
+            detail::raise_python_error();
     }
 
     void sort() {
         if (PyList_Sort(m_ptr))
-            raise_python_error();
+            detail::raise_python_error();
     }
 
     void reverse() {
         if (PyList_Reverse(m_ptr))
-            raise_python_error();
+            detail::raise_python_error();
     }
 
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
@@ -619,16 +895,14 @@ class dict : public object {
         return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
     object get(const char *key_, handle def) const {
-        object key = steal(PyUnicode_FromString(key_));
-        if (!key.is_valid())
-            raise_python_error();
+        object key = steal(detail::raise_if_null(PyUnicode_FromString(key_)));
         return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
     template <typename T> bool contains(T&& key) const;
     void clear() { PyDict_Clear(m_ptr); }
     void update(handle h) {
         if (PyDict_Update(m_ptr, h.ptr()))
-            raise_python_error();
+            detail::raise_python_error();
     }
     bool empty() const { return size() == 0; }
 
@@ -640,13 +914,13 @@ class set : public object {
     NB_OBJECT(set, object, "set", PySet_Check)
     set() : object(PySet_New(nullptr), detail::steal_t()) { }
     explicit set(handle h)
-        : object(detail::set_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PySet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     template <typename T> void add(T &&value);
     void clear() {
         if (PySet_Clear(m_ptr))
-            raise_python_error();
+            detail::raise_python_error();
     }
     template <typename T> bool discard(T &&value);
     bool empty() const { return size() == 0; }
@@ -656,7 +930,7 @@ class frozenset : public object {
     NB_OBJECT(frozenset, object, "frozenset", PyFrozenSet_Check)
     frozenset() : object(PyFrozenSet_New(nullptr), detail::steal_t()) { }
     explicit frozenset(handle h)
-        : object(detail::frozenset_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyFrozenSet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
     bool empty() const { return size() == 0; }
@@ -726,7 +1000,7 @@ public:
 
 /// Retrieve the Python type object associated with a C++ class
 template <typename T> handle type() noexcept {
-    return detail::nb_type_lookup(&typeid(detail::intrinsic_t<T>));
+    return NB_CALL(nb_type_lookup)(&typeid(detail::intrinsic_t<T>));
 }
 
 template <typename T>
@@ -734,7 +1008,7 @@ NB_INLINE bool isinstance(handle h) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(h);
     else if constexpr (detail::is_base_caster_v<detail::make_caster<T>>)
-        return detail::nb_type_isinstance(h.ptr(), &typeid(detail::intrinsic_t<T>));
+        return NB_CALL(nb_type_isinstance)(h.ptr(), &typeid(detail::intrinsic_t<T>));
     else
         return detail::make_caster<T>().from_python(h, 0, nullptr);
 }
@@ -743,14 +1017,16 @@ NB_INLINE bool issubclass(handle h1, handle h2) {
     return detail::issubclass(h1.ptr(), h2.ptr());
 }
 
-NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
+NB_INLINE str repr(handle h) {
+    return steal<str>(detail::raise_if_null(PyObject_Repr(h.ptr())));
+}
 NB_INLINE size_t len(handle h) {
     Py_ssize_t res = PyObject_Size(h.ptr());
     if (NB_UNLIKELY(res < 0))
         detail::raise_python_error();
     return (size_t) res;
 }
-NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }
+NB_INLINE size_t len_hint(handle h) { return NB_CALL(len_hint)(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &l) { return (size_t) NB_LIST_GET_SIZE(l.ptr()); }
 NB_INLINE size_t len(const dict &d) { return (size_t) NB_DICT_GET_SIZE(d.ptr()); }
@@ -778,7 +1054,7 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
 inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 
 inline iterator iter(handle h) {
-    return steal<iterator>(detail::obj_iter(h.ptr()));
+    return steal<iterator>(detail::raise_if_null(PyObject_GetIter(h.ptr())));
 }
 
 class slice : public object {
@@ -787,7 +1063,7 @@ public:
     slice(handle start, handle stop, handle step) {
         m_ptr = PySlice_New(start.ptr(), stop.ptr(), step.ptr());
         if (!m_ptr)
-            raise_python_error();
+            detail::raise_python_error();
     }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
@@ -799,8 +1075,9 @@ public:
 
     detail::tuple<Py_ssize_t, Py_ssize_t, Py_ssize_t, size_t> compute(size_t size) const {
         Py_ssize_t start, stop, step;
-        size_t slice_length;
-        detail::slice_compute(m_ptr, (Py_ssize_t) size, start, stop, step, slice_length);
+        detail::raise_if_nonzero(PySlice_Unpack(m_ptr, &start, &stop, &step));
+        size_t slice_length = (size_t) PySlice_AdjustIndices(
+            (Py_ssize_t) size, &start, &stop, step);
         return detail::tuple(start, stop, step, slice_length);
     }
 };
@@ -808,7 +1085,7 @@ public:
 class memoryview : public object {
     NB_OBJECT(memoryview, object, "memoryview", PyMemoryView_Check)
     explicit memoryview(handle h)
-        : object(detail::memoryview_from_obj(h.ptr()), detail::steal_t{}) { }
+        : object(detail::raise_if_null(PyMemoryView_FromObject(h.ptr())), detail::steal_t{}) { }
 };
 
 class ellipsis : public object {
@@ -840,7 +1117,7 @@ public:
     explicit weakref(handle obj, handle callback = {})
         : object(PyWeakref_NewRef(obj.ptr(), callback.ptr()), detail::steal_t{}) {
         if (!m_ptr)
-            raise_python_error();
+            detail::raise_python_error();
     }
 };
 

@@ -826,9 +826,9 @@ inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
 
 /// Convenience macro to potentially access cached functions
 #if defined(Py_LIMITED_API)
-#  define NB_SLOT(type, name) internals->type##_##name
+#  define NB_TYPE_SLOT(type, name) internals->type##_##name
 #else
-#  define NB_SLOT(type, name) type.name
+#  define NB_TYPE_SLOT(type, name) type.name
 #endif
 
 extern nb_internals *internals;

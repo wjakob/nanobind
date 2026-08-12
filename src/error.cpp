@@ -232,9 +232,7 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
     return result.release().ptr();
 }
 
-NAMESPACE_END(detail)
-
-static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
+void chain_v(PyObject *type, const char *fmt, va_list args) noexcept {
 #if PY_VERSION_HEX >= 0x030C0000
     PyObject *value = PyErr_GetRaisedException();
 #else
@@ -255,11 +253,11 @@ static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
 #endif
 
 #if !defined(PYPY_VERSION)
-    PyErr_FormatV(type.ptr(), fmt, args);
+    PyErr_FormatV(type, fmt, args);
 #else
     PyObject *exc_str = PyUnicode_FromFormatV(fmt, args);
-    check(exc_str, "nanobind::detail::raise_from(): PyUnicode_FromFormatV() failed!");
-    PyErr_SetObject(type.ptr(), exc_str);
+    check(exc_str, "nanobind::detail::chain_v(): PyUnicode_FromFormatV() failed!");
+    PyErr_SetObject(type, exc_str);
     Py_DECREF(exc_str);
 #endif
 
@@ -285,22 +283,5 @@ static void chain_error_v(handle type, const char *fmt, va_list args) noexcept {
 #endif
 }
 
-void chain_error(handle type, const char *fmt, ...) noexcept {
-    va_list args;
-    va_start(args, fmt);
-    chain_error_v(type, fmt, args);
-    va_end(args);
-}
-
-void raise_from(python_error &e, handle type, const char *fmt, ...) {
-    e.restore();
-
-    va_list args;
-    va_start(args, fmt);
-    chain_error_v(type, fmt, args);
-    va_end(args);
-
-    detail::raise_python_error();
-}
-
+NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

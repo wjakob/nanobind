@@ -15,7 +15,7 @@ static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObje
 #endif
 
     if (!static_property_disabled) {
-        return NB_SLOT(PyProperty_Type, tp_descr_get)(self, cls, cls);
+        return NB_TYPE_SLOT(PyProperty_Type, tp_descr_get)(self, cls, cls);
     } else {
         Py_INCREF(self);
         return self;
@@ -25,7 +25,7 @@ static PyObject *nb_static_property_descr_get(PyObject *self, PyObject *, PyObje
 /// `nb_static_property.__set__()`: Just like the above `__get__()`.
 static int nb_static_property_descr_set(PyObject *self, PyObject *obj, PyObject *value) {
     PyObject *cls = PyType_Check(obj) ? obj : (PyObject *) Py_TYPE(obj);
-    return NB_SLOT(PyProperty_Type, tp_descr_set)(self, cls, value);
+    return NB_TYPE_SLOT(PyProperty_Type, tp_descr_set)(self, cls, value);
 }
 
 PyTypeObject *nb_static_property_tp() noexcept {

@@ -645,7 +645,7 @@ static void nb_type_dealloc(PyObject *o) {
     nb_trampoline_free(t);
 
     PyTypeObject *meta = Py_TYPE(o);
-    NB_SLOT(PyType_Type, tp_dealloc)(o);
+    NB_TYPE_SLOT(PyType_Type, tp_dealloc)(o);
     NB_DECREF_TYPE(meta);
 
     if (initialized)
@@ -680,7 +680,7 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
         return -1;
     }
 
-    int rv = NB_SLOT(PyType_Type, tp_init)(self, args, kwds);
+    int rv = NB_TYPE_SLOT(PyType_Type, tp_init)(self, args, kwds);
     if (rv)
         return rv;
 
@@ -775,7 +775,7 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         PyErr_Clear();
     }
 
-    int rv = NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
+    int rv = NB_TYPE_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 
     /* The assignment may have (un)shadowed a bound method; drop the
        trampoline override tables of this type and its subclasses so that
@@ -1901,7 +1901,7 @@ static PyMethodDef keep_alive_callback_def = {
     METH_FASTCALL, nullptr
 };
 
-void keep_alive(PyObject *nurse, PyObject *patient) {
+void keep_alive_py(PyObject *nurse, PyObject *patient) {
     if (!patient || !nurse || nurse == Py_None || patient == Py_None)
         return;
 
@@ -1925,7 +1925,7 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
 
         nb_weakref_seq *s =
             (nb_weakref_seq *) PyMem_Malloc(sizeof(nb_weakref_seq));
-        check(s, "nanobind::detail::keep_alive(): out of memory!");
+        check(s, "nanobind::detail::keep_alive_py(): out of memory!");
 
         s->payload = patient;
         s->callback = nullptr;
@@ -1938,13 +1938,13 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
         PyObject *callback =
             PyCFunction_New(&keep_alive_callback_def, patient);
         check(callback,
-              "nanobind::detail::keep_alive(): callback creation failed!");
+              "nanobind::detail::keep_alive_py(): callback creation failed!");
 
         PyObject *weakref = PyWeakref_NewRef(nurse, callback);
         if (!weakref) {
             Py_DECREF(callback);
             PyErr_Clear();
-            raise("nanobind::detail::keep_alive(): could not create a weak "
+            raise("nanobind::detail::keep_alive_py(): could not create a weak "
                   "reference! Likely, the 'nurse' argument you specified is not "
                   "a weak-referenceable type!");
         }
@@ -1955,9 +1955,9 @@ void keep_alive(PyObject *nurse, PyObject *patient) {
     }
 }
 
-void keep_alive(PyObject *nurse, void *payload,
+void keep_alive_ptr(PyObject *nurse, void *payload,
                 void (*callback)(void *) noexcept) noexcept {
-    check(nurse, "nanobind::detail::keep_alive(): 'nurse' is undefined!");
+    check(nurse, "nanobind::detail::keep_alive_ptr(): 'nurse' is undefined!");
 
     if (nb_type_check((PyObject *) Py_TYPE(nurse))) {
 #if defined(NB_FREE_THREADED)
@@ -1970,7 +1970,7 @@ void keep_alive(PyObject *nurse, void *payload,
         nb_weakref_seq
             **pp = (nb_weakref_seq **) &shard.keep_alive[nurse],
             *s   = (nb_weakref_seq *) PyMem_Malloc(sizeof(nb_weakref_seq));
-        check(s, "nanobind::detail::keep_alive(): out of memory!");
+        check(s, "nanobind::detail::keep_alive_ptr(): out of memory!");
 
         s->payload = payload;
         s->callback = callback;
@@ -1986,12 +1986,12 @@ void keep_alive(PyObject *nurse, void *payload,
         };
 
         PyObject *patient = PyCapsule_New(payload, nullptr, capsule_cleanup);
-        check(patient, "nanobind::detail::keep_alive(): capsule creation "
+        check(patient, "nanobind::detail::keep_alive_ptr(): capsule creation "
                        "failed!");
         check(PyCapsule_SetContext(patient, (void *) callback) == 0,
-              "nanobind::detail::keep_alive(): could not set context!");
+              "nanobind::detail::keep_alive_ptr(): could not set context!");
 
-        keep_alive(nurse, patient);
+        keep_alive_py(nurse, patient);
         Py_DECREF(patient);
     }
 }
@@ -2076,7 +2076,7 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
     inst->state.state = nb_inst_state::state_ready;
 
     if (rvp == rv_policy::reference_internal)
-        keep_alive((PyObject *) inst, cleanup->self());
+        keep_alive_py((PyObject *) inst, cleanup->self());
 
     if (intrusive)
         t->set_self_py(new_value, (PyObject *) inst);
@@ -2334,7 +2334,7 @@ PyObject *nb_inst_reference(PyTypeObject *t, void *ptr, PyObject *parent) {
     nbi->state.destruct = nbi->state.cpp_delete = false;
     nbi->state.state = nb_inst_state::state_ready;
     if (parent)
-        keep_alive(result, parent);
+        keep_alive_py(result, parent);
     inst_register(result, ptr);
     return result;
 }
@@ -2374,16 +2374,18 @@ PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
     return result;
 }
 
-void nb_inst_set_state(PyObject *o, bool ready, bool destruct) noexcept {
+void nb_inst_state_write(PyObject *o, uint32_t state) noexcept {
     nb_inst *nbi = (nb_inst *) o;
+    bool ready = state & 1, destruct = state & 2;
     nbi->state.state = ready ? nb_inst_state::state_ready : nb_inst_state::state_uninitialized;
     nbi->state.destruct = destruct;
     nbi->state.cpp_delete = destruct && !nbi->state.internal;
 }
 
-std::pair<bool, bool> nb_inst_state_read(PyObject *o) noexcept {
+uint32_t nb_inst_state_read(PyObject *o) noexcept {
     nb_inst *nbi = (nb_inst *) o;
-    return { nbi->state.state == nb_inst_state::state_ready, (bool) nbi->state.destruct };
+    return (uint32_t) (nbi->state.state == nb_inst_state::state_ready) |
+           ((uint32_t) nbi->state.destruct << 1);
 }
 
 void nb_inst_destruct(PyObject *o) noexcept {

@@ -1,0 +1,353 @@
+/*
+    nanobind/nb_backend_slots.h: function slots of the backend ABI. A consumer
+    defines NB_SLOT(return type, name, argument list) and includes this file
+    (which has no include guards and undefines the macro again at its end).
+
+    The entries in this file are frozen and part of the versioned backend ABI.
+    Any modifications to function order/signatures requires bumping the major
+    version, which is generally not acceptable. Appending entries is possible
+    but requires careful planning/discussion and a minor ABI bump.
+
+    The main characteristic of functions declared here is that they require
+    access to backend state (``nb_internals``, etc.) or are unacceptably slow
+    in the Python 3.10 limited ABI.
+
+    Copyright (c) 2022 Wenzel Jakob
+
+    All rights reserved. Use of this source code is governed by a
+    BSD-style license that can be found in the LICENSE file.
+*/
+
+// --------------------------------------------------------------------------
+// Error handling
+// --------------------------------------------------------------------------
+
+/// Raise a builtin_exception of the given kind (va_list core)
+NB_SLOT(void, raise_v, (exception_type type, const char *fmt, va_list args))
+
+/// Chain a new error of the given type onto the currently pending one
+NB_SLOT(void, chain_v, (PyObject *type, const char *fmt, va_list args) noexcept)
+
+// --------------------------------------------------------------------------
+// Backend implementation of the 'python_error' exception class
+// --------------------------------------------------------------------------
+
+/// Fetch the pending Python error as a normalized exception object
+NB_SLOT(PyObject *, error_fetch, () noexcept)
+
+/// Copy the exception state of another python_error instance
+NB_SLOT(PyObject *, error_copy, (PyObject *value, char **what) noexcept)
+
+/// Release a python_error's owned reference and what() buffer
+NB_SLOT(void, error_release, (PyObject *value, char *what) noexcept)
+
+/// Restore the exception as the pending Python error
+NB_SLOT(void, error_restore, (PyObject *value) noexcept)
+
+/// Render and cache a human-readable description incl. the traceback
+NB_SLOT(const char *, error_what,
+        (PyObject *value, char **what) noexcept)
+
+// --------------------------------------------------------------------------
+// Custom exception types and translators
+// --------------------------------------------------------------------------
+
+/// Create a new Python exception type (see nb::exception<T>)
+NB_SLOT(PyObject *, exception_new,
+        (PyObject *mod, const char *name, PyObject *base))
+
+/// Prepend a C++ -> Python exception translation callback
+NB_SLOT(void, register_exception_translator,
+        (exception_translator translator, void *payload))
+
+// --------------------------------------------------------------------------
+// Module bootstrap
+// --------------------------------------------------------------------------
+
+/// Initialize the backend state for a nanobind extension module. Reports
+/// failure by returning -1 with a Python error set. The module argument is
+/// currently unused; it reserves room for future per-module state.
+NB_SLOT(int, nb_module_init, (const char *domain, PyObject *m) noexcept)
+
+/// Build a module definition and slot array on the backend's heap and return
+/// the result of PyModuleDef_Init(). 'exec' is a 'int (*)(PyObject *)'
+/// callback; the last parameter is reserved and must be zero.
+NB_SLOT(PyObject *, module_new,
+        (const char *name, const char *doc, void *exec,
+         uint32_t reserved) noexcept)
+
+/// Create a submodule of an existing module
+NB_SLOT(PyObject *, submodule_new,
+        (PyObject *base, const char *name, const char *doc) noexcept)
+
+// --------------------------------------------------------------------------
+// Object protocol helpers
+// --------------------------------------------------------------------------
+
+/// Try to roughly determine the length of a Python object
+NB_SLOT(size_t, len_hint, (PyObject *o) noexcept)
+
+/// Perform a vector function call
+NB_SLOT(PyObject *, obj_vectorcall,
+        (PyObject *base, PyObject *const *args, size_t nargsf,
+         PyObject *kwnames, bool method_call))
+
+// --------------------------------------------------------------------------
+// Sequence helpers
+// --------------------------------------------------------------------------
+
+/// If the given sequence has the size 'size', return a pointer to its contents.
+/// May produce a temporary.
+NB_SLOT(PyObject **, seq_get_with_size,
+        (PyObject *seq, size_t size, PyObject **temp) noexcept)
+
+/// Like the above, but return the size instead of checking it.
+NB_SLOT(PyObject **, seq_get,
+        (PyObject *seq, size_t *size, PyObject **temp) noexcept)
+
+// --------------------------------------------------------------------------
+// Function objects
+// --------------------------------------------------------------------------
+
+/// Create a Python function object for the given function record
+NB_SLOT(PyObject *, nb_func_new, (const func_data_init_base *f) noexcept)
+
+// --------------------------------------------------------------------------
+// Type objects and instances
+// --------------------------------------------------------------------------
+
+/// Create a Python type object for the given type record
+NB_SLOT(PyObject *, nb_type_new, (const type_data_init *c) noexcept)
+
+/// Extract a pointer to a C++ type underlying a Python object, if possible
+NB_SLOT(bool, nb_type_get,
+        (const std::type_info *t, PyObject *o, uint32_t flags,
+         cleanup_list *cleanup, void **out) noexcept)
+
+/// Cast a C++ type instance into a Python object. 'cpp_type_p' optionally
+/// names the dynamic (most derived) type of polymorphic instances
+NB_SLOT(PyObject *, nb_type_put,
+        (const std::type_info *cpp_type, const std::type_info *cpp_type_p,
+         void *value, rv_policy rvp, cleanup_list *cleanup,
+         bool *is_new) noexcept)
+
+/// Special version of 'nb_type_put' for unique pointers and ownership transfer
+NB_SLOT(PyObject *, nb_type_put_unique,
+        (const std::type_info *cpp_type, const std::type_info *cpp_type_p,
+         void *value, cleanup_list *cleanup, bool cpp_delete) noexcept)
+
+/// Try to relinquish ownership from Python object to a unique_ptr;
+/// return true if successful, false if not. (Failure is only
+/// possible if `cpp_delete` is true.)
+NB_SLOT(bool, nb_type_relinquish_ownership,
+        (PyObject *o, bool cpp_delete) noexcept)
+
+/// Reverse the effects of nb_type_relinquish_ownership().
+NB_SLOT(void, nb_type_restore_ownership,
+        (PyObject *o, bool cpp_delete) noexcept)
+
+/// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
+NB_SLOT(void *, nb_type_supplement, (PyObject *t) noexcept)
+
+/// Check if the given python object represents a nanobind type
+NB_SLOT(bool, nb_type_check, (PyObject *t) noexcept)
+
+/// Return the size of the type wrapped by the given nanobind type object
+NB_SLOT(size_t, nb_type_size, (PyObject *t) noexcept)
+
+/// Return the alignment of the type wrapped by the given nanobind type object
+NB_SLOT(size_t, nb_type_align, (PyObject *t) noexcept)
+
+/// Return a unicode string representing the long-form name of the given type
+NB_SLOT(PyObject *, nb_type_name, (PyObject *t) noexcept)
+
+/// Return a unicode string representing the long-form name of object's type
+NB_SLOT(PyObject *, nb_inst_name, (PyObject *o) noexcept)
+
+/// Return the C++ type_info wrapped by the given nanobind type object
+NB_SLOT(const std::type_info *, nb_type_info, (PyObject *t) noexcept)
+
+/// Get a pointer to the instance data of a nanobind instance (nb_inst)
+NB_SLOT(void *, nb_inst_ptr, (PyObject *o) noexcept)
+
+/// Check if a Python type object wraps an instance of a specific C++ type
+NB_SLOT(bool, nb_type_isinstance,
+        (PyObject *obj, const std::type_info *t) noexcept)
+
+/// Search for the Python type object associated with a C++ type
+NB_SLOT(PyObject *, nb_type_lookup, (const std::type_info *t) noexcept)
+
+/// Allocate an instance of type 't'
+NB_SLOT(PyObject *, nb_inst_alloc, (PyTypeObject *t))
+
+/// Allocate an zero-initialized instance of type 't'
+NB_SLOT(PyObject *, nb_inst_alloc_zero, (PyTypeObject *t))
+
+/// Allocate an instance of type 't' referencing the existing 'ptr'
+NB_SLOT(PyObject *, nb_inst_reference,
+        (PyTypeObject *t, void *ptr, PyObject *parent))
+
+/// Allocate an instance of type 't' taking ownership of the existing 'ptr'
+NB_SLOT(PyObject *, nb_inst_take_ownership, (PyTypeObject *t, void *ptr))
+
+/// Call the destructor of the given python object
+NB_SLOT(void, nb_inst_destruct, (PyObject *o) noexcept)
+
+/// Zero-initialize a POD type and mark it as ready + to be destructed upon GC
+NB_SLOT(void, nb_inst_zero, (PyObject *o) noexcept)
+
+/// Copy-construct 'dst' from 'src' and mark it as ready (both must share
+/// one nb_type). An uninitialized 'dst' afterwards has its 'destruct' flag
+/// set; a live 'dst' is destructed first and keeps its previous flag value
+NB_SLOT(void, nb_inst_copy, (PyObject *dst, const PyObject *src) noexcept)
+
+/// Analogous to 'nb_inst_copy', using the move constructor
+NB_SLOT(void, nb_inst_move, (PyObject *dst, const PyObject *src) noexcept)
+
+/// Check if a particular instance uses a Python-derived type
+NB_SLOT(bool, nb_inst_python_derived, (PyObject *o) noexcept)
+
+/// Query the instance's ready (bit 0) and destruct (bit 1) flags
+NB_SLOT(uint32_t, nb_inst_state_read, (PyObject *o) noexcept)
+
+/// Overwrite the instance's ready (bit 0) and destruct (bit 1) flags
+NB_SLOT(void, nb_inst_state_write, (PyObject *o, uint32_t state) noexcept)
+
+// --------------------------------------------------------------------------
+// Properties
+// --------------------------------------------------------------------------
+
+/// Create and install a Python property object
+NB_SLOT(void, property_install,
+        (PyObject *scope, const char *name, PyObject *getter,
+         PyObject *setter, bool is_static) noexcept)
+
+// --------------------------------------------------------------------------
+// Trampolines (Python overrides of C++ virtual methods)
+// --------------------------------------------------------------------------
+
+/// Return the Python object that owns the C++ instance 'ptr' (borrowed)
+NB_SLOT(PyObject *, trampoline_new, (void *ptr) noexcept)
+
+/// Look up the Python override of a virtual method, filling 'ticket'
+NB_SLOT(void, trampoline_enter,
+        (PyObject *self, const char *name, uint64_t hash, bool pure,
+         ticket *ticket))
+
+/// Release the resources held by a method override 'ticket'
+NB_SLOT(void, trampoline_leave, (ticket *ticket) noexcept)
+
+// --------------------------------------------------------------------------
+// Keep-alive relationships
+// --------------------------------------------------------------------------
+
+/// Ensure that 'patient' cannot be GCed while 'nurse' is alive
+NB_SLOT(void, keep_alive_py, (PyObject *nurse, PyObject *patient))
+
+/// Keep 'payload' alive until 'nurse' is GCed
+NB_SLOT(void, keep_alive_ptr,
+        (PyObject *nurse, void *payload,
+         void (*deleter)(void *) noexcept) noexcept)
+
+// --------------------------------------------------------------------------
+// Implicit conversions
+// --------------------------------------------------------------------------
+
+/// Register an implicit conversion to 'dst'. 'src' is either a
+/// 'const std::type_info *' naming the source type (is_predicate == false)
+/// or a 'bool (*)(PyTypeObject *, PyObject *, cleanup_list *)' callback
+/// that decides convertibility at runtime (is_predicate == true)
+NB_SLOT(void, implicitly_convertible,
+        (const std::type_info *dst, void *src, bool is_predicate) noexcept)
+
+// --------------------------------------------------------------------------
+// Enumerations
+// --------------------------------------------------------------------------
+
+/// Create a new enumeration type
+NB_SLOT(PyObject *, enum_create, (const enum_data_init *e) noexcept)
+
+/// Append an entry to an enumeration. For StrEnum members, 'str_value' carries
+/// the string value; for all other enumerations it must be nullptr.
+NB_SLOT(void, enum_append,
+        (PyObject *tp, const char *name, int64_t value, const char *str_value,
+         const char *doc) noexcept)
+
+/// Query an enumeration's Python object -> integer value map
+NB_SLOT(bool, enum_from_python,
+        (const std::type_info *type, PyObject *o, int64_t *out,
+         uint32_t flags) noexcept)
+
+/// Query an enumeration's integer value -> Python object map
+NB_SLOT(PyObject *, enum_from_cpp,
+        (const std::type_info *type, int64_t value) noexcept)
+
+/// Export enum entries to the parent scope
+NB_SLOT(void, enum_export, (PyObject *tp))
+
+// --------------------------------------------------------------------------
+// ndarrays
+// --------------------------------------------------------------------------
+
+/// Try to import a reference-counted ndarray object via DLPack.
+NB_SLOT(ndarray_handle *, ndarray_import,
+        (PyObject *o, const ndarray_config *c, size_t config_size,
+         bool convert, cleanup_list *cleanup) noexcept)
+
+/// Describe a local ndarray object using a DLPack capsule.
+NB_SLOT(ndarray_handle *, ndarray_create,
+        (const ndarray_create_args *a, size_t args_size))
+
+/// Increase the reference count of the given ndarray object
+NB_SLOT(dlpack::dltensor *, ndarray_inc_ref, (ndarray_handle *h) noexcept)
+
+/// Decrease the reference count of the given ndarray object
+NB_SLOT(void, ndarray_dec_ref, (ndarray_handle *h) noexcept)
+
+/// Wrap a ndarray_handle* into a PyCapsule
+NB_SLOT(PyObject *, ndarray_export,
+        (ndarray_handle *h, int framework, rv_policy policy,
+         cleanup_list *cleanup) noexcept)
+
+/// Check if an object represents an ndarray
+NB_SLOT(bool, ndarray_check, (PyObject *o) noexcept)
+
+// --------------------------------------------------------------------------
+// Scalar conversions used by the arithmetic type casters
+// --------------------------------------------------------------------------
+
+/// Type-checked conversions of a Python object into a C++ scalar value;
+/// 'flags' carries the cast_flags of the current conversion
+NB_SLOT(bool, load_i8, (PyObject *o, uint32_t flags, int8_t *out) noexcept)
+NB_SLOT(bool, load_u8, (PyObject *o, uint32_t flags, uint8_t *out) noexcept)
+NB_SLOT(bool, load_i16, (PyObject *o, uint32_t flags, int16_t *out) noexcept)
+NB_SLOT(bool, load_u16, (PyObject *o, uint32_t flags, uint16_t *out) noexcept)
+NB_SLOT(bool, load_i32, (PyObject *o, uint32_t flags, int32_t *out) noexcept)
+NB_SLOT(bool, load_u32, (PyObject *o, uint32_t flags, uint32_t *out) noexcept)
+NB_SLOT(bool, load_i64, (PyObject *o, uint32_t flags, int64_t *out) noexcept)
+NB_SLOT(bool, load_u64, (PyObject *o, uint32_t flags, uint64_t *out) noexcept)
+NB_SLOT(bool, load_f32, (PyObject *o, uint32_t flags, float *out) noexcept)
+NB_SLOT(bool, load_f64, (PyObject *o, uint32_t flags, double *out) noexcept)
+
+/// Load a complex number; 'out' points to two doubles (real, imaginary).
+/// std::complex<double> is layout-compatible; the spelling keeps <complex>
+/// out of the core headers. Used by <nanobind/stl/complex.h>.
+NB_SLOT(bool, load_cmplx, (PyObject *o, uint32_t flags, double *out) noexcept)
+
+// --------------------------------------------------------------------------
+// Interpreter-state queries and backend configuration
+// --------------------------------------------------------------------------
+
+/// PyGILState_Check() for TUs that cannot call it (limited API)
+NB_SLOT(bool, gil_check, () noexcept)
+
+/// Read a backend configuration flag (see the 'nb_flag' enumeration)
+NB_SLOT(uint32_t, read_flag, (nb_flag f) noexcept)
+
+/// Write a backend configuration flag
+NB_SLOT(void, write_flag, (nb_flag f, uint32_t value) noexcept)
+
+/// Check whether the Python interpreter is still running (nb::is_alive)
+NB_SLOT(bool, is_alive, () noexcept)
+
+#undef NB_SLOT

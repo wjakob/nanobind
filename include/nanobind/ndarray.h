@@ -21,6 +21,10 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 /// DLPack API/ABI data structures are part of a separate namespace.
 NAMESPACE_BEGIN(dlpack)
 
+// The version of DLPack that is supported by libnanobind
+static constexpr uint32_t major_version = 1;
+static constexpr uint32_t minor_version = 1;
+
 enum class dtype_code : uint8_t {
     Int = 0, UInt = 1, Float = 2, Bfloat = 4, Complex = 5, Bool = 6,
     Float8_E3M4 = 7, Float8_E4M3 = 8, Float8_E4M3B11FNUZ = 9,
@@ -411,7 +415,7 @@ public:
 
     explicit ndarray(detail::ndarray_handle *handle) : m_handle(handle) {
         if (handle)
-            m_dltensor = *detail::ndarray_inc_ref(handle);
+            m_dltensor = *NB_CALL(ndarray_inc_ref)(handle);
     }
 
     template <typename... Args2>
@@ -441,8 +445,8 @@ public:
         args.order = order;
         args.ro = ReadOnly;
 
-        m_handle = detail::ndarray_create(&args, sizeof(args));
-        m_dltensor = *detail::ndarray_inc_ref(m_handle);
+        m_handle = NB_CALL(ndarray_create)(&args, sizeof(args));
+        m_dltensor = *NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
     ndarray(VoidPtr data,
@@ -489,16 +493,16 @@ public:
         args.order = order;
         args.ro = ReadOnly;
 
-        m_handle = detail::ndarray_create(&args, sizeof(args));
-        m_dltensor = *detail::ndarray_inc_ref(m_handle);
+        m_handle = NB_CALL(ndarray_create)(&args, sizeof(args));
+        m_dltensor = *NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
     ~ndarray() {
-        detail::ndarray_dec_ref(m_handle);
+        NB_CALL(ndarray_dec_ref)(m_handle);
     }
 
     ndarray(const ndarray &t) : m_handle(t.m_handle), m_dltensor(t.m_dltensor) {
-        detail::ndarray_inc_ref(m_handle);
+        NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
     ndarray(ndarray &&t) noexcept : m_handle(t.m_handle), m_dltensor(t.m_dltensor) {
@@ -507,7 +511,7 @@ public:
     }
 
     ndarray &operator=(ndarray &&t) noexcept {
-        detail::ndarray_dec_ref(m_handle);
+        NB_CALL(ndarray_dec_ref)(m_handle);
         m_handle = t.m_handle;
         m_dltensor = t.m_dltensor;
         // Only reset t.m_handle, it's safe to leave t.m_dltensor as-is
@@ -516,8 +520,8 @@ public:
     }
 
     ndarray &operator=(const ndarray &t) {
-        detail::ndarray_inc_ref(t.m_handle);
-        detail::ndarray_dec_ref(m_handle);
+        NB_CALL(ndarray_inc_ref)(t.m_handle);
+        NB_CALL(ndarray_dec_ref)(m_handle);
         m_handle = t.m_handle;
         m_dltensor = t.m_dltensor;
         return *this;
@@ -620,7 +624,7 @@ private:
     dlpack::dltensor m_dltensor;
 };
 
-inline bool ndarray_check(handle h) { return detail::ndarray_check(h.ptr()); }
+inline bool ndarray_check(handle h) { return NB_CALL(ndarray_check)(h.ptr()); }
 
 NAMESPACE_BEGIN(detail)
 
@@ -665,21 +669,21 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
             (void) shape_buf;
         }
 
-        detail::ndarray_handle *h = ndarray_import(
+        detail::ndarray_handle *h = NB_CALL(ndarray_import)(
             src.ptr(), &config, sizeof(config), flags & cast_flags::convert,
             cleanup);
 
         if (NB_UNLIKELY(value.m_handle))
-            detail::ndarray_dec_ref(value.m_handle);
+            NB_CALL(ndarray_dec_ref)(value.m_handle);
         if (NB_LIKELY(h))
-            value.m_dltensor = *detail::ndarray_inc_ref(h);
+            value.m_dltensor = *NB_CALL(ndarray_inc_ref)(h);
         value.m_handle = h;
         return h != nullptr;
     }
 
     static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return ndarray_export(tensor.handle(), Config::Framework::value, policy, cleanup);
+        return NB_CALL(ndarray_export)(tensor.handle(), Config::Framework::value, policy, cleanup);
     }
 };
 

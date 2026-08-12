@@ -32,13 +32,12 @@ private:
 inline namespace NB_BACKEND_ABI_NS {
 
 // Wraps a Python error state as a C++ exception.
-// The layout of this class is frozen and part of the nanobind ABI contract
 class NB_EXPORT python_error : public std::exception {
 public:
-    python_error() { m_value = detail::error_fetch(); }
+    python_error() { m_value = NB_CALL(error_fetch)(); }
     python_error(const python_error &e)
         : std::exception(e), m_what(e.m_what) {
-        m_value = detail::error_copy(e.m_value, &m_what);
+        m_value = NB_CALL(error_copy)(e.m_value, &m_what);
     }
     python_error(python_error &&e) noexcept
         : std::exception(e), m_value(e.m_value), m_what(e.m_what) {
@@ -54,7 +53,7 @@ public:
     /// Move the error back into the Python domain. This may only be called
     /// once, and you should not reraise the exception in C++ afterward.
     void restore() noexcept {
-        detail::error_restore(m_value);
+        NB_CALL(error_restore)(m_value);
         m_value = nullptr;
     }
 
@@ -82,17 +81,13 @@ public:
     }
 
     const char *what() const noexcept override {
-        return detail::error_what(m_value, &m_what);
+        return NB_CALL(error_what)(m_value, &m_what);
     }
 
 private:
     mutable PyObject *m_value = nullptr;
     mutable char *m_what = nullptr;
 };
-
-static_assert(sizeof(python_error) ==
-                  sizeof(std::exception) + 2 * sizeof(void *),
-              "frozen layout of python_error changed");
 
 /// Thrown by nanobind::cast when casting fails
 using cast_error = std::bad_cast;
@@ -144,7 +139,7 @@ NAMESPACE_END(detail)
 
 inline void register_exception_translator(detail::exception_translator t,
                                           void *payload = nullptr) {
-    detail::register_exception_translator(t, payload);
+    NB_CALL(register_exception_translator)(t, payload);
 }
 
 template <typename T>
@@ -152,9 +147,9 @@ class exception : public object {
     NB_OBJECT_DEFAULT(exception, object, "Exception", PyExceptionClass_Check)
 
     exception(handle scope, const char *name, handle base = PyExc_Exception)
-        : object(detail::exception_new(scope.ptr(), name, base.ptr()),
+        : object(NB_CALL(exception_new)(scope.ptr(), name, base.ptr()),
                  detail::steal_t()) {
-        detail::register_exception_translator(
+        NB_CALL(register_exception_translator)(
             [](const std::exception_ptr &p, void *payload) {
                 try {
                     std::rethrow_exception(p);
@@ -165,7 +160,30 @@ class exception : public object {
     }
 };
 
-NB_CORE void chain_error(handle type, const char *fmt, ...) noexcept;
-[[noreturn]] NB_CORE void raise_from(python_error &e, handle type, const char *fmt, ...);
+/// Chain a new error of type 'type' onto the currently pending one
+#if defined(__GNUC__)
+    __attribute__((__format__ (__printf__, 2, 3)))
+#endif
+inline void chain_error(handle type, const char *fmt, ...) noexcept {
+    va_list args;
+    va_start(args, fmt);
+    NB_CALL(chain_v)(type.ptr(), fmt, args);
+    va_end(args);
+}
+
+/// Restore 'e', chain a new error of type 'type' onto it, and re-raise
+#if defined(__GNUC__)
+    __attribute__((noreturn, noinline, __format__ (__printf__, 3, 4)))
+#else
+    [[noreturn]] NB_NOINLINE
+#endif
+inline void raise_from(python_error &e, handle type, const char *fmt, ...) {
+    e.restore();
+    va_list args;
+    va_start(args, fmt);
+    NB_CALL(chain_v)(type.ptr(), fmt, args);
+    va_end(args);
+    detail::raise_python_error();
+}
 
 NAMESPACE_END(NB_NAMESPACE)

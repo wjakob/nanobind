@@ -1,8 +1,9 @@
 /*
-    nanobind/nb_platform.h: nanobind's binary interface versions and the
-    platform ABI tag, a string capturing the properties of the compilation
-    environment that determine whether two binaries may call each other at
-    all. A mismatch means that no compatible backend exists.
+    nanobind/nb_platform.h: this file computes the platform ABI tag, a string
+    capturing the properties of the compilation environment that determine
+    whether two binaries may call each other at all. A mismatch means that no
+    compatible backend exists. The other binary compatibility contracts are
+    described in nb_backend.h.
 
     The implementation of this file is designed to be compatible with @rwgk's
     https://github.com/pybind/pybind11/blob/master/include/pybind11/conduit/pybind11_platform_abi_id.h
@@ -17,21 +18,6 @@
 // Include a libstdc++ header so that _GLIBCXX_USE_CXX11_ABI is defined below
 // regardless of include order
 #include <cstddef>
-
-/// Shape of the boundary between nanobind headers and a compiled backend.
-/// Bumped when a boundary function or frozen record changes incompatibly;
-/// see the evolution rules in nb_attr.h and nb_lib.h.
-#define NB_BACKEND_ABI_MAJOR 1
-
-/// Capability counter of the boundary; bumped by any additive change
-/// (an appended boundary function, a flag-gated record field, a new flag
-/// bit or accepted enumeration value).
-#define NB_BACKEND_ABI_MINOR 0
-
-/// Inline namespace holding nanobind's boundary-crossing exception types.
-/// Deriving the name from NB_BACKEND_ABI_MAJOR keeps the mangled names of two
-/// coexisting majors distinct (see nb_error.h).
-#define NB_BACKEND_ABI_NS NB_CONCAT(abi, NB_BACKEND_ABI_MAJOR)
 
 #if defined(__MINGW32__)
 #  define NB_COMPILER_TYPE "mingw"

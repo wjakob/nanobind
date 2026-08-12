@@ -15,12 +15,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-struct ticket;
-
-NB_CORE PyObject *trampoline_new(void *ptr) noexcept;
-NB_CORE void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
-                              bool pure, ticket *ticket);
-NB_CORE void trampoline_leave(ticket *ticket) noexcept;
+// ``trampoline`` and ``ticket`` below are in the frozen backend ABI.
 
 /// Compile-time hash (FNV-1a) of a method name
 constexpr uint64_t trampoline_hash(const char *s) {
@@ -43,7 +38,7 @@ struct trampoline {
 #else
     NB_INLINE trampoline(void *ptr) : self(nullptr) {
 #endif
-        self = trampoline_new(ptr);
+        self = NB_CALL(trampoline_new)(ptr);
     }
     NB_INLINE handle base() const { return self; }
 };
@@ -58,12 +53,12 @@ struct ticket {
     PyGILState_STATE state{};
 
     NB_INLINE ticket(const trampoline &t, const char *name, uint64_t hash, bool pure) {
-        trampoline_enter(t.self, name, hash, pure, this);
+        NB_CALL(trampoline_enter)(t.self, name, hash, pure, this);
     }
 
     NB_INLINE ~ticket() noexcept {
         if (key.is_valid())
-            trampoline_leave(this);
+            NB_CALL(trampoline_leave)(this);
     }
 };
 

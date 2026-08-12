@@ -31,7 +31,7 @@ inline void map_set(Map &m, const Key &k, const Value &v) {
 
 /// Render the repr of a mapping in Python dict syntax
 NB_NOINLINE inline PyObject *repr_map(PyObject *o) {
-    object name = steal(nb_inst_name(o));
+    object name = steal(NB_CALL(nb_inst_name)(o));
     list items;
     for (handle kv : handle(o).attr("items")()) {
         object k = kv[0], v = kv[1],

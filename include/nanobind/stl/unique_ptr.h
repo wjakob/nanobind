@@ -32,7 +32,7 @@ template <typename T> struct deleter {
     void operator()(void *p) noexcept {
         if (o) {
             // Don't run the deleter if the interpreter has been shut down
-            if (!is_alive())
+            if (!NB_CALL(is_alive)())
                 return;
             gil_scoped_acquire guard;
             Py_DECREF(o);
@@ -90,7 +90,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
 
     ~type_caster() {
         if (inflight)
-            nb_type_restore_ownership(src.ptr(), IsDefaultDeleter);
+            NB_CALL(nb_type_restore_ownership)(src.ptr(), IsDefaultDeleter);
     }
 
     bool from_python(handle src_, uint32_t, cleanup_list *) noexcept {
@@ -134,8 +134,8 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         if constexpr (std::is_polymorphic_v<Td>)
             type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-        handle result = nb_type_put_unique(type, type_p, ptr, cleanup,
-                                           cpp_delete);
+        handle result = NB_CALL(nb_type_put_unique)(type, type_p, ptr, cleanup,
+                                                    cpp_delete);
 
         if (result.is_valid()) {
             if (cpp_delete)
@@ -151,7 +151,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     bool can_cast() const noexcept {
         if (src.is_none() || inflight)
             return true;
-        else if (!nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+        else if (!NB_CALL(nb_type_relinquish_ownership)(src.ptr(), IsDefaultDeleter))
             return false;
         inflight = true;
         return true;
@@ -159,7 +159,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
 
     explicit operator Value() {
         if (!inflight && !src.is_none() &&
-            !nb_type_relinquish_ownership(src.ptr(), IsDefaultDeleter))
+            !NB_CALL(nb_type_relinquish_ownership)(src.ptr(), IsDefaultDeleter))
             throw next_overload();
 
         Td *p = caster.operator Td *();

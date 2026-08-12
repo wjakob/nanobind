@@ -8,6 +8,7 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
 #include <structmember.h>
 #include "nb_internals.h"
 #include <thread>
@@ -275,7 +276,7 @@ static void init_internals(nb_internals *p) {
         return;
 
     p->lifeline = PyList_New(0);
-    check(p->lifeline, "nanobind::detail::nb_module_exec(): "
+    check(p->lifeline, "nanobind::detail::nb_module_init(): "
                         "could not create lifeline list!");
 
     str nb_name("nanobind");
@@ -292,7 +293,7 @@ static void init_internals(nb_internals *p) {
 
     check(p->nb_module && nb_meta && p->nb_func &&
               p->nb_method && p->nb_bound_method,
-          "nanobind::detail::nb_module_exec(): initialization failed!");
+          "nanobind::detail::nb_module_init(): initialization failed!");
 
 #if defined(Py_LIMITED_API)
     p->PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
@@ -329,7 +330,7 @@ static void init_internals(nb_internals *p) {
     // Create the single metaclass shared by all bound types. This may
     // access 'type_data_offset' defined just above.
     p->nb_type = nb_type_create_metaclass(p, nb_meta);
-    check(p->nb_type, "nanobind::detail::nb_module_exec(): "
+    check(p->nb_type, "nanobind::detail::nb_module_init(): "
                       "nb_type metaclass creation failed!");
 }
 
@@ -363,7 +364,7 @@ void internals_dec_ref() {
         static_pyobjects[i] = nullptr;
 }
 
-void nb_module_free(void *) {
+static void nb_module_free(void *) {
     internals_dec_ref();
 }
 
@@ -410,6 +411,7 @@ PyObject *module_new(const char *name, const char *doc, void *exec,
 static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
+
 
 static void internals_cleanup() {
     nb_internals *p = internals;
@@ -564,12 +566,12 @@ static void internals_cleanup() {
 #endif
 }
 
-NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
+static int nb_module_init_impl(const char *domain, PyObject *) {
     if (internals) {
         init_internals(internals);
         init_pyobjects(internals);
         internals_inc_ref();
-        return;
+        return 0;
     }
 
 #if defined(PYPY_VERSION)
@@ -577,20 +579,25 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
 #else
     PyObject *dict = PyInterpreterState_GetDict(PyInterpreterState_Get());
 #endif
-    check(dict, "nanobind::detail::nb_module_exec(): "
-                "could not access internals dictionary!");
+    if (!dict) {
+        PyErr_SetString(PyExc_SystemError,
+                        "nanobind: could not access the internals dictionary!");
+        return -1;
+    }
 
     PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s__",
-                                         NB_INTERNALS_KEY, name ? name : "");
-    check(key, "nanobind::detail::nb_module_exec(): "
-               "could not create dictionary key!");
+                                         NB_INTERNALS_KEY, domain);
+    if (!key)
+        return -1;
 
     PyObject *capsule = dict_getitem_or_default(dict, key, nullptr);
     if (capsule) {
         Py_DECREF(key);
         internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
-        check(internals, "nanobind::detail::nb_module_exec(): "
-                         "capsule pointer is NULL!");
+        if (!internals) {
+            Py_DECREF(capsule);
+            return -1;
+        }
         is_alive_ptr = internals->is_alive_ptr;
 
         init_internals(internals);
@@ -598,7 +605,7 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
         internals_inc_ref();
 
         Py_DECREF(capsule);
-        return;
+        return 0;
     }
 
     nb_internals *p = new nb_internals();
@@ -686,13 +693,30 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
                 "python extension library, you can ignore this warning.");
 
     capsule = PyCapsule_New(p, "nb_internals", nullptr);
-    check(capsule,
-          "nanobind::detail::nb_module_exec(): capsule creation failed!");
-    check(PyDict_SetItem(dict, key, capsule) == 0,
-          "nanobind::detail::nb_module_exec(): could not register the "
-          "internals capsule!");
+    if (!capsule) {
+        Py_DECREF(key);
+        return -1;
+    }
+    int rv = PyDict_SetItem(dict, key, capsule);
     Py_DECREF(capsule);
     Py_DECREF(key);
+    return rv;
+}
+
+NB_NOINLINE int nb_module_init(const char *domain, PyObject *m) noexcept {
+    try {
+        return nb_module_init_impl(domain, m);
+    } catch (python_error &e) {
+        e.restore();
+    } catch (const std::bad_alloc &) {
+        PyErr_NoMemory();
+    } catch (const std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+    } catch (...) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "nanobind: unknown initialization failure!");
+    }
+    return -1;
 }
 
 #if defined(NB_COMPACT_ASSERTIONS)
@@ -705,6 +729,13 @@ NB_NOINLINE void fail_unspecified() noexcept {
     #endif
 }
 #endif
+
+// Statically initialized boundary function table
+[[maybe_unused]] static const nb_backend_table nb_backend_export = {
+    nb_backend_slot_count, NB_BACKEND_ABI_MINOR, { 0 },
+#define NB_SLOT(ret, name, args) nanobind::detail::name,
+#include <nanobind/nb_backend_slots.h>
+};
 
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

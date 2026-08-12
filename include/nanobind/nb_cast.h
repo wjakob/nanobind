@@ -135,12 +135,12 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
     NB_INLINE bool from_python(handle src, uint32_t flags, cleanup_list *) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
             if constexpr (std::is_same_v<T, double>) {
-                return detail::load_f64(src.ptr(), flags, &value);
+                return NB_CALL(load_f64)(src.ptr(), flags, &value);
             } else if constexpr (std::is_same_v<T, float>) {
-                return detail::load_f32(src.ptr(), flags, &value);
+                return NB_CALL(load_f32)(src.ptr(), flags, &value);
             } else {
                 double d;
-                if (!detail::load_f64(src.ptr(), flags, &d))
+                if (!NB_CALL(load_f64)(src.ptr(), flags, &d))
                     return false;
                 T result = (T) d;
                 if ((flags & cast_flags::convert)
@@ -154,22 +154,22 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
         } else {
             if constexpr (std::is_signed_v<T>) {
                 if constexpr (sizeof(T) == 8)
-                    return detail::load_i64(src.ptr(), flags, (int64_t *) &value);
+                    return NB_CALL(load_i64)(src.ptr(), flags, (int64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    return detail::load_i32(src.ptr(), flags, (int32_t *) &value);
+                    return NB_CALL(load_i32)(src.ptr(), flags, (int32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    return detail::load_i16(src.ptr(), flags, (int16_t *) &value);
+                    return NB_CALL(load_i16)(src.ptr(), flags, (int16_t *) &value);
                 else
-                    return detail::load_i8(src.ptr(), flags, (int8_t *) &value);
+                    return NB_CALL(load_i8)(src.ptr(), flags, (int8_t *) &value);
             } else {
                 if constexpr (sizeof(T) == 8)
-                    return detail::load_u64(src.ptr(), flags, (uint64_t *) &value);
+                    return NB_CALL(load_u64)(src.ptr(), flags, (uint64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    return detail::load_u32(src.ptr(), flags, (uint32_t *) &value);
+                    return NB_CALL(load_u32)(src.ptr(), flags, (uint32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    return detail::load_u16(src.ptr(), flags, (uint16_t *) &value);
+                    return NB_CALL(load_u16)(src.ptr(), flags, (uint16_t *) &value);
                 else
-                    return detail::load_u8(src.ptr(), flags, (uint8_t *) &value);
+                    return NB_CALL(load_u8)(src.ptr(), flags, (uint8_t *) &value);
             }
         }
     }
@@ -199,14 +199,14 @@ template <typename T>
 struct type_caster<T, enable_if_t<std::is_enum_v<T>>> {
     NB_INLINE bool from_python(handle src, uint32_t flags, cleanup_list *) noexcept {
         int64_t result;
-        bool rv = enum_from_python(&typeid(T), src.ptr(), &result, flags);
+        bool rv = NB_CALL(enum_from_python)(&typeid(T), src.ptr(), &result, flags);
         if (rv)
             value = (T) result;
         return rv;
     }
 
     NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
-        return enum_from_cpp(&typeid(T), (int64_t) src);
+        return NB_CALL(enum_from_cpp)(&typeid(T), (int64_t) src);
     }
 
     NB_TYPE_CASTER(T, const_name<T>())
@@ -339,7 +339,7 @@ template <typename T> struct type_caster<pointer_and_handle<T>> {
         // Fast path for implicit ``self`` argument from ``nb_type_vectorcall()``
         if (flags & cast_flags::trusted) {
             value.h = src;
-            value.p = (T *) nb_inst_ptr(src.ptr());
+            value.p = (T *) NB_CALL(nb_inst_ptr)(src.ptr());
             return true;
         }
         Caster c;
@@ -485,7 +485,7 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         // only one that is ever trusted) and, as a fallback, in nb_type_get.
         // The generic base caster therefore need not test for it here, which
         // would only add a never-taken branch to every bound-type argument.
-        return nb_type_get(&typeid(Type), src.ptr(), flags, cleanup,
+        return NB_CALL(nb_type_get)(&typeid(Type), src.ptr(), flags, cleanup,
                            (void **) &value);
     }
 
@@ -510,7 +510,8 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         if constexpr (std::is_polymorphic_v<Type>)
             type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-        return nb_type_put(type, type_p, ptr, policy, cleanup);
+        return NB_CALL(nb_type_put)(type, type_p, ptr, policy, cleanup,
+                                    nullptr);
     }
 
     template <typename T_>
@@ -708,20 +709,20 @@ detail::accessor<Impl>& detail::accessor<Impl>::operator=(T &&value) {
 template <typename T> void list::append(T &&value) {
     object o = nanobind::cast((detail::forward_t<T>) value);
     if (PyList_Append(m_ptr, o.ptr()))
-        raise_python_error();
+        detail::raise_python_error();
 }
 
 template <typename T> void list::insert(Py_ssize_t index, T &&value) {
     object o = nanobind::cast((detail::forward_t<T>) value);
     if (PyList_Insert(m_ptr, index, o.ptr()))
-        raise_python_error();
+        detail::raise_python_error();
 }
 
 template <typename T> bool dict::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PyDict_Contains(m_ptr, o.ptr());
     if (rv == -1)
-        raise_python_error();
+        detail::raise_python_error();
     return rv == 1;
 }
 
@@ -729,7 +730,7 @@ template <typename T> bool set::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Contains(m_ptr, o.ptr());
     if (rv == -1)
-        raise_python_error();
+        detail::raise_python_error();
     return rv == 1;
 }
 
@@ -737,14 +738,14 @@ template <typename T> void set::add(T&& key) {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Add(m_ptr, o.ptr());
     if (rv == -1)
-        raise_python_error();
+        detail::raise_python_error();
 }
 
 template <typename T> bool set::discard(T &&value) {
     object o = nanobind::cast((detail::forward_t<T>) value);
     int rv = PySet_Discard(m_ptr, o.ptr());
     if (rv < 0)
-        raise_python_error();
+        detail::raise_python_error();
     return rv == 1;
 }
 
@@ -752,7 +753,7 @@ template <typename T> bool frozenset::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Contains(m_ptr, o.ptr());
     if (rv == -1)
-        raise_python_error();
+        detail::raise_python_error();
     return rv == 1;
 }
 
@@ -760,7 +761,7 @@ template <typename T> bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PyMapping_HasKey(m_ptr, o.ptr());
     if (rv == -1)
-        raise_python_error();
+        detail::raise_python_error();
     return rv == 1;
 }
 

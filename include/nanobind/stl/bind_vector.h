@@ -37,7 +37,7 @@ template <> struct iterator_access<typename std::vector<bool>::iterator> {
 
 /// Render the repr of a sequence in Python list syntax
 NB_NOINLINE inline PyObject *repr_list(PyObject *o) {
-    object name = steal(nb_inst_name(o));
+    object name = steal(NB_CALL(nb_inst_name)(o));
     list items;
     for (size_t i = 0, l = len(o); i < l; ++i)
         items.append(repr(handle(o)[i]));

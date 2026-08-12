@@ -10,133 +10,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-/* Public flags about a type. These are construction inputs written by an
-   extension and read by the backend, so their values are frozen: adding a
-   value is a minor version bump, while changing what an existing value means
-   is a major bump. Bits 14..18 are free; bits 19..23 belong to
-   type_init_flags below; runtime-only flags used by the backend occupy
-   bits 24+ of the backend's private flags word and never appear here.
-   Once bits 14..18 are exhausted, additional flags continue in the
-   'reserved' field of type_data_init. */
-enum class type_flags : uint32_t {
-    /// Does the type provide a C++ destructor?
-    is_destructible          = (1 << 0),
-
-    /// Does the type provide a C++ copy constructor?
-    is_copy_constructible    = (1 << 1),
-
-    /// Does the type provide a C++ move constructor?
-    is_move_constructible    = (1 << 2),
-
-    /// Is the 'destruct' field of the type_data_init structure set?
-    has_destruct             = (1 << 3),
-
-    /// Is the 'copy' field of the type_data_init structure set?
-    has_copy                 = (1 << 4),
-
-    /// Is the 'move' field of the type_data_init structure set?
-    has_move                 = (1 << 5),
-
-    /// This type does not permit subclassing from Python
-    is_final                 = (1 << 6),
-
-    /// Instances of this type support dynamic attribute assignment
-    has_dynamic_attr         = (1 << 7),
-
-    /// The class uses an intrusive reference counting approach
-    intrusive_ptr            = (1 << 8),
-
-    /// Is this a class that inherits from enable_shared_from_this?
-    /// If so, type_data_init::keep_shared_from_this_alive is also set.
-    has_shared_from_this     = (1 << 9),
-
-    /// Instances of this type can be referenced by 'weakref'
-    is_weak_referenceable    = (1 << 10),
-
-    /// A custom signature override was specified
-    has_signature            = (1 << 11),
-
-    /// The class implements __class_getitem__ similar to typing.Generic
-    is_generic               = (1 << 12),
-
-    /// Does the type opt into instance pooling? (nb::pooled)
-    pooled                   = (1 << 13)
-};
-
-/// Flags about a type that are only relevant when it is being created.
-/// They share type_data_init::flags with the type_flags above and are
-/// stripped when the backend copies the word into its private record.
-enum class type_init_flags : uint32_t {
-    /// Is the 'supplement_size' field of the type_data_init structure set?
-    has_supplement           = (1 << 19),
-
-    /// Is the 'doc' field of the type_data_init structure set?
-    has_doc                  = (1 << 20),
-
-    /// Is the 'base' field of the type_data_init structure set?
-    has_base                 = (1 << 21),
-
-    /// Is the 'base_py' field of the type_data_init structure set?
-    has_base_py              = (1 << 22),
-
-    /// This type provides extra PyType_Slot fields
-    has_type_slots           = (1 << 23),
-
-    all_init_flags           = (0x1f << 19)
-};
-
-/// Describes a type binding
-struct type_data_init {
-    uint32_t size;
-
-    /// log2 of the type's alignment. The exponent form is deliberate: a raw
-    /// 8-bit alignment value would silently truncate alignas(256) and
-    /// beyond, while eight bits of exponent are effectively unbounded.
-    uint32_t align_log2 : 8;
-    uint32_t flags : 24;
-    const char *name;
-    const std::type_info *type;
-    void (*destruct)(void *);
-    void (*copy)(void *, const void *);
-    void (*move)(void *, void *) noexcept;
-    void (*set_self_py)(void *, PyObject *) noexcept;
-    bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
-
-    /// Instance pool capacity (see nb::pooled)
-    uint32_t pool_capacity;
-
-    /// Room for future 'type_flags' growth, must be zero
-    uint32_t reserved = 0;
-
-    // ------- Fields only consulted during type construction -------
-
-    PyObject *scope;
-    const std::type_info *base;
-    PyTypeObject *base_py;
-    const char *doc;
-    const PyType_Slot *type_slots;
-    size_t supplement_size;
-};
-
-static_assert(sizeof(void *) != 8 || sizeof(type_data_init) == 120,
-              "frozen ABI layout of type_data_init changed");
-NB_FROZEN_OFF(type_data_init, size, 0);
-NB_FROZEN_OFF(type_data_init, name, 8);
-NB_FROZEN_OFF(type_data_init, type, 16);
-NB_FROZEN_OFF(type_data_init, destruct, 24);
-NB_FROZEN_OFF(type_data_init, copy, 32);
-NB_FROZEN_OFF(type_data_init, move, 40);
-NB_FROZEN_OFF(type_data_init, set_self_py, 48);
-NB_FROZEN_OFF(type_data_init, keep_shared_from_this_alive, 56);
-NB_FROZEN_OFF(type_data_init, pool_capacity, 64);
-NB_FROZEN_OFF(type_data_init, reserved, 68);
-NB_FROZEN_OFF(type_data_init, scope, 72);
-NB_FROZEN_OFF(type_data_init, base, 80);
-NB_FROZEN_OFF(type_data_init, base_py, 88);
-NB_FROZEN_OFF(type_data_init, doc, 96);
-NB_FROZEN_OFF(type_data_init, type_slots, 104);
-NB_FROZEN_OFF(type_data_init, supplement_size, 112);
-
 NB_INLINE void type_extra_apply(type_data_init &t, const handle &h) {
     t.flags |= (uint32_t) type_init_flags::has_base_py;
     t.base_py = (PyTypeObject *) h.ptr();
@@ -197,46 +70,6 @@ NB_INLINE void type_extra_apply(type_data_init &t, supplement<T>) {
     t.flags |= (uint32_t) type_init_flags::has_supplement | (uint32_t) type_flags::is_final;
     t.supplement_size = sizeof(T);
 }
-
-enum class enum_flags : uint32_t {
-    /// Is this an arithmetic enumeration?
-    is_arithmetic            = (1 << 1),
-
-    /// Is the number type underlying the enumeration signed?
-    is_signed                = (1 << 2),
-
-    /// Is the underlying enumeration type Flag?
-    is_flag                = (1 << 3),
-
-    /// Is this a string-valued enumeration (StrEnum)?
-    is_str                 = (1 << 4)
-};
-
-/// Describes an enumeration binding
-struct enum_data_init {
-    /// C++ RTTI record of the enumeration type
-    const std::type_info *type;
-
-    /// Python scope (module or type) in which the enumeration is installed
-    PyObject *scope;
-
-    /// Name of the enumeration
-    const char *name;
-
-    /// Docstring (or nullptr)
-    const char *docstr;
-
-    /// Enumeration flags (see the 'enum_flags' enumeration)
-    uint32_t flags;
-};
-
-static_assert(sizeof(void *) != 8 || sizeof(enum_data_init) == 40,
-              "frozen ABI layout of enum_data_init changed");
-NB_FROZEN_OFF(enum_data_init, type, 0);
-NB_FROZEN_OFF(enum_data_init, scope, 8);
-NB_FROZEN_OFF(enum_data_init, name, 16);
-NB_FROZEN_OFF(enum_data_init, docstr, 24);
-NB_FROZEN_OFF(enum_data_init, flags, 32);
 
 NB_INLINE void enum_extra_apply(enum_data_init &e, is_arithmetic) {
     e.flags |= (uint32_t) enum_flags::is_arithmetic;
@@ -311,46 +144,56 @@ constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
 NAMESPACE_END(detail)
 
 // Low level access to nanobind type objects
-inline bool type_check(handle h) { return detail::nb_type_check(h.ptr()); }
-inline size_t type_size(handle h) { return detail::nb_type_size(h.ptr()); }
-inline size_t type_align(handle h) { return detail::nb_type_align(h.ptr()); }
-inline const std::type_info& type_info(handle h) { return *detail::nb_type_info(h.ptr()); }
+inline bool type_check(handle h) { return NB_CALL(nb_type_check)(h.ptr()); }
+inline size_t type_size(handle h) { return NB_CALL(nb_type_size)(h.ptr()); }
+inline size_t type_align(handle h) { return NB_CALL(nb_type_align)(h.ptr()); }
+inline const std::type_info& type_info(handle h) { return *NB_CALL(nb_type_info)(h.ptr()); }
 template <typename T>
-inline T &type_supplement(handle h) { return *(T *) detail::nb_type_supplement(h.ptr()); }
-inline str type_name(handle h) { return steal<str>(detail::nb_type_name(h.ptr())); }
+inline T &type_supplement(handle h) { return *(T *) NB_CALL(nb_type_supplement)(h.ptr()); }
+inline str type_name(handle h) { return steal<str>(NB_CALL(nb_type_name)(h.ptr())); }
 
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) {
-    return steal<str>(detail::nb_inst_name(h.ptr()));
+    return steal<str>(NB_CALL(nb_inst_name)(h.ptr()));
 }
 inline object inst_alloc(handle h) {
-    return steal(detail::nb_inst_alloc((PyTypeObject *) h.ptr()));
+    return steal(NB_CALL(nb_inst_alloc)((PyTypeObject *) h.ptr()));
 }
 inline object inst_alloc_zero(handle h) {
-    return steal(detail::nb_inst_alloc_zero((PyTypeObject *) h.ptr()));
+    return steal(NB_CALL(nb_inst_alloc_zero)((PyTypeObject *) h.ptr()));
 }
 inline object inst_take_ownership(handle h, void *p) {
-    return steal(detail::nb_inst_take_ownership((PyTypeObject *) h.ptr(), p));
+    return steal(NB_CALL(nb_inst_take_ownership)((PyTypeObject *) h.ptr(), p));
 }
 inline object inst_reference(handle h, void *p, handle parent = handle()) {
-    return steal(detail::nb_inst_reference((PyTypeObject *) h.ptr(), p, parent.ptr()));
+    return steal(NB_CALL(nb_inst_reference)((PyTypeObject *) h.ptr(), p, parent.ptr()));
 }
-inline void inst_zero(handle h) { detail::nb_inst_zero(h.ptr()); }
+inline void inst_zero(handle h) { NB_CALL(nb_inst_zero)(h.ptr()); }
 inline void inst_set_state(handle h, bool ready, bool destruct) {
-    detail::nb_inst_set_state(h.ptr(), ready, destruct);
+    NB_CALL(nb_inst_state_write)(h.ptr(), (uint32_t) ready | ((uint32_t) destruct << 1));
 }
 inline std::pair<bool, bool> inst_state(handle h) {
-    return detail::nb_inst_state_read(h.ptr());
+    uint32_t state = NB_CALL(nb_inst_state_read)(h.ptr());
+    return { (state & 1) != 0, (state & 2) != 0 };
 }
 inline void inst_mark_ready(handle h) { inst_set_state(h, true, true); }
 inline bool inst_ready(handle h) { return inst_state(h).first; }
-inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
-inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
-inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
-inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
-inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
-template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
+inline void inst_destruct(handle h) { NB_CALL(nb_inst_destruct)(h.ptr()); }
+inline void inst_copy(handle dst, handle src) { NB_CALL(nb_inst_copy)(dst.ptr(), src.ptr()); }
+inline void inst_move(handle dst, handle src) { NB_CALL(nb_inst_move)(dst.ptr(), src.ptr()); }
+inline void inst_replace_copy(handle dst, handle src) { NB_CALL(nb_inst_copy)(dst.ptr(), src.ptr()); }
+inline void inst_replace_move(handle dst, handle src) { NB_CALL(nb_inst_move)(dst.ptr(), src.ptr()); }
+template <typename T> T *inst_ptr(handle h) { return (T *) NB_CALL(nb_inst_ptr)(h.ptr()); }
+
+#if NB_TYPE_GET_SLOT_IMPL
+NAMESPACE_BEGIN(detail)
+// PyPy-only replacement for PyType_GetSlot(); not part of the dispatch
+// table, since split mode requires CPython
+NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
+NAMESPACE_END(detail)
+#endif
+
 inline void *type_get_slot(handle h, int slot_id) {
 #if NB_TYPE_GET_SLOT_IMPL
     return detail::type_get_slot((PyTypeObject *) h.ptr(), slot_id);
@@ -383,7 +226,7 @@ private:
             [](pointer_and_handle<Type> v, Args... args) {
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Args...>) {
-                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                    if (!NB_CALL(nb_inst_python_derived)(v.h.ptr())) {
                         new (v.p) Type((detail::forward_t<Args>) args...);
                         return;
                     }
@@ -413,7 +256,7 @@ private:
             [](pointer_and_handle<Type> v, Arg arg) {
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Arg>) {
-                    if (!detail::nb_inst_python_derived(v.h.ptr())) {
+                    if (!NB_CALL(nb_inst_python_derived)(v.h.ptr())) {
                         new ((Type *) v.p) Type((detail::forward_t<Arg>) arg);
                         return;
                     }
@@ -435,7 +278,7 @@ private:
                     return Caster().from_python(
                         src, detail::cast_flags::convert, cleanup);
                 };
-            detail::implicitly_convertible(&typeid(Type), (void *) pred, true);
+            NB_CALL(implicitly_convertible)(&typeid(Type), (void *) pred, true);
         }
     }
 };
@@ -644,10 +487,10 @@ public:
                 // throwing an exception if there is no active shared_ptr
                 // for this object. (Added in C++17.)
                 if (auto sp = inst_ptr<T>(self)->weak_from_this().lock()) {
-                    detail::keep_alive(self, new auto(std::move(sp)),
-                                       [](void *p) noexcept {
-                                           delete (decltype(sp) *) p;
-                                       });
+                    NB_CALL(keep_alive_ptr)(self, new auto(std::move(sp)),
+                                            [](void *p) noexcept {
+                                                delete (decltype(sp) *) p;
+                                            });
                     return true;
                 }
                 return false;
@@ -656,7 +499,7 @@ public:
 
         (detail::type_extra_apply(d, extra), ...);
 
-        m_ptr = detail::nb_type_new(&d);
+        m_ptr = NB_CALL(nb_type_new)(&d);
     }
 
     template <typename Func, typename... Extra>
@@ -698,7 +541,7 @@ public:
             set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
                                     is_method(), detail::filter_setter(extra)...);
 
-        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
+        NB_CALL(property_install)(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
         return *this;
     }
 
@@ -717,7 +560,7 @@ public:
             set_p = cpp_function((detail::forward_t<Setter>) setter,
                                  detail::filter_setter(extra)...);
 
-        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr(), true);
+        NB_CALL(property_install)(m_ptr, name_, get_p.ptr(), set_p.ptr(), true);
         return *this;
     }
 
@@ -819,21 +662,21 @@ public:
                        ? (uint32_t) detail::enum_flags::is_signed
                        : 0;
         (detail::enum_extra_apply(ed, extra), ...);
-        m_ptr = detail::enum_create(&ed);
+        m_ptr = NB_CALL(enum_create)(&ed);
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
-        detail::enum_append(m_ptr, name, (int64_t) value, nullptr, doc);
+        NB_CALL(enum_append)(m_ptr, name, (int64_t) value, nullptr, doc);
         return *this;
     }
 
     NB_INLINE enum_ &str_value(const char *name, T value, const char *str_val,
                                const char *doc = nullptr) {
-        detail::enum_append(m_ptr, name, (int64_t) value, str_val, doc);
+        NB_CALL(enum_append)(m_ptr, name, (int64_t) value, str_val, doc);
         return *this;
     }
 
-    NB_INLINE enum_ &export_values() { detail::enum_export(m_ptr); return *this; }
+    NB_INLINE enum_ &export_values() { NB_CALL(enum_export)(m_ptr); return *this; }
 
     template <typename Func, typename... Extra>
     NB_INLINE enum_ &def(const char *name_, Func &&f, const Extra &... extra) {
@@ -868,7 +711,7 @@ public:
             set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
                                     is_method(), detail::filter_setter(extra)...);
 
-        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
+        NB_CALL(property_install)(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
         return *this;
     }
 
@@ -890,8 +733,8 @@ template <typename Source, typename Target> void implicitly_convertible() {
             "unless it is opaque.");
 
         if constexpr (detail::is_base_caster_v<Caster>) {
-            detail::implicitly_convertible(&typeid(Target),
-                                           (void *) &typeid(Source), false);
+            NB_CALL(implicitly_convertible)(&typeid(Target),
+                                            (void *) &typeid(Source), false);
         } else {
             bool (*pred)(PyTypeObject *, PyObject *,
                          detail::cleanup_list *) noexcept =
@@ -900,8 +743,8 @@ template <typename Source, typename Target> void implicitly_convertible() {
                     return Caster().from_python(src, detail::cast_flags::convert,
                                                 cleanup);
                 };
-            detail::implicitly_convertible(&typeid(Target), (void *) pred,
-                                           true);
+            NB_CALL(implicitly_convertible)(&typeid(Target), (void *) pred,
+                                            true);
         }
     }
 }

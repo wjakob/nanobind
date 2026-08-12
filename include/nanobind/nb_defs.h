@@ -15,13 +15,6 @@
 #define NB_CONCAT(first, second) NB_CONCAT_IMPL(first, second)
 #define NB_NEXT_OVERLOAD ((PyObject *) 1) // special failure return code
 
-/* Layout freeze check for records that cross the header/backend boundary.
-   Only 64-bit layouts are pinned; 32-bit layouts follow from the field
-   order. */
-#define NB_FROZEN_OFF(S, F, V)                                                 \
-    static_assert(sizeof(void *) != 8 || offsetof(S, F) == (V),                \
-                  "frozen ABI layout of " #S "::" #F " changed")
-
 #if !defined(NAMESPACE_BEGIN)
 #  define NAMESPACE_BEGIN(name) namespace name {
 #endif
@@ -67,12 +60,6 @@
 #else
 #  define NB_LIKELY(x) x
 #  define NB_UNLIKELY(x) x
-#endif
-
-#if defined(_MSC_VER) && !defined(__clang__)
-#  define NB_UNREACHABLE() __assume(0)
-#else
-#  define NB_UNREACHABLE() __builtin_unreachable()
 #endif
 
 #if defined(NB_SHARED)
@@ -143,7 +130,7 @@
 #if defined(NB_DOMAIN)
 #  define NB_DOMAIN_STR NB_TOSTRING(NB_DOMAIN)
 #else
-#  define NB_DOMAIN_STR nullptr
+#  define NB_DOMAIN_STR ""
 #endif
 
 #if !defined(PYPY_VERSION)
@@ -168,12 +155,31 @@
     X(const X &) = delete;                                                     \
     X &operator=(const X &) = delete;
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#  define NB_UNREACHABLE() __assume(0)
+#else
+#  define NB_UNREACHABLE() __builtin_unreachable()
+#endif
+
+#if defined(_MSC_VER)
+#  define NB_HIDDEN
+#else
+#  define NB_HIDDEN __attribute__((visibility("hidden")))
+#endif
+
+#if defined(NB_BUILD) || !defined(NB_BACKEND_MODULE)
+#  define NB_CALL(name) ::nanobind::detail::name
+#else
+#  define NB_CALL(name) ::nanobind::detail::nb_backend.name
+#endif
+
 // Helper macros to ensure macro arguments are expanded before token pasting/stringification
 #define NB_MODULE_IMPL(name, variable) NB_MODULE_IMPL2(name, variable)
 #define NB_MODULE_IMPL2(name, variable)                                        \
     static void nanobind_##name##_exec_impl(nanobind::module_);                \
     static int nanobind_##name##_exec(PyObject *m) {                           \
-        nanobind::detail::nb_module_exec(NB_DOMAIN_STR, m);                    \
+        if (NB_CALL(nb_module_init)(NB_DOMAIN_STR, m) != 0)                    \
+            return -1;                                                         \
         try {                                                                  \
             nanobind_##name##_exec_impl(                                       \
                 nanobind::borrow<nanobind::module_>(m));                       \
@@ -192,7 +198,7 @@
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \
         if (!nanobind_##name##_def)                                            \
-            nanobind_##name##_def = nanobind::detail::module_new(              \
+            nanobind_##name##_def = NB_CALL(module_new)(                       \
                 #name, nullptr, (void *) nanobind_##name##_exec, 0);           \
         return nanobind_##name##_def;                                          \
     }                                                                          \

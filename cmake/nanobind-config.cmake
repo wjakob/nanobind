@@ -154,6 +154,8 @@ function (nanobind_build_library TARGET_NAME)
     EXCLUDE_FROM_ALL
     ${NB_DIR}/include/nanobind/make_iterator.h
     ${NB_DIR}/include/nanobind/nanobind.h
+    ${NB_DIR}/include/nanobind/nb_backend.h
+    ${NB_DIR}/include/nanobind/nb_backend_slots.h
     ${NB_DIR}/include/nanobind/nb_accessor.h
     ${NB_DIR}/include/nanobind/nb_attr.h
     ${NB_DIR}/include/nanobind/nb_call.h
@@ -161,11 +163,10 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/nb_class.h
     ${NB_DIR}/include/nanobind/nb_defs.h
     ${NB_DIR}/include/nanobind/nb_descr.h
-    ${NB_DIR}/include/nanobind/nb_enums.h
     ${NB_DIR}/include/nanobind/nb_error.h
     ${NB_DIR}/include/nanobind/nb_func.h
-    ${NB_DIR}/include/nanobind/nb_lib.h
     ${NB_DIR}/include/nanobind/nb_misc.h
+    ${NB_DIR}/include/nanobind/nb_platform.h
     ${NB_DIR}/include/nanobind/nb_python.h
     ${NB_DIR}/include/nanobind/nb_traits.h
     ${NB_DIR}/include/nanobind/nb_tuple.h
@@ -223,9 +224,10 @@ function (nanobind_build_library TARGET_NAME)
     target_sources(${TARGET_NAME} PRIVATE ${NB_DIR}/src/nb_ft.cpp)
   endif()
 
+  target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
+
   if (TARGET_TYPE STREQUAL "SHARED")
     nanobind_link_options(${TARGET_NAME})
-    target_compile_definitions(${TARGET_NAME} PRIVATE -DNB_BUILD)
     target_compile_definitions(${TARGET_NAME} PUBLIC -DNB_SHARED)
     nanobind_lto(${TARGET_NAME})
 

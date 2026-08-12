@@ -35,6 +35,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <stdexcept>
 #include <type_traits>
@@ -46,10 +47,9 @@
 // IWYU pragma: begin_exports
 #include "nb_defs.h"
 #include "nb_platform.h"
-#include "nb_enums.h"
 #include "nb_traits.h"
 #include "nb_tuple.h"
-#include "nb_lib.h"
+#include "nb_backend.h"
 #include "nb_descr.h"
 #include "nb_types.h"
 #include "nb_accessor.h"

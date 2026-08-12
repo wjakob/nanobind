@@ -8,7 +8,6 @@
 */
 
 #include <nanobind/nanobind.h>
-#include <complex>
 #include "nb_internals.h"
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -40,12 +39,6 @@ void raise_v(exception_type type, const char *fmt, va_list args) {
     throw create_exception(type, fmt, args);
 }
 
-/// Abort the process with a fatal error
-#if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
-#else
-    [[noreturn]]
-#endif
 void fail(const char *fmt, ...) noexcept {
     va_list args;
     fprintf(stderr, "Critical nanobind error: ");
@@ -58,51 +51,7 @@ void fail(const char *fmt, ...) noexcept {
 
 // ========================================================================
 
-/* Cleanup lists are created on both sides of the header/backend boundary
-   (the dispatcher builds one per call, nb::cast builds one in the
-   extension), so a list may be grown in one binary and released in another.
-   The overflow buffer therefore uses PyMem_Malloc/PyMem_Free, which live in
-   libpython and are shared by every binary in the process; raw
-   malloc/free would pair allocators across static-CRT boundaries. */
-
-void cleanup_list::release() noexcept {
-    /* Don't decrease the reference count of the first
-       element, it stores the 'self' element. */
-    for (size_t i = 1; i < m_size; ++i)
-        Py_DECREF(m_data[i]);
-    if (m_capacity != Small)
-        PyMem_Free(m_data);
-    m_data = nullptr;
-}
-
-void cleanup_list::expand() noexcept {
-    uint32_t new_capacity = m_capacity * 2;
-    PyObject **new_data = (PyObject **) PyMem_Malloc(new_capacity * sizeof(PyObject *));
-    check(new_data, "nanobind::detail::cleanup_list::expand(): out of memory!");
-    memcpy(new_data, m_data, m_size * sizeof(PyObject *));
-    if (m_capacity != Small)
-        PyMem_Free(m_data);
-    m_data = new_data;
-    m_capacity = new_capacity;
-}
-
-// ========================================================================
-
-PyObject *module_import(const char *name) {
-    PyObject *res = PyImport_ImportModule(name);
-    if (!res)
-        throw python_error();
-    return res;
-}
-
-PyObject *module_import(PyObject *o) {
-    PyObject *res = PyImport_Import(o);
-    if (!res)
-        throw python_error();
-    return res;
-}
-
-PyObject *module_new_submodule(PyObject *base, const char *name,
+PyObject *submodule_new(PyObject *base, const char *name,
                                const char *doc) noexcept {
     const char *base_name, *tmp_str;
     Py_ssize_t tmp_size = 0;
@@ -151,7 +100,7 @@ fail:
 
 // ========================================================================
 
-size_t obj_len_hint(PyObject *o) noexcept {
+size_t len_hint(PyObject *o) noexcept {
 #if !defined(Py_LIMITED_API)
     Py_ssize_t res = PyObject_LengthHint(o, 0);
     if (res < 0) {
@@ -180,29 +129,6 @@ size_t obj_len_hint(PyObject *o) noexcept {
         return 0;
     }
 #endif
-}
-
-PyObject *obj_repr(PyObject *o) {
-    PyObject *res = PyObject_Repr(o);
-    if (!res)
-        raise_python_error();
-    return res;
-}
-
-PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*)) {
-    PyObject *res = op(a);
-    if (!res)
-        raise_python_error();
-    return res;
-}
-
-PyObject *obj_op_2(PyObject *a, PyObject *b,
-                   PyObject *(*op)(PyObject *, PyObject *) ) {
-    PyObject *res = op(a, b);
-    if (!res)
-        raise_python_error();
-
-    return res;
 }
 
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
@@ -247,294 +173,6 @@ end:
     return res;
 }
 
-
-PyObject *obj_iter(PyObject *o) {
-    PyObject *result = PyObject_GetIter(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-
-
-// ========================================================================
-
-PyObject *getattr(PyObject *obj, const char *key) {
-    PyObject *res = PyObject_GetAttrString(obj, key);
-    if (!res)
-        raise_python_error();
-    return res;
-}
-
-PyObject *getattr(PyObject *obj, PyObject *key) {
-    PyObject *res = PyObject_GetAttr(obj, key);
-    if (!res)
-        raise_python_error();
-    return res;
-}
-
-PyObject *getattr(PyObject *obj, const char *key_, PyObject *def) noexcept {
-#if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
-    str key(key_);
-    if (PyObject_HasAttr(obj, key.ptr())) {
-        PyObject *res = PyObject_GetAttr(obj, key.ptr());
-        if (res)
-            return res;
-        PyErr_Clear();
-    }
-#else
-    PyObject *res;
-    int rv;
-
-    #if PY_VERSION_HEX < 0x030d0000
-        rv = _PyObject_LookupAttr(obj, str(key_).ptr(), &res);
-    #else
-        rv = PyObject_GetOptionalAttrString(obj, key_, &res);
-    #endif
-
-    if (rv == 1)
-        return res;
-    else if (rv < 0)
-        PyErr_Clear();
-#endif
-
-    Py_XINCREF(def);
-    return def;
-}
-
-PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
-#if (defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030d0000) || defined(PYPY_VERSION)
-    if (PyObject_HasAttr(obj, key)) {
-        PyObject *res = PyObject_GetAttr(obj, key);
-        if (res)
-            return res;
-        PyErr_Clear();
-    }
-#else
-    PyObject *res;
-    int rv;
-
-    #if PY_VERSION_HEX < 0x030d0000
-        rv = _PyObject_LookupAttr(obj, key, &res);
-    #else
-        rv = PyObject_GetOptionalAttr(obj, key, &res);
-    #endif
-
-    if (rv == 1)
-        return res;
-    else if (rv < 0)
-        PyErr_Clear();
-#endif
-
-    Py_XINCREF(def);
-    return def;
-}
-
-void setattr(PyObject *obj, const char *key, PyObject *value) {
-    int rv = PyObject_SetAttrString(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void setattr(PyObject *obj, PyObject *key, PyObject *value) {
-    int rv = PyObject_SetAttr(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void delattr(PyObject *obj, const char *key) {
-#if defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030D0000
-    int rv = PyObject_SetAttrString(obj, key, nullptr);
-#else
-    int rv = PyObject_DelAttrString(obj, key);
-#endif
-
-    if (rv)
-        raise_python_error();
-}
-
-void delattr(PyObject *obj, PyObject *key) {
-#if defined(Py_LIMITED_API) && PY_LIMITED_API < 0x030D0000
-    int rv = PyObject_SetAttr(obj, key, nullptr);
-#else
-    int rv = PyObject_DelAttr(obj, key);
-#endif
-
-    if (rv)
-        raise_python_error();
-}
-
-// ========================================================================
-
-void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
-    int rv = PySequence_SetItem(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void setitem(PyObject *obj, const char *key_, PyObject *value) {
-    PyObject *key = PyUnicode_FromString(key_);
-    if (!key)
-        raise_python_error();
-
-    int rv = PyObject_SetItem(obj, key, value);
-    Py_DECREF(key);
-
-    if (rv)
-        raise_python_error();
-}
-
-void setitem(PyObject *obj, PyObject *key, PyObject *value) {
-    int rv = PyObject_SetItem(obj, key, value);
-    if (rv)
-        raise_python_error();
-}
-
-void delitem(PyObject *obj, Py_ssize_t key_) {
-    PyObject *key = PyLong_FromSsize_t(key_);
-    if (!key)
-        raise_python_error();
-
-    int rv = PyObject_DelItem(obj, key);
-    Py_DECREF(key);
-
-    if (rv)
-        raise_python_error();
-}
-
-void delitem(PyObject *obj, const char *key_) {
-    PyObject *key = PyUnicode_FromString(key_);
-    if (!key)
-        raise_python_error();
-
-    int rv = PyObject_DelItem(obj, key);
-    Py_DECREF(key);
-
-    if (rv)
-        raise_python_error();
-}
-
-void delitem(PyObject *obj, PyObject *key) {
-    int rv = PyObject_DelItem(obj, key);
-    if (rv)
-        raise_python_error();
-}
-
-// ========================================================================
-
-PyObject *str_from_obj(PyObject *o) {
-    PyObject *result = PyObject_Str(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *str_from_cstr(const char *str) {
-    PyObject *result = PyUnicode_FromString(str);
-    if (!result)
-        raise("nanobind::detail::str_from_cstr(): conversion error!");
-    return result;
-}
-
-PyObject *str_from_cstr_and_size(const char *str, size_t size) {
-    PyObject *result = PyUnicode_FromStringAndSize(str, (Py_ssize_t) size);
-    if (!result)
-        raise("nanobind::detail::str_from_cstr_and_size(): conversion error!");
-    return result;
-}
-
-// ========================================================================
-
-PyObject *bytes_from_obj(PyObject *o) {
-    PyObject *result = PyBytes_FromObject(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *bytes_from_cstr(const char *str) {
-    PyObject *result = PyBytes_FromString(str);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *bytes_from_cstr_and_size(const void *str, size_t size) {
-    PyObject *result = PyBytes_FromStringAndSize((const char *) str, (Py_ssize_t) size);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-// ========================================================================
-
-PyObject *bytearray_from_obj(PyObject *o) {
-    PyObject *result = PyByteArray_FromObject(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *bytearray_from_cstr_and_size(const void *str, size_t size) {
-    PyObject *result = PyByteArray_FromStringAndSize((const char *) str, (Py_ssize_t) size);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-
-// ========================================================================
-
-PyObject *int_from_obj(PyObject *o) {
-    PyObject *result = PyNumber_Long(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *float_from_obj(PyObject *o) {
-    PyObject *result = PyNumber_Float(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-// ========================================================================
-
-PyObject *tuple_from_obj(PyObject *o) {
-    PyObject *result = PySequence_Tuple(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *list_from_obj(PyObject *o) {
-    PyObject *result = PySequence_List(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *set_from_obj(PyObject *o) {
-    PyObject *result = PySet_New(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *frozenset_from_obj(PyObject *o) {
-    PyObject *result = PyFrozenSet_New(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
-
-PyObject *memoryview_from_obj(PyObject *o) {
-    PyObject *result = PyMemoryView_FromObject(o);
-    if (!result)
-        raise_python_error();
-    return result;
-}
 
 // ========================================================================
 
@@ -762,15 +400,15 @@ void property_install(PyObject *scope, const char *name, PyObject *getter,
 
 // ========================================================================
 
-NB_CORE bool load_cmplx(PyObject *ob, uint32_t flags,
-                        std::complex<double> *out) noexcept {
+bool load_cmplx(PyObject *ob, uint32_t flags,
+                 double *out) noexcept {
     bool is_complex = PyComplex_CheckExact(ob),
          convert = (flags & cast_flags::convert);
 #if !defined(Py_LIMITED_API)
     if (is_complex || convert) {
         Py_complex result = PyComplex_AsCComplex(ob);
         if (result.real != -1.0 || !PyErr_Occurred()) {
-            *out = std::complex<double>(result.real, result.imag);
+            out[0] = result.real; out[1] = result.imag;
             return true;
         } else {
             PyErr_Clear();
@@ -790,7 +428,7 @@ NB_CORE bool load_cmplx(PyObject *ob, uint32_t flags,
             double im = PyComplex_ImagAsDouble(tmp);
             Py_DECREF(tmp);
             if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
-                *out = std::complex<double>(re, im);
+                out[0] = re; out[1] = im;
                 return true;
             }
         }
@@ -802,7 +440,7 @@ NB_CORE bool load_cmplx(PyObject *ob, uint32_t flags,
         double re = PyComplex_RealAsDouble(ob);
         double im = PyComplex_ImagAsDouble(ob);
         if ((re != -1.0 && im != -1.0) || !PyErr_Occurred()) {
-            *out = std::complex<double>(re, im);
+            out[0] = re; out[1] = im;
             return true;
         } else {
             PyErr_Clear();
@@ -1074,28 +712,6 @@ void write_flag(nb_flag f, uint32_t value) noexcept {
         default:
             fail("nanobind::detail::write_flag(): unknown flag!");
     }
-}
-
-// ========================================================================
-
-void slice_compute(PyObject *slice, Py_ssize_t size, Py_ssize_t &start,
-                   Py_ssize_t &stop, Py_ssize_t &step,
-                   size_t &slice_length) {
-    if (PySlice_Unpack(slice, &start, &stop, &step) < 0)
-        detail::raise_python_error();
-    Py_ssize_t slice_length_ =
-        PySlice_AdjustIndices((Py_ssize_t) size, &start, &stop, step);
-    slice_length = (size_t) slice_length_;
-}
-
-void dict_setitem(PyObject *obj, PyObject *key, PyObject *value) {
-    if (PyDict_SetItem(obj, key, value))
-        raise_python_error();
-}
-
-void dict_delitem(PyObject *obj, PyObject *key) {
-    if (PyDict_DelItem(obj, key))
-        raise_python_error();
 }
 
 NAMESPACE_END(detail)

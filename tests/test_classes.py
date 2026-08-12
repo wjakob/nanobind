@@ -415,7 +415,7 @@ def test16_keep_alive_custom(clean):
         x = 5
         t.keep_alive_ret(x, s)
 
-    assert "nanobind::detail::keep_alive(): could not create a weak reference!" in str(
+    assert "nanobind::detail::keep_alive_py(): could not create a weak reference!" in str(
         excinfo.value
     )
 

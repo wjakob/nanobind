@@ -16,14 +16,14 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-NB_CORE bool load_cmplx(PyObject*, uint32_t flags, std::complex<double> *out) noexcept;
-
 template <typename T> struct type_caster<std::complex<T>> {
     NB_TYPE_CASTER(std::complex<T>, const_name("complex"))
 
     bool from_python(handle src, uint32_t flags, cleanup_list*) noexcept {
+        // The boundary function writes (real, imaginary) to two doubles;
+        // std::complex<double> is layout-compatible
         std::complex<double> cmplx;
-        if (!load_cmplx(src.ptr(), flags, &cmplx))
+        if (!NB_CALL(load_cmplx)(src.ptr(), flags, (double *) &cmplx))
             return false;
         if constexpr (std::is_same_v<T, double>) {
             value = cmplx;

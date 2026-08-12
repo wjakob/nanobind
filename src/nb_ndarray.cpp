@@ -584,9 +584,7 @@ static constexpr import_info importers[] = {
     /* no_framework */ { nullptr, nullptr, nullptr },
     /* numpy        */ { "numpy", "numpy.ndarray", nullptr },
     /* pytorch      */ { "torch", "torch.Tensor", "torch.utils.dlpack" },
-    /* tensorflow   */ { "tensorflow.",
-                         "tensorflow.python.framework.ops.EagerTensor",
-                         "tensorflow.experimental.dlpack" },
+    /* tensorflow   */ { "tensorflow", "tensorflow.Tensor", "tensorflow.experimental.dlpack" },
     /* jax          */ { "jaxlib", "jaxlib._jax.ArrayImpl", "jax.dlpack" },
     /* cupy         */ { "cupy", "cupy.ndarray", nullptr }
 };

@@ -116,9 +116,9 @@ _FRAMEWORK_STUB_TYPES: Dict[str, Tuple[str, str]] = {
     "torch.Tensor":          ("torch", "Tensor"),
     "mlx.core.array":        ("mlx.core", "array"),
     "cupy.ndarray":          ("cupy", "ndarray"),
-    "tensorflow.python.framework.ops.EagerTensor": ("tensorflow", "Tensor"),
-    "memoryview": ("builtins", "memoryview"),
-    "ArrayLike": ("typing", "Any"),
+    "tensorflow.Tensor":     ("tensorflow", "Tensor"),
+    "memoryview":            ("builtins", "memoryview"),
+    "ArrayLike":             ("typing", "Any"),
 }
 
 # Type of an entry of the ``__nb_signature__`` tuple of nanobind functions.

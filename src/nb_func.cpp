@@ -968,7 +968,20 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
             // Parameters at index >= nargs_pos (keyword-only) always take the
             // default branch here since nargs_in <= nargs_pos was checked above.
             size_t i = 0;
-            for (; i < nargs; ++i) {
+            if (NB_LIKELY(nargs_in == nargs)) {
+                // No defaults needed. Only consult 'args' if one of the
+                // arguments is None
+                for (; i < nargs; ++i) {
+                    PyObject *arg = args_in[i];
+
+                    if (NB_UNLIKELY(arg == Py_None) &&
+                        (!has_args ||
+                         (f->args[i].flag & cast_flags::accepts_none) == 0))
+                        break;
+
+                    args[i] = arg;
+                }
+            } else for (; i < nargs; ++i) {
                 PyObject *arg = i < nargs_in ? args_in[i] : nullptr;
                 uint32_t arg_flag = 0;
 
@@ -1048,7 +1061,8 @@ static PyObject *nb_func_vectorcall_medium(PyObject *self,
                                            PyObject *kwargs_in) noexcept {
     if (NB_UNLIKELY(kwargs_in))
         return nb_func_vectorcall_complex(self, args_in, nargsf, kwargs_in);
-    return nb_func_vectorcall_medium_pos(self, args_in, nargsf, kwargs_in);
+    else
+        return nb_func_vectorcall_medium_pos(self, args_in, nargsf, kwargs_in);
 }
 
 /// Simplified nb_func_vectorcall variant for functions w/o keyword arguments,

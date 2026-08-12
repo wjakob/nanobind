@@ -79,6 +79,17 @@ protected:
     PyObject *m_local[Small];
 };
 
+/* Both sides of the header/backend boundary create cleanup lists on the
+   stack and operate on their fields inline, so the layout (including the
+   inline array length) is frozen: any change is a major version bump. The
+   overflow buffer must be allocated with PyMem_Malloc and freed with
+   PyMem_Free, never malloc/free: a list may be grown in one binary and
+   released in another, and only the libpython allocator is shared by every
+   binary in the process. */
+static_assert(cleanup_list::Small == 6 &&
+              (sizeof(void *) != 8 || sizeof(cleanup_list) == 64),
+              "frozen ABI layout of cleanup_list changed");
+
 // ========================================================================
 
 /// Raise a runtime error with the given message
@@ -299,16 +310,16 @@ NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
 // ========================================================================
 
 // Forward declaration for type in nb_attr.h
-struct func_data_prelim_base;
+struct func_data_init_base;
 
 /// Create a Python function object for the given function record
-NB_CORE PyObject *nb_func_new(const func_data_prelim_base *f) noexcept;
+NB_CORE PyObject *nb_func_new(const func_data_init_base *f) noexcept;
 
 // ========================================================================
 
 /// Create a Python type object for the given type record
-struct type_init_data;
-NB_CORE PyObject *nb_type_new(const type_init_data *c) noexcept;
+struct type_data_init;
+NB_CORE PyObject *nb_type_new(const type_data_init *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint32_t flags,
@@ -453,10 +464,10 @@ NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
 
 // ========================================================================
 
-struct enum_init_data;
+struct enum_data_init;
 
 /// Create a new enumeration type
-NB_CORE PyObject *enum_create(enum_init_data *) noexcept;
+NB_CORE PyObject *enum_create(const enum_data_init *) noexcept;
 
 /// Append an entry to an enumeration. For StrEnum members, 'str_value' carries
 /// the string value; for all other enumerations it must be nullptr.

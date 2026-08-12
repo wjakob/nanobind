@@ -170,7 +170,7 @@ struct type_slots {
 };
 
 struct type_slots_callback {
-    using cb_t = void (*)(const detail::type_init_data *t,
+    using cb_t = void (*)(const detail::type_data_init *t,
                           PyType_Slot *&slots, size_t max_slots) noexcept;
     type_slots_callback(cb_t callback) : callback(callback) { }
     cb_t callback;
@@ -212,7 +212,7 @@ enum class func_flags : uint32_t {
     is_implicit = (1 << 8),
     /// Is this function an arithmetic operator?
     is_operator = (1 << 9),
-    /// When the function is GCed, do we need to call func_data_prelim::free_capture?
+    /// When the function is GCed, do we need to call func_data_init::free_capture?
     has_free = (1 << 10),
     /// Should the func_new() call return a new reference?
     return_ref = (1 << 11),
@@ -227,22 +227,33 @@ enum class func_flags : uint32_t {
     is_copy_constructor = (1 << 14)
 };
 
-struct arg_data {
+/// Describes a function argument binding
+struct arg_data_init {
+    /// Argument name (nullptr if unnamed)
     const char *name;
+
+    /// Overrides the argument type in docstrings and stubs (or nullptr)
     const char *signature;
+
+    /// Interned Python version of 'name', filled by the backend
     PyObject *name_py;
+
+    /// Default argument value (or nullptr)
     PyObject *value;
-    uint32_t flag;
+
+    /// Argument-specific cast flags (see the 'cast_flags' enumeration)
+    uint16_t flag;
 };
 
-struct func_data_prelim_base {
+/// Describes a function binding
+struct func_data_init_base {
     // A small amount of space to capture data used by the function/closure
     void *capture[3];
 
     // Callback to clean up the 'capture' field
     void (*free_capture)(void *);
 
-    /// Implementation of the function call.
+    /// Type-erased trampoline implementing the function call
     PyObject *(*impl)(void *, PyObject **, uint32_t, cleanup_list *);
 
     /// Function signature description
@@ -256,7 +267,7 @@ struct func_data_prelim_base {
 
     /// Total number of parameters accepted by the C++ function; nb::args
     /// and nb::kwargs parameters are counted as one each. If the
-    /// 'has_args' flag is set, then there is one arg_data structure
+    /// 'has_args' flag is set, then there is one arg_data_init structure
     /// for each of these.
     uint16_t nargs;
 
@@ -269,18 +280,54 @@ struct func_data_prelim_base {
     /// nargs_pos is always <= nargs.
     uint16_t nargs_pos;
 
-    // ------- Extra fields -------
+    /// sizeof(func_data_init_base) at the extension's compile time; the
+    /// argument array of func_data_init<N> begins at this offset
+    uint16_t base_size;
 
+    /// sizeof(arg_data_init) at the extension's compile time; the stride of
+    /// the argument array
+    uint16_t arg_stride;
+
+    /// Function name
     const char *name;
+
+    /// Docstring
     const char *doc;
+
+    /// Scope (e.g. module) in which the function will be installed
     PyObject *scope;
 };
 
-template<size_t Size> struct func_data_prelim : func_data_prelim_base {
-    arg_data args[Size];
+/// Sized version of func_data_init_base
+template<size_t Size> struct func_data_init : func_data_init_base {
+    arg_data_init args[Size];
 };
 
-template<> struct func_data_prelim<0> : func_data_prelim_base {};
+template<> struct func_data_init<0> : func_data_init_base {};
+
+static_assert(sizeof(void *) != 8 || sizeof(arg_data_init) == 40,
+              "frozen ABI layout of arg_data_init changed");
+NB_FROZEN_OFF(arg_data_init, name, 0);
+NB_FROZEN_OFF(arg_data_init, signature, 8);
+NB_FROZEN_OFF(arg_data_init, name_py, 16);
+NB_FROZEN_OFF(arg_data_init, value, 24);
+NB_FROZEN_OFF(arg_data_init, flag, 32);
+
+static_assert(sizeof(void *) != 8 || sizeof(func_data_init_base) == 96,
+              "frozen ABI layout of func_data_init_base changed");
+NB_FROZEN_OFF(func_data_init_base, capture, 0);
+NB_FROZEN_OFF(func_data_init_base, free_capture, 24);
+NB_FROZEN_OFF(func_data_init_base, impl, 32);
+NB_FROZEN_OFF(func_data_init_base, descr, 40);
+NB_FROZEN_OFF(func_data_init_base, descr_types, 48);
+NB_FROZEN_OFF(func_data_init_base, flags, 56);
+NB_FROZEN_OFF(func_data_init_base, nargs, 60);
+NB_FROZEN_OFF(func_data_init_base, nargs_pos, 62);
+NB_FROZEN_OFF(func_data_init_base, base_size, 64);
+NB_FROZEN_OFF(func_data_init_base, arg_stride, 66);
+NB_FROZEN_OFF(func_data_init_base, name, 72);
+NB_FROZEN_OFF(func_data_init_base, doc, 80);
+NB_FROZEN_OFF(func_data_init_base, scope, 88);
 
 
 template <typename F>
@@ -348,7 +395,7 @@ NB_INLINE void func_extra_apply(F &, std::nullptr_t, size_t &) { }
 template <typename F, uint32_t Flags, bool Locked>
 NB_INLINE void func_extra_apply(F &f, const arg_t<Flags, Locked> &a,
                                 size_t &index) {
-    arg_data &ad = f.args[index++];
+    arg_data_init &ad = f.args[index++];
     ad.name = a.name_;
     ad.signature = a.signature_;
     ad.value = nullptr;
@@ -357,7 +404,7 @@ NB_INLINE void func_extra_apply(F &f, const arg_t<Flags, Locked> &a,
 template <typename F, uint32_t Flags, bool Locked>
 NB_INLINE void func_extra_apply(F &f, const arg_v_t<Flags, Locked> &a,
                                 size_t &index) {
-    arg_data &ad = f.args[index];
+    arg_data_init &ad = f.args[index];
     func_extra_apply(f, (const arg_t<Flags, Locked> &) a, index);
     ad.value = a.value.ptr();
 }

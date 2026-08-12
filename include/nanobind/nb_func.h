@@ -243,14 +243,16 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_prelim<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
+    func_data_init<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
 
+    f.base_size = (uint16_t) sizeof(func_data_init_base);
+    f.arg_stride = (uint16_t) sizeof(arg_data_init);
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
               (has_arg_annotations  ? (uint32_t) func_flags::has_args       : 0);
 
-    /* Store captured function inside 'func_data_prelim' if there is space. Issues
+    /* Store captured function inside 'func_data_init' if there is space. Issues
        with aliasing are resolved via separate compilation of libnanobind. */
     if constexpr (sizeof(capture) <= sizeof(f.capture)) {
         capture *cap = (capture *) f.capture;
@@ -382,8 +384,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             has_arg_defaults ? (nargs - is_method_det) : nargs_provided;
         for (size_t i = 0; i < nrec; ++i)
             f.args[i] = { nullptr, nullptr, nullptr, nullptr,
-                          arg_flags.v[i + is_method_det] &
-                              cast_flags::accepts_none };
+                          (uint16_t) (arg_flags.v[i + is_method_det] &
+                                      cast_flags::accepts_none) };
     }
 
     // Fill remaining fields of 'f'

@@ -65,7 +65,7 @@ static int inst_init(PyObject *self, PyObject *, PyObject *) {
 static NB_INLINE bool nb_type_has_gc(PyTypeObject *tp, uint32_t flags) {
 #if defined(Py_LIMITED_API)
     (void) tp;
-    return flags & (uint32_t) type_flags::has_gc;
+    return flags & (uint32_t) type_flags_internal::has_gc;
 #else
     (void) flags;
     return PyType_HasFeature(tp, Py_TPFLAGS_HAVE_GC);
@@ -124,7 +124,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self = (nb_inst *) PyType_GenericAlloc(tp, 0);
 
     if (NB_LIKELY(self)) {
-        uint32_t align = (uint32_t) t->align;
+        uint32_t align = t->align();
         bool intrusive = flags & (uint32_t) type_flags::intrusive_ptr;
 
         uintptr_t payload = (uintptr_t) (self + 1);
@@ -441,10 +441,10 @@ static void inst_dealloc(PyObject *self) {
     }
 
     if (inst->state.cpp_delete) {
-        if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
+        if (NB_LIKELY(t->align() <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
             operator delete(p);
         else
-            operator delete(p, std::align_val_t(t->align));
+            operator delete(p, std::align_val_t(t->align()));
     }
 
     nb_weakref_seq *wr_seq = nullptr;
@@ -523,7 +523,7 @@ static void inst_dealloc(PyObject *self) {
     // Release the type reference acquired at allocation. On free-threaded
     // builds, nanobind types are immortal but Python subclasses are not.
 #if defined(Py_GIL_DISABLED)
-    if (flags & (uint32_t) type_flags::is_python_type)
+    if (flags & (uint32_t) type_flags_internal::is_python_type)
         Py_DECREF(tp);
 #else
     Py_DECREF(tp);
@@ -631,10 +631,10 @@ static void nb_type_dealloc(PyObject *o) {
         nb_pool_drain(&t->pool, /* can_free = */ true);
 #endif
 
-    if (t->type && (t->flags & (uint32_t) type_flags::is_python_type) == 0)
+    if (t->type && (t->flags & (uint32_t) type_flags_internal::is_python_type) == 0)
         nb_type_unregister(t);
 
-    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
+    if (t->flags & (uint32_t) type_flags_internal::has_implicit_conversions) {
         PyMem_Free(t->implicit.cpp);
         PyMem_Free(t->implicit.py);
     }
@@ -692,14 +692,14 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->trampoline_table_pub = nullptr;
     t->trampoline_allocs = nullptr;
 
-    t->flags |=  (uint32_t) type_flags::is_python_type;
-    t->flags &= (~(uint32_t) type_flags::has_implicit_conversions) & 0xFFFFFF;
+    t->flags |=  (uint32_t) type_flags_internal::is_python_type;
+    t->flags &= ~(uint32_t) type_flags_internal::has_implicit_conversions;
 
     // A Python subclass is always a GC heap type
-    t->flags |= ((uint32_t) type_flags::has_gc) & 0xFFFFFF;
+    t->flags |= (uint32_t) type_flags_internal::has_gc;
 
     // Sublclasses do not inherit the pooling feature as a consequence
-    t->flags &= ~((uint32_t) type_flags::pooled) & 0xFFFFFF;
+    t->flags &= ~(uint32_t) type_flags::pooled;
     t->pool_capacity = 0;
 #if defined(NB_FREE_THREADED)
     t->pool_index = 0;
@@ -716,8 +716,9 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->alias_chain = nullptr;
     t->supplement = nullptr;
 
+#if defined(Py_LIMITED_API)
     t->vectorcall = nullptr;
-#if !defined(Py_LIMITED_API)
+#else
     ((PyTypeObject *) self)->tp_vectorcall = nullptr;
 #endif
 
@@ -1138,7 +1139,7 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
     PyTypeObject *tp = (PyTypeObject *) self;
     type_data *td = nb_type_data(tp);
     nb_func *func = (nb_func *) td->init;
-    bool is_init = (td->flags & (uint32_t) type_flags::has_new) == 0;
+    bool is_init = (td->flags & (uint32_t) type_flags_internal::has_new) == 0;
     Py_ssize_t nargs = NB_VECTORCALL_NARGS(nargsf);
 
     if (NB_UNLIKELY(!func)) {
@@ -1151,7 +1152,7 @@ static PyObject *nb_type_vectorcall(PyObject *self, PyObject *const *args_in,
         if (!self)
             return nullptr;
     } else if (nargs == 0 && !kwargs_in &&
-               !(td->flags & (uint32_t) type_flags::has_nullary_new)) {
+               !(td->flags & (uint32_t) type_flags_internal::has_nullary_new)) {
         // When the bindings define a custom __new__ operator, nanobind always
         // provides a no-argument dummy __new__ constructor to handle unpickling
         // via __setstate__. This is an implementation detail that should not be
@@ -1302,7 +1303,7 @@ static PyMethodDef class_getitem_method[] = {
 };
 
 /// Called when a C++ type is bound via nb::class_<>
-PyObject *nb_type_new(const type_init_data *t) noexcept {
+PyObject *nb_type_new(const type_data_init *t) noexcept {
     bool has_doc               = t->flags & (uint32_t) type_init_flags::has_doc,
          has_base              = t->flags & (uint32_t) type_init_flags::has_base,
          has_base_py           = t->flags & (uint32_t) type_init_flags::has_base_py,
@@ -1373,8 +1374,9 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     constexpr size_t ptr_size = sizeof(void *);
     size_t basicsize = sizeof(nb_inst) + t->size;
-    if (t->align > ptr_size)
-        basicsize += t->align - ptr_size;
+    uint32_t t_align = 1u << t->align_log2;
+    if (t_align > ptr_size)
+        basicsize += t_align - ptr_size;
 
     PyObject *base = nullptr;
 
@@ -1427,8 +1429,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
         do {
             size_t base_basicsize = sizeof(nb_inst) + tb_2->size;
-            if (tb_2->align > ptr_size)
-                base_basicsize += tb_2->align - ptr_size;
+            if (tb_2->align() > ptr_size)
+                base_basicsize += tb_2->align() - ptr_size;
             if (base_basicsize > basicsize)
                 basicsize = base_basicsize;
 
@@ -1585,8 +1587,18 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
 
     type_data *to = nb_type_data((PyTypeObject *) result);
 
-    *to = *t; // note: slices off _init parts
-    to->flags &= (~(uint32_t) type_init_flags::all_init_flags) & 0xFFFFFF;
+    memset((void *) to, 0, sizeof(type_data));
+    to->size = t->size;
+    to->flags = t->flags & ~(uint32_t) type_init_flags::all_init_flags;
+    to->align_log2 = t->align_log2;
+    to->name = t->name;
+    to->type = t->type;
+    to->destruct = t->destruct;
+    to->copy = t->copy;
+    to->move = t->move;
+    to->set_self_py = t->set_self_py;
+    to->keep_shared_from_this_alive = t->keep_shared_from_this_alive;
+    to->pool_capacity = t->pool_capacity;
 
     if (!intrusive_ptr && base_intrusive_ptr) {
         to->flags |= (uint32_t) type_flags::intrusive_ptr;
@@ -1615,8 +1627,6 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     to->type_py = (PyTypeObject *) result;
     to->alias_chain = nullptr;
     to->init = nullptr;
-    to->trampoline_table_pub = nullptr;
-    to->trampoline_allocs = nullptr;
 
     if (has_supplement) {
         to->supplement = PyMem_Malloc(t->supplement_size);
@@ -1643,7 +1653,7 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     bool have_gc =
         PyType_HasFeature((PyTypeObject *) result, Py_TPFLAGS_HAVE_GC);
     if (have_gc)
-        to->flags |= (uint32_t) type_flags::has_gc;
+        to->flags |= (uint32_t) type_flags_internal::has_gc;
 
     // Instance pool setup + eligibility check (nb::pooled). Decide once here
     // so the hot paths can trust the 'pooled' flag alone.
@@ -1869,7 +1879,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint32_t flags,
             dst_type = nb_type_c2p(internals_, cpp_type);
 
         if (dst_type &&
-            (dst_type->flags & (uint32_t) type_flags::has_implicit_conversions))
+            (dst_type->flags & (uint32_t) type_flags_internal::has_implicit_conversions))
             return nb_type_get_implicit(src, src_type, cpp_type_src, dst_type,
                                         internals_, cleanup, out);
     }
@@ -2374,7 +2384,7 @@ size_t nb_type_size(PyObject *t) noexcept {
 }
 
 size_t nb_type_align(PyObject *t) noexcept {
-    return nb_type_data((PyTypeObject *) t)->align;
+    return nb_type_data((PyTypeObject *) t)->align();
 }
 
 const std::type_info *nb_type_info(PyObject *t) noexcept {
@@ -2583,7 +2593,7 @@ PyObject *nb_inst_name(PyObject *o) noexcept {
 
 bool nb_inst_python_derived(PyObject *o) noexcept {
     return nb_type_data(Py_TYPE(o))->flags &
-           (uint32_t) type_flags::is_python_type;
+           (uint32_t) type_flags_internal::is_python_type;
 }
 
 NAMESPACE_END(detail)

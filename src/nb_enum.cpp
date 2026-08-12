@@ -16,7 +16,7 @@ struct int64_hash {
 // hold both.
 using enum_map = tsl::robin_map<int64_t, int64_t, int64_hash>;
 
-PyObject *enum_create(enum_init_data *ed) noexcept {
+PyObject *enum_create(const enum_data_init *ed) noexcept {
     // Update hash table that maps from std::type_info to Python type
     nb_internals *internals_ = internals;
     bool success;
@@ -104,12 +104,11 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
 
-    type_init_data *t = new type_init_data();
-    memset(t, 0, sizeof(type_data));
+    enum_type_data *t = new enum_type_data{};
     t->name = strdup_check(ed->name);
     t->type = ed->type;
     t->type_py = (PyTypeObject *) result.ptr();
-    t->flags = ed->flags & 0xFFFFFF;
+    t->flags = ed->flags;
     t->enum_tbl.fwd = new enum_map();
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;
@@ -126,7 +125,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     make_immortal(result.ptr());
 
     result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
-        type_init_data *t = (type_init_data *) p;
+        enum_type_data *t = (enum_type_data *) p;
         delete (enum_map *) t->enum_tbl.fwd;
         delete (enum_map *) t->enum_tbl.rev;
         nb_type_unregister(t);
@@ -137,8 +136,8 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     return result.release().ptr();
 }
 
-static type_init_data *enum_get_type_data(handle tp) {
-    return (type_init_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
+static enum_type_data *enum_get_type_data(handle tp) {
+    return (enum_type_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
 }
 
 void enum_append(PyObject *tp_, const char *name_, int64_t value_,
@@ -377,7 +376,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
 }
 
 void enum_export(PyObject *tp) {
-    type_init_data *t = enum_get_type_data(tp);
+    enum_type_data *t = enum_get_type_data(tp);
 
     handle scope = t->scope;
     for (handle item: handle(tp))

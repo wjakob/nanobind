@@ -15,6 +15,13 @@
 #define NB_CONCAT(first, second) NB_CONCAT_IMPL(first, second)
 #define NB_NEXT_OVERLOAD ((PyObject *) 1) // special failure return code
 
+/* Layout freeze check for records that cross the header/backend boundary.
+   Only 64-bit layouts are pinned; 32-bit layouts follow from the field
+   order. */
+#define NB_FROZEN_OFF(S, F, V)                                                 \
+    static_assert(sizeof(void *) != 8 || offsetof(S, F) == (V),                \
+                  "frozen ABI layout of " #S "::" #F " changed")
+
 #if !defined(NAMESPACE_BEGIN)
 #  define NAMESPACE_BEGIN(name) namespace name {
 #endif

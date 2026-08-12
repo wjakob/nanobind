@@ -86,10 +86,194 @@ NAMESPACE_BEGIN(detail)
 #  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail(__VA_ARGS__)
 #endif
 
-/// Nanobind function metadata (overloads, etc.)
-struct func_data : func_data_prelim_base {
+/// Internal version of a function argument record (see arg_data_init in
+/// nb_backend.h)
+struct arg_data {
+    /// Argument name (nullptr if unnamed)
+    const char *name;
+
+    /// Overrides the argument type in docstrings and stubs (or nullptr)
+    const char *signature;
+
+    /// Interned Python version of 'name'
+    PyObject *name_py;
+
+    /// Default argument value (or nullptr)
+    PyObject *value;
+
+    /// Argument-specific cast flags (see the 'cast_flags' enumeration)
+    uint16_t flag;
+};
+
+/// Internal version of a function binding record (see func_data_init_base in
+/// nb_backend.h)
+struct func_data {
+    /// Space to capture data used by the function/closure
+    void *capture[3];
+
+    /// Callback to clean up the 'capture' field
+    void (*free_capture)(void *);
+
+    /// Type-erased trampoline implementing the function call
+    PyObject *(*impl)(void *, PyObject **, uint32_t, cleanup_list *);
+
+    /// Function signature description
+    const char *descr;
+
+    /// C++ types referenced by 'descr'
+    const std::type_info **descr_types;
+
+    /// Supplementary flags
+    uint32_t flags;
+
+    /// Total number of parameters accepted by the C++ function
+    uint16_t nargs;
+
+    /// Number of parameters that can be filled from positional arguments
+    uint16_t nargs_pos;
+
+    /// Function name
+    const char *name;
+
+    /// Docstring
+    const char *doc;
+
+    /// Argument records (nargs entries when func_flags::has_args is set)
     arg_data *args;
+
+    /// Custom signature override (nb::sig), or nullptr
     char *signature;
+};
+
+/// Runtime-only type flags maintained by the backend. They occupy bits 24+
+/// of type_data::flags, above the public type_flags (bits 0..13) and
+/// type_init_flags (bits 19..23, stripped during translation).
+enum class type_flags_internal : uint32_t {
+    /// Cached copy of Py_TPFLAGS_HAVE_GC
+    has_gc                   = (1 << 24),
+
+    /// Does the type maintain a list of implicit conversions?
+    has_implicit_conversions = (1 << 25),
+
+    /// Is this a python type that extends a bound C++ type?
+    is_python_type           = (1 << 26),
+
+    /// Does the type implement a custom __new__ operator?
+    has_new                  = (1 << 27),
+
+    /// Does the type implement a custom __new__ operator that can take no
+    /// args (except the type object)?
+    has_nullary_new          = (1 << 28)
+};
+
+struct nb_alias_chain;
+struct nb_inst;
+
+/// LIFO Instance pool
+struct nb_inst_pool {
+    nb_inst **slots;
+    uint32_t count;
+    uint32_t capacity;
+};
+
+// Implicit conversions for C++ type bindings, used in type_data below
+struct implicit_t {
+    const std::type_info **cpp;
+    bool (**py)(PyTypeObject *, PyObject *, cleanup_list *) noexcept;
+};
+
+// Forward and reverse mappings for enumerations, used in type_data below
+struct enum_tbl_t {
+    void *fwd;
+    void *rev;
+};
+
+/// Internal version of a type binding record (see type_data_init in
+/// nb_backend.h)
+struct type_data {
+    /// Size of a C++ instance in bytes
+    uint32_t size;
+
+    /// Full 32-bit flags word: public type_flags in the low bits (init-only
+    /// flags stripped during translation) plus type_flags_internal (24+)
+    uint32_t flags;
+
+    /// log2 of the type's alignment (see type_data_init::align_log2)
+    uint32_t align_log2;
+
+    /// Instance pool capacity
+    uint32_t pool_capacity;
+
+    /// Type name
+    const char *name;
+
+    /// C++ RTTI record of the bound type
+    const std::type_info *type;
+
+    /// Associated Python type object
+    PyTypeObject *type_py;
+
+    /// Alternative C++ RTTI records that also map to this type
+    nb_alias_chain *alias_chain;
+#if defined(Py_LIMITED_API)
+    /// Cached tp_vectorcall_offset target; the limited API provides no way
+    /// to read it from PyTypeObject
+    PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
+#endif
+
+    /// Constructor nb_func object
+    void *init;
+
+    /// Destruct an instance
+    void (*destruct)(void *);
+
+    /// Copy-construct an instance from another one
+    void (*copy)(void *, const void *);
+
+    /// Move-construct an instance from another one
+    void (*move)(void *, void *) noexcept;
+
+    union {
+        implicit_t implicit;  // for C++ type bindings
+        enum_tbl_t enum_tbl;  // for enumerations
+    };
+
+    /// Inform an intrusively reference-counted instance about its Python side
+    void (*set_self_py)(void *, PyObject *) noexcept;
+
+    /// Keep-alive callback of types deriving from enable_shared_from_this
+    bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
+
+    /// Offset of the instance dictionary (or 0)
+    uint32_t dictoffset;
+
+    /// Offset of the weak reference list (or 0)
+    uint32_t weaklistoffset;
+
+    /// Out-of-line heap storage for an optional nb::supplement<T>
+    void *supplement;
+
+    /// Currently published trampoline table (see trampoline.cpp)
+    void *trampoline_table_pub;
+
+    /// Linked list of trampoline table allocations for later cleanup
+    void *trampoline_allocs;
+#if defined(NB_FREE_THREADED)
+    /// Slot of this type's pool in the packed per-thread pool array
+    uint32_t pool_index;
+#else
+    /// Per-type instance pool for non-FT builds
+    nb_inst_pool pool;
+#endif
+
+    /// Recover the alignment in bytes from its stored logarithm
+    uint32_t align() const { return (uint32_t) 1 << align_log2; }
+};
+
+/// Runtime record for enumeration bindings; extends the private type record
+/// with the scope that enum_export() consults
+struct enum_type_data : type_data {
+    PyObject *scope;
 };
 
 /// Packed status of a nanobind type instance.
@@ -177,6 +361,7 @@ struct nb_func {
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     call_complexity complexity;
+    PyObject *scope; // borrowed; the scope owns this function
     PyObject *module_name; // '__module__' captured at definition time
     bool doc_uniform;
 };

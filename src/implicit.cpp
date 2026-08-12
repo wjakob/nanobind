@@ -27,13 +27,13 @@ void implicitly_convertible(const std::type_info *src,
     lock_internals guard(internals_);
     size_t size = 0;
 
-    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
+    if (t->flags & (uint32_t) type_flags_internal::has_implicit_conversions) {
         while (t->implicit.cpp && t->implicit.cpp[size])
             size++;
     } else {
         t->implicit.cpp = nullptr;
         t->implicit.py = nullptr;
-        t->flags |= (uint32_t) type_flags::has_implicit_conversions;
+        t->flags |= (uint32_t) type_flags_internal::has_implicit_conversions;
     }
 
     void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));
@@ -58,13 +58,13 @@ void implicitly_convertible(bool (*predicate)(PyTypeObject *, PyObject *,
     lock_internals guard(internals_);
     size_t size = 0;
 
-    if (t->flags & (uint32_t) type_flags::has_implicit_conversions) {
+    if (t->flags & (uint32_t) type_flags_internal::has_implicit_conversions) {
         while (t->implicit.py && t->implicit.py[size])
             size++;
     } else {
         t->implicit.cpp = nullptr;
         t->implicit.py = nullptr;
-        t->flags |= (uint32_t) type_flags::has_implicit_conversions;
+        t->flags |= (uint32_t) type_flags_internal::has_implicit_conversions;
     }
 
     void **data = (void **) PyMem_Malloc(sizeof(void *) * (size + 2));

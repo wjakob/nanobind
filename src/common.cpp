@@ -116,23 +116,30 @@ void raise_python_or_cast_error() {
 
 // ========================================================================
 
+/* Cleanup lists are created on both sides of the header/backend boundary
+   (the dispatcher builds one per call, nb::cast builds one in the
+   extension), so a list may be grown in one binary and released in another.
+   The overflow buffer therefore uses PyMem_Malloc/PyMem_Free, which live in
+   libpython and are shared by every binary in the process; raw
+   malloc/free would pair allocators across static-CRT boundaries. */
+
 void cleanup_list::release() noexcept {
     /* Don't decrease the reference count of the first
        element, it stores the 'self' element. */
     for (size_t i = 1; i < m_size; ++i)
         Py_DECREF(m_data[i]);
     if (m_capacity != Small)
-        free(m_data);
+        PyMem_Free(m_data);
     m_data = nullptr;
 }
 
 void cleanup_list::expand() noexcept {
     uint32_t new_capacity = m_capacity * 2;
-    PyObject **new_data = (PyObject **) malloc(new_capacity * sizeof(PyObject *));
+    PyObject **new_data = (PyObject **) PyMem_Malloc(new_capacity * sizeof(PyObject *));
     check(new_data, "nanobind::detail::cleanup_list::expand(): out of memory!");
     memcpy(new_data, m_data, m_size * sizeof(PyObject *));
     if (m_capacity != Small)
-        free(m_data);
+        PyMem_Free(m_data);
     m_data = new_data;
     m_capacity = new_capacity;
 }

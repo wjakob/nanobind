@@ -164,6 +164,11 @@ void nb_bound_method_dealloc(PyObject *self) {
 /// Synthetic argument annotation for the 'self' parameter of methods
 static const arg_data method_self_arg = { "self", nullptr, nullptr, nullptr, 0 };
 
+/// Translate a public argument record into the private runtime form
+static arg_data arg_from_init(const arg_data_init &a) {
+    return { a.name, a.signature, a.name_py, a.value, a.flag };
+}
+
 static bool set_builtin_exception_status(builtin_exception &e) {
     PyObject *o;
 
@@ -211,7 +216,7 @@ char *strdup_check(const char *s) {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
+PyObject *nb_func_new(const func_data_init_base *f) noexcept {
     bool has_scope       = f->flags & (uint32_t) func_flags::has_scope,
          has_name        = f->flags & (uint32_t) func_flags::has_name,
          has_args        = f->flags & (uint32_t) func_flags::has_args,
@@ -229,9 +234,16 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
          is_new          = false,
          is_setstate     = false;
 
-    arg_data *args_in = nullptr;
+    /* Locate the argument array through the 'base_size' / 'arg_stride'
+       fields rather than sizeof(): the record may come from an extension
+       compiled against headers whose version of these structures differs */
+    arg_data_init *args_in = nullptr;
     if (has_args)
-        args_in = std::launder((arg_data*) ((func_data_prelim<1>*) f)->args);
+        args_in = (arg_data_init *) ((char *) f + f->base_size);
+    const size_t arg_stride = f->arg_stride;
+    auto arg_in = [args_in, arg_stride](size_t i) -> arg_data_init & {
+        return *(arg_data_init *) ((char *) args_in + i * arg_stride);
+    };
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -265,7 +277,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
                 /* Never append a method to an overload chain of a parent class;
                    instead, hide the parent's overloads in this case */
-                if (fp->scope != f->scope)
+                if (((nb_func *) func_prev)->scope != f->scope)
                     NB_CLEAR_FUNC(func_prev);
             } else if (name_cstr[0] == '_') {
                 NB_CLEAR_FUNC(func_prev);
@@ -313,7 +325,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
         if (has_args) {
             for (size_t i = is_method; i < f->nargs; ++i) {
-                arg_data &a = args_in[i - is_method];
+                arg_data_init &a = arg_in(i - is_method);
                 uint32_t dispatch_flags =
                     a.flag & cast_flags::accepts_none;
                 medium_call |= a.name != nullptr || a.value != nullptr ||
@@ -356,6 +368,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 
     func->max_nargs = max_nargs;
     func->complexity = complexity;
+    func->scope = has_scope ? f->scope : nullptr;
 
     // Snapshot the current '__module__'
     if (has_scope) {
@@ -392,7 +405,18 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
 #endif
 
     func_data *fc = nb_func_data(func) + prev_overloads;
-    memcpy(fc, f, sizeof(func_data_prelim_base));
+    memcpy(fc->capture, f->capture, sizeof(fc->capture));
+    fc->free_capture = f->free_capture;
+    fc->impl = f->impl;
+    fc->descr = f->descr;
+    fc->descr_types = f->descr_types;
+    fc->flags = f->flags;
+    fc->nargs = f->nargs;
+    fc->nargs_pos = f->nargs_pos;
+    fc->name = f->name;
+    fc->doc = f->doc;
+    fc->args = nullptr;
+    fc->signature = nullptr;
     if (has_doc) {
         if (fc->doc[0] == '\n')
             fc->doc++;
@@ -458,7 +482,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
         if (is_method) // add implicit 'self' argument annotation
             fc->args[0] = method_self_arg;
         for (size_t i = is_method; i < fc->nargs; ++i)
-            fc->args[i] = args_in[i - is_method];
+            fc->args[i] = arg_from_init(arg_in(i - is_method));
 
         for (size_t i = 0; i < fc->nargs; ++i) {
             arg_data &a = fc->args[i];
@@ -477,7 +501,7 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
     if (((is_init && is_method) || (is_new && !is_method)) &&
         nb_type_check(f->scope)) {
         type_data *td = nb_type_data((PyTypeObject *) f->scope);
-        bool has_new = td->flags & (uint32_t) type_flags::has_new;
+        bool has_new = td->flags & (uint32_t) type_flags_internal::has_new;
 
         if (is_init) {
             if (!has_new) {
@@ -501,11 +525,11 @@ PyObject *nb_func_new(const func_data_prelim_base *f) noexcept {
                     break;
                 }
                 if (noargs_ok)
-                    td->flags |= (uint32_t) type_flags::has_nullary_new;
+                    td->flags |= (uint32_t) type_flags_internal::has_nullary_new;
             }
         } else if (is_new) {
             td->init = func;
-            td->flags |= (uint32_t) type_flags::has_new;
+            td->flags |= (uint32_t) type_flags_internal::has_new;
         }
     }
 
@@ -1608,7 +1632,7 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
     if ((f->flags & (uint32_t) func_flags::has_scope) &&
         (f->flags & (uint32_t) func_flags::has_name)) {
         PyObject *scope_name =
-            PyObject_GetAttr(f->scope, NB_INTERNED(__qualname__));
+            PyObject_GetAttr(((nb_func *) self)->scope, NB_INTERNED(__qualname__));
         if (scope_name) {
             PyObject *result = PyUnicode_FromFormat("%U.%s", scope_name, f->name);
             Py_DECREF(scope_name);

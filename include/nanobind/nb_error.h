@@ -26,6 +26,17 @@ private:
 };
 #endif
 
+/// Tag distinguishing the exception kinds carried by a 'builtin_exception'
+enum class exception_type {
+    runtime_error, stop_iteration, index_error, key_error, value_error,
+    type_error, buffer_error, import_error, attribute_error, next_overload
+};
+
+/* The layout of ``python_error`` and ``builtin_exception`` is part of
+   nanobind's backend ABI contract and is frozen within major versions. */
+
+inline namespace NB_BACKEND_ABI_NS {
+
 // Wraps a Python error state as a C++ exception.
 // The layout of this class is frozen and part of the nanobind ABI contract
 class NB_EXPORT python_error : public std::exception {
@@ -92,11 +103,6 @@ static_assert(sizeof(python_error) ==
 /// Thrown by nanobind::cast when casting fails
 using cast_error = std::bad_cast;
 
-enum class exception_type {
-    runtime_error, stop_iteration, index_error, key_error, value_error,
-    type_error, buffer_error, import_error, attribute_error, next_overload
-};
-
 // Base interface used to expose common Python exceptions in C++
 class NB_EXPORT builtin_exception : public std::runtime_error {
 public:
@@ -108,6 +114,8 @@ public:
 private:
     exception_type m_type;
 };
+
+} // namespace NB_BACKEND_ABI_NS
 
 #define NB_EXCEPTION(name)                                                     \
     inline builtin_exception name(const char *what = nullptr) {                \

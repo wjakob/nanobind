@@ -1,21 +1,37 @@
 /*
-   src/nb_abi.h: this file computes tags that are used to isolate extensions
-   from each other in the case of platform or nanobind-related ABI
-   incompatibilities. The file is included by ``nb_internals.cpp`` and should
-   not be used directly.
+    nanobind/nb_platform.h: nanobind's binary interface versions and the
+    platform ABI tag, a string capturing the properties of the compilation
+    environment that determine whether two binaries may call each other at
+    all. A mismatch means that no compatible backend exists.
 
-   The implementation of this file (specifically, the NB_PLATFORM_ABI_TAG) is
-   designed to be compatible with @rwgk's
-   https://github.com/pybind/pybind11/blob/master/include/pybind11/conduit/pybind11_platform_abi_id.h
+    The implementation of this file is designed to be compatible with @rwgk's
+    https://github.com/pybind/pybind11/blob/master/include/pybind11/conduit/pybind11_platform_abi_id.h
+    though the resulting tag string is specific to nanobind.
 
-   Use of this source code is governed by a BSD-style license that can be found
-   in the LICENSE file.
+    Use of this source code is governed by a BSD-style license that can be
+    found in the LICENSE file.
 */
 
-/// Tracks the version of nanobind's internal data structures
-#ifndef NB_INTERNALS_VERSION
-#  define NB_INTERNALS_VERSION 22
-#endif
+#pragma once
+
+// Include a libstdc++ header so that _GLIBCXX_USE_CXX11_ABI is defined below
+// regardless of include order
+#include <cstddef>
+
+/// Shape of the boundary between nanobind headers and a compiled backend.
+/// Bumped when a boundary function or frozen record changes incompatibly;
+/// see the evolution rules in nb_attr.h and nb_lib.h.
+#define NB_BACKEND_ABI_MAJOR 1
+
+/// Capability counter of the boundary; bumped by any additive change
+/// (an appended boundary function, a flag-gated record field, a new flag
+/// bit or accepted enumeration value).
+#define NB_BACKEND_ABI_MINOR 0
+
+/// Inline namespace holding nanobind's boundary-crossing exception types.
+/// Deriving the name from NB_BACKEND_ABI_MAJOR keeps the mangled names of two
+/// coexisting majors distinct (see nb_error.h).
+#define NB_BACKEND_ABI_NS NB_CONCAT(abi, NB_BACKEND_ABI_MAJOR)
 
 #if defined(__MINGW32__)
 #  define NB_COMPILER_TYPE "mingw"
@@ -72,32 +88,21 @@
 #  define NB_BUILD_TYPE ""
 #endif
 
-// Tag to determine if inter-library C++ function can be safely dispatched
-#define NB_PLATFORM_ABI_TAG \
-    NB_COMPILER_TYPE NB_BUILD_ABI NB_BUILD_TYPE
-
-// Can have limited and non-limited-API extensions in the same process.
-// Nanobind data structures will differ, so these can't talk to each other
-#if defined(Py_LIMITED_API)
-#  define NB_STABLE_ABI "_stable"
-#else
-#  define NB_STABLE_ABI ""
-#endif
-
-// As above, but for free-threaded extensions
+// Free-threaded extensions lay out per-type state differently
 #if defined(NB_FREE_THREADED)
 #  define NB_FREE_THREADED_ABI "_ft"
 #else
 #  define NB_FREE_THREADED_ABI ""
 #endif
 
+// Separate one pre-release's boundary from the next; empty in releases
 #if NB_VERSION_DEV > 0
-  #define NB_VERSION_DEV_STR "_dev" NB_TOSTRING(NB_VERSION_DEV)
+#  define NB_VERSION_DEV_STR "_dev" NB_TOSTRING(NB_VERSION_DEV)
 #else
-  #define NB_VERSION_DEV_STR ""
+#  define NB_VERSION_DEV_STR ""
 #endif
 
-#define NB_ABI_TAG                                                             \
-    "v" NB_TOSTRING(NB_INTERNALS_VERSION)                                      \
-        NB_VERSION_DEV_STR "_" NB_PLATFORM_ABI_TAG NB_STABLE_ABI               \
-            NB_FREE_THREADED_ABI
+// Tag to determine if inter-library C++ function calls are safe
+#define NB_PLATFORM_ABI_TAG                                                    \
+    "nanobind" NB_VERSION_DEV_STR "_"                                          \
+        NB_COMPILER_TYPE NB_BUILD_ABI NB_BUILD_TYPE NB_FREE_THREADED_ABI

@@ -45,6 +45,7 @@
 // Implementation. The nb_*.h files should only be included through nanobind.h
 // IWYU pragma: begin_exports
 #include "nb_defs.h"
+#include "nb_platform.h"
 #include "nb_enums.h"
 #include "nb_traits.h"
 #include "nb_tuple.h"

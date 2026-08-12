@@ -11,7 +11,8 @@
 
 #define NB_STRINGIFY(x) #x
 #define NB_TOSTRING(x) NB_STRINGIFY(x)
-#define NB_CONCAT(first, second) first##second
+#define NB_CONCAT_IMPL(first, second) first##second
+#define NB_CONCAT(first, second) NB_CONCAT_IMPL(first, second)
 #define NB_NEXT_OVERLOAD ((PyObject *) 1) // special failure return code
 
 #if !defined(NAMESPACE_BEGIN)

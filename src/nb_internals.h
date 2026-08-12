@@ -55,6 +55,27 @@
     ((Py_ssize_t) ((n) & ~(PY_VECTORCALL_ARGUMENTS_OFFSET |                     \
                            NB_VECTORCALL_TRUSTED_SELF)))
 
+/// Version of nanobind's internal data structures. A mismatch isolates
+/// backends from each other instead of breaking them: their type universes
+/// simply become disjoint.
+#ifndef NB_INTERNALS_VERSION
+#  define NB_INTERNALS_VERSION 22
+#endif
+
+/// Backends compiled under the limited API cache type slots and lay out
+/// their internals differently, so they must not share state with others
+#if defined(Py_LIMITED_API)
+#  define NB_STABLE_ABI "_stable"
+#else
+#  define NB_STABLE_ABI ""
+#endif
+
+/// Dictionary key under which a backend stores its ``nb_internals`` record.
+/// Backend binaries in one process share state exactly when their keys match.
+#define NB_INTERNALS_KEY                                                       \
+    NB_PLATFORM_ABI_TAG "_a" NB_TOSTRING(NB_BACKEND_ABI_MAJOR)                 \
+                        "_v" NB_TOSTRING(NB_INTERNALS_VERSION) NB_STABLE_ABI
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

@@ -10,7 +10,6 @@
 #include <nanobind/nanobind.h>
 #include <structmember.h>
 #include "nb_internals.h"
-#include "nb_abi.h"
 #include <thread>
 
 #if defined(NB_FREE_THREADED)
@@ -412,7 +411,7 @@ static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
 
-const char *abi_tag() { return NB_ABI_TAG; }
+const char *abi_tag() { return NB_INTERNALS_KEY; }
 
 static void internals_cleanup() {
     nb_internals *p = internals;

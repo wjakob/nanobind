@@ -175,6 +175,9 @@ annotation can be omitted:
 
    m.def("bark", &bark, nb::arg("dog") = nb::none());
 
+This shortcut requires that the default value is literally spelled
+``nb::none()`` or ``nullptr``, since nanobind detects it at compile time.
+
 Note that passing values *by pointer* (including null pointers) is only
 supported for :ref:`bound <bindings>` types. :ref:`Type casters <type_casters>`
 and :ref:`wrappers <wrappers>` cannot be used in such cases and will produce
@@ -580,9 +583,7 @@ This is because ``f1``:
 
    - **Default argument values**, e.g., :cpp:func:`nb::arg() = 0 <arg::operator=>` or ``"name"_a = false``.
 
-   - **Nullability** or **implicit conversion** flags, e.g.,
-     :cpp:func:`nb::arg().none() <arg::none>` or :cpp:func:`"name"_a.noconvert()
-     <arg::noconvert>`.
+   - **Nullability** flags, e.g., :cpp:func:`nb::arg().none() <arg::none>`.
 
 2. Has no :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>` or
    :cpp:class:`nb::call_policy\<Policy\>() <call_policy>` annotations.

@@ -77,6 +77,11 @@ def test01_metadata():
     assert t.get_nbytes(None) == 0
     assert t.get_itemsize(None) == 0
 
+    # A 'None' default value (spelled nb::none()) implies that the argument
+    # accepts 'None', both when defaulted and when passed explicitly
+    assert not t.get_is_valid_default()
+    assert not t.get_is_valid_default(None)
+
 
 def test02_docstr():
     assert t.pass_uint32.__doc__ == "pass_uint32(array: ndarray[dtype=uint32]) -> None"

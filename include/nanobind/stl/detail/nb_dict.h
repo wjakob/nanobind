@@ -23,7 +23,7 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
     using KeyCaster = make_caster<Key>;
     using ValCaster = make_caster<Val>;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
         if (!PyDict_CheckExact(src.ptr()) && !PyMapping_Check(src.ptr()))
@@ -40,8 +40,8 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
         Py_ssize_t size = NB_LIST_GET_SIZE(items);
         bool success = size >= 0;
 
-        uint8_t flags_key = flags_for_local_caster<Key>(flags),
-                flags_val = flags_for_local_caster<Val>(flags);
+        uint32_t flags_key = flags_for_local_caster<Key>(flags),
+                 flags_val = flags_for_local_caster<Val>(flags);
 
         KeyCaster key_caster;
         ValCaster val_caster;

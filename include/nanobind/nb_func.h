@@ -11,10 +11,10 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 template <typename Caster>
-bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t *args_flags,
+bool from_python_remember_conv(Caster &c, PyObject **args, uint32_t flags,
                                cleanup_list *cleanup, size_t index) {
     size_t size_before = cleanup->size();
-    if (!c.from_python(args[index], args_flags[index], cleanup))
+    if (!c.from_python(args[index], flags, cleanup))
         return false;
 
     // If an implicit conversion took place, update the 'args' array so that
@@ -26,13 +26,64 @@ bool from_python_remember_conv(Caster &c, PyObject **args, uint8_t *args_flags,
     return true;
 }
 
+/// Compute the compile-time cast flags of every C++ function parameter.
+/// Annotations map to consecutive parameters, skipping the 'self' argument
+/// of methods (whose flags are zero).
+template <bool IsMethod, bool HasArgAnnotations, typename... Extra,
+          typename Return, typename... Args>
+constexpr auto arg_flags_static(Return (*)(Args...)) {
+    constexpr size_t N = sizeof...(Args), M = sizeof...(Extra);
+
+    // Contribution of the C++ parameter types: std::optional-style arguments
+    // implicitly accept 'None'; value/reference bindings of bound types do not
+    constexpr uint32_t type_flags[] = {
+        ((has_arg_defaults_v<Args> ? cast_flags::accepts_none : 0u) |
+         none_disallowed_flag<Args>)..., 0u };
+
+    // Which 'Extra' entries are argument annotations, and their flags
+    constexpr bool     is_ann[]    = { arg_traits<Extra>::is_arg..., false };
+    constexpr uint32_t ann_flags[] = { arg_traits<Extra>::flags..., 0u };
+
+    struct { uint32_t v[N == 0 ? 1 : N]; } r{};
+    size_t j = 0;
+    for (size_t i = IsMethod ? 1 : 0; i < N; ++i) {
+        uint32_t f = arg_flags_default;
+        if constexpr (HasArgAnnotations) {
+            while (j < M && !is_ann[j]) // advance to the next annotation
+                j++;
+            if (j < M)
+                f = ann_flags[j++];
+        }
+        r.v[i] = f | type_flags[i];
+    }
+
+    (void) is_ann; (void) ann_flags; (void) j;
+    return r;
+}
+
+/// Combine an argument's compile-time cast flags with the call-wide dynamic
+/// word assembled by the dispatcher
+template <size_t Index, uint32_t ArgFlags>
+NB_INLINE uint32_t combine_flags(uint32_t call_flags) {
+    // 'construct' and 'trusted' only apply to the 'self' argument
+    if constexpr (Index != 0)
+        call_flags &= ~(cast_flags::construct |
+                        cast_flags::trusted);
+
+    // Implicit conversion requires agreement of both flag words
+    if constexpr (!(ArgFlags & cast_flags::convert))
+        call_flags &= ~cast_flags::convert;
+
+    return call_flags | (ArgFlags & ~cast_flags::convert);
+}
+
 // Return the number of nb::arg and nb::arg_v types in the first I types Ts.
 // Invoke with std::make_index_sequence<sizeof...(Ts)>() to provide
 // an index pack 'Is' that parallels the types pack Ts.
 template <size_t I, typename... Ts, size_t... Is>
 constexpr size_t count_args_before_index(std::index_sequence<Is...>) {
     static_assert(sizeof...(Is) == sizeof...(Ts));
-    return ((Is < I && std::is_base_of_v<arg, Ts>) + ... + 0);
+    return ((Is < I && arg_traits<Ts>::is_arg) + ... + 0);
 }
 
 #if defined(NB_FREE_THREADED)
@@ -43,14 +94,16 @@ struct ft_args_collector {
     size_t index = 0;
 
     NB_INLINE explicit ft_args_collector(PyObject **a) : args(a) {}
-    NB_INLINE void apply(arg_locked *) {
-        if (h1.ptr() == nullptr)
-            h1 = args[index];
-        h2 = args[index];
-        ++index;
+    template <typename T> NB_INLINE void apply(T *) {
+        if constexpr (arg_traits<T>::is_arg) {
+            if constexpr (arg_traits<T>::locked) {
+                if (h1.ptr() == nullptr)
+                    h1 = args[index];
+                h2 = args[index];
+            }
+            ++index;
+        }
     }
-    NB_INLINE void apply(arg *) { ++index; }
-    NB_INLINE void apply(...) {}
 };
 
 struct ft_args_guard {
@@ -99,7 +152,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
-        (std::is_base_of_v<arg, Extra> + ... + 0);
+        (arg_traits<Extra>::is_arg + ... + 0);
     constexpr bool is_method_det =
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
@@ -192,17 +245,6 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // The following temporary record will describe the function in detail
     func_data_prelim<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
 
-    // Pre-initialize argument flags with 'convert'. The 'accepts_none' flag
-    // for std::optional<> args is applied after func_extra_apply (see below).
-    if constexpr (has_arg_defaults) {
-        ((void)(Is < (size_t)is_method_det ||
-                (f.args[Is - is_method_det] = { nullptr, nullptr, nullptr, nullptr,
-                    (uint8_t) cast_flags::convert }, true)), ...);
-    } else if constexpr (nargs_provided > 0) {
-        for (size_t i = 0; i < nargs_provided; ++i)
-            f.args[i].flag = 0;
-    }
-
     f.flags = (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
@@ -230,9 +272,10 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         };
     }
 
-    f.impl = [](void *p, PyObject **args, uint8_t *args_flags, rv_policy policy,
-                cleanup_list *cleanup) NB_INLINE_LAMBDA -> PyObject * {
-        (void) p; (void) args; (void) args_flags; (void) policy; (void) cleanup;
+    f.impl = [](void *p, PyObject **args, uint32_t call_flags,
+                cleanup_list *cleanup)
+                    NB_INLINE_LAMBDA -> PyObject * {
+        (void) p; (void) args; (void) call_flags; (void) cleanup;
 
         const capture *cap;
         if constexpr (sizeof(capture) <= sizeof(f.capture))
@@ -258,15 +301,24 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         }
 #endif
 
+        // Per-argument cast flags, indexed by C++ parameter
+        constexpr auto arg_flags =
+            arg_flags_static<is_method_det, has_arg_annotations, Extra...>(
+                (Return (*)(Args...)) nullptr);
+
         if constexpr (Info::pre_post_hooks) {
             std::integral_constant<size_t, nargs> nargs_c;
             (process_precall(args, nargs_c, cleanup, (Extra *) nullptr), ...);
-            if ((!from_python_remember_conv(in.template get<Is>(), args,
-                                            args_flags, cleanup, Is) || ...))
+            if ((!from_python_remember_conv(
+                     in.template get<Is>(), args,
+                     combine_flags<Is, arg_flags.v[Is]>(call_flags),
+                     cleanup, Is) || ...))
                 return NB_NEXT_OVERLOAD;
         } else {
-            if ((!in.template get<Is>().from_python(args[Is], args_flags[Is],
-                                                    cleanup) || ...))
+            if ((!in.template get<Is>().from_python(
+                     args[Is],
+                     combine_flags<Is, arg_flags.v[Is]>(call_flags),
+                     cleanup) || ...))
                 return NB_NEXT_OVERLOAD;
         }
 
@@ -282,12 +334,12 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 #if defined(_WIN32) && !defined(__CUDACC__) // temporary workaround for an internal compiler error in MSVC
             result = cast_out::from_cpp(
                        cap->func(static_cast<cast_t<Args>>(in.template get<Is>())...),
-                       policy, cleanup).ptr();
+                       rv_policy(Info::policy), cleanup).ptr();
 #else
             result = cast_out::from_cpp(
                        cap->func((in.template get<Is>())
                                      .operator cast_t<Args>()...),
-                       policy, cleanup).ptr();
+                       rv_policy(Info::policy), cleanup).ptr();
 #endif
         }
 
@@ -318,31 +370,27 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                       explicit_kw_only ? nargs_before_kw_only :
                   kwargs_pos_1 < nargs ? kwargs_pos_1 : nargs;
 
+    // Store information (flags, defaults) about annotated parameters.
+    // When 'has_arg_defaults' is set (e.g. due to the presence of
+    // ``std::optional<T>``), we provide an implicit annotation for every
+    // parameter, which is initialized by the loop below.
+    if constexpr (has_arg_defaults || nargs_provided > 0) {
+        constexpr auto arg_flags =
+            arg_flags_static<is_method_det, has_arg_annotations, Extra...>(
+                (Return (*)(Args...)) nullptr);
+        constexpr size_t nrec =
+            has_arg_defaults ? (nargs - is_method_det) : nargs_provided;
+        for (size_t i = 0; i < nrec; ++i)
+            f.args[i] = { nullptr, nullptr, nullptr, nullptr,
+                          arg_flags.v[i + is_method_det] &
+                              cast_flags::accepts_none };
+    }
+
     // Fill remaining fields of 'f'
     size_t arg_index = 0;
     (func_extra_apply(f, extra, arg_index), ...);
 
     (void) arg_index;
-
-    // Apply implicit accepts_none for std::optional<> typed arguments
-    // after func_extra_apply, so that explicit nb::arg().noconvert() works.
-    if constexpr (has_arg_defaults) {
-        ((void)(Is >= (size_t)is_method_det && has_arg_defaults_v<Args> &&
-                (f.args[Is - is_method_det].flag |=
-                     (uint8_t) cast_flags::accepts_none, true)), ...);
-    }
-
-    // Record 'none_disallowed' (nonzero only for value/reference bound-type
-    // targets) in the per-argument flag at bind time. The dispatcher carries
-    // it into the call via 'args_flags', so the heavily-inlined function
-    // trampoline need not OR it in at every from_python() invocation. Simple
-    // overloads ignore the per-argument flags but reject 'None' up front, so
-    // the bit is only consulted where 'None' can actually reach a caster.
-    if constexpr (has_arg_annotations) {
-        ((void)(Is >= (size_t)is_method_det &&
-                (f.args[Is - is_method_det].flag |=
-                     none_disallowed_flag<Args>, true)), ...);
-    }
 
     return nb_func_new(&f);
 }

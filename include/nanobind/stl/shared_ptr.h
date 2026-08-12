@@ -70,9 +70,9 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
                   "However, a type caster was registered to intercept this "
                   "particular type, which is not allowed.");
 
-    bool from_python(handle src, uint8_t flags,
+    bool from_python(handle src, uint32_t flags,
                      cleanup_list *cleanup) noexcept {
-        flags &= ~((uint8_t) cast_flags::convert);
+        flags &= ~cast_flags::convert;
 
         Caster caster;
         if (!caster.from_python(src, flags, cleanup))

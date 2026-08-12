@@ -99,7 +99,7 @@ PyObject *enum_create(enum_init_data *ed) noexcept {
     }
 
     scope.attr(name) = result;
-    result.attr("__doc__") = ed->docstr ? str(ed->docstr) : none();
+    result.attr("__doc__") = ed->docstr ? (object) str(ed->docstr) : (object) none();
 
     result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
     result.attr("__repr__") = result.attr("__str__");
@@ -209,7 +209,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     el.attr(NB_INTERNED(__init__))(val);
     el.attr("_sort_order_") = len(member_names);
     el.attr("_value_") = val;
-    el.attr("__doc__") = doc ? str(doc) : none();
+    el.attr("__doc__") = doc ? (object) str(doc) : (object) none();
 
     // Compatibility with nanobind 1.x
     el.attr("__name__") = name;
@@ -230,7 +230,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     rev->emplace((int64_t) (uintptr_t) el.ptr(), value_);
 }
 
-bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8_t flags) noexcept {
+bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint32_t flags) noexcept {
     type_data *t = nb_type_c2p(internals, tp);
     if (!t)
         return false;
@@ -271,7 +271,7 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint8
         return true;
     }
 
-    if (flags & (uint8_t) cast_flags::convert) {
+    if (flags & cast_flags::convert) {
         enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
 
         if (t->flags & (uint32_t) enum_flags::is_str) {

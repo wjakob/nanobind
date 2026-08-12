@@ -93,7 +93,7 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
             nb_type_restore_ownership(src.ptr(), IsDefaultDeleter);
     }
 
-    bool from_python(handle src_, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src_, uint32_t, cleanup_list *) noexcept {
         // Stash source python object
         src = src_;
 

@@ -32,7 +32,7 @@ public:
     using period = typename type::period;
     using duration_t = std::chrono::duration<rep, period>;
 
-    bool from_python(handle src, uint8_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle src, uint32_t /*flags*/, cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         if (!src) return false;
@@ -138,7 +138,7 @@ template <typename Duration>
 class type_caster<std::chrono::time_point<std::chrono::system_clock, Duration>> {
 public:
     using type = std::chrono::time_point<std::chrono::system_clock, Duration>;
-    bool from_python(handle src, uint8_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle src, uint32_t /*flags*/, cleanup_list*) noexcept {
         namespace ch = std::chrono;
 
         if (!src)

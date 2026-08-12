@@ -1782,7 +1782,7 @@ NB_NOINLINE static bool nb_type_get_state_error(uint8_t state,
 }
 
 // Attempt to retrieve a pointer to a C++ instance
-bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
+bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint32_t flags,
                  cleanup_list *cleanup, void **out) noexcept {
     static_assert(cast_flags::construct == nb_inst_state::state_ready,
                   "this function is optimized assuming that "
@@ -1791,7 +1791,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
     // Convert None -> nullptr, unless the target binds by value/reference and
     // therefore has no valid mapping for None (then reject -> next overload).
     if (NB_UNLIKELY(src == Py_None)) {
-        if (flags & (uint8_t) cast_flags::none_disallowed)
+        if (flags & cast_flags::none_disallowed)
             return false;
         *out = nullptr;
         return true;
@@ -1799,7 +1799,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
 
     // Trusted 'self' from nb_type_vectorcall: a freshly allocated instance of
     // exactly this type, so skip verification and read the pointer directly.
-    if (NB_UNLIKELY(flags & (uint8_t) cast_flags::trusted)) {
+    if (NB_UNLIKELY(flags & cast_flags::trusted)) {
         *out = inst_ptr((nb_inst *) src);
         return true;
     }
@@ -1838,7 +1838,7 @@ bool nb_type_get(const std::type_info *cpp_type, PyObject *src, uint8_t flags,
             //       [construct] 2  [relinq] 1  3           no
             //       [construct] 2   [ready] 2  0           no
 
-            if (NB_UNLIKELY(((flags & (uint8_t) cast_flags::construct) ^
+            if (NB_UNLIKELY(((flags & cast_flags::construct) ^
                              inst->state.state) != nb_inst_state::state_ready))
                 return nb_type_get_state_error(inst->state.state, t->name);
 

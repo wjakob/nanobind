@@ -74,6 +74,9 @@ class PairStruct:
     @s2.setter
     def s2(self, arg: Struct, /) -> None: ...
 
+    @property
+    def s1_copy(self) -> Struct: ...
+
 class InitListTest:
     def __init__(self, arg: int, /) -> None: ...
 
@@ -219,6 +222,9 @@ class D:
 
     @overload
     def __init__(self, arg: float, /) -> None: ...
+
+    @overload
+    def __init__(self, arg: D, /) -> None: ...
 
     @property
     def value(self) -> int: ...

@@ -1277,6 +1277,14 @@ Wrapper classes
     Attempt to create a ``memoryview`` Python object from an object. Analogous
     to the expression ``memoryview(h)`` in Python.
 
+.. cpp:class:: none: public object
+
+   Wrapper class representing a Python ``None`` object.
+
+   .. cpp:function:: none()
+
+      Create a wrapper referencing the unique Python ``None`` object.
+
 .. cpp:class:: ellipsis: public object
 
    Wrapper class representing a Python ellipsis (``...``) object.
@@ -1739,24 +1747,27 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
 
       Create a function argument annotation. The name is optional.
 
-   .. cpp:function:: template <typename T> arg_v operator=(T &&value) const
+   .. cpp:function:: template <typename T> auto operator=(T &&value) const
 
       Return an argument annotation that is like this one but also assigns a
       default value to the argument. The default will be converted into a Python
       object immediately, so its bindings must have already been defined.
+      Assigning ``nb::none()`` or ``nullptr`` additionally marks the
+      argument as accepting ``None``, as if :cpp:func:`.none() <arg::none>`
+      had been specified.
 
-   .. cpp:function:: arg &none(bool value = true)
+   .. cpp:function:: auto none() const
 
-      Set a flag noting that the function argument accepts ``None``. Can only
-      be used for python wrapper types (e.g. :cpp:class:`handle`,
+      Return an annotation noting that the function argument accepts ``None``.
+      Can only be used for python wrapper types (e.g. :cpp:class:`handle`,
       :cpp:class:`int_`) and types that have been bound using
       :cpp:class:`class_`. You cannot use this to implement functions that
       accept null pointers to builtin C++ types like ``int *i = nullptr``.
 
-   .. cpp:function:: arg &noconvert(bool value = true)
+   .. cpp:function:: auto noconvert() const
 
-      Set a flag noting that implicit conversion should never be performed for
-      this function argument.
+      Return an annotation noting that implicit conversion should never be
+      performed for this function argument.
 
    .. cpp:function:: arg &sig(const char * sig)
 
@@ -1765,7 +1776,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
       explain it in docstrings and stubs (``str(value)``) does not produce
       acceptable output.
 
-   .. cpp:function:: arg_locked lock()
+   .. cpp:function:: auto lock() const
 
       Return an argument annotation that is like this one but also requests that
       this argument be locked when dispatching a function call in free-threaded
@@ -3252,10 +3263,6 @@ Miscellaneous
 .. cpp:function:: iterator iter(handle h)
 
    Equivalent to ``iter(h)`` in Python.
-
-.. cpp:function:: object none()
-
-   Return an object representing the value ``None``.
 
 .. cpp:function:: dict builtins()
 

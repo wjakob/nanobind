@@ -35,11 +35,11 @@ args_proxy api<Derived>::operator*() const {
 template <typename T>
 NB_INLINE void call_analyze(size_t &nargs, size_t &nkwargs, const T &value) {
     using D = std::decay_t<T>;
-    static_assert(!std::is_base_of_v<arg_locked, D>,
+    static_assert(!arg_traits<D>::locked,
                   "nb::arg().lock() may be used only when defining functions, "
                   "not when calling them");
 
-    if constexpr (std::is_same_v<D, arg_v>)
+    if constexpr (arg_traits<D>::has_default)
         nkwargs++;
     else if constexpr (std::is_same_v<D, args_proxy>)
         nargs += len(value);
@@ -58,7 +58,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
                          T &&value) {
     using D = std::decay_t<T>;
 
-    if constexpr (std::is_same_v<D, arg_v>) {
+    if constexpr (arg_traits<D>::has_default) {
         args[kwargs_offset + nkwargs] = value.value.release().ptr();
         NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkwargs++,
                          PyUnicode_InternFromString(value.name_));
@@ -106,9 +106,9 @@ object api<Derived>::operator()(Args &&...args_) const {
         std::is_same_v<Derived, accessor<obj_attr>> ||
         std::is_same_v<Derived, accessor<str_attr>>;
 
-    if constexpr (((std::is_same_v<Args, arg_v> ||
-                    std::is_same_v<Args, args_proxy> ||
-                    std::is_same_v<Args, kwargs_proxy>) || ...)) {
+    if constexpr (((arg_traits<std::decay_t<Args>>::has_default ||
+                    std::is_same_v<std::decay_t<Args>, args_proxy> ||
+                    std::is_same_v<std::decay_t<Args>, kwargs_proxy>) || ...)) {
         // Complex call with keyword arguments, *args/**kwargs expansion, etc.
         size_t nargs = 0, nkwargs = 0, nargs2 = 0, nkwargs2 = 0;
 

@@ -26,27 +26,88 @@ This is a major release with breaking API and ABI changes, in particular:
   a number of workarounds for missing C API functionality.
 
 - **Return value policies**: policies like :cpp:member:`nb::rv_policy::move
-  <rv_policy::move>` are now compile-time tags. This is advantageous because
-  binding declarations like
+  <rv_policy::move>` used to be ``enum`` values and now became compile-time tags. As a consequence, function
+  bindings like
 
   .. code-block:: cpp
 
      m.def("f", &f, nb::rv_policy::reference);
 
-  can now directly bake the policy into generated code instead of having to
-  load it from memory. In the unlikely case that your implementation computed
-  policies at runtime, this will need to be converted to ``constexpr``.
+  can specialize to the policy and generate more efficient code.
+
+  **API break**: Bindings with "computed" policies are no longer legal:
 
   .. code-block:: cpp
 
      auto policy = ...;
-     m.def("f", &f, policy); // <-- not allowed
+     m.def("f", &f, policy); // <-- not allowed, policy must be a compile-time tag
 
-  The policy tag implicitly casts to a :cpp:enum:`rv_policy::value
-  <rv_policy::value>` at runtime.
-  Various non-binding functions like :cpp:func:`nb::cast() <cast>` and
-  :cpp:func:`nb::make_iterator <make_iterator>` take this form. Your code
-  may require similar adaptations.
+- **Argument annotations**: Argument binding annotations like
+
+  .. code-block:: cpp
+
+     m.def("f", &f, "x"_a.noconvert() = nb::none());
+
+  are now handled at compile time. As a consequence, function bindings can
+  specialize and generate more efficient code.
+
+  **API break**: Bindings with "computed" annotations are no longer legal:
+
+  .. code-block:: cpp
+
+     bool is_noconvert = ..;
+     m.def("f", &f, "x"_a.noconvert(is_noconvert));
+
+  Argument default values remain runtime parameters. However, whether a
+  parameter accepts ``None`` is detected at compile time.
+
+  .. code-block:: cpp
+
+     // OK: nanobind can infer that 'x' is nullable
+     m.def("f", &f, "x"_a = nb::none());
+
+     // OK: nanobind can infer that 'x' is nullable
+     nb::object none_value = nb::none();
+     m.def("f", &f, "x"_a.none() = none_value);
+
+     // Bad: nanobind cannot infer at compile time that 'x' should be nullable
+     m.def("f", &f, "x"_a = none_value);
+
+- **The None wrapper type**: :cpp:class:`nb::none <none>` used to be a function
+  returning an :cpp:class:`nb::object <object>`. It is now a wrapper class whose
+  default constructor ``nb::none()`` references the ``None`` singleton.
+
+  **API break**: a conditional expression can no longer mix ``nb::none()`` with
+  a different wrapper type, since the two branches have unrelated types:
+
+  .. code-block:: cpp
+
+     // Bad: the branches of the conditional have unrelated types
+     nb::object doc = cond ? nb::str(value) : nb::none();
+
+     // OK
+     nb::object doc = cond ? (nb::object) nb::str(value) : (nb::object) nb::none();
+
+- **Type caster interface**: the ``flags`` parameter of ``from_python()``
+  function in type casters widened from ``uint8_t`` to ``uint32_t``:
+
+  .. code-block:: cpp
+
+     bool from_python(nb::handle src, uint32_t flags,
+                      nb::detail::cleanup_list *cleanup) noexcept;
+
+  Type casters written for nanobind 2.x still compile and behave correctly
+  because the value converts implicitly, though this may cause compiler
+  warnings. It is advisable that you widen the parameter in your casters.
+
+- **Miscellaneous**:
+
+  - The ``self`` argument of a method is no longer subject to implicit
+    conversion when the method is called in unbound form
+    (``MyClass.method(obj)``). This previously worked, which was arguably a
+    bug.
+
+- ABI version 22.
 
 Version 2.15.0 (Aug 15, 2026)
 -----------------------------

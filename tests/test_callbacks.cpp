@@ -41,7 +41,7 @@ template <> struct nanobind::detail::type_caster<callback> {
     static void wrap_call(void *context, int arg) {
         borrow<callable>((PyObject *) context)(arg);
     }
-    bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+    bool from_python(handle src, uint32_t, cleanup_list*) noexcept {
         if (!isinstance<callable>(src)) return false;
         value = {(void *) src.ptr(), &wrap_call};
         return true;

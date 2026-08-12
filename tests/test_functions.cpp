@@ -69,7 +69,7 @@ struct numeric_string {
 template <> struct nb::detail::type_caster<numeric_string> {
     NB_TYPE_CASTER(numeric_string, const_name("str"))
 
-    bool from_python(handle h, uint8_t flags, cleanup_list* cleanup) noexcept {
+    bool from_python(handle h, uint32_t flags, cleanup_list* cleanup) noexcept {
         make_caster<const char*> str_caster;
         if (!str_caster.from_python(h, flags, cleanup))
             return false;

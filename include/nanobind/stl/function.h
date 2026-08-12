@@ -71,7 +71,7 @@ struct type_caster<std::function<Return(Args...)>> {
         }
     };
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *) noexcept {
         if (src.is_none())
             return flags & cast_flags::convert;
 

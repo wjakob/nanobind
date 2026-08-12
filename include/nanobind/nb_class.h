@@ -525,8 +525,7 @@ struct new_<Func, Return(Args...)> : def_visitor<new_<Func, Return(Args...)>> {
         // We can't do this if the user-provided __new__ takes no
         // arguments, because it would make an ambiguous overload set.
         constexpr size_t num_defaults =
-            ((std::is_same_v<Extra, arg_v> ||
-              std::is_same_v<Extra, arg_locked_v>) + ... + 0);
+            (detail::arg_traits<Extra>::has_default + ... + 0);
         constexpr size_t num_varargs =
             ((std::is_same_v<detail::intrinsic_t<Args>, args> ||
               std::is_same_v<detail::intrinsic_t<Args>, kwargs>) + ... + 0);
@@ -537,7 +536,7 @@ struct new_<Func, Return(Args...)> : def_visitor<new_<Func, Return(Args...)>> {
         };
 
         auto policy = call_policy<detail::new_returntype_fixup_policy>();
-        if constexpr ((std::is_base_of_v<arg, Extra> || ...)) {
+        if constexpr ((detail::arg_traits<Extra>::is_arg || ...)) {
             // If any argument annotations are specified, add another for the
             // extra class argument that we don't forward to Func, so visible
             // arg() annotations stay aligned with visible function arguments.

@@ -388,6 +388,15 @@ class capsule : public object {
     }
 };
 
+class none : public object {
+public:
+    static constexpr auto Name = detail::const_name("None");
+    NB_INLINE none() : object(detail::none_ref(), detail::steal_t{}) { }
+    NB_INLINE none(handle h, detail::borrow_t) : object(h, detail::borrow_t{}) { }
+    NB_INLINE none(handle h, detail::steal_t) : object(h, detail::steal_t{}) { }
+    NB_INLINE static bool check_(handle h) { return h.ptr() == Py_None; }
+};
+
 class bool_ : public object {
     NB_OBJECT_DEFAULT(bool_, object, "bool", PyBool_Check)
 
@@ -732,7 +741,6 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
-inline object none() { return steal(detail::none_ref()); }
 inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
 
 inline iterator iter(handle h) {

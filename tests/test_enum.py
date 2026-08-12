@@ -267,3 +267,15 @@ def test11_enum_name_value_members():
     assert t.item_to_int(t.Item.value) == 1
     assert t.item_to_int(t.Item.extra) == 2
     assert t.item_to_int() == 0  # default is Item.name
+
+
+def test13_no_implicit_self_conversion():
+    # 'EnumWrapper' is implicitly constructible from 'EnumWrapper.Value'. That
+    # conversion must not apply to the implicit 'self' argument of an unbound
+    # method call, since the method would then run on a temporary.
+    w = t.EnumWrapper(t.EnumWrapper.Value.Beta)
+    assert w.get_value() == t.EnumWrapper.Value.Beta
+    assert t.EnumWrapper.get_value(w) == t.EnumWrapper.Value.Beta
+
+    with pytest.raises(TypeError):
+        t.EnumWrapper.get_value(t.EnumWrapper.Value.Beta)

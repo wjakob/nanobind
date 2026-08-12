@@ -23,7 +23,7 @@ template <typename List, typename Entry> struct list_caster {
 
     template <typename T> using has_reserve = decltype(std::declval<T>().reserve(0));
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         size_t size;
         PyObject *temp;
 

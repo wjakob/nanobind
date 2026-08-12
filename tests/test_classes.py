@@ -319,6 +319,13 @@ def test13_implicitly_convertible():
     d = t.D(5)
     assert t.get_d(d) == 10005
     assert t.get_optional_d(d) == 10005
+
+    # The copy constructor must copy without invoking an implicit conversion
+    # (D(D(...)) would otherwise recurse), and implicit conversions of other
+    # argument types must still work in its presence
+    d2 = t.D(d)
+    assert d2.value == 10005
+    assert t.D(a).value == 11
     assert t.get_d_via_cast(d) == (10005, 10005, 10005, 10005)
     assert t.get_d_via_try_cast(d) == (10005, 10005, 10005, 10005)
 
@@ -642,6 +649,15 @@ def test30_property_assignment_instance():
     assert s.s2.value() == 456
     assert s1.value() == 123
     assert s2.value() == 456
+
+
+def test30b_property_policy_override():
+    # A user-provided policy must take precedence over the implicit
+    # 'reference_internal' policy of def_prop_ro
+    s = t.PairStruct()
+    c = s.s1_copy
+    c.set_value(123)
+    assert s.s1.value() != 123
 
 
 # cpyext reference cycles are not supported, see https://foss.heptapod.net/pypy/pypy/-/issues/3849

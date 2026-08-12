@@ -302,7 +302,10 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<PairStruct>(m, "PairStruct")
         .def(nb::init<>())
         .def_rw("s1", &PairStruct::s1, "A documented property")
-        .def_rw("s2", &PairStruct::s2);
+        .def_rw("s2", &PairStruct::s2)
+        // An explicit policy must override the implicit 'reference_internal'
+        .def_prop_ro("s1_copy", [](PairStruct &p) -> Struct & { return p.s1; },
+                     nb::rv_policy::copy);
 
     // Test case for issue #1074
     nb::class_<InitListTest>(m, "InitListTest")
@@ -537,6 +540,9 @@ NB_MODULE(test_classes_ext, m) {
         .def(nb::init_implicit<const B *>())
         .def(nb::init_implicit<int>())
         .def(nb::init_implicit<float>())
+        // Unannotated copy constructor: must dispatch via the simple fast
+        // path without recursing into the implicit conversion constructors
+        .def(nb::init<const D &>())
         .def_rw("value", &D::value);
 
     m.def("get_d", [](const D &d) { return d.value; });

@@ -98,11 +98,11 @@ struct type_caster<
 
     NDArrayCaster caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         // Disable implicit conversions
-        flags &= ~(uint8_t)cast_flags::convert;
+        flags &= ~cast_flags::convert;
         // Do not accept None
-        flags &= ~(uint8_t)cast_flags::accepts_none;
+        flags &= ~cast_flags::accepts_none;
 
         if (!caster.from_python(src, flags, cleanup))
             return false;
@@ -155,11 +155,11 @@ struct type_caster<
     // PlainTensor value;
     NB_TYPE_CASTER(PlainTensor, NDArrayCaster::Name);
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         using NDArrayConst = ndarray_for_eigen_tensor_t<PlainTensor, const Scalar>;
         make_caster<NDArrayConst> caster;
         // Do not accept None
-        if (!caster.from_python(src, flags & ~(uint8_t)cast_flags::accepts_none, cleanup))
+        if (!caster.from_python(src, flags & ~cast_flags::accepts_none, cleanup))
             return false;
 
         const NDArrayConst &array = caster.value;
@@ -230,7 +230,7 @@ struct type_caster<T, enable_if_t<is_eigen_tensor_xpr_v<T> && is_ndarray_scalar_
     template<typename T_> static constexpr bool can_cast() { return true; }
 
     /// Generating an expression template from a Python object is impossible.
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept = delete;
 
     template <typename T2>
     static handle from_cpp(T2 &&v, rv_policy policy, cleanup_list *cleanup) noexcept {
@@ -277,10 +277,10 @@ struct type_caster<
     struct Empty {};
     std::conditional_t<MaybeConvert, PlainCaster, Empty> plain_caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         // no conversion for mutable Ref
         if constexpr (!std::is_const_v<T>)
-            flags &= ~(uint8_t) cast_flags::convert;
+            flags &= ~cast_flags::convert;
 
         // Try direct cast
         if (caster.from_python(src, flags, cleanup))
@@ -291,8 +291,8 @@ struct type_caster<
             // we create a new temporary tensor object, and
             // its lifetime is that of plain_caster.
             // for manual conversion, disable conversion.
-            if ((flags & (uint8_t) cast_flags::manual))
-                flags &= ~(uint8_t) cast_flags::convert;
+            if ((flags & cast_flags::manual))
+                flags &= ~cast_flags::convert;
             if (plain_caster.from_python(src, flags, cleanup))
                 return true;
         }

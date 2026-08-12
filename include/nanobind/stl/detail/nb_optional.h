@@ -20,7 +20,7 @@ struct optional_caster {
 
     NB_TYPE_CASTER(Optional, optional_name(Caster::Name))
 
-    bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list* cleanup) noexcept {
         if (src.is_none()) {
             value.reset();
             return true;

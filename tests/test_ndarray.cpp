@@ -68,6 +68,10 @@ NB_MODULE(test_ndarray_ext, m) {
         return t.is_valid();
     }, "array"_a.noconvert().none());
 
+    m.def("get_is_valid_default", [](const nb::ndarray<nb::ro> &t) {
+        return t.is_valid();
+    }, "array"_a.noconvert() = nb::none());
+
     m.def("get_shape", [](const nb::ndarray<nb::ro> &t) {
         nb::list l;
         for (size_t i = 0; i < t.ndim(); ++i)

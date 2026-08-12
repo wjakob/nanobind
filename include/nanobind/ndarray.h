@@ -558,8 +558,8 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
                                     dtype_const_name<Scalar>::name) +
                    const_name("]"))
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        if (src.is_none() && flags & (uint8_t) cast_flags::accepts_none) {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
+        if (src.is_none() && flags & cast_flags::accepts_none) {
             value = ndarray<Args...>();
             return true;
         }
@@ -575,7 +575,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         }
 
         detail::ndarray_handle *h = ndarray_import(
-            src.ptr(), &config, flags & (uint8_t) cast_flags::convert, cleanup);
+            src.ptr(), &config, flags & cast_flags::convert, cleanup);
 
         if (NB_UNLIKELY(value.m_handle))
             detail::ndarray_dec_ref(value.m_handle);

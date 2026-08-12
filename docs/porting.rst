@@ -270,7 +270,7 @@ The API of custom type casters has changed *significantly*. The following
 changes are needed:
 
 - ``load()`` was renamed to ``from_python()``. The function now takes an extra
-  ``uint8_t flags`` parameter (instead ``bool convert``, which is now
+  ``uint32_t flags`` parameter (instead ``bool convert``, which is now
   represented by the flag ``nb::detail::cast_flags::convert``). A
   ``cleanup_list *`` pointer keeps track of Python temporaries that are created
   by the conversion, and which need to be deallocated after a function call has

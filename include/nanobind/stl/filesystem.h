@@ -35,7 +35,7 @@ struct type_caster<std::filesystem::path> {
     }
 
     template <typename Char = typename std::filesystem::path::value_type>
-    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+    bool from_python(handle src, uint32_t, cleanup_list *) noexcept {
         bool success = false;
 
         /* PyUnicode_FSConverter and PyUnicode_FSDecoder normally take care of

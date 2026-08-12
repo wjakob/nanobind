@@ -944,10 +944,10 @@ void print(PyObject *value, PyObject *end, PyObject *file) {
 
 // ========================================================================
 
-NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
+NB_CORE bool load_cmplx(PyObject *ob, uint32_t flags,
                         std::complex<double> *out) noexcept {
     bool is_complex = PyComplex_CheckExact(ob),
-         convert = (flags & (uint8_t) cast_flags::convert);
+         convert = (flags & cast_flags::convert);
 #if !defined(Py_LIMITED_API)
     if (is_complex || convert) {
         Py_complex result = PyComplex_AsCComplex(ob);
@@ -995,7 +995,7 @@ NB_CORE bool load_cmplx(PyObject *ob, uint8_t flags,
     return false;
 }
 
-bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
+bool load_f64(PyObject *o, uint32_t flags, double *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
 
 #if !defined(Py_LIMITED_API)
@@ -1007,7 +1007,7 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     is_float = false;
 #endif
 
-    if (is_float || (flags & (uint8_t) cast_flags::convert)) {
+    if (is_float || (flags & cast_flags::convert)) {
         double result = PyFloat_AsDouble(o);
 
         if (result != -1.0 || !PyErr_Occurred()) {
@@ -1021,9 +1021,9 @@ bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept {
     return false;
 }
 
-bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept {
+bool load_f32(PyObject *o, uint32_t flags, float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
-    bool convert = flags & (uint8_t) cast_flags::convert;
+    bool convert = flags & cast_flags::convert;
 
 #if !defined(Py_LIMITED_API)
     if (NB_LIKELY(is_float)) {
@@ -1125,7 +1125,7 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     }
 
     if constexpr (Recurse) {
-        if (flags & (uint8_t) cast_flags::convert) {
+        if (flags & cast_flags::convert) {
             PyObject* temp = PyNumber_Index(o);
             if (temp) {
                 bool result = load_int<T, false>(temp, 0, out);
@@ -1140,35 +1140,35 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
     return false;
 }
 
-bool load_u8(PyObject *o, uint8_t flags, uint8_t *out) noexcept {
+bool load_u8(PyObject *o, uint32_t flags, uint8_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_i8(PyObject *o, uint8_t flags, int8_t *out) noexcept {
+bool load_i8(PyObject *o, uint32_t flags, int8_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_u16(PyObject *o, uint8_t flags, uint16_t *out) noexcept {
+bool load_u16(PyObject *o, uint32_t flags, uint16_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_i16(PyObject *o, uint8_t flags, int16_t *out) noexcept {
+bool load_i16(PyObject *o, uint32_t flags, int16_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_u32(PyObject *o, uint8_t flags, uint32_t *out) noexcept {
+bool load_u32(PyObject *o, uint32_t flags, uint32_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_i32(PyObject *o, uint8_t flags, int32_t *out) noexcept {
+bool load_i32(PyObject *o, uint32_t flags, int32_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept {
+bool load_u64(PyObject *o, uint32_t flags, uint64_t *out) noexcept {
     return load_int(o, flags, out);
 }
 
-bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept {
+bool load_i64(PyObject *o, uint32_t flags, int64_t *out) noexcept {
     return load_int(o, flags, out);
 }
 

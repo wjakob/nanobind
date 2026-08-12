@@ -21,7 +21,7 @@ template <typename Set, typename Key> struct set_caster {
 
     using Caster = make_caster<Key>;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
         PyObject *iter = try_iter(src.ptr());

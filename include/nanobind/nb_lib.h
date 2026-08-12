@@ -302,7 +302,7 @@ struct type_init_data;
 NB_CORE PyObject *nb_type_new(const type_init_data *c) noexcept;
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
-NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint8_t flags,
+NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint32_t flags,
                          cleanup_list *cleanup, void **out) noexcept;
 
 /// Cast a C++ type instance into a Python object
@@ -456,7 +456,7 @@ NB_CORE void enum_append(PyObject *tp, const char *name, int64_t value,
 
 // Query an enumeration's Python object -> integer value map
 NB_CORE bool enum_from_python(const std::type_info *, PyObject *, int64_t *,
-                              uint8_t flags) noexcept;
+                              uint32_t flags) noexcept;
 
 // Query an enumeration's integer value -> Python object map
 NB_CORE PyObject *enum_from_cpp(const std::type_info *, int64_t) noexcept;
@@ -524,16 +524,16 @@ NB_CORE PyObject *exception_new(PyObject *mod, const char *name,
 
 // ========================================================================
 
-NB_CORE bool load_i8 (PyObject *o, uint8_t flags, int8_t *out) noexcept;
-NB_CORE bool load_u8 (PyObject *o, uint8_t flags, uint8_t *out) noexcept;
-NB_CORE bool load_i16(PyObject *o, uint8_t flags, int16_t *out) noexcept;
-NB_CORE bool load_u16(PyObject *o, uint8_t flags, uint16_t *out) noexcept;
-NB_CORE bool load_i32(PyObject *o, uint8_t flags, int32_t *out) noexcept;
-NB_CORE bool load_u32(PyObject *o, uint8_t flags, uint32_t *out) noexcept;
-NB_CORE bool load_i64(PyObject *o, uint8_t flags, int64_t *out) noexcept;
-NB_CORE bool load_u64(PyObject *o, uint8_t flags, uint64_t *out) noexcept;
-NB_CORE bool load_f32(PyObject *o, uint8_t flags, float *out) noexcept;
-NB_CORE bool load_f64(PyObject *o, uint8_t flags, double *out) noexcept;
+NB_CORE bool load_i8 (PyObject *o, uint32_t flags, int8_t *out) noexcept;
+NB_CORE bool load_u8 (PyObject *o, uint32_t flags, uint8_t *out) noexcept;
+NB_CORE bool load_i16(PyObject *o, uint32_t flags, int16_t *out) noexcept;
+NB_CORE bool load_u16(PyObject *o, uint32_t flags, uint16_t *out) noexcept;
+NB_CORE bool load_i32(PyObject *o, uint32_t flags, int32_t *out) noexcept;
+NB_CORE bool load_u32(PyObject *o, uint32_t flags, uint32_t *out) noexcept;
+NB_CORE bool load_i64(PyObject *o, uint32_t flags, int64_t *out) noexcept;
+NB_CORE bool load_u64(PyObject *o, uint32_t flags, uint64_t *out) noexcept;
+NB_CORE bool load_f32(PyObject *o, uint32_t flags, float *out) noexcept;
+NB_CORE bool load_f64(PyObject *o, uint32_t flags, double *out) noexcept;
 
 // ========================================================================
 

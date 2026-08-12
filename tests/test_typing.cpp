@@ -12,7 +12,7 @@ template <>
 struct type_caster<NestedClass> {
     NB_TYPE_CASTER(NestedClass, const_name("py_stub_test.AClass.NestedClass"))
 
-    bool from_python(handle /*src*/, uint8_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle /*src*/, uint32_t /*flags*/, cleanup_list*) noexcept {
         return true;
     }
 

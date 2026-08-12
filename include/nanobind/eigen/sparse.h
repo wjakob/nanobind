@@ -51,7 +51,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
     ScalarCaster data_caster;
     StorageIndexCaster indices_caster, indptr_caster;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         object obj = borrow(src);
 
         try {
@@ -59,7 +59,7 @@ template <typename T> struct type_caster<T, enable_if_t<is_eigen_sparse_matrix_v
                 module_::import_("scipy.sparse")
                     .attr(RowMajor ? "csr_matrix" : "csc_matrix");
             if (!obj.type().is(matrix_type)) {
-                if (!(flags & (uint8_t) cast_flags::convert))
+                if (!(flags & cast_flags::convert))
                     return false;
                 obj = matrix_type(obj);
             }
@@ -189,8 +189,8 @@ struct type_caster<Eigen::Map<T>, enable_if_t<is_eigen_sparse_matrix_v<T>>> {
     StorageIndexCaster indices_caster, indptr_caster;
     Index rows, cols, nnz;
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept {
-        flags &= ~(uint8_t) cast_flags::convert;
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
+        flags &= ~cast_flags::convert;
 
         try {
             object matrix_type =
@@ -285,7 +285,7 @@ struct type_caster<Eigen::Ref<T, Options>, enable_if_t<is_eigen_sparse_matrix_v<
     template <typename T_> using Cast = Ref;
     template <typename T_> static constexpr bool can_cast() { return true; }
 
-    bool from_python(handle src, uint8_t flags, cleanup_list *cleanup) noexcept = delete;
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept = delete;
 
     static handle from_cpp(const Ref &v, rv_policy policy, cleanup_list *cleanup) noexcept = delete;
 };

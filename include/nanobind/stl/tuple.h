@@ -33,13 +33,13 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
     /// alias below informs users of this class of this fact.
     template <typename T> using Cast = Value;
 
-    bool from_python(handle src, uint8_t flags,
+    bool from_python(handle src, uint32_t flags,
                      cleanup_list *cleanup) noexcept {
         return from_python_impl(src, flags, cleanup, Indices{});
     }
 
     template <size_t... Is>
-    bool from_python_impl(handle src, uint8_t flags, cleanup_list *cleanup,
+    bool from_python_impl(handle src, uint32_t flags, cleanup_list *cleanup,
                           std::index_sequence<Is...>) noexcept {
         (void) src; (void) flags; (void) cleanup;
 

@@ -21,8 +21,8 @@
 #  pragma warning(disable: 4251) // [..] needs to have a dll-interface to be used by clients of class [..]
 #endif
 
-#define NB_VERSION_MAJOR 2
-#define NB_VERSION_MINOR 16
+#define NB_VERSION_MAJOR 3
+#define NB_VERSION_MINOR 0
 #define NB_VERSION_PATCH 0
 #define NB_VERSION_DEV   1 // A value > 0 indicates a development release
 

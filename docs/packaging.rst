@@ -101,7 +101,7 @@ An example is shown below:
    version = "0.0.1"
    description = "A brief description of what this project does"
    readme = "README.md"
-   requires-python = ">=3.9"
+   requires-python = ">=3.10"
    authors = [
        { name = "Your Name", email = "your.email@address.com" },
    ]
@@ -178,7 +178,7 @@ component that can be used to create `stable ABI
 .. code-block:: cmake
 
    # Try to import all Python components potentially needed by nanobind
-   find_package(Python 3.9
+   find_package(Python 3.10
      REQUIRED COMPONENTS Interpreter Development.Module
      OPTIONAL_COMPONENTS Development.SABIModule)
 
@@ -310,7 +310,7 @@ is a ZIP file containing all the individual wheel files for each platform.
 
 By default, ``cibuildwheel`` will launch a very large build matrix, and it is
 possible that your extension is not compatible with every single configuration.
-For example, suppose that the project depends on Python 3.9+ and a 64 bit
+For example, suppose that the project depends on Python 3.10+ and a 64 bit
 processor. In this case, add further entries to the ``[tool.cibuildwheel]``
 block to remove incompatible configurations from the matrix:
 

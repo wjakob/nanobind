@@ -51,12 +51,6 @@
     ((Py_ssize_t) ((n) & ~(PY_VECTORCALL_ARGUMENTS_OFFSET |                     \
                            NB_VECTORCALL_TRUSTED_SELF)))
 
-#if PY_VERSION_HEX >= 0x030A0000
-#  define NB_TPFLAGS_IMMUTABLETYPE Py_TPFLAGS_IMMUTABLETYPE
-#else
-#  define NB_TPFLAGS_IMMUTABLETYPE 0
-#endif
-
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 

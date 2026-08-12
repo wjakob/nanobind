@@ -3024,11 +3024,11 @@ Type objects
 
 .. cpp:function:: void * type_get_slot(handle h, int slot_id)
 
-   On Python 3.10+, this function is a simple wrapper around the Python C API
+   On CPython, this function is a simple wrapper around the Python C API
    function ``PyType_GetSlot`` that provides stable API-compatible access to
-   type object members. On Python 3.9 and earlier, the official function did
-   not work on non-heap types. The nanobind version consistently works on heap
-   and non-heap types across Python versions.
+   type object members. On PyPy, where that function only handles heap types,
+   nanobind substitutes its own implementation that consistently works on
+   heap and non-heap types.
 
 Instances
 ^^^^^^^^^

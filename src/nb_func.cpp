@@ -1483,27 +1483,14 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     }
 
                     buf.put(": ");
-                    if (has_args && f->args[arg_index].flag &
-                                        (uint8_t) cast_flags::accepts_none) {
-#if PY_VERSION_HEX < 0x030A0000
-                            buf.put("typing.Optional[");
-                        #else
-                            // See below
-                        #endif
-                    }
                 }
                 break;
 
             case '}':
                 // Default argument
                 if (has_args) {
-                    if (f->args[arg_index].flag & (uint8_t) cast_flags::accepts_none) {
-                        #if PY_VERSION_HEX < 0x030A0000
-                            buf.put(']');
-                        #else
-                            buf.put(" | None");
-                        #endif
-                    }
+                    if (f->args[arg_index].flag & (uint8_t) cast_flags::accepts_none)
+                        buf.put(" | None");
 
                     if (f->args[arg_index].value) {
                         const arg_data &arg = f->args[arg_index];

@@ -51,7 +51,7 @@ static PyType_Spec nb_meta_spec = {
     /* .basicsize = */ 0,
     /* .itemsize = */ 0,
     /* .flags = */ Py_TPFLAGS_DEFAULT |
-                   NB_TPFLAGS_IMMUTABLETYPE,
+                   Py_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_meta_slots
 };
 
@@ -86,7 +86,7 @@ static PyType_Spec nb_func_spec = {
     /* .flags = */ Py_TPFLAGS_DEFAULT |
                    Py_TPFLAGS_HAVE_GC |
                    Py_TPFLAGS_HAVE_VECTORCALL |
-                   NB_TPFLAGS_IMMUTABLETYPE,
+                   Py_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_func_slots
 };
 
@@ -111,7 +111,7 @@ static PyType_Spec nb_method_spec = {
                   Py_TPFLAGS_HAVE_GC |
                   Py_TPFLAGS_METHOD_DESCRIPTOR |
                   Py_TPFLAGS_HAVE_VECTORCALL |
-                  NB_TPFLAGS_IMMUTABLETYPE,
+                  Py_TPFLAGS_IMMUTABLETYPE,
     /*.slots = */ nb_method_slots
 };
 
@@ -142,7 +142,7 @@ static PyType_Spec nb_bound_method_spec = {
     /* .flags = */ Py_TPFLAGS_DEFAULT |
                    Py_TPFLAGS_HAVE_GC |
                    Py_TPFLAGS_HAVE_VECTORCALL |
-                   NB_TPFLAGS_IMMUTABLETYPE,
+                   Py_TPFLAGS_IMMUTABLETYPE,
     /* .slots = */ nb_bound_method_slots
 };
 

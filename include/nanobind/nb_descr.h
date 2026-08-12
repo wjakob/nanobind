@@ -85,14 +85,6 @@ constexpr auto io_name(char const (&text1)[N1], char const (&text2)[N2]) {
            const_name(text2) + const_name('@');
 }
 
-#if PY_VERSION_HEX < 0x030A0000
-template <typename T> constexpr auto optional_name(const T &v) {
-    return const_name("typing.Optional[") + v + const_name("]");
-}
-template <typename... Ts> constexpr auto union_name(const Ts&... vs) {
-    return const_name("typing.Union[") + concat(vs...) + const_name("]");
-}
-#else
 template <typename T> constexpr auto optional_name(const T &v) {
     return v + const_name(" | None");
 }
@@ -103,7 +95,6 @@ template <typename T1, typename T2, typename... Ts>
 constexpr auto union_name(const T1 &v1, const T2 &v2, const Ts &...vs) {
     return v1 + const_name(" | ") + union_name(v2, vs...);
 }
-#endif
 
 template <size_t Size>
 auto constexpr const_name() -> std::remove_cv_t<decltype(int_to_str<Size / 10, Size % 10>::digits)> {

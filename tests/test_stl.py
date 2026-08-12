@@ -1,23 +1,16 @@
 import test_stl_ext as t
 import typing
 import pytest
-import sys
 from common import collect, skip_on_pypy
 
 
 
 def optional(arg: str, /) -> str:
-    if sys.version_info < (3, 10):
-        return "typing.Optional[" + arg + "]"
-    else:
-        return arg + " | " + "None"
+    return arg + " | " + "None"
 
 
 def union(*args: str) -> str:
-    if sys.version_info < (3, 10):
-        return "typing.Union[" + ", ".join(args) + "]"
-    else:
-        return " | ".join(args)
+    return " | ".join(args)
 
 
 @pytest.fixture

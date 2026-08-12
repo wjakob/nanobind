@@ -7,7 +7,7 @@
 PyPy support
 ------------
 
-PyPy 7.3.10 and newer versions are supported, though with some limitations:
+PyPy 7.3.12 and newer versions are supported, though with some limitations:
 
 1. When nanobind types occur in reference cycles, then those cycles are not
    collectable and will be leaked. This is a limitation of PyPy's ``cpyext``

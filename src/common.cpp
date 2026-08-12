@@ -1071,8 +1071,8 @@ NB_INLINE Py_ssize_t PyUnstable_Long_CompactValue(const PyLongObject *o) {
 
 template <typename T, bool Recurse = true>
 NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
-    // Only CPython 3.10+ guarantees that PyNumber_Index() returns an exact 'int'.
-#if PY_VERSION_HEX < 0x030A0000 || defined(PYPY_VERSION)
+    // Only CPython guarantees that PyNumber_Index() returns an exact 'int'.
+#if defined(PYPY_VERSION)
     constexpr bool Exact = Recurse;
 #else
     constexpr bool Exact = true;

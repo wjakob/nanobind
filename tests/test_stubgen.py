@@ -15,9 +15,9 @@ import types
 
 import pytest
 
-is_unsupported = platform.python_implementation() == 'PyPy' or sys.version_info < (3, 10)
+is_unsupported = platform.python_implementation() == 'PyPy'
 pytestmark = pytest.mark.skipif(
-    is_unsupported, reason="Stub generation is only tested on CPython >= 3.10.0")
+    is_unsupported, reason="Stub generation is only tested on CPython")
 
 
 @pytest.fixture(scope="module")

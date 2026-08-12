@@ -16,6 +16,15 @@ isolated from each other. Releases that don't explicitly mention an ABI version
 below inherit that of the preceding release.
 
 
+Version 3.0.0 (unreleased)
+--------------------------
+
+This is a major release with breaking API and ABI changes, in particular:
+
+- **Python version requirement**: nanobind now requires Python 3.10 or newer.
+  Python 3.9 reached its end of life in October 2025, and dropping it removes
+  a number of workarounds for missing C API functionality.
+
 Version 2.15.0 (Aug 15, 2026)
 -----------------------------
 

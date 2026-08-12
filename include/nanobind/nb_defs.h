@@ -117,8 +117,8 @@
 #  define NB_SET_GET_SIZE PySet_GET_SIZE
 #endif
 
-#if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x07030a00
-#    error "nanobind requires a newer PyPy version (>= 7.3.10)"
+#if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x07030c00
+#    error "nanobind requires a newer PyPy version (>= 7.3.12)"
 #endif
 
 #if defined(NB_FREE_THREADED) && !defined(Py_GIL_DISABLED)
@@ -132,11 +132,7 @@
 #endif
 
 #if !defined(PYPY_VERSION)
-#  if PY_VERSION_HEX < 0x030A0000
-#    define NB_TYPE_GET_SLOT_IMPL 1 // Custom implementation of nb::type_get_slot
-#  else
-#    define NB_TYPE_GET_SLOT_IMPL 0
-#  endif
+#  define NB_TYPE_GET_SLOT_IMPL 0
 #  if PY_VERSION_HEX < 0x030C0000
 #    define NB_TYPE_FROM_METACLASS_IMPL 1 // Custom implementation of PyType_FromMetaclass
 #  else

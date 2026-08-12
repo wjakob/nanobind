@@ -55,6 +55,6 @@
 #  pragma warning(pop)
 #endif
 
-#if PY_VERSION_HEX < 0x03090000
-#  error The nanobind library requires Python 3.9 (or newer)
+#if PY_VERSION_HEX < 0x030A0000
+#  error The nanobind library requires Python 3.10 (or newer)
 #endif

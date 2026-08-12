@@ -6,10 +6,7 @@ from common import skip_on_pypy, collect, parallelize
 
 
 def optional(arg: str, /) -> str:
-    if sys.version_info < (3, 10):
-        return "typing.Optional[" + arg + "]"
-    else:
-        return arg + " | " + "None"
+    return arg + " | " + "None"
 
 
 @pytest.fixture

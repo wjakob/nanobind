@@ -734,7 +734,7 @@ class StubGen:
     def is_type_var(self, tp: type) -> bool:
         if issubclass(tp, typing.TypeVar):
             return True
-        if sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec):
+        if issubclass(tp, typing.ParamSpec):
             return True
         if sys.version_info >= (3, 11) and issubclass(tp, typing.TypeVarTuple):
             return True
@@ -1196,7 +1196,7 @@ class StubGen:
             return f'"{e.__forward_arg__}"'
         elif issubclass(tp, enum.Enum):
             return self.type_str(tp) + '.' + e._name_
-        elif (sys.version_info >= (3, 10) and issubclass(tp, typing.ParamSpec)) \
+        elif issubclass(tp, typing.ParamSpec) \
             or (typing_extensions is not None and issubclass(tp, typing_extensions.ParamSpec)):
             tv = self.bind(tp.__module__, "ParamSpec")
             return f'{tv}("{e.__name__}")'

@@ -133,7 +133,7 @@ The high-level interface consists of just one CMake command:
 
    - It links the newly created library against the ``nanobind-..`` target.
 
-   - It appends the library suffix (e.g., ``.cpython-39-darwin.so``) based
+   - It appends the library suffix (e.g., ``.cpython-313-darwin.so``) based
      on information provided by CMake’s ``FindPython`` module.
 
    - When requested via the optional ``STABLE_ABI`` parameter, the build system

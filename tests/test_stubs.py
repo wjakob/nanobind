@@ -5,9 +5,9 @@ import sys
 import platform
 import pytest
 
-is_unsupported = platform.python_implementation() == 'PyPy' or sys.version_info < (3, 10)
+is_unsupported = platform.python_implementation() == 'PyPy'
 skip_on_unsupported = pytest.mark.skipif(
-    is_unsupported, reason="Stub generation is only tested on CPython >= 3.10.0")
+    is_unsupported, reason="Stub generation is only tested on CPython")
 
 def remove_platform_dependent(s):
     '''Remove platform-dependent functions from the stubs'''

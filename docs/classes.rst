@@ -1008,6 +1008,12 @@ pickling. The example below, e.g., does this using a tuple.
 The ``__setstate__`` method should construct the object in-place analogous to
 custom ``__init__``-style constructors.
 
+Note that by calling ``new (&pet)`` we allocate a new ``Pet`` object at the
+same memory position the old one was. This means that, since the destructor
+of the old ``Pet`` object is never called, any non-POD data will be leaked.
+For this reason, we should explicitly call the destructor prior to using
+``new (&pet)``.
+
 .. code-block:: cpp
 
    #include <nanobind/stl/tuple.h>
@@ -1023,6 +1029,7 @@ custom ``__init__``-style constructors.
           // ...
           .def("__getstate__", [](const Pet &pet) { return std::make_tuple(pet.name, pet.age); })
           .def("__setstate__", [](Pet &pet, const std::tuple<std::string, int> &state) {
+                pet.~Pet();
                 new (&pet) Pet(
                     std::get<0>(state),
                     std::get<1>(state)

@@ -22,132 +22,75 @@ NAMESPACE_BEGIN(detail)
 // Protected by internals->mutex in free-threaded builds
 Buffer buf(128);
 
-NAMESPACE_END(detail)
-
-#if PY_VERSION_HEX >= 0x030C0000
-python_error::python_error() {
-    m_value = PyErr_GetRaisedException();
-    check(m_value,
-          "nanobind::python_error::python_error(): error indicator unset!");
+PyObject *error_fetch() noexcept {
+    #if PY_VERSION_HEX >= 0x030C0000
+        PyObject *value = PyErr_GetRaisedException();
+        check(value,
+              "nanobind::python_error::python_error(): error indicator unset!");
+        return value;
+    #else
+        PyObject *t, *v, *tb;
+        PyErr_Fetch(&t, &v, &tb);
+        check(t, "nanobind::python_error::python_error(): error indicator unset!");
+        PyErr_NormalizeException(&t, &v, &tb);
+        check(v, "nanobind::python_error::python_error(): "
+                 "PyErr_NormalizeException() failed!");
+        if (tb) {
+            if (PyException_SetTraceback(v, tb) < 0)
+                PyErr_Clear();
+            Py_DECREF(tb);
+        }
+        Py_DECREF(t);
+        return v;
+    #endif
 }
 
-python_error::~python_error() {
-    if (m_value) {
+void error_restore(PyObject *value) noexcept {
+    check(value, "nanobind::python_error::restore(): error was already restored!");
+    #if PY_VERSION_HEX >= 0x030C0000
+        PyErr_SetRaisedException(value);
+    #else
+        PyErr_Restore(Py_NewRef(Py_TYPE(value)), value,
+                      PyException_GetTraceback(value));
+    #endif
+}
+
+void error_release(PyObject *value, char *what) noexcept {
+    if (value) {
         gil_scoped_acquire acq;
         /* With GIL held */ {
             // Clear error status in case the following executes Python code
             error_scope scope;
-            Py_DECREF(m_value);
+            Py_DECREF(value);
         }
     }
 
-    free(m_what);
+    free(what);
 }
 
-python_error::python_error(const python_error &e)
-    : std::exception(e), m_value(e.m_value) {
-    if (m_value) {
+PyObject *error_copy(PyObject *value, char **what) noexcept {
+    if (*what)
+        *what = strdup_check(*what);
+    if (value) {
         gil_scoped_acquire acq;
-        Py_INCREF(m_value);
+        Py_INCREF(value);
     }
-    if (e.m_what)
-        m_what = detail::strdup_check(e.m_what);
+    return value;
 }
 
-python_error::python_error(python_error &&e) noexcept
-    : std::exception(e), m_value(e.m_value), m_what(e.m_what) {
-    e.m_value = nullptr;
-    e.m_what = nullptr;
-}
-
-void python_error::restore() noexcept {
-    check(m_value,
-          "nanobind::python_error::restore(): error was already restored!");
-
-    PyErr_SetRaisedException(m_value);
-    m_value = nullptr;
-}
-
-#else /* Exception handling for Python 3.11 and older versions */
-
-python_error::python_error() {
-    PyErr_Fetch(&m_type, &m_value, &m_traceback);
-    check(m_type,
-          "nanobind::python_error::python_error(): error indicator unset!");
-}
-
-python_error::~python_error() {
-    if (m_type) {
-        gil_scoped_acquire acq;
-        /* With GIL held */ {
-            // Clear error status in case the following executes Python code
-            error_scope scope;
-            Py_XDECREF(m_type);
-            Py_XDECREF(m_value);
-            Py_XDECREF(m_traceback);
-        }
-    }
-    free(m_what);
-}
-
-python_error::python_error(const python_error &e)
-    : std::exception(e), m_type(e.m_type), m_value(e.m_value),
-      m_traceback(e.m_traceback) {
-    if (m_type) {
-        gil_scoped_acquire acq;
-        Py_INCREF(m_type);
-        Py_XINCREF(m_value);
-        Py_XINCREF(m_traceback);
-    }
-    if (e.m_what)
-        m_what = detail::strdup_check(e.m_what);
-}
-
-python_error::python_error(python_error &&e) noexcept
-    : std::exception(e), m_type(e.m_type), m_value(e.m_value),
-      m_traceback(e.m_traceback), m_what(e.m_what) {
-    e.m_type = e.m_value = e.m_traceback = nullptr;
-    e.m_what = nullptr;
-}
-
-void python_error::restore() noexcept {
-    check(m_type,
-          "nanobind::python_error::restore(): error was already restored!");
-
-    PyErr_Restore(m_type, m_value, m_traceback);
-    m_type = m_value = m_traceback = nullptr;
-}
-
-#endif
-
-const char *python_error::what() const noexcept {
-    using namespace nanobind::detail;
-
+const char *error_what(PyObject *value, char **what) noexcept {
     // Return the existing error message if already computed once
-    if (m_what)
-        return m_what;
+    if (*what)
+        return *what;
 
     gil_scoped_acquire acq;
 
     // Try again with GIL held
-    if (m_what)
-        return m_what;
+    if (*what)
+        return *what;
 
-#if PY_VERSION_HEX < 0x030C0000
-    PyErr_NormalizeException(&m_type, &m_value, &m_traceback);
-    check(m_type,
-          "nanobind::python_error::what(): PyErr_NormalizeException() failed!");
-
-    if (m_traceback) {
-        if (PyException_SetTraceback(m_value, m_traceback) < 0)
-            PyErr_Clear();
-    }
-
-    handle exc_type = m_type, exc_value = m_value;
-#else
-    handle exc_value = m_value, exc_type = exc_value.type();
-#endif
-    object exc_traceback = traceback();
+    handle exc_value = value, exc_type = exc_value.type();
+    object exc_traceback = steal(PyException_GetTraceback(value));
 
 #if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
     char *tmp;
@@ -233,17 +176,23 @@ const char *python_error::what() const noexcept {
     char *expected = nullptr;
 #if defined(_MSC_VER)
     expected = (char *) _InterlockedCompareExchangePointer(
-        (void *volatile *) &m_what, tmp, nullptr);
+        (void *volatile *) what, tmp, nullptr);
     if (!expected)
         return tmp;
 #else
-    if (__atomic_compare_exchange_n(&m_what, &expected, tmp, false,
+    if (__atomic_compare_exchange_n(what, &expected, tmp, false,
                                     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
         return tmp;
 #endif
     free(tmp);
     return expected;
 }
+
+NAMESPACE_END(detail)
+
+// Deliberately out-of-line: the key function anchors the class's vtable and
+// typeinfo (see the comment in nb_error.h)
+python_error::~python_error() { detail::error_release(m_value, m_what); }
 
 builtin_exception::builtin_exception(exception_type type, const char *what)
     : std::runtime_error(what ? what : ""), m_type(type) { }

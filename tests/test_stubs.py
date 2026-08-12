@@ -5,6 +5,8 @@ import sys
 import platform
 import pytest
 
+import test_typing_ext
+
 is_unsupported = platform.python_implementation() == 'PyPy'
 skip_on_unsupported = pytest.mark.skipif(
     is_unsupported, reason="Stub generation is only tested on CPython")
@@ -59,13 +61,16 @@ def test01_check_stub_refs(p_ref, request):
         # fallback to Python 3.10's `(str, Enum)` MRO.
         s_ref = [line.replace("(enum.StrEnum)", "(str, enum.Enum)") for line in s_ref]
 
-    if "test_typing_ext" in p_in.name and sys.version_info < (3, 13):
+    if ("test_typing_ext" in p_in.name and
+            test_typing_ext._target_version_hex < 0x030D0000):
         # The 'T4'/'T5' bindings from test_typing.cpp carry PEP 696 'default='
         # values (and pull in the Unpack/TypeVarTuple imports) that only exist
         # on Python 3.13+, which the reference file captures and the 3.13+ CI
-        # job checks exactly. On older interpreters, drop those lines and the
-        # 'from typing import' block from both the generated and reference text
-        # -- collapsing the blank gaps -- so the rest still diffs cleanly.
+        # job checks exactly. When the extension targets an older version
+        # (because it was built for an older interpreter or under an older
+        # limited API), drop those lines and the 'from typing import' block
+        # from both the generated and reference text -- collapsing the blank
+        # gaps -- so the rest still diffs cleanly.
         def strip(lines):
             out, i = [], 0
             while i < len(lines):

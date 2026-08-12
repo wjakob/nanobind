@@ -111,8 +111,17 @@ NB_CORE void fail(const char *fmt, ...) noexcept;
 /// Raise nanobind::cast_error
 [[noreturn]] NB_CORE void raise_python_or_cast_error();
 
+// Backend implementation of the 'python_error' exception class
+NB_CORE PyObject *error_fetch() noexcept;
+NB_CORE PyObject *error_copy(PyObject *value, char **what) noexcept;
+NB_CORE void error_release(PyObject *value, char *what) noexcept;
+NB_CORE void error_restore(PyObject *value) noexcept;
+NB_CORE const char *error_what(PyObject *value, char **what) noexcept;
+
 // ========================================================================
 
+NB_CORE PyObject *module_new(const char *name, const char *doc, void *exec,
+                             uint32_t reserved) noexcept;
 NB_CORE void nb_module_exec(const char *domain, PyObject *m);
 NB_CORE void nb_module_free(void *m);
 

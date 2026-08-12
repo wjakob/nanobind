@@ -32,6 +32,10 @@
 #  error nanobind depends on tsl::robin_map, in particular version >= 1.3.0, <2.0.0
 #endif
 
+#if defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030C0000
+#  error "Compiling the nanobind backend under the limited API requires Python >= 3.12"
+#endif
+
 #if defined(_MSC_VER)
 #  define NB_THREAD_LOCAL __declspec(thread)
 #else

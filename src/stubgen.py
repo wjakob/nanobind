@@ -777,6 +777,9 @@ class StubGen:
            changed to 'collections.abc' on newer Python versions)
         """
 
+        if sys.version_info >= (3, 13):
+            s = s.replace("typing_extensions.CapsuleType", "types.CapsuleType")
+
         # Process nd-array type annotations so that MyPy accepts them
         s = self.ndarray_re.sub(
             lambda m: self._format_ndarray(m.group(1), m.group(2)), s

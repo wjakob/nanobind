@@ -359,6 +359,45 @@ void nb_module_free(void *) {
     internals_dec_ref();
 }
 
+PyObject *module_new(const char *name, const char *doc, void *exec,
+                     uint32_t reserved) noexcept {
+    if (reserved != 0) {
+        PyErr_SetString(PyExc_SystemError,
+                        "nanobind::detail::module_new(): the reserved "
+                        "parameter must be zero (this extension was built "
+                        "against incompatible nanobind headers)");
+        return nullptr;
+    }
+
+    PyModuleDef_Slot *s =
+        (PyModuleDef_Slot *) PyMem_Calloc(4, sizeof(PyModuleDef_Slot));
+    PyModuleDef *d = (PyModuleDef *) PyMem_Calloc(1, sizeof(PyModuleDef));
+    if (!s || !d) {
+        PyMem_Free(s);
+        PyMem_Free(d);
+        PyErr_NoMemory();
+        return nullptr;
+    }
+
+    size_t i = 0;
+    s[i++] = { Py_mod_exec, exec };
+#if defined(NB_FREE_THREADED)
+    s[i++] = { Py_mod_gil, Py_MOD_GIL_NOT_USED };
+#endif
+#if PY_VERSION_HEX >= 0x030C0000
+    s[i++] = { Py_mod_multiple_interpreters,
+               Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED };
+#endif
+
+    PyModuleDef_Base base = PyModuleDef_HEAD_INIT;
+    d->m_base = base;
+    d->m_name = name;
+    d->m_doc = doc;
+    d->m_slots = s;
+    d->m_free = nb_module_free;
+    return PyModuleDef_Init(d);
+}
+
 
 static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;

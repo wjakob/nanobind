@@ -81,22 +81,23 @@
 #  define NB_HAS_U8STRING
 #endif
 
-#if PY_VERSION_HEX < 0x030D0000
-#  define NB_TYPING_CAPSULE "typing_extensions.CapsuleType"
+// The oldest Python version that the compiled binary must be able to run on
+#if defined(Py_LIMITED_API)
+#  define NB_PYTHON_VERSION Py_LIMITED_API
 #else
-#  define NB_TYPING_CAPSULE "types.CapsuleType"
+#  define NB_PYTHON_VERSION PY_VERSION_HEX
 #endif
 
-// Singletons (True, False, None) are immortal on 3.12+ / 3.12 stable ABI
-#if defined(Py_LIMITED_API) || PY_VERSION_HEX >= 0x030C0000
+// Singletons (True, False, None) are immortal on Python 3.12+
+#if NB_PYTHON_VERSION >= 0x030C0000
 #  define NB_IMMORTAL_SINGLETONS 1
 #else
 #  define NB_IMMORTAL_SINGLETONS 0
 #endif
 
 #if defined(Py_LIMITED_API)
-#  if PY_VERSION_HEX < 0x030C0000 || defined(PYPY_VERSION)
-#    error "nanobind can target Python's limited API, but this requires CPython >= 3.12"
+#  if Py_LIMITED_API < 0x030A0000 || defined(PYPY_VERSION)
+#    error "nanobind can target Python's limited API, but this requires CPython >= 3.10"
 #  endif
 #  define NB_TUPLE_GET_SIZE PyTuple_Size
 #  define NB_TUPLE_GET_ITEM PyTuple_GetItem
@@ -149,25 +150,6 @@
 #  define NB_DYNAMIC_VERSION PY_VERSION_HEX
 #endif
 
-#define NB_MODULE_SLOTS_0 { 0, nullptr }
-
-#if PY_VERSION_HEX < 0x030C0000
-#  define NB_MODULE_SLOTS_1 NB_MODULE_SLOTS_0
-#else
-#  define NB_MODULE_SLOTS_1                                                    \
-    { Py_mod_multiple_interpreters,                                            \
-      Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED },                            \
-    NB_MODULE_SLOTS_0
-#endif
-
-#if !defined(NB_FREE_THREADED)
-#  define NB_MODULE_SLOTS_2 NB_MODULE_SLOTS_1
-#else
-#  define NB_MODULE_SLOTS_2                                                    \
-   { Py_mod_gil, Py_MOD_GIL_NOT_USED },                                        \
-   NB_MODULE_SLOTS_1
-#endif
-
 #define NB_NONCOPYABLE(X)                                                      \
     X(const X &) = delete;                                                     \
     X &operator=(const X &) = delete;
@@ -192,18 +174,13 @@
         }                                                                      \
         return -1;                                                             \
     }                                                                          \
-    static PyModuleDef_Slot nanobind_##name##_slots[] = {                      \
-        { Py_mod_exec, (void *) nanobind_##name##_exec },                      \
-        NB_MODULE_SLOTS_2                                                      \
-    };                                                                         \
-    static struct PyModuleDef nanobind_##name##_module = {                     \
-        PyModuleDef_HEAD_INIT, #name, nullptr, 0, nullptr,                     \
-        nanobind_##name##_slots, nullptr, nullptr,                             \
-        nanobind::detail::nb_module_free                                       \
-    };                                                                         \
+    static PyObject *nanobind_##name##_def = nullptr;                          \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \
-        return PyModuleDef_Init(&nanobind_##name##_module);                    \
+        if (!nanobind_##name##_def)                                            \
+            nanobind_##name##_def = nanobind::detail::module_new(              \
+                #name, nullptr, (void *) nanobind_##name##_exec, 0);           \
+        return nanobind_##name##_def;                                          \
     }                                                                          \
     void nanobind_##name##_exec_impl(nanobind::module_ variable)
 

@@ -10,6 +10,14 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+// PY_VECTORCALL_ARGUMENTS_OFFSET is hidden from the limited API before
+// Python 3.12, but its value is frozen by the vectorcall protocol (PEP 590)
+#if defined(PY_VECTORCALL_ARGUMENTS_OFFSET)
+#  define NB_VECTORCALL_ARGUMENTS_OFFSET PY_VECTORCALL_ARGUMENTS_OFFSET
+#else
+#  define NB_VECTORCALL_ARGUMENTS_OFFSET ((size_t) 1 << (8 * sizeof(size_t) - 1))
+#endif
+
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable: 6255) // _alloca indicates failure by raising a stack overflow exception
@@ -96,7 +104,7 @@ NB_INLINE void call_init(PyObject **args, PyObject *kwnames, size_t &nargs,
         args[0] = nullptr;                                                     \
         args_p = args + 1;                                                     \
     }                                                                          \
-    nargs |= PY_VECTORCALL_ARGUMENTS_OFFSET;                                   \
+    nargs |= NB_VECTORCALL_ARGUMENTS_OFFSET;                                   \
     return steal(obj_vectorcall(base, args_p, nargs, kwnames, method_call))
 
 template <typename Derived>

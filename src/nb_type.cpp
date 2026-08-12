@@ -710,9 +710,8 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     t->alias_chain = nullptr;
     t->supplement = nullptr;
 
-#if defined(Py_LIMITED_API)
     t->vectorcall = nullptr;
-#else
+#if !defined(Py_LIMITED_API)
     ((PyTypeObject *) self)->tp_vectorcall = nullptr;
 #endif
 

@@ -10,7 +10,7 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 /// RAII wrapper that temporarily clears any Python error state
-#if PY_VERSION_HEX >= 0x030C0000
+#if NB_PYTHON_VERSION >= 0x030C0000
 struct error_scope {
     error_scope() { value = PyErr_GetRaisedException(); }
     ~error_scope() { PyErr_SetRaisedException(value); }
@@ -26,25 +26,32 @@ private:
 };
 #endif
 
-/// Wraps a Python error state as a C++ exception
+// Wraps a Python error state as a C++ exception.
+// The layout of this class is frozen and part of the nanobind ABI contract
 class NB_EXPORT python_error : public std::exception {
 public:
-    NB_EXPORT_SHARED python_error();
-    NB_EXPORT_SHARED python_error(const python_error &);
-    NB_EXPORT_SHARED python_error(python_error &&) noexcept;
+    python_error() { m_value = detail::error_fetch(); }
+    python_error(const python_error &e)
+        : std::exception(e), m_what(e.m_what) {
+        m_value = detail::error_copy(e.m_value, &m_what);
+    }
+    python_error(python_error &&e) noexcept
+        : std::exception(e), m_value(e.m_value), m_what(e.m_what) {
+        e.m_value = nullptr;
+        e.m_what = nullptr;
+    }
     NB_EXPORT_SHARED ~python_error() override;
 
     bool matches(handle exc) const noexcept {
-#if PY_VERSION_HEX < 0x030C0000
-        return PyErr_GivenExceptionMatches(m_type, exc.ptr()) != 0;
-#else
         return PyErr_GivenExceptionMatches(m_value, exc.ptr()) != 0;
-#endif
     }
 
     /// Move the error back into the Python domain. This may only be called
     /// once, and you should not reraise the exception in C++ afterward.
-    NB_EXPORT_SHARED void restore() noexcept;
+    void restore() noexcept {
+        detail::error_restore(m_value);
+        m_value = nullptr;
+    }
 
     /// Pass the error to Python's `sys.unraisablehook`, which prints
     /// a traceback to `sys.stderr` by default but may be overridden.
@@ -63,28 +70,24 @@ public:
 
     handle value() const { return m_value; }
 
-#if PY_VERSION_HEX < 0x030C0000
-    handle type() const { return m_type; }
-    object traceback() const { return borrow(m_traceback); }
-#else
     handle type() const { return value().type(); }
-    object traceback() const { return steal(PyException_GetTraceback(m_value)); }
-#endif
-    [[deprecated]]
-    object trace() const { return traceback(); }
 
-    NB_EXPORT_SHARED const char *what() const noexcept override;
+    object traceback() const {
+        return steal(PyException_GetTraceback(m_value));
+    }
+
+    const char *what() const noexcept override {
+        return detail::error_what(m_value, &m_what);
+    }
 
 private:
-#if PY_VERSION_HEX < 0x030C0000
-    mutable PyObject *m_type = nullptr;
     mutable PyObject *m_value = nullptr;
-    mutable PyObject *m_traceback = nullptr;
-#else
-    mutable PyObject *m_value = nullptr;
-#endif
     mutable char *m_what = nullptr;
 };
+
+static_assert(sizeof(python_error) ==
+                  sizeof(std::exception) + 2 * sizeof(void *),
+              "frozen layout of python_error changed");
 
 /// Thrown by nanobind::cast when casting fails
 using cast_error = std::bad_cast;

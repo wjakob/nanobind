@@ -220,7 +220,7 @@ template <> struct type_caster<void> {
     template <typename T_> using Cast = void *;
     template <typename T_> static constexpr bool can_cast() { return true; }
     using Value = void*;
-    static constexpr auto Name = const_name(NB_TYPING_CAPSULE);
+    static constexpr auto Name = const_name("typing_extensions.CapsuleType");
     explicit operator void *() { return value; }
     Value value;
 

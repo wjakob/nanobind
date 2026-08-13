@@ -706,8 +706,10 @@ static NB_INLINE bool dtype_code_is_complex(uint8_t code) {
            code == (uint8_t) dlpack::dtype_code::Bcomplex;
 }
 
-ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
-                               bool convert, cleanup_list *cleanup) noexcept {
+static ndarray_handle *ndarray_import_impl(PyObject *src,
+                                           const ndarray_config &cfg,
+                                           bool convert,
+                                           cleanup_list *cleanup) noexcept {
     object capsule;
     mt_unique_ptr_t mt_unique_ptr(nullptr, &mt_from_buffer_delete);
 
@@ -739,8 +741,8 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
             // The unversioned path is generally faster to handle for the target
             // framework. Try that first if the user only requested readonly input.
-            capsule = dlpack(c->ro ? nullptr : max_version_kw);
-            expect_versioned = !c->ro;
+            capsule = dlpack(cfg.ro ? nullptr : max_version_kw);
+            expect_versioned = !cfg.ro;
 
             // Fall back to the other variant on failure: a read-only source
             // refusing unversioned export raises BufferError, and producers
@@ -749,8 +751,8 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
                 (PyErr_ExceptionMatches(PyExc_BufferError) ||
                  PyErr_ExceptionMatches(PyExc_TypeError))) {
                 PyErr_Clear();
-                capsule = dlpack(c->ro ? max_version_kw : nullptr);
-                expect_versioned = c->ro;
+                capsule = dlpack(cfg.ro ? max_version_kw : nullptr);
+                expect_versioned = cfg.ro;
             }
 
             if (!capsule.is_valid())
@@ -759,7 +761,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
         // Fall back to the buffer protocol, again gated on a non-raising probe.
         if (!capsule.is_valid() && obj_has_buffer(src, tp))
-            mt_unique_ptr = make_mt_from_buffer_protocol(src, c->ro);
+            mt_unique_ptr = make_mt_from_buffer_protocol(src, cfg.ro);
 
         // Try the function to_dlpack(), already obsolete in array API v2021
         if (!mt_unique_ptr && !capsule.is_valid()) {
@@ -811,26 +813,26 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
     // Reject a read-only ndarray if a writable one is required, and
     // reject an ndarray not on the required device.
-    if ((!c->ro && (flags & dlpack::flag_bitmask_read_only))
-        || (c->device_type != 0 && t.device.device_type != c->device_type)) {
+    if ((!cfg.ro && (flags & dlpack::flag_bitmask_read_only))
+        || (cfg.device_type != 0 && t.device.device_type != cfg.device_type)) {
         return nullptr;
     }
 
     // Check if the ndarray satisfies the remaining requirements.
-    bool has_dtype = c->dtype != dlpack::dtype(),
-         has_shape = c->ndim != -1,
-         has_order = c->order != '\0';
+    bool has_dtype = cfg.dtype != dlpack::dtype(),
+         has_shape = cfg.ndim != -1,
+         has_order = cfg.order != '\0';
 
     bool pass_dtype = true, pass_shape = true, pass_order = true;
 
     if (has_dtype)
-        pass_dtype = t.dtype == c->dtype;
+        pass_dtype = t.dtype == cfg.dtype;
 
     if (has_shape) {
-        pass_shape = t.ndim == c->ndim;
+        pass_shape = t.ndim == cfg.ndim;
         if (pass_shape) {
-            for (int32_t i = 0; i < c->ndim; ++i) {
-                if (c->shape[i] != -1 && t.shape[i] != c->shape[i]) {
+            for (int32_t i = 0; i < cfg.ndim; ++i) {
+                if (cfg.shape[i] != -1 && t.shape[i] != cfg.shape[i]) {
                     pass_shape = false;
                     break;
                 }
@@ -846,7 +848,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
     // Tolerate any strides if the array has 1 or fewer elements
     if (pass_shape && has_order && size > 1) {
-        char order = c->order;
+        char order = cfg.order;
 
         bool c_order = order == 'C' || order == 'A',
              f_order = order == 'F' || order == 'A';
@@ -884,17 +886,17 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     // Do not convert shape and do not convert complex numbers to non-complex.
     convert &= pass_shape &
                !(dtype_code_is_complex(t.dtype.code) &&
-                 has_dtype && !dtype_code_is_complex(c->dtype.code));
+                 has_dtype && !dtype_code_is_complex(cfg.dtype.code));
 
     // Support implicit conversion of dtype and order.
     if (convert && (!pass_dtype || !pass_order) && !src_is_pycapsule) {
         int fw = detect_framework(tp);
 
         char order = 'K'; // for NumPy. 'K' means 'keep'
-        if (c->order)
-            order = c->order;
+        if (cfg.order)
+            order = cfg.order;
 
-        dlpack::dtype dt = has_dtype ? c->dtype : t.dtype;
+        dlpack::dtype dt = has_dtype ? cfg.dtype : t.dtype;
         if (dt.lanes != 1)
             return nullptr;
 
@@ -933,7 +935,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
         // Potentially try once again, recursively
         if (converted.is_valid()) {
             ndarray_handle *h =
-                ndarray_import(converted.ptr(), c, false, nullptr);
+                ndarray_import_impl(converted.ptr(), cfg, false, nullptr);
             if (h && cleanup)
                 cleanup->append(converted.release().ptr());
             return h;
@@ -954,7 +956,7 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
     result->owner = nullptr;
     result->versioned = versioned;
     result->call_deleter = true;
-    result->ro = c->ro;
+    result->ro = cfg.ro;
 
     if (src_is_pycapsule) {
         result->self = nullptr;
@@ -998,6 +1000,26 @@ ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
 
     mt_unique_ptr.release();
     return result.release();
+}
+
+// Copy a construction record written by an extension into a full-size record
+// owned by the backend. Keeps the default for fields not provided by the extension.
+template <typename T> static T normalize_record(const void *src, size_t size) {
+    T dst{};
+    memcpy(&dst, src, size < sizeof(T) ? size : sizeof(T));
+    return dst;
+}
+
+ndarray_handle *ndarray_import(PyObject *src, const ndarray_config *c,
+                               size_t config_size, bool convert,
+                               cleanup_list *cleanup) noexcept {
+    ndarray_config cfg = normalize_record<ndarray_config>(c, config_size);
+
+    check(cfg.flags == 0,
+          "ndarray_import(): the extension requested an array constraint that "
+          "this version of nanobind does not implement!");
+
+    return ndarray_import_impl(src, cfg, convert, cleanup);
 }
 
 dlpack::dltensor *ndarray_inc_ref(ndarray_handle *th) noexcept {
@@ -1060,12 +1082,15 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
     }
 }
 
-ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
-                               PyObject *owner, const int64_t *strides_in,
-                               dlpack::dtype dtype, bool ro, int device_type,
-                               int device_id, char order,
-                               uint64_t byte_offset) {
-    check(ndim <= (size_t) max_ndim,
+ndarray_handle *ndarray_create(const ndarray_create_args *a, size_t args_size) {
+    ndarray_create_args args =
+        normalize_record<ndarray_create_args>(a, args_size);
+
+    check(args.flags == 0,
+          "ndarray_create(): the extension set an array property that this "
+          "version of nanobind does not implement!");
+
+    check(args.ndim <= (size_t) max_ndim,
           "ndarray_create(): ndim is too large!");
 
     /* A comment in the DLPack header file suggests 256-byte alignment of the
@@ -1077,35 +1102,37 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
        opaque device pointer or handle, on which arithmetic is impossible.
        See also: https://github.com/data-apis/array-api/discussions/779  */
 
-    if (device_type == 0)
-        device_type = device::cpu::value;
+    if (args.device_type == 0)
+        args.device_type = device::cpu::value;
 
     static_assert(alignof(managed_dltensor_versioned) >= alignof(int64_t));
-    scoped_pymalloc<managed_dltensor_versioned> mt(1, 2 * sizeof(int64_t)*ndim);
+    scoped_pymalloc<managed_dltensor_versioned> mt(
+        1, 2 * sizeof(int64_t) * args.ndim);
     int64_t* shape = nullptr;
     int64_t* strides = nullptr;
-    if (ndim > 0) {
-        shape = new ((void*) (mt.get() + 1)) int64_t[2 * ndim];
-        strides = shape + ndim;
+    if (args.ndim > 0) {
+        shape = new ((void*) (mt.get() + 1)) int64_t[2 * args.ndim];
+        strides = shape + args.ndim;
     }
 
-    for (size_t i = 0; i < ndim; ++i)
-        shape[i] = (int64_t) shape_in[i];
+    for (size_t i = 0; i < args.ndim; ++i)
+        shape[i] = (int64_t) args.shape[i];
 
-    if (ndim > 0) {
+    if (args.ndim > 0) {
         int64_t prod = 1;
-        if (strides_in) {
-            for (size_t i = 0; i < ndim; ++i)
-                strides[i] = strides_in[i];
-        } else if (order == 'F') {
-            for (size_t i = 0; i < ndim; ++i) {
+        if (args.strides) {
+            for (size_t i = 0; i < args.ndim; ++i)
+                strides[i] = args.strides[i];
+        } else if (args.order == 'F') {
+            for (size_t i = 0; i < args.ndim; ++i) {
                 strides[i] = prod;
-                prod *= (int64_t) shape_in[i];
+                prod *= (int64_t) args.shape[i];
             }
-        } else if (order == '\0' || order == 'A' || order == 'C') {
-            for (ssize_t i = (ssize_t) ndim - 1; i >= 0; --i) {
+        } else if (args.order == '\0' || args.order == 'A' ||
+                   args.order == 'C') {
+            for (ssize_t i = (ssize_t) args.ndim - 1; i >= 0; --i) {
                 strides[i] = prod;
-                prod *= (int64_t) shape_in[i];
+                prod *= (int64_t) args.shape[i];
             }
         } else {
             check(false, "ndarray_create(): unknown memory order requested!");
@@ -1119,24 +1146,24 @@ ndarray_handle *ndarray_create(void *data, size_t ndim, const size_t *shape_in,
     mt->deleter = [](managed_dltensor_versioned *self) {
                       ndarray_dec_ref((ndarray_handle *) self->manager_ctx);
                   };
-    mt->flags = (ro) ? dlpack::flag_bitmask_read_only : 0;
-    mt->dltensor.data = data;
-    mt->dltensor.device.device_type = (int32_t) device_type;
-    mt->dltensor.device.device_id = (int32_t) device_id;
-    mt->dltensor.ndim = (int32_t) ndim;
-    mt->dltensor.dtype = dtype;
+    mt->flags = (args.ro) ? dlpack::flag_bitmask_read_only : 0;
+    mt->dltensor.data = args.data;
+    mt->dltensor.device.device_type = args.device_type;
+    mt->dltensor.device.device_id = args.device_id;
+    mt->dltensor.ndim = (int32_t) args.ndim;
+    mt->dltensor.dtype = args.dtype;
     mt->dltensor.shape = shape;
     mt->dltensor.strides = strides;
-    mt->dltensor.byte_offset = byte_offset;
+    mt->dltensor.byte_offset = args.byte_offset;
     result->mt_versioned = mt.release();
     result->refcount = 0;
-    result->owner = owner;
+    result->owner = args.owner;
     result->self = nullptr;
     result->versioned = true;
     result->free_strides = false;
     result->call_deleter = false;
-    result->ro = ro;
-    Py_XINCREF(owner);
+    result->ro = args.ro;
+    Py_XINCREF(args.owner);
     return result.release();
 }
 

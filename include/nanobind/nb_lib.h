@@ -26,6 +26,7 @@ NAMESPACE_BEGIN(detail)
 // Forward declarations for types in ndarray.h (2)
 struct ndarray_handle;
 struct ndarray_config;
+struct ndarray_create_args;
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -499,19 +500,18 @@ NB_CORE PyObject *module_new_submodule(PyObject *base, const char *name,
 
 // ========================================================================
 
-// Try to import a reference-counted ndarray object via DLPack
+// Try to import a reference-counted ndarray object via DLPack. The caller
+// passes sizeof(ndarray_config) so that record can grow (see ndarray.h).
 NB_CORE ndarray_handle *ndarray_import(PyObject *o,
                                        const ndarray_config *c,
+                                       size_t config_size,
                                        bool convert,
                                        cleanup_list *cleanup) noexcept;
 
-// Describe a local ndarray object using a DLPack capsule
-NB_CORE ndarray_handle *ndarray_create(void *data, size_t ndim,
-                                       const size_t *shape, PyObject *owner,
-                                       const int64_t *strides,
-                                       dlpack::dtype dtype, bool ro,
-                                       int device, int device_id,
-                                       char order, uint64_t byte_offset);
+// Describe a local ndarray object using a DLPack capsule. The caller
+// passes sizeof(ndarray_create_args) for the same reason.
+NB_CORE ndarray_handle *ndarray_create(const ndarray_create_args *a,
+                                       size_t args_size);
 
 /// Increase the reference count of the given ndarray object; returns a pointer
 /// to the underlying DLTensor

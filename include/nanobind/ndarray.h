@@ -206,23 +206,90 @@ struct unused {
     static constexpr auto name = descr<0>();
 };
 
-/// ndarray_config describes a requested array configuration
+/**
+ * \brief ndarray_config describes a requested array configuration, which the
+ * backend reads through \ref ndarray_import().
+ *
+ * The layout of this data structure is part of the backend ABI contract.
+ */
 struct ndarray_config {
-    int device_type = 0;
-    char order = '\0';
-    bool ro = false;
-    dlpack::dtype dtype { };
+    /// Announces optional constraints (see above); currently always zero
+    uint32_t flags = 0;
+
+    /// Requested DLPack device type (0: any)
+    int32_t device_type = 0;
+
+    /// Requested dimension count (-1: any)
     int32_t ndim = -1;
-    int64_t *shape = nullptr;
+
+    /// Requested element type (a zero 'bits' field means any)
+    dlpack::dtype dtype { };
+
+    /// Requested memory order ('C', 'F', 'A', or '\0' for any)
+    char order = '\0';
+
+    /// Does the binding access the array through a const pointer?
+    bool ro = false;
+
+    /// Reserved, must be zero
+    uint16_t reserved_0 = 0;
+    uint32_t reserved_1 = 0;
+
+    /// Requested extents ('ndim' entries, -1 marks a free dimension)
+    const int64_t *shape = nullptr;
 
     ndarray_config() = default;
     template <typename T> ndarray_config(T)
         : device_type(T::DeviceType::value),
-          order((char) T::Order::value),
-          ro(std::is_const_v<typename T::Scalar>),
-          dtype(nanobind::dtype<typename T::Scalar>()),
           ndim(T::N),
-          shape(nullptr) { }
+          dtype(nanobind::dtype<typename T::Scalar>()),
+          order((char) T::Order::value),
+          ro(std::is_const_v<typename T::Scalar>) { }
+};
+
+/// ndarray_create_args describes an array that a binding hands to Python,
+/// which the backend reads through ndarray_create()
+struct ndarray_create_args {
+    /// Pointer to the array contents
+    void *data = nullptr;
+
+    /// Extents of the array ('ndim' entries)
+    const size_t *shape = nullptr;
+
+    /// Strides in units of elements ('ndim' entries). When null, they are
+    /// derived from 'shape' and 'order'.
+    const int64_t *strides = nullptr;
+
+    /// Python object owning the data, if any
+    PyObject *owner = nullptr;
+
+    /// Number of dimensions
+    size_t ndim = 0;
+
+    /// Offset of the first element in bytes
+    uint64_t byte_offset = 0;
+
+    /// Announces optional fields (see above); currently always zero
+    uint32_t flags = 0;
+
+    /// DLPack device type (0: the CPU device)
+    int32_t device_type = 0;
+
+    /// Index of the device within its device type
+    int32_t device_id = 0;
+
+    /// Element type
+    dlpack::dtype dtype { };
+
+    /// Memory order used to derive missing strides ('C', 'F', 'A', or '\0')
+    char order = '\0';
+
+    /// Is the array read-only?
+    bool ro = false;
+
+    /// Reserved, must be zero
+    uint16_t reserved_0 = 0;
+    uint32_t reserved_1 = 0;
 };
 
 /// ndarray_config_t collects nd-array template parameters in a structured way.
@@ -359,10 +426,20 @@ public:
             char order = Order,
             uint64_t byte_offset = 0) {
 
-        m_handle = detail::ndarray_create(
-            (void *) data, ndim, shape, owner.ptr(), strides, dtype,
-            ReadOnly, device_type, device_id, order, byte_offset);
+        detail::ndarray_create_args args;
+        args.data = (void *) data;
+        args.shape = shape;
+        args.strides = strides;
+        args.owner = owner.ptr();
+        args.ndim = ndim;
+        args.byte_offset = byte_offset;
+        args.device_type = device_type;
+        args.device_id = device_id;
+        args.dtype = dtype;
+        args.order = order;
+        args.ro = ReadOnly;
 
+        m_handle = detail::ndarray_create(&args, sizeof(args));
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
@@ -394,11 +471,20 @@ public:
             (void) shape_buf;
         }
 
-        m_handle = detail::ndarray_create(
-            (void *) data, shape_size, shape_ptr, owner.ptr(),
-            (strides.size() == 0) ? nullptr : strides.begin(), dtype,
-            ReadOnly, device_type, device_id, order, byte_offset);
+        detail::ndarray_create_args args;
+        args.data = (void *) data;
+        args.shape = shape_ptr;
+        args.strides = (strides.size() == 0) ? nullptr : strides.begin();
+        args.owner = owner.ptr();
+        args.ndim = shape_size;
+        args.byte_offset = byte_offset;
+        args.device_type = device_type;
+        args.device_id = device_id;
+        args.dtype = dtype;
+        args.order = order;
+        args.ro = ReadOnly;
 
+        m_handle = detail::ndarray_create(&args, sizeof(args));
         m_dltensor = *detail::ndarray_inc_ref(m_handle);
     }
 
@@ -575,7 +661,8 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         }
 
         detail::ndarray_handle *h = ndarray_import(
-            src.ptr(), &config, flags & cast_flags::convert, cleanup);
+            src.ptr(), &config, sizeof(config), flags & cast_flags::convert,
+            cleanup);
 
         if (NB_UNLIKELY(value.m_handle))
             detail::ndarray_dec_ref(value.m_handle);

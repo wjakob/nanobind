@@ -25,8 +25,10 @@ endif()
 set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS} NB_DOMAIN mydomain)
 
 # NB_TEST_SPLIT_MODE runs the test suite in split mode: every test extension
-# resolves the compiled backend from a backend module at import time. It is
-# an internal testing knob passed via -D.
+# resolves the compiled backend from a backend module at import time.
+# NB_TEST_SPLIT_WHEEL routes the suite through the installed
+# 'nanobind_backend' module (from the nanobind-backend wheel) instead of a
+# locally built one. Both are internal testing knobs passed via -D.
 if (NB_TEST_SPLIT_MODE)
   if (NB_FREE_THREADED AND NOT NB_TEST_FREE_THREADED)
     message(FATAL_ERROR "NB_TEST_SPLIT_MODE=ON on a free-threaded interpreter "
@@ -40,7 +42,13 @@ if (NB_TEST_SPLIT_MODE)
   nanobind_add_backend(nanobind_backend_test_mydomain NB_DOMAIN mydomain)
   set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS}
       BACKEND_MODULE nanobind_backend_test_mydomain)
-  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} BACKEND_MODULE nanobind_backend_test)
+  if (NB_TEST_SPLIT_WHEEL)
+    # The local twins above still serve the fill() handshake tests and
+    # the 'mydomain' extensions
+    set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} BACKEND_MODULE nanobind_backend)
+  else()
+    set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} BACKEND_MODULE nanobind_backend_test)
+  endif()
 endif()
 
 # ---------------------------------------------------------------------------

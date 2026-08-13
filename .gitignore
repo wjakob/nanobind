@@ -41,3 +41,5 @@ test_*_ext*.pyd
 *.pyi
 py\.typed
 .mypy_cache
+nanobind-backend/build/
+nanobind-backend/dist/

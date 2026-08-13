@@ -1,0 +1,32 @@
+[build-system]
+requires = ["scikit-build-core >=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "nanobind-backend"
+# MAJOR.MINOR name the newest nanobind ABI this wheel provides; the revision
+# covers all non-contractual change. See docs/split_mode.rst.
+version = "1.0.0"
+description = "Compiled nanobind backend for extensions built in split mode"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Wenzel Jakob", email = "wenzel.jakob@epfl.ch" },
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/wjakob/nanobind"
+Documentation = "https://nanobind.readthedocs.io/en/latest/split_mode.html"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["src/nanobind_backend"]

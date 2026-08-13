@@ -570,10 +570,13 @@ struct pyobj_name {
         #undef NB_INTERNED_ENTRY
         string_count,
 
-        // Cached constant tuples using the same interning machinery
+        // Cached constants using the same interning machinery
         interned_max_version_tpl = string_count, // tuple ("max_version")
         interned_dl_cpu_tpl,              // tuple (1, 0) == nb::device::cpu
         interned_dl_version_tpl,          // tuple (dlpack major, minor)
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
+        interned_u64_limit,               // 2**64, used by the integer casters
+#endif
         total_count
     };
 };

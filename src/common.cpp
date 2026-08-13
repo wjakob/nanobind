@@ -1056,88 +1056,137 @@ bool load_f32(PyObject *o, uint32_t flags, float *out) noexcept {
     return false;
 }
 
-#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && PY_VERSION_HEX < 0x030c0000
-// Direct access for compact integers. These functions are
-// available as part of Python starting with version 3.12b1+
-
-NB_INLINE bool PyUnstable_Long_IsCompact(const PyLongObject *o) {
-    return abs(Py_SIZE(o)) <= 1;
-}
-
-NB_INLINE Py_ssize_t PyUnstable_Long_CompactValue(const PyLongObject *o) {
-    return Py_SIZE(o) * (Py_ssize_t) o->ob_digit[0];
-}
-#endif
-
-template <typename T, bool Recurse = true>
-NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
-    // Only CPython guarantees that PyNumber_Index() returns an exact 'int'.
-#if defined(PYPY_VERSION)
-    constexpr bool Exact = Recurse;
-#else
-    constexpr bool Exact = true;
-#endif
-
-    if (NB_LIKELY(Exact ? PyLong_CheckExact(o) : PyLong_Check(o))) {
 #if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
-        PyLongObject *l = (PyLongObject *) o;
 
-        // Fast path for compact integers
-        if (NB_LIKELY(PyUnstable_Long_IsCompact(l))) {
-            Py_ssize_t value = PyUnstable_Long_CompactValue(l);
-            T value_t = (T) value;
+/// Sign and digits of a Python 'int', see Include/cpython/longintrepr.h
+struct int_repr {
+    const digit *digits; // Little-endian, PyLong_SHIFT bits each
+    Py_ssize_t size;     // Number of digits, of which zero has none
+    bool negative;
+};
 
-            if (NB_UNLIKELY((std::is_unsigned_v<T> && value < 0) ||
-                            (sizeof(T) != sizeof(Py_ssize_t) &&
-                             value != (Py_ssize_t) value_t)))
-                return false;
+NB_INLINE int_repr int_repr_get(PyObject *o) noexcept {
+    PyLongObject *l = (PyLongObject *) o;
 
-            *out = value_t;
-            return true;
-        }
+#if PY_VERSION_HEX < 0x030c0000
+    Py_ssize_t size = Py_SIZE(l);
+    return { l->ob_digit, size < 0 ? -size : size, size < 0 };
+#else
+    uintptr_t tag = l->long_value.lv_tag;
+    return { l->long_value.ob_digit,
+             (Py_ssize_t) (tag >> _PyLong_NON_SIZE_BITS),
+             (tag & _PyLong_SIGN_MASK) == 2 };
 #endif
+}
 
-        // Slow path
-        using T0 = std::conditional_t<sizeof(T) <= sizeof(long), long, long long>;
-        using Tp = std::conditional_t<std::is_signed_v<T>, T0, std::make_unsigned_t<T0>>;
+/// Convert an object that is already known to be an 'int'. Never raises.
+template <typename T>
+NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
+    constexpr size_t bits = sizeof(T) * 8;
 
-        Tp value_p;
-        if constexpr (std::is_unsigned_v<Tp>)
-            value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsUnsignedLong(o)
-                                                : (Tp) PyLong_AsUnsignedLongLong(o);
-        else
-            value_p = sizeof(T) <= sizeof(long) ? (Tp) PyLong_AsLong(o)
-                                                : (Tp) PyLong_AsLongLong(o);
+    // Number of digits of the largest value of type 'T'
+    constexpr Py_ssize_t size_max =
+        (Py_ssize_t) ((bits + PyLong_SHIFT - 1) / PyLong_SHIFT);
 
-        if (value_p == Tp(-1) && PyErr_Occurred()) {
-            PyErr_Clear();
+    // Largest leading digit that keeps the accumulator below 2**64
+    constexpr uint64_t digit_max =
+        (~(uint64_t) 0) >> ((size_max - 1) * PyLong_SHIFT);
+
+    // Magnitude of the largest positive and negative value of type 'T'
+    constexpr uint64_t max_pos = (~(uint64_t) 0) >> (64 - bits + std::is_signed_v<T>),
+                       max_neg = std::is_signed_v<T> ? max_pos + 1 : 0;
+
+    int_repr r = int_repr_get(o);
+    uint64_t value;
+
+    if (NB_LIKELY(r.size <= 1)) {
+        value = r.size ? r.digits[0] : 0;
+    } else {
+        if (NB_UNLIKELY(r.size > size_max ||
+                        (r.size == size_max && r.digits[size_max - 1] > digit_max)))
             return false;
-        }
 
-        T value = (T) value_p;
-        if constexpr (sizeof(Tp) != sizeof(T)) {
-            if (value_p != (Tp) value)
-                return false;
-        }
+        value = 0;
+        for (Py_ssize_t i = r.size - 1; i >= 0; --i)
+            value = (value << PyLong_SHIFT) | r.digits[i];
+    }
 
-        *out = value;
+    // 'max_neg' is zero when 'T' is unsigned, which rejects negative values
+    if (NB_UNLIKELY(value > (r.negative ? max_neg : max_pos)))
+        return false;
+
+    *out = (T) (r.negative ? (uint64_t) 0 - value : value);
+    return true;
+}
+
+#else
+
+/// Convert an object that is already known to be an 'int'. Never raises.
+template <typename T>
+NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
+    int overflow;
+    long long value = PyLong_AsLongLongAndOverflow(o, &overflow);
+
+    if (NB_LIKELY(overflow == 0)) {
+        T value_t = (T) value;
+
+        if (NB_UNLIKELY((std::is_unsigned_v<T> && value < 0) ||
+                        (sizeof(T) != sizeof(long long) &&
+                         value != (long long) value_t)))
+            return false;
+
+        *out = value_t;
         return true;
     }
 
-    if constexpr (Recurse) {
-        if (flags & cast_flags::convert) {
-            PyObject* temp = PyNumber_Index(o);
-            if (temp) {
-                bool result = load_int<T, false>(temp, 0, out);
-                Py_DECREF(temp);
-                return result;
-            } else {
-                PyErr_Clear();
+    // Branch to handle the [2**63, 2**64) range (out of bounds of 'long long')
+    if constexpr (std::is_unsigned_v<T> && sizeof(T) == sizeof(long long)) {
+        if (overflow > 0) {
+            // Guard against out of range values using a comparison instead of
+            // letting PyLong_AsUnsignedLongLong fail, which would be much more expensive.
+            if (PyObject_RichCompareBool(o, NB_INTERNED(u64_limit), Py_LT) == 1) {
+                *out = (T) PyLong_AsUnsignedLongLongMask(o);
+                return true;
             }
         }
     }
 
     return false;
+}
+
+#endif
+
+template <typename T>
+NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
+    if (NB_LIKELY(PyLong_CheckExact(o)))
+        return load_int_exact(o, out);
+
+    if (!(flags & cast_flags::convert))
+        return false;
+
+    // Handle subclasses of 'int' via the _exact() caster
+    if (PyLong_Check(o))
+        return load_int_exact(o, out);
+
+    // Give up if we reach this point and __index__() does not exist
+#if !defined(Py_LIMITED_API)
+    PyNumberMethods *nm = Py_TYPE(o)->tp_as_number;
+    if (!nm || !nm->nb_index)
+        return false;
+#else
+    if (!PyIndex_Check(o))
+        return false;
+#endif
+
+    PyObject *temp = PyNumber_Index(o);
+    if (NB_UNLIKELY(!temp)) {
+        PyErr_Clear();
+        return false;
+    }
+
+    bool result = load_int_exact(temp, out);
+    Py_DECREF(temp);
+    return result;
 }
 
 bool load_u8(PyObject *o, uint32_t flags, uint8_t *out) noexcept {

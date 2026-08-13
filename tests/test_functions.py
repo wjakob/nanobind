@@ -63,14 +63,14 @@ def test04_overloads():
 
     # Strings must not implicitly convert to an integer argument
     with pytest.raises(TypeError):
-        t.test_11_sl("5")
+        t.identity_long("5")
 
     # Subclasses of 'int' still convert
     class IntEnum(enum.IntEnum):
         A = 5
 
-    assert t.test_11_sl(True) == 1
-    assert t.test_11_sl(IntEnum.A) == 5
+    assert t.identity_long(True) == 1
+    assert t.identity_long(IntEnum.A) == 5
 
 
 def test05_signature():
@@ -293,12 +293,12 @@ def test21_numpy_overloads():
 
     # ... and do not convert to a pure integer argument at all
     with pytest.raises(TypeError):
-        t.test_11_sl(np.float32(0.5))
+        t.identity_long(np.float32(0.5))
 
-    assert t.test_11_sl(np.int32(5)) == 5
-    assert t.test_11_ul(np.int32(5)) == 5
-    assert t.test_11_sll(np.int32(5)) == 5
-    assert t.test_11_ull(np.int32(5)) == 5
+    assert t.identity_long(np.int32(5)) == 5
+    assert t.identity_ulong(np.int32(5)) == 5
+    assert t.identity_llong(np.int32(5)) == 5
+    assert t.identity_ullong(np.int32(5)) == 5
 
     with pytest.raises(TypeError) as excinfo:
         t.test_21_dnc(np.float64(21.0))  # Python type is not exactly float
@@ -415,68 +415,35 @@ def test30_noexcept():
     assert t.test_32(123) == 123
 
 
-@pytest.mark.parametrize(
-    "func_name",
-    [
-        "identity_i8",
-        "identity_u8",
-        "identity_i16",
-        "identity_u16",
-        "identity_i32",
-        "identity_u32",
-        "identity_i64",
-        "identity_u64",
-    ],
-)
-def test31_range(func_name):
-    func = getattr(t, func_name)
+@pytest.mark.parametrize("name", sorted(t.int_limits))
+def test31_range(name):
+    """Check the integer type casters against the range of every C++ type"""
+    func = getattr(t, "identity_" + name)
+    range_min, range_max = t.int_limits[name]
 
-    values = [
-        0,
-        -1,
-        1,
-        2**7,
-        2**7 - 1,
-        2**8,
-        2**8 - 1,
-        2**15,
-        2**15 - 1,
-        2**16,
-        2**16 - 1,
-        2**29,
-        2**29 - 1,
-        2**30,
-        2**30 - 1,
-        2**31,
-        2**31 - 1,
-        2**32,
-        2**32 - 1,
-        2**63,
-        2**63 - 1,
-        2**64,
-        2**64 - 1,
-        2**127,
-        2**127 - 1,
-        2**128,
-        2**128 - 1,
-    ]
+    # Bit positions where a C integer type or a CPython digit boundary lies,
+    # so that the values below span one, two, three and many digits
+    values = [0]
+    for bits in (7, 8, 15, 16, 29, 30, 31, 32, 45, 60, 63, 64, 75, 90, 127, 128, 1000):
+        values += [2**bits - 1, 2**bits, 2**bits + 1]
     values += [-value for value in values]
-    suffix = func.__name__[9:]
 
-    if suffix[0] == "u":
-        range_min = 0
-        range_max = 2 ** int(suffix[1:]) - 1
-    else:
-        range_min = -(2 ** (int(suffix[1:]) - 1))
-        range_max = -range_min - 1
+    class Indexable:
+        """Conversion of a foreign type goes through __index__"""
 
-    for value in values:
-        if value < range_min or value > range_max:
-            with pytest.raises(TypeError):
-                value_out = func(value)
-        else:
-            value_out = func(value)
-            assert value_out == value
+        def __init__(self, value):
+            self.value = value
+
+        def __index__(self):
+            return self.value
+
+    for wrapper in (int, Indexable):
+        for value in values:
+            if range_min <= value <= range_max:
+                assert func(wrapper(value)) == value
+            else:
+                with pytest.raises(TypeError):
+                    func(wrapper(value))
 
 
 def test33_method_on_non_nanobind_class():

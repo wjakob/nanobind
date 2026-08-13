@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 
+#include <limits>
 #include <string.h>
 
 #include <nanobind/stl/function.h>
@@ -252,12 +253,6 @@ NB_MODULE(test_functions_ext, m) {
         return d.contains("foo"_s);
     });
 
-    // Test implicit conversion of various types
-    m.def("test_11_sl",  [](signed long x)        { return x; });
-    m.def("test_11_ul",  [](unsigned long x)      { return x; });
-    m.def("test_11_sll", [](signed long long x)   { return x; });
-    m.def("test_11_ull", [](unsigned long long x) { return x; });
-
     // Test string caster
     m.def("test_12", [](const char *c) { return nb::str(c); });
     m.def("test_13", []() -> const char * { return "test"; });
@@ -334,14 +329,37 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_31", &test_31);
     m.def("test_32", [](int i) noexcept { return i; });
 
-    m.def("identity_i8", [](int8_t  i) { return i; });
-    m.def("identity_u8", [](uint8_t i) { return i; });
-    m.def("identity_i16", [](int16_t  i) { return i; });
-    m.def("identity_u16", [](uint16_t i) { return i; });
-    m.def("identity_i32", [](int32_t  i) { return i; });
-    m.def("identity_u32", [](uint32_t i) { return i; });
-    m.def("identity_i64", [](int64_t  i) { return i; });
-    m.def("identity_u64", [](uint64_t i) { return i; });
+    // An identity function for every integer type that the type caster
+    // handles, plus a table with the range of each of them. The Python test
+    // 'test31_range' iterates over this table.
+    nb::dict int_limits;
+    auto bind_int = [&](const char *name, auto tag) {
+        using T = decltype(tag);
+        m.def(("identity_" + std::string(name)).c_str(), [](T value) { return value; });
+        int_limits[name] = nb::make_tuple(std::numeric_limits<T>::min(),
+                                          std::numeric_limits<T>::max());
+    };
+
+    bind_int("i8",     (int8_t) 0);
+    bind_int("u8",     (uint8_t) 0);
+    bind_int("i16",    (int16_t) 0);
+    bind_int("u16",    (uint16_t) 0);
+    bind_int("i32",    (int32_t) 0);
+    bind_int("u32",    (uint32_t) 0);
+    bind_int("i64",    (int64_t) 0);
+    bind_int("u64",    (uint64_t) 0);
+    bind_int("schar",  (signed char) 0);
+    bind_int("uchar",  (unsigned char) 0);
+    bind_int("short",  (short) 0);
+    bind_int("ushort", (unsigned short) 0);
+    bind_int("int",    (int) 0);
+    bind_int("uint",   (unsigned int) 0);
+    bind_int("long",   (long) 0);
+    bind_int("ulong",  (unsigned long) 0);
+    bind_int("llong",  (long long) 0);
+    bind_int("ullong", (unsigned long long) 0);
+
+    m.attr("int_limits") = int_limits;
 
     m.attr("test_33") = nb::cpp_function([](nb::object self, int y) {
         return nb::cast<int>(self.attr("x")) + y;

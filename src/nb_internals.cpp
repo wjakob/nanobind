@@ -259,6 +259,15 @@ static void init_pyobjects(nb_internals *p) {
     new_constant(p, pyobj_name::interned_dl_version_tpl, PyTuple_Pack(2, major, minor));
     Py_DECREF(minor);
     Py_DECREF(major);
+
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
+    // Upper bound of the 'uint64_t' range, see load_int_exact() in common.cpp
+    PyObject *u64_max = PyLong_FromUnsignedLongLong(~(unsigned long long) 0),
+             *u64_one = PyLong_FromLong(1);
+    new_constant(p, pyobj_name::interned_u64_limit, PyNumber_Add(u64_max, u64_one));
+    Py_DECREF(u64_one);
+    Py_DECREF(u64_max);
+#endif
 }
 
 /// Create lifeline + internal types if needed

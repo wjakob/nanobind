@@ -11,6 +11,7 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
+#include <optional>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
@@ -56,6 +57,46 @@ template <typename Iterator> struct iterator_value_access {
     result_type operator()(Iterator &it) const { return (*it).second; }
 };
 
+/// Return type of the generated __next__() method. This exists to raise
+/// ``StopIteration`` in Python without (slow) C++ exceptions.
+template <typename T, typename /* SFINAE */ = int> struct iter_result;
+
+/// Element access yielded a reference, so refer to the element in place
+template <typename T> struct iter_result<T, enable_if_t<std::is_reference_v<T>>> {
+    std::remove_reference_t<T> *value = nullptr;
+
+    iter_result() = default;
+    iter_result(T v) : value(std::addressof(v)) { }
+
+    bool has_value() const { return value != nullptr; }
+    T get() { return static_cast<T>(*value); }
+};
+
+/// Element access yielded a temporary, so hold on to it
+template <typename T> struct iter_result<T, enable_if_t<!std::is_reference_v<T>>> {
+    std::optional<T> value;
+
+    iter_result() = default;
+    iter_result(T &&v) : value(std::move(v)) { }
+
+    bool has_value() const { return value.has_value(); }
+    T &&get() { return std::move(*value); }
+};
+
+template <typename T> struct type_caster<iter_result<T>> {
+    static constexpr auto Name = make_caster<T>::Name;
+
+    static handle from_cpp(iter_result<T> r, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        if (!r.has_value()) {
+            PyErr_SetNone(PyExc_StopIteration);
+            return { };
+        }
+
+        return make_caster<T>::from_cpp(r.get(), policy, cleanup);
+    }
+};
+
 template <typename Access, rv_policy::value Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
 typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
@@ -78,7 +119,7 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
             class_<State>(scope, name)
                 .def("__iter__", [](handle h) { return h; })
                 .def("__next__",
-                    [](State &s) -> ValueType {
+                    [](State &s) -> iter_result<ValueType> {
                         if (!s.first_or_done)
                             ++s.it;
                         else
@@ -86,7 +127,7 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
 
                         if (s.it == s.end) {
                             s.first_or_done = true;
-                            throw stop_iteration();
+                            return { };
                         }
 
                         return Access()(s.it);

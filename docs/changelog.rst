@@ -107,6 +107,16 @@ This is a major release with breaking API and ABI changes, in particular:
     (``MyClass.method(obj)``). This previously worked, which was arguably a
     bug.
 
+This release also brings a set of performance improvements:
+
+- **Faster iteration**: ranges exposed through ``nb::make_iterator()``
+  previously raised a C++ exception to signal the end of each loop. The cost
+  of the resulting stack unwinding (several microseconds) could easily
+  dominate iteration over small sequences. The generated ``__next__``
+  function now signals exhaustion without raising a C++ exception, which
+  reduces the cost of a loop over a 4-element sequence from **5167ns** to
+  **125ns** on my machine. The per-element cost is unchanged.
+
 - ABI version 22.
 
 Version 2.15.0 (Aug 15, 2026)

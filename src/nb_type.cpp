@@ -642,6 +642,7 @@ static void nb_type_dealloc(PyObject *o) {
     bool initialized = t->name != nullptr;
     free((char *) t->name);
     PyMem_Free(t->supplement);
+    nb_trampoline_free(t);
 
     PyTypeObject *meta = Py_TYPE(o);
     NB_SLOT(PyType_Type, tp_dealloc)(o);
@@ -686,6 +687,11 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     type_data *t = nb_type_data((PyTypeObject *) self);
 
     *t = *t_b;
+
+    // Subclasses resolve their own overrides
+    t->trampoline_table_pub = nullptr;
+    t->trampoline_allocs = nullptr;
+
     t->flags |=  (uint32_t) type_flags::is_python_type;
     t->flags &= (~(uint32_t) type_flags::has_implicit_conversions) & 0xFFFFFF;
 
@@ -768,7 +774,15 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         PyErr_Clear();
     }
 
-    return NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
+    int rv = NB_SLOT(PyType_Type, tp_setattro)(obj, name, value);
+
+    /* The assignment may have (un)shadowed a bound method; drop the
+       trampoline override tables of this type and its subclasses so that
+       virtual method calls observe the modification. */
+    if (rv == 0)
+        nb_trampoline_invalidate(obj);
+
+    return rv;
 }
 
 #if NB_TYPE_FROM_METACLASS_IMPL || NB_TYPE_GET_SLOT_IMPL
@@ -1601,6 +1615,8 @@ PyObject *nb_type_new(const type_init_data *t) noexcept {
     to->type_py = (PyTypeObject *) result;
     to->alias_chain = nullptr;
     to->init = nullptr;
+    to->trampoline_table_pub = nullptr;
+    to->trampoline_allocs = nullptr;
 
     if (has_supplement) {
         to->supplement = PyMem_Malloc(t->supplement_size);

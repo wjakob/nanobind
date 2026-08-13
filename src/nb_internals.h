@@ -497,6 +497,12 @@ struct nb_internals {
     nb_ptr_map funcs;
 #endif
 
+    /// Counter bumped on every type modification (release increment).
+    /// Trampoline override resolution reads it before resolving (acquire)
+    /// and re-checks it before publishing an entry, discarding results
+    /// that raced with a concurrent modification (see trampoline.cpp).
+    nb_maybe_atomic<size_t> trampoline_epoch = 0;
+
     /// Registered C++ -> Python exception translators
     nb_maybe_atomic<nb_translator_seq *> translators = nullptr;
 
@@ -626,6 +632,13 @@ extern PyTypeObject *nb_static_property_tp() noexcept;
 extern type_data *nb_type_c2p(nb_internals *internals,
                               const std::type_info *type);
 extern void nb_type_unregister(type_data *t) noexcept;
+
+/// Drop the published trampoline tables of 'tp' and its subclasses after a
+/// type modification so that overrides are re-resolved (GIL held)
+extern void nb_trampoline_invalidate(PyObject *tp) noexcept;
+
+/// Free the trampoline allocations owned by a type record (GIL held)
+extern void nb_trampoline_free(type_data *t) noexcept;
 
 extern PyObject *call_one_arg(PyObject *fn, PyObject *arg) noexcept;
 

@@ -561,7 +561,7 @@ to Python.
    #include <nanobind/trampoline.h>
 
    struct PyDog : Dog {
-       NB_TRAMPOLINE(Dog, 1);
+       NB_TRAMPOLINE(Dog);
 
        std::string bark() const override {
            NB_OVERRIDE(bark);
@@ -569,20 +569,8 @@ to Python.
    };
 
 This involves an additional include directive and the line
-:c:macro:`NB_TRAMPOLINE(Dog, 1) <NB_TRAMPOLINE>` to mark the class as a
-trampoline for the ``Dog`` base type. The count (``1``) denotes to the total
-number of virtual method slots that can be overridden within Python.
-
-.. note::
-
-   The number of virtual method slots is used to preallocate memory.
-   Trampoline declarations with an insufficient size may eventually trigger a
-   Python ``RuntimeError`` exception with a descriptive label, e.g.:
-
-   .. code-block:: text
-
-      nanobind::detail::get_trampoline('PyDog::bark()'): the trampoline ran out of
-      slots (you will need to increase the value provided to the NB_TRAMPOLINE() macro)
+:c:macro:`NB_TRAMPOLINE(Dog) <NB_TRAMPOLINE>` to mark the class as a
+trampoline for the ``Dog`` base type.
 
 The macro :c:macro:`NB_OVERRIDE(bark) <NB_OVERRIDE>` intercepts the virtual
 function call, checks if a Python override exists, and forwards the call in
@@ -802,7 +790,7 @@ described trampoline:
 
     class Trampoline : public A {
     public:
-        NB_TRAMPOLINE(A, 1);
+        NB_TRAMPOLINE(A);
         int foo() const override { NB_OVERRIDE(foo); }
     };
 

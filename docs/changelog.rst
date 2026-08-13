@@ -25,6 +25,52 @@ This is a major release with breaking API and ABI changes, in particular:
   Python 3.9 reached its end of life in October 2025, and dropping it removes
   a number of workarounds for missing C API functionality.
 
+- **Trampolines**: nanobind 3 switches to a new :ref:`trampoline <trampolines>`
+  mechanism to override C++ methods in Python. Instead of caching data about
+  such overrides within instances (which cost 16 bytes per overload), the
+  cache is now located within type objects. Trampoline dispatch became
+  faster, and its cost no longer grows with the number of overridable
+  methods. Monkey-patching methods into an existing type object now works
+  correctly and invalidates this cache.
+
+  **API break**: it is no longer necessary to specify the ``Size`` of the
+  trampoline in the :c:macro:`NB_TRAMPOLINE(Base, Size) <NB_TRAMPOLINE>` macro,
+  and doing so will cause a deprecation warning.
+
+  .. code-block:: cpp
+
+     struct PyDog : Dog {
+         NB_TRAMPOLINE(Dog, 1); // deprecated, warns
+         ...
+
+  Rewrite it as follows:
+
+  .. code-block:: cpp
+
+     struct PyDog : Dog {
+         NB_TRAMPOLINE(Dog); // OK
+         ...
+
+  In the past, it was possible to monkey-patch methods into *instances*
+
+  .. code-block:: python
+
+     inst = Dog()
+     inst.bark = ... // Ignored since nanobind 3.0.0
+
+  Such assignments are now ignored by the trampoline. Methods can only be
+  overridden in the *type*, either at creation time, or by patching it later:
+
+  .. code-block:: python
+
+     # Override in the instance
+     class MyDog(Dog):
+        def bark(self): ...
+
+     # .. or monkey-patch
+     inst = Dog()
+     Dog.bark = ...
+
 - **Return value policies**: policies like :cpp:member:`nb::rv_policy::move
   <rv_policy::move>` used to be ``enum`` values and now became compile-time tags. As a consequence, function
   bindings like

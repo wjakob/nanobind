@@ -23,7 +23,7 @@ public:
 };
 
 class PyTest : Test {
-    NB_TRAMPOLINE(Test, 1);
+    NB_TRAMPOLINE(Test);
     virtual int value(int i) const {
         NB_OVERRIDE(value, i);
     }

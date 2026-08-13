@@ -1,6 +1,6 @@
 /*
-    nanobind/trampoline.h: functionality for overriding C++ virtual
-    functions from within Python
+    nanobind/trampoline.h: functionality for overriding C++ virtual functions
+    from within Python. See src/trampoline.cpp for more details.
 
     Copyright (c) 2022 Wenzel Jakob
 
@@ -17,44 +17,75 @@ NAMESPACE_BEGIN(detail)
 
 struct ticket;
 
-NB_CORE void trampoline_new(void **data, size_t size, void *ptr) noexcept;
-NB_CORE void trampoline_release(void **data, size_t size) noexcept;
-NB_CORE void trampoline_enter(void **data, size_t size, const char *name,
+NB_CORE PyObject *trampoline_new(void *ptr) noexcept;
+NB_CORE void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
                               bool pure, ticket *ticket);
 NB_CORE void trampoline_leave(ticket *ticket) noexcept;
 
-template <size_t Size> struct trampoline {
-    mutable void *data[2 * Size + 1];
+/// Compile-time hash (FNV-1a) of a method name
+constexpr uint64_t trampoline_hash(const char *s) {
+    uint64_t h = 0xcbf29ce484222325ull;
+    while (*s) {
+        h ^= (uint64_t) (uint8_t) *s++;
+        h *= 0x100000001b3ull;
+    }
+    return h;
+}
 
-    NB_INLINE constexpr trampoline(void *ptr) { trampoline_new(data, Size, ptr); }
-    NB_INLINE ~trampoline() { trampoline_release(data, Size); }
+/// Member of every trampoline class (see NB_TRAMPOLINE). The constructor
+/// asks the backend for the Python object that owns the C++ instance 'ptr'.
+struct trampoline {
+    PyObject *self;
 
-    NB_INLINE handle base() const { return (PyObject *) data[0]; }
+#if defined(_MSC_VER) && !defined(__clang__)
+    // MSVC requires this when the base class has a constexpr constructor
+    NB_INLINE constexpr trampoline(void *ptr) : self(nullptr) {
+#else
+    NB_INLINE trampoline(void *ptr) : self(nullptr) {
+#endif
+        self = trampoline_new(ptr);
+    }
+    NB_INLINE handle base() const { return self; }
 };
 
+/// Asks the backend whether the method 'name' is overridden in Python. If
+/// so, 'key' holds the method name for the call, and the destructor notifies
+/// the backend when the call is over. The other fields are backend-private.
 struct ticket {
     handle self;
     handle key;
     ticket *prev{};
     PyGILState_STATE state{};
 
-    template <size_t Size>
-    NB_INLINE ticket(const trampoline<Size> &t, const char *name, bool pure) {
-        trampoline_enter(t.data, Size, name, pure, this);
+    NB_INLINE ticket(const trampoline &t, const char *name, uint64_t hash, bool pure) {
+        trampoline_enter(t.self, name, hash, pure, this);
     }
 
-    NB_INLINE ~ticket() noexcept { trampoline_leave(this); }
+    NB_INLINE ~ticket() noexcept {
+        if (key.is_valid())
+            trampoline_leave(this);
+    }
 };
 
-#define NB_TRAMPOLINE(base, size)                                              \
-    using NBBase = base;                                                       \
+// Extracts the base type of NB_TRAMPOLINE. The specialization with a size
+// argument is deprecated.
+template <typename Base, int... Size> struct trampoline_base;
+template <typename Base> struct trampoline_base<Base> { using type = Base; };
+template <typename Base, int Size>
+struct [[deprecated("the NB_TRAMPOLINE size argument is obsolete and can be removed")]]
+trampoline_base<Base, Size> { using type = Base; };
+
+#define NB_TRAMPOLINE(...)                                                     \
+    using NBBase =                                                             \
+        typename nanobind::detail::trampoline_base<__VA_ARGS__>::type;         \
     using NBBase::NBBase;                                                      \
-    nanobind::detail::trampoline<size> nb_trampoline{ this }
+    nanobind::detail::trampoline nb_trampoline{ this }
 
 #define NB_OVERRIDE_NAME(name, func, ...)                                      \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    nanobind::detail::ticket nb_ticket(nb_trampoline, name, false);            \
-    if (nb_ticket.key.is_valid()) {                                                       \
+    constexpr uint64_t nb_hash = nanobind::detail::trampoline_hash(name);      \
+    nanobind::detail::ticket nb_ticket(nb_trampoline, name, nb_hash, false);   \
+    if (nb_ticket.key.is_valid()) {                                            \
         return nanobind::cast<nb_ret_type>(                                    \
             nb_trampoline.base().attr(nb_ticket.key)(__VA_ARGS__));            \
     } else                                                                     \
@@ -62,7 +93,8 @@ struct ticket {
 
 #define NB_OVERRIDE_PURE_NAME(name, func, ...)                                 \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    nanobind::detail::ticket nb_ticket(nb_trampoline, name, true);             \
+    constexpr uint64_t nb_hash = nanobind::detail::trampoline_hash(name);      \
+    nanobind::detail::ticket nb_ticket(nb_trampoline, name, nb_hash, true);    \
     return nanobind::cast<nb_ret_type>(                                        \
         nb_trampoline.base().attr(nb_ticket.key)(__VA_ARGS__))
 

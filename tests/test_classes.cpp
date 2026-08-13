@@ -414,7 +414,7 @@ NB_MODULE(test_classes_ext, m) {
     // test10_trampoline_failures
 
     struct PyAnimal : Animal {
-        NB_TRAMPOLINE(Animal, 3);
+        NB_TRAMPOLINE(Animal);
 
         PyAnimal() {
             default_constructed++;
@@ -445,7 +445,7 @@ NB_MODULE(test_classes_ext, m) {
     };
 
     struct PyDog : Dog {
-        NB_TRAMPOLINE(Dog, 2);
+        NB_TRAMPOLINE(Dog);
 
         PyDog(const std::string &s) : Dog(s) { }
 
@@ -986,7 +986,20 @@ NB_MODULE(test_classes_ext, m) {
     };
 
     struct PyConstexprClass : ConstexprClass {
+        // Deliberate use of the obsolete two-argument form to keep it compiling
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#else
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
         NB_TRAMPOLINE(ConstexprClass, 1);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#else
+#  pragma GCC diagnostic pop
+#endif
 
         int getInt() const override {
             NB_OVERRIDE(getInt);

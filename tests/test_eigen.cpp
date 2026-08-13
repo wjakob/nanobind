@@ -297,7 +297,7 @@ NB_MODULE(test_eigen_ext, m) {
     };
 
     struct PyBase : Base {
-        NB_TRAMPOLINE(Base, 3);
+        NB_TRAMPOLINE(Base);
         void modRefData(Eigen::Ref<Eigen::VectorXd> a) override {
             NB_OVERRIDE_PURE(modRefData, a);
         }

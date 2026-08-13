@@ -142,6 +142,15 @@ struct type_data {
     uint32_t weaklistoffset;
     /// Out-of-line heap storage for an optional nb::supplement<T>
     void *supplement;
+
+    /* Trampoline override state. 'trampoline_table_pub' holds the published
+       override table (a 'trampoline_table *' accessed atomically);
+       'trampoline_allocs' owns every table allocation of this type,
+       including retired tables that may still have lock-free readers, and
+       is only freed with the type. Its low bit records whether the type's
+       subtree ever constructed a trampoline instance (see trampoline.cpp). */
+    void *trampoline_table_pub;
+    void *trampoline_allocs;
     /// Instance pool capacity
     uint32_t pool_capacity;
 #if defined(NB_FREE_THREADED)

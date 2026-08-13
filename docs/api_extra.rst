@@ -111,11 +111,15 @@ calls to Python require an additional include directive:
 
 See the section on :ref:`trampolines <trampolines>` for further detail.
 
-.. c:macro:: NB_TRAMPOLINE(base, size)
+.. c:macro:: NB_TRAMPOLINE(base)
 
    Install a trampoline in an alias class to enable dispatching C++ virtual
    function calls to a Python implementation. Refer to the documentation on
    :ref:`trampolines <trampolines>` to see how this macro can be used.
+
+   The two-argument form ``NB_TRAMPOLINE(base, size)`` of nanobind 2.x is
+   still accepted, but the ``size`` argument is obsolete and produces a
+   deprecation warning.
 
 .. c:macro:: NB_OVERRIDE(func, ...)
 

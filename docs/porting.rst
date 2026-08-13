@@ -219,11 +219,9 @@ specify them within the constructor declaration:
 Trampoline classes
 ------------------
 Trampolines, i.e., polymorphic class implementations that forward virtual
-function calls to Python, now require an extra :c:macro:`NB_TRAMPOLINE(parent,
-size) <NB_TRAMPOLINE()>` declaration, where ``parent`` refers to the parent class
-and ``size`` is at least as big as the number of :c:macro:`NB_OVERRIDE_*() <NB_OVERRIDE>`
-calls. nanobind caches information to enable efficient function dispatch, for
-which it must know the number of trampoline "slots".
+function calls to Python, now require an extra
+:c:macro:`NB_TRAMPOLINE(parent) <NB_TRAMPOLINE()>` declaration, where
+``parent`` refers to the parent class.
 
 The macro ``PYBIND11_OVERRIDE_*(..)`` required the base type and return value
 as the first two arguments. This information is no longer needed in nanobind,
@@ -235,20 +233,12 @@ An example:
 .. code-block:: cpp
 
    struct PyAnimal : Animal {
-       NB_TRAMPOLINE(Animal, 1);
+       NB_TRAMPOLINE(Animal);
 
        std::string name() const override {
            NB_OVERRIDE(name);
        }
    };
-
-Trampoline declarations with an insufficient size may eventually trigger a
-Python ``RuntimeError`` exception with a descriptive label, e.g.:
-
-.. code-block:: text
-
-   nanobind::detail::get_trampoline('PyAnimal::what()'): the trampoline ran out of
-   slots (you will need to increase the value provided to the NB_TRAMPOLINE() macro)
 
 Iterator bindings
 -----------------

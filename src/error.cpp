@@ -188,18 +188,6 @@ const char *error_what(PyObject *value, char **what) noexcept {
     return expected;
 }
 
-NAMESPACE_END(detail)
-
-// Deliberately out-of-line: the key function anchors the class's vtable and
-// typeinfo (see the comment in nb_error.h)
-python_error::~python_error() { detail::error_release(m_value, m_what); }
-
-builtin_exception::builtin_exception(exception_type type, const char *what)
-    : std::runtime_error(what ? what : ""), m_type(type) { }
-builtin_exception::~builtin_exception() { }
-
-NAMESPACE_BEGIN(detail)
-
 void register_exception_translator(exception_translator t, void *payload) {
     nb_translator_seq *head = new nb_translator_seq{ t, payload,
                                                      internals->translators.load_acquire() };

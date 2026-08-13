@@ -44,7 +44,9 @@ public:
         e.m_value = nullptr;
         e.m_what = nullptr;
     }
-    NB_EXPORT_SHARED ~python_error() override;
+    // The destructor is deliberately inline so that the vtable & typeinfo are
+    // weak definitions in every binary that the dynamic linker can then unify.
+    ~python_error() override { NB_CALL(error_release)(m_value, m_what); }
 
     bool matches(handle exc) const noexcept {
         return PyErr_GivenExceptionMatches(m_value, exc.ptr()) != 0;
@@ -92,14 +94,16 @@ private:
 /// Thrown by nanobind::cast when casting fails
 using cast_error = std::bad_cast;
 
-// Base interface used to expose common Python exceptions in C++
+// Base interface used to expose common Python exceptions in C++. Fully
+// inline for the same reason as python_error's destructor above.
 class NB_EXPORT builtin_exception : public std::runtime_error {
 public:
-    NB_EXPORT_SHARED builtin_exception(exception_type type, const char *what);
-    NB_EXPORT_SHARED builtin_exception(builtin_exception &&) = default;
-    NB_EXPORT_SHARED builtin_exception(const builtin_exception &) = default;
-    NB_EXPORT_SHARED ~builtin_exception();
-    NB_EXPORT_SHARED exception_type type() const { return m_type; }
+    builtin_exception(exception_type type, const char *what)
+        : std::runtime_error(what ? what : ""), m_type(type) { }
+    builtin_exception(builtin_exception &&) = default;
+    builtin_exception(const builtin_exception &) = default;
+    ~builtin_exception() override = default;
+    exception_type type() const { return m_type; }
 private:
     exception_type m_type;
 };

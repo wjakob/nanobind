@@ -522,10 +522,10 @@ constexpr uint16_t nb_backend_slot_count = (uint16_t) (0
 #include "nb_backend_slots.h"
 );
 
-/// Backend ABI function table, to be filled by ``register()``.
+/// Backend ABI function table, populated by the backend module's ``fill()``.
 struct nb_backend_table {
     uint16_t slot_count;  // Number of slots expected by the caller
-    uint16_t abi_minor;   // Minimum NB_BACKEND_ABI_MINOR the caller requires
+    uint16_t abi_minor;   // Caller's NB_BACKEND_ABI_MINOR
     uint8_t reserved[4];  // Unused, zero for now.
 
 #define NB_SLOT(ret, name, args) ret (*name) args;
@@ -540,13 +540,61 @@ static_assert(sizeof(nb_backend_table) == 8 + nb_backend_slot_count * sizeof(voi
               "nb_backend_table contains unexpected padding");
 
 #if defined(NB_BACKEND_MODULE)
+/// Create a default-initialized ABI function table.
+constexpr nb_backend_table nb_backend_table_init() noexcept {
+    nb_backend_table result {};
+    result.slot_count = nb_backend_slot_count;
+    result.abi_minor = NB_BACKEND_ABI_MINOR;
+    return result;
+}
+
 /// The function table is declared as hidden and inline so that all versions
 /// of it are merged into a single private copy per DSO.
-NB_HIDDEN inline nb_backend_table nb_backend { nb_backend_slot_count, NB_BACKEND_ABI_MINOR, {} };
+NB_HIDDEN inline nb_backend_table nb_backend = nb_backend_table_init();
 
 /// Has the table been filled by a backend module? (see the NB_MODULE bootstrap)
 NB_HIDDEN inline bool nb_backend_ready = false;
 
+#define NB_BACKEND_MODULE_STR NB_TOSTRING(NB_BACKEND_MODULE)
+
+/// Import a backend module and ask it to fill our function table
+NB_NOINLINE inline bool nb_backend_init(const char *extension) noexcept {
+    if (nb_backend_ready)
+        return true;
+
+    PyObject *mod = PyImport_ImportModule(NB_BACKEND_MODULE_STR);
+    if (!mod) {
+        if (PyErr_ExceptionMatches(PyExc_ModuleNotFoundError))
+            PyErr_Format(
+                PyExc_ImportError,
+                "Importing the extension '%s' failed because the nanobind "
+                "backend module '" NB_BACKEND_MODULE_STR "' is not installed."
+#if defined(NB_BACKEND_PYPI)
+                " Install it via 'pip install " NB_TOSTRING(NB_BACKEND_PYPI) "'."
+#endif
+                , extension);
+        return false;
+    }
+
+    // Provide the platform ABI tag both as an explicit string, and as capsule name.
+    PyObject *capsule = PyCapsule_New(&nb_backend, NB_PLATFORM_ABI_TAG, nullptr);
+    PyObject *result =
+        capsule ? PyObject_CallMethod(mod, "fill", "(isO)",
+                                      (int) NB_BACKEND_ABI_MAJOR,
+                                      NB_PLATFORM_ABI_TAG, capsule)
+                : nullptr;
+    Py_XDECREF(capsule);
+    Py_DECREF(mod);
+    if (!result)
+        return false; // fill() has already phrased a precise error
+    Py_DECREF(result);
+
+    nb_backend_ready = true;
+    return true;
+}
+#else
+/// Linked build modes have no bootstrap; see NB_MODULE in nb_defs.h
+NB_INLINE bool nb_backend_init(const char *) noexcept { return true; }
 #endif
 
 NAMESPACE_END(detail)

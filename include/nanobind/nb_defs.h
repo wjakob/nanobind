@@ -123,6 +123,25 @@
 #    error "nanobind requires a newer PyPy version (>= 7.3.12)"
 #endif
 
+#if defined(NB_BACKEND_MODULE) && defined(PYPY_VERSION)
+#    error "nanobind's split mode requires CPython"
+#endif
+
+#if defined(NB_BACKEND_MODULE) && defined(NB_DOMAIN)
+#    error "split mode cannot be combined with NB_DOMAIN: the extension joins the domain of its backend module"
+#endif
+
+/* python_error is unusable with libc++ on ELF platforms, where typeinfo is
+   compared by pointer. Python imports extensions with RTLD_LOCAL, so the
+   weak symbols of the extensions are not correctly merged. */
+#if defined(NB_BACKEND_MODULE) && defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#    error "nanobind's split mode requires libstdc++ on ELF platforms"
+#endif
+
+#if defined(NB_BACKEND_MODULE) && !defined(Py_LIMITED_API)
+#    error "nanobind's split mode requires targeting the Python stable ABI (Py_LIMITED_API)"
+#endif
+
 #if defined(NB_FREE_THREADED) && !defined(Py_GIL_DISABLED)
 #    error "Free-threaded extensions require a free-threaded version of Python"
 #endif
@@ -197,6 +216,8 @@
     static PyObject *nanobind_##name##_def = nullptr;                          \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \
+        if (!nanobind::detail::nb_backend_init(#name))                         \
+            return nullptr;                                                    \
         if (!nanobind_##name##_def)                                            \
             nanobind_##name##_def = NB_CALL(module_new)(                       \
                 #name, nullptr, (void *) nanobind_##name##_exec, 0);           \

@@ -506,13 +506,11 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         if constexpr (has_type_hook)
             type = type_hook<Type>::get(ptr);
 
-        if constexpr (!std::is_polymorphic_v<Type>) {
-            return nb_type_put(type, ptr, policy, cleanup);
-        } else {
-            const std::type_info *type_p =
-                (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
-            return nb_type_put_p(type, type_p, ptr, policy, cleanup);
-        }
+        const std::type_info *type_p = nullptr;
+        if constexpr (std::is_polymorphic_v<Type>)
+            type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
+
+        return nb_type_put(type, type_p, ptr, policy, cleanup);
     }
 
     template <typename T_>
@@ -670,6 +668,15 @@ template <typename T> object find(const T &value) noexcept {
     return steal(detail::make_caster<T>::from_cpp(value, rv_policy::none, nullptr));
 }
 
+NAMESPACE_BEGIN(detail)
+/// Store an element produced by make_tuple, raising if its cast failed
+NB_INLINE void tuple_set_checked(PyObject *tuple, Py_ssize_t i, PyObject *p) {
+    if (NB_UNLIKELY(!p))
+        raise_python_or_cast_error();
+    NB_TUPLE_SET_ITEM(tuple, i, p);
+}
+NAMESPACE_END(detail)
+
 template <rv_policy::value policy = rv_policy::automatic_v, typename... Args>
 tuple make_tuple(Args &&...args) {
     tuple result = steal<tuple>(PyTuple_New((Py_ssize_t) sizeof...(Args)));
@@ -677,13 +684,11 @@ tuple make_tuple(Args &&...args) {
     Py_ssize_t nargs = 0;
     PyObject *o = result.ptr();
 
-    (NB_TUPLE_SET_ITEM(o, nargs++,
-                       detail::make_caster<Args>::from_cpp(
-                           (detail::forward_t<Args>) args, policy, nullptr)
-                           .ptr()),
+    (detail::tuple_set_checked(o, nargs++,
+                               detail::make_caster<Args>::from_cpp(
+                                   (detail::forward_t<Args>) args, policy,
+                                   nullptr).ptr()),
      ...);
-
-    detail::tuple_check(o, sizeof...(Args));
 
     return result;
 }

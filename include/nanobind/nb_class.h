@@ -348,8 +348,8 @@ inline bool inst_ready(handle h) { return inst_state(h).first; }
 inline void inst_destruct(handle h) { detail::nb_inst_destruct(h.ptr()); }
 inline void inst_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
 inline void inst_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
-inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_replace_copy(dst.ptr(), src.ptr()); }
-inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_replace_move(dst.ptr(), src.ptr()); }
+inline void inst_replace_copy(handle dst, handle src) { detail::nb_inst_copy(dst.ptr(), src.ptr()); }
+inline void inst_replace_move(handle dst, handle src) { detail::nb_inst_move(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) detail::nb_inst_ptr(h.ptr()); }
 inline void *type_get_slot(handle h, int slot_id) {
 #if NB_TYPE_GET_SLOT_IMPL
@@ -428,13 +428,14 @@ private:
         using Caster = detail::make_caster<Arg>;
 
         if constexpr (!detail::is_class_caster_v<Caster>) {
-            detail::implicitly_convertible(
+            bool (*pred)(PyTypeObject *, PyObject *,
+                         detail::cleanup_list *) noexcept =
                 [](PyTypeObject *, PyObject *src,
                    detail::cleanup_list *cleanup) noexcept -> bool {
                     return Caster().from_python(
                         src, detail::cast_flags::convert, cleanup);
-                },
-                &typeid(Type));
+                };
+            detail::implicitly_convertible(&typeid(Type), (void *) pred, true);
         }
     }
 };
@@ -697,7 +698,7 @@ public:
             set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
                                     is_method(), detail::filter_setter(extra)...);
 
-        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr());
+        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
         return *this;
     }
 
@@ -716,7 +717,7 @@ public:
             set_p = cpp_function((detail::forward_t<Setter>) setter,
                                  detail::filter_setter(extra)...);
 
-        detail::property_install_static(m_ptr, name_, get_p.ptr(), set_p.ptr());
+        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr(), true);
         return *this;
     }
 
@@ -867,7 +868,7 @@ public:
             set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
                                     is_method(), detail::filter_setter(extra)...);
 
-        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr());
+        detail::property_install(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
         return *this;
     }
 
@@ -889,15 +890,18 @@ template <typename Source, typename Target> void implicitly_convertible() {
             "unless it is opaque.");
 
         if constexpr (detail::is_base_caster_v<Caster>) {
-            detail::implicitly_convertible(&typeid(Source), &typeid(Target));
+            detail::implicitly_convertible(&typeid(Target),
+                                           (void *) &typeid(Source), false);
         } else {
-            detail::implicitly_convertible(
+            bool (*pred)(PyTypeObject *, PyObject *,
+                         detail::cleanup_list *) noexcept =
                 [](PyTypeObject *, PyObject *src,
                    detail::cleanup_list *cleanup) noexcept -> bool {
                     return Caster().from_python(src, detail::cast_flags::convert,
                                                 cleanup);
-                },
-                &typeid(Target));
+                };
+            detail::implicitly_convertible(&typeid(Target), (void *) pred,
+                                           true);
         }
     }
 }

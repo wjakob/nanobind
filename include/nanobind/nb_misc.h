@@ -82,19 +82,19 @@ private:
 };
 
 inline bool leak_warnings() noexcept {
-    return detail::leak_warnings();
+    return detail::read_flag(detail::nb_flag::leak_warnings) != 0;
 }
 
 inline bool implicit_cast_warnings() noexcept {
-    return detail::implicit_cast_warnings();
+    return detail::read_flag(detail::nb_flag::implicit_cast_warnings) != 0;
 }
 
 inline void set_leak_warnings(bool value) noexcept {
-    detail::set_leak_warnings(value);
+    detail::write_flag(detail::nb_flag::leak_warnings, value);
 }
 
 inline void set_implicit_cast_warnings(bool value) noexcept {
-    detail::set_implicit_cast_warnings(value);
+    detail::write_flag(detail::nb_flag::implicit_cast_warnings, value);
 }
 
 inline dict globals() {

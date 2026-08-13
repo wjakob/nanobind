@@ -130,15 +130,12 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         if constexpr (has_type_hook)
             type = type_hook<Td>::get(ptr);
 
-        handle result;
-        if constexpr (!std::is_polymorphic_v<Td>) {
-            result = nb_type_put_unique(type, ptr, cleanup, cpp_delete);
-        } else {
-            const std::type_info *type_p =
-                (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
+        const std::type_info *type_p = nullptr;
+        if constexpr (std::is_polymorphic_v<Td>)
+            type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-            result = nb_type_put_unique_p(type, type_p, ptr, cleanup, cpp_delete);
-        }
+        handle result = nb_type_put_unique(type, type_p, ptr, cleanup,
+                                           cpp_delete);
 
         if (result.is_valid()) {
             if (cpp_delete)

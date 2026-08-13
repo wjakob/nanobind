@@ -35,6 +35,18 @@ template <> struct iterator_access<typename std::vector<bool>::iterator> {
     result_type operator()(typename std::vector<bool>::iterator &it) const { return *it; }
 };
 
+/// Render the repr of a sequence in Python list syntax
+NB_NOINLINE inline PyObject *repr_list(PyObject *o) {
+    object name = steal(nb_inst_name(o));
+    list items;
+    for (size_t i = 0, l = len(o); i < l; ++i)
+        items.append(repr(handle(o)[i]));
+    object body = steal(raise_if_null(
+        PyUnicode_Join(str(", ").ptr(), items.ptr())));
+    return raise_if_null(
+        PyUnicode_FromFormat("%U([%U])", name.ptr(), body.ptr()));
+}
+
 NAMESPACE_END(detail)
 
 

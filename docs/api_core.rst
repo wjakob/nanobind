@@ -3166,18 +3166,18 @@ The documentation below refers to two per-instance flags with the following mean
 
 .. cpp:function:: void inst_copy(handle dst, handle src)
 
-   Copy-construct the contents of `src` into `dst` and set the *ready* and
-   *destruct* flags of `dst` to ``true``.
+   Copy-construct the contents of `src` into `dst` and set the *ready* flag
+   of `dst`. Both must be instances of the same type.
 
-   `dst` should be an uninitialized instance of the same type. Note that
-   setting the *destruct* flag may be problematic if `dst` is an offset into an
-   existing object created using :cpp:func:`inst_reference` (the destructor
-   will be called multiple times in this case). If so, you must use
-   :cpp:func:`inst_set_state` to disable the flag following the call to
-   :cpp:func:`inst_copy`.
+   The behavior depends on the prior state of `dst`. When `dst` is
+   uninitialized, the value is constructed in place and the *destruct* flag
+   is set. When `dst` holds a live value (its *ready* flag is set), that
+   value is destructed first (even if the *destruct* flag is ``false``) and
+   the *destruct* flag keeps its previous value, so an instance referencing
+   foreign storage created via :cpp:func:`inst_reference` remains a
+   non-owning view.
 
-   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
-   refer to the same object.
+   The function is a no-op when ``src`` and ``dst`` refer to the same object.
 
 .. cpp:function:: void inst_move(handle dst, handle src)
 
@@ -3186,23 +3186,13 @@ The documentation below refers to two per-instance flags with the following mean
 
 .. cpp:function:: void inst_replace_copy(handle dst, handle src)
 
-   Destruct the contents of `dst` (even if the *destruct* flag is ``false``).
-   Next, copy-construct the contents of `src` into `dst` and set the *ready*
-   flag of ``dst``. The value of the *destruct* flag is subsequently set to its
-   value prior to the call.
-
-   This operation is useful to replace the contents of one instance with that
-   of another regardless of whether `dst` has been created using
-   :cpp:func:`inst_alloc`, :cpp:func:`inst_reference`, or
-   :cpp:func:`inst_take_ownership`.
-
-   *New in nanobind v2.0.0*: The function is a no-op when ``src`` and ``dst``
-   refer to the same object.
+   Equivalent to :cpp:func:`inst_copy`, which now detects at runtime whether
+   the contents of `dst` must be replaced. The name remains for
+   compatibility.
 
 .. cpp:function:: void inst_replace_move(handle dst, handle src)
 
-   Analogous to :cpp:func:`inst_replace_copy`, except that the move constructor
-   is used instead of the copy constructor.
+   Equivalent to :cpp:func:`inst_move`; see :cpp:func:`inst_replace_copy`.
 
 .. cpp:function:: str inst_name(handle h)
 

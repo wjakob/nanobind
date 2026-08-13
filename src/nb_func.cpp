@@ -455,7 +455,8 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
               name_cstr);
 
         if (f->descr_types[1])
-            implicitly_convertible(f->descr_types[1], f->descr_types[0]);
+            implicitly_convertible(f->descr_types[0],
+                                   (void *) f->descr_types[1], false);
     }
 
     for (size_t i = 0;; ++i) {

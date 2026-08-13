@@ -69,6 +69,12 @@
 #  define NB_UNLIKELY(x) x
 #endif
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#  define NB_UNREACHABLE() __assume(0)
+#else
+#  define NB_UNREACHABLE() __builtin_unreachable()
+#endif
+
 #if defined(NB_SHARED)
 #  if defined(NB_BUILD)
 #    define NB_CORE NB_EXPORT

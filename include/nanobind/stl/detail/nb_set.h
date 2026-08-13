@@ -24,9 +24,16 @@ template <typename Set, typename Key> struct set_caster {
     bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         value.clear();
 
-        PyObject *iter = try_iter(src.ptr());
-        if (!iter)
+        // Cheap pre-check so that a failed PyObject_GetIter on a
+        // non-iterable overload candidate never raises and clears
+        if (!iterable_check(src.ptr()))
             return false;
+
+        PyObject *iter = PyObject_GetIter(src.ptr());
+        if (NB_UNLIKELY(!iter)) {
+            PyErr_Clear();
+            return false;
+        }
 
         bool success = true;
         Caster key_caster;

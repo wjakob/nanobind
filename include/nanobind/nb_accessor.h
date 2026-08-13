@@ -42,7 +42,10 @@ public:
     template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
     operator T() const { return borrow<T>(ptr()); }
     NB_INLINE PyObject *ptr() const {
-        Impl::get(m_base, m_key, &m_cache);
+        // Fetch once and cache an owned reference. Impls with cache_dec_ref
+        // == false hand out borrowed references and refetch on every access.
+        if (!Impl::cache_dec_ref || !m_cache)
+            m_cache = Impl::get(m_base, m_key);
         return m_cache;
     }
     NB_INLINE handle base() const { return m_base; }
@@ -72,8 +75,8 @@ struct str_attr {
     static constexpr bool cache_dec_ref = true;
     using key_type = const char *;
 
-    NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
-        detail::getattr_or_raise(obj, key, cache);
+    NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
+        return detail::getattr(obj, key);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -89,8 +92,8 @@ struct obj_attr {
     static constexpr bool cache_dec_ref = true;
     using key_type = object;
 
-    NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::getattr_or_raise(obj, key.ptr(), cache);
+    NB_INLINE static PyObject *get(PyObject *obj, handle key) {
+        return detail::getattr(obj, key.ptr());
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
@@ -107,8 +110,11 @@ struct str_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = const char *;
 
-    NB_INLINE static void get(PyObject *obj, const char *key, PyObject **cache) {
-        detail::getitem_or_raise(obj, key, cache);
+    NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
+        PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
+        PyObject *res = PyObject_GetItem(obj, key_py);
+        Py_DECREF(key_py);
+        return raise_if_null(res);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -124,8 +130,8 @@ struct obj_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = object;
 
-    NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::getitem_or_raise(obj, key.ptr(), cache);
+    NB_INLINE static PyObject *get(PyObject *obj, handle key) {
+        return raise_if_null(PyObject_GetItem(obj, key.ptr()));
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
@@ -141,8 +147,12 @@ struct dict_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = object;
 
-    NB_INLINE static void get(PyObject *obj, handle key, PyObject **cache) {
-        detail::dict_getitem_or_raise(obj, key.ptr(), cache);
+    NB_INLINE static PyObject *get(PyObject *obj, handle key) {
+        bool error;
+        PyObject *value = dict_getitem_ref(obj, key.ptr(), &error);
+        if (NB_UNLIKELY(!value))
+            error ? raise_python_error() : raise_key_error(key.ptr());
+        return value;
     }
 
     NB_INLINE static void set(PyObject *obj, handle key, PyObject *v) {
@@ -163,8 +173,8 @@ struct num_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
-        detail::getitem_or_raise(obj, index, cache);
+    NB_INLINE static PyObject *get(PyObject *obj, Py_ssize_t index) {
+        return raise_if_null(PySequence_GetItem(obj, index));
     }
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
@@ -185,13 +195,11 @@ struct num_item_list {
 
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
+    NB_INLINE static PyObject *get(PyObject *obj, Py_ssize_t index) {
         #if defined(Py_GIL_DISABLED)
-            if (*cache)
-                return;
-            *cache = PyList_GetItemRef(obj, index);
+            return PyList_GetItemRef(obj, index);
         #else
-            *cache = NB_LIST_GET_ITEM(obj, index);
+            return NB_LIST_GET_ITEM(obj, index);
         #endif
     }
 
@@ -216,8 +224,8 @@ struct num_item_tuple {
     static constexpr bool cache_dec_ref = false;
     using key_type = Py_ssize_t;
 
-    NB_INLINE static void get(PyObject *obj, Py_ssize_t index, PyObject **cache) {
-        *cache = NB_TUPLE_GET_ITEM(obj, index);
+    NB_INLINE static PyObject *get(PyObject *obj, Py_ssize_t index) {
+        return NB_TUPLE_GET_ITEM(obj, index);
     }
 
     template <typename...Ts> static void set(Ts...) {

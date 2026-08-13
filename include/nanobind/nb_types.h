@@ -33,7 +33,11 @@ public:                                                                        \
 #define NB_IMPL_COMP(name, op)                                                 \
     template <typename T1> template <typename T2>                              \
     NB_INLINE bool api<T1>::name(const api<T2> &o) const {                     \
-        return detail::obj_comp(derived().ptr(), o.derived().ptr(), op);       \
+        int rv = PyObject_RichCompareBool(derived().ptr(),                     \
+                                          o.derived().ptr(), op);              \
+        if (NB_UNLIKELY(rv < 0))                                               \
+            detail::raise_python_error();                                      \
+        return rv == 1;                                                        \
     }
 
 /// Helper macros to create detail::api unary operators
@@ -210,20 +214,20 @@ public:
     NB_INLINE handle(const PyTypeObject *ptr) : m_ptr((PyObject *) ptr) { }
 
     const handle& inc_ref() const & noexcept {
-#if defined(NDEBUG)
-        Py_XINCREF(m_ptr);
-#else
-        detail::incref_checked(m_ptr);
+#if !defined(NDEBUG)
+        if (m_ptr && NB_UNLIKELY(!detail::gil_check()))
+            detail::fail_gil();
 #endif
+        Py_XINCREF(m_ptr);
         return *this;
     }
 
     const handle& dec_ref() const & noexcept {
-#if defined(NDEBUG)
-        Py_XDECREF(m_ptr);
-#else
-        detail::decref_checked(m_ptr);
+#if !defined(NDEBUG)
+        if (m_ptr && NB_UNLIKELY(!detail::gil_check()))
+            detail::fail_gil();
 #endif
+        Py_XDECREF(m_ptr);
         return *this;
     }
 
@@ -364,13 +368,26 @@ class capsule : public object {
     NB_OBJECT_DEFAULT(capsule, object, "typing_extensions.CapsuleType",
                       PyCapsule_CheckExact)
 
-    capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, nullptr, cleanup);
-    }
+    capsule(const void *ptr, void (*cleanup)(void *) noexcept = nullptr)
+        : capsule(ptr, nullptr, cleanup) { }
 
     capsule(const void *ptr, const char *name,
             void (*cleanup)(void *) noexcept = nullptr) {
-        m_ptr = detail::capsule_new(ptr, name, cleanup);
+        if (!ptr) {
+            m_ptr = detail::none_ref();
+            return;
+        }
+
+        // Capsule destructor that invokes the cleanup callback in the context
+        auto capsule_cleanup = [](PyObject *o) {
+            auto cleanup_2 = (void (*)(void *)) PyCapsule_GetContext(o);
+            if (cleanup_2)
+                cleanup_2(PyCapsule_GetPointer(o, PyCapsule_GetName(o)));
+        };
+
+        m_ptr = detail::raise_if_null(
+            PyCapsule_New((void *) ptr, name, capsule_cleanup));
+        detail::raise_if_nonzero(PyCapsule_SetContext(m_ptr, (void *) cleanup));
     }
 
     const char *name() const {
@@ -727,7 +744,12 @@ NB_INLINE bool issubclass(handle h1, handle h2) {
 }
 
 NB_INLINE str repr(handle h) { return steal<str>(detail::obj_repr(h.ptr())); }
-NB_INLINE size_t len(handle h) { return detail::obj_len(h.ptr()); }
+NB_INLINE size_t len(handle h) {
+    Py_ssize_t res = PyObject_Size(h.ptr());
+    if (NB_UNLIKELY(res < 0))
+        detail::raise_python_error();
+    return (size_t) res;
+}
 NB_INLINE size_t len_hint(handle h) { return detail::obj_len_hint(h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &l) { return (size_t) NB_LIST_GET_SIZE(l.ptr()); }
@@ -735,7 +757,18 @@ NB_INLINE size_t len(const dict &d) { return (size_t) NB_DICT_GET_SIZE(d.ptr());
 NB_INLINE size_t len(const set &d) { return (size_t) NB_SET_GET_SIZE(d.ptr()); }
 
 inline void print(handle value, handle end = handle(), handle file = handle()) {
-    detail::print(value.ptr(), end.ptr(), file.ptr());
+    PyObject *file_p = file.ptr();
+    if (!file_p)
+        file_p = PySys_GetObject("stdout");
+
+    detail::raise_if_nonzero(PyFile_WriteObject(value.ptr(), file_p, Py_PRINT_RAW));
+
+    int rv;
+    if (end.is_valid())
+        rv = PyFile_WriteObject(end.ptr(), file_p, Py_PRINT_RAW);
+    else
+        rv = PyFile_WriteString("\n", file_p);
+    detail::raise_if_nonzero(rv);
 }
 
 inline void print(const char *str, handle end = handle(), handle file = handle()) {

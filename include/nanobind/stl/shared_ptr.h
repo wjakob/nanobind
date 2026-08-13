@@ -116,16 +116,12 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         if constexpr (has_type_hook)
             type = type_hook<Td>::get(ptr);
 
-        if constexpr (!std::is_polymorphic_v<Td>) {
-            result = nb_type_put(type, ptr, rv_policy::reference,
-                                 cleanup, &is_new);
-        } else {
-            const std::type_info *type_p =
-                (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
+        const std::type_info *type_p = nullptr;
+        if constexpr (std::is_polymorphic_v<Td>)
+            type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-            result = nb_type_put_p(type, type_p, ptr, rv_policy::reference,
-                                   cleanup, &is_new);
-        }
+        result = nb_type_put(type, type_p, ptr, rv_policy::reference,
+                             cleanup, &is_new);
 
         if (is_new) {
             std::shared_ptr<void> pp;

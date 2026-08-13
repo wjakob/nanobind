@@ -79,6 +79,14 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+/// Abort the process with a fatal error
+#if defined(__GNUC__)
+    __attribute__((noreturn, __format__(__printf__, 1, 2)))
+#else
+    [[noreturn]]
+#endif
+extern void fail(const char *fmt, ...) noexcept;
+
 #if defined(NB_COMPACT_ASSERTIONS)
 [[noreturn]] extern void fail_unspecified() noexcept;
 #  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail_unspecified()

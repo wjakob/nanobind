@@ -153,6 +153,13 @@ This is a major release with breaking API and ABI changes, in particular:
     (``MyClass.method(obj)``). This previously worked, which was arguably a
     bug.
 
+  - The low-level instance functions :cpp:func:`nb::inst_copy() <inst_copy>`
+    and :cpp:func:`nb::inst_move() <inst_move>` now detect at runtime whether
+    the target holds a live value and then apply the replace semantics of
+    :cpp:func:`nb::inst_replace_copy() <inst_replace_copy>` and
+    :cpp:func:`nb::inst_replace_move() <inst_replace_move>`, which are now
+    aliases.
+
 This release also brings a set of performance improvements:
 
 - **Faster iteration**: ranges exposed through ``nb::make_iterator()``

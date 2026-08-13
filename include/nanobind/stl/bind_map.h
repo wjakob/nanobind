@@ -29,6 +29,22 @@ inline void map_set(Map &m, const Key &k, const Value &v) {
     }
 }
 
+/// Render the repr of a mapping in Python dict syntax
+NB_NOINLINE inline PyObject *repr_map(PyObject *o) {
+    object name = steal(nb_inst_name(o));
+    list items;
+    for (handle kv : handle(o).attr("items")()) {
+        object k = kv[0], v = kv[1],
+               item = steal(raise_if_null(
+                   PyUnicode_FromFormat("%R: %R", k.ptr(), v.ptr())));
+        items.append(item);
+    }
+    object body = steal(raise_if_null(
+        PyUnicode_Join(str(", ").ptr(), items.ptr())));
+    return raise_if_null(
+        PyUnicode_FromFormat("%U({%U})", name.ptr(), body.ptr()));
+}
+
 NAMESPACE_END(detail)
 
 template <typename Map,

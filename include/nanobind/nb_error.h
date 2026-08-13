@@ -26,12 +26,6 @@ private:
 };
 #endif
 
-/// Tag distinguishing the exception kinds carried by a 'builtin_exception'
-enum class exception_type {
-    runtime_error, stop_iteration, index_error, key_error, value_error,
-    type_error, buffer_error, import_error, attribute_error, next_overload
-};
-
 /* The layout of ``python_error`` and ``builtin_exception`` is part of
    nanobind's backend ABI contract and is frozen within major versions. */
 
@@ -133,6 +127,20 @@ NB_EXCEPTION(attribute_error)
 NB_EXCEPTION(next_overload)
 
 #undef NB_EXCEPTION
+
+NAMESPACE_BEGIN(detail)
+
+[[noreturn]] NB_NOINLINE inline void raise_python_error() {
+    throw python_error();
+}
+
+[[noreturn]] NB_NOINLINE inline void raise_python_or_cast_error() {
+    if (PyErr_Occurred())
+        throw python_error();
+    throw cast_error();
+}
+
+NAMESPACE_END(detail)
 
 inline void register_exception_translator(detail::exception_translator t,
                                           void *payload = nullptr) {

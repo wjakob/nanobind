@@ -21,12 +21,29 @@ struct dtype;
 
 NAMESPACE_END(dlpack)
 
+/// Tag distinguishing the exception kinds that a 'builtin_exception' (see
+/// nb_error.h) carries, and the first parameter of 'raise_v' below. The
+/// inline namespace keeps the mangled names of two coexisting majors
+/// distinct.
+inline namespace NB_BACKEND_ABI_NS {
+enum class exception_type {
+    runtime_error, stop_iteration, index_error, key_error, value_error,
+    type_error, buffer_error, import_error, attribute_error, next_overload
+};
+}
+
 NAMESPACE_BEGIN(detail)
 
 // Forward declarations for types in ndarray.h (2)
 struct ndarray_handle;
 struct ndarray_config;
 struct ndarray_create_args;
+
+/// Backend configuration flags accessed via read_flag/write_flag below
+enum class nb_flag : uint32_t {
+    leak_warnings = 0,
+    implicit_cast_warnings = 1
+};
 
 /**
  * Helper class to clean temporaries created by function dispatch.
@@ -93,35 +110,61 @@ static_assert(cleanup_list::Small == 6 &&
 
 // ========================================================================
 
+/// Raise a builtin_exception of the given kind (va_list core). C varargs
+/// cannot be forwarded, so the variadic wrappers below hand off a va_list
+/// and carry the [[noreturn]] and format attributes themselves.
+NB_CORE void raise_v(exception_type type, const char *fmt, va_list args);
+
 /// Raise a runtime error with the given message
 #if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
+    __attribute__((noreturn, noinline, __format__ (__printf__, 1, 2)))
 #else
-    [[noreturn]]
+    [[noreturn]] NB_NOINLINE
 #endif
-NB_CORE void raise(const char *fmt, ...);
+inline void raise(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    raise_v(exception_type::runtime_error, fmt, args);
+    va_end(args);
+    NB_UNREACHABLE();
+}
 
 /// Raise a type error with the given message
 #if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
+    __attribute__((noreturn, noinline, __format__ (__printf__, 1, 2)))
 #else
-    [[noreturn]]
+    [[noreturn]] NB_NOINLINE
 #endif
-NB_CORE void raise_type_error(const char *fmt, ...);
+inline void raise_type_error(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    raise_v(exception_type::type_error, fmt, args);
+    va_end(args);
+    NB_UNREACHABLE();
+}
 
-/// Abort the process with a fatal error
-#if defined(__GNUC__)
-    __attribute__((noreturn, __format__ (__printf__, 1, 2)))
-#else
-    [[noreturn]]
-#endif
-NB_CORE void fail(const char *fmt, ...) noexcept;
+/* Raise nanobind::python_error, resp. nanobind::cast_error when no Python
+   error is pending. Defined in nb_error.h, which has the complete
+   python_error type. */
+[[noreturn]] NB_NOINLINE inline void raise_python_error();
+[[noreturn]] NB_NOINLINE inline void raise_python_or_cast_error();
 
-/// Raise nanobind::python_error after an error condition was found
-[[noreturn]] NB_CORE void raise_python_error();
+/// Raise an exception if 'p' is null (shared cold path of inline helpers)
+NB_INLINE PyObject *raise_if_null(PyObject *p) {
+    if (NB_UNLIKELY(!p))
+        raise_python_error();
+    return p;
+}
 
-/// Raise nanobind::cast_error
-[[noreturn]] NB_CORE void raise_python_or_cast_error();
+/// Raise an exception if 'rv' is nonzero (ditto, for int-returning C API)
+NB_INLINE void raise_if_nonzero(int rv) {
+    if (NB_UNLIKELY(rv))
+        raise_python_error();
+}
+
+NB_INLINE PyObject *none_ref() noexcept { Py_RETURN_NONE; }
+NB_INLINE PyObject *true_ref() noexcept { Py_RETURN_TRUE; }
+NB_INLINE PyObject *false_ref() noexcept { Py_RETURN_FALSE; }
 
 // Backend implementation of the 'python_error' exception class
 NB_CORE PyObject *error_fetch() noexcept;
@@ -170,7 +213,12 @@ NB_CORE PyObject *bytearray_from_cstr_and_size(const void *c, size_t n);
 // ========================================================================
 
 /// Convert a Python object into a Python boolean object
-NB_CORE PyObject *bool_from_obj(PyObject *o);
+inline PyObject *bool_from_obj(PyObject *o) {
+    int rv = PyObject_IsTrue(o);
+    if (NB_UNLIKELY(rv < 0))
+        raise_python_error();
+    return rv ? true_ref() : false_ref();
+}
 
 /// Convert a Python object into a Python integer object
 NB_CORE PyObject *int_from_obj(PyObject *o);
@@ -205,10 +253,6 @@ NB_CORE PyObject *getattr(PyObject *obj, PyObject *key);
 NB_CORE PyObject *getattr(PyObject *obj, const char *key, PyObject *def) noexcept;
 NB_CORE PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept;
 
-/// Get an object attribute or raise an exception. Skip if 'out' is non-null
-NB_CORE void getattr_or_raise(PyObject *obj, const char *key, PyObject **out);
-NB_CORE void getattr_or_raise(PyObject *obj, PyObject *key, PyObject **out);
-
 /// Set an object attribute or raise an exception
 NB_CORE void setattr(PyObject *obj, const char *key, PyObject *value);
 NB_CORE void setattr(PyObject *obj, PyObject *key, PyObject *value);
@@ -218,11 +262,6 @@ NB_CORE void delattr(PyObject *obj, const char *key);
 NB_CORE void delattr(PyObject *obj, PyObject *key);
 
 // ========================================================================
-
-/// Index into an object or raise an exception. Skip if 'out' is non-null
-NB_CORE void getitem_or_raise(PyObject *obj, Py_ssize_t, PyObject **out);
-NB_CORE void getitem_or_raise(PyObject *obj, const char *key, PyObject **out);
-NB_CORE void getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out);
 
 /// Set an item or raise an exception
 NB_CORE void setitem(PyObject *obj, Py_ssize_t, PyObject *value);
@@ -234,25 +273,52 @@ NB_CORE void delitem(PyObject *obj, Py_ssize_t);
 NB_CORE void delitem(PyObject *obj, const char *key);
 NB_CORE void delitem(PyObject *obj, PyObject *key);
 
+/// Raise a KeyError for the given key (cold path of dict lookups)
+[[noreturn]] NB_NOINLINE inline void raise_key_error(PyObject *key) {
+    PyErr_SetObject(PyExc_KeyError, key);
+    raise_python_error();
+}
+
+/// Look up 'k' in the dictionary 'd', returning a *new* reference
+inline PyObject *dict_getitem_ref(PyObject *d, PyObject *k, bool *error) noexcept {
+    PyObject *value;
+#if NB_PYTHON_VERSION >= 0x030D0000
+    *error = PyDict_GetItemRef(d, k, &value) == -1;
+#else
+    // GIL-protected borrowed-reference pattern; free-threaded builds never
+    // land here (NB_FREE_THREADED implies 3.13+ headers)
+    value = PyDict_GetItemWithError(d, k);
+    if (value)
+        Py_INCREF(value);
+    *error = !value && PyErr_Occurred() != nullptr;
+#endif
+    return value;
+}
+
+/// Dict lookup that returns a default value for missing keys
+inline PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def) {
+    bool error;
+    PyObject *value = dict_getitem_ref(d, k, &error);
+    if (NB_UNLIKELY(error))
+        raise_python_error();
+    if (!value) {
+        Py_XINCREF(def);
+        value = def;
+    }
+    return value;
+}
+
 /// Dict-specialized item access
-NB_CORE void dict_getitem_or_raise(PyObject *obj, PyObject *key, PyObject **out);
-NB_CORE PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def);
 NB_CORE void dict_setitem(PyObject *obj, PyObject *key, PyObject *value);
 NB_CORE void dict_delitem(PyObject *obj, PyObject *key);
 
 // ========================================================================
-
-/// Determine the length of a Python object
-NB_CORE size_t obj_len(PyObject *o);
 
 /// Try to roughly determine the length of a Python object
 NB_CORE size_t obj_len_hint(PyObject *o) noexcept;
 
 /// Obtain a string representation of a Python object
 NB_CORE PyObject* obj_repr(PyObject *o);
-
-/// Perform a comparison between Python objects and handle errors
-NB_CORE bool obj_comp(PyObject *a, PyObject *b, int value);
 
 /// Perform an unary operation on a Python object with error handling
 NB_CORE PyObject *obj_op_1(PyObject *a, PyObject* (*op)(PyObject*));
@@ -269,13 +335,14 @@ NB_CORE PyObject *obj_vectorcall(PyObject *base, PyObject *const *args,
 /// Create an iterator from 'o', raise an exception in case of errors
 NB_CORE PyObject *obj_iter(PyObject *o);
 
-/// Advance the iterator 'o', raise an exception in case of errors
-NB_CORE PyObject *obj_iter_next(PyObject *o);
-
-// ========================================================================
-
-// Conversion validity check done by nb::make_tuple
-NB_CORE void tuple_check(PyObject *tuple, size_t nargs);
+/// Advance the iterator 'o', raise an exception in case of errors. A null
+/// return without a pending error indicates exhaustion.
+inline PyObject *obj_iter_next(PyObject *o) {
+    PyObject *result = PyIter_Next(o);
+    if (NB_UNLIKELY(!result && PyErr_Occurred()))
+        raise_python_error();
+    return result;
+}
 
 // ========================================================================
 
@@ -304,12 +371,6 @@ NB_CORE PyObject **seq_get(PyObject *seq, size_t *size,
 
 // ========================================================================
 
-/// Create a new capsule object with a name
-NB_CORE PyObject *capsule_new(const void *ptr, const char *name,
-                              void (*cleanup)(void *) noexcept) noexcept;
-
-// ========================================================================
-
 // Forward declaration for type in nb_attr.h
 struct func_data_init_base;
 
@@ -326,27 +387,18 @@ NB_CORE PyObject *nb_type_new(const type_data_init *c) noexcept;
 NB_CORE bool nb_type_get(const std::type_info *t, PyObject *o, uint32_t flags,
                          cleanup_list *cleanup, void **out) noexcept;
 
-/// Cast a C++ type instance into a Python object
-NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type, void *value,
+/// Cast a C++ type instance into a Python object. 'cpp_type_p' optionally
+/// names the dynamic (most derived) type of polymorphic instances
+NB_CORE PyObject *nb_type_put(const std::type_info *cpp_type,
+                              const std::type_info *cpp_type_p, void *value,
                               rv_policy rvp, cleanup_list *cleanup,
                               bool *is_new = nullptr) noexcept;
 
-// Special version of nb_type_put for polymorphic classes
-NB_CORE PyObject *nb_type_put_p(const std::type_info *cpp_type,
-                                const std::type_info *cpp_type_p, void *value,
-                                rv_policy rvp, cleanup_list *cleanup,
-                                bool *is_new = nullptr) noexcept;
-
 // Special version of 'nb_type_put' for unique pointers and ownership transfer
 NB_CORE PyObject *nb_type_put_unique(const std::type_info *cpp_type,
+                                     const std::type_info *cpp_type_p,
                                      void *value, cleanup_list *cleanup,
                                      bool cpp_delete) noexcept;
-
-// Special version of 'nb_type_put_unique' for polymorphic classes
-NB_CORE PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
-                                       const std::type_info *cpp_type_p,
-                                       void *value, cleanup_list *cleanup,
-                                       bool cpp_delete) noexcept;
 
 /// Try to relinquish ownership from Python object to a unique_ptr;
 /// return true if successful, false if not. (Failure is only
@@ -405,17 +457,13 @@ NB_CORE void nb_inst_destruct(PyObject *o) noexcept;
 /// Zero-initialize a POD type and mark it as ready + to be destructed upon GC
 NB_CORE void nb_inst_zero(PyObject *o) noexcept;
 
-/// Copy-construct 'dst' from 'src', mark it as ready and to be destructed (must have the same nb_type)
+/// Copy-construct 'dst' from 'src' and mark it as ready (both must share
+/// one nb_type). An uninitialized 'dst' afterwards has its 'destruct' flag
+/// set; a live 'dst' is destructed first and keeps its previous flag value
 NB_CORE void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept;
 
-/// Move-construct 'dst' from 'src', mark it as ready and to be destructed (must have the same nb_type)
+/// Analogous to 'nb_inst_copy', using the move constructor
 NB_CORE void nb_inst_move(PyObject *dst, const PyObject *src) noexcept;
-
-/// Destruct 'dst', copy-construct 'dst' from 'src', mark ready and retain 'destruct' status (must have the same nb_type)
-NB_CORE void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept;
-
-/// Destruct 'dst', move-construct 'dst' from 'src', mark ready and retain 'destruct' status (must have the same nb_type)
-NB_CORE void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept;
 
 /// Check if a particular instance uses a Python-derived type
 NB_CORE bool nb_inst_python_derived(PyObject *o) noexcept;
@@ -430,11 +478,8 @@ NB_CORE std::pair<bool, bool> nb_inst_state_read(PyObject *o) noexcept;
 
 // Create and install a Python property object
 NB_CORE void property_install(PyObject *scope, const char *name,
-                              PyObject *getter, PyObject *setter) noexcept;
-
-NB_CORE void property_install_static(PyObject *scope, const char *name,
-                                     PyObject *getter,
-                                     PyObject *setter) noexcept;
+                              PyObject *getter, PyObject *setter,
+                              bool is_static) noexcept;
 
 // ========================================================================
 
@@ -453,15 +498,12 @@ NB_CORE void keep_alive(PyObject *nurse, void *payload,
 
 // ========================================================================
 
-/// Indicate to nanobind that an implicit constructor can convert 'src' -> 'dst'
-NB_CORE void implicitly_convertible(const std::type_info *src,
-                                    const std::type_info *dst) noexcept;
-
-/// Register a callback to check if implicit conversion to 'dst' is possible
-NB_CORE void implicitly_convertible(bool (*predicate)(PyTypeObject *,
-                                                      PyObject *,
-                                                      cleanup_list *),
-                                    const std::type_info *dst) noexcept;
+/// Register an implicit conversion to 'dst'. 'src' is either a
+/// 'const std::type_info *' naming the source type (is_predicate == false)
+/// or a 'bool (*)(PyTypeObject *, PyObject *, cleanup_list *)' callback
+/// that decides convertibility at runtime (is_predicate == true)
+NB_CORE void implicitly_convertible(const std::type_info *dst, void *src,
+                                    bool is_predicate) noexcept;
 
 // ========================================================================
 
@@ -529,11 +571,6 @@ NB_CORE bool ndarray_check(PyObject *o) noexcept;
 
 // ========================================================================
 
-/// Print to stdout using Python
-NB_CORE void print(PyObject *file, PyObject *str, PyObject *end);
-
-// ========================================================================
-
 typedef void (*exception_translator)(const std::exception_ptr &, void *);
 
 NB_CORE void register_exception_translator(exception_translator translator,
@@ -557,25 +594,35 @@ NB_CORE bool load_f64(PyObject *o, uint32_t flags, double *out) noexcept;
 
 // ========================================================================
 
-/// Increase the reference count of 'o', and check that the GIL is held
-NB_CORE void incref_checked(PyObject *o) noexcept;
+/// PyGILState_Check() for TUs that cannot call it (limited API)
+NB_CORE bool gil_check() noexcept;
 
-/// Decrease the reference count of 'o', and check that the GIL is held
-NB_CORE void decref_checked(PyObject *o) noexcept;
-
-// ========================================================================
-
-NB_CORE bool leak_warnings() noexcept;
-NB_CORE bool implicit_cast_warnings() noexcept;
-NB_CORE void set_leak_warnings(bool value) noexcept;
-NB_CORE void set_implicit_cast_warnings(bool value) noexcept;
+/// Cold path of the GIL assertion in handle::inc_ref/dec_ref (debug builds)
+[[noreturn]] NB_NOINLINE inline void fail_gil() noexcept {
+    fprintf(stderr, "Critical nanobind error: attempted to change the "
+                    "reference count of a Python object while the GIL was "
+                    "not held!\n");
+    abort();
+}
 
 // ========================================================================
 
-NB_CORE bool iterable_check(PyObject *o) noexcept;
+/// Read/write a backend configuration flag (see the 'nb_flag' enumeration)
+NB_CORE uint32_t read_flag(nb_flag f) noexcept;
+NB_CORE void write_flag(nb_flag f, uint32_t value) noexcept;
 
-/// Return a new reference to an iterator for 'o', or nullptr
-NB_CORE PyObject *try_iter(PyObject *o) noexcept;
+// ========================================================================
+
+/// Check whether the object can be iterated over (see nb::iterable)
+inline bool iterable_check(PyObject *o) noexcept {
+    PyTypeObject *tp = Py_TYPE(o);
+#if !defined(Py_LIMITED_API)
+    bool has_iter = tp->tp_iter != nullptr;
+#else
+    bool has_iter = PyType_GetSlot(tp, Py_tp_iter) != nullptr;
+#endif
+    return has_iter || PySequence_Check(o);
+}
 
 // ========================================================================
 
@@ -585,24 +632,21 @@ NB_CORE void slice_compute(PyObject *slice, Py_ssize_t size,
 
 // ========================================================================
 
-NB_CORE bool issubclass(PyObject *a, PyObject *b);
+/// Python issubclass() check with error handling
+inline bool issubclass(PyObject *a, PyObject *b) {
+    int rv = PyObject_IsSubclass(a, b);
+    if (NB_UNLIKELY(rv < 0))
+        raise_python_error();
+    return bool(rv);
+}
 
 // ========================================================================
-
-NB_CORE PyObject *repr_list(PyObject *o);
-NB_CORE PyObject *repr_map(PyObject *o);
 
 NB_CORE bool is_alive() noexcept;
 
 #if NB_TYPE_GET_SLOT_IMPL
 NB_CORE void *type_get_slot(PyTypeObject *t, int slot_id);
 #endif
-
-NB_CORE const char *abi_tag();
-
-NB_INLINE PyObject *none_ref() noexcept { Py_RETURN_NONE; }
-NB_INLINE PyObject *true_ref() noexcept { Py_RETURN_TRUE; }
-NB_INLINE PyObject *false_ref() noexcept { Py_RETURN_FALSE; }
 
 NAMESPACE_END(detail)
 

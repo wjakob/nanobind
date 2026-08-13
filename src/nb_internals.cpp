@@ -411,8 +411,6 @@ static bool is_alive_value = false;
 static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
 
-const char *abi_tag() { return NB_INTERNALS_KEY; }
-
 static void internals_cleanup() {
     nb_internals *p = internals;
     if (!p)
@@ -583,7 +581,7 @@ NB_NOINLINE void nb_module_exec(const char *name, PyObject *) {
                 "could not access internals dictionary!");
 
     PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s__",
-                                         abi_tag(), name ? name : "");
+                                         NB_INTERNALS_KEY, name ? name : "");
     check(key, "nanobind::detail::nb_module_exec(): "
                "could not create dictionary key!");
 

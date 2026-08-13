@@ -560,7 +560,7 @@ NB_MODULE(test_functions_ext, m) {
               return ret;
           });
 
-    m.def("abi_tag", [](){ return nb::detail::abi_tag(); });
+    m.def("abi_tag", [](){ return NB_PLATFORM_ABI_TAG; });
 
     // Test the nb::fallback type
     m.def("test_fallback_1", [](double){ return 0; });

@@ -168,7 +168,9 @@ template <ssize_t... Is> struct shape {
 
     static void put(size_t *out) {
         if constexpr (((Is == -1) || ...)) {
-            detail::fail("Negative ndarray sizes are not allowed here!");
+            fprintf(stderr, "Critical nanobind error: negative ndarray "
+                            "sizes are not allowed here!\n");
+            abort();
         } else {
             size_t ctr = 0;
             ((out[ctr++] = (size_t) Is), ...);
@@ -455,8 +457,11 @@ public:
 
         size_t shape_size = shape.size();
 
-        if (strides.size() != 0 && strides.size() != shape_size)
-            detail::fail("ndarray(): shape and strides have incompatible size!");
+        if (strides.size() != 0 && strides.size() != shape_size) {
+            fprintf(stderr, "Critical nanobind error: ndarray(): shape and "
+                            "strides have incompatible size!\n");
+            abort();
+        }
 
         size_t shape_buf[Config::N <= 0 ? 1 : Config::N];
         const size_t *shape_ptr = shape.begin();

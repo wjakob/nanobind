@@ -1979,7 +1979,18 @@ void keep_alive(PyObject *nurse, void *payload,
 
         ((nb_inst *) nurse)->state.clear_keep_alive = true;
     } else {
-        PyObject *patient = capsule_new(payload, nullptr, callback);
+        auto capsule_cleanup = [](PyObject *o) {
+            auto callback_2 = (void (*)(void *)) PyCapsule_GetContext(o);
+            if (callback_2)
+                callback_2(PyCapsule_GetPointer(o, nullptr));
+        };
+
+        PyObject *patient = PyCapsule_New(payload, nullptr, capsule_cleanup);
+        check(patient, "nanobind::detail::keep_alive(): capsule creation "
+                       "failed!");
+        check(PyCapsule_SetContext(patient, (void *) callback) == 0,
+              "nanobind::detail::keep_alive(): could not set context!");
+
         keep_alive(nurse, patient);
         Py_DECREF(patient);
     }
@@ -2077,83 +2088,10 @@ static PyObject *nb_type_put_common(void *value, type_data *t, rv_policy rvp,
 }
 
 PyObject *nb_type_put(const std::type_info *cpp_type,
+                      const std::type_info *cpp_type_p,
                       void *value, rv_policy rvp,
                       cleanup_list *cleanup,
                       bool *is_new) noexcept {
-    // Convert nullptr -> None
-    if (!value)
-        return none_ref();
-
-    nb_internals *internals_ = internals;
-    type_data *td = nullptr;
-
-    auto lookup_type = [cpp_type, internals_, &td]() -> bool {
-        if (!td) {
-            type_data *d = nb_type_c2p(internals_, cpp_type);
-            if (!d)
-                return false;
-            td = d;
-        }
-        return true;
-    };
-
-    if (rvp != rv_policy::copy) {
-        nb_shard &shard = internals_->shard(value);
-        lock_shard guard(shard);
-
-        // Check if the instance is already registered with nanobind
-        nb_ptr_map &inst_c2p = shard.inst_c2p;
-        nb_ptr_map::iterator it = inst_c2p.find(value);
-
-        if (it != inst_c2p.end()) {
-            void *entry = it->second;
-            nb_inst_seq seq;
-
-            if (NB_UNLIKELY(nb_is_seq(entry))) {
-                seq = *nb_get_seq(entry);
-            } else {
-                seq.inst = (PyObject *) entry;
-                seq.next = nullptr;
-            }
-
-            while (true) {
-                PyTypeObject *tp = Py_TYPE(seq.inst);
-
-                if (nb_type_data(tp)->type == cpp_type) {
-                    if (nb_try_inc_ref(seq.inst))
-                        return seq.inst;
-                }
-
-                if (!lookup_type())
-                    return nullptr;
-
-                if (PyType_IsSubtype(tp, td->type_py)) {
-                    if (nb_try_inc_ref(seq.inst))
-                        return seq.inst;
-                }
-
-                if (seq.next == nullptr)
-                    break;
-
-                seq = *seq.next;
-            }
-        } else if (rvp == rv_policy::none) {
-            return nullptr;
-        }
-    }
-
-    // Look up the corresponding Python type if not already done
-    if (!lookup_type())
-        return nullptr;
-
-    return nb_type_put_common(value, td, rvp, cleanup, is_new);
-}
-
-PyObject *nb_type_put_p(const std::type_info *cpp_type,
-                        const std::type_info *cpp_type_p,
-                        void *value, rv_policy rvp,
-                        cleanup_list *cleanup,
-                        bool *is_new) noexcept {
     // Convert nullptr -> None
     if (!value)
         return none_ref();
@@ -2267,28 +2205,14 @@ static void nb_type_put_unique_finalize(PyObject *o,
 }
 
 PyObject *nb_type_put_unique(const std::type_info *cpp_type,
+                             const std::type_info *cpp_type_p,
                              void *value,
                              cleanup_list *cleanup, bool cpp_delete) noexcept {
     rv_policy policy = cpp_delete ? rv_policy::take_ownership_v : rv_policy::none_v;
 
     bool is_new = false;
-    PyObject *o = nb_type_put(cpp_type, value, policy, cleanup, &is_new);
-
-    if (o)
-        nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new);
-
-    return o;
-}
-
-PyObject *nb_type_put_unique_p(const std::type_info *cpp_type,
-                               const std::type_info *cpp_type_p,
-                               void *value,
-                               cleanup_list *cleanup, bool cpp_delete) noexcept {
-    rv_policy policy = cpp_delete ? rv_policy::take_ownership_v : rv_policy::none_v;
-
-    bool is_new = false;
     PyObject *o =
-        nb_type_put_p(cpp_type, cpp_type_p, value, policy, cleanup, &is_new);
+        nb_type_put(cpp_type, cpp_type_p, value, policy, cleanup, &is_new);
 
     if (o)
         nb_type_put_unique_finalize(o, cpp_type, cpp_delete, is_new);
@@ -2484,76 +2408,61 @@ void nb_inst_destruct(PyObject *o) noexcept {
     nbi->state.state = nb_inst_state::state_uninitialized;
 }
 
-void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
+/* Shared implementation of nb_inst_copy/nb_inst_move. An uninitialized
+   'dst' is constructed in place and marked to-be-destructed; a live 'dst'
+   gets replace semantics: its contents are destructed first (even if the
+   'destruct' flag is unset) and the flag keeps its previous value, so an
+   instance referencing foreign storage stays a non-owning view. */
+static void inst_copy_move(PyObject *dst, const PyObject *src,
+                           bool move) noexcept {
     if (src == dst)
         return;
+
+    nb_inst *nbi = (nb_inst *) dst;
+    bool ready = nbi->state.state == nb_inst_state::state_ready,
+         destruct = true;
+
+    if (ready) {
+        destruct = nbi->state.destruct;
+        nbi->state.destruct = true;
+        nb_inst_destruct(dst);
+    }
 
     PyTypeObject *tp = Py_TYPE((PyObject *) src);
     type_data *t = nb_type_data(tp);
 
     check(tp == Py_TYPE(dst) &&
-              (t->flags & (uint32_t) type_flags::is_copy_constructible),
+              (t->flags & (uint32_t) (move ? type_flags::is_move_constructible
+                                           : type_flags::is_copy_constructible)),
           "nanobind::detail::nb_inst_copy(): invalid arguments!");
 
-    nb_inst *nbi = (nb_inst *) dst;
-    const void *src_data = inst_ptr((nb_inst *) src);
-    void *dst_data = inst_ptr(nbi);
+    void *src_data = inst_ptr((nb_inst *) src),
+         *dst_data = inst_ptr(nbi);
 
-    if (t->flags & (uint32_t) type_flags::has_copy)
-        t->copy(dst_data, src_data);
-    else
-        memcpy(dst_data, src_data, t->size);
-
-    nbi->state.state = nb_inst_state::state_ready;
-    nbi->state.destruct = true;
-}
-
-void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
-    if (src == dst)
-        return;
-
-    PyTypeObject *tp = Py_TYPE((PyObject *) src);
-    type_data *t = nb_type_data(tp);
-
-    check(tp == Py_TYPE(dst) &&
-              (t->flags & (uint32_t) type_flags::is_move_constructible),
-          "nanobind::detail::nb_inst_move(): invalid arguments!");
-
-    nb_inst *nbi = (nb_inst *) dst;
-    void *src_data = inst_ptr((nb_inst *) src);
-    void *dst_data = inst_ptr(nbi);
-
-    if (t->flags & (uint32_t) type_flags::has_move) {
-        t->move(dst_data, src_data);
+    if (move) {
+        if (t->flags & (uint32_t) type_flags::has_move) {
+            t->move(dst_data, src_data);
+        } else {
+            memcpy(dst_data, src_data, t->size);
+            memset(src_data, 0, t->size);
+        }
     } else {
-        memcpy(dst_data, src_data, t->size);
-        memset(src_data, 0, t->size);
+        if (t->flags & (uint32_t) type_flags::has_copy)
+            t->copy(dst_data, src_data);
+        else
+            memcpy(dst_data, src_data, t->size);
     }
 
     nbi->state.state = nb_inst_state::state_ready;
-    nbi->state.destruct = true;
-}
-
-void nb_inst_replace_move(PyObject *dst, const PyObject *src) noexcept {
-    if (src == dst)
-        return;
-    nb_inst *nbi = (nb_inst *) dst;
-    bool destruct = nbi->state.destruct;
-    nbi->state.destruct = true;
-    nb_inst_destruct(dst);
-    nb_inst_move(dst, src);
     nbi->state.destruct = destruct;
 }
 
-void nb_inst_replace_copy(PyObject *dst, const PyObject *src) noexcept {
-    if (src == dst)
-        return;
-    nb_inst *nbi = (nb_inst *) dst;
-    bool destruct = nbi->state.destruct;
-    nbi->state.destruct = true;
-    nb_inst_destruct(dst);
-    nb_inst_copy(dst, src);
-    nbi->state.destruct = destruct;
+void nb_inst_copy(PyObject *dst, const PyObject *src) noexcept {
+    inst_copy_move(dst, src, false);
+}
+
+void nb_inst_move(PyObject *dst, const PyObject *src) noexcept {
+    inst_copy_move(dst, src, true);
 }
 
 PyObject *nb_type_name(PyObject *t) noexcept {

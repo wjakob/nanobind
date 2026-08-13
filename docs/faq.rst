@@ -304,6 +304,21 @@ nanobind that need those interfaces then live in a backend module that is
 built per Python version, and only the extension itself must stay within the
 limited API.
 
+Does nanobind support subinterpreters?
+--------------------------------------
+
+No, and there is no plan to support them in the foreseeable future. This
+decision was made after building an experimental prototype. Efficiently
+supporting subinterpreters in nanobind is a quite gnarly technical problem
+without good solutions. It would impose a performance cost on every user,
+including the vast majority whose extensions will never run in a
+subinterpreter. Subinterpreters and free-threading address the same goal of
+parallelism beyond the limits of the GIL. Packages in the scientific computing
+and machine learning ecosystem have gravitated towards free-threading as the
+solution for parallel workloads, and this is also the path embraced by
+nanobind. See the :ref:`free-threading documentation <free-threaded>` for
+details.
+
 Policy on Clang-Tidy, ``-Wpedantic``, etc.
 ------------------------------------------
 

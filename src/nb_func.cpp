@@ -1446,7 +1446,12 @@ static uint32_t nb_func_render_signature(const func_data *f,
                     if (has_var_kwargs && arg_index + 1 == f->nargs) {
                         buf.put("**");
                         buf.put_dstr(arg_name ? arg_name : "kwargs");
-                        pc += 4; // strlen("dict")
+                        // Skip the type name without rendering it.
+                        while (pc[1] != '}') {
+                            if (pc[1] == '%')
+                                descr_type++;
+                            pc++;
+                        }
                         break;
                     }
 
@@ -1454,7 +1459,12 @@ static uint32_t nb_func_render_signature(const func_data *f,
                         buf.put("*");
                         if (has_var_args) {
                             buf.put_dstr(arg_name ? arg_name : "args");
-                            pc += 5; // strlen("tuple")
+                            // Skip the type name without rendering it.
+                            while (pc[1] != '}') {
+                                if (pc[1] == '%')
+                                    descr_type++;
+                                pc++;
+                            }
                             break;
                         } else {
                             buf.put(", ");

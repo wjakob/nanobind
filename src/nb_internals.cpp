@@ -171,6 +171,9 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
 // Initialized once when the module is loaded, no locking needed
 nb_internals *internals = nullptr;
 
+// Domain served by this backend image
+const char *nb_backend_domain = "";
+
 #if defined(NB_FREE_THREADED)
 NB_THREAD_LOCAL nb_thread_state *nb_thread_state_tls = nullptr;
 
@@ -585,8 +588,12 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
         return -1;
     }
 
-    PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s__",
-                                         NB_INTERNALS_KEY, domain);
+    // The key combines the domain served by this backend image (nonempty for
+    // a backend module built with NB_DOMAIN) with the one passed by a
+    // linked-mode extension; at most one of the two is a nonempty string.
+    PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s%s__",
+                                         NB_INTERNALS_KEY, nb_backend_domain,
+                                         domain);
     if (!key)
         return -1;
 

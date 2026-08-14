@@ -68,12 +68,17 @@ The high-level interface consists of just one CMake command:
         - Perform a `stable ABI
           <https://docs.python.org/3/c-api/stable.html>`__ build, making it
           possible to use a compiled extension across Python minor versions.
-          The flag is ignored on Python versions older than < 3.12.
+          Linked builds compile the nanobind library under the limited API
+          and require Python 3.12 or newer; the flag is ignored on
+          unsupported Python versions. *Split mode*
+          (``BACKEND_MODULE``) always targets the stable ABI with a Python
+          3.10 floor, and this flag is then redundant.
       * - ``FREE_THREADED``
         - Compile an Python extension that opts into free-threaded (i.e.,
           GIL-less) Python behavior, which requires a special free-threaded
           build of Python 3.13 or newer. The flag is ignored on unsupported
-          Python versions.
+          Python versions. It cannot be combined with ``BACKEND_MODULE``,
+          since free-threaded Python has no stable ABI.
       * - ``NB_STATIC``
         - Compile the core nanobind library as a static library. This
           simplifies redistribution but can increase the combined binary
@@ -83,6 +88,21 @@ The high-level interface consists of just one CMake command:
         - The opposite of ``NB_STATIC``: compile the core nanobind library
           as a shared library for use in projects that consist of multiple
           extensions.
+      * - ``BACKEND_MODULE <name>``
+        - Compile the extension in *split mode*: it then
+          contains no nanobind library code at all and resolves the
+          compiled backend at import time from the named backend module
+          (``nanobind_backend`` is shipped by the `nanobind-backend
+          <https://pypi.org/project/nanobind-backend>`__ wheel). Accepts a
+          dotted module name, e.g. a backend module bundled inside your own
+          package. Cannot be combined with ``NB_STATIC``, ``NB_SHARED``, or
+          ``NB_DOMAIN``.
+      * - ``BACKEND_PYPI <name>``
+        - Name of the PyPI package shipping the backend module. When the
+          module is missing at import time, the resulting ``ImportError``
+          advises the user to ``pip install`` this package. Defaults to
+          ``nanobind-backend`` when ``BACKEND_MODULE`` is not customized;
+          otherwise no hint is added unless this keyword names a package.
       * - ``NB_SUPPRESS_WARNINGS``
         - Mark the include directories of nanobind and Python as
           `SYSTEM <https://cmake.org/cmake/help/latest/command/include_directories.html>`__
@@ -92,7 +112,9 @@ The high-level interface consists of just one CMake command:
           ``-Wsign-conversion``.
       * - ``PROTECT_STACK``
         - Keep the stack protector enabled (for both the extension and
-          nanobind's core library).
+          nanobind's core library in the linked modes; a split-mode
+          extension contains no library code, and the backend module has its own
+          ``PROTECT_STACK`` option).
       * - ``LTO``
         - Perform link time optimization.
       * - ``NOMINSIZE``
@@ -103,6 +125,8 @@ The high-level interface consists of just one CMake command:
       * - ``NB_DOMAIN <name>``
         - Restrict the inter-extension type visibility to a named subdomain.
           See the associated :ref:`FAQ entry <type-visibility>` for details.
+          In :ref:`split mode <split-mode>`, the domain is instead a property
+          of the backend module (see :cmake:command:`nanobind_add_backend`).
       * - ``MUSL_DYNAMIC_LIBCPP``
         - When `cibuildwheel
           <https://cibuildwheel.readthedocs.io/en/stable/>`__ is used to
@@ -142,8 +166,9 @@ The high-level interface consists of just one CMake command:
 
      Once compiled, a stable ABI extension can be reused across Python minor
      versions. In contrast, ordinary builds are only compatible across patch
-     versions. This feature requires Python >= 3.12 and is ignored on older
-     versions. Note that use of the stable ABI come at a small performance cost
+     versions. In linked builds, this feature requires Python >= 3.12 and is
+     ignored on older versions; :ref:`split mode <split-mode>` builds always
+     target the stable ABI with a Python 3.10 floor. Note that use of the stable ABI come at a small performance cost
      since nanobind can no longer access the internals of various data
      structures directly. If in doubt, benchmark your code to see if the cost
      is acceptable.
@@ -222,6 +247,28 @@ The high-level interface consists of just one CMake command:
      restrict the visibility of symbols to a named subdomain to avoid conflicts
      between bindings. See the associated :ref:`FAQ entry <type-visibility>`
      for details.
+
+.. cmake:command:: nanobind_add_backend
+
+   Build a *backend module*: a Python module that contains the compiled
+   nanobind backend and serves it to extensions built in *split mode*. This is the same command that the official
+   ``nanobind-backend`` wheel uses. Projects that need a custom backend
+   module (unusual toolchain, vendoring, version pinning, custom domain)
+   build one with two extra lines:
+
+   .. code-block:: cmake
+
+      nanobind_add_backend(_backend)   # ships as, e.g., my_package._backend
+      nanobind_add_module(my_ext my_ext.cpp BACKEND_MODULE my_package._backend)
+
+   Backend modules never target the stable ABI and must be built per Python
+   version. On a free-threaded interpreter, the backend is automatically built
+   free-threaded and serves only free-threaded extensions. The command supports
+   the following optional parameters: ``NB_DOMAIN <name>`` confines all
+   extensions attached to the backend to an isolated :ref:`type visibility
+   domain <type-visibility>`. The parameters ``PROTECT_STACK``, ``NOMINSIZE``,
+   ``NOSTRIP``, and ``NB_SUPPRESS_WARNINGS`` have the same meaning as in
+   :cmake:command:`nanobind_add_module`.
 
 .. _lowlevel-cmake:
 

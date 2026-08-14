@@ -146,6 +146,14 @@ This is a major release with breaking API and ABI changes, in particular:
   because the value converts implicitly, though this may cause compiler
   warnings. It is advisable that you widen the parameter in your casters.
 
+- **Split mode**: extensions can now be built without any compiled nanobind
+  code by naming a ``BACKEND_MODULE`` in ``nanobind_add_module()``. Such an
+  extension targets the stable ABI and resolves the backend at import time
+  from a *backend module* built with the new CMake command
+  ``nanobind_add_backend()``; the default backend module is shipped by the
+  ``nanobind-backend`` wheel, and the optional ``BACKEND_PYPI`` parameter
+  names the PyPI package suggested when the module is missing.
+
 - **Miscellaneous**:
 
   - The ``self`` argument of a method is no longer subject to implicit

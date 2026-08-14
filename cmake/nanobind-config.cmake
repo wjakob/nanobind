@@ -30,12 +30,6 @@ elseif(DEFINED Python_SOSABI)
   set(NB_SOSABI "${Python_SOSABI}")
 endif()
 
-# Error if scikit-build-core is trying to build Stable ABI < 3.12 wheels
-if(DEFINED SKBUILD_SABI_VERSION AND SKBUILD_ABI_VERSION AND SKBUILD_SABI_VERSION VERSION_LESS "3.12")
-  message(FATAL_ERROR "You must set tool.scikit-build.wheel.py-api to 'cp312' or later when "
-                      "using scikit-build-core with nanobind, '${SKBUILD_SABI_VERSION}' is too old.")
-endif()
-
 # PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
 # report an incorrect value. Only use it if it looks correct (X-X-X form).
 if(DEFINED NB_SOABI AND "${NB_SOABI}" MATCHES ".+-.+-.+")
@@ -374,7 +368,7 @@ endfunction()
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
     "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP;NB_SUPPRESS_WARNINGS"
-    "NB_DOMAIN" "")
+    "NB_DOMAIN;BACKEND_MODULE;BACKEND_PYPI" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
@@ -382,64 +376,135 @@ function(nanobind_add_module name)
   nanobind_link_options(${name})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
-  if (ARG_NB_SHARED AND ARG_NB_STATIC)
+  # Split mode: use a libnanobind provided as a separate Python package.
+  if (ARG_BACKEND_MODULE)
+    set(IS_SPLIT TRUE)
+  else()
+    set(IS_SPLIT FALSE)
+  endif()
+
+  if (IS_SPLIT AND (ARG_NB_SHARED OR ARG_NB_STATIC))
+    message(FATAL_ERROR "split mode cannot be combined with NB_STATIC or NB_SHARED!")
+  elseif (IS_SPLIT AND ARG_NB_DOMAIN)
+    message(FATAL_ERROR "split mode cannot be combined with NB_DOMAIN: the "
+      "extension joins the domain of its backend module (see nanobind_add_backend())!")
+  elseif (ARG_NB_SHARED AND ARG_NB_STATIC)
     message(FATAL_ERROR "NB_SHARED and NB_STATIC cannot be specified at the same time!")
-  elseif (NOT ARG_NB_SHARED)
+  elseif (NOT IS_SPLIT AND NOT ARG_NB_SHARED)
     set(ARG_NB_STATIC TRUE)
   endif()
 
-  # Stable ABI builds require CPython >= 3.12 and Python::SABIModule
-  if ((Python_VERSION VERSION_LESS 3.12) OR
-      (NOT Python_INTERPRETER_ID STREQUAL "Python") OR
-      (NOT TARGET Python::SABIModule))
-    set(ARG_STABLE_ABI FALSE)
-  endif()
+  if (IS_SPLIT)
+    # Split mode extensions always target a stable ABI ('abi3' with a
+    # Python 3.10 floor)
+    set(ARG_STABLE_ABI TRUE)
 
-  if (NB_ABI MATCHES "[0-9]t")
-    # Free-threaded Python interpreters don't support building a nanobind
-    # module that uses the stable ABI.
-    set(ARG_STABLE_ABI FALSE)
-  else()
-    # A free-threaded Python interpreter is required to build a free-threaded
-    # nanobind module.
+    if (NOT Python_INTERPRETER_ID STREQUAL "Python")
+      message(FATAL_ERROR "Split mode requires CPython!")
+    endif()
+
+    if (NB_ABI MATCHES "[0-9]t")
+      # Free-threaded interpreters have no stable ABI
+      message(FATAL_ERROR "Split mode does not support free-threaded Python!")
+    endif()
     set(ARG_FREE_THREADED FALSE)
+
+    if (WIN32 AND NOT TARGET Python::SABIModule)
+      message(FATAL_ERROR
+        "Split mode requires the Development.SABIModule component of "
+        "find_package(Python) on Windows.")
+    endif()
+  else()
+    # Linked-mode stable ABI builds require CPython >= 3.12 (the backend
+    # itself then compiles under Py_LIMITED_API)
+    if (DEFINED SKBUILD_SABI_VERSION AND
+        NOT SKBUILD_SABI_VERSION STREQUAL "" AND
+        SKBUILD_SABI_VERSION VERSION_LESS "3.12")
+      message(FATAL_ERROR
+        "You must set tool.scikit-build.wheel.py-api to 'cp312' or later "
+        "when using linked nanobind, '${SKBUILD_SABI_VERSION}' is too old. "
+        "Stable ABI wheels for Python 3.10/3.11 require split mode.")
+    endif()
+
+    if ((Python_VERSION VERSION_LESS 3.12) OR
+        (NOT Python_INTERPRETER_ID STREQUAL "Python") OR
+        (NOT TARGET Python::SABIModule))
+      set(ARG_STABLE_ABI FALSE)
+    endif()
+
+    if (NB_ABI MATCHES "[0-9]t")
+      # No linked-mode stable ABI on free-threaded interpreters
+      set(ARG_STABLE_ABI FALSE)
+    else()
+      # A free-threaded Python interpreter is required to build a
+      # free-threaded nanobind module.
+      set(ARG_FREE_THREADED FALSE)
+    endif()
   endif()
 
-  set(libname "nanobind")
-  if (ARG_NB_STATIC)
-    set(libname "${libname}-static")
-  endif()
+  if (NOT IS_SPLIT)
+    set(libname "nanobind")
+    if (ARG_NB_STATIC)
+      set(libname "${libname}-static")
+    endif()
 
-  if (ARG_STABLE_ABI)
-    set(libname "${libname}-abi3")
-  endif()
+    if (ARG_STABLE_ABI)
+      set(libname "${libname}-abi3")
+    endif()
 
-  if (ARG_FREE_THREADED)
-    set(libname "${libname}-ft")
-  endif()
+    if (ARG_FREE_THREADED)
+      set(libname "${libname}-ft")
+    endif()
 
-  # The stack protector changes how libnanobind is compiled, so the protected
-  # variant needs its own library (like -abi3 / -ft).
-  if (ARG_PROTECT_STACK)
-    set(libname "${libname}-ps")
-  endif()
+    # The stack protector changes how libnanobind is compiled, so the protected
+    # variant needs its own library (like -abi3 / -ft).
+    if (ARG_PROTECT_STACK)
+      set(libname "${libname}-ps")
+    endif()
 
-  if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
-    set(libname ${libname}-${ARG_NB_DOMAIN})
-  endif()
+    if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
+      set(libname ${libname}-${ARG_NB_DOMAIN})
+    endif()
 
-  if (ARG_NB_SUPPRESS_WARNINGS)
-    set(EXTRA_LIBRARY_PARAMS AS_SYSINCLUDE)
-  endif()
+    if (ARG_NB_SUPPRESS_WARNINGS)
+      set(EXTRA_LIBRARY_PARAMS AS_SYSINCLUDE)
+    endif()
 
-  nanobind_build_library(${libname} ${EXTRA_LIBRARY_PARAMS})
+    nanobind_build_library(${libname} ${EXTRA_LIBRARY_PARAMS})
+  endif()
 
   if (ARG_NB_DOMAIN)
     target_compile_definitions(${name} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
   endif()
 
+  if (IS_SPLIT)
+    if (NOT ARG_BACKEND_PYPI AND ARG_BACKEND_MODULE STREQUAL "nanobind_backend")
+      set(ARG_BACKEND_PYPI "nanobind-backend")
+    endif()
+    target_compile_definitions(${name} PRIVATE
+      "NB_BACKEND_MODULE=${ARG_BACKEND_MODULE}")
+    if (ARG_BACKEND_PYPI)
+      target_compile_definitions(${name} PRIVATE
+        "NB_BACKEND_PYPI=${ARG_BACKEND_PYPI}")
+    endif()
+    if (ARG_NB_SUPPRESS_WARNINGS)
+      set(NB_SPLIT_SYSINCLUDE SYSTEM)
+    endif()
+    target_include_directories(${name} ${NB_SPLIT_SYSINCLUDE} PRIVATE
+      ${Python_INCLUDE_DIRS} ${NB_DIR}/include)
+    target_compile_features(${name} PRIVATE cxx_std_17)
+
+    if (WIN32)
+      target_link_libraries(${name} PRIVATE Python::SABIModule)
+    endif()
+  endif()
+
   if (ARG_STABLE_ABI)
-    target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
+    if (IS_SPLIT)
+      target_compile_definitions(${name} PRIVATE -DPy_LIMITED_API=0x030A0000)
+    else()
+      target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
+    endif()
     nanobind_extension_abi3(${name})
   else()
     nanobind_extension(${name})
@@ -449,11 +514,15 @@ function(nanobind_add_module name)
     target_compile_definitions(${name} PRIVATE NB_FREE_THREADED)
   endif()
 
-  target_link_libraries(${name} PRIVATE ${libname})
+  if (NOT IS_SPLIT)
+    target_link_libraries(${name} PRIVATE ${libname})
+  endif()
 
   if (NOT ARG_PROTECT_STACK)
     nanobind_disable_stack_protector(${name})
-    nanobind_disable_stack_protector(${libname})
+    if (NOT IS_SPLIT)
+      nanobind_disable_stack_protector(${libname})
+    endif()
   endif()
 
   if (NOT ARG_NOMINSIZE)
@@ -473,6 +542,64 @@ function(nanobind_add_module name)
   endif()
 
   nanobind_set_visibility(${name})
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Build a backend module: a Python module containing the compiled nanobind
+# backend, serving it to split-mode extensions through fill(). The official
+# 'nanobind-backend' wheel uses this same command.
+# ---------------------------------------------------------------------------
+
+function(nanobind_add_backend name)
+  cmake_parse_arguments(PARSE_ARGV 1 ARG
+    "PROTECT_STACK;NOMINSIZE;NOSTRIP;NB_SUPPRESS_WARNINGS" "NB_DOMAIN" "")
+
+  add_library(${name} MODULE ${NB_DIR}/src/nb_backend.cpp)
+
+  nanobind_compile_options(${name})
+  nanobind_link_options(${name})
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+
+  # Backend modules are never limited-API; the free-threading flavor
+  # follows the interpreter
+  set(libname "nanobind-static")
+  if (NB_FREE_THREADED)
+    set(libname "${libname}-ft")
+  endif()
+
+  if (ARG_PROTECT_STACK)
+    set(libname "${libname}-ps")
+  endif()
+
+  if (ARG_NB_SUPPRESS_WARNINGS)
+    set(EXTRA_LIBRARY_PARAMS AS_SYSINCLUDE)
+  endif()
+
+  nanobind_build_library(${libname} ${EXTRA_LIBRARY_PARAMS})
+  target_link_libraries(${name} PRIVATE ${libname} tsl::robin_map)
+
+  target_compile_definitions(${name} PRIVATE
+    NB_BUILD "NB_BACKEND_NAME=${name}")
+
+  if (ARG_NB_DOMAIN)
+    target_compile_definitions(${name} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
+  endif()
+
+  nanobind_extension(${name})
+  nanobind_set_visibility(${name})
+
+  if (NOT ARG_PROTECT_STACK)
+    nanobind_disable_stack_protector(${name})
+    nanobind_disable_stack_protector(${libname})
+  endif()
+
+  if (NOT ARG_NOMINSIZE)
+    nanobind_opt_size(${name})
+  endif()
+
+  if (NOT ARG_NOSTRIP)
+    nanobind_strip(${name})
+  endif()
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -643,7 +770,13 @@ endfunction()
 # ---------------------------------------------------------------------------
 
 function (nanobind_add_stub name)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;EXCLUDE_VALUES;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL" "MODULE;COMPONENT;OUTPUT_PATH" "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT;PATTERN_FILE")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG
+    # Options
+    "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;EXCLUDE_VALUES;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL"
+    # Single-value arguments
+    "MODULE;COMPONENT;OUTPUT_PATH"
+    # Multi-value arguments
+    "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT;PATTERN_FILE")
 
   if (EXISTS ${NB_DIR}/src/stubgen.py)
     set(NB_STUBGEN "${NB_DIR}/src/stubgen.py")

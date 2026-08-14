@@ -833,6 +833,9 @@ inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
 
 extern nb_internals *internals;
 
+/// Domain served by this backend image (see nb_module_init_impl)
+extern const char *nb_backend_domain;
+
 extern char *type_name(const std::type_info *t);
 
 /// Construct 'nb_type' as an instance of the meta-metaclass 'nb_meta'

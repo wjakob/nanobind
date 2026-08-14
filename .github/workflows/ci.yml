@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu-latest', 'windows-2022', 'macos-15']
-        python: ['3.10', '3.11', '3.12', '3.13', '3.14', 'pypy3.10-v7.3.19', 'pypy3.11-v7.3.20']
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14', '3.15', 'pypy3.10-v7.3.19', 'pypy3.11-v7.3.20']
 
     name: "Python ${{ matrix.python }} / ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
@@ -36,6 +36,7 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
         cache: 'pip'
+        allow-prereleases: true
 
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest
@@ -44,12 +45,13 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: sudo apt-get -y install libeigen3-dev
 
-    - name: Install PyTest
+    - name: Install test dependencies
       run: |
         python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions
 
+    # Skipped on prerelease interpreters, whose binary wheels lag behind
     - name: Install NumPy
-      if: ${{ !startsWith(matrix.python, 'pypy') && !contains(matrix.python, 'alpha') }}
+      if: ${{ !startsWith(matrix.python, 'pypy') && matrix.python != '3.15' }}
       run: |
         python -m pip install numpy scipy
 
@@ -124,7 +126,7 @@ jobs:
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest
 
-    - name: Install PyTest
+    - name: Install test dependencies
       run: |
         python -m pip install pytest pytest-github-actions-annotate-failures
 
@@ -190,7 +192,7 @@ jobs:
         pacman -U --noconfirm --nodeps --nodeps \
           https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-15.2.0-13-any.pkg.tar.zst
 
-    - name: Install Python packages
+    - name: Install test dependencies
       shell: msys2 {0}
       run: |
         python -m pip install pytest-github-actions-annotate-failures typing_extensions
@@ -270,7 +272,7 @@ jobs:
     - name: Install the latest CMake
       uses: lukka/get-cmake@latest
 
-    - name: Install PyTest
+    - name: Install test dependencies
       run: |
         python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions
 

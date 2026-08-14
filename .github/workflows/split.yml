@@ -1,0 +1,209 @@
+name: split
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+      - stable
+      - v*
+
+concurrency:
+  group: split-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The full test suite served by a locally built backend module, with
+  # extensions targeting the Python 3.10 limited API
+  split:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest', 'windows-2022', 'macos-15']
+        python: ['3.10', '3.13']
+        include:
+          - os: ubuntu-latest
+            python: '3.14'
+          # Also test x86_64 macOS, which coalesces weak exports differently
+          - os: macos-13
+            python: '3.13'
+
+    name: "split mode / Python ${{ matrix.python }} / ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python ${{ matrix.python }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        cache: 'pip'
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions numpy
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DNB_TEST_SPLIT_MODE=ON
+        -DNB_TEST_FREE_THREADED=OFF
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Run tests
+      run: |
+        cd build
+        python -m pytest
+
+  # The full test suite served by the nanobind-backend wheel, which is built
+  # and installed first
+  split-wheel:
+    name: "split mode / nanobind-backend wheel"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions numpy
+
+    - name: Build and install the nanobind-backend wheel
+      run: |
+        python -m pip install build
+        python -m build --wheel nanobind-backend --outdir dist
+        python -m pip install dist/*.whl
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DNB_TEST_SPLIT_MODE=ON -DNB_TEST_SPLIT_WHEEL=ON
+        -DNB_TEST_FREE_THREADED=OFF
+
+    - name: Build C++
+      run: |
+        cmake --build build -j 2
+        ls build/tests/*.abi3.so > /dev/null  # STABLE_ABI must not be dropped
+
+    - name: Run tests
+      run: |
+        cd build
+        python -m pytest
+
+  # Forward compatibility of stable-ABI extensions in split mode: compile the
+  # whole suite against Python 3.14 headers, then run it on Python 3.10
+  # through a backend module built for 3.10
+  split-cross-version:
+    name: "split mode / 3.14 extensions on Python 3.10"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python 3.14
+      id: py314
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.14'
+
+    - name: Setup Python 3.10
+      id: py310
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install test dependencies
+      run: |
+        "${{ steps.py310.outputs.python-path }}" -m pip install pytest typing_extensions numpy
+
+    - name: Build the test suite against Python 3.14 headers
+      run: |
+        cmake -S . -B build314 -DNB_TEST_SPLIT_MODE=ON \
+          -DNB_TEST_FREE_THREADED=OFF \
+          -DPython_EXECUTABLE="${{ steps.py314.outputs.python-path }}"
+        cmake --build build314 -j 2
+
+    - name: Build the version-specific pieces against Python 3.10
+      run: |
+        cmake -S . -B build310 -DNB_TEST_SPLIT_MODE=ON \
+          -DNB_TEST_FREE_THREADED=OFF \
+          -DPython_EXECUTABLE="${{ steps.py310.outputs.python-path }}"
+        # Everything else (the abi3 extensions) comes from the 3.14 build
+        cmake --build build310 -j 2 --target nanobind_backend_test \
+          nanobind_backend_test_mydomain test_abi_missing_ext copy-tests
+
+    - name: Replace the 3.10 extensions with the 3.14-built ones
+      run: |
+        count=$(ls build314/tests/*.abi3.so | wc -l)
+        echo "copying $count abi3 extensions"
+        test "$count" -ge 20
+        cp build314/tests/*.abi3.so build310/tests/
+
+    - name: Run tests
+      run: |
+        cd build310/tests
+        "${{ steps.py310.outputs.python-path }}" -c "import test_abi_multi_ext as t; assert t.limited_api == 0x030A0000"
+        "${{ steps.py310.outputs.python-path }}" -m pytest
+
+  # abi3t extensions (PEP 803) served by a free-threaded backend module.
+  # Python 3.15 is only available as a prerelease at the moment
+  abi3t:
+    name: "split mode / Python 3.15t (abi3t) / ubuntu-latest"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python 3.15t (free-threaded)
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.15t'
+        allow-prereleases: true
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DNB_TEST_SPLIT_MODE=ON
+        -DNB_TEST_FREE_THREADED=ON
+        -DPython_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')"
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Run tests
+      run: |
+        cd build/tests
+        python -c "import test_abi_multi_ext as t; assert t.limited_api == 0x030F0000"
+        cd ..
+        python -m pytest

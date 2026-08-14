@@ -453,7 +453,8 @@ conditions in free-threaded Python builds.
 Version 2.12.0 (Feb 25, 2026)
 -----------------------------
 
-- Added :cpp:class:`nb::memoryview` that wraps the Python ``memoryview`` type.
+- Added :cpp:class:`nb::memoryview <memoryview>` that wraps the Python
+  ``memoryview`` type.
   (PR `#1291 <https://github.com/wjakob/nanobind/pull/1291>`__).
 
 - Made stub generation compatible with the Realtime Sanitizer (RTSan)
@@ -1372,7 +1373,7 @@ noteworthy:
 
 * The ``nb::any`` placeholder to specify an unconstrained
   :cpp:class:`nb::ndarray <ndarray>` axis was removed. This name was given to a
-  new wrapper type :cpp:class:`nb::any` indicating ``typing.Any``-typed
+  new wrapper type :cpp:class:`nb::any <any>` indicating ``typing.Any``-typed
   values.
 
   All use of ``nb::any`` in existing code must be replaced with ``-1`` (for
@@ -1845,8 +1846,9 @@ Miscellaneous fixes and improvements
   the construct ``nb::class_<T>(..., nb::is_enum(...))`` is no longer permitted;
   use ``nb::enum_<T>(...)`` instead.
   (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
-* Added the :cpp:class:`nb::type_slots_callback` class binding annotation,
-  similar to :cpp:class:`nb::type_slots` but allowing more dynamic choices.
+* Added the ``nb::type_slots_callback`` class binding annotation,
+  similar to :cpp:struct:`nb::type_slots <type_slots>` but allowing more
+  dynamic choices.
   (PR `#195 <https://github.com/wjakob/nanobind/pull/195>`__).
 * nanobind type objects now treat attributes specially whose names
   begin with ``@``. These attributes can be set once, but not

@@ -316,8 +316,8 @@ Any-typed return values
 The return value of a function can sometimes be unclear (dynamic), in which
 case it can be helpful to declare ``typing.Any`` as a pragmatic return type
 (this effectively disables analysis of the return value in static type
-checkers). nanobind provides a :py:class:`nb::any <any>` wrapper type that is
-equivalent to :py:class:`nb::object <object>` except that its type signature
+checkers). nanobind provides a :cpp:class:`nb::any <any>` wrapper type that is
+equivalent to :cpp:class:`nb::object <object>` except that its type signature
 renders as ``typing.Any`` to facilitate this.
 
 .. _stubs:
@@ -539,8 +539,9 @@ The program has the following command line options:
 
 .. code-block:: text
 
-   usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH] [-m MODULE]
-                                     [-r] [-M FILE] [-P] [-D] [--exclude-values] [-q]
+   usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH]
+                                     [-m MODULE] [-r] [-M FILE] [-p FILE] [-P]
+                                     [-D] [--exclude-values] [-q]
 
    Generate stubs for nanobind-based extensions.
 

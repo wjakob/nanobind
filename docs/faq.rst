@@ -56,7 +56,7 @@ nanobind specifically. There are two solutions:
 
    Depending on the flags provided to :cmake:command:`nanobind_add_module()`,
    the shared library component may have a different name following the pattern
-   ``nanobind[-abi3][-lto]``.
+   ``nanobind[-static][-abi3][-ft][-ps][-<domain>]``.
 
    The following CMake commands may be useful to adjust the build and install
    `rpath <https://en.wikipedia.org/wiki/Rpath>`_ of the extension:
@@ -369,8 +369,8 @@ build system compatible with another tool that is sufficiently
 feature-complete, then please file an issue and I am happy to reference it in
 the documentation.
 
-Is there a way to pass ``JSON`` objects between Python and C++? 
--------------------------------------------------
+Is there a way to pass ``JSON`` objects between Python and C++?
+---------------------------------------------------------------
 Yes, an unofficial, currently maintained, package supporting that can be found `here
 <https://github.com/Griger5/nanobind_json>`_. It is based on a similar package for 
 ``pybind11`` called ``pybind11_json``.

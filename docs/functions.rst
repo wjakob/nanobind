@@ -584,8 +584,8 @@ This is because ``f1``:
      :cpp:func:`nb::arg().none() <arg::none>` or :cpp:func:`"name"_a.noconvert()
      <arg::noconvert>`.
 
-2. Has no :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>`
-   annotations.
+2. Has no :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>` or
+   :cpp:class:`nb::call_policy\<Policy\>() <call_policy>` annotations.
 
 3. Takes no variable-length positional (:cpp:class:`nb::args <args>`) or keyword
    (:cpp:class:`nb::kwargs <kwargs>`) arguments.
@@ -594,9 +594,11 @@ This is because ``f1``:
 
 If all of the above conditions are satisfied, nanobind switches to a
 specialized dispatcher that is optimized to handle a small number of positional
-arguments. Otherwise, it uses the default dispatcher that works in any
-situation. It is also worth noting that functions with many overloads generally
-execute more slowly, since nanobind must first select a suitable one.
+arguments. Violating points 1 or 2 selects a somewhat slower dispatcher that
+handles named and default arguments, and violating points 3 or 4 falls back to
+the fully general one. It is also worth noting that functions with many
+overloads generally execute more slowly, since nanobind must first select a
+suitable one.
 
 These differences are mainly of interest when a function that does *very
 little* is called at a *very high rate*, in which case binding overheads can

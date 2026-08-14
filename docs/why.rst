@@ -180,7 +180,7 @@ The following lists minor-but-useful additions relative to pybind11.
   type signature of a class or function to provide richer type information to
   static type checkers like `MyPy <https://github.com/python/mypy>`__ or
   `PyRight <https://github.com/microsoft/pyright>`__. In such cases, specify
-  the :cpp:class:`nb::sig <signature>` attribute to override the default
+  the :cpp:struct:`nb::sig <sig>` attribute to override the default
   nanobind-provided signature.
 
   For example, the following function signature annotation creates an overload

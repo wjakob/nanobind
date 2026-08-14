@@ -219,13 +219,13 @@ options below. In particular, the following policies are available:
 
 - :cpp:enumerator:`rv_policy::automatic`: This is the default return value
   policy, which falls back to :cpp:enumerator:`take_ownership
-  <rv_policy::automatic>` when the return value is a pointer,
+  <rv_policy::take_ownership>` when the return value is a pointer,
   :cpp:enumerator:`move <rv_policy::move>` when it is a rvalue reference, and
   :cpp:enumerator:`copy <rv_policy::copy>` when it is a lvalue reference.
 
 - :cpp:enumerator:`rv_policy::automatic_reference`: This policy matches
   :cpp:enumerator:`automatic <rv_policy::automatic>` but falls back to
-  :cpp:enumerator:`reference <rv_policy::refernece>` when the return value is a
+  :cpp:enumerator:`reference <rv_policy::reference>` when the return value is a
   pointer. It is the default for function arguments when calling Python
   functions from C++ code via :cpp:func:`detail::api::operator()`. You probably
   won't need to use this policy in your own code.

@@ -184,7 +184,7 @@ sequence.
       .def("set", nb::overload_cast<int>(&Pet::set), "Set the pet's age")
       .def("set", nb::overload_cast<const std::string &>(&Pet::set), "Set the pet's name");
 
-Here, :cpp:func:`nb::overload_cast <overload_cast>` only requires the parameter
+Here, ``nb::overload_cast`` only requires the parameter
 types to be specified, and it deduces the return type.
 
 .. note::

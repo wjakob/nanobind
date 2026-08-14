@@ -379,7 +379,8 @@ constructor and then decrease it again when the created NumPy array expires.
 
 The above example binding returns a *new* memory region that should be deleted
 when it is no longer in use. This is done by creating a
-:cpp:class:`nb::capsule`, an opaque pointer with a destructor callback that
+:cpp:class:`nb::capsule <capsule>`, an opaque pointer with a destructor
+callback that
 runs at this point and takes care of cleaning things up.
 
 If there is already an existing Python object, whose existence guarantees that

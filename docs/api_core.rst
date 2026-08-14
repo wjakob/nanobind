@@ -659,7 +659,7 @@ Wrapper classes
    read tuple elements.
    Once created, the tuple is immutable and its elements cannot be replaced.
 
-   Use the :py:func:`make_tuple` function to create new tuples.
+   Use the :cpp:func:`make_tuple` function to create new tuples.
 
    .. cpp:function:: tuple()
 
@@ -1408,14 +1408,14 @@ the reference section on :ref:`class binding <class_binding>`.
 
       Move constructor
 
-   .. cpp:function:: const char * what() noexcept
+   .. cpp:function:: const char * what() const noexcept
 
       Return a stringified version of the exception. nanobind internally
       normalizes the exception and generates a traceback that is included
       as part of this string. This can be a relatively costly operation
       and should only be used if all of this detail is actually needed.
 
-   .. cpp:function:: bool matches(handle exc) noexcept
+   .. cpp:function:: bool matches(handle exc) const noexcept
 
       Checks whether the exception has the same type as `exc`.
 

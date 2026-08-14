@@ -836,7 +836,8 @@ section <ndarrays>`.
 
       Return the size of a single array element in bytes. The returned value
       is rounded up to the next full byte in case of bit-level representations
-      (query :cpp:member:`dtype::bits` for bit-level granularity).
+      (query :cpp:member:`dtype::bits <dlpack::dtype::bits>` for bit-level
+      granularity).
 
    .. cpp:function:: size_t nbytes() const
 
@@ -917,7 +918,7 @@ section <ndarrays>`.
       ``shape()``, ``stride()``, and ``operator()`` following the conventions
       of the `ndarray` type.
 
-   .. cpp:function:: auto cast(rv_policy policy = rv_policy::automatic_reference, handle parent = {})
+   .. cpp:function:: auto cast(rv_policy policy = rv_policy::automatic, handle parent = {})
 
       The expression ``array.cast(policy, parent)`` is almost equivalent to
       :cpp:func:`nb::cast(array, policy, parent) <cast>`.
@@ -1067,6 +1068,10 @@ Device type
    value`` field that will then match up with
    :cpp:func:`ndarray::device_id()`.
 
+   .. cpp:class:: none
+
+      Unannotated (the device type is unconstrained)
+
    .. cpp:class:: cpu
 
       CPU heap memory
@@ -1082,6 +1087,10 @@ Device type
    .. cpp:class:: cuda_managed
 
       NVIDIA CUDA managed memory
+
+   .. cpp:class:: opencl
+
+      OpenCL device memory
 
    .. cpp:class:: vulkan
 

@@ -294,6 +294,8 @@ The various commands are described below:
         - Perform a stable ABI build targeting Python v3.12+.
       * - ``-ft``
         - Perform a build that opts into the Python 3.13+ free-threaded behavior.
+      * - ``-ps``
+        - Keep the stack protector enabled (see the ``PROTECT_STACK`` flag).
 
    .. code-block:: cmake
 
@@ -516,6 +518,10 @@ Nanobind's CMake tooling includes a convenience command to interface with the
 
       * - ``EXCLUDE_DOCSTRINGS``
         - Generate a stub containing only typed signatures without docstrings.
+
+      * - ``EXCLUDE_VALUES``
+        - Don't include the values of variables in the generated stub, only
+          their types.
 
       * - ``INCLUDE_PRIVATE``
         - Also include private members, whose names begin or end with a single

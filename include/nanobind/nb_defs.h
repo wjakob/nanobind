@@ -142,6 +142,11 @@
 #    error "nanobind's split mode requires targeting the Python stable ABI (Py_LIMITED_API)"
 #endif
 
+#if defined(NB_BACKEND_MODULE) && defined(Py_GIL_DISABLED) &&                  \
+    defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030F0000
+#    error "nanobind's split mode requires the 'abi3t' stable ABI (Python >= 3.15) on free-threaded builds"
+#endif
+
 #if defined(NB_FREE_THREADED) && !defined(Py_GIL_DISABLED)
 #    error "Free-threaded extensions require a free-threaded version of Python"
 #endif

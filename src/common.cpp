@@ -690,6 +690,30 @@ bool gil_check() noexcept {
 
 // ========================================================================
 
+/* 'abi3t' extensions store the mutex as a single byte because PyMutex is not
+   part of their stable ABI. A larger PyMutex would overflow that byte. */
+#if defined(NB_FREE_THREADED)
+static_assert(sizeof(PyMutex) == 1, "nb::ft_mutex assumes a one-byte PyMutex");
+#endif
+
+void ft_mutex_lock(void *m) noexcept {
+#if defined(NB_FREE_THREADED)
+    PyMutex_Lock((PyMutex *) m);
+#else
+    (void) m;
+#endif
+}
+
+void ft_mutex_unlock(void *m) noexcept {
+#if defined(NB_FREE_THREADED)
+    PyMutex_Unlock((PyMutex *) m);
+#else
+    (void) m;
+#endif
+}
+
+// ========================================================================
+
 uint32_t read_flag(nb_flag f) noexcept {
     switch (f) {
         case nb_flag::leak_warnings:

@@ -332,6 +332,17 @@ function(nanobind_extension_abi3 name)
   set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX "${NB_SUFFIX_S}")
 endfunction()
 
+function(nanobind_extension_abi3t name)
+  # The 'abi3t' stable ABI variant of free-threaded builds (PEP 803)
+  if (WIN32)
+    set(suffix "${NB_SUFFIX_S}")
+  else()
+    get_filename_component(ext "${NB_SUFFIX}" LAST_EXT)
+    set(suffix ".abi3t${ext}")
+  endif()
+  set_target_properties(${name} PROPERTIES PREFIX "" SUFFIX "${suffix}")
+endfunction()
+
 function (nanobind_lto name)
   set_target_properties(${name} PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
@@ -394,9 +405,10 @@ function(nanobind_add_module name)
     set(ARG_NB_STATIC TRUE)
   endif()
 
+  set(NB_ABI3T FALSE)
   if (IS_SPLIT)
-    # Split mode extensions always target a stable ABI ('abi3' with a
-    # Python 3.10 floor)
+    # Split mode extensions always targets a stable ABI: 'abi3' with a Python
+    # 3.10 floor, or 'abi3t' (PEP 803) on free-threaded Python 3.15+.
     set(ARG_STABLE_ABI TRUE)
 
     if (NOT Python_INTERPRETER_ID STREQUAL "Python")
@@ -404,10 +416,25 @@ function(nanobind_add_module name)
     endif()
 
     if (NB_ABI MATCHES "[0-9]t")
-      # Free-threaded interpreters have no stable ABI
-      message(FATAL_ERROR "Split mode does not support free-threaded Python!")
+      if (ARG_FREE_THREADED)
+        if (Python_VERSION VERSION_LESS 3.15)
+          message(FATAL_ERROR
+            "Free-threaded extensions in split mode require the 'abi3t' "
+            "stable ABI of Python 3.15 or newer; use a linked mode on "
+            "Python ${Python_VERSION}.")
+        endif()
+        set(NB_ABI3T TRUE)
+      else()
+        message(FATAL_ERROR
+          "Split mode on a free-threaded interpreter requires the "
+          "FREE_THREADED option ('abi3t', Python 3.15 or newer). Classic "
+          "'abi3' extensions cannot be built against free-threaded Python.")
+      endif()
+    else()
+      # A free-threaded Python interpreter is required to build a
+      # free-threaded nanobind module.
+      set(ARG_FREE_THREADED FALSE)
     endif()
-    set(ARG_FREE_THREADED FALSE)
 
     if (WIN32 AND NOT TARGET Python::SABIModule)
       message(FATAL_ERROR
@@ -500,12 +527,16 @@ function(nanobind_add_module name)
   endif()
 
   if (ARG_STABLE_ABI)
-    if (IS_SPLIT)
+    if (NB_ABI3T)
+      target_compile_definitions(${name} PRIVATE -DPy_LIMITED_API=0x030F0000)
+      nanobind_extension_abi3t(${name})
+    elseif (IS_SPLIT)
       target_compile_definitions(${name} PRIVATE -DPy_LIMITED_API=0x030A0000)
+      nanobind_extension_abi3(${name})
     else()
       target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
+      nanobind_extension_abi3(${name})
     endif()
-    nanobind_extension_abi3(${name})
   else()
     nanobind_extension(${name})
   endif()

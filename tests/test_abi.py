@@ -8,6 +8,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import sysconfig
 
 import pytest
 
@@ -42,8 +43,10 @@ def test01_multi_tu_types(multi):
 
 
 def test01b_stable_abi_target(multi):
-    # Extensions in split mode always target the Python 3.10 limited API
-    assert multi.limited_api == 0x030A0000
+    # Extensions in split mode always target the stable ABI: the Python 3.10
+    # limited API, or its 'abi3t' variant (floor 3.15) when free-threaded
+    free_threaded = sysconfig.get_config_var("Py_GIL_DISABLED") == 1
+    assert multi.limited_api == (0x030F0000 if free_threaded else 0x030A0000)
 
 
 def test04_missing_backend():

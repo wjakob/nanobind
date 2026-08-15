@@ -335,6 +335,15 @@ NB_SLOT(bool, load_f64, (PyObject *o, uint32_t flags, double *out) noexcept)
 NB_SLOT(bool, load_cmplx, (PyObject *o, uint32_t flags, double *out) noexcept)
 
 // --------------------------------------------------------------------------
+// Free-threading
+// --------------------------------------------------------------------------
+
+/// Lock/unlock a one-byte PyMutex on behalf of 'abi3t' extensions, whose
+/// stable ABI lacks the mutex API (see nb::ft_mutex)
+NB_SLOT(void, ft_mutex_lock, (void *m) noexcept)
+NB_SLOT(void, ft_mutex_unlock, (void *m) noexcept)
+
+// --------------------------------------------------------------------------
 // Interpreter-state queries and backend configuration
 // --------------------------------------------------------------------------
 

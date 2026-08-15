@@ -70,15 +70,17 @@ The high-level interface consists of just one CMake command:
           possible to use a compiled extension across Python minor versions.
           Linked builds compile the nanobind library under the limited API
           and require Python 3.12 or newer; the flag is ignored on
-          unsupported Python versions. *Split mode*
+          unsupported Python versions. :ref:`Split mode <split-mode>`
           (``BACKEND_MODULE``) always targets the stable ABI with a Python
           3.10 floor, and this flag is then redundant.
       * - ``FREE_THREADED``
         - Compile an Python extension that opts into free-threaded (i.e.,
           GIL-less) Python behavior, which requires a special free-threaded
           build of Python 3.13 or newer. The flag is ignored on unsupported
-          Python versions. It cannot be combined with ``BACKEND_MODULE``,
-          since free-threaded Python has no stable ABI.
+          Python versions. Combined with ``BACKEND_MODULE``, it targets the
+          provisional ``abi3t`` stable ABI variant (`PEP 803
+          <https://peps.python.org/pep-0803/>`__) and requires free-threaded
+          Python 3.15 or newer.
       * - ``NB_STATIC``
         - Compile the core nanobind library as a static library. This
           simplifies redistribution but can increase the combined binary
@@ -89,7 +91,7 @@ The high-level interface consists of just one CMake command:
           as a shared library for use in projects that consist of multiple
           extensions.
       * - ``BACKEND_MODULE <name>``
-        - Compile the extension in *split mode*: it then
+        - Compile the extension in :ref:`split mode <split-mode>`: it then
           contains no nanobind library code at all and resolves the
           compiled backend at import time from the named backend module
           (``nanobind_backend`` is shipped by the `nanobind-backend
@@ -251,7 +253,8 @@ The high-level interface consists of just one CMake command:
 .. cmake:command:: nanobind_add_backend
 
    Build a *backend module*: a Python module that contains the compiled
-   nanobind backend and serves it to extensions built in *split mode*. This is the same command that the official
+   nanobind backend and serves it to extensions built in :ref:`split mode
+   <split-mode>`. This is the same command that the official
    ``nanobind-backend`` wheel uses. Projects that need a custom backend
    module (unusual toolchain, vendoring, version pinning, custom domain)
    build one with two extra lines:
@@ -414,6 +417,15 @@ The various commands are described below:
 
       nanobind_extension_abi3(my_target)
 
+.. cmake:command:: nanobind_extension_abi3t
+
+   This function assigns the ``abi3t`` stable ABI extension name of
+   free-threaded Python 3.15+ (`PEP 803 <https://peps.python.org/pep-0803/>`__)
+   to the compiled binding, e.g., ``.abi3t.so``. Use it as follows:
+
+   .. code-block:: cmake
+
+      nanobind_extension_abi3t(my_target)
 
 .. cmake:command:: nanobind_compile_options
 

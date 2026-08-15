@@ -38,11 +38,13 @@ version does not support free-threading.
 
 .. note::
 
-   **Stable ABI**: Note that there currently is no stable ABI for free-threaded
+   **Stable ABI**: In linked builds, there is no stable ABI for free-threaded
    Python, hence the ``STABLE_ABI`` parameter will be ignored in free-threaded
-   extensions builds. It is valid to combine the ``STABLE_ABI`` and
+   extension builds. It is valid to combine the ``STABLE_ABI`` and
    ``FREE_THREADED`` arguments: the build system will choose between the two
-   depending on the detected Python version.
+   depending on the detected Python version. :ref:`Split mode <split-mode>`
+   extensions can target the provisional ``abi3t`` stable ABI of free-threaded
+   Python 3.15+ (`PEP 803 <https://peps.python.org/pep-0803/>`__).
 
 .. warning::
 
@@ -141,8 +143,11 @@ rewritten as:
        }
    };
 
-These locks are very compact (``sizeof(nb::ft_mutex) == 1``), though this is a
-Python implementation detail that could change in the future.
+These locks are very compact (``sizeof(nb::ft_mutex) == 1``), though this is
+a Python implementation detail that could change in the future. Extensions
+targeting the ``abi3t`` stable ABI (see :ref:`split mode <split-mode>`)
+cannot call the ``PyMutex`` API directly and route these operations through
+the nanobind backend module, which adds a small amount of call overhead.
 
 .. _argument-locks:
 

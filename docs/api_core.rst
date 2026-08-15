@@ -153,10 +153,10 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
 
    .. cpp:function:: args_proxy operator*() const
 
-      Given a a tuple or list, this helper function performs variable argument
-      list unpacking in function calls resembling the ``*`` operator in Python.
-      Applying `operator*()` twice yields ``**`` keyword argument
-      unpacking for dictionaries.
+      Given an iterable, this helper function performs variable argument list
+      unpacking in function calls resembling the ``*`` operator in Python.
+      Applying `operator*()` twice yields ``**`` keyword argument unpacking
+      for dictionaries and other mappings.
 
    .. cpp:function:: bool is(handle value) const
 

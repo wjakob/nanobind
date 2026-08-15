@@ -49,7 +49,13 @@ public:
         return m_cache;
     }
     NB_INLINE handle base() const { return m_base; }
-    NB_INLINE object key() const { return steal(Impl::key(m_key)); }
+
+    /// Python key of an attribute accessor. Borrowed when the accessor holds
+    /// a Python key, and a new reference when it must be created from a C
+    /// string ('key_owned' tells the two apart).
+    static constexpr bool key_owned =
+        std::is_same_v<typename Impl::key_type, const char *>;
+    NB_INLINE PyObject *key() const { return Impl::key(m_key); }
 
     NB_DECL_ACCESSOR_OP_I(operator+=)
     NB_DECL_ACCESSOR_OP_I(operator-=)
@@ -100,10 +106,7 @@ struct obj_attr {
         setattr(obj, key.ptr(), v);
     }
 
-    NB_INLINE static PyObject *key(handle key) {
-        Py_INCREF(key.ptr());
-        return key.ptr();
-    }
+    NB_INLINE static PyObject *key(handle key) { return key.ptr(); }
 };
 
 // String-keyed item access on an arbitrary object. Exact dictionaries
@@ -172,11 +175,6 @@ struct dict_item {
 
     NB_INLINE static void del(PyObject *obj, handle key) {
         raise_if_nonzero(PyDict_DelItem(obj, key.ptr()));
-    }
-
-    NB_INLINE static PyObject *key(handle key) {
-        Py_INCREF(key.ptr());
-        return key.ptr();
     }
 };
 

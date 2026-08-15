@@ -376,6 +376,37 @@ struct arg_data_init {
     uint16_t flag;
 };
 
+/// Flags of the 'obj_vectorcall' and 'obj_vectorcall_ex' backend slots
+enum class call_flags : uint32_t {
+    /// 'base' is a method name to be looked up on the first argument
+    method = (1 << 0),
+
+    /// 'base' is a strong reference that the backend releases
+    base_owned = (1 << 1)
+};
+
+/// Role of a 'call_arg' entry
+enum class call_arg_kind : uint32_t {
+    positional = 0,
+    keyword = 1,
+    /// Positional expansion of an iterable ('*args')
+    args = 2,
+    /// Keyword expansion of a mapping ('**kwargs')
+    kwargs = 3
+};
+
+/// One argument of a call with keyword arguments or '*'/'**' expansion.
+/// Both fields hold strong references that the backend releases.
+struct call_arg {
+    /// Argument value, or the operand of an expansion
+    PyObject *value;
+
+    /// Keyword name (only for 'call_arg_kind::keyword', otherwise null)
+    PyObject *name;
+
+    call_arg_kind kind;
+};
+
 /// Describes a function binding
 struct func_data_init_base {
     // A small amount of space to capture data used by the function/closure

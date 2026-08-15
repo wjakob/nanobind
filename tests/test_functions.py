@@ -196,6 +196,69 @@ def test11_call_complex():
     assert result == [((1, 2, 5, 6), {"extra": 5, "hello": "world"})]
 
 
+def test11b_call_expansion():
+    import types
+
+    def f(*args, **kwargs):
+        return args, kwargs
+
+    # '*' accepts any iterable, '**' any mapping (as in Python)
+    assert t.test_call_star(f, [1, 2]) == ((1, 2), {})
+    assert t.test_call_star(f, (i for i in range(3))) == ((0, 1, 2), {})
+    assert t.test_call_star(f, {"a": 1}) == (("a",), {})
+    assert t.test_call_star(f, "ab") == (("a", "b"), {})
+    with pytest.raises(TypeError, match="not iterable"):
+        t.test_call_star(f, 1)
+
+    assert t.test_call_dstar(f, {"a": 1}) == ((), {"a": 1})
+    assert t.test_call_dstar(f, types.MappingProxyType({"a": 1})) == ((), {"a": 1})
+    with pytest.raises(TypeError, match="must be a mapping"):
+        t.test_call_dstar(f, 1)
+    with pytest.raises(TypeError, match="keywords must be strings"):
+        t.test_call_dstar(f, {1: 2})
+
+    # A sequence that reports different lengths on each query
+    class Growing:
+        def __init__(self):
+            self.n = 1
+
+        def __len__(self):
+            n, self.n = self.n, 2048
+            return n
+
+        def __getitem__(self, i):
+            if i >= 2048:
+                raise IndexError
+            return i
+
+    args, _ = t.test_call_star(f, Growing())
+    assert args == tuple(range(2048))
+
+    # A '*' operand whose iteration mutates the '**' operand
+    d = {"a": 1}
+
+    class Mutator:
+        def __iter__(self):
+            d["b"] = 2
+            return iter((9,))
+
+    assert t.test_call_star_dstar(f, Mutator(), d) == ((9,), {"a": 1, "b": 2})
+
+    assert t.test_call_kwarg_lvalue(f) == (((), {"x": 42}), ((), {"x": 42}))
+
+    class C:
+        def meth(self, *args, **kwargs):
+            return args, kwargs
+
+    assert t.test_call_method_complex(C(), [2, 3], {"z": 4}) == \
+        ((1, 2, 3), {"k": 2, "z": 4})
+
+    for fn in (t.test_call_null_base, lambda: t.test_call_null_arg(f),
+               lambda: t.test_call_null_kwarg(f)):
+        with pytest.raises(RuntimeError, match="bad.cast"):
+            fn()
+
+
 def test12_list_tuple_manipulation():
     li = [1, 5, 6, 7]
     t.test_list(li)

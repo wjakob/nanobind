@@ -10,6 +10,10 @@
 #include <nanobind/nanobind.h>
 #include "nb_internals.h"
 
+#if defined(_MSC_VER)
+#  pragma warning(disable: 6255) // _alloca indicates failure by raising a stack overflow exception
+#endif
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -129,36 +133,147 @@ size_t len_hint(PyObject *o) noexcept {
 }
 
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
-                         PyObject *kwnames, bool method_call) {
+                         uint64_t owned, uint32_t flags) {
+    size_t nargs = (size_t) PyVectorcall_NARGS(nargsf);
     PyObject *res = nullptr;
-    bool cast_error = false;
+    bool cast_error = !base;
 
-    size_t nargs_total = (size_t) (PyVectorcall_NARGS(nargsf) +
-                         (kwnames ? NB_TUPLE_GET_SIZE(kwnames) : 0));
+    for (size_t i = 0; i < nargs; ++i)
+        cast_error |= !args[i];
 
-#if !defined(Py_LIMITED_API)
-    if (!PyGILState_Check()) {
-        // Deliberately leak the argument references: decref'ing them without
-        // holding the GIL would be undefined behavior, and we are about to raise.
-        raise("nanobind::detail::obj_vectorcall(): PyGILState_Check() failure.");
-    }
-#endif
+    if (!cast_error)
+        res = (flags & (uint32_t) call_flags::method
+                   ? PyObject_VectorcallMethod
+                   : PyObject_Vectorcall)(base, args, nargsf, nullptr);
 
-    for (size_t i = 0; i < nargs_total; ++i) {
-        if (!args[i]) {
-            cast_error = true;
-            goto end;
+    // Calls that pass every argument as a borrowed pointer skip this pass
+    if (owned || nargs > 64) {
+        for (size_t i = 0; i < nargs; ++i) {
+            if (i >= 64 || (owned & ((uint64_t) 1 << i)))
+                Py_XDECREF(args[i]);
         }
     }
 
-    res = (method_call ? PyObject_VectorcallMethod
-                       : PyObject_Vectorcall)(base, args, nargsf, kwnames);
+    if (flags & (uint32_t) call_flags::base_owned)
+        Py_XDECREF(base);
 
-end:
-    for (size_t i = 0; i < nargs_total; ++i)
-        Py_XDECREF(args[i]);
+    if (!res) {
+        if (cast_error)
+            raise_python_or_cast_error();
+        else
+            raise_python_error();
+    }
+
+    return res;
+}
+
+/// Turn the operand of a '**' expansion into a private dict, with the error
+/// message that CPython uses for the equivalent Python syntax
+static PyObject *kwargs_dict(PyObject *value) {
+    PyObject *dict = PyDict_New();
+    if (dict && PyDict_Update(dict, value) < 0) {
+        Py_CLEAR(dict);
+        if (PyErr_ExceptionMatches(PyExc_AttributeError))
+            PyErr_SetString(PyExc_TypeError,
+                            "argument after ** must be a mapping");
+    }
+    return dict;
+}
+
+PyObject *obj_vectorcall_ex(PyObject *base, call_arg *args, size_t n,
+                            uint32_t flags) {
+    PyObject *res = nullptr, *kwnames = nullptr, **stack, **pos, **kw;
+    size_t nargs = 0, nkwargs = 0, nkw = 0;
+    bool cast_error = !base;
+
+    /* Pass 1: turn expansion operands into tuples and private dicts (as CPython
+       does before CALL_FUNCTION_EX) and count. Only the conversions can run
+       Python code, and they cannot change the size of the entries before them. */
+    for (size_t i = 0; i < n && !cast_error; ++i) {
+        call_arg &a = args[i];
+        bool star = a.kind == call_arg_kind::args;
+
+        if (!a.value || (a.kind == call_arg_kind::keyword && !a.name)) {
+            cast_error = true;
+        } else if (a.kind == call_arg_kind::positional) {
+            nargs++;
+        } else if (a.kind == call_arg_kind::keyword) {
+            nkwargs++;
+        } else {
+            PyObject *tmp = star ? PySequence_Tuple(a.value) : kwargs_dict(a.value);
+            if (!tmp)
+                goto cleanup;
+            Py_DECREF(a.value);
+            a.value = tmp;
+            if (star)
+                nargs += (size_t) NB_TUPLE_GET_SIZE(tmp);
+            else
+                nkwargs += (size_t) NB_DICT_GET_SIZE(tmp);
+        }
+    }
+    if (cast_error)
+        goto cleanup;
+
+    /* Pass 2: fill the stack, whose entries borrow from the 'call_arg' array
+       and the containers created above, and 'kwnames'. 'stack[0]' is the
+       writable slot required by PEP 590. */
+    stack = (PyObject **) alloca((nargs + nkwargs + 1) * sizeof(PyObject *));
+    stack[0] = nullptr;
+    pos = stack + 1;
+    kw = pos + nargs;
+
+    if (nkwargs && !(kwnames = PyTuple_New((Py_ssize_t) nkwargs)))
+        goto cleanup;
+
+    for (size_t i = 0; i < n; ++i) {
+        call_arg &a = args[i];
+        switch (a.kind) {
+            case call_arg_kind::positional:
+                *pos++ = a.value;
+                break;
+
+            case call_arg_kind::keyword: // 'kwnames' takes over the name
+                *kw++ = a.value;
+                NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkw++, a.name);
+                a.name = nullptr;
+                break;
+
+            case call_arg_kind::args:
+                for (Py_ssize_t j = 0, l = NB_TUPLE_GET_SIZE(a.value); j < l; ++j)
+                    *pos++ = NB_TUPLE_GET_ITEM(a.value, j);
+                break;
+
+            case call_arg_kind::kwargs: {
+                PyObject *key, *value;
+                Py_ssize_t p = 0;
+                while (PyDict_Next(a.value, &p, &key, &value)) {
+                    if (!PyUnicode_Check(key)) {
+                        PyErr_SetString(PyExc_TypeError, "keywords must be strings");
+                        goto cleanup;
+                    }
+                    Py_INCREF(key);
+                    NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkw++, key);
+                    *kw++ = value;
+                }
+                break;
+            }
+        }
+    }
+
+    res = (flags & (uint32_t) call_flags::method
+               ? PyObject_VectorcallMethod
+               : PyObject_Vectorcall)(base, stack + 1,
+                                      nargs | PY_VECTORCALL_ARGUMENTS_OFFSET,
+                                      kwnames);
+
+cleanup:
     Py_XDECREF(kwnames);
-    Py_DECREF(base);
+    for (size_t i = 0; i < n; ++i) {
+        Py_XDECREF(args[i].value);
+        Py_XDECREF(args[i].name);
+    }
+    if (flags & (uint32_t) call_flags::base_owned)
+        Py_XDECREF(base);
 
     if (!res) {
         if (cast_error)

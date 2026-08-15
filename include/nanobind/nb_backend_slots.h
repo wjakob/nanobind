@@ -87,10 +87,21 @@ NB_SLOT(PyObject *, submodule_new,
 /// Try to roughly determine the length of a Python object
 NB_SLOT(size_t, len_hint, (PyObject *o) noexcept)
 
-/// Perform a vector function call
+/// Perform a vector call with positional arguments. 'base' is the callable
+/// or, with 'call_flags::method', a method name looked up on 'args[0]'.
+/// The bits of 'owned' mark arguments that the backend releases; the caller
+/// keeps the others alive across the call. Arguments beyond the 64th are
+/// always released. The slot in front of the first argument ('args[-1]', or
+/// the 'self' entry of a method call) may be overwritten during the call.
 NB_SLOT(PyObject *, obj_vectorcall,
         (PyObject *base, PyObject *const *args, size_t nargsf,
-         PyObject *kwnames, bool method_call))
+         uint64_t owned, uint32_t flags))
+
+/// Perform a call with keyword arguments and/or '*'/'**' expansions,
+/// described by 'nargs' entries of 'args'. With 'call_flags::method', the
+/// first entry is the 'self' object.
+NB_SLOT(PyObject *, obj_vectorcall_ex,
+        (PyObject *base, call_arg *args, size_t nargs, uint32_t flags))
 
 // --------------------------------------------------------------------------
 // Sequence helpers

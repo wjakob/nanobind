@@ -272,11 +272,11 @@ NB_INLINE PyObject *none_ref() noexcept { Py_RETURN_NONE; }
 NB_INLINE PyObject *true_ref() noexcept { Py_RETURN_TRUE; }
 NB_INLINE PyObject *false_ref() noexcept { Py_RETURN_FALSE; }
 
-/// Cold path of the GIL assertion in handle::inc_ref/dec_ref (debug builds)
+/// Cold path of the GIL assertions in debug builds (reference counting, calls)
 [[noreturn]] NB_NOINLINE inline void fail_gil() noexcept {
     fprintf(stderr, "Critical nanobind error: attempted to change the "
-                    "reference count of a Python object while the GIL was "
-                    "not held!\n");
+                    "reference count of a Python object or to call into "
+                    "Python while the GIL was not held!\n");
     abort();
 }
 

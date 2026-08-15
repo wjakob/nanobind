@@ -171,6 +171,33 @@ NB_MODULE(test_functions_ext, m) {
         return o(1, 2, *args, **kwargs, "extra"_a = 5);
     });
 
+    /// Test '*' and '**' expansion of arbitrary iterables and mappings
+    m.def("test_call_star", [](nb::object f, nb::object seq) {
+        return f(*seq);
+    });
+    m.def("test_call_dstar", [](nb::object f, nb::object map) {
+        return f(**map);
+    });
+    m.def("test_call_star_dstar", [](nb::object f, nb::object seq, nb::object map) {
+        return f(*seq, **map);
+    });
+
+    /// A keyword argument object may be reused across calls
+    m.def("test_call_kwarg_lvalue", [](nb::object f) {
+        nb::arg_v kw = nb::arg("x") = 42;
+        return nb::make_tuple(f(kw), f(kw));
+    });
+
+    /// Method call with keyword arguments and expansions
+    m.def("test_call_method_complex", [](nb::object o, nb::object seq, nb::object map) {
+        return o.attr("meth")(1, *seq, "k"_a = 2, **map);
+    });
+
+    /// Calls involving null objects must raise instead of crashing
+    m.def("test_call_null_base", []() { return nb::object()(1); });
+    m.def("test_call_null_arg", [](nb::object f) { return f(nb::object()); });
+    m.def("test_call_null_kwarg", [](nb::object f) { return f("x"_a = nb::object()); });
+
     /// Test list manipulation
     m.def("test_list", [](nb::list l) {
         int result = 0;

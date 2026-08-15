@@ -33,6 +33,12 @@ NB_FROZEN_OFF(arg_data_init, name_py, 16);
 NB_FROZEN_OFF(arg_data_init, value, 24);
 NB_FROZEN_OFF(arg_data_init, flag, 32);
 
+static_assert(sizeof(void *) != 8 || sizeof(call_arg) == 24,
+              "frozen ABI layout of call_arg changed");
+NB_FROZEN_OFF(call_arg, value, 0);
+NB_FROZEN_OFF(call_arg, name, 8);
+NB_FROZEN_OFF(call_arg, kind, 16);
+
 static_assert(sizeof(void *) != 8 || sizeof(func_data_init_base) == 96,
               "frozen ABI layout of func_data_init_base changed");
 NB_FROZEN_OFF(func_data_init_base, capture, 0);

@@ -211,6 +211,11 @@ improvements:
 
 This release also brings a set of performance improvements:
 
+- **Unnecessary reference counting**: the C++ wrappers performed many
+  unnecessary calls to ``Py_INCREF()`` and ``Py_DECREF()`` that have a
+  nontrivial cost. The overhead of performing a Python function call from
+  C++ dropped significantly.
+
 - **Faster iteration**: ranges exposed through ``nb::make_iterator()``
   previously raised a C++ exception to signal the end of each loop. The cost
   of the resulting stack unwinding (several microseconds) could easily

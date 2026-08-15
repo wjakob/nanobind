@@ -44,6 +44,21 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: sudo apt-get -y install libeigen3-dev
 
+    # ubuntu packages xtensor-dev and xtl-dev are outdated
+    # so we will install them from sources
+    - name: Install xtensor and xtl
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir -p /tmp/xtensor-install && cd /tmp/xtensor-install
+        wget https://github.com/xtensor-stack/xtl/archive/refs/tags/0.8.2.zip -O xtl-0.8.2.zip
+        unzip xtl-0.8.2.zip && cd xtl-0.8.2
+        cmake . && sudo make install
+        cd /tmp/xtensor-install
+        wget https://github.com/xtensor-stack/xtensor/archive/refs/tags/0.26.0.zip -O xtensor-0.26.0.zip
+        unzip xtensor-0.26.0.zip && cd xtensor-0.26.0
+        mkdir build && cd build
+        cmake .. && sudo make install
+
     - name: Install PyTest
       run: |
         python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions

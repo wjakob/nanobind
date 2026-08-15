@@ -293,11 +293,16 @@ Can I make stable ABI extensions for pre-3.12 Python?
 -----------------------------------------------------
 
 Stable ABI extensions are convenient because they can be reused across Python
-versions, but this unfortunately only works on Python 3.12 and newer. Nanobind
-crucially depends on several `features
+versions, but in the linked build modes this only works on Python 3.12 and
+newer. Nanobind crucially depends on several `features
 <https://docs.python.org/3/whatsnew/3.12.html#c-api-changes>`__ that were added
 in version 3.12 (specifically, ``PyType_FromMetaclass()`` and limited API
 bindings of the vector call protocol).
+
+:ref:`Split mode <split-mode>` drops the floor to Python 3.10: the parts of
+nanobind that need those interfaces then live in a backend module that is
+built per Python version, and only the extension itself must stay within the
+limited API.
 
 Policy on Clang-Tidy, ``-Wpedantic``, etc.
 ------------------------------------------

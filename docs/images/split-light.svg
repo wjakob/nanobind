@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 870 196" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-fast" viewBox="0 0 10 10" refX="0.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#c0604f"/>
+    </marker>
+    <marker id="arrow-stable" viewBox="0 0 10 10" refX="0.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#5673d8"/>
+    </marker>
+    <marker id="arrow-table" viewBox="0 0 10 10" refX="0.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#7a7a7a"/>
+    </marker>
+    <style>
+      .title   { font-size: 13.5px; font-weight: 600; fill: #1a1a1a; }
+      .label   { font-size: 12px; fill: #1a1a1a; }
+      .mono    { font-size: 11.5px; fill: #1a1a1a; font-family: SFMono-Regular, Consolas, Menlo, monospace; }
+      .caption { font-size: 11px; fill: #707070; }
+      .fast    { fill: #fbeae6; stroke: #c0604f; stroke-width: 1.25; }
+      .stable  { fill: #e9edfb; stroke: #5673d8; stroke-width: 1.25; }
+      .afast   { stroke: #c0604f; stroke-width: 1.6; fill: none; }
+      .astable { stroke: #5673d8; stroke-width: 1.6; fill: none; }
+      .atable  { stroke: #7a7a7a; stroke-width: 1.6; fill: none; }
+    </style>
+  </defs>
+
+  <g>
+    <line x1="215" y1="8" x2="233" y2="8" class="afast" marker-end="url(#arrow-fast)"/>
+    <text x="245" y="12" class="caption">Unstable ABI (fast)</text>
+    <line x1="350" y1="8" x2="368" y2="8" class="astable" marker-end="url(#arrow-stable)"/>
+    <text x="380" y="12" class="caption">Stable ABI (slow)</text>
+    <line x1="475" y1="8" x2="493" y2="8" class="atable" marker-end="url(#arrow-table)"/>
+    <text x="505" y="12" class="caption">Backend ABI</text>
+  </g>
+
+  <g transform="translate(10,24)">
+    <text x="120" y="16" text-anchor="middle" class="title">Static</text>
+    <rect x="0" y="28" width="240" height="76" rx="8" class="fast"/>
+    <text x="120" y="46" text-anchor="middle" class="label">Extension</text>
+    <rect x="10" y="54" width="106" height="40" rx="5" class="fast"/>
+    <text x="63" y="78" text-anchor="middle" class="label">Bindings</text>
+    <rect x="124" y="54" width="106" height="40" rx="5" class="fast"/>
+    <text x="177" y="78" text-anchor="middle" class="mono">libnanobind</text>
+    <line x1="120" y1="104" x2="120" y2="123" class="afast" marker-end="url(#arrow-fast)"/>
+    <rect x="0" y="134" width="240" height="32" rx="8" class="fast"/>
+    <text x="120" y="155" text-anchor="middle" class="label">Python</text>
+  </g>
+
+  <g transform="translate(295,24)">
+    <text x="120" y="16" text-anchor="middle" class="title">Static + stable ABI</text>
+    <rect x="0" y="28" width="240" height="76" rx="8" class="stable"/>
+    <text x="120" y="46" text-anchor="middle" class="label">Extension</text>
+    <rect x="10" y="54" width="106" height="40" rx="5" class="stable"/>
+    <text x="63" y="78" text-anchor="middle" class="label">Bindings</text>
+    <rect x="124" y="54" width="106" height="40" rx="5" class="stable"/>
+    <text x="177" y="78" text-anchor="middle" class="mono">libnanobind</text>
+    <line x1="120" y1="104" x2="120" y2="123" class="astable" marker-end="url(#arrow-stable)"/>
+    <rect x="0" y="134" width="240" height="32" rx="8" class="fast"/>
+    <text x="120" y="155" text-anchor="middle" class="label">Python</text>
+  </g>
+
+  <g transform="translate(580,24)">
+    <text x="140" y="16" text-anchor="middle" class="title">Split mode</text>
+    <rect x="0" y="28" width="120" height="76" rx="8" class="stable"/>
+    <text x="60" y="46" text-anchor="middle" class="label">Extension</text>
+    <rect x="10" y="54" width="100" height="40" rx="5" class="stable"/>
+    <text x="60" y="78" text-anchor="middle" class="label">Bindings</text>
+    <rect x="160" y="28" width="120" height="76" rx="8" class="fast"/>
+    <text x="220" y="46" text-anchor="middle" class="label">Backend</text>
+    <rect x="170" y="54" width="100" height="40" rx="5" class="fast"/>
+    <text x="220" y="78" text-anchor="middle" class="mono">libnanobind</text>
+    <line x1="123" y1="74" x2="149" y2="74" class="atable" marker-end="url(#arrow-table)"/>
+    <line x1="60" y1="104" x2="60" y2="123" class="astable" marker-end="url(#arrow-stable)"/>
+    <line x1="220" y1="104" x2="220" y2="123" class="afast" marker-end="url(#arrow-fast)"/>
+    <rect x="0" y="134" width="280" height="32" rx="8" class="fast"/>
+    <text x="140" y="155" text-anchor="middle" class="label">Python</text>
+  </g>
+</svg>

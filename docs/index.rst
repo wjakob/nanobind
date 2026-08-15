@@ -134,6 +134,7 @@ The nanobind logo was designed by `AndoTwin Studio
    :caption: Advanced
    :maxdepth: 1
 
+   split_mode
    free_threaded
    ownership_adv
    lowlevel

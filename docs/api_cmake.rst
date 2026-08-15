@@ -254,15 +254,12 @@ The high-level interface consists of just one CMake command:
 
    Build a *backend module*: a Python module that contains the compiled
    nanobind backend and serves it to extensions built in :ref:`split mode
-   <split-mode>`. This is the same command that the official
-   ``nanobind-backend`` wheel uses. Projects that need a custom backend
-   module (unusual toolchain, vendoring, version pinning, custom domain)
-   build one with two extra lines:
+   <split-mode>`. See the section on :ref:`compiling a custom backend
+   <custom-backend>` for details.
 
    .. code-block:: cmake
 
       nanobind_add_backend(_backend)   # ships as, e.g., my_package._backend
-      nanobind_add_module(my_ext my_ext.cpp BACKEND_MODULE my_package._backend)
 
    Backend modules never target the stable ABI and must be built per Python
    version. On a free-threaded interpreter, the backend is automatically built

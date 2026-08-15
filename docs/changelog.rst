@@ -19,11 +19,57 @@ below inherit that of the preceding release.
 Version 3.0.0 (unreleased)
 --------------------------
 
-This is a major release with breaking API and ABI changes, in particular:
+This major release of nanobind introduces **split mode** to address a
+frustration shared by many extension developers. It also includes minor API
+breaks discussed below, though most existing code is expected to require no
+adaptations.
 
-- **Python version requirement**: nanobind now requires Python 3.10 or newer.
-  Python 3.9 reached its end of life in October 2025, and dropping it removes
-  a number of workarounds for missing C API functionality.
+- **Split mode**: nanobind introduces a new distribution model named
+  :ref:`split mode <split-mode>`. It fixes the wheel distribution problem,
+  where binary wheels have to be built for a vast matrix of Python versions and
+  platforms. Python's stable ABI exists to fix this problem but falls short in
+  several ways:
+
+  - Python's stable ABI makes nanobind slower. Performance-critical code like
+    nanobind's function dispatcher needs access to Python internals to work
+    efficiently, and such low-level access is prohibited by the stable ABI.
+
+  - Meaningfully reducing the wheel count only works when targeting a low stable
+    ABI version. The earliest version usable by nanobind was 3.12, which means
+    that users still have to ship separate wheels for Python 3.10 and 3.11.
+
+  - A Python 3.12 stable ABI floor would leave nanobind "forever frozen"
+    at the stagnant 3.12 feature set, which lacks many important features
+    and improvements shipped since then.
+
+  Split mode gets rid of all of these problems by splitting a nanobind
+  extension into a frontend and a backend part. The backend contains the
+  advanced and performance-critical parts that benefit from coupling to a
+  specific Python version. It is tiny and shipped on `PyPI
+  <https://pypi.org/project/nanobind-backend/>`__ for relevant platforms
+  and Python versions, so users do not have to worry about it (though it is
+  possible for them to also ship their own backend).
+
+  The frontend part (i.e., *your code*) delegates most work to the backend
+  and targets the Python 3.10 stable ABI, so that it can be distributed as a
+  single Python wheel per platform that covers every supported Python
+  version.
+
+  Split mode is an **optional** feature, and the traditional workflow without
+  it remains the default. To enable split mode, pass the ``BACKEND_MODULE``
+  option to :cmake:command:`nanobind_add_module`, naming the backend module
+  that your extension should use.
+
+  .. code-block:: cmake
+
+     nanobind_add_module(
+         my_ext
+         my_ext.cpp
+         BACKEND_MODULE nanobind_backend
+     )
+
+The release makes several API-breaking changes that unlock internal
+improvements:
 
 - **Trampolines**: nanobind 3 switches to a new :ref:`trampoline <trampolines>`
   mechanism to override C++ methods in Python. Instead of caching data about
@@ -146,15 +192,11 @@ This is a major release with breaking API and ABI changes, in particular:
   because the value converts implicitly, though this may cause compiler
   warnings. It is advisable that you widen the parameter in your casters.
 
-- **Split mode**: extensions can now be built without any compiled nanobind
-  code by naming a ``BACKEND_MODULE`` in ``nanobind_add_module()``. Such an
-  extension targets the stable ABI and resolves the backend at import time
-  from a *backend module* built with the new CMake command
-  ``nanobind_add_backend()``; the default backend module is shipped by the
-  ``nanobind-backend`` wheel, and the optional ``BACKEND_PYPI`` parameter
-  names the PyPI package suggested when the module is missing.
-
 - **Miscellaneous**:
+
+  - **Python version requirement**: nanobind now requires Python 3.10 or newer.
+    Python 3.9 reached its end of life in October 2025, and dropping it removes
+    a number of workarounds for missing C API functionality.
 
   - The ``self`` argument of a method is no longer subject to implicit
     conversion when the method is called in unbound form

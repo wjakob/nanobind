@@ -121,9 +121,10 @@ nanobind includes a number of quality-of-life improvements for developers:
   the :ref:`section on n-dimensional arrays <ndarrays>` for details.
 
 - **Stable ABI**: nanobind can target Python's `stable ABI interface
-  <https://docs.python.org/3/c-api/stable.html>`__ starting with Python 3.12.
-  This means that extension modules are compatible with later version of
-  Python without having to compile separate binaries per interpreter.
+  <https://docs.python.org/3/c-api/stable.html>`__ starting with Python 3.12
+  (or 3.10 in :ref:`split mode <split-mode>`). This means that extension
+  modules are compatible with later version of Python without having to
+  compile separate binaries per interpreter.
 
 - **Stub generation**: nanobind ships with a custom :ref:`stub generator
   <stubs>` and CMake integration to automatically create high quality type

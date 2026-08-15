@@ -1,0 +1,126 @@
+name: backend-wheels
+
+# Builds the nanobind-backend wheel matrix for a release. Run it manually on
+# the release tag; the wheels are attached as the 'dist' artifact for a manual
+# upload to PyPI (see docs/release.rst). Nothing here publishes anything.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest', 'ubuntu-24.04-arm', 'windows-2022', 'macos-15', 'macos-13']
+
+    name: "wheels / ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    # The whole checkout is the cibuildwheel project (it is copied into the
+    # manylinux container), the package is the subdirectory
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v3
+      with:
+        package-dir: nanobind-backend
+        output-dir: dist
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: wheels-${{ matrix.os }}
+        path: dist/*.whl
+
+  # Run the full test suite against the freshly built wheels on the lowest and
+  # highest CPython version of each platform
+  validate:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest', 'windows-2022', 'macos-15']
+        python: ['3.10', '3.14']
+
+    name: "validate / Python ${{ matrix.python }} / ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python ${{ matrix.python }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        cache: 'pip'
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: wheels-*
+        merge-multiple: true
+        path: dist
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions numpy
+
+    - name: Install the nanobind-backend wheel
+      run: |
+        python -m pip install nanobind-backend --no-index --find-links dist
+        python -m pip show nanobind-backend
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DNB_TEST_SPLIT_MODE=ON -DNB_TEST_SPLIT_WHEEL=ON
+        -DNB_TEST_FREE_THREADED=OFF
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Run tests
+      run: |
+        cd build
+        python -m pytest
+
+  # Merge the per-platform artifacts into one 'dist' artifact and summarize
+  # what was built. A job that runs the previous release's test suite against
+  # these wheels (the backward-compatibility promise of revision releases)
+  # should be added here once a first release exists.
+  collect:
+    needs: [build, validate]
+    name: "collect"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/upload-artifact/merge@v4
+      with:
+        name: dist
+        pattern: wheels-*
+        delete-merged: true
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist
+
+    - name: Summarize
+      run: |
+        {
+          echo '## nanobind-backend wheels'
+          echo
+          echo '```'
+          python src/version.py
+          echo
+          ls -1 dist
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"

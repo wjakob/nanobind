@@ -6,14 +6,9 @@ Changelog
 #########
 
 nanobind uses a `semantic versioning <http://semver.org>`__ policy for its API.
-It also has a separate ABI version that is *not* subject to semantic
-versioning.
-
-The ABI version is relevant whenever a type binding from one extension module
-should be visible in another nanobind-based extension module. In this
-case, both modules must use the same nanobind ABI version, or they will be
-isolated from each other. Releases that don't explicitly mention an ABI version
-below inherit that of the preceding release.
+There is also a separate *ABI version* that is *not* subject to semantic
+versioning. Please review the :ref:`ABI compatibility <abi_compatibility>`
+documentation for details.
 
 
 Version 3.0.0 (unreleased)
@@ -67,6 +62,10 @@ adaptations.
          my_ext.cpp
          BACKEND_MODULE nanobind_backend
      )
+
+It will still take some time to stabilize split mode before a regular 3.0.0
+release. For now, please try your projects with the development release of
+nanobind (``3.0.0.dev1``) and ``nanobind-backend`` (``1.0.0.dev1``) on PyPI.
 
 The release makes several API-breaking changes that unlock internal
 improvements:
@@ -220,7 +219,7 @@ This release also brings a set of performance improvements:
   reduces the cost of a loop over a 4-element sequence from **5167ns** to
   **125ns** on my machine. The per-element cost is unchanged.
 
-- ABI version 22.
+- Internal ABI version 22.
 
 Version 2.15.0 (Aug 15, 2026)
 -----------------------------
@@ -279,7 +278,7 @@ commits `922a5c <https://github.com/wjakob/nanobind/commit/922a5cdaa4e6e18ecd233
 `53d546 <https://github.com/wjakob/nanobind/commit/53d546f1a3d62a4f00aff4dfd26a12cfd5df08e8>`__,
 `ef993f <https://github.com/wjakob/nanobind/commit/ef993ffa28e631151ceac27746ef79da09eda783>`__).
 
-- ABI version 21.
+- Internal ABI version 21.
 
 Version 2.14.0 (Aug 7, 2026)
 ----------------------------
@@ -654,7 +653,7 @@ conditions in free-threaded Python builds.
   `b22f1f <https://github.com/wjakob/nanobind/commit/b22f1fe0f257d85ae0425695082115d87053173a>`__,
   `96cc36 <https://github.com/wjakob/nanobind/commit/96cc36bfa666306428e27d27111cfa6c203a966d>`__, `279947 <https://github.com/wjakob/nanobind/commit/27994734f66c647347d5ee2218b464a6fbd8e953>`__, `bc6bf8 <https://github.com/wjakob/nanobind/commit/bc6bf8a4e82355b59784920a966726586b2eaa42>`__, `3408c6 <https://github.com/wjakob/nanobind/commit/3408c6623133ecf54afcef1c002414094aa16d67>`__, `7c9e94 <https://github.com/wjakob/nanobind/commit/7c9e94ad77c60ad7b15e336367cbfab9fec2f285>`__, `ef1266 <https://github.com/wjakob/nanobind/commit/ef12667c1bd8fc0aa5110400ed4b7a206a95f594>`__, `0528ff <https://github.com/wjakob/nanobind/commit/0528ff7bca4155bd7214114dc864a091c9554220>`__).
 
-- ABI version 20.
+- Internal ABI version 20.
 
 Version 2.12.0 (Feb 25, 2026)
 -----------------------------
@@ -682,7 +681,7 @@ Version 2.12.0 (Feb 25, 2026)
   commits `ed7ab3 <https://github.com/wjakob/nanobind/commit/ed7ab31f5ffe313b2ca945573e29112ea5e475b2>`__,
   `1f9627 <https://github.com/wjakob/nanobind/commit/1f96278c09ec1f7110105f5e2e3dbd2f08dc66a4>`__).
 
-- ABI version 19.
+- Internal ABI version 19.
 
 Version 2.11.0 (Jan 29, 2026)
 -----------------------------
@@ -732,7 +731,7 @@ Version 2.11.0 (Jan 29, 2026)
   about empty compilation units. (PR `#1271
   <https://github.com/wjakob/nanobind/pull/1271>`__).
 
-- ABI version 18.
+- Internal ABI version 18.
 
 - **Eigen type caster improvements**:
 
@@ -810,7 +809,7 @@ Version 2.10.1 (Dec 8, 2025)
   extension builds (PR `#1191
   <https://github.com/wjakob/nanobind/pull/1191>`__)
 
-- ABI version 17.
+- Internal ABI version 17.
 
 - **Stub generation improvements**:
 
@@ -1054,7 +1053,7 @@ Version 2.6.1 (Mar 28, 2025)
   default) <getattr>` in cases where ``obj[key]`` does not exist. (commit
   `bb05f5 <https://github.com/wjakob/nanobind/commit/bb05f5503aef9b70498302bf30bf958e8cc605c7>`__).
 
-- ABI version 16.
+- Internal ABI version 16.
 
 - Miscellaneous fixes and improvements (PRs `#913
   <https://github.com/wjakob/nanobind/pull/913>`__, `#914
@@ -1355,7 +1354,7 @@ Version 2.2.0 (October 3, 2024)
   can also accommodate non-STL frameworks, such as Boost, Abseil, etc. (PR
   `#675 <https://github.com/wjakob/nanobind/pull/675>`__)
 
-* ABI version 15.
+* Internal ABI version 15.
 
 * Minor fixes and improvements (PRs
   `#703 <https://github.com/wjakob/nanobind/pull/703>`__,
@@ -1651,7 +1650,7 @@ noteworthy:
   it existed to avoid one particular source of exceptions from a cast
   operator, but ``can_cast<T>()`` now handles that problem more generally.
 
-* ABI version 14.
+* Internal ABI version 14.
 
 .. rubric:: Footnote
 
@@ -1709,7 +1708,7 @@ Version 1.9.2 (Feb 23, 2024)
   commit `978dbb <https://github.com/wjakob/nanobind/commit/978dbb1d6aaeee7530d57cf3e8d558e099a4eec6>`__,
   commit `f5d8de <https://github.com/wjakob/nanobind/commit/f5d8defc68a5c6a79b0e64de016ee52dde6ea54d>`__).
 
-* ABI version 13.
+* Internal ABI version 13.
 
 * Minor fixes and improvements.
 
@@ -1742,7 +1741,7 @@ Version 1.8.0 (Nov 2, 2023)
 
 * Minor fixes and improvements.
 
-* ABI version 12.
+* Internal ABI version 12.
 
 
 Version 1.7.0 (Oct 19, 2023)
@@ -1784,7 +1783,7 @@ New features
 
 * Minor fixes and improvements.
 
-* ABI version 11.
+* Internal ABI version 11.
 
 Bugfixes
 ^^^^^^^^
@@ -1905,9 +1904,9 @@ Version 1.5.1 (Aug 23, 2023)
 * Extended the internal data structure tag so that it isolates different MSVC
   versions from each other (they are often not ABI compatible, see pybind11
   issue `#4779 <https://github.com/pybind/pybind11/pull/4779>`__). This means
-  that nanobind 1.5.1 effectively bumps the ABI version to "10.5" when
-  compiling for MSVC, and the internals will be isolated from extensions built
-  with nanobind v1.5.0 or older. (commit `c7f3cd <https://github.com/wjakob/nanobind/commit/c7f3cd6a7023dec55c63b995ba50c9f5d4b9147a>`__).
+  that nanobind 1.5.1 effectively bumps the internal ABI version to "10.5"
+  when compiling for MSVC, and the internals will be isolated from extensions
+  built with nanobind v1.5.0 or older. (commit `c7f3cd <https://github.com/wjakob/nanobind/commit/c7f3cd6a7023dec55c63b995ba50c9f5d4b9147a>`__).
 * Incorporated fixes so that nanobind works with PyPy 3.10. (commits `fb5508 <https://github.com/wjakob/nanobind/commit/fb5508955e1b1455adfe1372b49748ba706b4d87>`__
   and `2ed108 <https://github.com/wjakob/nanobind/commit/2ed108a73bd5fbe0e1c43a8db07e40a165fc265f>`__).
 * Fixed type caster for ``std::vector<bool>``. (PR `#256
@@ -1949,7 +1948,7 @@ Version 1.5.0 (Aug 7, 2023)
   base C++ class type caster. (commit `1ff9df <https://github.com/wjakob/nanobind/commit/1ff9df03fb56a16f56854b4cecd1f388f73d3b53>`__).
 * Switch to the new Python 3.12 error status API if available. (commit `36751c <https://github.com/wjakob/nanobind/commit/36751cb05994a96a3801bf511c846a7bc68e2f09>`__).
 * Various minor fixes and improvements.
-* ABI version 10.
+* Internal ABI version 10.
 
 Version 1.4.0 (June 8, 2023)
 ----------------------------
@@ -1967,7 +1966,7 @@ Version 1.4.0 (June 8, 2023)
   (commits `f3b0e6 <https://github.com/wjakob/nanobind/commit/f3b0e6cbd69a4adcdc31dbe0b844370b1b60dbcf>`__,
   and `2c9124 <https://github.com/wjakob/nanobind/commit/2c9124bbbe736881fa8f9f33ea7817c98b43bf8b>`__).
 * Support for pickling/unpickling nanobind objects. (commit `59843e <https://github.com/wjakob/nanobind/commit/59843e09bc6e8f2b0338829a44cf71e25f76cba3>`__).
-* ABI version 9.
+* Internal ABI version 9.
 
 Version 1.3.2 (June 2, 2023)
 ----------------------------
@@ -2098,7 +2097,7 @@ Miscellaneous fixes and improvements
     ``some_enum < None`` will still fail, but now with a more
     informative error.
 
-* ABI version 8.
+* Internal ABI version 8.
 
 Version 1.2.0 (April 24, 2023)
 ------------------------------
@@ -2256,7 +2255,7 @@ Version 0.2.0 (March 3, 2023)
 * Switched shared library linking on macOS back to a two-level namespace.
   (commit `a617fb <https://github.com/wjakob/nanobind/commit/a617fb672bcb83e620c155799b96233500add2cf>`__).
 * Various minor fixes and improvements.
-* ABI version 7.
+* Internal ABI version 7.
 
 Version 0.1.0 (January 3, 2023)
 -------------------------------
@@ -2279,7 +2278,7 @@ Version 0.1.0 (January 3, 2023)
   rare `overflow issue <https://github.com/Tessil/robin-map/issues/52>`__
   discovered in this codebase. (commit `3b81b1 <https://github.com/wjakob/nanobind/commit/3b81b18577e243118a659b524d4de9500a320312>`__).
 * Various minor fixes and improvements.
-* ABI version 6.
+* Internal ABI version 6.
 
 Version 0.0.9 (Nov 23, 2022)
 ----------------------------
@@ -2326,7 +2325,7 @@ Version 0.0.8 (Oct 27, 2022)
 * Added a workaround for spurious reference leak warnings caused by other
   extension modules in conjunction with ``typing.py`` (commit `5e11e8 <https://github.com/wjakob/nanobind/commit/5e11e8032f777c0a34abd437dc6e84a909907c91>`__).
 * Various minor fixes and improvements.
-* ABI version 5.
+* Internal ABI version 5.
 
 Version 0.0.7 (Oct 14, 2022)
 ----------------------------
@@ -2349,7 +2348,7 @@ Version 0.0.6 (Oct 14, 2022)
 * Custom exception support (commit `41b7da <https://github.com/wjakob/nanobind/commit/41b7da33f1bc5c583bb98df66bdac2a058ec5c15>`__).
 * Register nanobind functions with Python's cyclic garbage collector (PR `#86 <https://github.com/wjakob/nanobind/pull/86>`__).
 * Various minor fixes and improvements.
-* ABI version 3.
+* Internal ABI version 3.
 
 Version 0.0.5 (May 13, 2022)
 ----------------------------
@@ -2376,7 +2375,7 @@ Version 0.0.2 (Mar 10, 2022)
 ----------------------------
 
 * Initial release of the nanobind codebase.
-* ABI version 1.
+* Internal ABI version 1.
 
 Version 0.0.1 (Feb 21, 2022)
 ----------------------------

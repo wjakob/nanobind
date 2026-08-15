@@ -4,9 +4,11 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "nanobind-backend"
-# MAJOR.MINOR name the newest nanobind ABI this wheel provides; the revision
-# covers all non-contractual change. See docs/split_mode.rst.
-version = "1.0.0"
+# MAJOR.MINOR name the newest backend ABI this wheel provides; the revision
+# covers all non-contractual change (see docs/split_mode.rst). This value
+# mirrors the macros in include/nanobind/nb_backend.h; set both via
+# 'src/version.py -b'.
+version = "1.0.0.dev1"
 description = "Compiled nanobind backend for extensions built in split mode"
 readme = "README.md"
 requires-python = ">=3.10"

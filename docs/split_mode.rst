@@ -116,7 +116,9 @@ Next, declare the backend package as a runtime dependency in
    [project]
    dependencies = ["nanobind-backend>=1.0"]
 
-The ``>=`` constraint specifies the backend version (currently ``1.0``).
+The ``>=`` constraint names the backend ABI version of the nanobind release
+used for building (``nanobind-backend>=1.0`` for this release). CMake also
+prints it when configuring a split-mode extension.
 
 .. warning::
 

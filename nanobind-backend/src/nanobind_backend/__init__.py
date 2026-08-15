@@ -15,13 +15,20 @@ requested backend.
 def fill(abi_major, platform_tag, table_capsule):
     """Fill a split-mode extension's function table."""
     if abi_major == 1:
-        from . import _nb_backend_v1 as backend
+        try:
+            from . import _nb_backend_v1 as backend
+        except ModuleNotFoundError as e:
+            raise ImportError(
+                "The installed nanobind-backend package contains no compiled "
+                "backend for this Python interpreter. This can happen when a "
+                "virtual environment is reused across a Python upgrade. "
+                "Reinstall it via 'pip install --force-reinstall "
+                "nanobind-backend'."
+            ) from e
     else:
         raise ImportError(
-            f"This nanobind-backend package bundles the backend for backend "
-            f"ABI major version 1, but this extension requires major "
-            f"version {abi_major}. If the required major is newer, upgrade "
-            f"via 'pip install -U nanobind-backend'; if it was retired, pin the "
-            f"last nanobind-backend release that still bundled it."
+            f"This nanobind-backend package bundles the backend for ABI major "
+            f"version 1, but this extension requires major version "
+            f"{abi_major}. Upgrade it via 'pip install -U nanobind-backend'."
         )
     return backend.fill(abi_major, platform_tag, table_capsule)

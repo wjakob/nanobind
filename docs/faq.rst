@@ -304,6 +304,42 @@ nanobind that need those interfaces then live in a backend module that is
 built per Python version, and only the extension itself must stay within the
 limited API.
 
+.. _abi_compatibility:
+
+What does the term "ABI compatible" mean in this project?
+---------------------------------------------------------
+
+An `Application Binary Interface
+<https://en.wikipedia.org/wiki/Application_binary_interface>`__ (ABI) is a
+convention enabling libraries and programs to communicate with each other.
+ABI compatibility determines whether two nanobind extensions loaded into the
+same Python process have mutual visibility of each other's C++ ↔ Python type
+bindings.
+
+For example, suppose that an extension ``A`` binds a type ``MyType``, while an
+**ABI-incompatible** extension ``B`` binds a function ``void f(MyType &)``. The
+Python expression ``B.f(A.MyType())`` must fail with a ``TypeError``. ``B``
+cannot communicate with the ABI-incompatible extension ``A``, therefore it does
+not know whether the provided input is truly a ``MyType`` instance.
+
+To avoid such isolation, the following must be matched:
+
+1. **Platform ABI**. nanobind isolates extensions with an incompatible
+   *platform ABI* tag (computed in ``nb_platform.h``). The tag encodes the
+   compiler family, C++ standard library and ABI variant, MSVC CRT flavor, and
+   debug mode flag. Calls between ABI-mismatched libraries is undefined
+   behavior and could crash the process.
+
+2. **Internal ABI**. nanobind releases further specify an *internal ABI version* in
+   their :ref:`changelog <changelog>` entry or inherit that of the preceding
+   release. This number versions the internal data structures that are needed
+   for safe inter-extension communication.
+
+**Split mode**: Extensions using :ref:`split mode <split-mode>` relax these
+constraints. In split mode, nanobind internals are packaged into a separate
+backend package (the official one is called ``nanobind-backend``). All extensions
+sharing a backend have full mutual visibility of type bindings.
+
 Does nanobind support subinterpreters?
 --------------------------------------
 

@@ -81,9 +81,13 @@
 #  define NB_FREE_THREADED_ABI ""
 #endif
 
-// Separate one pre-release's boundary from the next; empty in releases
+// Separate one pre-release's boundary from the next; empty in releases. The
+// release version is part of the tag because the dev counter restarts at 1
+// with every release cycle
 #if NB_VERSION_DEV > 0
-#  define NB_VERSION_DEV_STR "_dev" NB_TOSTRING(NB_VERSION_DEV)
+#  define NB_VERSION_DEV_STR                                                   \
+       "_" NB_TOSTRING(NB_VERSION_MAJOR) "_" NB_TOSTRING(NB_VERSION_MINOR)     \
+       "_" NB_TOSTRING(NB_VERSION_PATCH) "_dev" NB_TOSTRING(NB_VERSION_DEV)
 #else
 #  define NB_VERSION_DEV_STR ""
 #endif

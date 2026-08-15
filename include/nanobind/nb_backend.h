@@ -42,6 +42,11 @@
 /// (appending flag-gated fields, adding enum bits, etc.).
 #define NB_BACKEND_ABI_MINOR 0
 
+/// Patch revision signaling internal improvements without effect on the ABI
+/// contract. Together with the ABI macros above, it forms the version of the
+/// ``nanobind-backend`` package (maintained by ``python src/version.py -b``).
+#define NB_BACKEND_REVISION 0
+
 /// Inline namespace holding weakly exported symbols like exceptions.
 #define NB_BACKEND_ABI_NS NB_CONCAT(abi, NB_BACKEND_ABI_MAJOR)
 

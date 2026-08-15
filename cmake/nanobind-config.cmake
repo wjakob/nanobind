@@ -508,6 +508,18 @@ function(nanobind_add_module name)
     if (NOT ARG_BACKEND_PYPI AND ARG_BACKEND_MODULE STREQUAL "nanobind_backend")
       set(ARG_BACKEND_PYPI "nanobind-backend")
     endif()
+    # Remind the author which requirement to declare, once per configure
+    get_property(reminded GLOBAL PROPERTY nanobind_backend_reminder)
+    if (ARG_BACKEND_PYPI STREQUAL "nanobind-backend" AND NOT reminded)
+      set_property(GLOBAL PROPERTY nanobind_backend_reminder ON)
+      file(STRINGS ${NB_DIR}/include/nanobind/nb_backend.h lines
+           REGEX "^#define NB_BACKEND_ABI_(MAJOR|MINOR) ")
+      string(REGEX MATCH "MAJOR ([0-9]+)" _ "${lines}")
+      set(abi "${CMAKE_MATCH_1}")
+      string(REGEX MATCH "MINOR ([0-9]+)" _ "${lines}")
+      message(STATUS "nanobind: split-mode extensions require "
+        "'nanobind-backend>=${abi}.${CMAKE_MATCH_1}' at runtime")
+    endif()
     target_compile_definitions(${name} PRIVATE
       "NB_BACKEND_MODULE=${ARG_BACKEND_MODULE}")
     if (ARG_BACKEND_PYPI)

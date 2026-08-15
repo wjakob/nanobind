@@ -680,7 +680,8 @@ NAMESPACE_END(detail)
 
 template <rv_policy::value policy = rv_policy::automatic_v, typename... Args>
 tuple make_tuple(Args &&...args) {
-    tuple result = steal<tuple>(PyTuple_New((Py_ssize_t) sizeof...(Args)));
+    tuple result = steal<tuple>(
+        detail::raise_if_null(PyTuple_New((Py_ssize_t) sizeof...(Args))));
 
     Py_ssize_t nargs = 0;
     PyObject *o = result.ptr();
@@ -759,7 +760,11 @@ template <typename T> bool frozenset::contains(T&& key) const {
 
 template <typename T> bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
+#if NB_PYTHON_VERSION >= 0x030D0000
+    int rv = PyMapping_HasKeyWithError(m_ptr, o.ptr());
+#else
     int rv = PyMapping_HasKey(m_ptr, o.ptr());
+#endif
     if (rv == -1)
         detail::raise_python_error();
     return rv == 1;

@@ -68,39 +68,11 @@ PyObject* pack_datetime(int year, int month, int day,
 
 #if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
 
-struct datetime_types_t {
-    // Types defined by the datetime module
-    handle datetime;
-    handle time;
-    handle date;
-    handle timedelta;
-
-    // Ensure that the above four handles point to valid Python objects.
-    // If unable, throw nb::python_error.
-    void ensure_ready() {
-        if (datetime.is_valid())
-            return;
-
-        object mod = module_::import_("datetime");
-        object datetime_o = mod.attr("datetime");
-        object time_o = mod.attr("time");
-        object date_o = mod.attr("date");
-        object timedelta_o = mod.attr("timedelta");
-
-        // Leak references to these datetime types. We could improve upon
-        // this by storing them in the internals structure and decref'ing
-        // in internals_cleanup(), but it doesn't seem worthwhile for
-        // something this fundamental. We can't store nb::object in this
-        // structure because it might be destroyed after the Python
-        // interpreter has finalized.
-        datetime = datetime_o.release();
-        time = time_o.release();
-        date = date_o.release();
-        timedelta = timedelta_o.release();
-    }
-};
-
-inline datetime_types_t datetime_types;
+// Types defined by the datetime module
+inline import_cache datetime_type { "datetime", "datetime" },
+                    time_type { "datetime", "time" },
+                    date_type { "datetime", "date" },
+                    timedelta_type { "datetime", "timedelta" };
 
 // Set *dest to the integer value of getattr(o, name). Returns true
 // on success, false and sets the Python error indicator on failure.
@@ -131,9 +103,8 @@ NB_NOINLINE inline bool set_from_int_attr(int *dest, PyObject *o,
 
 NB_NOINLINE inline bool unpack_timedelta(PyObject *o, int *days,
                                          int *secs, int *usecs) {
-    datetime_types.ensure_ready();
     if (PyType_IsSubtype(Py_TYPE(o),
-                         (PyTypeObject *) datetime_types.timedelta.ptr())) {
+                         (PyTypeObject *) timedelta_type.get().ptr())) {
         if (!set_from_int_attr(days, o, "days") ||
             !set_from_int_attr(secs, o, "seconds") ||
             !set_from_int_attr(usecs, o, "microseconds")) {
@@ -148,10 +119,9 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
                                         int *year, int *month, int *day,
                                         int *hour, int *minute, int *second,
                                         int *usec) {
-    datetime_types.ensure_ready();
     PyTypeObject *tp = Py_TYPE(o);
     if (PyType_IsSubtype(tp,
-                         (PyTypeObject *) datetime_types.datetime.ptr())) {
+                         (PyTypeObject *) datetime_type.get().ptr())) {
         if (!set_from_int_attr(usec, o, "microsecond") ||
             !set_from_int_attr(second, o, "second") ||
             !set_from_int_attr(minute, o, "minute") ||
@@ -163,8 +133,7 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
         }
         return true;
     }
-    if (PyType_IsSubtype(tp,
-                         (PyTypeObject *) datetime_types.date.ptr())) {
+    if (PyType_IsSubtype(tp, (PyTypeObject *) date_type.get().ptr())) {
         *usec = *second = *minute = *hour = 0;
         if (!set_from_int_attr(day, o, "day") ||
             !set_from_int_attr(month, o, "month") ||
@@ -173,8 +142,7 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
         }
         return true;
     }
-    if (PyType_IsSubtype(tp,
-                         (PyTypeObject *) datetime_types.time.ptr())) {
+    if (PyType_IsSubtype(tp, (PyTypeObject *) time_type.get().ptr())) {
         *day = 1;
         *month = 1;
         *year = 1970;
@@ -191,8 +159,7 @@ NB_NOINLINE inline bool unpack_datetime(PyObject *o,
 
 inline PyObject* pack_timedelta(int days, int secs, int usecs) noexcept {
     try {
-        datetime_types.ensure_ready();
-        return datetime_types.timedelta(days, secs, usecs).release().ptr();
+        return timedelta_type.get()(days, secs, usecs).release().ptr();
     } catch (python_error& e) {
         e.restore();
         return nullptr;
@@ -203,8 +170,7 @@ inline PyObject* pack_datetime(int year, int month, int day,
                                int hour, int minute, int second,
                                int usec) noexcept {
     try {
-        datetime_types.ensure_ready();
-        return datetime_types.datetime(
+        return datetime_type.get()(
                 year, month, day, hour, minute, second, usec).release().ptr();
     } catch (python_error& e) {
         e.restore();

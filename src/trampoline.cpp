@@ -254,7 +254,8 @@ static void *trampoline_resolve(PyTypeObject *tp, const char *name,
 
     PyObject *raw;
 
-#if defined(NB_FREE_THREADED)
+#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030D0000 && \
+    !defined(PYPY_VERSION)
     raw = _PyType_LookupRef(tp, key);
 #elif !defined(Py_LIMITED_API)
     raw = _PyType_Lookup(tp, key);

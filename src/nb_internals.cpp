@@ -9,7 +9,6 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
-#include <structmember.h>
 #include "nb_internals.h"
 #include <thread>
 
@@ -56,8 +55,8 @@ static PyType_Spec nb_meta_spec = {
 };
 
 static PyMemberDef nb_func_members[] = {
-    { "__vectorcalloffset__", T_PYSSIZET,
-      (Py_ssize_t) offsetof(nb_func, vectorcall), READONLY, nullptr },
+    { "__vectorcalloffset__", Py_T_PYSSIZET,
+      (Py_ssize_t) offsetof(nb_func, vectorcall), Py_READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 
@@ -116,12 +115,12 @@ static PyType_Spec nb_method_spec = {
 };
 
 static PyMemberDef nb_bound_method_members[] = {
-    { "__vectorcalloffset__", T_PYSSIZET,
-      (Py_ssize_t) offsetof(nb_bound_method, vectorcall), READONLY, nullptr },
-    { "__func__", T_OBJECT_EX,
-      (Py_ssize_t) offsetof(nb_bound_method, func), READONLY, nullptr },
-    { "__self__", T_OBJECT_EX,
-      (Py_ssize_t) offsetof(nb_bound_method, self), READONLY, nullptr },
+    { "__vectorcalloffset__", Py_T_PYSSIZET,
+      (Py_ssize_t) offsetof(nb_bound_method, vectorcall), Py_READONLY, nullptr },
+    { "__func__", Py_T_OBJECT_EX,
+      (Py_ssize_t) offsetof(nb_bound_method, func), Py_READONLY, nullptr },
+    { "__self__", Py_T_OBJECT_EX,
+      (Py_ssize_t) offsetof(nb_bound_method, self), Py_READONLY, nullptr },
     { nullptr, 0, 0, 0, nullptr }
 };
 
@@ -337,6 +336,43 @@ static void init_internals(nb_internals *p) {
                       "nb_type metaclass creation failed!");
 }
 
+PyObject *import_cached(import_cache *c) noexcept {
+    // Resolve outside of the lock since the import may need to re-enter nanobind.
+    PyObject *mod = PyImport_ImportModule(c->module);
+    if (!mod)
+        return nullptr;
+    PyObject *o = PyObject_GetAttrString(mod, c->attr);
+    Py_DECREF(mod);
+    if (!o)
+        return nullptr;
+
+    nb_internals *p = internals;
+    lock_internals guard(p);
+
+    if (PyObject *cur = c->load()) { // lost the race
+        Py_DECREF(o);
+        return cur;
+    }
+
+    if (!p->lifeline) {
+        Py_DECREF(o);
+        PyErr_SetString(PyExc_RuntimeError,
+                        "nanobind::detail::import_cached(): the nanobind "
+                        "internals are being torn down!");
+        return nullptr;
+    }
+
+    if (PyList_Append(p->lifeline, o)) {
+        Py_DECREF(o);
+        return nullptr;
+    }
+    Py_DECREF(o); // the lifeline now owns the only reference
+
+    p->import_slots.push_back(c);
+    c->store(o);
+    return o;
+}
+
 void internals_inc_ref() {
     internals->shared_ref_count.value++;
 }
@@ -365,6 +401,10 @@ void internals_dec_ref() {
 
     for (int i = 0; i < pyobj_name::total_count; ++i)
         static_pyobjects[i] = nullptr;
+
+    for (import_cache *c : p->import_slots)
+        c->store(nullptr);
+    p->import_slots.clear();
 }
 
 static void nb_module_free(void *) {
@@ -681,10 +721,16 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
 
     PyObject *code = Py_CompileString(str, "<internal>", Py_file_input);
     if (code) {
-        PyObject *result = PyEval_EvalCode(code, PyEval_GetGlobals(), nullptr);
-        if (!result)
+        PyObject *globals = PyDict_New();
+        if (globals) {
+            PyObject *result = PyEval_EvalCode(code, globals, nullptr);
+            if (!result)
+                PyErr_Clear();
+            Py_XDECREF(result);
+            Py_DECREF(globals);
+        } else {
             PyErr_Clear();
-        Py_XDECREF(result);
+        }
         Py_DECREF(code);
     } else {
         PyErr_Clear();

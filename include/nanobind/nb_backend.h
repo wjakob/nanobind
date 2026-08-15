@@ -104,6 +104,7 @@ struct ndarray_handle;
 struct ndarray_config;
 struct ndarray_create_args;
 struct ticket;
+struct import_cache;
 
 /// Backend configuration flags accessed via read_flag/write_flag.
 enum class nb_flag : uint32_t {

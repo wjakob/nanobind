@@ -435,7 +435,8 @@ static PyTypeObject *nb_ndarray_tp(nb_internals *internals_) noexcept {
             /* .name = */ "nanobind.nb_ndarray",
             /* .basicsize = */ (int) sizeof(nb_ndarray),
             /* .itemsize = */ 0,
-            /* .flags = */ Py_TPFLAGS_DEFAULT,
+            /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
+                           Py_TPFLAGS_DISALLOW_INSTANTIATION,
             /* .slots = */ slots
         };
 
@@ -663,7 +664,10 @@ static bool obj_has_buffer(PyObject *src, PyTypeObject *tp) noexcept {
 // Fetch __dlpack__ as an unbound descriptor (callable with self at args[0]), or
 // an invalid object if absent. Avoids exception-related costs if possible.
 static object dlpack_method(PyTypeObject *tp) noexcept {
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030D0000 && \
+    !defined(PYPY_VERSION)
+    return steal(_PyType_LookupRef(tp, NB_INTERNED(__dlpack__)));
+#elif !defined(Py_LIMITED_API)
     return borrow(_PyType_Lookup(tp, NB_INTERNED(__dlpack__)));
 #else
     object descr =
@@ -1186,13 +1190,16 @@ static PyObject *ndarray_export_fn(nb_internals *internals_,
     if (NB_LIKELY(fn))
         return fn;
 
+    /* Resolve before taking the lock: the import runs arbitrary Python code
+       that may reenter nanobind, and the internals mutex is non-reentrant */
+    object obj = steal(module_import(ndarray_export_spec[slot].pkg))
+                     .attr(ndarray_export_spec[slot].attr);
+
     lock_internals guard(internals_);
     fn = internals_->ndarray_export[slot].load_relaxed();
     if (fn)
         return fn;
 
-    object obj = steal(module_import(ndarray_export_spec[slot].pkg))
-                     .attr(ndarray_export_spec[slot].attr);
     fn = obj.release().ptr();
     new_object(internals_, fn);
     internals_->ndarray_export[slot].store_release(fn);

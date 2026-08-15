@@ -135,3 +135,8 @@ NB_FROZEN_OFF(ticket, self, 0);
 NB_FROZEN_OFF(ticket, key, 8);
 NB_FROZEN_OFF(ticket, prev, 16);
 NB_FROZEN_OFF(ticket, state, 24);
+
+static_assert(sizeof(void *) != 8 || sizeof(import_cache) == 24,
+              "frozen ABI layout of import_cache changed");
+NB_FROZEN_OFF(import_cache, module, 0);
+NB_FROZEN_OFF(import_cache, attr, 8);

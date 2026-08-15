@@ -54,13 +54,7 @@ public:
         }
 
         // If invoked with a float we assume it is seconds and convert
-        int is_float;
-#if defined(Py_LIMITED_API)
-        is_float = PyType_IsSubtype(Py_TYPE(src.ptr()), &PyFloat_Type);
-#else
-        is_float = PyFloat_Check(src.ptr());
-#endif
-        if (is_float) {
+        if (PyFloat_Check(src.ptr())) {
             value = type(ch::duration_cast<duration_t>(
                              ch::duration<double>(PyFloat_AsDouble(src.ptr()))));
             return true;

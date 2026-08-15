@@ -48,10 +48,12 @@ object eval(const str &expr, handle global = handle(), handle local = handle()) 
     return steal(result);
 }
 
+namespace detail { inline import_cache textwrap_dedent { "textwrap", "dedent" }; }
+
 template <eval_mode start = eval_expr, size_t N>
 object eval(const char (&s)[N], handle global = handle(), handle local = handle()) {
     // Support raw string literals by removing common leading whitespace
-    str expr = (s[0] == '\n') ? str(module_::import_("textwrap").attr("dedent")(s)) : str(s);
+    str expr = (s[0] == '\n') ? str(detail::textwrap_dedent.get()(s)) : str(s);
     return eval<start>(expr, global, local);
 }
 

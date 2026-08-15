@@ -39,13 +39,8 @@ PyTypeObject *nb_static_property_tp() noexcept {
         if (tp)
             return tp;
 
-        PyMemberDef *members;
-
-        #if defined(Py_LIMITED_API)
-            members = (PyMemberDef *) PyType_GetSlot(&PyProperty_Type, Py_tp_members);
-        #else
-            members = PyProperty_Type.tp_members;
-        #endif
+        PyMemberDef *members =
+            (PyMemberDef *) PyType_GetSlot(&PyProperty_Type, Py_tp_members);
 
         PyType_Slot slots[] = {
             { Py_tp_base, &PyProperty_Type },
@@ -58,7 +53,7 @@ PyTypeObject *nb_static_property_tp() noexcept {
             /* .name = */ "nanobind.nb_static_property",
             /* .basicsize = */ 0,
             /* .itemsize = */ 0,
-            /* .flags = */ Py_TPFLAGS_DEFAULT,
+            /* .flags = */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE,
             /* .slots = */ slots
         };
 

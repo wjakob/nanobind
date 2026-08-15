@@ -1,7 +1,6 @@
 import pytest
 import itertools
 import re
-import sys
 
 try:
     import numpy as np
@@ -339,8 +338,8 @@ def test08b_sparse_noconvert():
 
 
 @needs_numpy_and_eigen
-def test09_sparse_failures():
-    sp = pytest.importorskip("scipy.sparse")
+def test09_sparse_uncompressed():
+    pytest.importorskip("scipy.sparse")
 
     with pytest.raises(
         ValueError,
@@ -350,27 +349,6 @@ def test09_sparse_failures():
     ):
         t.sparse_r_uncompressed()
 
-    csr_matrix = sp.csr_matrix
-    sp.csr_matrix = None
-    with pytest.raises(TypeError, match=re.escape("'NoneType' object is not callable")):
-        t.sparse_r()
-
-    del sp.csr_matrix
-    with pytest.raises(
-        AttributeError,
-        match=re.escape("'scipy.sparse' has no attribute 'csr_matrix'"),
-    ):
-        t.sparse_r()
-
-    sys_path = sys.path
-    sys.path = []
-    del sys.modules["scipy"]
-    with pytest.raises(ModuleNotFoundError, match=re.escape("No module named 'scipy'")):
-        t.sparse_r()
-
-    # undo sabotage of the module
-    sys.path = sys_path
-    sp.csr_matrix = csr_matrix
 
 @needs_numpy_and_eigen
 def test10_eigen_scalar_default():

@@ -233,7 +233,8 @@ inline void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
 }
 inline void setitem(PyObject *obj, const char *key, PyObject *value) {
     PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
-    int rv = PyObject_SetItem(obj, key_py, value);
+    int rv = PyDict_CheckExact(obj) ? PyDict_SetItem(obj, key_py, value)
+                                    : PyObject_SetItem(obj, key_py, value);
     Py_DECREF(key_py);
     raise_if_nonzero(rv);
 }
@@ -247,7 +248,8 @@ inline void delitem(PyObject *obj, Py_ssize_t key) {
 }
 inline void delitem(PyObject *obj, const char *key) {
     PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
-    int rv = PyObject_DelItem(obj, key_py);
+    int rv = PyDict_CheckExact(obj) ? PyDict_DelItem(obj, key_py)
+                                    : PyObject_DelItem(obj, key_py);
     Py_DECREF(key_py);
     raise_if_nonzero(rv);
 }
@@ -354,7 +356,8 @@ template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
 template <typename Impl> class accessor;
 struct str_attr; struct obj_attr;
-struct str_item; struct obj_item; struct num_item; struct dict_item;
+struct str_item; struct obj_item; struct num_item;
+struct dict_item; struct dict_str_item;
 struct num_item_list; struct num_item_tuple;
 class args_proxy; class kwargs_proxy;
 struct borrow_t { };
@@ -856,12 +859,22 @@ class list : public object {
     detail::accessor<detail::num_item_list> operator[](T key) const;
 
     void clear() {
+#if PY_VERSION_HEX >= 0x030D0000 && !defined(PYPY_VERSION) && \
+    !defined(Py_LIMITED_API)
+        if (PyList_Clear(m_ptr))
+#else
         if (PyList_SetSlice(m_ptr, 0, PY_SSIZE_T_MAX, nullptr))
+#endif
             detail::raise_python_error();
     }
 
     void extend(handle h) {
+#if PY_VERSION_HEX >= 0x030D0000 && !defined(PYPY_VERSION) && \
+    !defined(Py_LIMITED_API)
+        if (PyList_Extend(m_ptr, h.ptr()))
+#else
         if (PyList_SetSlice(m_ptr, PY_SSIZE_T_MAX, PY_SSIZE_T_MAX, h.ptr()))
+#endif
             detail::raise_python_error();
     }
 
@@ -908,6 +921,7 @@ class dict : public object {
 
     using object::operator[];
     detail::accessor<detail::dict_item> operator[](handle key) const;
+    detail::accessor<detail::dict_str_item> operator[](const char *key) const;
 };
 
 class set : public object {
@@ -1033,9 +1047,14 @@ NB_INLINE size_t len(const dict &d) { return (size_t) NB_DICT_GET_SIZE(d.ptr());
 NB_INLINE size_t len(const set &d) { return (size_t) NB_SET_GET_SIZE(d.ptr()); }
 
 inline void print(handle value, handle end = handle(), handle file = handle()) {
-    PyObject *file_p = file.ptr();
-    if (!file_p)
-        file_p = PySys_GetObject("stdout");
+    object file_o;
+    if (!file.is_valid()) {
+        object sys = steal(detail::raise_if_null(PyImport_ImportModule("sys")));
+        file_o = steal(
+            detail::raise_if_null(PyObject_GetAttrString(sys.ptr(), "stdout")));
+    }
+
+    PyObject *file_p = file.is_valid() ? file.ptr() : file_o.ptr();
 
     detail::raise_if_nonzero(PyFile_WriteObject(value.ptr(), file_p, Py_PRINT_RAW));
 
@@ -1051,7 +1070,13 @@ inline void print(const char *str, handle end = handle(), handle file = handle()
     print(nanobind::str(str), end, file);
 }
 
-inline dict builtins() { return borrow<dict>(PyEval_GetBuiltins()); }
+inline dict builtins() {
+#if NB_PYTHON_VERSION >= 0x030D0000
+    return steal<dict>(PyEval_GetFrameBuiltins());
+#else
+    return borrow<dict>(PyEval_GetBuiltins());
+#endif
+}
 
 inline iterator iter(handle h) {
     return steal<iterator>(detail::raise_if_null(PyObject_GetIter(h.ptr())));
@@ -1179,6 +1204,45 @@ template <typename T> struct pointer_and_handle {
 };
 
 NAMESPACE_BEGIN(detail)
+
+/// Module attribute resolved on first use. The constructor runs no code, and
+/// the returned handle belongs to the nanobind internals.
+struct import_cache {
+    constexpr import_cache(const char *module, const char *attr)
+        : module(module), attr(attr) { }
+
+    handle get() {
+        PyObject *v = load();
+        if (NB_UNLIKELY(!v))
+            v = raise_if_null(NB_CALL(import_cached)(this));
+        return v;
+    }
+
+    PyObject *load() const {
+#if defined(NB_FREE_THREADED)
+        return value.load(std::memory_order_acquire);
+#else
+        return value;
+#endif
+    }
+
+    void store(PyObject *v) {
+#if defined(NB_FREE_THREADED)
+        value.store(v, std::memory_order_release);
+#else
+        value = v;
+#endif
+    }
+
+    const char *module;
+    const char *attr;
+#if defined(NB_FREE_THREADED)
+    std::atomic<PyObject *> value { nullptr };
+#else
+    PyObject *value = nullptr;
+#endif
+};
+
 template <typename Derived> NB_INLINE api<Derived>::operator handle() const {
     return derived().ptr();
 }

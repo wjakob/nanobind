@@ -975,6 +975,9 @@
 -U __Py_NewReference
 -U __PyObject_GetDictPtr
 -U _PyList_GetItemRef
+-U _PyErr_FormatUnraisable
+-U _PyList_Clear
+-U _PyList_Extend
 -U _PyDict_GetItemRef
 -U _PyDict_GetItemStringRef
 -U _PyDict_SetDefault

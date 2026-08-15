@@ -38,7 +38,7 @@ PyObject *enum_create(const enum_data_init *ed) noexcept {
         if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
                              "nanobind: type '%s' was already registered!\n",
                              ed->name) != 0)
-            PyErr_WriteUnraisable(nullptr);
+            warning_failed();
         return existing;
     }
 
@@ -279,16 +279,18 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint3
             PyObject *vmap = PyObject_GetAttrString(
                 (PyObject *) t->type_py, "_value2member_map_");
             if (vmap) {
-                PyObject *member = PyDict_GetItemWithError(vmap, o);
+                bool error;
+                PyObject *member = dict_getitem_ref(vmap, o, &error);
                 Py_DECREF(vmap);
                 if (member) {
                     enum_map::iterator it3 =
                         rev->find((int64_t) (uintptr_t) member);
+                    Py_DECREF(member);
                     if (it3 != rev->end()) {
                         *out = it3->second;
                         return true;
                     }
-                } else if (PyErr_Occurred()) {
+                } else if (error) {
                     PyErr_Clear();
                 }
             } else {

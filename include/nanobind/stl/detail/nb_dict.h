@@ -47,6 +47,12 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
         ValCaster val_caster;
         for (Py_ssize_t i = 0; i < size; ++i) {
             PyObject *item = NB_LIST_GET_ITEM(items, i);
+
+            if (!PyTuple_Check(item) || NB_TUPLE_GET_SIZE(item) != 2) {
+                success = false;
+                break;
+            }
+
             PyObject *key = NB_TUPLE_GET_ITEM(item, 0);
             PyObject *val = NB_TUPLE_GET_ITEM(item, 1);
 

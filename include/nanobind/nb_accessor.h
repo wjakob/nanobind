@@ -106,15 +106,24 @@ struct obj_attr {
     }
 };
 
+// String-keyed item access on an arbitrary object. Exact dictionaries
+// shortcut the object protocol, which produces the same behavior at a lower
+// cost. Subclasses stay on the generic path, where an overridden
+// '__getitem__' and the '__missing__' hook remain visible.
 struct str_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = const char *;
 
     NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
-        PyObject *res = PyObject_GetItem(obj, key_py);
-        Py_DECREF(key_py);
-        return raise_if_null(res);
+        object key_py = steal(raise_if_null(PyUnicode_FromString(key)));
+        if (PyDict_CheckExact(obj)) {
+            bool error;
+            PyObject *value = dict_getitem_ref(obj, key_py.ptr(), &error);
+            if (NB_UNLIKELY(!value))
+                error ? raise_python_error() : raise_key_error(key_py.ptr());
+            return value;
+        }
+        return raise_if_null(PyObject_GetItem(obj, key_py.ptr()));
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -143,6 +152,8 @@ struct obj_item {
     }
 };
 
+// Item access on an 'nb::dict', which always uses the PyDict_* API. This also
+// covers dictionary subclasses, whose item hooks therefore have no effect.
 struct dict_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = object;
@@ -169,6 +180,26 @@ struct dict_item {
     }
 };
 
+struct dict_str_item {
+    static constexpr bool cache_dec_ref = true;
+    using key_type = const char *;
+
+    NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
+        object k = steal(raise_if_null(PyUnicode_FromString(key)));
+        return dict_item::get(obj, k);
+    }
+
+    NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
+        object k = steal(raise_if_null(PyUnicode_FromString(key)));
+        dict_item::set(obj, k, v);
+    }
+
+    NB_INLINE static void del(PyObject *obj, const char *key) {
+        object k = steal(raise_if_null(PyUnicode_FromString(key)));
+        dict_item::del(obj, k);
+    }
+};
+
 struct num_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = Py_ssize_t;
@@ -187,7 +218,7 @@ struct num_item {
 };
 
 struct num_item_list {
-    #if defined(Py_GIL_DISABLED)
+    #if defined(NB_FREE_THREADED)
           static constexpr bool cache_dec_ref = true;
     #else
           static constexpr bool cache_dec_ref = false;
@@ -196,10 +227,12 @@ struct num_item_list {
     using key_type = Py_ssize_t;
 
     NB_INLINE static PyObject *get(PyObject *obj, Py_ssize_t index) {
-        #if defined(Py_GIL_DISABLED)
+        #if !defined(NB_FREE_THREADED)
+            return NB_LIST_GET_ITEM(obj, index);
+        #elif NB_PYTHON_VERSION >= 0x030D0000
             return PyList_GetItemRef(obj, index);
         #else
-            return NB_LIST_GET_ITEM(obj, index);
+            return PySequence_GetItem(obj, index);
         #endif
     }
 
@@ -284,6 +317,11 @@ detail::accessor<detail::num_item_tuple> tuple::operator[](T index) const {
 
 inline detail::accessor<detail::dict_item> dict::operator[](handle key) const {
     return { *this, borrow(key) };
+}
+
+inline detail::accessor<detail::dict_str_item>
+dict::operator[](const char *key) const {
+    return { *this, key };
 }
 
 template <typename... Args> str str::format(Args&&... args) const {

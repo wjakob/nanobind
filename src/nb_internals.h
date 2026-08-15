@@ -22,6 +22,7 @@
 #include <cstring>
 #include <string_view>
 #include <functional>
+#include <vector>
 #include "hash.h"
 
 #if defined(_AIX) && defined(func_data)
@@ -34,6 +35,13 @@
 
 #if defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030C0000
 #  error "Compiling the nanobind backend under the limited API requires Python >= 3.12"
+#endif
+
+#if PY_VERSION_HEX < 0x030C0000
+#  include <structmember.h>
+#  define Py_T_PYSSIZET  T_PYSSIZET
+#  define Py_T_OBJECT_EX T_OBJECT_EX
+#  define Py_READONLY    READONLY
 #endif
 
 #if defined(_MSC_VER)
@@ -757,6 +765,9 @@ struct nb_internals {
     /// Incremented whenever 'lifeline' is destroyed; used to detect stale
     /// per-library 'static_pyobjects' arrays (see init_pyobjects())
     uint32_t lifeline_generation = 0;
+
+    /// Caches filled by import_cached(); reset along with the lifeline
+    std::vector<import_cache *> import_slots;
 };
 
 // Pre-interned strings in the per-module state array, alphabetically
@@ -953,6 +964,16 @@ struct lock_internals { lock_internals(nb_internals *) { } };
 struct unlock_internals { unlock_internals(nb_internals *) { } };
 struct lock_obj { lock_obj(PyObject *) { } };
 #endif
+
+/// Report a warning that a warnings-as-errors filter turned into an exception
+inline void warning_failed() noexcept {
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && \
+    PY_VERSION_HEX >= 0x030D0000
+    PyErr_FormatUnraisable("Exception ignored while issuing a nanobind warning");
+#else
+    PyErr_WriteUnraisable(nullptr);
+#endif
+}
 
 extern char *strdup_check(const char *);
 extern void *malloc_check(size_t size);

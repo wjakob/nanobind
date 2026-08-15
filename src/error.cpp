@@ -19,9 +19,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-// Protected by internals->mutex in free-threaded builds
-Buffer buf(128);
-
 PyObject *error_fetch() noexcept {
     #if PY_VERSION_HEX >= 0x030C0000
         PyObject *value = PyErr_GetRaisedException();

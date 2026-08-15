@@ -359,4 +359,7 @@ NB_SLOT(void, write_flag, (nb_flag f, uint32_t value) noexcept)
 /// Check whether the Python interpreter is still running (nb::is_alive)
 NB_SLOT(bool, is_alive, () noexcept)
 
+/// Resolve and cache 'c->module.c->attr' (cold path of import_cache::get())
+NB_SLOT(PyObject *, import_cached, (import_cache *c) noexcept)
+
 #undef NB_SLOT

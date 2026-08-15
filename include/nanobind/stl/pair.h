@@ -66,6 +66,8 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
             return {};
 
         PyObject *r = PyTuple_New(2);
+        if (NB_UNLIKELY(!r))
+            return {};
         NB_TUPLE_SET_ITEM(r, 0, o1.release().ptr());
         NB_TUPLE_SET_ITEM(r, 1, o2.release().ptr());
         return r;

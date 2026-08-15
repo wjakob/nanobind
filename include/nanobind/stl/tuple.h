@@ -83,6 +83,8 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
             return handle();
 
         PyObject *r = PyTuple_New(N);
+        if (NB_UNLIKELY(!r))
+            return handle();
         (NB_TUPLE_SET_ITEM(r, Is, o[Is].release().ptr()), ...);
         return r;
     }

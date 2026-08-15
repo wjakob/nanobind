@@ -106,10 +106,14 @@ inline void set_implicit_cast_warnings(bool value) noexcept {
 }
 
 inline dict globals() {
-    PyObject *p = PyEval_GetGlobals();
-    if (!p)
+#if NB_PYTHON_VERSION >= 0x030D0000
+    dict d = steal<dict>(PyEval_GetFrameGlobals());
+#else
+    dict d = borrow<dict>(PyEval_GetGlobals());
+#endif
+    if (!d.is_valid())
         raise("nanobind::globals(): no frame is currently executing!");
-    return borrow<dict>(p);
+    return d;
 }
 
 inline Py_hash_t hash(handle h) {

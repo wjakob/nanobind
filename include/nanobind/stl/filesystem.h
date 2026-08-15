@@ -16,6 +16,8 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+inline import_cache pathlib_path { "pathlib", "Path" };
+
 template <>
 struct type_caster<std::filesystem::path> {
 
@@ -24,9 +26,7 @@ struct type_caster<std::filesystem::path> {
         str py_str = to_py_str(path.native());
         if (py_str.is_valid()) {
             try {
-                return module_::import_("pathlib")
-                    .attr("Path")(py_str)
-                    .release();
+                return pathlib_path.get()(py_str).release();
             } catch (python_error &e) {
                 e.restore();
             }

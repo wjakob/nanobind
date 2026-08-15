@@ -10,7 +10,6 @@
 #include "nb_internals.h"
 #include "nb_ft.h"
 
-#include <structmember.h>
 
 #if defined(_MSC_VER)
 #  pragma warning(disable: 4706) // assignment within conditional expression
@@ -738,7 +737,7 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     int_p->nb_static_property_disabled = true;
 #endif
 
-    PyObject *cur = PyObject_GetAttr(obj, name);
+    PyObject *cur = getattr(obj, name, nullptr);
 
 #if defined(NB_FREE_THREADED)
     PyThread_tss_set(int_p->nb_static_property_disabled, (void *) 0);
@@ -771,8 +770,6 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
                          "reassigned or deleted.", cname);
             return -1;
         }
-    } else {
-        PyErr_Clear();
     }
 
     int rv = NB_TYPE_SLOT(PyType_Type, tp_setattro)(obj, name, value);
@@ -1035,7 +1032,7 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
 
     if (members && !fail) {
         while (members->name) {
-            if (members->type == T_PYSSIZET && members->flags == READONLY) {
+            if (members->type == Py_T_PYSSIZET && members->flags == Py_READONLY) {
                 if (strcmp(members->name, "__dictoffset__") == 0)
                     tp->tp_dictoffset = members->offset;
                 else if (strcmp(members->name, "__weaklistoffset__") == 0)
@@ -1334,6 +1331,7 @@ PyObject *nb_type_new(const type_data_init *t) noexcept {
     PyObject *existing = nullptr;
     {
         lock_internals guard(internals_);
+        // Placeholder, filled at the end. Type registration must not race with type use.
         std::tie(it, success) = internals_->type_c2p_slow.try_emplace(t->type, nullptr);
         if (!success) {
             existing = (PyObject *) it->second->type_py;
@@ -1347,7 +1345,7 @@ PyObject *nb_type_new(const type_data_init *t) noexcept {
         if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1,
                              "nanobind: type '%s' was already registered!\n",
                              t_name) != 0)
-            PyErr_WriteUnraisable(nullptr);
+            warning_failed();
         if (has_signature)
             free((char *) t_name);
         return existing;
@@ -1527,8 +1525,8 @@ PyObject *nb_type_new(const type_data_init *t) noexcept {
         dictoffset = (Py_ssize_t) basicsize;
         basicsize += ptr_size;
 
-        members[num_members] = PyMemberDef{ "__dictoffset__", T_PYSSIZET,
-                                            dictoffset, READONLY, nullptr };
+        members[num_members] = PyMemberDef{ "__dictoffset__", Py_T_PYSSIZET,
+                                            dictoffset, Py_READONLY, nullptr };
         ++num_members;
 
         // Install GC traverse and clear routines if not inherited/overridden
@@ -1547,8 +1545,8 @@ PyObject *nb_type_new(const type_data_init *t) noexcept {
         weaklistoffset = (Py_ssize_t) basicsize;
         basicsize += ptr_size;
 
-        members[num_members] = PyMemberDef{ "__weaklistoffset__", T_PYSSIZET,
-                                            weaklistoffset, READONLY, nullptr };
+        members[num_members] = PyMemberDef{ "__weaklistoffset__", Py_T_PYSSIZET,
+                                            weaklistoffset, Py_READONLY, nullptr };
         ++num_members;
 
         // Install GC traverse and clear routines if not inherited/overridden
@@ -1802,7 +1800,7 @@ NB_NOINLINE static bool nb_type_get_state_error(uint8_t state,
     };
     if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "nanobind: %s of type '%s'!\n",
                          errors[state & 3], name) != 0)
-        PyErr_WriteUnraisable(nullptr);
+        warning_failed();
     return false;
 }
 
@@ -2485,7 +2483,11 @@ PyObject *nb_type_name(PyObject *t) noexcept {
 #endif
 
     if (PyType_HasFeature((PyTypeObject *) t, Py_TPFLAGS_HEAPTYPE)) {
+#if NB_PYTHON_VERSION >= 0x030D0000
+        PyObject *mod = PyType_GetModuleName((PyTypeObject *) t);
+#else
         PyObject *mod = PyObject_GetAttr(t, NB_INTERNED(__module__));
+#endif
         // Tolerate a missing or non-string '__module__' attribute
         if (NB_LIKELY(mod && PyUnicode_Check(mod))) {
             PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);

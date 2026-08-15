@@ -92,8 +92,9 @@ wrapper API (i.e., the bindings of Python within C++):
 
 - **Unnecessary reference counting**: the C++ wrappers performed many
   unnecessary calls to ``Py_INCREF()`` and ``Py_DECREF()`` that have a
-  nontrivial cost. The overhead of performing a Python function call from
-  C++ dropped significantly.
+  nontrivial cost. The overhead of performing a Python function call, looking
+  up an attribute or dictionary entry from C++ dropped significantly (~1.3-1.4x
+  depending on the operation).
 
 - **Faster iteration**: ranges exposed through ``nb::make_iterator()``
   previously raised a C++ exception to signal the end of each loop. The cost
@@ -226,6 +227,7 @@ improvements:
   Type casters written for nanobind 2.x still compile and behave correctly
   because the value converts implicitly, though this may cause compiler
   warnings. It is advisable that you widen the parameter in your casters.
+
 
 - **Miscellaneous**:
 

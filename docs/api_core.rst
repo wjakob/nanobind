@@ -101,10 +101,12 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
       Return a :cpp:class:`handle` wrapping the underlying ``PyObject*`` pointer.
 
    .. cpp:function:: detail::accessor<obj_attr> attr(handle key) const
+   .. cpp:function:: template <typename T, enable_if_t<is_owned_key_v<T>> = 0> detail::accessor<obj_attr_own> attr(T && key) const
 
       Analogous to ``self.key`` in Python, where ``key`` is a Python object.
       The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so
-      that it can be read and written.
+      that it can be read and written. The second overload takes ownership of
+      keys passed as an rvalue, which may not outlive the accessor.
 
    .. cpp:function:: detail::accessor<str_attr> attr(const char * key) const
 
@@ -119,10 +121,12 @@ following mixin class that lives in the ``nanobind::detail`` namespace.
        written.
 
    .. cpp:function:: detail::accessor<obj_item> operator[](handle key) const
+   .. cpp:function:: template <typename T, enable_if_t<is_owned_key_v<T>> = 0> detail::accessor<obj_item_own> operator[](T && key) const
 
       Analogous to ``self[key]`` in Python, where ``key`` is a Python object.
       The result is wrapped in an :cpp:class:`accessor <detail::accessor>` so that it can be read and
-      written.
+      written. The second overload takes ownership of keys passed as an
+      rvalue, which may not outlive the accessor.
 
    .. cpp:function:: detail::accessor<str_item> operator[](const char * key) const
 

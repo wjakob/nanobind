@@ -40,7 +40,19 @@ public:
     template <typename T> accessor& operator=(T &&value);
 
     template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
-    operator T() const { return borrow<T>(ptr()); }
+    operator T() const & { return borrow<T>(ptr()); }
+
+    // Temporary accessors hand out the cached reference instead of copying it
+    template <typename T, enable_if_t<std::is_base_of_v<object, T>> = 0>
+    operator T() && {
+        if constexpr (Impl::cache_dec_ref) {
+            PyObject *value = ptr();
+            m_cache = nullptr;
+            return steal<T>(value);
+        } else {
+            return borrow<T>(ptr());
+        }
+    }
     NB_INLINE PyObject *ptr() const {
         // Fetch once and cache an owned reference. Impls with cache_dec_ref
         // == false hand out borrowed references and refetch on every access.
@@ -92,9 +104,9 @@ struct str_attr {
     }
 };
 
-struct obj_attr {
+template <typename Key> struct obj_attr_t {
     static constexpr bool cache_dec_ref = true;
-    using key_type = object;
+    using key_type = Key;
 
     NB_INLINE static PyObject *get(PyObject *obj, handle key) {
         return detail::getattr(obj, key.ptr());
@@ -127,9 +139,9 @@ struct str_item {
     }
 };
 
-struct obj_item {
+template <typename Key> struct obj_item_t {
     static constexpr bool cache_dec_ref = true;
-    using key_type = object;
+    using key_type = Key;
 
     NB_INLINE static PyObject *get(PyObject *obj, handle key) {
         return raise_if_null(PyObject_GetItem(obj, key.ptr()));
@@ -146,9 +158,9 @@ struct obj_item {
 
 // Item access on an 'nb::dict', which always uses the PyDict_* API. This also
 // covers dictionary subclasses, whose item hooks therefore have no effect.
-struct dict_item {
+template <typename Key> struct dict_item_t {
     static constexpr bool cache_dec_ref = true;
-    using key_type = object;
+    using key_type = Key;
 
     NB_INLINE static PyObject *get(PyObject *obj, handle key) {
         bool error;
@@ -251,7 +263,13 @@ struct num_item_tuple {
 };
 
 template <typename D> accessor<obj_attr> api<D>::attr(handle key) const {
-    return { derived(), borrow(key) };
+    return { derived(), key };
+}
+
+template <typename D>
+template <typename T, enable_if_t<is_owned_key_v<T>>>
+accessor<obj_attr_own> api<D>::attr(T &&key) const {
+    return { derived(), (forward_t<T>) key };
 }
 
 template <typename D> accessor<str_attr> api<D>::attr(str_key key) const {
@@ -263,7 +281,13 @@ template <typename D> accessor<str_attr> api<D>::doc() const {
 }
 
 template <typename D> accessor<obj_item> api<D>::operator[](handle key) const {
-    return { derived(), borrow(key) };
+    return { derived(), key };
+}
+
+template <typename D>
+template <typename T, enable_if_t<is_owned_key_v<T>>>
+accessor<obj_item_own> api<D>::operator[](T &&key) const {
+    return { derived(), (forward_t<T>) key };
 }
 
 template <typename D> accessor<str_item> api<D>::operator[](str_key key) const {
@@ -300,7 +324,12 @@ detail::accessor<detail::num_item_tuple> tuple::operator[](T index) const {
 }
 
 inline detail::accessor<detail::dict_item> dict::operator[](handle key) const {
-    return { *this, borrow(key) };
+    return { *this, key };
+}
+
+template <typename T, detail::enable_if_t<detail::is_owned_key_v<T>>>
+detail::accessor<detail::dict_item_own> dict::operator[](T &&key) const {
+    return { *this, (detail::forward_t<T>) key };
 }
 
 inline detail::accessor<detail::dict_str_item>

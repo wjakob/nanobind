@@ -349,10 +349,26 @@ template <typename T, typename SFINAE = int> struct type_caster;
 template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
 template <typename Impl> class accessor;
-struct str_attr; struct obj_attr;
-struct str_item; struct obj_item; struct num_item;
-struct dict_item; struct dict_str_item;
+struct str_attr; struct str_item; struct num_item; struct dict_str_item;
 struct num_item_list; struct num_item_tuple;
+template <typename Key> struct obj_attr_t;
+template <typename Key> struct obj_item_t;
+template <typename Key> struct dict_item_t;
+
+/* An accessor borrows its key from the caller whenever the latter is known to
+   outlive it, and captures it by value otherwise. The second case covers
+   temporaries and nested accessors; a bare 'handle' remains borrowed, since
+   its lifetime is the caller's responsibility either way. */
+using obj_attr = obj_attr_t<handle>;
+using obj_item = obj_item_t<handle>;
+using dict_item = dict_item_t<handle>;
+using obj_attr_own = obj_attr_t<object>;
+using obj_item_own = obj_item_t<object>;
+using dict_item_own = dict_item_t<object>;
+
+template <typename T>
+constexpr bool is_owned_key_v = !std::is_lvalue_reference_v<T> &&
+                                std::is_constructible_v<object, forward_t<T>>;
 class args_proxy; class kwargs_proxy;
 struct borrow_t { };
 struct steal_t { };
@@ -381,10 +397,14 @@ public:
     NB_INLINE operator handle() const;
 
     accessor<obj_attr> attr(handle key) const;
+    template <typename T, enable_if_t<is_owned_key_v<T>> = 0>
+    accessor<obj_attr_own> attr(T &&key) const;
     accessor<str_attr> attr(str_key key) const;
     accessor<str_attr> doc() const;
 
     accessor<obj_item> operator[](handle key) const;
+    template <typename T, enable_if_t<is_owned_key_v<T>> = 0>
+    accessor<obj_item_own> operator[](T &&key) const;
     accessor<str_item> operator[](str_key key) const;
     template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1>
     accessor<num_item> operator[](T key) const;
@@ -461,10 +481,10 @@ using detail::raise_python_error;
 class handle : public detail::api<handle> {
     friend class python_error;
     friend struct detail::str_attr;
-    friend struct detail::obj_attr;
     friend struct detail::str_item;
-    friend struct detail::obj_item;
     friend struct detail::num_item;
+    template <typename> friend struct detail::obj_attr_t;
+    template <typename> friend struct detail::obj_item_t;
 public:
     static constexpr auto Name = detail::const_name("object");
 
@@ -919,6 +939,8 @@ class dict : public object {
 
     using object::operator[];
     detail::accessor<detail::dict_item> operator[](handle key) const;
+    template <typename T, detail::enable_if_t<detail::is_owned_key_v<T>> = 0>
+    detail::accessor<detail::dict_item_own> operator[](T &&key) const;
     detail::accessor<detail::dict_str_item> operator[](detail::str_key key) const;
 };
 

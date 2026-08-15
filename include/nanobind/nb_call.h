@@ -85,6 +85,7 @@ template <rv_policy::value policy, typename... Args>
 object api<Derived>::operator()(Args &&...args_) const {
     static constexpr bool method_call =
         std::is_same_v<Derived, accessor<obj_attr>> ||
+        std::is_same_v<Derived, accessor<obj_attr_own>> ||
         std::is_same_v<Derived, accessor<str_attr>>;
 
     static_assert(sizeof...(Args) + method_call <= 64,

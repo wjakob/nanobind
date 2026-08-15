@@ -44,12 +44,43 @@ def test_04_obj_item_inplace_mutation():
     assert d[0] == 1  # dict lookup
 
 
-def test_05_obj_item_accessor_owns_key():
+def test_05_obj_item_accessor_borrows_key():
     """
-    An accessor created from a handle key (obj[h] on the C++ side) must keep
-    a reference to that key alive for its own lifetime.
+    An accessor keyed by an lvalue (obj[k] on the C++ side, where k is a named
+    variable) borrows the key instead of taking a reference to it.
+    """
+    assert t.test_obj_item_accessor_borrows_key()
+
+
+def test_06_obj_item_accessor_owns_key():
+    """
+    An accessor keyed by a temporary must keep that key alive for its own
+    lifetime.
     """
     assert t.test_obj_item_accessor_owns_key()
+
+
+def test_07_obj_attr_accessor_owns_key():
+    """
+    Same as the previous test, for attribute access.
+    """
+    assert t.test_obj_attr_accessor_owns_key()
+
+
+def test_08_nested_accessor_key():
+    """
+    An accessor keyed by another accessor must capture that key, since the
+    inner accessor releases its reference at the end of the full expression.
+    """
+    assert t.test_nested_accessor_key()
+
+
+def test_09_accessor_conversion_refcount():
+    """
+    Converting a temporary accessor to nb::object hands out the accessor's own
+    reference, while converting a named accessor takes a new one.
+    """
+    assert t.test_accessor_conversion_refcount()
 
 
 def test_10_dynamic_keys_uncached():

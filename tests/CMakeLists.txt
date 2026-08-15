@@ -13,6 +13,36 @@ if (NB_TEST_SHARED_BUILD)
   set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} NB_SHARED)
 endif()
 
+# Extension flavor keywords without the backend-selecting ones, for test
+# extensions that pick their own backend below
+set(NB_FLAVOR_ARGS "")
+if (NB_TEST_FREE_THREADED)
+  set(NB_FLAVOR_ARGS FREE_THREADED)
+endif()
+
+# NB_EXTRA_ARGS for test extensions in the 'mydomain' domain; split mode
+# instead points them at a backend module serving that domain below
+set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS} NB_DOMAIN mydomain)
+
+# NB_TEST_SPLIT_MODE runs the test suite in split mode: every test extension
+# resolves the compiled backend from a backend module at import time. It is
+# an internal testing knob passed via -D.
+if (NB_TEST_SPLIT_MODE)
+  if (NB_FREE_THREADED AND NOT NB_TEST_FREE_THREADED)
+    message(FATAL_ERROR "NB_TEST_SPLIT_MODE=ON on a free-threaded interpreter "
+      "requires NB_TEST_FREE_THREADED=ON (a free-threaded backend serves "
+      "only free-threaded extensions)")
+  endif()
+
+  # Build local backend modules and route every test extension through them.
+  # A domain is a property of the backend module, hence the 'mydomain' twin.
+  nanobind_add_backend(nanobind_backend_test)
+  nanobind_add_backend(nanobind_backend_test_mydomain NB_DOMAIN mydomain)
+  set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS}
+      BACKEND_MODULE nanobind_backend_test_mydomain)
+  set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} BACKEND_MODULE nanobind_backend_test)
+endif()
+
 # ---------------------------------------------------------------------------
 # Compile with a few more compiler warnings turned on
 # ---------------------------------------------------------------------------
@@ -158,10 +188,28 @@ target_compile_definitions(inter_module PRIVATE -DSHARED_BUILD)
 target_compile_features(inter_module PRIVATE cxx_std_17)
 target_include_directories(inter_module PRIVATE ${NB_DIR}/include)
 
-nanobind_add_module(test_inter_module_1_ext NB_DOMAIN mydomain test_inter_module_1.cpp ${NB_EXTRA_ARGS})
-nanobind_add_module(test_inter_module_2_ext NB_DOMAIN mydomain test_inter_module_2.cpp ${NB_EXTRA_ARGS})
+nanobind_add_module(test_inter_module_1_ext test_inter_module_1.cpp ${NB_EXTRA_ARGS_MYDOMAIN})
+nanobind_add_module(test_inter_module_2_ext test_inter_module_2.cpp ${NB_EXTRA_ARGS_MYDOMAIN})
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
 target_link_libraries(test_inter_module_2_ext PRIVATE inter_module)
+
+if (NB_TEST_SPLIT_MODE)
+  # Bindings spread over two translation units that exchange bound types;
+  # validates that the per-DSO dispatch table merges into a single instance.
+  # The LTO twin re-checks this under interprocedural optimization.
+  set(NB_ABI_MULTI_SOURCES test_abi_multi_1.cpp test_abi_multi_2.cpp)
+  nanobind_add_module(test_abi_multi_ext ${NB_ABI_MULTI_SOURCES}
+    ${NB_EXTRA_ARGS})
+  nanobind_add_module(test_abi_multi_lto_ext ${NB_ABI_MULTI_SOURCES} LTO
+    ${NB_EXTRA_ARGS})
+  target_compile_definitions(test_abi_multi_lto_ext PRIVATE
+    NB_ABI_MULTI_NAME=test_abi_multi_lto_ext NB_ABI_MULTI_NS=abi_multi_lto)
+
+  # Points at a backend module that does not exist; its import must fail
+  # with an instructive error message
+  nanobind_add_module(test_abi_missing_ext test_abi_missing.cpp
+    BACKEND_MODULE nanobind_backend_absent ${NB_FLAVOR_ARGS})
+endif()
 
 set(TEST_FILES
   common.py
@@ -191,6 +239,7 @@ set(TEST_FILES
   test_typing.py
   test_thread.py
   test_specialization.py
+  test_abi.py
 
   # Stub reference files
   test_classes_ext.pyi.ref

@@ -317,13 +317,13 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         constexpr int IS = StrideType::InnerStrideAtCompileTime,
                       OS = StrideType::OuterStrideAtCompileTime;
 
-        int64_t inner = caster.value.stride(0),
+        Eigen::Index inner = (Eigen::Index) caster.value.stride(0),
                 outer;
 
         if constexpr (ndim_v<T> == 1)
-            outer = (int64_t) caster.value.shape(0);
+            outer = (Eigen::Index) caster.value.shape(0);
         else
-            outer = caster.value.stride(1);
+            outer = (Eigen::Index) caster.value.stride(1);
 
         (void) inner; (void) outer;
         if constexpr (ndim_v<T> == 2 && T::IsRowMajor)

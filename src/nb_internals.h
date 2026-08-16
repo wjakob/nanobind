@@ -768,6 +768,18 @@ struct nb_internals {
 
     /// Caches filled by import_cached(); reset along with the lifeline
     std::vector<import_cache *> import_slots;
+
+    /// 2-way set-associative cache of interned strings exposed via
+    /// see cached_string().
+    struct name_cache_entry {
+        uintptr_t key;
+        const char *utf8;
+        size_t len;
+        nb_maybe_atomic<PyObject *> value { nullptr };
+    };
+
+    static constexpr uint32_t name_cache_bits = 12;
+    alignas(64) name_cache_entry name_cache[(size_t) 1 << name_cache_bits];
 };
 
 // Pre-interned strings in the per-module state array, alphabetically

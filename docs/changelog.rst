@@ -67,6 +67,42 @@ It will still take some time to stabilize split mode before a regular 3.0.0
 release. For now, please try your projects with the development release of
 nanobind (``3.0.0.dev1``) and ``nanobind-backend`` (``1.0.0.dev1``) on PyPI.
 
+This release also brings a set of performance improvements, mainly to the
+wrapper API (i.e., the bindings of Python within C++):
+
+- **Interned string keys**: Idiomatic code like
+
+  .. code-block:: cpp
+
+     nb::object obj = obj.attr("name");
+     dict["name"] = obj;
+
+  used to generate many temporary ``str`` objects, whose construction is
+  surprisingly expensive. nanobind now constructs and memoizes *interned*
+  Python strings in an internal cache so that repeat use of a string literal
+  becomes fast. Interned strings further take a fast path in Python's attribute
+  and dictionary lookup.
+
+  With this change, a keyword attribute lookup (``obj.attr("name")``) reduces
+  from **30ns** to **9ns** on my machine. The change affects ``nb::getattr()``,
+  ``nb::setattr()``, ``nb::delattr()``, ``nb::hasattr()``, the ``attr()`` and
+  ``operator[]`` accessors, ``nb::dict::get()``, the ``contains()`` methods of
+  ``nb::dict``, ``nb::set``, ``nb::frozenset``, and ``nb::mapping``, and the
+  keyword argument names of ``nb::arg()``.
+
+- **Unnecessary reference counting**: the C++ wrappers performed many
+  unnecessary calls to ``Py_INCREF()`` and ``Py_DECREF()`` that have a
+  nontrivial cost. The overhead of performing a Python function call from
+  C++ dropped significantly.
+
+- **Faster iteration**: ranges exposed through ``nb::make_iterator()``
+  previously raised a C++ exception to signal the end of each loop. The cost
+  of the resulting stack unwinding (several microseconds) could easily
+  dominate iteration over small sequences. The generated ``__next__``
+  function now signals exhaustion without raising a C++ exception, which
+  reduces the cost of a loop over a 4-element sequence from **5167ns** to
+  **125ns** on my machine. The per-element cost is unchanged.
+
 The release makes several API-breaking changes that unlock internal
 improvements:
 
@@ -208,21 +244,6 @@ improvements:
     :cpp:func:`nb::inst_replace_copy() <inst_replace_copy>` and
     :cpp:func:`nb::inst_replace_move() <inst_replace_move>`, which are now
     aliases.
-
-This release also brings a set of performance improvements:
-
-- **Unnecessary reference counting**: the C++ wrappers performed many
-  unnecessary calls to ``Py_INCREF()`` and ``Py_DECREF()`` that have a
-  nontrivial cost. The overhead of performing a Python function call from
-  C++ dropped significantly.
-
-- **Faster iteration**: ranges exposed through ``nb::make_iterator()``
-  previously raised a C++ exception to signal the end of each loop. The cost
-  of the resulting stack unwinding (several microseconds) could easily
-  dominate iteration over small sequences. The generated ``__next__``
-  function now signals exhaustion without raising a C++ exception, which
-  reduces the cost of a loop over a 4-element sequence from **5167ns** to
-  **125ns** on my machine. The per-element cost is unchanged.
 
 - Internal ABI version 22.
 

@@ -68,8 +68,10 @@ NB_INLINE void call_arg_init(call_arg &a, T &&value) {
         a.kind = call_arg_kind::keyword;
         a.value = make_caster<object>::from_cpp(((forward_t<T>) value).value,
                                                 policy, nullptr).ptr();
-        if (value.name_)
-            a.name = PyUnicode_InternFromString(value.name_);
+        if (value.name_) {
+            cached_name name(value.name_);
+            a.name = name.release(); // the record owns its fields
+        }
     } else {
         a.kind = std::is_same_v<D, args_proxy>   ? call_arg_kind::args
                : std::is_same_v<D, kwargs_proxy> ? call_arg_kind::kwargs
@@ -98,9 +100,10 @@ object api<Derived>::operator()(Args &&...args_) const {
     uint32_t flags = 0;
 
     if constexpr (method_call) {
-        base = derived().key();
+        bool owned;
+        base = derived().key(owned);
         flags = (uint32_t) call_flags::method |
-                (Derived::key_owned ? (uint32_t) call_flags::base_owned : 0);
+                (owned ? (uint32_t) call_flags::base_owned : 0);
     } else {
         base = call_arg_value<policy>(derived());
         if constexpr (!call_borrows<const Derived &>())

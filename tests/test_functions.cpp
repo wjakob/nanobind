@@ -193,6 +193,22 @@ NB_MODULE(test_functions_ext, m) {
         return o.attr("meth")(1, *seq, "k"_a = 2, **map);
     });
 
+    /// Attribute and keyword names passed through a reused buffer must not
+    /// be confused by the interned-string cache
+    m.def("test_attr_dynamic", [](nb::object o) {
+        char buf[32];
+        nb::list result;
+        for (int i = 0; i < 3; ++i) {
+            snprintf(buf, sizeof(buf), "field_%i", i);
+            result.append(o.attr(buf));
+        }
+        for (int i = 0; i < 3; ++i) {
+            snprintf(buf, sizeof(buf), "kw_%i", i);
+            result.append(o.attr("collect")(nb::arg(buf) = i));
+        }
+        return result;
+    });
+
     /// Calls involving null objects must raise instead of crashing
     m.def("test_call_null_base", []() { return nb::object()(1); });
     m.def("test_call_null_arg", [](nb::object f) { return f(nb::object()); });

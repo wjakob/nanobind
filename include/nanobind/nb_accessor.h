@@ -50,12 +50,10 @@ public:
     }
     NB_INLINE handle base() const { return m_base; }
 
-    /// Python key of an attribute accessor. Borrowed when the accessor holds
-    /// a Python key, and a new reference when it must be created from a C
-    /// string ('key_owned' tells the two apart).
-    static constexpr bool key_owned =
-        std::is_same_v<typename Impl::key_type, const char *>;
-    NB_INLINE PyObject *key() const { return Impl::key(m_key); }
+    /// Python key of an attribute accessor. Borrowed unless 'owned' is set.
+    NB_INLINE PyObject *key(bool &owned) const {
+        return Impl::key(m_key, owned);
+    }
 
     NB_DECL_ACCESSOR_OP_I(operator+=)
     NB_DECL_ACCESSOR_OP_I(operator-=)
@@ -89,8 +87,8 @@ struct str_attr {
         setattr(obj, key, v);
     }
 
-    NB_INLINE static PyObject *key(const char *key) {
-        return PyUnicode_InternFromString(key);
+    NB_INLINE static PyObject *key(const char *key, bool &owned) {
+        return NB_CALL(cached_string)(key, strlen(key) + 1, &owned);
     }
 };
 
@@ -106,7 +104,10 @@ struct obj_attr {
         setattr(obj, key.ptr(), v);
     }
 
-    NB_INLINE static PyObject *key(handle key) { return key.ptr(); }
+    NB_INLINE static PyObject *key(handle key, bool &owned) {
+        owned = false;
+        return key.ptr();
+    }
 };
 
 // String-keyed item access on an arbitrary object. Exact dictionaries
@@ -118,15 +119,16 @@ struct str_item {
     using key_type = const char *;
 
     NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        object key_py = steal(raise_if_null(PyUnicode_FromString(key)));
+        cached_name name(key);
+        PyObject *key_py = raise_if_null(name.value);
         if (PyDict_CheckExact(obj)) {
             bool error;
-            PyObject *value = dict_getitem_ref(obj, key_py.ptr(), &error);
+            PyObject *value = dict_getitem_ref(obj, key_py, &error);
             if (NB_UNLIKELY(!value))
-                error ? raise_python_error() : raise_key_error(key_py.ptr());
+                error ? raise_python_error() : raise_key_error(key_py);
             return value;
         }
-        return raise_if_null(PyObject_GetItem(obj, key_py.ptr()));
+        return raise_if_null(PyObject_GetItem(obj, key_py));
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -183,18 +185,18 @@ struct dict_str_item {
     using key_type = const char *;
 
     NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        object k = steal(raise_if_null(PyUnicode_FromString(key)));
-        return dict_item::get(obj, k);
+        cached_name name(key);
+        return dict_item::get(obj, raise_if_null(name.value));
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        object k = steal(raise_if_null(PyUnicode_FromString(key)));
-        dict_item::set(obj, k, v);
+        cached_name name(key);
+        dict_item::set(obj, raise_if_null(name.value), v);
     }
 
     NB_INLINE static void del(PyObject *obj, const char *key) {
-        object k = steal(raise_if_null(PyUnicode_FromString(key)));
-        dict_item::del(obj, k);
+        cached_name name(key);
+        dict_item::del(obj, raise_if_null(name.value));
     }
 };
 

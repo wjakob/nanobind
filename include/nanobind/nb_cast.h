@@ -727,12 +727,22 @@ template <typename T> bool dict::contains(T&& key) const {
     return rv == 1;
 }
 
+inline bool dict::contains(const char *key_) const {
+    detail::cached_name key(key_);
+    return contains(handle(detail::raise_if_null(key.value)));
+}
+
 template <typename T> bool set::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Contains(m_ptr, o.ptr());
     if (rv == -1)
         detail::raise_python_error();
     return rv == 1;
+}
+
+inline bool set::contains(const char *key_) const {
+    detail::cached_name key(key_);
+    return contains(handle(detail::raise_if_null(key.value)));
 }
 
 template <typename T> void set::add(T&& key) {
@@ -758,6 +768,11 @@ template <typename T> bool frozenset::contains(T&& key) const {
     return rv == 1;
 }
 
+inline bool frozenset::contains(const char *key_) const {
+    detail::cached_name key(key_);
+    return contains(handle(detail::raise_if_null(key.value)));
+}
+
 template <typename T> bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
 #if NB_PYTHON_VERSION >= 0x030D0000
@@ -768,6 +783,11 @@ template <typename T> bool mapping::contains(T&& key) const {
     if (rv == -1)
         detail::raise_python_error();
     return rv == 1;
+}
+
+inline bool mapping::contains(const char *key_) const {
+    detail::cached_name key(key_);
+    return contains(handle(detail::raise_if_null(key.value)));
 }
 
 NAMESPACE_END(NB_NAMESPACE)

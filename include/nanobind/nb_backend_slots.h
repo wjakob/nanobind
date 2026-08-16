@@ -87,6 +87,13 @@ NB_SLOT(PyObject *, submodule_new,
 /// Try to roughly determine the length of a Python object
 NB_SLOT(size_t, len_hint, (PyObject *o) noexcept)
 
+/// Return a Python string for 'str' of size <= 'bound'. The implementation
+/// tries to memoize the result in a builtin cache. 'owned' returns whether the
+/// caller receives an owned non-interned string. Returns nullptr with an error
+/// set on failure.
+NB_SLOT(PyObject *, cached_string,
+        (const char *str, size_t bound, bool *owned) noexcept)
+
 /// Perform a vector call with positional arguments. 'base' is the callable
 /// or, with 'call_flags::method', a method name looked up on 'args[0]'.
 /// The bits of 'owned' mark arguments that the backend releases; the caller

@@ -373,6 +373,84 @@ PyObject *import_cached(import_cache *c) noexcept {
     return o;
 }
 
+PyObject *cached_string(const char *str, size_t bound, bool *owned) noexcept {
+    nb_internals *p = internals;
+    uintptr_t key = (uintptr_t) str;
+
+    // Related string addresses differ mostly in their low bits. Apply a
+    // Fibonacci hash-based mixing step to spread this across the table.
+    size_t slot = (size_t) ((key * 0x9E3779B97F4A7C15ull) >>
+                            (64 - nb_internals::name_cache_bits));
+    *owned = false;
+
+    /* A matching entry must hold the same address and content: a character
+       buffer can be reused with different content at the same address. The
+       comparison reads at most 'e.len + 1 <= bound' bytes of 'str', which
+       the caller's bound proves to be accessible. */
+    bool vacancy = false;
+    for (size_t i = 0; i < 2; ++i) {
+        nb_internals::name_cache_entry &e = p->name_cache[slot ^ i];
+        PyObject *v = e.value.load_acquire();
+        if (NB_LIKELY(v && e.key == key && e.len < bound &&
+                      str[e.len] == '\0' && memcmp(e.utf8, str, e.len) == 0))
+            return v;
+        vacancy |= !v;
+    }
+
+    // On FT threads, interned strings are immortal. To avoid leaks with
+    // runtime-generated values, we only intern strings that are about to
+    // enter the cache.
+    if (!vacancy) {
+        PyObject *s = PyUnicode_FromString(str);
+        *owned = s != nullptr;
+        return s;
+    }
+
+    PyObject *s = PyUnicode_InternFromString(str);
+    if (NB_UNLIKELY(!s))
+        return nullptr;
+    *owned = true;
+
+    lock_internals guard(p);
+
+    nb_internals::name_cache_entry *free_slot = nullptr;
+    for (size_t i = 0; i < 2; ++i) {
+        nb_internals::name_cache_entry &e = p->name_cache[slot ^ i];
+        PyObject *v = e.value.load_relaxed();
+        if (!v) {
+            if (!free_slot)
+                free_slot = &e;
+        } else if (e.key == key && e.len < bound && str[e.len] == '\0' &&
+                   memcmp(e.utf8, str, e.len) == 0) {
+            // Lost a race against an identical fill; interning made the
+            // strings equal, so ours only holds a redundant reference
+            Py_DECREF(s);
+            *owned = false;
+            return v;
+        }
+    }
+
+    if (!free_slot)
+        return s; // the set filled up concurrently; the reference is owned
+
+    /* Hand the string over to the lifeline, whose lifetime bounds that of
+       the cache entry, or signal to the caller that this was not possible. */
+    Py_ssize_t utf8_len = 0;
+    const char *utf8 = PyUnicode_AsUTF8AndSize(s, &utf8_len);
+    if (!utf8 || !p->lifeline || PyList_Append(p->lifeline, s) != 0) {
+        PyErr_Clear();
+        return s;
+    }
+    Py_DECREF(s); // the lifeline now owns the only reference
+
+    free_slot->key = key;
+    free_slot->len = (size_t) utf8_len;
+    free_slot->utf8 = utf8;
+    free_slot->value.store_release(s);
+    *owned = false;
+    return s;
+}
+
 void internals_inc_ref() {
     internals->shared_ref_count.value++;
 }
@@ -405,6 +483,10 @@ void internals_dec_ref() {
     for (import_cache *c : p->import_slots)
         c->store(nullptr);
     p->import_slots.clear();
+
+    // The cached interned strings die with the lifeline
+    for (auto &e : p->name_cache)
+        e.value.store_release(nullptr);
 }
 
 static void nb_module_free(void *) {

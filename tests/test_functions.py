@@ -259,6 +259,16 @@ def test11b_call_expansion():
             fn()
 
 
+def test11c_attr_dynamic_names():
+    class C:
+        field_0, field_1, field_2 = 10, 11, 12
+        def collect(self, **kwargs):
+            return kwargs
+
+    assert t.test_attr_dynamic(C()) == \
+        [10, 11, 12, {"kw_0": 0}, {"kw_1": 1}, {"kw_2": 2}]
+
+
 def test12_list_tuple_manipulation():
     li = [1, 5, 6, 7]
     t.test_list(li)

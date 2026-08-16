@@ -17,16 +17,6 @@ NAMESPACE_BEGIN(detail)
 
 // ``trampoline`` and ``ticket`` below are in the frozen backend ABI.
 
-/// Compile-time hash (FNV-1a) of a method name
-constexpr uint64_t trampoline_hash(const char *s) {
-    uint64_t h = 0xcbf29ce484222325ull;
-    while (*s) {
-        h ^= (uint64_t) (uint8_t) *s++;
-        h *= 0x100000001b3ull;
-    }
-    return h;
-}
-
 /// Member of every trampoline class (see NB_TRAMPOLINE). The constructor
 /// asks the backend for the Python object that owns the C++ instance 'ptr'.
 struct trampoline {
@@ -78,7 +68,7 @@ trampoline_base<Base, Size> { using type = Base; };
 
 #define NB_OVERRIDE_NAME(name, func, ...)                                      \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    constexpr uint64_t nb_hash = nanobind::detail::trampoline_hash(name);      \
+    constexpr uint64_t nb_hash = nanobind::detail::str_hash(name);             \
     nanobind::detail::ticket nb_ticket(nb_trampoline, name, nb_hash, false);   \
     if (nb_ticket.key.is_valid()) {                                            \
         return nanobind::cast<nb_ret_type>(                                    \
@@ -88,7 +78,7 @@ trampoline_base<Base, Size> { using type = Base; };
 
 #define NB_OVERRIDE_PURE_NAME(name, func, ...)                                 \
     using nb_ret_type = decltype(NBBase::func(__VA_ARGS__));                   \
-    constexpr uint64_t nb_hash = nanobind::detail::trampoline_hash(name);      \
+    constexpr uint64_t nb_hash = nanobind::detail::str_hash(name);             \
     nanobind::detail::ticket nb_ticket(nb_trampoline, name, nb_hash, true);    \
     return nanobind::cast<nb_ret_type>(                                        \
         nb_trampoline.base().attr(nb_ticket.key)(__VA_ARGS__))

@@ -314,7 +314,7 @@ static void trampoline_publish(type_data *td, const char *name, uint64_t hash,
     memset((void *) t->entries(), 0, capacity * sizeof(trampoline_entry));
 
     auto insert = [t](const char *n, void *v) {
-        uint32_t i = t->slot(trampoline_hash(n));
+        uint32_t i = t->slot(str_hash(n));
         while (t->entries()[i].name)
             i = (i + 1) & t->mask;
         t->entries()[i] = { n, v };

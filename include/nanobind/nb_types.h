@@ -132,6 +132,42 @@ NB_INLINE void raise_if_nonzero(int rv) {
         raise_python_error();
 }
 
+/// FNV-1a string hash; the trampoline macros bind it to a constexpr variable
+constexpr uint64_t str_hash(const char *s) {
+    uint64_t h = 0xcbf29ce484222325ull;
+    while (*s) {
+        h ^= (uint64_t) (uint8_t) *s++;
+        h *= 0x100000001b3ull;
+    }
+    return h;
+}
+
+/// Python string for a C string key, memoized in the backend's cache when
+/// possible (see the cached_string() slot). The instance owns the result
+/// only when the cache could not retain it. 'value' is null if the
+/// conversion failed (with a Python error set).
+struct cached_name {
+    PyObject *value;
+    bool owned;
+
+    NB_INLINE cached_name(const char *key)
+        : value(NB_CALL(cached_string)(key, strlen(key) + 1, &owned)) { }
+    cached_name(const cached_name &) = delete;
+    cached_name(cached_name &&) = delete;
+    NB_INLINE ~cached_name() {
+        if (NB_UNLIKELY(owned))
+            Py_DECREF(value);
+    }
+
+    /// Transfer ownership to the caller, adding a reference if needed
+    NB_INLINE PyObject *release() {
+        if (value && !owned)
+            Py_INCREF(value);
+        owned = false;
+        return value;
+    }
+};
+
 /// Try to import a Python extension module, raises an exception upon failure
 inline PyObject *module_import(const char *name) {
     return raise_if_null(PyImport_ImportModule(name));
@@ -144,7 +180,8 @@ inline PyObject *module_import(PyObject *name) {
 
 /// Get an object attribute or raise an exception
 inline PyObject *getattr(PyObject *obj, const char *key) {
-    return raise_if_null(PyObject_GetAttrString(obj, key));
+    cached_name name(key);
+    return raise_if_null(PyObject_GetAttr(obj, raise_if_null(name.value)));
 }
 inline PyObject *getattr(PyObject *obj, PyObject *key) {
     return raise_if_null(PyObject_GetAttr(obj, key));
@@ -179,46 +216,25 @@ inline PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
 
 inline PyObject *getattr(PyObject *obj, const char *key,
                          PyObject *def) noexcept {
-#if defined(PYPY_VERSION) || \
-    (defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000) || \
-    PY_VERSION_HEX < 0x030D0000
-    PyObject *key_py = PyUnicode_FromString(key);
-    if (key_py) {
-        PyObject *res = getattr(obj, key_py, def);
-        Py_DECREF(key_py);
-        return res;
-    }
-    PyErr_Clear();
-    Py_XINCREF(def);
-    return def;
-#else
-    PyObject *res;
-    int rv = PyObject_GetOptionalAttrString(obj, key, &res);
-    if (rv == 1)
-        return res;
-    else if (rv < 0)
+    cached_name name(key);
+    if (NB_UNLIKELY(!name.value)) {
         PyErr_Clear();
-    Py_XINCREF(def);
-    return def;
-#endif
+        Py_XINCREF(def);
+        return def;
+    }
+    return getattr(obj, name.value, def);
 }
 
 /// Set an object attribute or raise an exception
 inline void setattr(PyObject *obj, const char *key, PyObject *value) {
-    raise_if_nonzero(PyObject_SetAttrString(obj, key, value));
+    cached_name name(key);
+    raise_if_nonzero(PyObject_SetAttr(obj, raise_if_null(name.value), value));
 }
 inline void setattr(PyObject *obj, PyObject *key, PyObject *value) {
     raise_if_nonzero(PyObject_SetAttr(obj, key, value));
 }
 
 /// Delete an object attribute or raise an exception
-inline void delattr(PyObject *obj, const char *key) {
-#if defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000
-    raise_if_nonzero(PyObject_SetAttrString(obj, key, nullptr));
-#else
-    raise_if_nonzero(PyObject_DelAttrString(obj, key));
-#endif
-}
 inline void delattr(PyObject *obj, PyObject *key) {
 #if defined(Py_LIMITED_API) && NB_PYTHON_VERSION < 0x030D0000
     raise_if_nonzero(PyObject_SetAttr(obj, key, nullptr));
@@ -226,17 +242,21 @@ inline void delattr(PyObject *obj, PyObject *key) {
     raise_if_nonzero(PyObject_DelAttr(obj, key));
 #endif
 }
+inline void delattr(PyObject *obj, const char *key) {
+    cached_name name(key);
+    delattr(obj, raise_if_null(name.value));
+}
 
 /// Set an item or raise an exception
 inline void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
     raise_if_nonzero(PySequence_SetItem(obj, key, value));
 }
 inline void setitem(PyObject *obj, const char *key, PyObject *value) {
-    PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
-    int rv = PyDict_CheckExact(obj) ? PyDict_SetItem(obj, key_py, value)
-                                    : PyObject_SetItem(obj, key_py, value);
-    Py_DECREF(key_py);
-    raise_if_nonzero(rv);
+    cached_name name(key);
+    PyObject *key_py = raise_if_null(name.value);
+    raise_if_nonzero(PyDict_CheckExact(obj)
+                         ? PyDict_SetItem(obj, key_py, value)
+                         : PyObject_SetItem(obj, key_py, value));
 }
 inline void setitem(PyObject *obj, PyObject *key, PyObject *value) {
     raise_if_nonzero(PyObject_SetItem(obj, key, value));
@@ -247,11 +267,11 @@ inline void delitem(PyObject *obj, Py_ssize_t key) {
     raise_if_nonzero(PySequence_DelItem(obj, key));
 }
 inline void delitem(PyObject *obj, const char *key) {
-    PyObject *key_py = raise_if_null(PyUnicode_FromString(key));
-    int rv = PyDict_CheckExact(obj) ? PyDict_DelItem(obj, key_py)
-                                    : PyObject_DelItem(obj, key_py);
-    Py_DECREF(key_py);
-    raise_if_nonzero(rv);
+    cached_name name(key);
+    PyObject *key_py = raise_if_null(name.value);
+    raise_if_nonzero(PyDict_CheckExact(obj)
+                         ? PyDict_DelItem(obj, key_py)
+                         : PyObject_DelItem(obj, key_py));
 }
 inline void delitem(PyObject *obj, PyObject *key) {
     raise_if_nonzero(PyObject_DelItem(obj, key));
@@ -575,7 +595,12 @@ template <typename T> NB_INLINE T steal(handle h) {
 }
 
 inline bool hasattr(handle h, const char *key) noexcept {
-    return PyObject_HasAttrString(h.ptr(), key);
+    detail::cached_name name(key);
+    if (NB_UNLIKELY(!name.value)) {
+        PyErr_Clear();
+        return false;
+    }
+    return PyObject_HasAttr(h.ptr(), name.value);
 }
 
 inline bool hasattr(handle h, handle key) noexcept {
@@ -908,10 +933,12 @@ class dict : public object {
         return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
     object get(const char *key_, handle def) const {
-        object key = steal(detail::raise_if_null(PyUnicode_FromString(key_)));
-        return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
+        detail::cached_name key(key_);
+        return steal(detail::dict_getitem_or_default(
+            m_ptr, detail::raise_if_null(key.value), def.ptr()));
     }
     template <typename T> bool contains(T&& key) const;
+    bool contains(const char *key) const;
     void clear() { PyDict_Clear(m_ptr); }
     void update(handle h) {
         if (PyDict_Update(m_ptr, h.ptr()))
@@ -931,6 +958,7 @@ class set : public object {
         : object(detail::raise_if_null(PySet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
+    bool contains(const char *key) const;
     template <typename T> void add(T &&value);
     void clear() {
         if (PySet_Clear(m_ptr))
@@ -947,6 +975,7 @@ class frozenset : public object {
         : object(detail::raise_if_null(PyFrozenSet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
     template <typename T> bool contains(T&& key) const;
+    bool contains(const char *key) const;
     bool empty() const { return size() == 0; }
 };
 
@@ -960,6 +989,7 @@ class mapping : public object {
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
     template <typename T> bool contains(T&& key) const;
+    bool contains(const char *key) const;
 };
 
 class args : public tuple {

@@ -50,4 +50,16 @@ NB_MODULE(test_accessor_ext, m) {
         Py_ssize_t during = Py_REFCNT(key.ptr());
         return nb::cast<int>(acc) == 7 && during == before + 1;
     });
+    // Attribute access with a runtime-generated key takes the pointer path
+    // of the string cache: it must work without inserting into the cache or
+    // the interpreter's interned-string table
+    m.def("getattr_dynamic", [](nb::handle o, const char *name) {
+        return nb::object(o.attr(name));
+    });
+    m.def("setattr_dynamic", [](nb::handle o, const char *name, nb::handle v) {
+        o.attr(name) = v;
+    });
+    m.def("hasattr_dynamic", [](nb::handle o, const char *name) {
+        return nb::hasattr(o, name);
+    });
 }

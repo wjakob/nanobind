@@ -1,3 +1,6 @@
+import sys
+import types
+
 import test_accessor_ext as t
 
 
@@ -47,3 +50,23 @@ def test_05_obj_item_accessor_owns_key():
     a reference to that key alive for its own lifetime.
     """
     assert t.test_obj_item_accessor_owns_key()
+
+
+def test_10_dynamic_keys_uncached():
+    """
+    Attribute access with runtime-generated keys goes through the pointer
+    path of the string cache. It must behave correctly and must not grow the
+    interpreter's interned-string table, whose entries are immortal on
+    free-threaded builds.
+    """
+    o = types.SimpleNamespace()
+    t.setattr_dynamic(o, "dyn_first", 1)
+    assert t.getattr_dynamic(o, "dyn_first") == 1
+
+    # CPython itself interns names stored by setattr, so the growth check
+    # must use a read-only operation
+    if hasattr(sys, "getunicodeinternedsize"):
+        base = sys.getunicodeinternedsize()
+        for i in range(5000):
+            assert not t.hasattr_dynamic(o, "dyn_key_%d" % i)
+        assert sys.getunicodeinternedsize() - base < 100

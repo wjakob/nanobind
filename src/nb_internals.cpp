@@ -377,8 +377,14 @@ PyObject *import_cached(import_cache *c) noexcept {
 /// address and contents.
 static bool name_cache_match(const nb_internals::name_cache_entry &e,
                              const char *str, size_t bound) {
-    return e.len < bound && str[e.len] == '\0' &&
-           memcmp(e.utf8, str, e.len) == 0;
+    if (bound)
+        return e.len < bound && str[e.len] == '\0' &&
+               memcmp(e.utf8, str, e.len) == 0;
+
+    for (size_t i = 0; i < e.len; ++i)
+        if (e.utf8[i] != str[i])
+            return false;
+    return str[e.len] == '\0';
 }
 
 /// Miss path of cached_string() below; 'slot' and 'vacancy' carry over what
@@ -391,8 +397,8 @@ NB_NOINLINE static PyObject *cached_string_slow(const char *str, size_t bound,
 
     // On FT threads, interned strings are immortal. To avoid leaks with
     // runtime-generated values, we only intern strings that are about to
-    // enter the cache.
-    if (!vacancy) {
+    // enter the cache. This is restricted to literals.
+    if (bound == 0 || !vacancy) {
         PyObject *s = PyUnicode_FromString(str);
         *owned = s != nullptr;
         return s;

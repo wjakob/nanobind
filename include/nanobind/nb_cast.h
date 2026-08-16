@@ -719,7 +719,8 @@ template <typename T> void list::insert(Py_ssize_t index, T &&value) {
         detail::raise_python_error();
 }
 
-template <typename T> bool dict::contains(T&& key) const {
+template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>>>
+bool dict::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PyDict_Contains(m_ptr, o.ptr());
     if (rv == -1)
@@ -727,11 +728,12 @@ template <typename T> bool dict::contains(T&& key) const {
     return rv == 1;
 }
 
-inline bool dict::contains(const char *key_) const {
-    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
+inline bool dict::contains(detail::str_key key) const {
+    return NB_CALL(contains_str)(m_ptr, key.str, key.bound);
 }
 
-template <typename T> bool set::contains(T&& key) const {
+template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>>>
+bool set::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Contains(m_ptr, o.ptr());
     if (rv == -1)
@@ -739,8 +741,8 @@ template <typename T> bool set::contains(T&& key) const {
     return rv == 1;
 }
 
-inline bool set::contains(const char *key_) const {
-    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
+inline bool set::contains(detail::str_key key) const {
+    return NB_CALL(contains_str)(m_ptr, key.str, key.bound);
 }
 
 template <typename T> void set::add(T&& key) {
@@ -758,7 +760,8 @@ template <typename T> bool set::discard(T &&value) {
     return rv == 1;
 }
 
-template <typename T> bool frozenset::contains(T&& key) const {
+template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>>>
+bool frozenset::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
     int rv = PySet_Contains(m_ptr, o.ptr());
     if (rv == -1)
@@ -766,11 +769,12 @@ template <typename T> bool frozenset::contains(T&& key) const {
     return rv == 1;
 }
 
-inline bool frozenset::contains(const char *key_) const {
-    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
+inline bool frozenset::contains(detail::str_key key) const {
+    return NB_CALL(contains_str)(m_ptr, key.str, key.bound);
 }
 
-template <typename T> bool mapping::contains(T&& key) const {
+template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>>>
+bool mapping::contains(T&& key) const {
     object o = nanobind::cast((detail::forward_t<T>) key);
 #if NB_PYTHON_VERSION >= 0x030D0000
     int rv = PyMapping_HasKeyWithError(m_ptr, o.ptr());
@@ -782,8 +786,8 @@ template <typename T> bool mapping::contains(T&& key) const {
     return rv == 1;
 }
 
-inline bool mapping::contains(const char *key_) const {
-    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
+inline bool mapping::contains(detail::str_key key) const {
+    return NB_CALL(contains_str)(m_ptr, key.str, key.bound);
 }
 
 NAMESPACE_END(NB_NAMESPACE)

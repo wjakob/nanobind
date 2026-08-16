@@ -87,10 +87,10 @@ NB_SLOT(PyObject *, submodule_new,
 /// Try to roughly determine the length of a Python object
 NB_SLOT(size_t, len_hint, (PyObject *o) noexcept)
 
-/// Return a Python string for 'str' of size <= 'bound'. The implementation
-/// tries to memoize the result in a builtin cache. 'owned' returns whether the
-/// caller receives an owned non-interned string. Returns nullptr with an error
-/// set on failure.
+/// Return a Python string for 'str' of size <= 'bound'. 0 indicates a
+/// potentially non-literal string. The implementation tries to memoize
+/// literals in a builtin cache. 'owned' returns whether the caller receives an
+/// owned non-interned string. Returns nullptr with an error set on failure.
 NB_SLOT(PyObject *, cached_string,
         (const char *str, size_t bound, bool *owned) noexcept)
 

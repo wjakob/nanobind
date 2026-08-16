@@ -1685,9 +1685,10 @@ PyObject *nb_type_new(const type_data_init *t) noexcept {
     }
 
     if (t->scope != nullptr)
-        setattr(t->scope, t_name, result);
+        setattr_str(t->scope, t_name, 0, result);
 
-    setattr(result, "__qualname__", qualname.ptr());
+    setattr_str(result, "__qualname__", sizeof("__qualname__"),
+                qualname.ptr());
 
     if (modname.is_valid())
         setattr(result, NB_INTERNED(__module__), modname.ptr());

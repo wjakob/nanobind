@@ -77,18 +77,18 @@ private:
 
 struct str_attr {
     static constexpr bool cache_dec_ref = true;
-    using key_type = const char *;
+    using key_type = str_key;
 
-    NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        return detail::getattr(obj, key);
+    NB_INLINE static PyObject *get(PyObject *obj, str_key k) {
+        return NB_CALL(getattr_str)(obj, k.str, k.bound);
     }
 
-    NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        setattr(obj, key, v);
+    NB_INLINE static void set(PyObject *obj, str_key k, PyObject *v) {
+        NB_CALL(setattr_str)(obj, k.str, k.bound, v);
     }
 
-    NB_INLINE static PyObject *key(const char *key, bool &owned) {
-        return NB_CALL(cached_string)(key, strlen(key) + 1, &owned);
+    NB_INLINE static PyObject *key(str_key k, bool &owned) {
+        return NB_CALL(cached_string)(k.str, k.bound, &owned);
     }
 };
 
@@ -112,18 +112,18 @@ struct obj_attr {
 
 struct str_item {
     static constexpr bool cache_dec_ref = true;
-    using key_type = const char *;
+    using key_type = str_key;
 
-    NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        return NB_CALL(getitem_str)(obj, key, strlen(key) + 1);
+    NB_INLINE static PyObject *get(PyObject *obj, str_key k) {
+        return NB_CALL(getitem_str)(obj, k.str, k.bound);
     }
 
-    NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        setitem(obj, key, v);
+    NB_INLINE static void set(PyObject *obj, str_key k, PyObject *v) {
+        NB_CALL(setitem_str)(obj, k.str, k.bound, v);
     }
 
-    NB_INLINE static void del(PyObject *obj, const char *key) {
-        delitem(obj, key);
+    NB_INLINE static void del(PyObject *obj, str_key k) {
+        NB_CALL(delitem_str)(obj, k.str, k.bound);
     }
 };
 
@@ -169,18 +169,18 @@ struct dict_item {
 
 struct dict_str_item {
     static constexpr bool cache_dec_ref = true;
-    using key_type = const char *;
+    using key_type = str_key;
 
-    NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        return NB_CALL(dict_getitem_str)(obj, key, strlen(key) + 1);
+    NB_INLINE static PyObject *get(PyObject *obj, str_key k) {
+        return NB_CALL(dict_getitem_str)(obj, k.str, k.bound);
     }
 
-    NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        NB_CALL(dict_setitem_str)(obj, key, strlen(key) + 1, v);
+    NB_INLINE static void set(PyObject *obj, str_key k, PyObject *v) {
+        NB_CALL(dict_setitem_str)(obj, k.str, k.bound, v);
     }
 
-    NB_INLINE static void del(PyObject *obj, const char *key) {
-        NB_CALL(dict_delitem_str)(obj, key, strlen(key) + 1);
+    NB_INLINE static void del(PyObject *obj, str_key k) {
+        NB_CALL(dict_delitem_str)(obj, k.str, k.bound);
     }
 };
 
@@ -254,19 +254,19 @@ template <typename D> accessor<obj_attr> api<D>::attr(handle key) const {
     return { derived(), borrow(key) };
 }
 
-template <typename D> accessor<str_attr> api<D>::attr(const char *key) const {
+template <typename D> accessor<str_attr> api<D>::attr(str_key key) const {
     return { derived(), key };
 }
 
 template <typename D> accessor<str_attr> api<D>::doc() const {
-    return { derived(), "__doc__" };
+    return { derived(), str_key("__doc__", sizeof("__doc__")) };
 }
 
 template <typename D> accessor<obj_item> api<D>::operator[](handle key) const {
     return { derived(), borrow(key) };
 }
 
-template <typename D> accessor<str_item> api<D>::operator[](const char *key) const {
+template <typename D> accessor<str_item> api<D>::operator[](str_key key) const {
     return { derived(), key };
 }
 
@@ -304,7 +304,7 @@ inline detail::accessor<detail::dict_item> dict::operator[](handle key) const {
 }
 
 inline detail::accessor<detail::dict_str_item>
-dict::operator[](const char *key) const {
+dict::operator[](detail::str_key key) const {
     return { *this, key };
 }
 

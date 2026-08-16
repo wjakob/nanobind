@@ -142,6 +142,16 @@ constexpr uint64_t str_hash(const char *s) {
     return h;
 }
 
+/// A C string key together with a size bound.
+struct str_key {
+    const char *str;
+    size_t bound;
+
+    template <typename T, enable_if_t<is_c_string_v<T>> = 0>
+    NB_INLINE str_key(T &&s) : str(s), bound(c_string_bound<T>()) { }
+    NB_INLINE str_key(const char *s, size_t bound) : str(s), bound(bound) { }
+};
+
 /// Python string for a C string key, memoized in the backend's cache when
 /// possible (see the cached_string() slot). The instance owns the result
 /// only when the cache could not retain it. 'value' is null if the
@@ -152,6 +162,8 @@ struct cached_name {
 
     NB_INLINE cached_name(const char *key)
         : value(NB_CALL(cached_string)(key, strlen(key) + 1, &owned)) { }
+    NB_INLINE cached_name(str_key key)
+        : value(NB_CALL(cached_string)(key.str, key.bound, &owned)) { }
     cached_name(const cached_name &) = delete;
     cached_name(cached_name &&) = delete;
     NB_INLINE ~cached_name() {
@@ -179,9 +191,6 @@ inline PyObject *module_import(PyObject *name) {
 }
 
 /// Get an object attribute or raise an exception
-inline PyObject *getattr(PyObject *obj, const char *key) {
-    return NB_CALL(getattr_str)(obj, key, strlen(key) + 1);
-}
 inline PyObject *getattr(PyObject *obj, PyObject *key) {
     return raise_if_null(PyObject_GetAttr(obj, key));
 }
@@ -213,15 +222,7 @@ inline PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
     return def;
 }
 
-inline PyObject *getattr(PyObject *obj, const char *key,
-                         PyObject *def) noexcept {
-    return NB_CALL(getattr_str_def)(obj, key, strlen(key) + 1, def);
-}
-
 /// Set an object attribute or raise an exception
-inline void setattr(PyObject *obj, const char *key, PyObject *value) {
-    NB_CALL(setattr_str)(obj, key, strlen(key) + 1, value);
-}
 inline void setattr(PyObject *obj, PyObject *key, PyObject *value) {
     raise_if_nonzero(PyObject_SetAttr(obj, key, value));
 }
@@ -234,16 +235,9 @@ inline void delattr(PyObject *obj, PyObject *key) {
     raise_if_nonzero(PyObject_DelAttr(obj, key));
 #endif
 }
-inline void delattr(PyObject *obj, const char *key) {
-    NB_CALL(delattr_str)(obj, key, strlen(key) + 1);
-}
-
 /// Set an item or raise an exception
 inline void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
     raise_if_nonzero(PySequence_SetItem(obj, key, value));
-}
-inline void setitem(PyObject *obj, const char *key, PyObject *value) {
-    NB_CALL(setitem_str)(obj, key, strlen(key) + 1, value);
 }
 inline void setitem(PyObject *obj, PyObject *key, PyObject *value) {
     raise_if_nonzero(PyObject_SetItem(obj, key, value));
@@ -252,9 +246,6 @@ inline void setitem(PyObject *obj, PyObject *key, PyObject *value) {
 /// Delete an item or raise an exception
 inline void delitem(PyObject *obj, Py_ssize_t key) {
     raise_if_nonzero(PySequence_DelItem(obj, key));
-}
-inline void delitem(PyObject *obj, const char *key) {
-    NB_CALL(delitem_str)(obj, key, strlen(key) + 1);
 }
 inline void delitem(PyObject *obj, PyObject *key) {
     raise_if_nonzero(PyObject_DelItem(obj, key));
@@ -390,11 +381,11 @@ public:
     NB_INLINE operator handle() const;
 
     accessor<obj_attr> attr(handle key) const;
-    accessor<str_attr> attr(const char *key) const;
+    accessor<str_attr> attr(str_key key) const;
     accessor<str_attr> doc() const;
 
     accessor<obj_item> operator[](handle key) const;
-    accessor<str_item> operator[](const char *key) const;
+    accessor<str_item> operator[](str_key key) const;
     template <typename T, enable_if_t<std::is_arithmetic_v<T>> = 1>
     accessor<num_item> operator[](T key) const;
     args_proxy operator*() const;
@@ -577,40 +568,41 @@ template <typename T> NB_INLINE T steal(handle h) {
     return { h, detail::steal_t() };
 }
 
-inline bool hasattr(handle h, const char *key) noexcept {
-    return NB_CALL(hasattr_str)(h.ptr(), key, strlen(key) + 1);
+inline bool hasattr(handle h, detail::str_key key) noexcept {
+    return NB_CALL(hasattr_str)(h.ptr(), key.str, key.bound);
 }
 
 inline bool hasattr(handle h, handle key) noexcept {
     return PyObject_HasAttr(h.ptr(), key.ptr());
 }
 
-inline object getattr(handle h, const char *key) {
-    return steal(detail::getattr(h.ptr(), key));
+inline object getattr(handle h, detail::str_key key) {
+    return steal(NB_CALL(getattr_str)(h.ptr(), key.str, key.bound));
 }
 
 inline object getattr(handle h, handle key) {
     return steal(detail::getattr(h.ptr(), key.ptr()));
 }
 
-inline object getattr(handle h, const char *key, handle def) noexcept {
-    return steal(detail::getattr(h.ptr(), key, def.ptr()));
+inline object getattr(handle h, detail::str_key key, handle def) noexcept {
+    return steal(
+        NB_CALL(getattr_str_def)(h.ptr(), key.str, key.bound, def.ptr()));
 }
 
 inline object getattr(handle h, handle key, handle value) noexcept {
     return steal(detail::getattr(h.ptr(), key.ptr(), value.ptr()));
 }
 
-inline void setattr(handle h, const char *key, handle value) {
-    detail::setattr(h.ptr(), key, value.ptr());
+inline void setattr(handle h, detail::str_key key, handle value) {
+    NB_CALL(setattr_str)(h.ptr(), key.str, key.bound, value.ptr());
 }
 
 inline void setattr(handle h, handle key, handle value) {
     detail::setattr(h.ptr(), key.ptr(), value.ptr());
 }
 
-inline void delattr(handle h, const char *key) {
-    detail::delattr(h.ptr(), key);
+inline void delattr(handle h, detail::str_key key) {
+    NB_CALL(delattr_str)(h.ptr(), key.str, key.bound);
 }
 
 inline void delattr(handle h, handle key) {
@@ -910,13 +902,14 @@ class dict : public object {
     object get(handle key, handle def) const {
         return steal(detail::dict_getitem_or_default(m_ptr, key.ptr(), def.ptr()));
     }
-    object get(const char *key_, handle def) const {
+    object get(detail::str_key key_, handle def) const {
         detail::cached_name key(key_);
         return steal(detail::dict_getitem_or_default(
             m_ptr, detail::raise_if_null(key.value), def.ptr()));
     }
-    template <typename T> bool contains(T&& key) const;
-    bool contains(const char *key) const;
+    template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>> = 0>
+    bool contains(T&& key) const;
+    bool contains(detail::str_key key) const;
     void clear() { PyDict_Clear(m_ptr); }
     void update(handle h) {
         if (PyDict_Update(m_ptr, h.ptr()))
@@ -926,7 +919,7 @@ class dict : public object {
 
     using object::operator[];
     detail::accessor<detail::dict_item> operator[](handle key) const;
-    detail::accessor<detail::dict_str_item> operator[](const char *key) const;
+    detail::accessor<detail::dict_str_item> operator[](detail::str_key key) const;
 };
 
 class set : public object {
@@ -935,8 +928,9 @@ class set : public object {
     explicit set(handle h)
         : object(detail::raise_if_null(PySet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
-    template <typename T> bool contains(T&& key) const;
-    bool contains(const char *key) const;
+    template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>> = 0>
+    bool contains(T&& key) const;
+    bool contains(detail::str_key key) const;
     template <typename T> void add(T &&value);
     void clear() {
         if (PySet_Clear(m_ptr))
@@ -952,8 +946,9 @@ class frozenset : public object {
     explicit frozenset(handle h)
         : object(detail::raise_if_null(PyFrozenSet_New(h.ptr())), detail::steal_t{}) { }
     size_t size() const { return (size_t) NB_SET_GET_SIZE(m_ptr); }
-    template <typename T> bool contains(T&& key) const;
-    bool contains(const char *key) const;
+    template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>> = 0>
+    bool contains(T&& key) const;
+    bool contains(detail::str_key key) const;
     bool empty() const { return size() == 0; }
 };
 
@@ -966,8 +961,9 @@ class mapping : public object {
     list keys() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Keys)); }
     list values() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Values)); }
     list items() const { return steal<list>(detail::obj_op_1(m_ptr, PyMapping_Items)); }
-    template <typename T> bool contains(T&& key) const;
-    bool contains(const char *key) const;
+    template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>> = 0>
+    bool contains(T&& key) const;
+    bool contains(detail::str_key key) const;
 };
 
 class args : public tuple {

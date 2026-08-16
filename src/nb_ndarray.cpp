@@ -858,8 +858,8 @@ static ndarray_handle *ndarray_import_impl(PyObject *src,
              f_order = order == 'F' || order == 'A';
 
         if (!t.strides) {
-            /* When the provided tensor does not have a valid
-               strides field, it uses the C ordering convention */
+            // When the provided tensor does not have a valid
+            // strides field, it uses the C ordering convention
             if (c_order) {
                 pass_order = true;
             } else {
@@ -1097,14 +1097,14 @@ ndarray_handle *ndarray_create(const ndarray_create_args *a, size_t args_size) {
     check(args.ndim <= (size_t) max_ndim,
           "ndarray_create(): ndim is too large!");
 
-    /* A comment in the DLPack header file suggests 256-byte alignment of the
-       DLTensor::data field, but this is generally (and necessarily) ignored.
-       Note that the pointer dltensor.data must point to allocated memory
-       (i.e., memory that can be accessed), so it cannot simply be rounded
-       down by zeroing its lowest 8 bits.
-       A byte_offset can be used to support array slicing when data is an
-       opaque device pointer or handle, on which arithmetic is impossible.
-       See also: https://github.com/data-apis/array-api/discussions/779  */
+    // A comment in the DLPack header file suggests 256-byte alignment of the
+    // DLTensor::data field, but this is generally (and necessarily) ignored.
+    // Note that the pointer dltensor.data must point to allocated memory
+    // (i.e., memory that can be accessed), so it cannot simply be rounded
+    // down by zeroing its lowest 8 bits.
+    // A byte_offset can be used to support array slicing when data is an
+    // opaque device pointer or handle, on which arithmetic is impossible.
+    // See also: https://github.com/data-apis/array-api/discussions/779
 
     if (args.device_type == 0)
         args.device_type = device::cpu::value;
@@ -1190,8 +1190,8 @@ static PyObject *ndarray_export_fn(nb_internals *internals_,
     if (NB_LIKELY(fn))
         return fn;
 
-    /* Resolve before taking the lock: the import runs arbitrary Python code
-       that may reenter nanobind, and the internals mutex is non-reentrant */
+    // Resolve before taking the lock: the import runs arbitrary Python code
+    // that may reenter nanobind, and the internals mutex is non-reentrant
     object obj = steal(module_import(ndarray_export_spec[slot].pkg))
                      .attr(ndarray_export_spec[slot].attr);
 

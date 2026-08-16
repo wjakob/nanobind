@@ -232,9 +232,9 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
          is_new          = false,
          is_setstate     = false;
 
-    /* Locate the argument array through the 'base_size' / 'arg_stride'
-       fields rather than sizeof(): the record may come from an extension
-       compiled against headers whose version of these structures differs */
+    // Locate the argument array through the 'base_size' / 'arg_stride'
+    // fields rather than sizeof(): the record may come from an extension
+    // compiled against headers whose version of these structures differs
     arg_data_init *args_in = nullptr;
     if (has_args)
         args_in = (arg_data_init *) ((char *) f + f->base_size);
@@ -273,8 +273,8 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
                       "instance method flags in function overloads!",
                       name_cstr);
 
-                /* Never append a method to an overload chain of a parent class;
-                   instead, hide the parent's overloads in this case */
+                // Never append a method to an overload chain of a parent class;
+                // instead, hide the parent's overloads in this case
                 if (((nb_func *) func_prev)->scope != f->scope)
                     NB_CLEAR_FUNC(func_prev);
             } else if (name_cstr[0] == '_') {
@@ -680,10 +680,10 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     PyObject *result = nullptr,
              *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
 
-    /* The following lines allocate memory on the stack, which is very efficient
-       but also potentially dangerous since it can be used to generate stack
-       overflows. We refuse unrealistically large number of 'kwargs' (the
-       'max_nargs' value is fine since it is specified by the bindings) */
+    // The following lines allocate memory on the stack, which is very efficient
+    // but also potentially dangerous since it can be used to generate stack
+    // overflows. We refuse unrealistically large number of 'kwargs' (the
+    // 'max_nargs' value is fine since it is specified by the bindings)
     if (nkwargs_in > 1024) {
         PyErr_SetString(PyExc_TypeError,
                         "nanobind::detail::nb_func_vectorcall(): too many (> "
@@ -740,32 +740,31 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
   traverse_overloads:
 #endif
 
-    /*  The logic below tries to find a suitable overload using two passes
-        of the overload chain (or 1, if there are no overloads). The first pass
-        is strict and permits no implicit conversions, while the second pass
-        allows them.
-
-        The following is done per overload during a pass
-
-        1. Copy individual arguments while checking that named positional
-           arguments weren't *also* specified as kwarg. Substitute missing
-           entries using keyword arguments or default argument values provided
-           in the bindings, if available.
-
-        2. Ensure that either all keyword arguments were "consumed", or that
-           the function takes a kwargs argument to accept unconsumed kwargs.
-
-        3. Any positional arguments still left get put into a tuple (for args),
-           and any leftover kwargs get put into a dict.
-
-        4. Pack everything into a vector; if we have nb::args or nb::kwargs,
-           they become a tuple or dict at the end of the positional arguments.
-
-        5. Call the function call dispatcher (func_data::impl)
-
-        If one of these fail, move on to the next overload and keep trying
-        until we get a result other than NB_NEXT_OVERLOAD.
-    */
+    // The logic below tries to find a suitable overload using two passes
+    // of the overload chain (or 1, if there are no overloads). The first pass
+    // is strict and permits no implicit conversions, while the second pass
+    // allows them.
+    //
+    // The following is done per overload during a pass
+    //
+    // 1. Copy individual arguments while checking that named positional
+    //    arguments weren't *also* specified as kwarg. Substitute missing
+    //    entries using keyword arguments or default argument values provided
+    //    in the bindings, if available.
+    //
+    // 2. Ensure that either all keyword arguments were "consumed", or that
+    //    the function takes a kwargs argument to accept unconsumed kwargs.
+    //
+    // 3. Any positional arguments still left get put into a tuple (for args),
+    //    and any leftover kwargs get put into a dict.
+    //
+    // 4. Pack everything into a vector; if we have nb::args or nb::kwargs,
+    //    they become a tuple or dict at the end of the positional arguments.
+    //
+    // 5. Call the function call dispatcher (func_data::impl)
+    //
+    // If one of these fail, move on to the next overload and keep trying
+    // until we get a result other than NB_NEXT_OVERLOAD.
 
     for (size_t pass = (count > 1) ? 0 : 1; pass < 2; ++pass) {
         for (size_t k = 0; k < count; ++k) {
@@ -1371,9 +1370,9 @@ static PyObject *nb_bound_method_vectorcall(PyObject *self,
 
 PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     if (inst) {
-        /* Return a bound method. This should be avoidable in most cases via the
-           'CALL_METHOD' opcode and vector calls. Pytest rewrites the bytecode
-           in a way that breaks this optimization :-/ */
+        // Return a bound method. This should be avoidable in most cases via the
+        // 'CALL_METHOD' opcode and vector calls. Pytest rewrites the bytecode
+        // in a way that breaks this optimization :-/
 
         nb_bound_method *mb =
             PyObject_GC_New(nb_bound_method, internals->nb_bound_method);

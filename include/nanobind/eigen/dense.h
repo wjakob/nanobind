@@ -267,7 +267,7 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
             if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic) {
                 // A compile-time stride of 0 implies "contiguous" ..
                 int64_t is_expected = StrideType::InnerStrideAtCompileTime == 0
-                                      ? 1 /*  .. and equals 1 for the inner stride */
+                                      ? 1 // .. and equals 1 for the inner stride
                                       : StrideType::InnerStrideAtCompileTime,
                         is_actual = caster.value.stride(
                             (ndim_v<T> != 1 && T::IsRowMajor) ? 1 : 0);
@@ -432,16 +432,16 @@ struct type_caster<Eigen::Ref<T, Options, StrideType>,
 
         // Potentially convert strides/dtype when casting constant references
         if constexpr (MaybeConvert) {
-            /* Generating an implicit copy requires some object to assume
-               ownership. During a function call, ``dcaster`` can serve that
-               role (this case is detected by checking whether ``flags`` has
-               the ``manual`` flag set). When used in other situations (e.g.
-               ``nb::cast()``), the created ``Eigen::Ref<..>`` must take
-               ownership of the copy. This is only guranteed to work if
-               DMapConstructorOwnsData.
-
-               If neither of these is possible, we disable implicit
-               conversions. */
+            // Generating an implicit copy requires some object to assume
+            // ownership. During a function call, ``dcaster`` can serve that
+            // role (this case is detected by checking whether ``flags`` has
+            // the ``manual`` flag set). When used in other situations (e.g.
+            // ``nb::cast()``), the created ``Eigen::Ref<..>`` must take
+            // ownership of the copy. This is only guranteed to work if
+            // DMapConstructorOwnsData.
+            //
+            // If neither of these is possible, we disable implicit
+            // conversions.
 
             if ((flags & cast_flags::manual) &&
                 !DMapConstructorOwnsData)

@@ -38,9 +38,9 @@ struct type_caster<std::filesystem::path> {
     bool from_python(handle src, uint32_t, cleanup_list *) noexcept {
         bool success = false;
 
-        /* PyUnicode_FSConverter and PyUnicode_FSDecoder normally take care of
-           calling PyOS_FSPath themselves, but that's broken on PyPy (see PyPy
-           issue #3168) so we do it ourselves instead. */
+        // PyUnicode_FSConverter and PyUnicode_FSDecoder normally take care of
+        // calling PyOS_FSPath themselves, but that's broken on PyPy (see PyPy
+        // issue #3168) so we do it ourselves instead.
         PyObject *buf = PyOS_FSPath(src.ptr());
         if (buf) {
             PyObject *native = nullptr;

@@ -75,17 +75,17 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
     Caster caster;
     handle src;
 
-    /* If true, the Python object has relinquished ownership but we have
-       not yet yielded a unique_ptr that holds ownership on the C++ side.
-
-       `nb_type_relinquish_ownership()` can fail, so we must check it in
-       `can_cast()`. If we do so, but then wind up not executing the cast
-       operator, we must remember to undo our relinquishment and push the
-       ownership back onto the Python side. For example, this might be
-       necessary if the Python object `[(foo, foo)]` is converted to
-       `std::vector<std::pair<std::unique_ptr<T>, std::unique_ptr<T>>>`;
-       the pair caster won't know that it can't cast the second element
-       until after it's verified that it can cast the first one. */
+    // If true, the Python object has relinquished ownership but we have
+    // not yet yielded a unique_ptr that holds ownership on the C++ side.
+    //
+    // `nb_type_relinquish_ownership()` can fail, so we must check it in
+    // `can_cast()`. If we do so, but then wind up not executing the cast
+    // operator, we must remember to undo our relinquishment and push the
+    // ownership back onto the Python side. For example, this might be
+    // necessary if the Python object `[(foo, foo)]` is converted to
+    // `std::vector<std::pair<std::unique_ptr<T>, std::unique_ptr<T>>>`;
+    // the pair caster won't know that it can't cast the second element
+    // until after it's verified that it can cast the first one.
     mutable bool inflight = false;
 
     ~type_caster() {
@@ -97,9 +97,9 @@ struct type_caster<std::unique_ptr<T, Deleter>> {
         // Stash source python object
         src = src_;
 
-        /* Try casting to a pointer of the underlying type. We pass flags=0 and
-           cleanup=nullptr to prevent implicit type conversions (they are
-           problematic since the instance then wouldn't be owned by 'src') */
+        // Try casting to a pointer of the underlying type. We pass flags=0 and
+        // cleanup=nullptr to prevent implicit type conversions (they are
+        // problematic since the instance then wouldn't be owned by 'src')
         return caster.from_python(src_, 0, nullptr);
     }
 

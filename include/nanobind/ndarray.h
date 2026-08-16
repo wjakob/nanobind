@@ -377,8 +377,8 @@ private:
                  std::index_sequence<I1...>, nanobind::shape<I2...>)
         : m_data(data) {
 
-        /* Initialize shape/strides with compile-time knowledge if
-           available (to permit vectorization, loop unrolling, etc.) */
+        // Initialize shape/strides with compile-time knowledge if
+        // available (to permit vectorization, loop unrolling, etc.)
         ((m_shape[I1] = (I2 == -1) ? shape[I1] : (int64_t) I2), ...);
         ((m_strides[I1] = strides[I1]), ...);
 

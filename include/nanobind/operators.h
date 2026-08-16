@@ -24,9 +24,9 @@ enum op_id : int {
 };
 
 enum op_type : int {
-    op_l, /* base type on left */
-    op_r, /* base type on right */
-    op_u  /* unary operator */
+    op_l, // base type on left
+    op_r, // base type on right
+    op_u  // unary operator
 };
 
 struct self_t { };

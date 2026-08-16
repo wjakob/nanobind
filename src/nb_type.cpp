@@ -760,11 +760,11 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
         if (!cname) {
             PyErr_Clear(); // probably a non-string attribute name
         } else if (cname[0] == '@') {
-            /* Prevent type attributes starting with an `@` sign from being
-               rebound or deleted. This is useful to safely stash owning
-               references. The ``nb::enum_<>`` class, e.g., uses this to ensure
-               indirect ownership of a borrowed reference in the supplemental
-               type data. */
+            // Prevent type attributes starting with an `@` sign from being
+            // rebound or deleted. This is useful to safely stash owning
+            // references. The ``nb::enum_<>`` class, e.g., uses this to ensure
+            // indirect ownership of a borrowed reference in the supplemental
+            // type data.
             PyErr_Format(PyExc_AttributeError,
                          "internal nanobind attribute '%s' cannot be "
                          "reassigned or deleted.", cname);
@@ -774,9 +774,9 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
 
     int rv = NB_TYPE_SLOT(PyType_Type, tp_setattro)(obj, name, value);
 
-    /* The assignment may have (un)shadowed a bound method; drop the
-       trampoline override tables of this type and its subclasses so that
-       virtual method calls observe the modification. */
+    // The assignment may have (un)shadowed a bound method; drop the
+    // trampoline override tables of this type and its subclasses so that
+    // virtual method calls observe the modification.
     if (rv == 0)
         nb_trampoline_invalidate(obj);
 
@@ -936,9 +936,9 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     // Life is good, PyType_FromMetaclass() is available
     return PyType_FromMetaclass(meta, mod, spec, nullptr);
 #else
-    /* The fallback code below emulates PyType_FromMetaclass() on Python prior
-       to version 3.12. It requires access to CPython-internal structures, which
-       is why nanobind can only target the stable ABI on version 3.12+. */
+    // The fallback code below emulates PyType_FromMetaclass() on Python prior
+    // to version 3.12. It requires access to CPython-internal structures, which
+    // is why nanobind can only target the stable ABI on version 3.12+.
 
     const char *name = strrchr(spec->name, '.');
     PyObject *modname_o = nullptr;
@@ -1419,8 +1419,8 @@ PyObject *nb_type_new(const type_data_init *t) noexcept {
         if (tb->flags & (uint32_t) type_flags::is_weak_referenceable)
             is_weak_referenceable = true;
 
-        /* Handle a corner case (base class larger than derived class)
-           which can arise when extending trampoline base classes */
+        // Handle a corner case (base class larger than derived class)
+        // which can arise when extending trampoline base classes
 
         PyTypeObject *base_2 = (PyTypeObject *) base;
         type_data *tb_2 = tb;
@@ -2234,11 +2234,11 @@ static void warn_relinquish_failed(const char *why, PyObject *o) noexcept {
 bool nb_type_relinquish_ownership(PyObject *o, bool cpp_delete) noexcept {
     nb_inst *inst = (nb_inst *) o;
 
-    /* This function is called after nb_type_get() succeeds, so the instance
-       should be ready; but the !ready case is possible if an attempt is made to
-       transfer ownership of the same object to C++ multiple times as part of
-       the same data structure. For example, converting Python (foo, foo) to C++
-       std::pair<std::unique_ptr<T>, std::unique_ptr<T>>. */
+    // This function is called after nb_type_get() succeeds, so the instance
+    // should be ready; but the !ready case is possible if an attempt is made to
+    // transfer ownership of the same object to C++ multiple times as part of
+    // the same data structure. For example, converting Python (foo, foo) to C++
+    // std::pair<std::unique_ptr<T>, std::unique_ptr<T>>.
 
     if (inst->state.state != nb_inst_state::state_ready) {
         warn_relinquish_failed(

@@ -15,7 +15,7 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
     bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         PyObject *temp;
 
-        /* Will initialize 'temp' (NULL in the case of a failure.) */
+        // Will initialize 'temp' (NULL in the case of a failure.)
         PyObject **o = NB_CALL(seq_get_with_size)(src.ptr(), Size, &temp);
 
         Caster caster;

@@ -105,19 +105,19 @@ NB_INLINE uint32_t flags_for_local_caster(uint32_t flags) noexcept {
     constexpr bool is_ref = std::is_pointer_v<T> || std::is_reference_v<T>;
     if constexpr (is_base_caster_v<Caster>) {
         if constexpr (is_ref) {
-            /* References/pointers to a type produced by implicit conversions
-               refer to storage owned by the cleanup_list. In a nb::cast() call,
-               that storage will be released before the reference can be used;
-               to prevent dangling, don't allow implicit conversions there. */
+            // References/pointers to a type produced by implicit conversions
+            // refer to storage owned by the cleanup_list. In a nb::cast() call,
+            // that storage will be released before the reference can be used;
+            // to prevent dangling, don't allow implicit conversions there.
             if (flags & cast_flags::manual)
                 flags &= ~cast_flags::convert;
         }
         flags |= none_disallowed_flag<T>;
     } else {
-        /* Any pointer produced by a non-base caster will generally point
-           into storage owned by the caster, which won't live long enough.
-           Exception: the 'char' caster produces a result that points to
-           storage owned by the incoming Python 'str' object, so it's OK. */
+        // Any pointer produced by a non-base caster will generally point
+        // into storage owned by the caster, which won't live long enough.
+        // Exception: the 'char' caster produces a result that points to
+        // storage owned by the incoming Python 'str' object, so it's OK.
         static_assert(!is_ref || std::is_same_v<T, const char*> ||
                       (std::is_pointer_v<T> && std::is_constructible_v<T*, Caster>),
                       "nanobind generally cannot produce objects that "

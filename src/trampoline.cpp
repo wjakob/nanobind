@@ -166,8 +166,8 @@ static void trampoline_mark(PyTypeObject *tp) noexcept {
             !PyType_IsSubtype(Py_TYPE(base), int_p->nb_type))
             continue;
         type_data *td = nb_type_data((PyTypeObject *) base);
-        /* Marks are one-way, and a marked type has marked ancestors, so
-           types that are already marked need no further ordering work */
+        // Marks are one-way, and a marked type has marked ancestors, so
+        // types that are already marked need no further ordering work
         if (subtree_marked(td))
             continue;
         ft_object_guard guard(base);
@@ -197,8 +197,8 @@ static void *trampoline_probe(type_data *td, const char *name, uint64_t hash) {
         for (uint32_t i = t->slot(hash); t->entries()[i].name;
              i = (i + 1) & t->mask) {
             trampoline_entry &e = t->entries()[i];
-            /* Entries are keyed by literal address; the same method name
-               compiled into several extension objects is matched by content */
+            // Entries are keyed by literal address; the same method name
+            // compiled into several extension objects is matched by content
             if (e.name == name || strcmp(e.name, name) == 0)
                 return e.value;
         }
@@ -304,8 +304,8 @@ static void trampoline_publish(type_data *td, const char *name, uint64_t hash,
     trampoline_table *t = (trampoline_table *) malloc_check(
         sizeof(trampoline_table) + capacity * sizeof(trampoline_entry));
 
-    /* Chain the allocation and set the type's mark bit, whose presence
-       tells the invalidation walk that tables may exist in this subtree */
+    // Chain the allocation and set the type's mark bit, whose presence
+    // tells the invalidation walk that tables may exist in this subtree
     t->next = alloc_chain(alloc_word(td).load(std::memory_order_relaxed));
     alloc_word(td).store((uintptr_t) t | 1, std::memory_order_relaxed);
 
@@ -340,9 +340,9 @@ static NB_THREAD_LOCAL ticket *current_ticket = nullptr;
 
 void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
                       bool pure, ticket *t) {
-    /* The type is looked up on every dispatch so that '__class__'
-       reassignment redirects future calls and cannot leave a dangling
-       reference to a collected type behind */
+    // The type is looked up on every dispatch so that '__class__'
+    // reassignment redirects future calls and cannot leave a dangling
+    // reference to a collected type behind
     type_data *td = nb_type_data(Py_TYPE(self));
     nb_internals *int_p = internals;
     const char *error = nullptr;
@@ -373,8 +373,8 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
                 goto fail;
 
             bool done = false;
-            /* The critical section must end before PyGILState_Release()
-               is called, hence the block scope. */
+            // The critical section must end before PyGILState_Release()
+            // is called, hence the block scope.
             {
                 ft_object_guard guard((PyObject *) td->type_py);
                 if (epoch == int_p->trampoline_epoch.load_relaxed()) {
@@ -410,9 +410,9 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
     t->prev = current_ticket;
 
     if (t->prev && t->prev->self.is(t->self) && t->prev->key.is(t->key)) {
-        /* The override itself invoked the bound base implementation, which
-           re-dispatched here through the C++ vtable. Deliver the call to
-           the C++ base method instead of recursing endlessly. */
+        // The override itself invoked the bound base implementation, which
+        // re-dispatched here through the C++ vtable. Deliver the call to
+        // the C++ base method instead of recursing endlessly.
         t->self = handle();
         t->key = handle();
         t->prev = nullptr;
@@ -446,9 +446,9 @@ static void trampoline_invalidate_rec(PyObject *tp, PyObject *&meth) noexcept {
 
     type_data *td = nb_type_data((PyTypeObject *) tp);
     {
-        /* Serialize against publishers and markers of this type (see the
-           file comment). An unmarked type has no trampoline instances at
-           or below it, so the entire branch can be skipped. */
+        // Serialize against publishers and markers of this type (see the
+        // file comment). An unmarked type has no trampoline instances at
+        // or below it, so the entire branch can be skipped.
         ft_object_guard guard(tp);
         if (!subtree_marked(td))
             return;
@@ -456,15 +456,15 @@ static void trampoline_invalidate_rec(PyObject *tp, PyObject *&meth) noexcept {
     }
 
 #if !defined(Py_LIMITED_API) && !defined(NB_FREE_THREADED)
-    /* The GIL orders subclass registration against this walk, so an
-       empty tp_subclasses field proves that there is nothing to visit */
+    // The GIL orders subclass registration against this walk, so an
+    // empty tp_subclasses field proves that there is nothing to visit
     if (!((PyTypeObject *) tp)->tp_subclasses)
         return;
 #endif
 
     if (!meth) {
-        /* The unbound type.__subclasses__, so that a shadowing definition
-           on a subclass cannot divert the walk */
+        // The unbound type.__subclasses__, so that a shadowing definition
+        // on a subclass cannot divert the walk
         meth = PyObject_GetAttrString((PyObject *) &PyType_Type,
                                       "__subclasses__");
         if (!meth) {

@@ -252,8 +252,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
               (has_arg_annotations  ? (uint32_t) func_flags::has_args       : 0);
 
-    /* Store captured function inside 'func_data_init' if there is space. Issues
-       with aliasing are resolved via separate compilation of libnanobind. */
+    // Store captured function inside 'func_data_init' if there is space. Issues
+    // with aliasing are resolved via separate compilation of libnanobind.
     if constexpr (sizeof(capture) <= sizeof(f.capture)) {
         capture *cap = (capture *) f.capture;
         new (cap) capture{ (forward_t<Func>) func };

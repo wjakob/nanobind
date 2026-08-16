@@ -188,9 +188,9 @@ PyObject *obj_vectorcall_ex(PyObject *base, call_arg *args, size_t n,
     size_t nargs = 0, nkwargs = 0, nkw = 0;
     bool cast_error = !base;
 
-    /* Pass 1: turn expansion operands into tuples and private dicts (as CPython
-       does before CALL_FUNCTION_EX) and count. Only the conversions can run
-       Python code, and they cannot change the size of the entries before them. */
+    // Pass 1: turn expansion operands into tuples and private dicts (as CPython
+    // does before CALL_FUNCTION_EX) and count. Only the conversions can run
+    // Python code, and they cannot change the size of the entries before them.
     for (size_t i = 0; i < n && !cast_error; ++i) {
         call_arg &a = args[i];
         bool star = a.kind == call_arg_kind::args;
@@ -216,9 +216,9 @@ PyObject *obj_vectorcall_ex(PyObject *base, call_arg *args, size_t n,
     if (cast_error)
         goto cleanup;
 
-    /* Pass 2: fill the stack, whose entries borrow from the 'call_arg' array
-       and the containers created above, and 'kwnames'. 'stack[0]' is the
-       writable slot required by PEP 590. */
+    // Pass 2: fill the stack, whose entries borrow from the 'call_arg' array
+    // and the containers created above, and 'kwnames'. 'stack[0]' is the
+    // writable slot required by PEP 590.
     stack = (PyObject **) alloca((nargs + nkwargs + 1) * sizeof(PyObject *));
     stack[0] = nullptr;
     pos = stack + 1;
@@ -295,9 +295,9 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
     size_t size = 0;
     PyObject **result = nullptr;
 
-    /* This function is used during overload resolution; if anything
-       goes wrong, it fails gracefully without reporting errors. Other
-       overloads will then be tried. */
+    // This function is used during overload resolution; if anything
+    // goes wrong, it fails gracefully without reporting errors. Other
+    // overloads will then be tried.
 
     if (PyUnicode_CheckExact(seq) || PyBytes_CheckExact(seq)) {
         *size_out = 0;
@@ -309,10 +309,10 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
     if (PyTuple_CheckExact(seq)) {
         size = (size_t) PyTuple_GET_SIZE(seq);
         result = ((PyTupleObject *) seq)->ob_item;
-        /* Special case for zero-sized lists/tuples. CPython
-           sets ob_item to NULL, which this function incidentally uses to
-           signal an error. Return a nonzero pointer that will, however,
-           still trigger a segfault if dereferenced. */
+        // Special case for zero-sized lists/tuples. CPython
+        // sets ob_item to NULL, which this function incidentally uses to
+        // signal an error. Return a nonzero pointer that will, however,
+        // still trigger a segfault if dereferenced.
         if (size == 0)
             result = (PyObject **) 1;
 #  if !defined(NB_FREE_THREADED) // Require immutable holder in free-threaded mode
@@ -331,8 +331,8 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
             PyErr_Clear();
     }
 #else
-    /* There isn't a nice way to get a PyObject** in Py_LIMITED_API. This
-       is going to be slow, but hopefully also very future-proof.. */
+    // There isn't a nice way to get a PyObject** in Py_LIMITED_API. This
+    // is going to be slow, but hopefully also very future-proof..
     if (PySequence_Check(seq)) {
         Py_ssize_t size_seq = PySequence_Length(seq);
 
@@ -393,9 +393,9 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
 PyObject **seq_get_with_size(PyObject *seq, size_t size,
                              PyObject **temp_out) noexcept {
 
-    /* This function is used during overload resolution; if anything
-       goes wrong, it fails gracefully without reporting errors. Other
-       overloads will then be tried. */
+    // This function is used during overload resolution; if anything
+    // goes wrong, it fails gracefully without reporting errors. Other
+    // overloads will then be tried.
 
     PyObject *temp = nullptr,
              **result = nullptr;
@@ -404,10 +404,10 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
     if (PyTuple_CheckExact(seq)) {
         if (size == (size_t) PyTuple_GET_SIZE(seq)) {
             result = ((PyTupleObject *) seq)->ob_item;
-            /* Special case for zero-sized lists/tuples. CPython
-               sets ob_item to NULL, which this function incidentally uses to
-               signal an error. Return a nonzero pointer that will, however,
-               still trigger a segfault if dereferenced. */
+            // Special case for zero-sized lists/tuples. CPython
+            // sets ob_item to NULL, which this function incidentally uses to
+            // signal an error. Return a nonzero pointer that will, however,
+            // still trigger a segfault if dereferenced.
             if (size == 0)
                 result = (PyObject **) 1;
         }
@@ -433,8 +433,8 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
         }
     }
 #else
-    /* There isn't a nice way to get a PyObject** in Py_LIMITED_API. This
-       is going to be slow, but hopefully also very future-proof.. */
+    // There isn't a nice way to get a PyObject** in Py_LIMITED_API. This
+    // is going to be slow, but hopefully also very future-proof..
     if (PySequence_Check(seq)) {
         Py_ssize_t size_seq = PySequence_Length(seq);
 

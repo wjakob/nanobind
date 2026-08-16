@@ -38,9 +38,9 @@ public:
     void lock() { }
     void unlock() { }
 #elif defined(Py_LIMITED_API)
-    /* PyMutex is not part of the 'abi3t' stable ABI (PEP 803), the only
-       limited-API form of free-threaded extensions. Such extensions always
-       run in split mode, and the backend operates on the mutex byte */
+    // PyMutex is not part of the 'abi3t' stable ABI (PEP 803), the only
+    // limited-API form of free-threaded extensions. Such extensions always
+    // run in split mode, and the backend operates on the mutex byte
     void lock() { NB_CALL(ft_mutex_lock)(&mutex); }
     void unlock() { NB_CALL(ft_mutex_unlock)(&mutex); }
 private:

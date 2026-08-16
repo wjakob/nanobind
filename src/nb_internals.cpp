@@ -430,8 +430,8 @@ NB_NOINLINE static PyObject *cached_string_slow(const char *str, size_t bound,
     if (!free_slot)
         return s; // the set filled up concurrently; the reference is owned
 
-    /* Hand the string over to the lifeline, whose lifetime bounds that of
-       the cache entry, or signal to the caller that this was not possible. */
+    // Hand the string over to the lifeline, whose lifetime bounds that of
+    // the cache entry, or signal to the caller that this was not possible.
     Py_ssize_t utf8_len = 0;
     const char *utf8 = PyUnicode_AsUTF8AndSize(s, &utf8_len);
     if (!utf8 || !p->lifeline || PyList_Append(p->lifeline, s) != 0) {
@@ -694,12 +694,12 @@ static void internals_cleanup() {
     *is_alive_ptr = false;
 
 #if !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
-    /* The memory leak checker is unsupported on PyPy, see
-       see https://foss.heptapod.net/pypy/pypy/-/issues/3855.
-
-       Leak reporting is explicitly disabled on free-threaded builds
-       for now because of the decision to immortalize function and
-       type objects. This may change in the future. */
+    // The memory leak checker is unsupported on PyPy, see
+    // see https://foss.heptapod.net/pypy/pypy/-/issues/3855.
+    //
+    // Leak reporting is explicitly disabled on free-threaded builds
+    // for now because of the decision to immortalize function and
+    // type objects. This may change in the future.
 
     bool print_leak_warnings = p->print_leak_warnings;
 

@@ -132,6 +132,8 @@ size_t len_hint(PyObject *o) noexcept {
 #endif
 }
 
+// ========================================================================
+
 PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
                          uint64_t owned, uint32_t flags) {
     size_t nargs = (size_t) PyVectorcall_NARGS(nargsf);

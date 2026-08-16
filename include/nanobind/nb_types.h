@@ -180,8 +180,7 @@ inline PyObject *module_import(PyObject *name) {
 
 /// Get an object attribute or raise an exception
 inline PyObject *getattr(PyObject *obj, const char *key) {
-    cached_name name(key);
-    return raise_if_null(PyObject_GetAttr(obj, raise_if_null(name.value)));
+    return NB_CALL(getattr_str)(obj, key, strlen(key) + 1);
 }
 inline PyObject *getattr(PyObject *obj, PyObject *key) {
     return raise_if_null(PyObject_GetAttr(obj, key));
@@ -216,19 +215,12 @@ inline PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
 
 inline PyObject *getattr(PyObject *obj, const char *key,
                          PyObject *def) noexcept {
-    cached_name name(key);
-    if (NB_UNLIKELY(!name.value)) {
-        PyErr_Clear();
-        Py_XINCREF(def);
-        return def;
-    }
-    return getattr(obj, name.value, def);
+    return NB_CALL(getattr_str_def)(obj, key, strlen(key) + 1, def);
 }
 
 /// Set an object attribute or raise an exception
 inline void setattr(PyObject *obj, const char *key, PyObject *value) {
-    cached_name name(key);
-    raise_if_nonzero(PyObject_SetAttr(obj, raise_if_null(name.value), value));
+    NB_CALL(setattr_str)(obj, key, strlen(key) + 1, value);
 }
 inline void setattr(PyObject *obj, PyObject *key, PyObject *value) {
     raise_if_nonzero(PyObject_SetAttr(obj, key, value));
@@ -243,8 +235,7 @@ inline void delattr(PyObject *obj, PyObject *key) {
 #endif
 }
 inline void delattr(PyObject *obj, const char *key) {
-    cached_name name(key);
-    delattr(obj, raise_if_null(name.value));
+    NB_CALL(delattr_str)(obj, key, strlen(key) + 1);
 }
 
 /// Set an item or raise an exception
@@ -252,11 +243,7 @@ inline void setitem(PyObject *obj, Py_ssize_t key, PyObject *value) {
     raise_if_nonzero(PySequence_SetItem(obj, key, value));
 }
 inline void setitem(PyObject *obj, const char *key, PyObject *value) {
-    cached_name name(key);
-    PyObject *key_py = raise_if_null(name.value);
-    raise_if_nonzero(PyDict_CheckExact(obj)
-                         ? PyDict_SetItem(obj, key_py, value)
-                         : PyObject_SetItem(obj, key_py, value));
+    NB_CALL(setitem_str)(obj, key, strlen(key) + 1, value);
 }
 inline void setitem(PyObject *obj, PyObject *key, PyObject *value) {
     raise_if_nonzero(PyObject_SetItem(obj, key, value));
@@ -267,11 +254,7 @@ inline void delitem(PyObject *obj, Py_ssize_t key) {
     raise_if_nonzero(PySequence_DelItem(obj, key));
 }
 inline void delitem(PyObject *obj, const char *key) {
-    cached_name name(key);
-    PyObject *key_py = raise_if_null(name.value);
-    raise_if_nonzero(PyDict_CheckExact(obj)
-                         ? PyDict_DelItem(obj, key_py)
-                         : PyObject_DelItem(obj, key_py));
+    NB_CALL(delitem_str)(obj, key, strlen(key) + 1);
 }
 inline void delitem(PyObject *obj, PyObject *key) {
     raise_if_nonzero(PyObject_DelItem(obj, key));
@@ -595,12 +578,7 @@ template <typename T> NB_INLINE T steal(handle h) {
 }
 
 inline bool hasattr(handle h, const char *key) noexcept {
-    detail::cached_name name(key);
-    if (NB_UNLIKELY(!name.value)) {
-        PyErr_Clear();
-        return false;
-    }
-    return PyObject_HasAttr(h.ptr(), name.value);
+    return NB_CALL(hasattr_str)(h.ptr(), key, strlen(key) + 1);
 }
 
 inline bool hasattr(handle h, handle key) noexcept {

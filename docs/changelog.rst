@@ -238,6 +238,10 @@ improvements:
     (``MyClass.method(obj)``). This previously worked, which was arguably a
     bug.
 
+  - ``nb::mapping::contains()`` now raises when the underlying lookup fails
+    on Python versions before 3.13 instead of returning ``false``, matching
+    its behavior on 3.13 and newer.
+
   - The low-level instance functions :cpp:func:`nb::inst_copy() <inst_copy>`
     and :cpp:func:`nb::inst_move() <inst_move>` now detect at runtime whether
     the target holds a live value and then apply the replace semantics of

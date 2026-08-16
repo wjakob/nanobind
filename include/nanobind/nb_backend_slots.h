@@ -94,6 +94,29 @@ NB_SLOT(size_t, len_hint, (PyObject *o) noexcept)
 NB_SLOT(PyObject *, cached_string,
         (const char *str, size_t bound, bool *owned) noexcept)
 
+// The operations below resolve their key via cached_string() ('str' and
+// 'bound' follow its contract) and raise an exception when the underlying
+// Python operation fails, except where noted.
+
+/// PyObject_GetAttr() with a C string key
+NB_SLOT(PyObject *, getattr_str, (PyObject *obj, const char *str, size_t bound))
+
+/// Variant of the above that returns a new reference to 'def' instead of
+/// raising when the attribute cannot be retrieved
+NB_SLOT(PyObject *, getattr_str_def,
+        (PyObject *obj, const char *str, size_t bound, PyObject *def) noexcept)
+
+/// PyObject_SetAttr() with a C string key
+NB_SLOT(void, setattr_str,
+        (PyObject *obj, const char *str, size_t bound, PyObject *value))
+
+/// PyObject_DelAttr() with a C string key
+NB_SLOT(void, delattr_str, (PyObject *obj, const char *str, size_t bound))
+
+/// PyObject_HasAttr() with a C string key (never raises)
+NB_SLOT(bool, hasattr_str,
+        (PyObject *obj, const char *str, size_t bound) noexcept)
+
 /// Perform a vector call with positional arguments. 'base' is the callable
 /// or, with 'call_flags::method', a method name looked up on 'args[0]'.
 /// The bits of 'owned' mark arguments that the backend releases; the caller
@@ -109,6 +132,33 @@ NB_SLOT(PyObject *, obj_vectorcall,
 /// first entry is the 'self' object.
 NB_SLOT(PyObject *, obj_vectorcall_ex,
         (PyObject *base, call_arg *args, size_t nargs, uint32_t flags))
+
+/// PyObject_GetItem() with a C string key
+NB_SLOT(PyObject *, getitem_str, (PyObject *obj, const char *str, size_t bound))
+
+/// PyObject_SetItem() with a C string key
+NB_SLOT(void, setitem_str,
+        (PyObject *obj, const char *str, size_t bound, PyObject *value))
+
+/// PyObject_DelItem() with a C string key
+NB_SLOT(void, delitem_str, (PyObject *obj, const char *str, size_t bound))
+
+// The three operations below serve the 'nb::dict' accessor and expect a
+// dictionary (or a subclass of one), which they access with the PyDict_* API.
+
+/// Dictionary lookup with a C string key, raises KeyError when it is absent
+NB_SLOT(PyObject *, dict_getitem_str,
+        (PyObject *obj, const char *str, size_t bound))
+
+/// PyDict_SetItem() with a C string key
+NB_SLOT(void, dict_setitem_str,
+        (PyObject *obj, const char *str, size_t bound, PyObject *value))
+
+/// PyDict_DelItem() with a C string key
+NB_SLOT(void, dict_delitem_str, (PyObject *obj, const char *str, size_t bound))
+
+/// Membership test ('key in obj') with a C string key
+NB_SLOT(bool, contains_str, (PyObject *obj, const char *str, size_t bound))
 
 // --------------------------------------------------------------------------
 // Sequence helpers

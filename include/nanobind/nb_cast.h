@@ -728,8 +728,7 @@ template <typename T> bool dict::contains(T&& key) const {
 }
 
 inline bool dict::contains(const char *key_) const {
-    detail::cached_name key(key_);
-    return contains(handle(detail::raise_if_null(key.value)));
+    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
 }
 
 template <typename T> bool set::contains(T&& key) const {
@@ -741,8 +740,7 @@ template <typename T> bool set::contains(T&& key) const {
 }
 
 inline bool set::contains(const char *key_) const {
-    detail::cached_name key(key_);
-    return contains(handle(detail::raise_if_null(key.value)));
+    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
 }
 
 template <typename T> void set::add(T&& key) {
@@ -769,8 +767,7 @@ template <typename T> bool frozenset::contains(T&& key) const {
 }
 
 inline bool frozenset::contains(const char *key_) const {
-    detail::cached_name key(key_);
-    return contains(handle(detail::raise_if_null(key.value)));
+    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
 }
 
 template <typename T> bool mapping::contains(T&& key) const {
@@ -786,8 +783,7 @@ template <typename T> bool mapping::contains(T&& key) const {
 }
 
 inline bool mapping::contains(const char *key_) const {
-    detail::cached_name key(key_);
-    return contains(handle(detail::raise_if_null(key.value)));
+    return NB_CALL(contains_str)(m_ptr, key_, strlen(key_) + 1);
 }
 
 NAMESPACE_END(NB_NAMESPACE)

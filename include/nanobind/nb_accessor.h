@@ -110,25 +110,12 @@ struct obj_attr {
     }
 };
 
-// String-keyed item access on an arbitrary object. Exact dictionaries
-// shortcut the object protocol, which produces the same behavior at a lower
-// cost. Subclasses stay on the generic path, where an overridden
-// '__getitem__' and the '__missing__' hook remain visible.
 struct str_item {
     static constexpr bool cache_dec_ref = true;
     using key_type = const char *;
 
     NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        cached_name name(key);
-        PyObject *key_py = raise_if_null(name.value);
-        if (PyDict_CheckExact(obj)) {
-            bool error;
-            PyObject *value = dict_getitem_ref(obj, key_py, &error);
-            if (NB_UNLIKELY(!value))
-                error ? raise_python_error() : raise_key_error(key_py);
-            return value;
-        }
-        return raise_if_null(PyObject_GetItem(obj, key_py));
+        return NB_CALL(getitem_str)(obj, key, strlen(key) + 1);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
@@ -185,18 +172,15 @@ struct dict_str_item {
     using key_type = const char *;
 
     NB_INLINE static PyObject *get(PyObject *obj, const char *key) {
-        cached_name name(key);
-        return dict_item::get(obj, raise_if_null(name.value));
+        return NB_CALL(dict_getitem_str)(obj, key, strlen(key) + 1);
     }
 
     NB_INLINE static void set(PyObject *obj, const char *key, PyObject *v) {
-        cached_name name(key);
-        dict_item::set(obj, raise_if_null(name.value), v);
+        NB_CALL(dict_setitem_str)(obj, key, strlen(key) + 1, v);
     }
 
     NB_INLINE static void del(PyObject *obj, const char *key) {
-        cached_name name(key);
-        dict_item::del(obj, raise_if_null(name.value));
+        NB_CALL(dict_delitem_str)(obj, key, strlen(key) + 1);
     }
 };
 

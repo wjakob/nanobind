@@ -373,29 +373,21 @@ PyObject *import_cached(import_cache *c) noexcept {
     return o;
 }
 
-PyObject *cached_string(const char *str, size_t bound, bool *owned) noexcept {
+/// Does the entry describe the current content of 'str'? Check the
+/// address and contents.
+static bool name_cache_match(const nb_internals::name_cache_entry &e,
+                             const char *str, size_t bound) {
+    return e.len < bound && str[e.len] == '\0' &&
+           memcmp(e.utf8, str, e.len) == 0;
+}
+
+/// Miss path of cached_string() below; 'slot' and 'vacancy' carry over what
+/// the fast path already determined about the key's two-slot set
+NB_NOINLINE static PyObject *cached_string_slow(const char *str, size_t bound,
+                                                bool *owned, size_t slot,
+                                                bool vacancy) noexcept {
     nb_internals *p = internals;
     uintptr_t key = (uintptr_t) str;
-
-    // Related string addresses differ mostly in their low bits. Apply a
-    // Fibonacci hash-based mixing step to spread this across the table.
-    size_t slot = (size_t) ((key * 0x9E3779B97F4A7C15ull) >>
-                            (64 - nb_internals::name_cache_bits));
-    *owned = false;
-
-    /* A matching entry must hold the same address and content: a character
-       buffer can be reused with different content at the same address. The
-       comparison reads at most 'e.len + 1 <= bound' bytes of 'str', which
-       the caller's bound proves to be accessible. */
-    bool vacancy = false;
-    for (size_t i = 0; i < 2; ++i) {
-        nb_internals::name_cache_entry &e = p->name_cache[slot ^ i];
-        PyObject *v = e.value.load_acquire();
-        if (NB_LIKELY(v && e.key == key && e.len < bound &&
-                      str[e.len] == '\0' && memcmp(e.utf8, str, e.len) == 0))
-            return v;
-        vacancy |= !v;
-    }
 
     // On FT threads, interned strings are immortal. To avoid leaks with
     // runtime-generated values, we only intern strings that are about to
@@ -420,8 +412,7 @@ PyObject *cached_string(const char *str, size_t bound, bool *owned) noexcept {
         if (!v) {
             if (!free_slot)
                 free_slot = &e;
-        } else if (e.key == key && e.len < bound && str[e.len] == '\0' &&
-                   memcmp(e.utf8, str, e.len) == 0) {
+        } else if (e.key == key && name_cache_match(e, str, bound)) {
             // Lost a race against an identical fill; interning made the
             // strings equal, so ours only holds a redundant reference
             Py_DECREF(s);
@@ -449,6 +440,157 @@ PyObject *cached_string(const char *str, size_t bound, bool *owned) noexcept {
     free_slot->value.store_release(s);
     *owned = false;
     return s;
+}
+
+/// Fast path of the 'cached_string' slot, inlined into the string-keyed
+/// object protocol operations below
+static NB_INLINE PyObject *cached_string_fast(const char *str, size_t bound,
+                                              bool *owned) noexcept {
+    nb_internals *p = internals;
+    uintptr_t key = (uintptr_t) str;
+
+    // Related string addresses differ mostly in their low bits. Apply a
+    // Fibonacci hash-based mixing step to spread this across the table.
+    size_t slot = (size_t) ((key * 0x9E3779B97F4A7C15ull) >>
+                            (64 - nb_internals::name_cache_bits));
+    *owned = false;
+
+    bool vacancy = false;
+    // Probe the entry and its neighbor
+    for (size_t i = 0; i < 2; ++i) {
+        nb_internals::name_cache_entry &e = p->name_cache[slot ^ i];
+        PyObject *v = e.value.load_acquire();
+        if (NB_LIKELY(v && e.key == key && name_cache_match(e, str, bound)))
+            return v;
+        vacancy |= !v;
+    }
+
+    return cached_string_slow(str, bound, owned, slot, vacancy);
+}
+
+PyObject *cached_string(const char *str, size_t bound, bool *owned) noexcept {
+    return cached_string_fast(str, bound, owned);
+}
+
+/// Python string key of the string-keyed object protocol operations below
+/// (interned when it could be cached); raises if the conversion fails
+struct py_key {
+    PyObject *value;
+    bool owned;
+
+    py_key(const char *str, size_t bound)
+        : value(cached_string_fast(str, bound, &owned)) {
+        if (NB_UNLIKELY(!value))
+            raise_python_error();
+    }
+    py_key(const py_key &) = delete;
+    ~py_key() {
+        if (NB_UNLIKELY(owned))
+            Py_DECREF(value);
+    }
+};
+
+PyObject *getattr_str(PyObject *obj, const char *str, size_t bound) {
+    py_key key(str, bound);
+    return getattr(obj, key.value);
+}
+
+PyObject *getattr_str_def(PyObject *obj, const char *str, size_t bound,
+                          PyObject *def) noexcept {
+    bool owned;
+    PyObject *key = cached_string_fast(str, bound, &owned);
+    if (NB_UNLIKELY(!key)) {
+        PyErr_Clear();
+        Py_XINCREF(def);
+        return def;
+    }
+    PyObject *res = getattr(obj, key, def);
+    if (NB_UNLIKELY(owned))
+        Py_DECREF(key);
+    return res;
+}
+
+void setattr_str(PyObject *obj, const char *str, size_t bound,
+                 PyObject *value) {
+    py_key key(str, bound);
+    setattr(obj, key.value, value);
+}
+
+void delattr_str(PyObject *obj, const char *str, size_t bound) {
+    py_key key(str, bound);
+    delattr(obj, key.value);
+}
+
+PyObject *dict_getitem_str(PyObject *obj, const char *str, size_t bound) {
+    py_key key(str, bound);
+    bool error;
+    PyObject *value = dict_getitem_ref(obj, key.value, &error);
+    if (NB_UNLIKELY(!value))
+        error ? raise_python_error() : raise_key_error(key.value);
+    return value;
+}
+
+void dict_setitem_str(PyObject *obj, const char *str, size_t bound,
+                      PyObject *value) {
+    py_key key(str, bound);
+    raise_if_nonzero(PyDict_SetItem(obj, key.value, value));
+}
+
+void dict_delitem_str(PyObject *obj, const char *str, size_t bound) {
+    py_key key(str, bound);
+    raise_if_nonzero(PyDict_DelItem(obj, key.value));
+}
+
+// The three operations below take the dictionary path above when 'obj' is an
+// exact dictionary, for which the two are equivalent. Subclasses stay on the
+// object protocol, where an overridden '__getitem__' and the '__missing__'
+// hook remain visible.
+
+PyObject *getitem_str(PyObject *obj, const char *str, size_t bound) {
+    if (PyDict_CheckExact(obj))
+        return dict_getitem_str(obj, str, bound);
+    py_key key(str, bound);
+    return raise_if_null(PyObject_GetItem(obj, key.value));
+}
+
+void setitem_str(PyObject *obj, const char *str, size_t bound,
+                 PyObject *value) {
+    if (PyDict_CheckExact(obj))
+        return dict_setitem_str(obj, str, bound, value);
+    py_key key(str, bound);
+    setitem(obj, key.value, value);
+}
+
+void delitem_str(PyObject *obj, const char *str, size_t bound) {
+    if (PyDict_CheckExact(obj))
+        return dict_delitem_str(obj, str, bound);
+    py_key key(str, bound);
+    delitem(obj, key.value);
+}
+
+bool contains_str(PyObject *obj, const char *str, size_t bound) {
+    py_key key(str, bound);
+    int rv;
+    if (PyDict_CheckExact(obj))
+        rv = PyDict_Contains(obj, key.value);
+    else
+        rv = PySequence_Contains(obj, key.value);
+    if (NB_UNLIKELY(rv == -1))
+        raise_python_error();
+    return rv == 1;
+}
+
+bool hasattr_str(PyObject *obj, const char *str, size_t bound) noexcept {
+    bool owned;
+    PyObject *key = cached_string_fast(str, bound, &owned);
+    if (NB_UNLIKELY(!key)) {
+        PyErr_Clear();
+        return false;
+    }
+    bool rv = PyObject_HasAttr(obj, key) == 1;
+    if (NB_UNLIKELY(owned))
+        Py_DECREF(key);
+    return rv;
 }
 
 void internals_inc_ref() {

@@ -104,6 +104,17 @@ wrapper API (i.e., the bindings of Python within C++):
   reduces the cost of a loop over a 4-element sequence from **5167ns** to
   **125ns** on my machine. The per-element cost is unchanged.
 
+The STL container bindings became safer to use, especially in free-threaded
+Python:
+
+- **Thread-safe container bindings**: the :cpp:func:`nb::bind_vector()
+  <bind_vector>` and :cpp:func:`nb::bind_map() <bind_map>` container bindings
+  now lock the container in free-threaded builds, which makes their concurrent
+  use safe. This safety guarantee also extends to list iterators, and
+  key/value/item views of maps. Similarly to the Python ``dict``, map bindings
+  raise an ``RuntimeError`` when they detect concurrent modification during
+  iteration.
+
 The release makes several API-breaking changes that unlock internal
 improvements:
 

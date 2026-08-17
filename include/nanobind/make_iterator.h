@@ -11,6 +11,7 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
+#include <new>
 #include <optional>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
@@ -204,6 +205,105 @@ auto make_index_iterator(handle scope, const char *name, handle seq) {
 
     register_step_iterator<State, Policy>(scope, name);
     return borrow<typed<iterator, ValueType>>(cast(State{ borrow(seq), 0 }));
+}
+
+/// The analogous iterator for maps refers to its position by key and looks the
+/// key up again on every step. A step that detects a modification raises
+/// ``RuntimeError`` instead of continuing. The ``Access`` parameter selects what
+/// the iterator yields (keys, values, or items).
+template <typename Access, rv_policy::value Policy, typename Map>
+struct cursor_iterator_state {
+    object owner;
+    std::optional<typename Map::key_type> cursor;
+    size_t size;
+    bool done;
+};
+
+/// The iteration step again runs during return value conversion, see ``next_step``
+template <typename Access, rv_policy::value Policy, typename Map>
+struct type_caster<next_step<cursor_iterator_state<Access, Policy, Map>>> {
+    using State = cursor_iterator_state<Access, Policy, Map>;
+    static constexpr auto Name = make_caster<typename Access::result_type>::Name;
+
+    static handle from_cpp(next_step<State> n, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        State &s = *n.state;
+        ft_object_guard guard(s.owner);
+        Map &m = *inst_ptr<Map>(s.owner);
+
+        if (s.done) {
+            PyErr_SetNone(PyExc_StopIteration);
+            return { };
+        }
+
+        if (m.size() != s.size) {
+            // Stay failed like a dict iterator (no map ever has this size)
+            s.size = (size_t) -1;
+            PyErr_SetString(PyExc_RuntimeError,
+                            "map changed size during iteration");
+            return { };
+        }
+
+        // The key copy and the user's comparator or hash function may throw,
+        // which must not escape this noexcept function
+        try {
+            typename Map::iterator it;
+            if (s.cursor.has_value()) {
+                it = m.find(*s.cursor);
+                if (it == m.end()) {
+                    s.size = (size_t) -1;
+                    PyErr_SetString(PyExc_RuntimeError,
+                                    "map keys changed during iteration");
+                    return { };
+                }
+                ++it;
+            } else {
+                it = m.begin();
+            }
+
+            if (it == m.end()) {
+                // Exhausted iterators stay exhausted, like their dict counterparts
+                s.done = true;
+                PyErr_SetNone(PyExc_StopIteration);
+                return { };
+            }
+
+            s.cursor.emplace((*it).first);
+            return make_caster<typename Access::result_type>::from_cpp(
+                Access()(it), policy, cleanup);
+        } catch (python_error &e) {
+            e.restore();
+        } catch (const std::bad_alloc &) {
+            PyErr_NoMemory();
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError,
+                            "an exception was raised while advancing the map "
+                            "iterator");
+        }
+
+        // The interrupted step may have lost the cursor position, stay failed
+        s.size = (size_t) -1;
+        return { };
+    }
+};
+
+/// Make a key-based Python iterator over the map ``map`` that yields the
+/// elements selected by ``Access``
+template <typename Access, rv_policy::value Policy, typename Map>
+auto make_cursor_iterator(handle scope, const char *name, handle map) {
+    using State = cursor_iterator_state<Access, Policy, Map>;
+    using ValueType = typename Access::result_type;
+
+    register_step_iterator<State, Policy>(scope, name);
+
+    size_t size;
+    {
+        ft_object_guard guard(map);
+        size = inst_ptr<Map>(map)->size();
+    }
+
+    return borrow<typed<iterator, ValueType>>(
+        cast(State{ borrow(map), std::nullopt, size, false }));
 }
 
 NAMESPACE_END(detail)

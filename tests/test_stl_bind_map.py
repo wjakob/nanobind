@@ -246,3 +246,59 @@ def test_map_init_partial_cleanup():
     collect()
     assert t.cnt_alive() == base
     del keep
+
+
+def test_map_iterator_modification():
+    # Map iterators re-derive their position by key on every step and raise
+    # RuntimeError when they detect a modification, like a dict iterator
+    for cls in (t.MapStringDouble, t.UnorderedMapStringDouble):
+        m = cls()
+        for i in range(10):
+            m[str(i)] = float(i)
+
+        with pytest.raises(RuntimeError, match="changed size"):
+            for k in m:
+                m["x"] = 1.0
+        del m["x"]
+
+        # Removing and adding a key between steps keeps the size constant.
+        # The disappearance of the cursor key reveals the modification anyway.
+        with pytest.raises(RuntimeError, match="keys changed"):
+            for k in m:
+                del m[k]
+                m[k + "y"] = 1.0
+
+        # Replacing the value of an existing key is legal during iteration
+        for k in m:
+            m[k] = 0.0
+        assert set(m.values()) == {0.0}
+
+        # The views iterate with the same protection
+        with pytest.raises(RuntimeError, match="changed size"):
+            for v in m.values():
+                m["x"] = 1.0
+        del m["x"]
+        with pytest.raises(RuntimeError, match="changed size"):
+            for kv in m.items():
+                m["x"] = 1.0
+        del m["x"]
+
+        # Like a dict iterator, an iterator that has observed a modification
+        # stays in the failed state even if the map is restored
+        it = iter(m)
+        next(it)
+        m["x"] = 1.0
+        with pytest.raises(RuntimeError, match="changed size"):
+            next(it)
+        del m["x"]
+        with pytest.raises(RuntimeError, match="changed size"):
+            next(it)
+
+        # Like a dict iterator, an exhausted iterator stays exhausted even if
+        # the map changes afterwards
+        it = iter(m)
+        for _ in it:
+            pass
+        m["x"] = 1.0
+        with pytest.raises(StopIteration):
+            next(it)

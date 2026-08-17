@@ -269,8 +269,13 @@ and :cpp:func:`nb::bind_map() <bind_map>` use :ref:`argument locks
 <argument-locks>` to protect all operations and views. Concurrent calls
 therefore cannot corrupt the underlying C++ container, though compound
 operations built from several calls may still require larger-scale
-synchronization, just as they do for ``list`` and ``dict``. Vectors may be
-iterated while other threads modify them.
+synchronization, just as they do for ``list`` and ``dict``. This safety
+guarantee also extends to list iterators and item/value/key views of maps.
+
+Map iterators raise a ``RuntimeError`` when they detect concurrent
+modification. This detection is best-effort and can miss modifications that
+preserve both the size and the last visited key. Such a miss affects which
+elements the iteration visits but never memory safety.
 
 GIL scope guards
 ________________

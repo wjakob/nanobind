@@ -230,3 +230,24 @@ def test14_bind_map_two_locks(n_threads=8):
 
     parallelize(f, n_threads=n_threads)
     assert len(dst) == n
+
+
+def test15_bind_map_iter_threaded(n_threads=8):
+    # Iterate while other threads insert. Each step re-derives the position
+    # by key under the map's lock, and either succeeds or raises RuntimeError
+    # when it detects the modification. It must never crash.
+    n = 2000
+    m = t.StringIntMap()
+
+    def f():
+        for i in range(n):
+            m[str(i)] = i
+            if (i & 15) == 0:
+                try:
+                    for _ in m:
+                        pass
+                except RuntimeError:
+                    pass
+
+    parallelize(f, n_threads=n_threads)
+    assert len(m) == n

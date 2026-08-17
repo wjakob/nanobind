@@ -54,8 +54,12 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
     using Key = typename Map::key_type;
     using Value = typename Map::mapped_type;
 
-    using ValueRef = typename detail::iterator_value_access<
-        typename Map::iterator>::result_type;
+    // Element access strategies of the key, value, and item iterators
+    using KeyAccess   = detail::iterator_key_access<typename Map::iterator>;
+    using ValueAccess = detail::iterator_value_access<typename Map::iterator>;
+    using ItemAccess  = detail::iterator_access<typename Map::iterator>;
+
+    using ValueRef = typename ValueAccess::result_type;
 
     static_assert(
         !detail::is_base_caster_v<detail::make_caster<Value>> ||
@@ -64,6 +68,11 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
          Policy != rv_policy::copy),
         "bind_map(): the generated __getitem__ would copy elements, so the "
         "value type must be copy-constructible");
+
+    static_assert(
+        detail::is_copy_constructible_v<Key>,
+        "bind_map(): the generated iterators store a copy of the last "
+        "visited key, so the key type must be copy-constructible");
 
     handle cl_cur = type<Map>();
     if (cl_cur.is_valid()) {
@@ -99,12 +108,13 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
         .def("__contains__", // fallback for incompatible types
              [](const Map &, handle) { return false; })
 
+        // The key-based iterator raises ``RuntimeError`` when it detects a
+        // modification of the map, see ``make_cursor_iterator()``
         .def("__iter__",
-             [](Map &m) {
-                 return make_key_iterator<Policy>(type<Map>(), "KeyIterator",
-                                                  m.begin(), m.end());
-             },
-             keep_alive<0, 1>(), lock_self())
+             [](handle_t<Map> h) {
+                 return detail::make_cursor_iterator<KeyAccess, Policy, Map>(
+                     type<Map>(), "KeyIterator", h);
+             })
 
         .def("__getitem__",
              [](Map &m, const Key &k) -> ValueRef {
@@ -190,12 +200,9 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
              })
         .def("__iter__",
              [](ItemView &v) {
-                 ft_object_guard guard(v.owner);
-                 Map &m = v.map();
-                 return make_iterator<Policy>(type<Map>(), "ItemIterator",
-                                              m.begin(), m.end());
-             },
-             keep_alive<0, 1>());
+                 return detail::make_cursor_iterator<ItemAccess, Policy, Map>(
+                     type<Map>(), "ItemIterator", v.owner);
+             });
 
     class_<KeyView>(cl, "KeyView")
         .def("__contains__",
@@ -212,12 +219,9 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
              })
         .def("__iter__",
              [](KeyView &v) {
-                 ft_object_guard guard(v.owner);
-                 Map &m = v.map();
-                 return make_key_iterator<Policy>(type<Map>(), "KeyIterator",
-                                                  m.begin(), m.end());
-             },
-             keep_alive<0, 1>());
+                 return detail::make_cursor_iterator<KeyAccess, Policy, Map>(
+                     type<Map>(), "KeyIterator", v.owner);
+             });
 
     class_<ValueView>(cl, "ValueView")
         .def("__len__",
@@ -227,12 +231,9 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
              })
         .def("__iter__",
              [](ValueView &v) {
-                 ft_object_guard guard(v.owner);
-                 Map &m = v.map();
-                 return make_value_iterator<Policy>(type<Map>(), "ValueIterator",
-                                                    m.begin(), m.end());
-             },
-             keep_alive<0, 1>());
+                 return detail::make_cursor_iterator<ValueAccess, Policy, Map>(
+                     type<Map>(), "ValueIterator", v.owner);
+             });
 
     cl.def("keys",   [](handle_t<Map> h) { return new KeyView{{ borrow(h) }};   },
            "Returns an iterable view of the map's keys.");

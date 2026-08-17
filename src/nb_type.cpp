@@ -2376,7 +2376,8 @@ PyObject *nb_inst_alloc_zero(PyTypeObject *t) {
 void nb_inst_state_write(PyObject *o, uint32_t state) noexcept {
     nb_inst *nbi = (nb_inst *) o;
     bool ready = state & 1, destruct = state & 2;
-    nbi->state.state = ready ? nb_inst_state::state_ready : nb_inst_state::state_uninitialized;
+    nbi->state.state = (uint8_t) (ready ? nb_inst_state::state_ready
+                                        : nb_inst_state::state_uninitialized);
     nbi->state.destruct = destruct;
     nbi->state.cpp_delete = destruct && !nbi->state.internal;
 }

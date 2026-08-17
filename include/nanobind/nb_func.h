@@ -37,7 +37,7 @@ constexpr auto arg_flags_static(Return (*)(Args...)) {
     // Contribution of the C++ parameter types: std::optional-style arguments
     // implicitly accept 'None'; value/reference bindings of bound types do not
     constexpr uint32_t type_flags[] = {
-        ((has_arg_defaults_v<Args> ? cast_flags::accepts_none : 0u) |
+        ((has_arg_defaults_v<Args> ? (uint32_t) cast_flags::accepts_none : 0u) |
          none_disallowed_flag<Args>)..., 0u };
 
     // Which 'Extra' entries are argument annotations, and their flags
@@ -153,14 +153,14 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Determine the number of nb::arg/nb::arg_v annotations
     constexpr size_t nargs_provided =
         (arg_traits<Extra>::is_arg + ... + 0);
-    constexpr bool is_method_det =
+    static constexpr bool is_method_det =
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
-    constexpr bool has_arg_annotations = has_arg_defaults || (nargs_provided > 0 && !is_getter_det);
+    static constexpr bool has_arg_annotations = has_arg_defaults || (nargs_provided > 0 && !is_getter_det);
 
     // Determine the number of potentially-locked function arguments
-    constexpr bool lock_self_det =
+    static constexpr bool lock_self_det =
         (std::is_same_v<lock_self, Extra> + ... + 0) != 0;
     static_assert(Info::nargs_locked <= 2,
         "At most two function arguments can be locked");

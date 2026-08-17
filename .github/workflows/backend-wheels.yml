@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest', 'ubuntu-24.04-arm', 'windows-2022', 'macos-15', 'macos-13']
+        os: ['ubuntu-latest', 'ubuntu-24.04-arm', 'windows-2022', 'macos-15', 'macos-15-intel']
 
     name: "wheels / ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
@@ -25,7 +25,7 @@ jobs:
     # The whole checkout is the cibuildwheel project (it is copied into the
     # manylinux container), the package is the subdirectory
     - name: Build wheels
-      uses: pypa/cibuildwheel@v3
+      uses: pypa/cibuildwheel@v4.2.0
       with:
         package-dir: nanobind-backend
         output-dir: dist
@@ -80,10 +80,10 @@ jobs:
     - name: Configure
       run: >
         cmake -S . -B build -DNB_TEST_SPLIT_MODE=ON -DNB_TEST_SPLIT_WHEEL=ON
-        -DNB_TEST_FREE_THREADED=OFF
+        -DNB_TEST_FREE_THREADED=OFF -DCMAKE_BUILD_TYPE=Release
 
     - name: Build C++
-      run: cmake --build build -j 2
+      run: cmake --build build -j 2 --config Release
 
     - name: Run tests
       run: |

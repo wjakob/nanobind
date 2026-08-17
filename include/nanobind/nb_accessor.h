@@ -56,8 +56,12 @@ public:
     NB_INLINE PyObject *ptr() const {
         // Fetch once and cache an owned reference. Impls with cache_dec_ref
         // == false hand out borrowed references and refetch on every access.
-        if (!Impl::cache_dec_ref || !m_cache)
+        if constexpr (Impl::cache_dec_ref) {
+            if (!m_cache)
+                m_cache = Impl::get(m_base, m_key);
+        } else {
             m_cache = Impl::get(m_base, m_key);
+        }
         return m_cache;
     }
     NB_INLINE handle base() const { return m_base; }

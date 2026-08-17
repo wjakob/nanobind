@@ -80,7 +80,7 @@ template <typename T>
 inline constexpr uint32_t none_disallowed_flag =
     (is_base_caster_v<make_caster<T>> &&
      !std::is_pointer_v<std::remove_reference_t<T>>)
-        ? cast_flags::none_disallowed : 0;
+        ? (uint32_t) cast_flags::none_disallowed : 0u;
 
 /// Many type casters delegate to another caster using the pattern:
 /// ~~~ .cc

@@ -26,7 +26,7 @@ jobs:
           - os: ubuntu-latest
             python: '3.14'
           # Also test x86_64 macOS, which coalesces weak exports differently
-          - os: macos-13
+          - os: macos-15-intel
             python: '3.13'
 
     name: "split mode / Python ${{ matrix.python }} / ${{ matrix.os }}"
@@ -161,6 +161,9 @@ jobs:
         echo "copying $count abi3 extensions"
         test "$count" -ge 20
         cp build314/tests/*.abi3.so build310/tests/
+        # The 3.10 build stops short of the stubs, which test_stubs.py checks
+        (cd build314/tests && find . \( -name '*.pyi' -o -name py.typed \) \
+           -exec cp {} ../../build310/tests/{} \;)
 
     - name: Run tests
       run: |

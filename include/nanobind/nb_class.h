@@ -435,7 +435,7 @@ public:
         detail::type_data_init d {};
 
         constexpr size_t alias_align = alignof(Alias);
-        uint32_t align_log2 = 0;
+        uint8_t align_log2 = 0;
         while (((size_t) 1 << align_log2) != alias_align)
             align_log2++;
 

@@ -23,7 +23,10 @@ struct trampoline {
     PyObject *self;
 
 #if defined(_MSC_VER) && !defined(__clang__)
-    // MSVC requires this when the base class has a constexpr constructor
+    // MSVC requires this when the base class has a constexpr constructor. The
+    // unused template parameter postpones the check that would otherwise
+    // reject the constexpr specifier because of the backend call below.
+    template <typename = void>
     NB_INLINE constexpr trampoline(void *ptr) : self(nullptr) {
 #else
     NB_INLINE trampoline(void *ptr) : self(nullptr) {

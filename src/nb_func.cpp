@@ -657,10 +657,10 @@ NB_INLINE uint32_t func_dispatch_flags(const func_data *f, bool convert,
     // skips the 'self' type check and is only safe for the freshly
     // allocated instance that nb_type_vectorcall passes to __init__.
     return ((convert && !(f->flags & (uint32_t) func_flags::is_copy_constructor))
-                ? cast_flags::convert : 0) |
-           (construct ? cast_flags::construct : 0) |
+                ? (uint32_t) cast_flags::convert : 0u) |
+           (construct ? (uint32_t) cast_flags::construct : 0u) |
            ((trusted && (f->flags & (uint32_t) func_flags::is_constructor))
-                ? cast_flags::trusted : 0);
+                ? (uint32_t) cast_flags::trusted : 0u);
 }
 
 /// Dispatch loop that is used to invoke functions created by nb_func_new

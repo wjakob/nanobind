@@ -930,9 +930,11 @@ extern void *attach_tstate_early() noexcept;
    indirection through the exported functions. */
 
 /// Does the calling thread have a Python thread state attached? The limited
-/// API cannot answer this and conservatively reports 'false'.
+/// API cannot answer this and conservatively reports 'false'. PyPy does the
+/// same because it hands out the thread state of a thread that released the
+/// GIL, which would send such a thread down the fast path below.
 NB_INLINE bool tstate_attached() noexcept {
-#if defined(Py_LIMITED_API)
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
     return false;
 #elif PY_VERSION_HEX < 0x030D0000
     return _PyThreadState_UncheckedGet() != nullptr;

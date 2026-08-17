@@ -40,6 +40,10 @@ if (NB_TEST_SPLIT_MODE)
   # A domain is a property of the backend module, hence the 'mydomain' twin.
   nanobind_add_backend(nanobind_backend_test)
   nanobind_add_backend(nanobind_backend_test_mydomain NB_DOMAIN mydomain)
+
+  # Stub generation imports the extensions, which need their backend
+  set(NB_BACKEND_DEPENDS nanobind_backend_test nanobind_backend_test_mydomain)
+
   set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS}
       BACKEND_MODULE nanobind_backend_test_mydomain)
   if (NB_TEST_SPLIT_WHEEL)
@@ -172,7 +176,7 @@ foreach (NAME functions classes ndarray jax tensorflow stl enum typing make_iter
     MODULE test_${NAME}_ext
     OUTPUT ${PYI_PREFIX}test_${NAME}_ext.pyi
     PYTHON_PATH $<TARGET_FILE_DIR:test_${NAME}_ext>
-    DEPENDS test_${NAME}_ext ${EXTRA_DEPENDS}
+    DEPENDS test_${NAME}_ext ${EXTRA_DEPENDS} ${NB_BACKEND_DEPENDS}
     ${EXTRA})
 endforeach()
 

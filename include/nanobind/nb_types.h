@@ -9,6 +9,8 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
+inline namespace NB_BACKEND_ABI_NS { class NB_EXPORT python_error; }
+
 /// Macro defining functions/constructors for nanobind::handle subclasses
 #define NB_OBJECT(Type, Parent, Str, Check)                                    \
 public:                                                                        \
@@ -115,9 +117,11 @@ inline void raise_type_error(const char *fmt, ...) {
 
 /* Raise nanobind::python_error, resp. nanobind::cast_error when no Python
    error is pending. Defined in nb_error.h, which has the complete
-   python_error type. */
-[[noreturn]] NB_NOINLINE inline void raise_python_error();
-[[noreturn]] NB_NOINLINE inline void raise_python_or_cast_error();
+   python_error type. GCC rejects the 'noinline' attribute when it appears
+   on a declaration that is already known to be inline, hence these two
+   specifiers only occur on the definition. */
+[[noreturn]] void raise_python_error();
+[[noreturn]] void raise_python_or_cast_error();
 
 /// Raise an exception if 'p' is null (shared cold path of the inline helpers)
 NB_INLINE PyObject *raise_if_null(PyObject *p) {
@@ -942,7 +946,6 @@ class dict : public object {
     }
     bool empty() const { return size() == 0; }
 
-    using object::operator[];
     detail::accessor<detail::dict_item> operator[](handle key) const;
     template <typename T, detail::enable_if_t<detail::is_owned_key_v<T>> = 0>
     detail::accessor<detail::dict_item_own> operator[](T &&key) const;

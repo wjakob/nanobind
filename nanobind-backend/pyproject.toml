@@ -36,10 +36,12 @@ wheel.packages = ["src/nanobind_backend"]
 # Wheel matrix of the 'backend-wheels' workflow. Free-threaded wheels start
 # at 3.15, the first version with a stable ABI for free-threaded builds
 # ('abi3t'); 'cpython-prerelease' admits 3.15 while it is a release candidate.
-# CPython for Windows on ARM64 begins at 3.11.
+# CPython for Windows on ARM64 begins at 3.11. musllinux is excluded because
+# auditwheel vendors a private copy of libstdc++ into the wheel there, which
+# would give the backend and the extensions separate C++ runtimes.
 [tool.cibuildwheel]
 build = "cp3*-*"
-skip = "pp* *-win32 *_i686 cp310-win_arm64 cp313t-* cp314t-*"
+skip = "pp* *musllinux* *-win32 *_i686 cp310-win_arm64 cp313t-* cp314t-*"
 enable = ["cpython-prerelease"]
 build-verbosity = 1
 test-command = "python -c \"import nanobind_backend._nb_backend_v1\""

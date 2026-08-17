@@ -143,8 +143,7 @@ platform:
    * - Windows
      - MSVC with the ``/MD`` runtime (release, shared CRT)
    * - Linux
-     - GCC or Clang with libstdc++ as provided by the manylinux and musllinux
-       images
+     - GCC or Clang with libstdc++ as provided by manylinux
    * - macOS
      - AppleClang with libc++
 
@@ -157,7 +156,9 @@ split mode. The extension will join the domain of the specified backend module.
 
 Finally, statically linking the C++ library into an extension or a backend
 module is unsupported in split mode, as the C++ runtime must be shared to
-correctly propagate exceptions.
+correctly propagate exceptions. The same goes for a private copy bundled into
+the wheel, which is what ``auditwheel`` does on ``musllinux``. There are
+therefore no ``musllinux`` backend wheels.
 
 Free-threading
 --------------

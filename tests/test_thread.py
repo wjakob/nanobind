@@ -1,6 +1,8 @@
 import random
 import threading
 
+import pytest
+
 import test_thread_ext as t
 from test_thread_ext import Counter, GlobalData, ClassWithProperty, ClassWithClassProperty
 from common import parallelize
@@ -116,3 +118,115 @@ def test08_shared_ptr_threaded_access(n_threads=8):
     for _ in range(100):
         barrier = threading.Barrier(n_threads)
         parallelize(lambda: f(barrier), n_threads=n_threads)
+
+
+def test09_bind_vector(n_threads=8):
+    # Hammer a shared nb::bind_vector() container. The locking annotations in
+    # bind_vector.h must keep the underlying std::vector consistent.
+    n = 10000
+    v = t.IntVector()
+    v.append(0)
+
+    def f():
+        for i in range(n):
+            v.append(i)
+            v[0] = i
+            v.count(i)
+            _ = i in v
+            _ = len(v)
+
+    parallelize(f, n_threads=n_threads)
+    assert len(v) == n * n_threads + 1
+
+
+def test10_bind_vector_two_locks(n_threads=8):
+    # Exercise the two-argument locking of 'extend' and slice assignment
+    n = 200
+    dst = t.IntVector()
+
+    def f():
+        src = t.IntVector()
+        for i in range(n):
+            src.append(i)
+            dst.extend(src)
+            src[:] = src
+
+    parallelize(f, n_threads=n_threads)
+    assert len(dst) == n_threads * n * (n + 1) // 2
+
+
+def test11_bind_map(n_threads=8):
+    # Hammer a shared nb::bind_map() container, including its views
+    n = 2000
+    m = t.StringIntMap()
+
+    def f():
+        for i in range(n):
+            k = str(i)
+            m[k] = i
+            _ = k in m
+            _ = len(m)
+            _ = len(m.keys())
+            _ = k in m.keys()
+
+    parallelize(f, n_threads=n_threads)
+    assert len(m) == n
+
+
+def test12_bind_vector_iter_realloc():
+    # The iterator refers to its position by index and re-derives the element
+    # on every step, so growing the vector cannot invalidate it. An iterator
+    # pair would refer to the buffer abandoned by the first reallocation.
+    v = t.IntVector()
+    for i in range(8):
+        v.append(i)
+
+    seen = 0
+    for x in v:
+        seen += 1
+        if len(v) < 4096:
+            v.append(x)
+
+    assert seen == 4096 and len(v) == 4096
+
+    # Like a list iterator, an exhausted iterator stays exhausted even if the
+    # vector grows afterwards
+    it = iter(v)
+    for _ in it:
+        pass
+    v.append(0)
+    with pytest.raises(StopIteration):
+        next(it)
+
+
+def test13_bind_vector_iter_threaded(n_threads=8):
+    # The same hazard, reached from another thread: iterate while the vector
+    # grows underneath, crossing many reallocations
+    n = 2000
+    v = t.IntVector()
+    v.append(0)
+
+    def f():
+        for i in range(n):
+            v.append(i)
+            if (i & 15) == 0:
+                for _ in v:
+                    pass
+
+    parallelize(f, n_threads=n_threads)
+    assert len(v) == n * n_threads + 1
+
+
+def test14_bind_map_two_locks(n_threads=8):
+    # Exercise the two-argument locking of 'update'
+    n = 200
+    dst = t.StringIntMap()
+
+    def f():
+        src = t.StringIntMap()
+        for i in range(n):
+            src[str(i)] = i
+            dst.update(src)
+
+    parallelize(f, n_threads=n_threads)
+    assert len(dst) == n

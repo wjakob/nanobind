@@ -250,6 +250,21 @@ include directive:
    The binding operation is a no-op if the vector type has already been
    registered with nanobind.
 
+   .. note::
+
+      **Free-threading**: the bindings use :ref:`argument locks
+      <argument-locks>` to make all operations safe under concurrent access in
+      free-threaded interpreters.
+
+      Iteration is safe as well. The returned iterator refers to its position
+      by index and locks the vector on every step, so insertions, removals, and
+      reallocation cannot invalidate it. As with a Python ``list``, elements
+      inserted or removed during iteration influence the remaining traversal.
+
+      Element access under the reference-returning policies discussed below
+      remains unsafe in the presence of concurrent modification, since the
+      returned Python object refers to memory owned by the container.
+
    .. warning::
 
       While this function creates a type resembling a Python ``list``, it has a
@@ -457,6 +472,13 @@ nanobind API and requires an additional include directive:
    If not all of these properties are available, then a subset of the above
    methods will be omitted. Please refer to ``bind_map.h`` for details on the
    logic.
+
+   .. note::
+
+      **Free-threading**: the bindings use :ref:`argument locks
+      <argument-locks>` to make operations safe with respect to concurrent
+      access in free-threaded interpreters. This safety guarantee also applies
+      to key/value/item views.
 
    .. warning::
 

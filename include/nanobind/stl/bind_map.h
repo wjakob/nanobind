@@ -71,23 +71,30 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
         return borrow<class_<Map>>(cl_cur);
     }
 
+    // The nb::lock_self() and nb::arg().lock() annotations protect the C++
+    // container from concurrent modification in free-threaded builds. They have
+    // no effect in GIL-protected Python.
     auto cl = class_<Map>(scope, name, std::forward<Args>(args)...)
         .def(init<>(),
              "Default constructor")
 
-        .def("__len__", [](const Map &m) { return m.size(); })
+        .def("__len__", [](const Map &m) { return m.size(); }, lock_self())
 
         .def("__bool__",
              [](const Map &m) { return !m.empty(); },
+             lock_self(),
              "Check whether the map is nonempty")
 
+        // __repr__ needs no annotation of its own. ``repr_map`` reaches the
+        // map through the bound ``items()`` view.
         .def("__repr__",
              [](handle_t<Map> h) {
                 return steal<str>(detail::repr_map(h.ptr()));
              })
 
         .def("__contains__",
-             [](const Map &m, const Key &k) { return m.find(k) != m.end(); })
+             [](const Map &m, const Key &k) { return m.find(k) != m.end(); },
+             lock_self())
 
         .def("__contains__", // fallback for incompatible types
              [](const Map &, handle) { return false; })
@@ -97,7 +104,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                  return make_key_iterator<Policy>(type<Map>(), "KeyIterator",
                                                   m.begin(), m.end());
              },
-             keep_alive<0, 1>())
+             keep_alive<0, 1>(), lock_self())
 
         .def("__getitem__",
              [](Map &m, const Key &k) -> ValueRef {
@@ -105,7 +112,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                  if (it == m.end())
                      throw key_error();
                  return (*it).second;
-             }, rv_policy::policy_tag<Policy>())
+             }, rv_policy::policy_tag<Policy>(), lock_self())
 
         .def("__delitem__",
             [](Map &m, const Key &k) {
@@ -113,14 +120,14 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                 if (it == m.end())
                     throw key_error();
                 m.erase(it);
-            })
+            }, lock_self())
 
         .def("clear", [](Map &m) { m.clear(); },
+             lock_self(),
              "Remove all items");
 
-
     if constexpr (detail::is_copy_constructible_v<Map>) {
-        cl.def(init<const Map &>(), "Copy constructor");
+        cl.def(init<const Map &>(), arg().lock(), "Copy constructor");
 
         cl.def("__init__", [](Map *m, typed<dict, Key, Value> d) {
             new (m) Map();
@@ -141,7 +148,7 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
                   detail::is_copy_constructible_v<Value>) {
         cl.def("__setitem__", [](Map &m, const Key &k, const Value &v) {
             detail::map_set<Map, Key, Value>(m, k, v);
-        });
+        }, lock_self());
 
         cl.def("update", [](Map &m, const Map &m2) {
             // Updating a map with itself would be a no-op, but the underlying
@@ -153,53 +160,85 @@ class_<Map> bind_map(handle scope, const char *name, Args &&...args) {
             for (auto &kv : m2)
                 detail::map_set<Map, Key, Value>(m, kv.first, kv.second);
         },
+        lock_self(), arg().lock(),
         "Update the map with element from ``arg``");
     }
 
     if constexpr (detail::is_equality_comparable_v<Map>) {
-        cl.def(self == self, sig("def __eq__(self, arg: object, /) -> bool"))
-          .def(self != self, sig("def __ne__(self, arg: object, /) -> bool"));
+        cl.def(self == self, sig("def __eq__(self, arg: object, /) -> bool"),
+               lock_self(), arg().lock())
+          .def(self != self, sig("def __ne__(self, arg: object, /) -> bool"),
+               lock_self(), arg().lock());
     }
 
-    // Item, value, and key views
-    struct KeyView   { Map &map; };
-    struct ValueView { Map &map; };
-    struct ItemView  { Map &map; };
+    // Item, value, and key views. Each holds a strong reference to the map
+    // object, which keeps the map alive and provides a lock target for
+    // free-threaded interpreters.
+    struct View {
+        object owner;
+        Map &map() const { return *inst_ptr<Map>(owner); }
+    };
+    struct KeyView   : View { };
+    struct ValueView : View { };
+    struct ItemView  : View { };
 
     class_<ItemView>(cl, "ItemView")
-        .def("__len__", [](ItemView &v) { return v.map.size(); })
+        .def("__len__",
+             [](ItemView &v) {
+                 ft_object_guard guard(v.owner);
+                 return v.map().size();
+             })
         .def("__iter__",
              [](ItemView &v) {
+                 ft_object_guard guard(v.owner);
+                 Map &m = v.map();
                  return make_iterator<Policy>(type<Map>(), "ItemIterator",
-                                              v.map.begin(), v.map.end());
+                                              m.begin(), m.end());
              },
              keep_alive<0, 1>());
 
     class_<KeyView>(cl, "KeyView")
-        .def("__contains__", [](KeyView &v, const Key &k) { return v.map.find(k) != v.map.end(); })
+        .def("__contains__",
+             [](KeyView &v, const Key &k) {
+                 ft_object_guard guard(v.owner);
+                 Map &m = v.map();
+                 return m.find(k) != m.end();
+             })
         .def("__contains__", [](KeyView &, handle) { return false; })
-        .def("__len__", [](KeyView &v) { return v.map.size(); })
+        .def("__len__",
+             [](KeyView &v) {
+                 ft_object_guard guard(v.owner);
+                 return v.map().size();
+             })
         .def("__iter__",
              [](KeyView &v) {
+                 ft_object_guard guard(v.owner);
+                 Map &m = v.map();
                  return make_key_iterator<Policy>(type<Map>(), "KeyIterator",
-                                                  v.map.begin(), v.map.end());
+                                                  m.begin(), m.end());
              },
              keep_alive<0, 1>());
 
     class_<ValueView>(cl, "ValueView")
-        .def("__len__", [](ValueView &v) { return v.map.size(); })
+        .def("__len__",
+             [](ValueView &v) {
+                 ft_object_guard guard(v.owner);
+                 return v.map().size();
+             })
         .def("__iter__",
              [](ValueView &v) {
+                 ft_object_guard guard(v.owner);
+                 Map &m = v.map();
                  return make_value_iterator<Policy>(type<Map>(), "ValueIterator",
-                                                    v.map.begin(), v.map.end());
+                                                    m.begin(), m.end());
              },
              keep_alive<0, 1>());
 
-    cl.def("keys",   [](Map &m) { return new KeyView{m};   }, keep_alive<0, 1>(),
+    cl.def("keys",   [](handle_t<Map> h) { return new KeyView{{ borrow(h) }};   },
            "Returns an iterable view of the map's keys.");
-    cl.def("values", [](Map &m) { return new ValueView{m}; }, keep_alive<0, 1>(),
+    cl.def("values", [](handle_t<Map> h) { return new ValueView{{ borrow(h) }}; },
            "Returns an iterable view of the map's values.");
-    cl.def("items",  [](Map &m) { return new ItemView{m};  }, keep_alive<0, 1>(),
+    cl.def("items",  [](handle_t<Map> h) { return new ItemView{{ borrow(h) }};  },
            "Returns an iterable view of the map's items.");
 
     return cl;

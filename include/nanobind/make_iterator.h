@@ -113,8 +113,10 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
         "element type must be copy-constructible");
 
     {
+#if defined(NB_FREE_THREADED)
         static ft_mutex mu;
         ft_lock_guard lock(mu);
+#endif
         if (!type<State>().is_valid()) {
             class_<State>(scope, name)
                 .def("__iter__", [](handle h) { return h; })
@@ -138,6 +140,70 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
     }
     return borrow<typed<iterator, ValueType>>(cast(State{
         std::forward<Iterator>(first), std::forward<Sentinel>(last), true }));
+}
+
+// Alternative iterator for random access sequences whose element storage may
+// move during iteration. The iterator refers to its position by index and
+// re-derives the element on every step. The state holds a reference to the
+// sequence, which serves as the lock target in free-threaded builds.
+template <rv_policy::value Policy, typename Seq> struct index_iterator_state {
+    object owner;
+    size_t index;
+};
+
+// Return type of the generated __next__() methods below
+template <typename State> struct next_step { State *state; };
+
+/// Register the Python iterator type ``State`` on first use
+template <typename State, rv_policy::value Policy>
+void register_step_iterator(handle scope, const char *name) {
+#if defined(NB_FREE_THREADED)
+    static ft_mutex mu;
+    ft_lock_guard lock(mu);
+#endif
+    if (!type<State>().is_valid()) {
+        class_<State>(scope, name)
+            .def("__iter__", [](handle h) { return h; })
+            .def("__next__",
+                 [](State &s) -> next_step<State> { return { &s }; },
+                 rv_policy::policy_tag<Policy>());
+    }
+}
+
+template <rv_policy::value Policy, typename Seq>
+struct type_caster<next_step<index_iterator_state<Policy, Seq>>> {
+    using State = index_iterator_state<Policy, Seq>;
+    using Access = iterator_access<decltype(std::declval<Seq &>().begin())>;
+    static constexpr auto Name = make_caster<typename Access::result_type>::Name;
+
+    static handle from_cpp(next_step<State> n, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        State &s = *n.state;
+        ft_object_guard guard(s.owner);
+        Seq &seq = *inst_ptr<Seq>(s.owner);
+
+        if (s.index >= seq.size()) {
+            // Exhausted iterators stay exhausted even if the sequence grows
+            s.index = (size_t) -1;
+            PyErr_SetNone(PyExc_StopIteration);
+            return { };
+        }
+
+        auto it = seq.begin() + (ptrdiff_t) s.index++;
+        return make_caster<typename Access::result_type>::from_cpp(
+            Access()(it), policy, cleanup);
+    }
+};
+
+/// Make an index-based Python iterator over the random access sequence ``seq``
+template <rv_policy::value Policy = rv_policy::automatic_reference_v, typename Seq>
+auto make_index_iterator(handle scope, const char *name, handle seq) {
+    using State = index_iterator_state<Policy, Seq>;
+    using ValueType = typename iterator_access<
+        decltype(std::declval<Seq &>().begin())>::result_type;
+
+    register_step_iterator<State, Policy>(scope, name);
+    return borrow<typed<iterator, ValueType>>(cast(State{ borrow(seq), 0 }));
 }
 
 NAMESPACE_END(detail)

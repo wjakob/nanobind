@@ -143,7 +143,8 @@ platform:
    * - Windows
      - MSVC with the ``/MD`` runtime (release, shared CRT)
    * - Linux
-     - GCC or Clang with libstdc++ as provided by manylinux
+     - GCC or Clang with libstdc++ as provided by the manylinux and musllinux
+       images
    * - macOS
      - AppleClang with libc++
 

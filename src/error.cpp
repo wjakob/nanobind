@@ -53,9 +53,10 @@ void error_restore(PyObject *value) noexcept {
 }
 
 void error_release(PyObject *value, char *what) noexcept {
+    // A python_error can be destroyed on any thread, including while the
+    // interpreter shuts down. Its reference is then no longer releasable.
     if (value) {
-        gil_scoped_acquire acq;
-        /* With GIL held */ {
+        if (cleanup_guard guard{}) {
             // Clear error status in case the following executes Python code
             error_scope scope;
             Py_DECREF(value);
@@ -69,8 +70,8 @@ PyObject *error_copy(PyObject *value, char **what) noexcept {
     if (*what)
         *what = strdup_check(*what);
     if (value) {
-        gil_scoped_acquire acq;
-        Py_INCREF(value);
+        if (cleanup_guard guard{})
+            Py_INCREF(value);
     }
     return value;
 }
@@ -80,9 +81,12 @@ const char *error_what(PyObject *value, char **what) noexcept {
     if (*what)
         return *what;
 
-    gil_scoped_acquire acq;
+    cleanup_guard guard;
+    if (!guard)
+        return "<error message unavailable, the Python interpreter is "
+               "shutting down>";
 
-    // Try again with GIL held
+    // Try again with a thread state attached
     if (*what)
         return *what;
 

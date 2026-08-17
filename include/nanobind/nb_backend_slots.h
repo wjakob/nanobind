@@ -415,6 +415,15 @@ NB_SLOT(void, ft_mutex_unlock, (void *m) noexcept)
 // Interpreter-state queries and backend configuration
 // --------------------------------------------------------------------------
 
+/// Attach a Python thread state to the calling thread, which acquires the GIL
+/// in non-free-threaded builds. Nested calls are allowed. The return value is
+/// an opaque token for 'tstate_release', or nullptr when the interpreter is
+/// shutting down and can no longer be entered (see nb::gil_scoped_acquire).
+NB_SLOT(void *, tstate_ensure, () noexcept)
+
+/// Undo a 'tstate_ensure' call. A null token (i.e. a failed one) is ignored.
+NB_SLOT(void, tstate_release, (void *token) noexcept)
+
 /// PyGILState_Check() for TUs that cannot call it (limited API)
 NB_SLOT(bool, gil_check, () noexcept)
 

@@ -182,14 +182,16 @@ static void nb_thread_state_destroy(void *p) noexcept {
     if (!ts)
         return;
 
-    // Reclaim this thread's instance pools if the runtime is still alive
+    // Reclaim this thread's instance pools if the runtime is still alive.
+    // Both steps need a thread state, so a shutdown that beats this callback
+    // leaves the pools to the operating system.
     if (internals && ts->pools) {
-        PyGILState_STATE state = PyGILState_Ensure();
-        for (uint32_t i = 0; i < ts->pools_size; ++i)
-            nb_pool_drain(&ts->pools[i], /* can_free = */ true);
-        PyGILState_Release(state);
+        if (cleanup_guard guard{}) {
+            for (uint32_t i = 0; i < ts->pools_size; ++i)
+                nb_pool_drain(&ts->pools[i], /* can_free = */ true);
+            PyMem_Free(ts->pools);
+        }
     }
-    PyMem_Free(ts->pools);
 
     nb_thread_state_tls = nullptr;
     delete ts;
@@ -686,6 +688,31 @@ static bool *is_alive_ptr = &is_alive_value;
 bool is_alive() noexcept { return *is_alive_ptr; }
 
 
+#if defined(NB_HAVE_INTERP_VIEW)
+PyInterpreterView *nb_interp_view = nullptr;
+
+// nb::gil_scoped_acquire is usable as soon as an application links against
+// nanobind, which an embedding application may do before it imports the
+// extension that publishes 'nb_interp_view'. Such callers get a throw-away
+// view instead.
+NB_NOINLINE void *attach_tstate_early() noexcept {
+    PyInterpreterView *view = PyInterpreterView_FromMain();
+    if (!view)
+        return nullptr;
+    void *token = PyThreadState_EnsureFromView(view);
+    PyInterpreterView_Close(view);
+    return token;
+}
+#endif
+
+void *tstate_ensure() noexcept { return attach_tstate(); }
+
+void tstate_release(void *token) noexcept {
+    if (token)
+        detach_tstate(token);
+}
+
+
 static void internals_cleanup() {
     nb_internals *p = internals;
     if (!p)
@@ -840,6 +867,18 @@ static void internals_cleanup() {
 }
 
 static int nb_module_init_impl(const char *domain, PyObject *) {
+#if defined(NB_HAVE_INTERP_VIEW)
+    // Needed by every later attach_tstate() call, including those of
+    // extensions that reuse an already initialized 'nb_internals'
+    if (!nb_interp_view) {
+        nb_interp_view = PyInterpreterView_FromMain();
+        if (!nb_interp_view) {
+            PyErr_NoMemory();
+            return -1;
+        }
+    }
+#endif
+
     if (internals) {
         init_internals(internals);
         init_pyobjects(internals);

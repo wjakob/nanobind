@@ -19,10 +19,8 @@ NAMESPACE_BEGIN(detail)
 struct py_deleter {
     void operator()(void *) noexcept {
         // Don't run the deleter if the interpreter has been shut down
-        if (!NB_CALL(is_alive)())
-            return;
-        gil_scoped_acquire guard;
-        Py_DECREF(o);
+        if (cleanup_guard guard{})
+            Py_DECREF(o);
     }
 
     PyObject *o;

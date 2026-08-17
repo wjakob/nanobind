@@ -346,14 +346,14 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
     type_data *td = nb_type_data(Py_TYPE(self));
     nb_internals *int_p = internals;
     const char *error = nullptr;
-    PyGILState_STATE state{};
-    bool have_gil = false;
+    void *state = nullptr;
 
     void *value = trampoline_probe(td, name, hash);
 
     if (!value) {
-        state = PyGILState_Ensure();
-        have_gil = true;
+        state = attach_tstate();
+        if (!state)
+            goto shutdown;
 
         // The load above may have raced with a '__class__' reassignment
         td = nb_type_data(Py_TYPE(self));
@@ -373,8 +373,8 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
                 goto fail;
 
             bool done = false;
-            // The critical section must end before PyGILState_Release()
-            // is called, hence the block scope.
+            // The critical section must end before the thread state is
+            // released, hence the block scope.
             {
                 ft_object_guard guard((PyObject *) td->type_py);
                 if (epoch == int_p->trampoline_epoch.load_relaxed()) {
@@ -396,13 +396,16 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
             error = "tried to call a pure virtual function";
             goto fail;
         }
-        if (have_gil)
-            PyGILState_Release(state);
+        if (state)
+            detach_tstate(state);
         return; // 't->key' stays null; the caller runs the C++ base method
     }
 
-    if (!have_gil)
-        state = PyGILState_Ensure();
+    if (!state) {
+        state = attach_tstate();
+        if (!state)
+            goto shutdown;
+    }
 
     t->state = state;
     t->key = (PyObject *) value;
@@ -416,7 +419,7 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
         t->self = handle();
         t->key = handle();
         t->prev = nullptr;
-        PyGILState_Release(state);
+        detach_tstate(state);
         if (pure)
             raise("nanobind::detail::trampoline_enter('%s()'): tried to call "
                   "a pure virtual function!", name);
@@ -426,16 +429,23 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
     current_ticket = t;
     return;
 
+shutdown:
+    // The interpreter is finalizing and refuses further thread state
+    // attachments. Defer to the C++ base method if the caller has one.
+    if (!pure)
+        return;
+    error = "the Python interpreter is shutting down";
+
 fail:
-    if (have_gil)
-        PyGILState_Release(state);
+    if (state)
+        detach_tstate(state);
     raise("nanobind::detail::trampoline_enter('%s::%s()'): %s!",
           td->name, name, error);
 }
 
 void trampoline_leave(ticket *t) noexcept {
     current_ticket = t->prev;
-    PyGILState_Release(t->state);
+    detach_tstate(t->state);
 }
 
 /// Drop the published tables in the marked part of 'tp's subtree. 'meth'

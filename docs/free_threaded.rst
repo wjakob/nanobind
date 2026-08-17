@@ -292,6 +292,10 @@ The :cpp:struct:`gil_scoped_release` RAII scope guard class plays a special
 role in free-threaded builds, since it releases all :ref:`argument locks
 <argument-locks>` held by the current thread.
 
+Attaching a thread context can :ref:`fail while the interpreter is shutting
+down <gil-shutdown>`, which code running on threads that Python did not create
+must handle.
+
 Immortalization
 _______________
 

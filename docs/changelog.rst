@@ -115,7 +115,47 @@ Python:
   raise an ``RuntimeError`` when they detect concurrent modification during
   iteration.
 
-The release makes several API-breaking changes that unlock internal
+Bindings also became more robust at interpreter shutdown:
+
+- **Interpreter finalization**: code that enters Python from a non-Python
+  thread can hang indefinitely when the interpreter begins to shut down. This
+  can be a tricky problem in C++ codebases, where destructors may want to
+  communicate a cleanup event to Python, without knowing whether it is still
+  safe to do so.
+
+  `PEP 788 <https://peps.python.org/pep-0788/>`__ adopts an official API where
+  code can request a kind of critical section that either fails or keeps the
+  interpreter alive until release. API like :cpp:struct:`nb::gil_scoped_acquire
+  <gil_scoped_acquire>` now builds on it when running on Python 3.15 or newer.
+
+  Many existing internal uses of this pattern moved to the new API, including
+  the deleters of ``std::shared_ptr`` and ``std::unique_ptr``, the wrapper
+  around a Python callable held in a ``std::function``, ndarray deallocation
+  and ``nb::python_error``. They skip their work instead of hanging when Python
+  can no longer be used. A :ref:`trampoline <trampolines>` in this situation
+  defers to the C++ base implementation, or raises when the method is pure
+  virtual.
+
+  **API break**: :cpp:struct:`nb::gil_scoped_acquire <gil_scoped_acquire>` can
+  fail and grows an :ref:`is_valid() <gil-shutdown>` query that foreign-thread
+  code should consult.
+
+  .. code-block:: cpp
+
+     nb::gil_scoped_acquire guard;
+     if (guard.is_valid())
+         Py_DECREF(o);
+
+  Older interpreters keep their previous behavior, where ``is_valid()`` always
+  reports success. Split-mode extensions pick up the improved handling from a
+  backend upgrade without recompiling.
+
+  The rewrite also removed a cost that this code paid needlessly. A thread that
+  already holds a Python thread state now proceeds with it instead of going
+  through an acquire/release pair, which reduces the cost of a :ref:`trampoline
+  <trampolines>` dispatch from **8.7ns** to **5.7ns** on my machine.
+
+The release makes several further API-breaking changes that unlock internal
 improvements:
 
 - **Trampolines**: nanobind 3 switches to a new :ref:`trampoline <trampolines>`

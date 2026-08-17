@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <string.h>
+#include <thread>
 
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/pair.h>
@@ -247,6 +248,32 @@ NB_MODULE(test_functions_ext, m) {
 #else
         return PyGILState_Check();
 #endif
+    }, nb::call_guard<nb::gil_scoped_release>());
+
+    // Acquire on a thread that already has a thread state
+    m.def("test_acquire_gil_nested", []() -> bool {
+        nb::gil_scoped_acquire g1;
+        nb::gil_scoped_acquire g2;
+        return g1.is_valid() && g2.is_valid() &&
+               nb::cast<int>(nb::int_(3) + nb::int_(4)) == 7;
+    });
+
+    // Reattach a thread state from a thread that just gave one up
+    m.def("test_reacquire_gil", []() -> bool {
+        nb::gil_scoped_acquire guard;
+        return guard.is_valid() && nb::cast<int>(nb::int_(3) + nb::int_(4)) == 7;
+    }, nb::call_guard<nb::gil_scoped_release>());
+
+    // Same from a thread that Python has never seen
+    m.def("test_acquire_gil_foreign", []() -> bool {
+        bool result = false;
+        std::thread t([&] {
+            nb::gil_scoped_acquire guard;
+            result = guard.is_valid() &&
+                     nb::cast<int>(nb::int_(3) + nb::int_(4)) == 7;
+        });
+        t.join();
+        return result;
     }, nb::call_guard<nb::gil_scoped_release>());
 
     m.def("test_print", []{

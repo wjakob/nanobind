@@ -8,6 +8,7 @@
 */
 
 #include <nanobind/nanobind.h>
+#include <memory>
 #include "nb_internals.h"
 
 #if defined(_MSC_VER)
@@ -17,6 +18,9 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+/* Note that this runs without an attached thread state in some cases (e.g.
+   when a trampoline gives up because the interpreter is shutting down), hence
+   the use of malloc() over PyMem_Malloc() for oversized messages. */
 NB_NOINLINE static builtin_exception
 create_exception(exception_type type, const char *fmt, va_list args_) {
     char buf[512];
@@ -29,7 +33,9 @@ create_exception(exception_type type, const char *fmt, va_list args_) {
     if (size < sizeof(buf)) {
         return builtin_exception(type, buf);
     } else {
-        scoped_pymalloc<char> temp(size + 1);
+        std::unique_ptr<char[]> temp(new (std::nothrow) char[size + 1]);
+        if (!temp)
+            return builtin_exception(type, buf); // Fall back to a truncation
 
         va_copy(args, args_);
         vsnprintf(temp.get(), size + 1, fmt, args);

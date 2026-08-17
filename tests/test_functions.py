@@ -285,6 +285,9 @@ def test13_call_guard():
     assert t.call_guard_value() == 2
     assert t.test_call_guard_wrapper_rvalue_ref(1) == 1
     assert not t.test_release_gil()
+    assert t.test_acquire_gil_nested()
+    assert t.test_reacquire_gil()
+    assert t.test_acquire_gil_foreign()
 
 
 def test14_print(capsys):

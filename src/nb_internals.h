@@ -37,6 +37,15 @@
 #  error "Compiling the nanobind backend under the limited API requires Python >= 3.12"
 #endif
 
+/* Can this build use the interpreter views and guards of PEP 788 to attach a
+   thread state without risking a hang at interpreter shutdown? They arrived in
+   Python 3.15, and only enter the limited API at that version. The backend
+   never targets a limited API newer than 3.12, so a linked-mode stable ABI
+   build has to fall back to PyGILState_Ensure(). */
+#if PY_VERSION_HEX >= 0x030F0000 && !defined(Py_LIMITED_API)
+#  define NB_HAVE_INTERP_VIEW 1
+#endif
+
 #if PY_VERSION_HEX < 0x030C0000
 #  include <structmember.h>
 #  define Py_T_PYSSIZET  T_PYSSIZET
@@ -858,6 +867,65 @@ extern nb_internals *internals;
 
 /// Domain served by this backend image (see nb_module_init_impl)
 extern const char *nb_backend_domain;
+
+#if defined(NB_HAVE_INTERP_VIEW)
+// A view of the main interpreter, created during module initialization and
+// deliberately never closed.
+extern PyInterpreterView *nb_interp_view;
+
+/// Cold path of attach_tstate() for callers that run before 'nb_interp_view'
+extern void *attach_tstate_early() noexcept;
+#endif
+
+/// Token reported by attach_tstate() when there is nothing to undo
+#define NB_TSTATE_ATTACHED ((void *) 1)
+
+/* Implementation of the 'tstate_ensure' and 'tstate_release' backend slots.
+   Hot paths like trampoline dispatch call these directly to skip the
+   indirection through the exported functions. */
+
+/// Does the calling thread have a Python thread state attached? The limited
+/// API cannot answer this and conservatively reports 'false'.
+NB_INLINE bool tstate_attached() noexcept {
+#if defined(Py_LIMITED_API)
+    return false;
+#elif PY_VERSION_HEX < 0x030D0000
+    return _PyThreadState_UncheckedGet() != nullptr;
+#else
+    return PyThreadState_GetUnchecked() != nullptr;
+#endif
+}
+
+NB_INLINE void *attach_tstate() noexcept {
+    /* Threads that already have a thread state proceed with it and undo
+       nothing later. Besides being much cheaper than the alternatives below,
+       this skips an interpreter guard that would serve no purpose: such a
+       thread cannot observe the interpreter disappearing underneath it. */
+    if (tstate_attached())
+        return NB_TSTATE_ATTACHED;
+
+#if defined(NB_HAVE_INTERP_VIEW)
+    if (NB_UNLIKELY(!nb_interp_view))
+        return attach_tstate_early();
+
+    return PyThreadState_EnsureFromView(nb_interp_view);
+#else
+    /* PyGILState_STATE is an enumeration starting at zero. The shift keeps a
+       successful attachment distinguishable from both a null token and the
+       sentinel above. */
+    return (void *) (uintptr_t) ((int) PyGILState_Ensure() + 2);
+#endif
+}
+
+NB_INLINE void detach_tstate(void *token) noexcept {
+    if (token == NB_TSTATE_ATTACHED)
+        return;
+#if defined(NB_HAVE_INTERP_VIEW)
+    PyThreadState_Release(token);
+#else
+    PyGILState_Release((PyGILState_STATE) ((uintptr_t) token - 2));
+#endif
+}
 
 extern char *type_name(const std::type_info *t);
 

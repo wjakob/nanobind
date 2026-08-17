@@ -42,13 +42,12 @@ struct managed_dltensor_versioned {
 
 static void mt_from_buffer_delete(managed_dltensor_versioned* self) {
     // Don't run the cleanup if the interpreter has been shut down
-    if (!is_alive())
-        return;
-    gil_scoped_acquire guard;
-    Py_buffer *buf = (Py_buffer *) self->manager_ctx;
-    PyBuffer_Release(buf);
-    PyMem_Free(buf);
-    PyMem_Free(self);  // This also frees shape and size arrays.
+    if (cleanup_guard guard{}) {
+        Py_buffer *buf = (Py_buffer *) self->manager_ctx;
+        PyBuffer_Release(buf);
+        PyMem_Free(buf);
+        PyMem_Free(self);  // This also frees shape and size arrays.
+    }
 }
 
 // Forward declaration
@@ -57,12 +56,11 @@ struct ndarray_handle;
 template<typename MT>
 static void mt_from_handle_delete(MT* self) {
     // Don't run the cleanup if the interpreter has been shut down
-    if (!is_alive())
-        return;
-    gil_scoped_acquire guard;
-    ndarray_handle* th = (ndarray_handle *) self->manager_ctx;
-    PyMem_Free(self);
-    ndarray_dec_ref(th);
+    if (cleanup_guard guard{}) {
+        ndarray_handle* th = (ndarray_handle *) self->manager_ctx;
+        PyMem_Free(self);
+        ndarray_dec_ref(th);
+    }
 }
 
 template<bool Versioned>
@@ -1071,18 +1069,8 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
         check(false, "ndarray_dec_ref(): reference count became negative!");
     } else if (rc_value == 1) {
         // Don't run the cleanup if the interpreter has been shut down
-        if (!is_alive())
-            return;
-
-#if !defined(Py_LIMITED_API)
-        // Avoid further GIL calls if we already hold it. (Slightly faster)
-        if (PyGILState_Check()) {
+        if (cleanup_guard guard{})
             ndarray_dec_ref_free(th);
-            return;
-        }
-#endif
-        gil_scoped_acquire guard;
-        ndarray_dec_ref_free(th);
     }
 }
 

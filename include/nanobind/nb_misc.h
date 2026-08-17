@@ -9,14 +9,30 @@
 
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
+/* Attach a Python thread state to the calling thread, which acquires the GIL
+   in non-free-threaded builds. Nested use is fine.
+
+   On Python 3.15 and newer, the interpreter refuses further attachments once
+   it starts shutting down (PEP 788), and the constructor then fails. Code
+   that can run on threads not created by Python must query is_valid() and
+   skip the Python part of its work when the guard is invalid. Older Python
+   versions block forever in this situation, so is_valid() always returns true
+   there. */
 struct gil_scoped_acquire {
 public:
     NB_NONCOPYABLE(gil_scoped_acquire)
-    gil_scoped_acquire() noexcept : state(PyGILState_Ensure()) { }
-    ~gil_scoped_acquire() { PyGILState_Release(state); }
+    gil_scoped_acquire() noexcept : state(NB_CALL(tstate_ensure)()) { }
+    ~gil_scoped_acquire() {
+        if (state)
+            NB_CALL(tstate_release)(state);
+    }
+
+    /// Was a thread state attached successfully?
+    bool is_valid() const { return state != nullptr; }
+    explicit operator bool() const { return state != nullptr; }
 
 private:
-    const PyGILState_STATE state;
+    void * const state;
 };
 
 struct gil_scoped_release {
@@ -28,6 +44,33 @@ public:
 private:
     PyThreadState *state;
 };
+
+NAMESPACE_BEGIN(detail)
+
+/* Guard for destructors and callbacks that release Python resources and may
+   run on any thread, including while the process is tearing down. It is
+   invalid when either the interpreter or the nanobind runtime can no longer
+   be entered, and the caller must then skip its work:
+
+       if (nb::detail::cleanup_guard guard{})
+           Py_DECREF(o); */
+struct cleanup_guard {
+public:
+    NB_NONCOPYABLE(cleanup_guard)
+    cleanup_guard() noexcept
+        : state(NB_CALL(is_alive)() ? NB_CALL(tstate_ensure)() : nullptr) { }
+    ~cleanup_guard() {
+        if (state)
+            NB_CALL(tstate_release)(state);
+    }
+
+    explicit operator bool() const { return state != nullptr; }
+
+private:
+    void * const state;
+};
+
+NAMESPACE_END(detail)
 
 struct ft_mutex {
 public:

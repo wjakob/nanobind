@@ -2906,15 +2906,46 @@ scope. The :cpp:struct:`gil_scoped_release` helper is often combined with the
 This releases the interpreter lock while `expensive` is running, which permits
 running it in parallel from multiple Python threads.
 
+.. _gil-shutdown:
+
+Acquiring the GIL can fail once the interpreter starts shutting down. This
+matters for code that runs on threads that Python did not create, such as a
+C++ destructor that drops the last reference to a Python object. Python 3.15
+introduced an interface for this situation (`PEP 788
+<https://peps.python.org/pep-0788/>`__) that nanobind uses when it is
+available. Query :cpp:func:`gil_scoped_acquire::is_valid()
+<gil_scoped_acquire::is_valid>` and skip the Python part of the work when the
+guard reports failure.
+
+.. code-block:: cpp
+
+    void my_deleter(PyObject *o) noexcept {
+        nb::gil_scoped_acquire guard;
+        if (guard.is_valid())
+            Py_DECREF(o);
+    }
+
+Older Python versions block indefinitely instead of reporting failure, so
+``is_valid()`` always returns ``true`` there. Writing the check is still
+worthwhile, since the same binary may later run on a newer interpreter.
+
 .. cpp:struct:: gil_scoped_acquire
 
    .. cpp:function:: gil_scoped_acquire()
 
-      Acquire the GIL
+      Attach a Python thread state to the calling thread, which acquires the
+      GIL in non-free-threaded builds. Nested use is fine. The operation can
+      fail while the interpreter is shutting down, see above.
 
    .. cpp:function:: ~gil_scoped_acquire()
 
-      Release the GIL
+      Undo a successful attachment, which releases the GIL in
+      non-free-threaded builds
+
+   .. cpp:function:: bool is_valid() const
+
+      Was a thread state attached successfully? The class also provides an
+      ``explicit operator bool()`` with the same meaning.
 
 .. cpp:struct:: gil_scoped_release
 

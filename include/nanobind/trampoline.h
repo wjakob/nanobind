@@ -40,7 +40,7 @@ struct ticket {
     handle self;
     handle key;
     ticket *prev{};
-    PyGILState_STATE state{};
+    void *state{};
 
     NB_INLINE ticket(const trampoline &t, const char *name, uint64_t hash, bool pure) {
         NB_CALL(trampoline_enter)(t.self, name, hash, pure, this);

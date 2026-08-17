@@ -29,22 +29,18 @@ struct pyfunc_wrapper {
     pyfunc_wrapper(const pyfunc_wrapper &w) : f(w.f) {
         if (f) {
             // Don't touch the reference count if the interpreter is shut down
-            if (!NB_CALL(is_alive)()) {
+            if (cleanup_guard guard{})
+                Py_INCREF(f);
+            else
                 f = nullptr;
-                return;
-            }
-            gil_scoped_acquire acq;
-            Py_INCREF(f);
         }
     }
 
     ~pyfunc_wrapper() {
         if (f) {
             // Don't run the deleter if the interpreter has been shut down
-            if (!NB_CALL(is_alive)())
-                return;
-            gil_scoped_acquire acq;
-            Py_DECREF(f);
+            if (cleanup_guard guard{})
+                Py_DECREF(f);
         }
     }
 
@@ -67,6 +63,9 @@ struct type_caster<std::function<Return(Args...)>> {
 
         Return operator()(Args... args) const {
             gil_scoped_acquire acq;
+            if (!acq.is_valid())
+                raise("nanobind: cannot invoke a Python callable, the "
+                      "interpreter is shutting down!");
             return cast<Return>(handle(f)((forward_t<Args>) args...));
         }
     };

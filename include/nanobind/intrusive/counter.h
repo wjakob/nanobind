@@ -137,11 +137,13 @@ NAMESPACE_BEGIN(nanobind)
  * nb::intrusive_init(
  *     [](PyObject *o) noexcept {
  *         nb::gil_scoped_acquire guard;
- *         Py_INCREF(o);
+ *         if (guard.is_valid())
+ *             Py_INCREF(o);
  *     },
  *     [](PyObject *o) noexcept {
  *         nb::gil_scoped_acquire guard;
- *         Py_DECREF(o);
+ *         if (guard.is_valid())
+ *             Py_DECREF(o);
  *     });
  * ```
  *

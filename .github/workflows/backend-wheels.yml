@@ -36,8 +36,47 @@ jobs:
         name: wheels-${{ matrix.os }}
         path: dist/*.whl
 
+  # GitHub has no riscv64 runners, so these wheels are built inside a riscv64
+  # container running under QEMU. Emulation is slow, hence one job per Python
+  # version. The only image that manylinux publishes for this architecture is
+  # manylinux_2_39 (AlmaLinux 10, GCC 14), which is still marked as alpha.
+  build-riscv64:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['cp310', 'cp311', 'cp312', 'cp313', 'cp314', 'cp315', 'cp315t']
+
+    name: "wheels / riscv64 / ${{ matrix.python }}"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Register the riscv64 binfmt handler
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: linux/riscv64
+
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v4.2.0
+      with:
+        package-dir: nanobind-backend
+        output-dir: dist
+      env:
+        CIBW_ARCHS_LINUX: riscv64
+        CIBW_BUILD: "${{ matrix.python }}-*"
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: wheels-riscv64-${{ matrix.python }}
+        path: dist/*.whl
+
   # Run the full test suite against the freshly built wheels on the lowest and
-  # highest CPython version of each platform
+  # highest CPython version of each platform. There is no riscv64 entry here;
+  # those wheels only get the import check that cibuildwheel runs in the
+  # container.
   validate:
     needs: build
     strategy:
@@ -96,7 +135,7 @@ jobs:
   # these wheels (the backward-compatibility promise of revision releases)
   # should be added here once a first release exists.
   collect:
-    needs: [build, validate]
+    needs: [build, build-riscv64, validate]
     name: "collect"
     runs-on: ubuntu-latest
 

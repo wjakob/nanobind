@@ -192,7 +192,7 @@ static bool set_builtin_exception_status(builtin_exception &e) {
 
 void *malloc_check(size_t size) {
     void *ptr = malloc(size);
-    if (!ptr)
+    if (NB_UNLIKELY(!ptr))
         fail("nanobind: malloc() failed!");
     return ptr;
 }
@@ -204,7 +204,7 @@ char *strdup_check(const char *s) {
     #else
         result = strdup(s);
     #endif
-    if (!result)
+    if (NB_UNLIKELY(!result))
         fail("nanobind: strdup() failed!");
     return result;
 }

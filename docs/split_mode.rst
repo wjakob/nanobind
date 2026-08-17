@@ -191,6 +191,12 @@ In the above example, the optional ``NB_DOMAIN`` parameter isolates bindings
 served by this backend from other nanobind instances in the same process.
 Extensions automatically join the domain of their backend module.
 
+Backend modules are always compiled with nanobind's detailed assertion
+messages. In a linked build, an internal check that fails in an optimized build
+only prints a generic message and asks the user to rebuild in ``Debug`` mode.
+That advice is useless in split mode, where the backend arrives as a prebuilt
+wheel, so backends report what actually went wrong.
+
 The ``BACKEND_MODULE`` argument of :cmake:command:`nanobind_add_module` accepts
 any importable module name. Use this to point the extension to your own
 backend:

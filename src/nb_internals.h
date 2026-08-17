@@ -104,11 +104,56 @@ NAMESPACE_BEGIN(detail)
 #endif
 extern void fail(const char *fmt, ...) noexcept;
 
+/* Assertion checks. Each check() expands to a branch that the compiler is
+   told to expect to succeed, and the message is only assembled once the
+   failure is certain. Release builds compile the messages out entirely
+   (NB_COMPACT_ASSERTIONS), except in backend modules, whose users have no way
+   to rebuild them with a different set of flags. */
 #if defined(NB_COMPACT_ASSERTIONS)
 [[noreturn]] extern void fail_unspecified() noexcept;
-#  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail_unspecified()
+#  define check(cond, ...)                                                     \
+      do {                                                                     \
+          if (NB_UNLIKELY(!(cond)))                                            \
+              nanobind::detail::fail_unspecified();                            \
+      } while (0)
 #else
-#  define check(cond, ...) if (NB_UNLIKELY(!(cond))) nanobind::detail::fail(__VA_ARGS__)
+/* Out-of-line stub that carries the arguments of a failing check() over to
+   fail(). Calling the variadic fail() from the check site would reserve
+   outgoing-argument stack space in the frame of every enclosing function,
+   which some ABIs charge for on the fast path (Apple arm64 passes variadic
+   arguments on the stack). This stub receives them in registers, which leaves
+   the enclosing frame identical to a build without messages. */
+#  if defined(__GNUC__)
+#    pragma GCC diagnostic push
+     // 'fmt' arrives as a parameter here; the check() macro below verifies it
+#    pragma GCC diagnostic ignored "-Wformat-security"
+#    pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#  endif
+template <typename... Ts>
+[[noreturn]] NB_NOINLINE void fail_cold(const char *fmt, Ts... args) noexcept {
+    fail(fmt, args...);
+}
+#  if defined(__GNUC__)
+#    pragma GCC diagnostic pop
+#  endif
+
+/* A dead direct call to fail() keeps the format attribute checking the format
+   string against its arguments, which the stub above cannot do. Both GCC and
+   Clang fold it away and generate identical code with and without it. MSVC
+   has no such check to begin with. */
+#  if defined(__GNUC__)
+#    define NB_CHECK_FMT(...) if (false) nanobind::detail::fail(__VA_ARGS__)
+#  else
+#    define NB_CHECK_FMT(...) ((void) 0)
+#  endif
+
+#  define check(cond, ...)                                                     \
+      do {                                                                     \
+          if (NB_UNLIKELY(!(cond))) {                                          \
+              NB_CHECK_FMT(__VA_ARGS__);                                       \
+              nanobind::detail::fail_cold(__VA_ARGS__);                        \
+          }                                                                    \
+      } while (0)
 #endif
 
 /// Internal version of a function argument record (see arg_data_init in
@@ -432,7 +477,7 @@ public:
         if (NB_UNLIKELY(n > SIZE_MAX / sizeof(T)))
             fail("py_allocator::allocate(): integer overflow!");
         void *p = PyMem_Malloc(n * sizeof(T));
-        if (!p)
+        if (NB_UNLIKELY(!p))
             fail("PyMem_Malloc(): out of memory!");
         return static_cast<pointer>(p);
     }
@@ -1003,7 +1048,7 @@ template <typename T> struct scoped_pymalloc {
             fail("scoped_pymalloc(): integer overflow!");
         total += extra_bytes;
         ptr = (T *) PyMem_Malloc(total);
-        if (!ptr)
+        if (NB_UNLIKELY(!ptr))
             fail("scoped_pymalloc(): could not allocate %llu bytes of memory!",
                  (unsigned long long) total);
     }

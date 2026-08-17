@@ -128,7 +128,7 @@ endfunction()
 
 function (nanobind_build_library TARGET_NAME)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "AS_SYSINCLUDE" "" "")
+    "AS_SYSINCLUDE;FULL_ASSERTIONS" "" "")
 
   if (TARGET ${TARGET_NAME})
     return()
@@ -265,9 +265,13 @@ function (nanobind_build_library TARGET_NAME)
   endif()
 
   # Nanobind performs many assertion checks -- detailed error messages aren't
-  # included in Release/MinSizeRel/RelWithDebInfo modes
-  target_compile_definitions(${TARGET_NAME} PRIVATE
-    $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
+  # included in Release/MinSizeRel/RelWithDebInfo modes. Pass FULL_ASSERTIONS
+  # to keep them, which backend modules do (their users cannot rebuild them in
+  # a different mode).
+  if (NOT ARG_FULL_ASSERTIONS)
+    target_compile_definitions(${TARGET_NAME} PRIVATE
+      $<${NB_OPT_SIZE}:NB_COMPACT_ASSERTIONS>)
+  endif()
 
   # If nanobind was installed without submodule dependencies, then the
   # dependencies directory won't exist and we need to find them.
@@ -604,8 +608,10 @@ function(nanobind_add_backend name)
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
   # Backend modules are never limited-API; the free-threading flavor
-  # follows the interpreter
-  set(libname "nanobind-static")
+  # follows the interpreter. The '-fa' part keeps the library separate from
+  # the one that linked mode builds, which drops the assertion messages in
+  # optimized builds.
+  set(libname "nanobind-static-fa")
   if (NB_FREE_THREADED)
     set(libname "${libname}-ft")
   endif()
@@ -618,7 +624,7 @@ function(nanobind_add_backend name)
     set(EXTRA_LIBRARY_PARAMS AS_SYSINCLUDE)
   endif()
 
-  nanobind_build_library(${libname} ${EXTRA_LIBRARY_PARAMS})
+  nanobind_build_library(${libname} FULL_ASSERTIONS ${EXTRA_LIBRARY_PARAMS})
   target_link_libraries(${name} PRIVATE ${libname} tsl::robin_map)
 
   target_compile_definitions(${name} PRIVATE

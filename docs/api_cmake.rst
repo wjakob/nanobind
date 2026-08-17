@@ -263,7 +263,9 @@ The high-level interface consists of just one CMake command:
 
    Backend modules never target the stable ABI and must be built per Python
    version. On a free-threaded interpreter, the backend is automatically built
-   free-threaded and serves only free-threaded extensions. The command supports
+   free-threaded and serves only free-threaded extensions. They always carry
+   nanobind's detailed assertion messages, since a user who hits one cannot
+   rebuild the backend in ``Debug`` mode. The command supports
    the following optional parameters: ``NB_DOMAIN <name>`` confines all
    extensions attached to the backend to an isolated :ref:`type visibility
    domain <type-visibility>`. The parameters ``PROTECT_STACK``, ``NOMINSIZE``,
@@ -351,6 +353,14 @@ The various commands are described below:
 
       # Static ABI3 build
       nanobind_build_library(nanobind-static-abi3)
+
+   The command also takes an optional ``FULL_ASSERTIONS`` flag. nanobind checks
+   many internal invariants and prints a detailed message when one of them
+   fails. Optimized builds normally replace these messages with a generic one
+   that asks the user to rebuild in ``Debug`` mode, which saves a few kilobytes
+   of string data. ``FULL_ASSERTIONS`` keeps the detailed messages regardless
+   of the build type. :cmake:command:`nanobind_add_backend` uses this flag
+   because the users of a backend module have no way to rebuild it.
 
 .. cmake:command:: nanobind_opt_size
 

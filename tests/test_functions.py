@@ -687,7 +687,7 @@ def test41_kw_only():
     assert t.test_kw_only_some(1, k=3, j=2) == (1, 2, 3)
     assert (
         t.test_kw_only_some.__doc__
-        == "test_kw_only_some(arg0: int, *, j: int, k: int) -> tuple"
+        == "test_kw_only_some(arg0: int, /, *, j: int, k: int) -> tuple"
     )
 
     # (__arg0=3, j=4, *, k=5, z)

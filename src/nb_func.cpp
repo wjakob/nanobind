@@ -1548,8 +1548,15 @@ static uint32_t nb_func_render_signature(Buffer &buf, const func_data *f,
 
                 arg_index++;
 
-                if (arg_index == f->nargs_pos && !has_args)
-                    buf.put(", /");
+                if (arg_index == f->nargs_pos) {
+                    // Mark the preceding parameters as positional-only if none
+                    // of them can be passed by keyword
+                    bool pos_only = true;
+                    for (uint32_t i = is_method; has_args && i < arg_index; ++i)
+                        pos_only &= f->args[i].name == nullptr;
+                    if (pos_only)
+                        buf.put(", /");
+                }
 
                 break;
 

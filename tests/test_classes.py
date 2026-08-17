@@ -570,10 +570,10 @@ def test25_none_arg():
     assert t.none_3(None) is True
     assert t.none_4(arg=None) is True
     assert t.none_0.__doc__ == "none_0(arg: test_classes_ext.Struct, /) -> bool"
-    assert t.none_1.__doc__ == "none_1(arg: test_classes_ext.Struct) -> bool"
+    assert t.none_1.__doc__ == "none_1(arg: test_classes_ext.Struct, /) -> bool"
     assert t.none_2.__doc__ == "none_2(arg: test_classes_ext.Struct) -> bool"
     opt_struct = optional("test_classes_ext.Struct")
-    assert t.none_3.__doc__ == f"none_3(arg: {opt_struct}) -> bool"
+    assert t.none_3.__doc__ == f"none_3(arg: {opt_struct}, /) -> bool"
     assert t.none_4.__doc__ == f"none_4(arg: {opt_struct}) -> bool"
 
 

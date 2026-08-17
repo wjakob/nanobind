@@ -349,6 +349,11 @@ template <typename T, typename SFINAE = int> struct type_caster;
 template <typename T> using make_caster = type_caster<intrinsic_t<T>>;
 
 template <typename Impl> class accessor;
+
+/// Is 'T' an accessor, whose value is only fetched when it is used?
+template <typename T> inline constexpr bool is_accessor_v = false;
+template <typename Impl> inline constexpr bool is_accessor_v<accessor<Impl>> = true;
+
 struct str_attr; struct str_item; struct num_item; struct dict_str_item;
 struct num_item_list; struct num_item_tuple;
 template <typename Key> struct obj_attr_t;

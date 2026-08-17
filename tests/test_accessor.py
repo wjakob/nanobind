@@ -1,6 +1,8 @@
 import sys
 import types
 
+import pytest
+
 import test_accessor_ext as t
 
 
@@ -101,3 +103,18 @@ def test_10_dynamic_keys_uncached():
         for i in range(5000):
             assert not t.hasattr_dynamic(o, "dyn_key_%d" % i)
         assert sys.getunicodeinternedsize() - base < 100
+
+
+def test_11_failing_accessor_conversion():
+    """
+    An accessor returned by a bound function performs its lookup while the
+    return value is converted. A failure must raise instead of terminating.
+    """
+    assert t.test_return_item_accessor({"k": 3}) == 3
+    assert t.test_return_dict_accessor({"k": 3}) == 3
+
+    with pytest.raises(KeyError, match="k"):
+        t.test_return_item_accessor({})
+
+    with pytest.raises(KeyError, match="k"):
+        t.test_return_dict_accessor({})

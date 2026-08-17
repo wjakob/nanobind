@@ -121,4 +121,8 @@ NB_MODULE(test_accessor_ext, m) {
         }
         return Py_REFCNT(value.ptr()) == before;
     });
+
+    // Returning an accessor defers the lookup to the return value conversion
+    m.def("test_return_item_accessor", [](nb::object o) { return o["k"]; });
+    m.def("test_return_dict_accessor", [](nb::dict d) { return d["k"]; });
 }

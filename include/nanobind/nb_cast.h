@@ -443,12 +443,28 @@ public:
     static handle from_cpp(T&& src, rv_policy, cleanup_list *) noexcept {
         if constexpr (std::is_base_of_v<object, T>)
             return src.release();
+        else if constexpr (is_accessor_v<T>)
+            return from_accessor(src);
         else
             return src.inc_ref();
     }
 
     static handle from_cpp(const T &src, rv_policy, cleanup_list *) noexcept {
-        return src.inc_ref();
+        if constexpr (is_accessor_v<T>)
+            return from_accessor(src);
+        else
+            return src.inc_ref();
+    }
+
+private:
+    /// Accessors may fail by raising an exception
+    static handle from_accessor(const T &src) noexcept {
+        try {
+            return src.inc_ref();
+        } catch (python_error &e) {
+            e.restore();
+            return handle();
+        }
     }
 };
 

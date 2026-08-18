@@ -132,6 +132,11 @@ wrapper API (i.e., the bindings of Python within C++):
   All internal sequence casters now use this form. Building sequences becomes
   up to ~1.5x faster when using this approach in split-mode extensions.
 
+- **Faster sequence traversal**: The ``nb::{tuple,list}::{begin,end}()``
+  iterators were redesigned and now have nearly the same performance in
+  unstable ABI and stable/split mode builds. (Previously, there was a ~2.5x
+  overhead when traversing large sequences in stable ABI extensions)
+
 The STL container bindings became safer to use, especially in free-threaded
 Python:
 

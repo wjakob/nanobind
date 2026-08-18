@@ -385,7 +385,16 @@ struct api_tag {
     constexpr static bool nb_typed = false;
 };
 class dict_iterator;
-struct fast_iterator;
+template <bool IsTuple> struct seq_iterator;
+
+using tuple_iterator = seq_iterator<true>;
+
+#if defined(NB_FREE_THREADED)
+struct list_ref_iterator;
+using list_iterator = list_ref_iterator;
+#else
+using list_iterator = seq_iterator<false>;
+#endif
 
 // Standard operations provided by every nanobind object
 template <typename Derived> class api : public api_tag {
@@ -869,10 +878,8 @@ class tuple : public object {
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 1>
     detail::accessor<detail::num_item_tuple> operator[](T key) const;
 
-#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
-    detail::fast_iterator begin() const;
-    detail::fast_iterator end() const;
-#endif
+    detail::tuple_iterator begin() const;
+    detail::tuple_iterator end() const;
     bool empty() const { return size() == 0; }
 };
 
@@ -923,10 +930,8 @@ class list : public object {
             detail::raise_python_error();
     }
 
-#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
-    detail::fast_iterator begin() const;
-    detail::fast_iterator end() const;
-#endif
+    detail::list_iterator begin() const;
+    detail::list_iterator end() const;
     bool empty() const { return size() == 0; }
 };
 
@@ -1486,23 +1491,86 @@ template <typename Derived> iterator api<Derived>::end() const {
     return iterator::sentinel();
 }
 
-struct fast_iterator {
+/// Tag type to construct the end sentinel of a sequence iterator
+struct seq_end_t { };
+
+/// Iterator over a tuple or list. Dereferencing produces a borrowed
+/// reference to an entry, which the sequence keeps alive.
+template <bool IsTuple> struct seq_iterator {
     using value_type = handle;
     using reference = const value_type;
     using difference_type = std::ptrdiff_t;
 
-    fast_iterator() = default;
-    fast_iterator(PyObject **value) : value(value) { }
+    seq_iterator() = default;
+    seq_iterator(PyObject *seq) : seq(seq), index(0) { }
+    seq_iterator(PyObject *seq, seq_end_t) : seq(seq) {
+        if constexpr (IsTuple)
+            index = NB_TUPLE_GET_SIZE(seq);
+        else
+            index = NB_LIST_GET_SIZE(seq);
+    }
 
-    fast_iterator& operator++() { value++; return *this; }
-    fast_iterator operator++(int) { fast_iterator rv = *this; value++; return rv; }
-    friend bool operator==(const fast_iterator &a, const fast_iterator &b) { return a.value == b.value; }
-    friend bool operator!=(const fast_iterator &a, const fast_iterator &b) { return a.value != b.value; }
+    seq_iterator& operator++() { index++; return *this; }
+    seq_iterator operator++(int) { seq_iterator rv = *this; index++; return rv; }
+    friend bool operator==(const seq_iterator &a, const seq_iterator &b) { return a.index == b.index; }
+    friend bool operator!=(const seq_iterator &a, const seq_iterator &b) { return a.index != b.index; }
 
-    handle operator*() const { return *value; }
+    handle operator*() const {
+        if constexpr (IsTuple)
+            return NB_TUPLE_GET_ITEM(seq, index);
+        else
+            return NB_LIST_GET_ITEM(seq, index);
+    }
 
-    PyObject **value;
+    static Py_ssize_t size(PyObject *seq) {
+        if constexpr (IsTuple)
+            return NB_TUPLE_GET_SIZE(seq);
+        else
+            return NB_LIST_GET_SIZE(seq);
+    }
+
+    PyObject *seq = nullptr;
+    Py_ssize_t index = 0;
 };
+
+#if defined(NB_FREE_THREADED)
+/// Iterator over a list in free-threaded builds. Another thread may drop an
+/// entry at any time, hence the iterator holds a reference to the current one
+/// instead of handing out a borrowed reference. Truncation ends the iteration,
+/// which matches the behavior of Python's own list iterator.
+struct list_ref_iterator {
+    using value_type = handle;
+    using reference = const value_type;
+    using difference_type = std::ptrdiff_t;
+
+    list_ref_iterator() = default;
+    list_ref_iterator(PyObject *seq) : seq(seq), index(0) { fetch(); }
+    list_ref_iterator(PyObject *, seq_end_t) { }
+
+    list_ref_iterator& operator++() { index++; fetch(); return *this; }
+    list_ref_iterator operator++(int) { list_ref_iterator rv = *this; index++; fetch(); return rv; }
+    friend bool operator==(const list_ref_iterator &a, const list_ref_iterator &b) { return a.index == b.index; }
+    friend bool operator!=(const list_ref_iterator &a, const list_ref_iterator &b) { return a.index != b.index; }
+
+    handle operator*() const { return value; }
+
+    void fetch() {
+        if (index < NB_LIST_GET_SIZE(seq)) {
+            value = steal(PyList_GetItemRef(seq, index));
+            if (value.is_valid())
+                return;
+            PyErr_Clear(); // Shrunk by another thread
+        }
+
+        value.reset();
+        index = -1;
+    }
+
+    PyObject *seq = nullptr;
+    Py_ssize_t index = -1;
+    object value;
+};
+#endif
 
 class dict_iterator {
 public:
@@ -1596,24 +1664,10 @@ NAMESPACE_END(detail)
 inline detail::dict_iterator dict::begin() const { return { *this }; }
 inline detail::dict_iterator dict::end() const { return { }; }
 
-#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
-inline detail::fast_iterator tuple::begin() const {
-    return ((PyTupleObject *) m_ptr)->ob_item;
-}
-inline detail::fast_iterator tuple::end() const {
-    PyTupleObject *v = (PyTupleObject *) m_ptr;
-    return v->ob_item + v->ob_base.ob_size;
-}
-#if !defined(NB_FREE_THREADED)
-inline detail::fast_iterator list::begin() const {
-    return ((PyListObject *) m_ptr)->ob_item;
-}
-inline detail::fast_iterator list::end() const {
-    PyListObject *v = (PyListObject *) m_ptr;
-    return v->ob_item + v->ob_base.ob_size;
-}
-#endif
-#endif
+inline detail::tuple_iterator tuple::begin() const { return { m_ptr }; }
+inline detail::tuple_iterator tuple::end() const { return { m_ptr, detail::seq_end_t() }; }
+inline detail::list_iterator list::begin() const { return { m_ptr }; }
+inline detail::list_iterator list::end() const { return { m_ptr, detail::seq_end_t() }; }
 
 template <typename T> void del(detail::accessor<T> &a) { a.del(); }
 template <typename T> void del(detail::accessor<T> &&a) { a.del(); }

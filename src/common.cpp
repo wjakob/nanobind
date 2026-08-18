@@ -351,7 +351,7 @@ PyObject *list_new(PyObject **items, size_t n) noexcept {
 }
 
 
-#if defined(Py_LIMITED_API)
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
 /// Scratch builder whose entries follow the header in the same allocation
 struct seq_scratch {
     size_t n;
@@ -362,7 +362,7 @@ struct seq_scratch {
 
 template <bool IsTuple>
 static void *seq_alloc_impl(size_t n, PyObject ***items) noexcept {
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     PyObject *result;
     PyObject **storage = nullptr;
 
@@ -412,7 +412,7 @@ void *list_alloc(size_t n, PyObject ***items) noexcept {
 
 
 PyObject *seq_commit(void *builder, size_t n_valid) noexcept {
-#if !defined(Py_LIMITED_API)
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
     PyObject *result = (PyObject *) builder;
 
     if (NB_LIKELY(n_valid == (size_t) Py_SIZE(result)))

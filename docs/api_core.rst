@@ -682,13 +682,13 @@ Wrapper classes
 
       Check whether the tuple is empty.
 
-   .. cpp:function:: detail::fast_iterator begin() const
+   .. cpp:function:: detail::tuple_iterator begin() const
 
       Return a forward iterator analogous to ``iter()`` in Python. The function
       overrides a generic version in :cpp:class:`detail::api` and is more
       efficient for tuples.
 
-   .. cpp:function:: detail::fast_iterator end() const
+   .. cpp:function:: detail::tuple_iterator end() const
 
       Return a sentinel that ends the iteration.
 
@@ -764,13 +764,15 @@ Wrapper classes
       The function overrides the generic version in :cpp:class:`detail::api`
       and is more efficient for lists.
 
-   .. cpp:function:: detail::fast_iterator begin() const
+   .. cpp:function:: detail::list_iterator begin() const
 
       Return a forward iterator analogous to ``iter()`` in Python. The operator
       provided here overrides the generic version in :cpp:class:`detail::api`
-      and is more efficient for lists.
+      and is more efficient for lists. In free-threaded builds, the iterator
+      holds a reference to the entry it points at, and another thread
+      shortening the list ends the iteration.
 
-   .. cpp:function:: detail::fast_iterator end() const
+   .. cpp:function:: detail::list_iterator end() const
 
       Return a sentinel that ends the iteration.
 

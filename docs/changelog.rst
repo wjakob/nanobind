@@ -104,6 +104,34 @@ wrapper API (i.e., the bindings of Python within C++):
   reduces the cost of a loop over a 4-element sequence from **5167ns** to
   **125ns** on my machine. The per-element cost is unchanged.
 
+- **Faster sequence construction**: creating and filling sequences iteratively
+  using code like
+
+  .. code-block:: cpp
+
+     nb::list out;
+     for (size_t i = 0; i < n; ++i)
+         out.append(/* value of entry i */);
+
+  is expensive in the limited ABI, which also affects the new split mode. The
+  necessary per-iteration Python library calls and underlying internal checks
+  can add up to significant overheads.
+
+  nanobind 3 addresses this issue using the new :cpp:class:`nb::tuple_builder
+  <tuple_builder>` and :cpp:class:`nb::list_builder <list_builder>` classes.
+  They provide a fast path for constructing tuples and lists of a known size.
+  Use them as follows:
+
+  .. code-block:: cpp
+
+     nb::list_builder builder(n);
+     for (size_t i = 0; i < n; ++i)
+         builder.put(/* value of entry i */);
+     nb::list result = builder.commit();
+
+  All internal sequence casters now use this form. Building sequences becomes
+  up to ~1.5x faster when using this approach in split-mode extensions.
+
 The STL container bindings became safer to use, especially in free-threaded
 Python:
 

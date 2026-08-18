@@ -72,22 +72,14 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
                                 cleanup_list *cleanup,
                                 std::index_sequence<Is...>) noexcept {
         (void) value; (void) policy; (void) cleanup;
-        object o[N1];
 
-        bool success =
-            (... &&
-             ((o[Is] = steal(make_caster<Ts>::from_cpp(
-                   forward_like_<T>(std::get<Is>(value)), policy, cleanup))),
-              o[Is].is_valid()));
+        PyObject *items[N1] { };
 
-        if (!success)
-            return handle();
+        (void) (... && ((items[Is] = make_caster<Ts>::from_cpp(
+                             forward_like_<T>(std::get<Is>(value)), policy,
+                             cleanup).ptr()) != nullptr));
 
-        PyObject *r = PyTuple_New(N);
-        if (NB_UNLIKELY(!r))
-            return handle();
-        (NB_TUPLE_SET_ITEM(r, Is, o[Is].release().ptr()), ...);
-        return r;
+        return NB_CALL(tuple_new)(items, N);
     }
 
     template <typename T>

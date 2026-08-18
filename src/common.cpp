@@ -314,6 +314,139 @@ cleanup:
 
 // ========================================================================
 
+template <bool IsTuple>
+static PyObject *seq_new_impl(PyObject **items, size_t n) noexcept {
+    PyObject *result = IsTuple ? PyTuple_New((Py_ssize_t) n)
+                               : PyList_New((Py_ssize_t) n);
+    size_t i = 0;
+
+    if (NB_UNLIKELY(!result))
+        goto fail;
+
+    for (; i < n; ++i) {
+        if (NB_UNLIKELY(!items[i]))
+            goto fail;
+
+        if constexpr (IsTuple)
+            NB_TUPLE_SET_ITEM(result, (Py_ssize_t) i, items[i]);
+        else
+            NB_LIST_SET_ITEM(result, (Py_ssize_t) i, items[i]);
+    }
+
+    return result;
+
+fail:
+    Py_XDECREF(result);
+    for (; i < n; ++i)
+        Py_XDECREF(items[i]);
+    return nullptr;
+}
+
+PyObject *tuple_new(PyObject **items, size_t n) noexcept {
+    return seq_new_impl<true>(items, n);
+}
+
+PyObject *list_new(PyObject **items, size_t n) noexcept {
+    return seq_new_impl<false>(items, n);
+}
+
+
+#if defined(Py_LIMITED_API)
+/// Scratch builder whose entries follow the header in the same allocation
+struct seq_scratch {
+    size_t n;
+    bool is_tuple;
+    PyObject **items;
+};
+#endif
+
+template <bool IsTuple>
+static void *seq_alloc_impl(size_t n, PyObject ***items) noexcept {
+#if !defined(Py_LIMITED_API)
+    PyObject *result;
+    PyObject **storage = nullptr;
+
+    if constexpr (IsTuple) {
+        result = PyTuple_New((Py_ssize_t) n);
+        // The empty tuple is a singleton, don't share its pointer
+        if (result && n)
+            storage = ((PyTupleObject *) result)->ob_item;
+    } else {
+        result = PyList_New((Py_ssize_t) n);
+        if (result)
+            storage = ((PyListObject *) result)->ob_item;
+    }
+
+    *items = storage;
+    return result;
+#else
+    seq_scratch *b = nullptr;
+
+    if (NB_LIKELY(n <= PY_SSIZE_T_MAX / sizeof(PyObject *)))
+        b = (seq_scratch *) PyMem_Malloc(sizeof(seq_scratch) +
+                                         n * sizeof(PyObject *));
+
+    if (NB_UNLIKELY(!b)) {
+        *items = nullptr;
+        PyErr_NoMemory();
+        return nullptr;
+    }
+
+    b->n = n;
+    b->is_tuple = IsTuple;
+    b->items = (PyObject **) (b + 1);
+    memset(b->items, 0, n * sizeof(PyObject *));
+
+    *items = b->items;
+    return b;
+#endif
+}
+
+void *tuple_alloc(size_t n, PyObject ***items) noexcept {
+    return seq_alloc_impl<true>(n, items);
+}
+
+void *list_alloc(size_t n, PyObject ***items) noexcept {
+    return seq_alloc_impl<false>(n, items);
+}
+
+
+PyObject *seq_commit(void *builder, size_t n_valid) noexcept {
+#if !defined(Py_LIMITED_API)
+    PyObject *result = (PyObject *) builder;
+
+    if (NB_LIKELY(n_valid == (size_t) Py_SIZE(result)))
+        return result;
+
+    Py_DECREF(result); // Releases the entries stored so far
+    return nullptr;
+#else
+    seq_scratch *b = (seq_scratch *) builder;
+    PyObject *result = nullptr;
+
+    if (NB_LIKELY(n_valid == b->n))
+        result = b->is_tuple ? PyTuple_New((Py_ssize_t) b->n)
+                             : PyList_New((Py_ssize_t) b->n);
+
+    if (NB_LIKELY(result)) {
+        if (b->is_tuple) {
+            for (size_t i = 0; i < b->n; ++i)
+                NB_TUPLE_SET_ITEM(result, (Py_ssize_t) i, b->items[i]);
+        } else {
+            for (size_t i = 0; i < b->n; ++i)
+                NB_LIST_SET_ITEM(result, (Py_ssize_t) i, b->items[i]);
+        }
+    } else {
+        for (size_t i = 0; i < b->n; ++i)
+            Py_XDECREF(b->items[i]);
+    }
+
+    PyMem_Free(b);
+    return result;
+#endif
+}
+
+
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {
     PyObject *temp = nullptr;
     size_t size = 0;

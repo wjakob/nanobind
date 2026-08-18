@@ -686,30 +686,22 @@ template <typename T> object find(const T &value) noexcept {
     return steal(detail::make_caster<T>::from_cpp(value, rv_policy::none, nullptr));
 }
 
-NAMESPACE_BEGIN(detail)
-/// Store an element produced by make_tuple, raising if its cast failed
-NB_INLINE void tuple_set_checked(PyObject *tuple, Py_ssize_t i, PyObject *p) {
-    if (NB_UNLIKELY(!p))
-        raise_python_or_cast_error();
-    NB_TUPLE_SET_ITEM(tuple, i, p);
-}
-NAMESPACE_END(detail)
-
 template <rv_policy::value policy = rv_policy::automatic_v, typename... Args>
 tuple make_tuple(Args &&...args) {
-    tuple result = steal<tuple>(
-        detail::raise_if_null(PyTuple_New((Py_ssize_t) sizeof...(Args))));
+    constexpr size_t Size = sizeof...(Args);
 
-    Py_ssize_t nargs = 0;
-    PyObject *o = result.ptr();
+    PyObject *items[Size > 0 ? Size : 1] { };
+    size_t i = 0;
 
-    (detail::tuple_set_checked(o, nargs++,
-                               detail::make_caster<Args>::from_cpp(
-                                   (detail::forward_t<Args>) args, policy,
-                                   nullptr).ptr()),
-     ...);
+    (void) (... && ((items[i++] = detail::make_caster<Args>::from_cpp(
+                         (detail::forward_t<Args>) args, policy, nullptr)
+                         .ptr()) != nullptr));
 
-    return result;
+    PyObject *result = NB_CALL(tuple_new)(items, Size);
+    if (NB_UNLIKELY(!result))
+        detail::raise_python_or_cast_error();
+
+    return steal<tuple>(result);
 }
 
 template <uint32_t Flags, bool Locked> template <typename T>
@@ -734,6 +726,17 @@ template <typename T> void list::insert(Py_ssize_t index, T &&value) {
     object o = nanobind::cast((detail::forward_t<T>) value);
     if (PyList_Insert(m_ptr, index, o.ptr()))
         detail::raise_python_error();
+}
+
+template <typename Seq> template <typename T>
+NB_INLINE bool builder<Seq>::put(T &&value) noexcept {
+    handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
+                                                rv_policy::automatic, nullptr);
+    if (NB_UNLIKELY(!h.is_valid()))
+        return false;
+
+    m_core.put(h);
+    return true;
 }
 
 template <typename T, detail::enable_if_t<!detail::is_c_string_v<T>>>

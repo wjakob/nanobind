@@ -165,6 +165,36 @@ def test09_maketuple():
     assert value == "std::bad_cast" or value == "bad cast"
 
 
+def test09_builder():
+    assert t.test_tuple_builder([1, "a", None]) == (1, "a", None)
+    assert t.test_tuple_builder([]) == ()
+    assert t.test_list_builder((1, "a", None)) == [1, "a", None]
+    assert t.test_list_builder(()) == []
+
+    if t.test_builder_checks():
+        # Precise diagnostics exist in debug builds of the extension only
+        with pytest.raises(RuntimeError, match="not completely filled"):
+            t.test_builder_incomplete()
+        with pytest.raises(RuntimeError, match="not completely filled"):
+            t.test_builder_put_fail()
+        with pytest.raises(RuntimeError, match="already committed"):
+            t.test_builder_reuse()
+    else:
+        with pytest.raises(RuntimeError, match="bad.cast"):
+            t.test_builder_incomplete()
+        with pytest.raises(RuntimeError, match="bad.cast"):
+            t.test_builder_put_fail()
+
+    # An abandoned builder must release the stored references
+    o = object()
+    if hasattr(sys, "getrefcount"):
+        refs_before = sys.getrefcount(o)
+    with pytest.raises(RuntimeError, match="abandoned"):
+        t.test_builder_abandon(o)
+    if hasattr(sys, "getrefcount"):
+        assert sys.getrefcount(o) == refs_before
+
+
 def test10_cpp_call_simple():
     result = []
 

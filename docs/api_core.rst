@@ -775,6 +775,67 @@ Wrapper classes
       Return a sentinel that ends the iteration.
 
 
+.. cpp:class:: tuple_builder
+
+   Helper class to build a tuple element by element. Tuples are immutable,
+   hence the wrapper API provides no equivalent of ``list.append()``, and
+   the usual workaround converts an intermediate list. This class instead
+   fills the item storage of a new tuple in place, and adding an entry
+   reduces to the cost of a pointer store. The size must be known up front,
+   and each entry must be filled exactly once:
+
+   .. code-block:: cpp
+
+      nb::tuple_builder builder(size);
+      for (size_t i = 0; i < size; ++i)
+          builder.put(/* value of entry i */);
+      nb::tuple result = builder.commit();
+
+   Destroying the builder without calling :cpp:func:`commit()` releases the
+   entries stored so far, hence a C++ exception raised midway does not leak
+   them.
+
+   .. cpp:function:: tuple_builder(size_t size)
+
+      Allocate a builder for a tuple with ``size`` entries.
+
+   .. cpp:function:: template <typename T> bool put(T &&value) noexcept
+
+      Fill the next entry. When `T` does not already represent a wrapped
+      Python object, the function performs a cast. A failed cast stores
+      nothing and returns ``false``. Checking the result is optional: it
+      leaves the sequence incomplete, and the subsequent
+      :cpp:func:`commit()` raises an exception. Calling ``put()`` more than
+      ``size`` times is undefined behavior, which debug builds diagnose
+      with a fatal error.
+
+   .. cpp:function:: tuple commit()
+
+      Return the finished tuple and deactivate the builder. The function
+      raises an exception when entries remain unfilled. Calling ``commit()``
+      a second time is undefined behavior, which debug builds diagnose with
+      an exception.
+
+.. cpp:class:: list_builder
+
+   Equivalent of :cpp:class:`tuple_builder` that constructs a ``list``.
+   When the size is known in advance, it is faster than growing a list
+   through repeated ``append()`` calls, especially in :ref:`split mode
+   <split-mode>` and stable-ABI builds, where each ``append()`` requires a
+   Python C API call.
+
+   .. cpp:function:: list_builder(size_t size)
+
+      Allocate a builder for a list with ``size`` entries.
+
+   .. cpp:function:: template <typename T> bool put(T &&value) noexcept
+
+      Fill the next entry, analogous to :cpp:func:`tuple_builder::put`.
+
+   .. cpp:function:: list commit()
+
+      Return the finished list, analogous to :cpp:func:`tuple_builder::commit`.
+
 .. cpp:class:: dict: public object
 
    Wrapper class representing Python ``dict`` instances.

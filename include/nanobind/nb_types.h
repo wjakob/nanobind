@@ -540,7 +540,18 @@ public:
     object() = default;
     object(const object &o) : handle(o) { inc_ref(); }
     object(object &&o) noexcept : handle(o) { o.m_ptr = nullptr; }
-    ~object() { dec_ref(); }
+    NB_INLINE ~object() {
+#if defined(__GNUC__)
+        // Fold away the destructor of moved-from instances
+        if (!__builtin_constant_p(m_ptr) || m_ptr)
+            dec_ref();
+#elif !defined(NDEBUG)
+        dec_ref(); // Includes the GIL assertion of debug builds
+#else
+        if (m_ptr)
+            Py_DECREF(m_ptr);
+#endif
+    }
     object(handle h, detail::borrow_t) : handle(h) { inc_ref(); }
     object(handle h, detail::steal_t) : handle(h) { }
 
@@ -1236,6 +1247,175 @@ template <typename T> struct pointer_and_handle {
     T *p;
     handle h;
 };
+
+NAMESPACE_BEGIN(detail)
+
+/// Cold path of the sequence builder assertions in debug builds
+[[noreturn]] NB_NOINLINE inline void fail_seq_builder(const char *why) noexcept {
+    fprintf(stderr, "Critical nanobind error: sequence builder misuse: %s\n",
+            why);
+    abort();
+}
+
+// Incrementally construct a tuple or list of known size
+template <bool IsTuple> struct seq_builder {
+public:
+    NB_INLINE explicit seq_builder(size_t size) noexcept : m_index(0), m_size(size) {
+#if defined(NB_BACKEND_MODULE)
+        PyObject **items;
+        if constexpr (IsTuple)
+            m_builder = NB_CALL(tuple_alloc)(size, &items);
+        else
+            m_builder = NB_CALL(list_alloc)(size, &items);
+        m_items = items;
+#else
+        if constexpr (IsTuple)
+            m_seq = PyTuple_New((Py_ssize_t) size);
+        else
+            m_seq = PyList_New((Py_ssize_t) size);
+#endif
+    }
+
+    seq_builder(const seq_builder &) = delete;
+    seq_builder &operator=(const seq_builder &) = delete;
+    seq_builder &operator=(seq_builder &&) = delete;
+
+    NB_INLINE seq_builder(seq_builder &&b) noexcept
+        : m_index(b.m_index), m_size(b.m_size) {
+#if defined(NB_BACKEND_MODULE)
+        m_builder = b.m_builder;
+        m_items = b.m_items;
+        b.m_builder = nullptr;
+#else
+        m_seq = b.m_seq;
+        b.m_seq = nullptr;
+#endif
+    }
+
+    NB_INLINE ~seq_builder() {
+#if defined(NB_BACKEND_MODULE)
+        if (NB_UNLIKELY(m_builder))
+            NB_CALL(seq_commit)(m_builder, SIZE_MAX);
+#else
+        Py_XDECREF(m_seq);
+#endif
+    }
+
+    /// Check whether the constructor succeeded
+    NB_INLINE bool valid() const noexcept {
+#if defined(NB_BACKEND_MODULE)
+        return m_builder != nullptr;
+#else
+        return m_seq != nullptr;
+#endif
+    }
+
+    /// Check whether every entry was filled
+    NB_INLINE bool full() const noexcept { return m_index == m_size; }
+
+    /// Fill the next entry, stealing the given valid reference
+    NB_INLINE void put(handle h) noexcept {
+#if !defined(NDEBUG)
+        if (NB_UNLIKELY(!valid()))
+            fail_seq_builder("put(): the builder is inactive");
+        if (NB_UNLIKELY(full()))
+            fail_seq_builder("put(): capacity exceeded");
+        if (NB_UNLIKELY(!h.ptr()))
+            fail_seq_builder("put(): null object");
+#endif
+#if defined(NB_BACKEND_MODULE)
+        m_items[m_index] = h.ptr();
+#else
+        if constexpr (IsTuple)
+            NB_TUPLE_SET_ITEM(m_seq, (Py_ssize_t) m_index, h.ptr());
+        else
+            NB_LIST_SET_ITEM(m_seq, (Py_ssize_t) m_index, h.ptr());
+#endif
+        m_index++;
+    }
+
+    /// Deactivate the builder and return the sequence or null
+    NB_INLINE handle commit() noexcept {
+#if !defined(NDEBUG)
+        if (NB_UNLIKELY(!valid()))
+            fail_seq_builder("commit(): the builder is inactive");
+#endif
+#if defined(NB_BACKEND_MODULE)
+        void *builder = m_builder;
+        m_builder = nullptr;
+        return NB_CALL(seq_commit)(builder, m_index);
+#else
+        PyObject *seq = m_seq;
+        m_seq = nullptr;
+
+        if (NB_LIKELY(m_index == m_size))
+            return seq;
+
+        Py_DECREF(seq);
+        return handle();
+#endif
+    }
+
+private:
+#if defined(NB_BACKEND_MODULE)
+    void *m_builder;
+    PyObject **m_items;
+#else
+    PyObject *m_seq;
+#endif
+    size_t m_index, m_size;
+};
+
+/// Cold error path of builder::commit()
+[[noreturn]] NB_NOINLINE inline void raise_incomplete_builder() {
+#if !defined(NDEBUG)
+    if (!PyErr_Occurred())
+        raise("nanobind::builder::commit(): the sequence was not completely "
+              "filled with put()");
+#endif
+    raise_python_or_cast_error();
+}
+
+NAMESPACE_END(detail)
+
+template <typename Seq> class builder {
+    static_assert(std::is_same_v<Seq, tuple> || std::is_same_v<Seq, list>,
+                  "nb::builder<Seq> requires Seq to be nb::tuple or nb::list");
+
+public:
+    /// Reserve a builder for a sequence with 'size' entries
+    NB_INLINE explicit builder(size_t size) : m_core(size) {
+        if (NB_UNLIKELY(!m_core.valid()))
+            detail::raise_python_error();
+    }
+
+    builder(builder &&) noexcept = default;
+    NB_INLINE ~builder() = default;
+
+    /// Cast 'value' to Python and store it in the next entry. Returns false
+    /// when the cast fails and stores nothing in that case. The result may
+    /// be ignored, since a later commit() raises on an incomplete sequence.
+    template <typename T> NB_INLINE bool put(T &&value) noexcept;
+
+    /// Finish the builder and return the sequence
+    NB_INLINE Seq commit() {
+#if !defined(NDEBUG)
+        if (NB_UNLIKELY(!m_core.valid()))
+            detail::raise("nanobind::builder::commit(): the builder was "
+                          "already committed or moved from");
+#endif
+        handle h = m_core.commit();
+        if (NB_UNLIKELY(!h.ptr()))
+            detail::raise_incomplete_builder();
+        return steal<Seq>(h);
+    }
+
+private:
+    detail::seq_builder<std::is_same_v<Seq, tuple>> m_core;
+};
+
+using tuple_builder = builder<tuple>;
+using list_builder = builder<list>;
 
 NAMESPACE_BEGIN(detail)
 

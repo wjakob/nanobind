@@ -199,6 +199,27 @@ NB_SLOT(bool, contains_str,
 // Sequence helpers
 // --------------------------------------------------------------------------
 
+/// Take ownership of 'n' objects and move them into a new tuple. When an
+/// item is null or the allocation fails, release the items and return null
+NB_SLOT(PyObject *, tuple_new, (PyObject **items, size_t n) noexcept)
+
+/// Equivalent of 'tuple_new' that constructs a list
+NB_SLOT(PyObject *, list_new, (PyObject **items, size_t n) noexcept)
+
+
+/// Allocate a tuple builder for 'n' entries and return its null-initialized
+/// item storage in 'items'. The caller fills a prefix with strong references
+/// and finishes via 'seq_commit'. Returns null with an error set on failure
+NB_SLOT(void *, tuple_alloc, (size_t n, PyObject ***items) noexcept)
+
+/// Equivalent of 'tuple_alloc', but build a list
+NB_SLOT(void *, list_alloc, (size_t n, PyObject ***items) noexcept)
+
+/// Release a builder. Returns the sequence when 'n_valid' equals its size.
+/// Any other value (e.g. SIZE_MAX) releases the stored references and
+/// returns null, without allocating or setting an error
+NB_SLOT(PyObject *, seq_commit, (void *builder, size_t n_valid) noexcept)
+
 /// If the given sequence has the size 'size', return a pointer to its contents.
 /// May produce a temporary.
 NB_SLOT(PyObject **, seq_get_with_size,

@@ -43,24 +43,23 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
     template <typename T>
     static handle from_cpp(T &&src, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        object ret = steal(PyList_New(Size));
+        seq_builder<false> b(Size);
 
-        if (ret.is_valid()) {
-            Py_ssize_t index = 0;
+        if (NB_UNLIKELY(!b.valid()))
+            return {};
 
-            for (auto &value : src) {
-                handle h = Caster::from_cpp(forward_like_<T>(value), policy, cleanup);
+        for (auto &value : src) {
+            if (NB_UNLIKELY(b.full()))
+                break;
 
-                if (!h.is_valid()) {
-                    ret.reset();
-                    break;
-                }
+            handle h = Caster::from_cpp(forward_like_<T>(value), policy, cleanup);
+            if (NB_UNLIKELY(!h.is_valid()))
+                break;
 
-                NB_LIST_SET_ITEM(ret.ptr(), index++, h.ptr());
-            }
+            b.put(h);
         }
 
-        return ret.release();
+        return b.commit();
     }
 };
 

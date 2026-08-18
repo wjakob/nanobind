@@ -158,6 +158,51 @@ NB_MODULE(test_functions_ext, m) {
     m.def("test_bad_tuple", []() -> nb::typed<nb::object, std::pair<std::string, nb::object>> {
         struct Foo{}; return nb::make_tuple("Hello", Foo()); });
 
+    /// Incremental construction of dynamically sized tuples/lists
+    m.def("test_tuple_builder", [](nb::list l) {
+        nb::tuple_builder b(l.size());
+        for (nb::handle h : l)
+            b.put(h);
+        return b.commit();
+    });
+    m.def("test_list_builder", [](nb::tuple t) {
+        nb::list_builder b(t.size());
+        for (nb::handle h : t)
+            b.put(h);
+        return b.commit();
+    });
+    m.def("test_builder_incomplete", []() {
+        nb::tuple_builder b(2);
+        b.put(1);
+        return b.commit();
+    });
+    m.def("test_builder_put_fail", []() {
+        struct Foo { };
+        nb::list_builder b(2);
+        b.put(1);
+        b.put(Foo()); // Returns false, making the later commit() raise
+        return b.commit();
+    });
+    m.def("test_builder_abandon", [](nb::handle h) {
+        nb::list_builder b(3);
+        b.put(h);
+        b.put(h);
+        throw std::runtime_error("abandoned");
+    });
+    m.def("test_builder_reuse", []() {
+        nb::tuple_builder b(1);
+        b.put(1);
+        nb::tuple t = b.commit();
+        return b.commit();
+    });
+    m.def("test_builder_checks", []() {
+#if !defined(NDEBUG)
+        return true;
+#else
+        return false;
+#endif
+    });
+
     /// Perform a Python function call from C++
     m.def("test_call_1", [](nb::typed<nb::object, std::function<int(int)>> o) {
         return o(1);

@@ -56,22 +56,15 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     template <typename T>
     static handle from_cpp(T &&value, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        object o1 = steal(
-            Caster1::from_cpp(forward_like_<T>(value.first), policy, cleanup));
-        if (!o1.is_valid())
-            return {};
+        PyObject *items[2] { };
 
-        object o2 = steal(
-            Caster2::from_cpp(forward_like_<T>(value.second), policy, cleanup));
-        if (!o2.is_valid())
-            return {};
+        items[0] = Caster1::from_cpp(forward_like_<T>(value.first), policy,
+                                     cleanup).ptr();
+        if (NB_LIKELY(items[0]))
+            items[1] = Caster2::from_cpp(forward_like_<T>(value.second), policy,
+                                         cleanup).ptr();
 
-        PyObject *r = PyTuple_New(2);
-        if (NB_UNLIKELY(!r))
-            return {};
-        NB_TUPLE_SET_ITEM(r, 0, o1.release().ptr());
-        NB_TUPLE_SET_ITEM(r, 1, o2.release().ptr());
-        return r;
+        return NB_CALL(tuple_new)(items, 2);
     }
 
     template <typename T>

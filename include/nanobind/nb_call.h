@@ -10,14 +10,6 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-// PY_VECTORCALL_ARGUMENTS_OFFSET is hidden from the limited API before
-// Python 3.12, but its value is frozen by the vectorcall protocol (PEP 590)
-#if defined(PY_VECTORCALL_ARGUMENTS_OFFSET)
-#  define NB_VECTORCALL_ARGUMENTS_OFFSET PY_VECTORCALL_ARGUMENTS_OFFSET
-#else
-#  define NB_VECTORCALL_ARGUMENTS_OFFSET ((size_t) 1 << (8 * sizeof(size_t) - 1))
-#endif
-
 class kwargs_proxy : public handle {
 public:
     explicit kwargs_proxy(handle h) : handle(h) { }

@@ -565,6 +565,10 @@ typedef void (*exception_translator)(const std::exception_ptr &, void *);
 /// included several times here depending on compilation mode.
 #if !defined(NB_BACKEND_MODULE) || defined(NB_BUILD)
 #define NB_SLOT(ret, name, args) NB_CORE ret name args;
+// NB_SLOT_ALIAS resolves to the CPython function itself, which every mode
+// that reaches this branch has access to.
+#define NB_SLOT_ALIAS(ret, name, args, target)                                 \
+    inline constexpr ret (*name) args = &target;
 #include "nb_backend_slots.h"
 #endif
 
@@ -647,6 +651,20 @@ NB_NOINLINE inline bool nb_backend_init(const char *extension) noexcept {
 #else
 /// Linked build modes have no bootstrap; see NB_MODULE in nb_defs.h
 NB_INLINE bool nb_backend_init(const char *) noexcept { return true; }
+#endif
+
+#if defined(NB_BACKEND_MODULE) && !defined(NB_BUILD)
+/// Split mode does not have access to the CPython vector call functions and
+/// reaches them through the table instead.
+NB_INLINE PyObject *vectorcall(PyObject *callable, PyObject *const *args,
+                               size_t nargsf, PyObject *kwnames) {
+    return nb_backend.vectorcall(callable, args, nargsf, kwnames);
+}
+
+NB_INLINE PyObject *vectorcall_method(PyObject *name, PyObject *const *args,
+                                      size_t nargsf, PyObject *kwnames) {
+    return nb_backend.vectorcall_method(name, args, nargsf, kwnames);
+}
 #endif
 
 NAMESPACE_END(detail)

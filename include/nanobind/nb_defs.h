@@ -187,6 +187,20 @@
 #  define NB_HIDDEN __attribute__((visibility("hidden")))
 #endif
 
+// PY_VECTORCALL_ARGUMENTS_OFFSET is hidden from the limited API before Python
+// 3.12, but its value is frozen by the vector call protocol (PEP 590)
+#if defined(PY_VECTORCALL_ARGUMENTS_OFFSET)
+#  define NB_VECTORCALL_ARGUMENTS_OFFSET PY_VECTORCALL_ARGUMENTS_OFFSET
+#else
+#  define NB_VECTORCALL_ARGUMENTS_OFFSET ((size_t) 1 << (8 * sizeof(size_t) - 1))
+#endif
+
+// Decode the argument count of a vector call. Equivalent to
+// PyVectorcall_NARGS(), which the Python 3.10 limited API does not expose and
+// which costs an indirect PLT call in later versions.
+#define NB_VECTORCALL_NARGS(n)                                                 \
+    ((Py_ssize_t) ((n) & ~NB_VECTORCALL_ARGUMENTS_OFFSET))
+
 #if defined(NB_BUILD) || !defined(NB_BACKEND_MODULE)
 #  define NB_CALL(name) ::nanobind::detail::name
 #else

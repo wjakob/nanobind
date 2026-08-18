@@ -3,6 +3,9 @@
     defines NB_SLOT(return type, name, argument list) and includes this file
     (which has no include guards and undefines the macro again at its end).
 
+    Slots declared with NB_SLOT_ALIAS name a CPython function that the backend
+    stores verbatim. Consumers may leave NB_SLOT_ALIAS undefined to get NB_SLOT.
+
     The entries in this file are frozen and part of the versioned backend ABI.
     Any modifications to function order/signatures requires bumping the major
     version, which is generally not acceptable. Appending entries is possible
@@ -30,6 +33,10 @@
     All rights reserved. Use of this source code is governed by a
     BSD-style license that can be found in the LICENSE file.
 */
+
+#if !defined(NB_SLOT_ALIAS)
+#  define NB_SLOT_ALIAS(ret, name, args, target) NB_SLOT(ret, name, args)
+#endif
 
 // --------------------------------------------------------------------------
 // Error handling
@@ -487,4 +494,24 @@ NB_SLOT(bool, is_alive, () noexcept)
 NB_SLOT(PyObject *, import_cached,
         (nb_internals *p, import_cache *c) noexcept)
 
+// --------------------------------------------------------------------------
+// Raw vector calls
+// --------------------------------------------------------------------------
+
+// Python < 3.12 does not expose vector calls in the stable ABI. The
+// following pipes them through to frontends that need them
+
+/// PyObject_Vectorcall()
+NB_SLOT_ALIAS(PyObject *, vectorcall,
+              (PyObject *callable, PyObject *const *args, size_t nargsf,
+               PyObject *kwnames),
+              PyObject_Vectorcall)
+
+/// PyObject_VectorcallMethod().
+NB_SLOT_ALIAS(PyObject *, vectorcall_method,
+              (PyObject *name, PyObject *const *args, size_t nargsf,
+               PyObject *kwnames),
+              PyObject_VectorcallMethod)
+
 #undef NB_SLOT
+#undef NB_SLOT_ALIAS

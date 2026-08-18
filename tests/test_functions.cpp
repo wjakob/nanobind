@@ -210,6 +210,43 @@ NB_MODULE(test_functions_ext, m) {
         return result;
     });
 
+    /// Raw vector calls, once with two positional arguments and once with one
+    /// positional and one keyword argument. 'stack[0]' is the scratch slot
+    /// that NB_VECTORCALL_ARGUMENTS_OFFSET promises to the callee.
+    m.def("test_vectorcall_raw", [](nb::object f, nb::object a, nb::object b) {
+        PyObject *stack[3] = { nullptr, a.ptr(), b.ptr() };
+        size_t nargsf = 2 | NB_VECTORCALL_ARGUMENTS_OFFSET;
+
+        nb::object pos = nb::steal(
+            nb::detail::vectorcall(f.ptr(), stack + 1, nargsf, nullptr));
+
+        nb::object kwnames = nb::make_tuple("x");
+        nb::object kw = nb::steal(nb::detail::vectorcall(
+            f.ptr(), stack + 1, 1 | NB_VECTORCALL_ARGUMENTS_OFFSET,
+            kwnames.ptr()));
+
+        return nb::make_tuple(pos, kw, NB_VECTORCALL_NARGS(nargsf));
+    });
+
+    /// The method flavor looks 'name' up on 'stack[1]', which counts towards
+    /// 'nargsf'. A failure returns null with an error set and does not raise.
+    m.def("test_vectorcall_raw_method", [](nb::object o, nb::object a) {
+        PyObject *stack[3] = { nullptr, o.ptr(), a.ptr() };
+        size_t nargsf = 2 | NB_VECTORCALL_ARGUMENTS_OFFSET;
+        nb::object name = nb::cast("meth"), missing = nb::cast("nonexistent");
+
+        nb::object r = nb::steal(nb::detail::vectorcall_method(
+            name.ptr(), stack + 1, nargsf, nullptr));
+
+        PyObject *bad = nb::detail::vectorcall_method(
+            missing.ptr(), stack + 1, nargsf, nullptr);
+        bool raised = !bad && PyErr_Occurred();
+        Py_XDECREF(bad);
+        PyErr_Clear();
+
+        return nb::make_tuple(r, raised);
+    });
+
     /// Calls involving null objects must raise instead of crashing
     m.def("test_call_null_base", []() { return nb::object()(1); });
     m.def("test_call_null_arg", [](nb::object f) { return f(nb::object()); });

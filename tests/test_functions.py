@@ -259,6 +259,21 @@ def test11b_call_expansion():
             fn()
 
 
+def test11b2_vectorcall_raw():
+    def f(*args, **kwargs):
+        return args, kwargs
+
+    class C:
+        def meth(self, *args, **kwargs):
+            return args, kwargs
+
+    assert t.test_vectorcall_raw(f, 1, 2) == (((1, 2), {}), ((1,), {"x": 2}), 2)
+
+    # The second element reports that a failed method call returned null with
+    # the error set instead of raising
+    assert t.test_vectorcall_raw_method(C(), 1) == (((1,), {}), True)
+
+
 def test11c_attr_dynamic_names():
     class C:
         field_0, field_1, field_2 = 10, 11, 12

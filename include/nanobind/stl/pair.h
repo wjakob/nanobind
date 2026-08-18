@@ -46,7 +46,8 @@ template <typename T1, typename T2> struct type_caster<std::pair<T1, T2>> {
     }
 
     template <typename T>
-    static handle from_cpp(T *value, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T *value, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         if (!value)
             return none().release();
         return from_cpp(*value, policy, cleanup);

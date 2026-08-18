@@ -41,7 +41,8 @@ template <typename Array, typename Entry, size_t Size> struct array_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         object ret = steal(PyList_New(Size));
 
         if (ret.is_valid()) {

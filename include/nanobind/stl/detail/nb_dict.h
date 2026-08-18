@@ -78,7 +78,8 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         dict ret;
 
         if (ret.is_valid()) {

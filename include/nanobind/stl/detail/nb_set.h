@@ -65,7 +65,8 @@ template <typename Set, typename Key> struct set_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         object ret = steal(PySet_New(nullptr));
 
         if (ret.is_valid()) {

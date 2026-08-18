@@ -14,7 +14,8 @@
     template <typename T_> static constexpr bool can_cast() { return true; }   \
     template <typename T_,                                                     \
               enable_if_t<std::is_same_v<std::remove_cv_t<T_>, Value>> = 0>    \
-    static handle from_cpp(T_ *p, rv_policy policy, cleanup_list *list) {      \
+    static handle from_cpp(T_ *p, rv_policy policy,                            \
+                           cleanup_list *list) noexcept {                      \
         if (!p)                                                                \
             return none().release();                                           \
         return from_cpp(*p, policy, list);                                     \

@@ -57,7 +57,8 @@ template <typename List, typename Entry> struct list_caster {
     }
 
     template <typename T>
-    static handle from_cpp(T &&src, rv_policy policy, cleanup_list *cleanup) {
+    static handle from_cpp(T &&src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
         object ret = steal(PyList_New((Py_ssize_t) src.size()));
 
         if (ret.is_valid()) {

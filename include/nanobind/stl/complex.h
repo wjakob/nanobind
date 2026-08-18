@@ -23,7 +23,7 @@ template <typename T> struct type_caster<std::complex<T>> {
         // The boundary function writes (real, imaginary) to two doubles;
         // std::complex<double> is layout-compatible
         std::complex<double> cmplx;
-        if (!NB_CALL(load_cmplx)(src.ptr(), flags, (double *) &cmplx))
+        if (!NB_CALL(load_cmplx)(NB_CTX, src.ptr(), flags, (double *) &cmplx))
             return false;
         if constexpr (std::is_same_v<T, double>) {
             value = cmplx;

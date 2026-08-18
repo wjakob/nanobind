@@ -39,7 +39,8 @@ static PyObject *nb_func_vectorcall_medium(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
-static uint32_t nb_func_render_signature(Buffer &buf, const func_data *f,
+static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
+                                         const func_data *f,
                                          bool nb_signature_mode = false) noexcept;
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
@@ -90,7 +91,7 @@ void nb_func_dealloc(PyObject *self) {
 
         // Delete from registered function list
 #if !defined(NB_FREE_THREADED)
-        size_t n_deleted = internals->funcs.erase(self);
+        size_t n_deleted = nb_func_internals(self)->funcs.erase(self);
         check(n_deleted == 1,
               "nanobind::detail::nb_func_dealloc(\"%s\"): function not found!",
               ((f->flags & (uint32_t) func_flags::has_name) ? f->name
@@ -124,11 +125,12 @@ void nb_func_dealloc(PyObject *self) {
 
     Py_XDECREF(((nb_func *) self)->module_name);
 
+    nb_internals *p = nb_func_internals(self);
     PyTypeObject *tp = Py_TYPE(self);
     PyObject_GC_Del(self);
     NB_DECREF_TYPE(tp);
 
-    internals_dec_ref();
+    internals_dec_ref(p);
 }
 
 int nb_bound_method_traverse(PyObject *self, visitproc visit, void *arg) {
@@ -214,7 +216,7 @@ char *strdup_check(const char *s) {
  *
  * This is an implementation detail of nanobind::cpp_function.
  */
-PyObject *nb_func_new(const func_data_init_base *f) noexcept {
+PyObject *nb_func_new(nb_internals *p, const func_data_init_base *f) noexcept {
     bool has_scope       = f->flags & (uint32_t) func_flags::has_scope,
          has_name        = f->flags & (uint32_t) func_flags::has_name,
          has_args        = f->flags & (uint32_t) func_flags::has_args,
@@ -255,7 +257,7 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
     }
 
     // Check for previous overloads
-    nb_internals *internals_ = internals;
+    nb_internals *internals_ = p;
     if (has_scope && has_name) {
         name = PyUnicode_InternFromString(name_cstr);
         check(name, "nb::detail::nb_func_new(\"%s\"): invalid name.", name_cstr);
@@ -310,7 +312,7 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
           name_cstr);
 
     make_immortal((PyObject *) func);
-    internals_inc_ref();
+    internals_inc_ref(p);
 
     // Determine which dispatcher this overload needs
     call_complexity complexity = call_complexity::simple;
@@ -365,14 +367,15 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
 
     func->max_nargs = max_nargs;
     func->complexity = complexity;
+    func->internals = p;
     func->scope = has_scope ? f->scope : nullptr;
 
     // Snapshot the current '__module__'
     if (has_scope) {
         func->module_name = getattr(f->scope,
                                     PyModule_Check(f->scope)
-                                        ? NB_INTERNED(__name__)
-                                        : NB_INTERNED(__module__),
+                                        ? NB_INTERNED(p, __name__)
+                                        : NB_INTERNED(p, __module__),
                                     nullptr);
     }
 
@@ -451,7 +454,7 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
               name_cstr);
 
         if (f->descr_types[1])
-            implicitly_convertible(f->descr_types[0],
+            implicitly_convertible(p, f->descr_types[0],
                                    (void *) f->descr_types[1], false);
     }
 
@@ -496,7 +499,7 @@ PyObject *nb_func_new(const func_data_init_base *f) noexcept {
 
     // Fast path for vector call object construction
     if (((is_init && is_method) || (is_new && !is_method)) &&
-        nb_type_check(f->scope)) {
+        nb_type_check(p, f->scope)) {
         type_data *td = nb_type_data((PyTypeObject *) f->scope);
         bool has_new = td->flags & (uint32_t) type_flags_internal::has_new;
 
@@ -571,7 +574,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
         buf.put("    ");
         buf.put_uint32(i + 1);
         buf.put(". ");
-        nb_func_render_signature(buf, f + i);
+        nb_func_render_signature(buf, nb_func_internals(self), f + i);
         buf.put('\n');
     }
 
@@ -623,16 +626,17 @@ static NB_NOINLINE PyObject *nb_func_error_noconvert(PyObject *self,
     Buffer buf(128);
     buf.put("Unable to convert function return value to a Python "
             "type! The signature was\n    ");
-    nb_func_render_signature(buf, f);
+    nb_func_render_signature(buf, nb_func_internals(self), f);
     PyErr_SetString(PyExc_TypeError, buf.get());
     return nullptr;
 }
 
 /// Used by nb_func_vectorcall: convert a C++ exception into a Python error
-static NB_NOINLINE void nb_func_convert_cpp_exception() noexcept {
+static NB_NOINLINE void nb_func_convert_cpp_exception(PyObject *self) noexcept {
     std::exception_ptr e = std::current_exception();
+    nb_internals *p = nb_func_internals(self);
 
-    for (nb_translator_seq *cur = internals->translators.load_acquire(); cur;
+    for (nb_translator_seq *cur = p->translators.load_acquire(); cur;
          cur = cur->next) {
         try {
             // Try exception translator & forward payload
@@ -911,7 +915,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
             } catch (python_error &e) {
                 e.restore();
             } catch (...) {
-                nb_func_convert_cpp_exception();
+                nb_func_convert_cpp_exception(self);
             }
 
             if (result != NB_NEXT_OVERLOAD) {
@@ -1036,7 +1040,7 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
             } catch (python_error &e) {
                 e.restore();
             } catch (...) {
-                nb_func_convert_cpp_exception();
+                nb_func_convert_cpp_exception(self);
             }
 
             if (result != NB_NEXT_OVERLOAD) {
@@ -1139,7 +1143,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
             } catch (python_error &e) {
                 e.restore();
             } catch (...) {
-                nb_func_convert_cpp_exception();
+                nb_func_convert_cpp_exception(self);
             }
 
             if (result != NB_NEXT_OVERLOAD) {
@@ -1197,7 +1201,7 @@ static PyObject *nb_func_vectorcall_simple_0(PyObject *self,
         } catch (python_error &e) {
             e.restore();
         } catch (...) {
-            nb_func_convert_cpp_exception();
+            nb_func_convert_cpp_exception(self);
         }
     } else {
         error_handler = nb_func_error_overload;
@@ -1253,7 +1257,7 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
         } catch (python_error &e) {
             e.restore();
         } catch (...) {
-            nb_func_convert_cpp_exception();
+            nb_func_convert_cpp_exception(self);
         }
 
         if (NB_UNLIKELY(cleanup.used()))
@@ -1312,7 +1316,7 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
         } catch (python_error &e) {
             e.restore();
         } catch (...) {
-            nb_func_convert_cpp_exception();
+            nb_func_convert_cpp_exception(self);
         }
 
         if (NB_UNLIKELY(cleanup.used()))
@@ -1375,7 +1379,8 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
         // in a way that breaks this optimization :-/
 
         nb_bound_method *mb =
-            PyObject_GC_New(nb_bound_method, internals->nb_bound_method);
+            PyObject_GC_New(nb_bound_method,
+                            nb_func_internals(self)->nb_bound_method);
         mb->func = (nb_func *) self;
         mb->self = inst;
         mb->vectorcall = nb_bound_method_vectorcall;
@@ -1393,7 +1398,8 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
 }
 
 /// Render the function signature of a single function
-static uint32_t nb_func_render_signature(Buffer &buf, const func_data *f,
+static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
+                                         const func_data *f,
                                          bool nb_signature_mode) noexcept {
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
                has_args       = f->flags & (uint32_t) func_flags::has_args,
@@ -1401,7 +1407,6 @@ static uint32_t nb_func_render_signature(Buffer &buf, const func_data *f,
                has_var_kwargs = f->flags & (uint32_t) func_flags::has_var_kwargs,
                has_signature  = f->flags & (uint32_t) func_flags::has_signature;
 
-    nb_internals *internals_ = internals;
     if (has_signature) {
         const char *s = f->signature;
 
@@ -1572,8 +1577,12 @@ static uint32_t nb_func_render_signature(Buffer &buf, const func_data *f,
                         // Non-throwing lookups: this function is noexcept, and
                         // the attributes may be missing or have a non-str type
                         PyObject *tp = (PyObject *) td->type_py;
-                        object mod = steal(getattr(tp, NB_INTERNED(__module__), nullptr)),
-                               qual = steal(getattr(tp, NB_INTERNED(__qualname__), nullptr));
+                        object mod = steal(getattr(
+                                   tp, NB_INTERNED(internals_, __module__),
+                                   nullptr)),
+                               qual = steal(getattr(
+                                   tp, NB_INTERNED(internals_, __qualname__),
+                                   nullptr));
 
                         const char *mod_str = mod.is_valid()
                             ? PyUnicode_AsUTF8AndSize(mod.ptr(), nullptr) : nullptr;
@@ -1635,8 +1644,10 @@ static PyObject *nb_func_get_qualname(PyObject *self) {
     func_data *f = nb_func_data(self);
     if ((f->flags & (uint32_t) func_flags::has_scope) &&
         (f->flags & (uint32_t) func_flags::has_name)) {
-        PyObject *scope_name = getattr(((nb_func *) self)->scope,
-                                       NB_INTERNED(__qualname__), nullptr);
+        PyObject *scope_name =
+            getattr(((nb_func *) self)->scope,
+                    NB_INTERNED(nb_func_internals(self), __qualname__),
+                    nullptr);
         if (scope_name) {
             PyObject *result = PyUnicode_FromFormat("%U.%s", scope_name, f->name);
             Py_DECREF(scope_name);
@@ -1682,7 +1693,8 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         }
 
         buf.clear();
-        uint32_t n_default_args = nb_func_render_signature(buf, fi, true);
+        uint32_t n_default_args =
+            nb_func_render_signature(buf, nb_func_internals(self), fi, true);
 
         item = PyTuple_New(3);
         sigstr = PyUnicode_FromString(buf.get());
@@ -1744,7 +1756,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
 
     for (uint32_t i = 0; i < count; ++i) {
         const func_data *fi = f + i;
-        nb_func_render_signature(buf, fi);
+        nb_func_render_signature(buf, nb_func_internals(self), fi);
         buf.put('\n');
         doc_found |= (fi->flags & (uint32_t) func_flags::has_doc) != 0;
     }
@@ -1762,7 +1774,7 @@ PyObject *nb_func_get_doc(PyObject *self, void *) {
                 buf.put('\n');
                 buf.put_uint32(i + 1);
                 buf.put(". ``");
-                nb_func_render_signature(buf, fi);
+                nb_func_render_signature(buf, nb_func_internals(self), fi);
                 buf.put("``\n\n");
 
                 if (fi->flags & (uint32_t) func_flags::has_doc) {

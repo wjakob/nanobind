@@ -97,8 +97,7 @@ The high-level interface consists of just one CMake command:
           (``nanobind_backend`` is shipped by the `nanobind-backend
           <https://pypi.org/project/nanobind-backend>`__ wheel). Accepts a
           dotted module name, e.g. a backend module bundled inside your own
-          package. Cannot be combined with ``NB_STATIC``, ``NB_SHARED``, or
-          ``NB_DOMAIN``.
+          package. Cannot be combined with ``NB_STATIC`` or ``NB_SHARED``.
       * - ``BACKEND_PYPI <name>``
         - Name of the PyPI package shipping the backend module. When the
           module is missing at import time, the resulting ``ImportError``
@@ -127,8 +126,6 @@ The high-level interface consists of just one CMake command:
       * - ``NB_DOMAIN <name>``
         - Restrict the inter-extension type visibility to a named subdomain.
           See the associated :ref:`FAQ entry <type-visibility>` for details.
-          In :ref:`split mode <split-mode>`, the domain is instead a property
-          of the backend module (see :cmake:command:`nanobind_add_backend`).
       * - ``MUSL_DYNAMIC_LIBCPP``
         - When `cibuildwheel
           <https://cibuildwheel.readthedocs.io/en/stable/>`__ is used to
@@ -265,11 +262,9 @@ The high-level interface consists of just one CMake command:
    version. On a free-threaded interpreter, the backend is automatically built
    free-threaded and serves only free-threaded extensions. They always carry
    nanobind's detailed assertion messages, since a user who hits one cannot
-   rebuild the backend in ``Debug`` mode. The command supports
-   the following optional parameters: ``NB_DOMAIN <name>`` confines all
-   extensions attached to the backend to an isolated :ref:`type visibility
-   domain <type-visibility>`. The parameters ``PROTECT_STACK``, ``NOMINSIZE``,
-   ``NOSTRIP``, and ``NB_SUPPRESS_WARNINGS`` have the same meaning as in
+   rebuild the backend in ``Debug`` mode. The optional parameters
+   ``PROTECT_STACK``, ``NOMINSIZE``, ``NOSTRIP``, and
+   ``NB_SUPPRESS_WARNINGS`` have the same meaning as in
    :cmake:command:`nanobind_add_module`.
 
 .. _lowlevel-cmake:

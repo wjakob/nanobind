@@ -116,6 +116,5 @@ NAMESPACE_END(NB_NAMESPACE)
 
 extern "C" NB_EXPORT PyObject *NB_CONCAT(PyInit_, NB_BACKEND_NAME)(void);
 extern "C" PyObject *NB_CONCAT(PyInit_, NB_BACKEND_NAME)(void) {
-    nanobind::detail::nb_backend_domain = NB_DOMAIN_STR;
     return PyModuleDef_Init(&nanobind::detail::nb_backend_def);
 }

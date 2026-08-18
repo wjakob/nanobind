@@ -85,7 +85,7 @@ NAMESPACE_BEGIN(detail)
    The name lookup in trampoline_enter() runs arbitrary Python code and must
    therefore happen outside the critical section. A type modification can slip
    in between the lookup and the publication of its result. The counter
-   internals->trampoline_epoch guards against this: the invalidation walk
+   nb_internals::trampoline_epoch guards against this: the invalidation walk
    increments it before dropping any table, and trampoline_enter() reads it
    before the lookup and compares inside the critical section, repeating the
    lookup if it changed. Marks and subclasses that the walk did not see were
@@ -152,7 +152,7 @@ static inline void epoch_inc(nb_internals *p) {
 /// invalidation walk skips unmarked subtrees (see big comment above). Runs
 /// once per type, before its first override entry is published.
 static void trampoline_mark(PyTypeObject *tp) noexcept {
-    nb_internals *int_p = internals;
+    nb_internals *int_p = nb_type_data(tp)->internals;
 
     PyObject *mro = PyObject_GetAttrString((PyObject *) tp, "__mro__");
     check(mro && PyTuple_Check(mro),
@@ -177,10 +177,10 @@ static void trampoline_mark(PyTypeObject *tp) noexcept {
     Py_DECREF(mro);
 }
 
-PyObject *trampoline_new(void *ptr) noexcept {
+PyObject *trampoline_new(nb_internals *p, void *ptr) noexcept {
     // GIL is held when the trampoline constructor runs. Lock the
     // associated instance shard in GIL-less Python.
-    nb_shard &shard = internals->shard(ptr);
+    nb_shard &shard = p->shard(ptr);
     lock_shard lock(shard);
 
     nb_ptr_map &inst_c2p = shard.inst_c2p;
@@ -209,7 +209,7 @@ static void *trampoline_probe(type_data *td, const char *name, uint64_t hash) {
 /// Portable substitute for _PyType_Lookup() in limited-API backends:
 /// return the raw MRO entry for 'key' as a new reference, or null
 #if defined(Py_LIMITED_API)
-static PyObject *type_lookup_portable(PyTypeObject *tp, PyObject *key) noexcept {
+PyObject *type_lookup_portable(PyTypeObject *tp, PyObject *key) noexcept {
     PyObject *mro = PyObject_GetAttrString((PyObject *) tp, "__mro__"),
              *result = nullptr;
     if (!mro) {
@@ -273,7 +273,7 @@ static void *trampoline_resolve(PyTypeObject *tp, const char *name,
     PyTypeObject *raw_tp = Py_TYPE(raw);
     Py_DECREF(raw);
 
-    nb_internals *int_p = internals;
+    nb_internals *int_p = nb_type_data(tp)->internals;
     if (raw_tp == int_p->nb_func || raw_tp == int_p->nb_method ||
         raw_tp == int_p->nb_bound_method) {
         Py_DECREF(key);
@@ -344,7 +344,7 @@ void trampoline_enter(PyObject *self, const char *name, uint64_t hash,
     // reassignment redirects future calls and cannot leave a dangling
     // reference to a collected type behind
     type_data *td = nb_type_data(Py_TYPE(self));
-    nb_internals *int_p = internals;
+    nb_internals *int_p = td->internals;
     const char *error = nullptr;
     void *state = nullptr;
 
@@ -450,8 +450,9 @@ void trampoline_leave(ticket *t) noexcept {
 
 /// Drop the published tables in the marked part of 'tp's subtree. 'meth'
 /// lazily caches the unbound type.__subclasses__ descriptor for the walk.
-static void trampoline_invalidate_rec(PyObject *tp, PyObject *&meth) noexcept {
-    if (!PyType_Check(tp) || !PyType_IsSubtype(Py_TYPE(tp), internals->nb_type))
+static void trampoline_invalidate_rec(nb_internals *int_p, PyObject *tp,
+                                      PyObject *&meth) noexcept {
+    if (!PyType_Check(tp) || !PyType_IsSubtype(Py_TYPE(tp), int_p->nb_type))
         return;
 
     type_data *td = nb_type_data((PyTypeObject *) tp);
@@ -494,7 +495,7 @@ static void trampoline_invalidate_rec(PyObject *tp, PyObject *&meth) noexcept {
         PyObject *sub = PySequence_GetItem(subs, i);
         if (!sub)
             break;
-        trampoline_invalidate_rec(sub, meth);
+        trampoline_invalidate_rec(int_p, sub, meth);
         Py_DECREF(sub);
     }
 
@@ -503,10 +504,11 @@ static void trampoline_invalidate_rec(PyObject *tp, PyObject *&meth) noexcept {
 }
 
 void nb_trampoline_invalidate(PyObject *tp) noexcept {
-    epoch_inc(internals);
+    nb_internals *int_p = nb_type_data((PyTypeObject *) tp)->internals;
+    epoch_inc(int_p);
 
     PyObject *meth = nullptr;
-    trampoline_invalidate_rec(tp, meth);
+    trampoline_invalidate_rec(int_p, tp, meth);
     Py_XDECREF(meth);
 }
 

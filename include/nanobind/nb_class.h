@@ -144,7 +144,7 @@ constexpr bool is_copy_constructible_v = is_copy_constructible<T>::value;
 NAMESPACE_END(detail)
 
 // Low level access to nanobind type objects
-inline bool type_check(handle h) { return NB_CALL(nb_type_check)(h.ptr()); }
+inline bool type_check(handle h) { return NB_CALL(nb_type_check)(NB_CTX, h.ptr()); }
 inline size_t type_size(handle h) { return NB_CALL(nb_type_size)(h.ptr()); }
 inline size_t type_align(handle h) { return NB_CALL(nb_type_align)(h.ptr()); }
 inline const std::type_info& type_info(handle h) { return *NB_CALL(nb_type_info)(h.ptr()); }
@@ -278,7 +278,7 @@ private:
                     return Caster().from_python(
                         src, detail::cast_flags::convert, cleanup);
                 };
-            NB_CALL(implicitly_convertible)(&typeid(Type), (void *) pred, true);
+            NB_CALL(implicitly_convertible)(NB_CTX, &typeid(Type), (void *) pred, true);
         }
     }
 };
@@ -487,7 +487,7 @@ public:
                 // throwing an exception if there is no active shared_ptr
                 // for this object. (Added in C++17.)
                 if (auto sp = inst_ptr<T>(self)->weak_from_this().lock()) {
-                    NB_CALL(keep_alive_ptr)(self, new auto(std::move(sp)),
+                    NB_CALL(keep_alive_ptr)(NB_CTX, self, new auto(std::move(sp)),
                                             [](void *p) noexcept {
                                                 delete (decltype(sp) *) p;
                                             });
@@ -499,7 +499,7 @@ public:
 
         (detail::type_extra_apply(d, extra), ...);
 
-        m_ptr = NB_CALL(nb_type_new)(&d);
+        m_ptr = NB_CALL(nb_type_new)(NB_CTX, &d);
     }
 
     template <typename Func, typename... Extra>
@@ -541,7 +541,7 @@ public:
             set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
                                     is_method(), detail::filter_setter(extra)...);
 
-        NB_CALL(property_install)(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
+        NB_CALL(property_install)(NB_CTX, m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
         return *this;
     }
 
@@ -560,7 +560,7 @@ public:
             set_p = cpp_function((detail::forward_t<Setter>) setter,
                                  detail::filter_setter(extra)...);
 
-        NB_CALL(property_install)(m_ptr, name_, get_p.ptr(), set_p.ptr(), true);
+        NB_CALL(property_install)(NB_CTX, m_ptr, name_, get_p.ptr(), set_p.ptr(), true);
         return *this;
     }
 
@@ -662,7 +662,7 @@ public:
                        ? (uint32_t) detail::enum_flags::is_signed
                        : 0;
         (detail::enum_extra_apply(ed, extra), ...);
-        m_ptr = NB_CALL(enum_create)(&ed);
+        m_ptr = NB_CALL(enum_create)(NB_CTX, &ed);
     }
 
     NB_INLINE enum_ &value(const char *name, T value, const char *doc = nullptr) {
@@ -711,7 +711,7 @@ public:
             set_p = cpp_function<T>((detail::forward_t<Setter>) setter,
                                     is_method(), detail::filter_setter(extra)...);
 
-        NB_CALL(property_install)(m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
+        NB_CALL(property_install)(NB_CTX, m_ptr, name_, get_p.ptr(), set_p.ptr(), false);
         return *this;
     }
 
@@ -733,7 +733,7 @@ template <typename Source, typename Target> void implicitly_convertible() {
             "unless it is opaque.");
 
         if constexpr (detail::is_base_caster_v<Caster>) {
-            NB_CALL(implicitly_convertible)(&typeid(Target),
+            NB_CALL(implicitly_convertible)(NB_CTX, &typeid(Target),
                                             (void *) &typeid(Source), false);
         } else {
             bool (*pred)(PyTypeObject *, PyObject *,
@@ -743,7 +743,7 @@ template <typename Source, typename Target> void implicitly_convertible() {
                     return Caster().from_python(src, detail::cast_flags::convert,
                                                 cleanup);
                 };
-            NB_CALL(implicitly_convertible)(&typeid(Target), (void *) pred,
+            NB_CALL(implicitly_convertible)(NB_CTX, &typeid(Target), (void *) pred,
                                             true);
         }
     }

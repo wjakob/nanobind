@@ -17,14 +17,13 @@ NAMESPACE_BEGIN(detail)
 // holding the internals lock. This is safe because conversions are registered
 // while binding a type, which never overlaps with concurrent use of that type.
 
-void implicitly_convertible(const std::type_info *dst, void *src,
-                            bool is_predicate) noexcept {
-    nb_internals *internals_ = internals;
-    type_data *t = nb_type_c2p(internals_, dst);
+void implicitly_convertible(nb_internals *p, const std::type_info *dst,
+                            void *src, bool is_predicate) noexcept {
+    type_data *t = nb_type_c2p(p, dst);
     check(t, "nanobind::detail::implicitly_convertible(dst=%s): "
              "destination type unknown!", type_name(dst));
 
-    lock_internals guard(internals_);
+    lock_internals guard(p);
     size_t size = 0;
 
     if (!(t->flags & (uint32_t) type_flags_internal::has_implicit_conversions)) {

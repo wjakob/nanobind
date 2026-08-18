@@ -122,7 +122,7 @@ object api<Derived>::operator()(Args &&...args_) const {
             call_arg_init<policy>(args[i++], derived().base());
         (call_arg_init<policy>(args[i++], (forward_t<Args>) args_), ...);
 
-        return steal(NB_CALL(obj_vectorcall_ex)(base, args, i, flags));
+        return steal(NB_CALL(obj_vectorcall_ex)(NB_CTX, base, args, i, flags));
     } else {
         // Call with only positional arguments. 'args[0]' is the writable slot
         // required by PEP 590, followed by 'self' (for method calls) and the
@@ -138,7 +138,7 @@ object api<Derived>::operator()(Args &&...args_) const {
         ((args[i] = call_arg_value<policy>((forward_t<Args>) args_),
           owned |= (uint64_t) !call_borrows<Args>() << (i - 1), ++i), ...);
 
-        return steal(NB_CALL(obj_vectorcall)(
+        return steal(NB_CALL(obj_vectorcall)(NB_CTX, 
             base, args + 1, (i - 1) | NB_VECTORCALL_ARGUMENTS_OFFSET, owned,
             flags));
     }

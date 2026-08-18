@@ -12,6 +12,24 @@
     access to backend state (``nb_internals``, etc.) or are unacceptably slow
     in the Python 3.10 limited ABI.
 
+    Backend state is an opaque ``nb_internals *`` pointer identifying the
+    caller's domain (see NB_DOMAIN). Two rules determine how a slot obtains
+    it:
+
+    1. A slot whose operation is defined by the *caller's context* (type
+       lookup and creation, string/import caches, configuration flags,
+       exception translators, generic keep-alive relationships) takes the
+       pointer as its first parameter.
+
+    2. A slot whose operation is defined by an existing *nanobind object or
+       type* derives the object's owning state internally and never takes
+       the parameter. This makes it impossible to register or unregister an
+       instance in the maps of the wrong domain.
+
+    Slots reachable from exception objects (``python_error``,
+    ``builtin_exception``) require no state at all so that exceptions remain
+    usable on any thread and in any binary.
+
     Copyright (c) 2022 Wenzel Jakob
 
     All rights reserved. Use of this source code is governed by a
@@ -54,68 +72,76 @@ NB_SLOT(const char *, error_what,
 
 /// Create a new Python exception type (see nb::exception<T>)
 NB_SLOT(PyObject *, exception_new,
-        (PyObject *mod, const char *name, PyObject *base))
+        (nb_internals *p, PyObject *mod, const char *name, PyObject *base))
 
 /// Prepend a C++ -> Python exception translation callback
 NB_SLOT(void, register_exception_translator,
-        (exception_translator translator, void *payload))
+        (nb_internals *p, exception_translator translator, void *payload))
 
 // --------------------------------------------------------------------------
 // Module bootstrap
 // --------------------------------------------------------------------------
 
-/// Initialize the backend state for a nanobind extension module. Reports
-/// failure by returning -1 with a Python error set. The module argument is
-/// currently unused; it reserves room for future per-module state.
-NB_SLOT(int, nb_module_init, (const char *domain, PyObject *m) noexcept)
+/// Resolve the backend state of the given domain, creating it if needed, and
+/// register the module 'm' (created by 'module_new') as one of its users.
+/// Returns nullptr with a Python error set on failure.
+NB_SLOT(nb_internals *, nb_module_init,
+        (const char *domain, PyObject *m) noexcept)
 
 /// Build a module definition and slot array on the backend's heap and return
 /// the result of PyModuleDef_Init(). 'exec' is a 'int (*)(PyObject *)'
-/// callback; the last parameter is reserved and must be zero.
+/// callback; the last parameter is reserved and must be zero. The module
+/// carries state that a later 'nb_module_init' call fills in.
 NB_SLOT(PyObject *, module_new,
         (const char *name, const char *doc, void *exec,
          uint32_t reserved) noexcept)
 
 /// Create a submodule of an existing module
 NB_SLOT(PyObject *, submodule_new,
-        (PyObject *base, const char *name, const char *doc) noexcept)
+        (nb_internals *p, PyObject *base, const char *name,
+         const char *doc) noexcept)
 
 // --------------------------------------------------------------------------
 // Object protocol helpers
 // --------------------------------------------------------------------------
 
 /// Try to roughly determine the length of a Python object
-NB_SLOT(size_t, len_hint, (PyObject *o) noexcept)
+NB_SLOT(size_t, len_hint, (nb_internals *p, PyObject *o) noexcept)
 
 /// Return a Python string for 'str' of size <= 'bound'. 0 indicates a
 /// potentially non-literal string. The implementation tries to memoize
 /// literals in a builtin cache. 'owned' returns whether the caller receives an
 /// owned non-interned string. Returns nullptr with an error set on failure.
 NB_SLOT(PyObject *, cached_string,
-        (const char *str, size_t bound, bool *owned) noexcept)
+        (nb_internals *p, const char *str, size_t bound, bool *owned) noexcept)
 
 // The operations below resolve their key via cached_string() ('str' and
 // 'bound' follow its contract) and raise an exception when the underlying
 // Python operation fails, except where noted.
 
 /// PyObject_GetAttr() with a C string key
-NB_SLOT(PyObject *, getattr_str, (PyObject *obj, const char *str, size_t bound))
+NB_SLOT(PyObject *, getattr_str,
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 /// Variant of the above that returns a new reference to 'def' instead of
 /// raising when the attribute cannot be retrieved
 NB_SLOT(PyObject *, getattr_str_def,
-        (PyObject *obj, const char *str, size_t bound, PyObject *def) noexcept)
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound,
+         PyObject *def) noexcept)
 
 /// PyObject_SetAttr() with a C string key
 NB_SLOT(void, setattr_str,
-        (PyObject *obj, const char *str, size_t bound, PyObject *value))
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound,
+         PyObject *value))
 
 /// PyObject_DelAttr() with a C string key
-NB_SLOT(void, delattr_str, (PyObject *obj, const char *str, size_t bound))
+NB_SLOT(void, delattr_str,
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 /// PyObject_HasAttr() with a C string key (never raises)
 NB_SLOT(bool, hasattr_str,
-        (PyObject *obj, const char *str, size_t bound) noexcept)
+        (nb_internals *p, PyObject *obj, const char *str,
+         size_t bound) noexcept)
 
 /// Perform a vector call with positional arguments. 'base' is the callable
 /// or, with 'call_flags::method', a method name looked up on 'args[0]'.
@@ -124,41 +150,48 @@ NB_SLOT(bool, hasattr_str,
 /// always released. The slot in front of the first argument ('args[-1]', or
 /// the 'self' entry of a method call) may be overwritten during the call.
 NB_SLOT(PyObject *, obj_vectorcall,
-        (PyObject *base, PyObject *const *args, size_t nargsf,
+        (nb_internals *p, PyObject *base, PyObject *const *args, size_t nargsf,
          uint64_t owned, uint32_t flags))
 
 /// Perform a call with keyword arguments and/or '*'/'**' expansions,
 /// described by 'nargs' entries of 'args'. With 'call_flags::method', the
 /// first entry is the 'self' object.
 NB_SLOT(PyObject *, obj_vectorcall_ex,
-        (PyObject *base, call_arg *args, size_t nargs, uint32_t flags))
+        (nb_internals *p, PyObject *base, call_arg *args, size_t nargs,
+         uint32_t flags))
 
 /// PyObject_GetItem() with a C string key
-NB_SLOT(PyObject *, getitem_str, (PyObject *obj, const char *str, size_t bound))
+NB_SLOT(PyObject *, getitem_str,
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 /// PyObject_SetItem() with a C string key
 NB_SLOT(void, setitem_str,
-        (PyObject *obj, const char *str, size_t bound, PyObject *value))
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound,
+         PyObject *value))
 
 /// PyObject_DelItem() with a C string key
-NB_SLOT(void, delitem_str, (PyObject *obj, const char *str, size_t bound))
+NB_SLOT(void, delitem_str,
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 // The three operations below serve the 'nb::dict' accessor and expect a
 // dictionary (or a subclass of one), which they access with the PyDict_* API.
 
 /// Dictionary lookup with a C string key, raises KeyError when it is absent
 NB_SLOT(PyObject *, dict_getitem_str,
-        (PyObject *obj, const char *str, size_t bound))
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 /// PyDict_SetItem() with a C string key
 NB_SLOT(void, dict_setitem_str,
-        (PyObject *obj, const char *str, size_t bound, PyObject *value))
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound,
+         PyObject *value))
 
 /// PyDict_DelItem() with a C string key
-NB_SLOT(void, dict_delitem_str, (PyObject *obj, const char *str, size_t bound))
+NB_SLOT(void, dict_delitem_str,
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 /// Membership test ('key in obj') with a C string key
-NB_SLOT(bool, contains_str, (PyObject *obj, const char *str, size_t bound))
+NB_SLOT(bool, contains_str,
+        (nb_internals *p, PyObject *obj, const char *str, size_t bound))
 
 // --------------------------------------------------------------------------
 // Sequence helpers
@@ -178,31 +211,34 @@ NB_SLOT(PyObject **, seq_get,
 // --------------------------------------------------------------------------
 
 /// Create a Python function object for the given function record
-NB_SLOT(PyObject *, nb_func_new, (const func_data_init_base *f) noexcept)
+NB_SLOT(PyObject *, nb_func_new,
+        (nb_internals *p, const func_data_init_base *f) noexcept)
 
 // --------------------------------------------------------------------------
 // Type objects and instances
 // --------------------------------------------------------------------------
 
 /// Create a Python type object for the given type record
-NB_SLOT(PyObject *, nb_type_new, (const type_data_init *c) noexcept)
+NB_SLOT(PyObject *, nb_type_new,
+        (nb_internals *p, const type_data_init *c) noexcept)
 
 /// Extract a pointer to a C++ type underlying a Python object, if possible
 NB_SLOT(bool, nb_type_get,
-        (const std::type_info *t, PyObject *o, uint32_t flags,
+        (nb_internals *p, const std::type_info *t, PyObject *o, uint32_t flags,
          cleanup_list *cleanup, void **out) noexcept)
 
 /// Cast a C++ type instance into a Python object. 'cpp_type_p' optionally
 /// names the dynamic (most derived) type of polymorphic instances
 NB_SLOT(PyObject *, nb_type_put,
-        (const std::type_info *cpp_type, const std::type_info *cpp_type_p,
-         void *value, rv_policy rvp, cleanup_list *cleanup,
-         bool *is_new) noexcept)
+        (nb_internals *p, const std::type_info *cpp_type,
+         const std::type_info *cpp_type_p, void *value, rv_policy rvp,
+         cleanup_list *cleanup, bool *is_new) noexcept)
 
 /// Special version of 'nb_type_put' for unique pointers and ownership transfer
 NB_SLOT(PyObject *, nb_type_put_unique,
-        (const std::type_info *cpp_type, const std::type_info *cpp_type_p,
-         void *value, cleanup_list *cleanup, bool cpp_delete) noexcept)
+        (nb_internals *p, const std::type_info *cpp_type,
+         const std::type_info *cpp_type_p, void *value, cleanup_list *cleanup,
+         bool cpp_delete) noexcept)
 
 /// Try to relinquish ownership from Python object to a unique_ptr;
 /// return true if successful, false if not. (Failure is only
@@ -217,8 +253,9 @@ NB_SLOT(void, nb_type_restore_ownership,
 /// Get a pointer to a user-defined 'extra' value associated with the nb_type t.
 NB_SLOT(void *, nb_type_supplement, (PyObject *t) noexcept)
 
-/// Check if the given python object represents a nanobind type
-NB_SLOT(bool, nb_type_check, (PyObject *t) noexcept)
+/// Check if the given python object represents a nanobind type of the
+/// caller's domain
+NB_SLOT(bool, nb_type_check, (nb_internals *p, PyObject *t) noexcept)
 
 /// Return the size of the type wrapped by the given nanobind type object
 NB_SLOT(size_t, nb_type_size, (PyObject *t) noexcept)
@@ -240,10 +277,11 @@ NB_SLOT(void *, nb_inst_ptr, (PyObject *o) noexcept)
 
 /// Check if a Python type object wraps an instance of a specific C++ type
 NB_SLOT(bool, nb_type_isinstance,
-        (PyObject *obj, const std::type_info *t) noexcept)
+        (nb_internals *p, PyObject *obj, const std::type_info *t) noexcept)
 
 /// Search for the Python type object associated with a C++ type
-NB_SLOT(PyObject *, nb_type_lookup, (const std::type_info *t) noexcept)
+NB_SLOT(PyObject *, nb_type_lookup,
+        (nb_internals *p, const std::type_info *t) noexcept)
 
 /// Allocate an instance of type 't'
 NB_SLOT(PyObject *, nb_inst_alloc, (PyTypeObject *t))
@@ -287,7 +325,7 @@ NB_SLOT(void, nb_inst_state_write, (PyObject *o, uint32_t state) noexcept)
 
 /// Create and install a Python property object
 NB_SLOT(void, property_install,
-        (PyObject *scope, const char *name, PyObject *getter,
+        (nb_internals *p, PyObject *scope, const char *name, PyObject *getter,
          PyObject *setter, bool is_static) noexcept)
 
 // --------------------------------------------------------------------------
@@ -295,7 +333,7 @@ NB_SLOT(void, property_install,
 // --------------------------------------------------------------------------
 
 /// Return the Python object that owns the C++ instance 'ptr' (borrowed)
-NB_SLOT(PyObject *, trampoline_new, (void *ptr) noexcept)
+NB_SLOT(PyObject *, trampoline_new, (nb_internals *p, void *ptr) noexcept)
 
 /// Look up the Python override of a virtual method, filling 'ticket'
 NB_SLOT(void, trampoline_enter,
@@ -310,11 +348,12 @@ NB_SLOT(void, trampoline_leave, (ticket *ticket) noexcept)
 // --------------------------------------------------------------------------
 
 /// Ensure that 'patient' cannot be GCed while 'nurse' is alive
-NB_SLOT(void, keep_alive_py, (PyObject *nurse, PyObject *patient))
+NB_SLOT(void, keep_alive_py,
+        (nb_internals *p, PyObject *nurse, PyObject *patient))
 
 /// Keep 'payload' alive until 'nurse' is GCed
 NB_SLOT(void, keep_alive_ptr,
-        (PyObject *nurse, void *payload,
+        (nb_internals *p, PyObject *nurse, void *payload,
          void (*deleter)(void *) noexcept) noexcept)
 
 // --------------------------------------------------------------------------
@@ -326,14 +365,16 @@ NB_SLOT(void, keep_alive_ptr,
 /// or a 'bool (*)(PyTypeObject *, PyObject *, cleanup_list *)' callback
 /// that decides convertibility at runtime (is_predicate == true)
 NB_SLOT(void, implicitly_convertible,
-        (const std::type_info *dst, void *src, bool is_predicate) noexcept)
+        (nb_internals *p, const std::type_info *dst, void *src,
+         bool is_predicate) noexcept)
 
 // --------------------------------------------------------------------------
 // Enumerations
 // --------------------------------------------------------------------------
 
 /// Create a new enumeration type
-NB_SLOT(PyObject *, enum_create, (const enum_data_init *e) noexcept)
+NB_SLOT(PyObject *, enum_create,
+        (nb_internals *p, const enum_data_init *e) noexcept)
 
 /// Append an entry to an enumeration. For StrEnum members, 'str_value' carries
 /// the string value; for all other enumerations it must be nullptr.
@@ -343,12 +384,12 @@ NB_SLOT(void, enum_append,
 
 /// Query an enumeration's Python object -> integer value map
 NB_SLOT(bool, enum_from_python,
-        (const std::type_info *type, PyObject *o, int64_t *out,
-         uint32_t flags) noexcept)
+        (nb_internals *p, const std::type_info *type, PyObject *o,
+         int64_t *out, uint32_t flags) noexcept)
 
 /// Query an enumeration's integer value -> Python object map
 NB_SLOT(PyObject *, enum_from_cpp,
-        (const std::type_info *type, int64_t value) noexcept)
+        (nb_internals *p, const std::type_info *type, int64_t value) noexcept)
 
 /// Export enum entries to the parent scope
 NB_SLOT(void, enum_export, (PyObject *tp))
@@ -359,12 +400,12 @@ NB_SLOT(void, enum_export, (PyObject *tp))
 
 /// Try to import a reference-counted ndarray object via DLPack.
 NB_SLOT(ndarray_handle *, ndarray_import,
-        (PyObject *o, const ndarray_config *c, size_t config_size,
-         bool convert, cleanup_list *cleanup) noexcept)
+        (nb_internals *p, PyObject *o, const ndarray_config *c,
+         size_t config_size, bool convert, cleanup_list *cleanup) noexcept)
 
 /// Describe a local ndarray object using a DLPack capsule.
 NB_SLOT(ndarray_handle *, ndarray_create,
-        (const ndarray_create_args *a, size_t args_size))
+        (nb_internals *p, const ndarray_create_args *a, size_t args_size))
 
 /// Increase the reference count of the given ndarray object
 NB_SLOT(dlpack::dltensor *, ndarray_inc_ref, (ndarray_handle *h) noexcept)
@@ -374,11 +415,11 @@ NB_SLOT(void, ndarray_dec_ref, (ndarray_handle *h) noexcept)
 
 /// Wrap a ndarray_handle* into a PyCapsule
 NB_SLOT(PyObject *, ndarray_export,
-        (ndarray_handle *h, int framework, rv_policy policy,
+        (nb_internals *p, ndarray_handle *h, int framework, rv_policy policy,
          cleanup_list *cleanup) noexcept)
 
 /// Check if an object represents an ndarray
-NB_SLOT(bool, ndarray_check, (PyObject *o) noexcept)
+NB_SLOT(bool, ndarray_check, (nb_internals *p, PyObject *o) noexcept)
 
 // --------------------------------------------------------------------------
 // Scalar conversions used by the arithmetic type casters
@@ -386,21 +427,32 @@ NB_SLOT(bool, ndarray_check, (PyObject *o) noexcept)
 
 /// Type-checked conversions of a Python object into a C++ scalar value;
 /// 'flags' carries the cast_flags of the current conversion
-NB_SLOT(bool, load_i8, (PyObject *o, uint32_t flags, int8_t *out) noexcept)
-NB_SLOT(bool, load_u8, (PyObject *o, uint32_t flags, uint8_t *out) noexcept)
-NB_SLOT(bool, load_i16, (PyObject *o, uint32_t flags, int16_t *out) noexcept)
-NB_SLOT(bool, load_u16, (PyObject *o, uint32_t flags, uint16_t *out) noexcept)
-NB_SLOT(bool, load_i32, (PyObject *o, uint32_t flags, int32_t *out) noexcept)
-NB_SLOT(bool, load_u32, (PyObject *o, uint32_t flags, uint32_t *out) noexcept)
-NB_SLOT(bool, load_i64, (PyObject *o, uint32_t flags, int64_t *out) noexcept)
-NB_SLOT(bool, load_u64, (PyObject *o, uint32_t flags, uint64_t *out) noexcept)
-NB_SLOT(bool, load_f32, (PyObject *o, uint32_t flags, float *out) noexcept)
-NB_SLOT(bool, load_f64, (PyObject *o, uint32_t flags, double *out) noexcept)
+NB_SLOT(bool, load_i8,
+        (nb_internals *p, PyObject *o, uint32_t flags, int8_t *out) noexcept)
+NB_SLOT(bool, load_u8,
+        (nb_internals *p, PyObject *o, uint32_t flags, uint8_t *out) noexcept)
+NB_SLOT(bool, load_i16,
+        (nb_internals *p, PyObject *o, uint32_t flags, int16_t *out) noexcept)
+NB_SLOT(bool, load_u16,
+        (nb_internals *p, PyObject *o, uint32_t flags, uint16_t *out) noexcept)
+NB_SLOT(bool, load_i32,
+        (nb_internals *p, PyObject *o, uint32_t flags, int32_t *out) noexcept)
+NB_SLOT(bool, load_u32,
+        (nb_internals *p, PyObject *o, uint32_t flags, uint32_t *out) noexcept)
+NB_SLOT(bool, load_i64,
+        (nb_internals *p, PyObject *o, uint32_t flags, int64_t *out) noexcept)
+NB_SLOT(bool, load_u64,
+        (nb_internals *p, PyObject *o, uint32_t flags, uint64_t *out) noexcept)
+NB_SLOT(bool, load_f32,
+        (nb_internals *p, PyObject *o, uint32_t flags, float *out) noexcept)
+NB_SLOT(bool, load_f64,
+        (nb_internals *p, PyObject *o, uint32_t flags, double *out) noexcept)
 
 /// Load a complex number; 'out' points to two doubles (real, imaginary).
 /// std::complex<double> is layout-compatible; the spelling keeps <complex>
 /// out of the core headers. Used by <nanobind/stl/complex.h>.
-NB_SLOT(bool, load_cmplx, (PyObject *o, uint32_t flags, double *out) noexcept)
+NB_SLOT(bool, load_cmplx,
+        (nb_internals *p, PyObject *o, uint32_t flags, double *out) noexcept)
 
 // --------------------------------------------------------------------------
 // Free-threading
@@ -428,15 +480,16 @@ NB_SLOT(void, tstate_release, (void *token) noexcept)
 NB_SLOT(bool, gil_check, () noexcept)
 
 /// Read a backend configuration flag (see the 'nb_flag' enumeration)
-NB_SLOT(uint32_t, read_flag, (nb_flag f) noexcept)
+NB_SLOT(uint32_t, read_flag, (nb_internals *p, nb_flag f) noexcept)
 
 /// Write a backend configuration flag
-NB_SLOT(void, write_flag, (nb_flag f, uint32_t value))
+NB_SLOT(void, write_flag, (nb_internals *p, nb_flag f, uint32_t value))
 
 /// Check whether the Python interpreter is still running (nb::is_alive)
 NB_SLOT(bool, is_alive, () noexcept)
 
 /// Resolve and cache 'c->module.c->attr' (cold path of import_cache::get())
-NB_SLOT(PyObject *, import_cached, (import_cache *c) noexcept)
+NB_SLOT(PyObject *, import_cached,
+        (nb_internals *p, import_cache *c) noexcept)
 
 #undef NB_SLOT

@@ -143,7 +143,7 @@ NAMESPACE_END(detail)
 
 inline void register_exception_translator(detail::exception_translator t,
                                           void *payload = nullptr) {
-    NB_CALL(register_exception_translator)(t, payload);
+    NB_CALL(register_exception_translator)(NB_CTX, t, payload);
 }
 
 template <typename T>
@@ -151,9 +151,9 @@ class exception : public object {
     NB_OBJECT_DEFAULT(exception, object, "Exception", PyExceptionClass_Check)
 
     exception(handle scope, const char *name, handle base = PyExc_Exception)
-        : object(NB_CALL(exception_new)(scope.ptr(), name, base.ptr()),
+        : object(NB_CALL(exception_new)(NB_CTX, scope.ptr(), name, base.ptr()),
                  detail::steal_t()) {
-        NB_CALL(register_exception_translator)(
+        NB_CALL(register_exception_translator)(NB_CTX, 
             [](const std::exception_ptr &p, void *payload) {
                 try {
                     std::rethrow_exception(p);

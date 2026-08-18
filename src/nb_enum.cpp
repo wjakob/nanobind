@@ -16,16 +16,15 @@ struct int64_hash {
 // hold both.
 using enum_map = tsl::robin_map<int64_t, int64_t, int64_hash>;
 
-PyObject *enum_create(const enum_data_init *ed) noexcept {
+PyObject *enum_create(nb_internals *p, const enum_data_init *ed) noexcept {
     // Update hash table that maps from std::type_info to Python type
-    nb_internals *internals_ = internals;
     bool success;
     nb_type_map_slow::iterator it;
 
     PyObject *existing = nullptr;
     {
-        lock_internals guard(internals_);
-        std::tie(it, success) = internals_->type_c2p_slow.try_emplace(ed->type, nullptr);
+        lock_internals guard(p);
+        std::tie(it, success) = p->type_c2p_slow.try_emplace(ed->type, nullptr);
         if (!success) {
             existing = (PyObject *) it->second->type_py;
             NB_INCREF_ENUM(existing);
@@ -56,16 +55,23 @@ PyObject *enum_create(const enum_data_init *ed) noexcept {
     object modname;
 
     if (PyModule_Check(ed->scope)) {
-        modname = getattr(scope, "__name__", handle());
+        modname = str_getattr_def(p, scope, "__name__");
     } else {
-        modname = getattr(scope, NB_INTERNED(__module__),
-                          handle());
+        modname = getattr(scope, NB_INTERNED(p, __module__), handle());
 
-        object scope_qualname = getattr(scope, "__qualname__", handle());
+        object scope_qualname = str_getattr_def(p, scope, "__qualname__");
         if (scope_qualname.is_valid())
             qualname = steal<str>(
                 PyUnicode_FromFormat("%U.%U", scope_qualname.ptr(), name.ptr()));
     }
+
+    /* The name must be present: Python's enum module needs it to make the
+       members picklable, and it guesses one via stack frame introspection
+       when the 'module' keyword is omitted below. */
+    check(modname.is_valid(),
+          "nanobind::detail::enum_create(\"%s\"): the scope lacks a "
+          "'__name__' or '__module__' attribute, could not determine the "
+          "enumeration's module name!", ed->name);
 
     const char *factory_name = "Enum";
 
@@ -81,30 +87,42 @@ PyObject *enum_create(const enum_data_init *ed) noexcept {
     object enum_mod = module_::import_("enum");
     object result;
 
+    bool str_fallback = false;
 #if PY_VERSION_HEX < 0x030B0000
     // enum.StrEnum was added in Python 3.11. On earlier versions, fall back to
     // bare Enum with type=str, which produces an equivalent class derived from (str, Enum).
-    if (is_str) {
-        handle str_tp((PyObject *) &PyUnicode_Type);
-        result = enum_mod.attr("Enum")(name, nanobind::tuple(),
-                                       arg("module") = modname,
-                                       arg("qualname") = qualname,
-                                       arg("type") = str_tp);
-    } else
+    str_fallback = is_str;
 #endif
+
     {
-        result = enum_mod.attr(factory_name)(name, nanobind::tuple(),
-                                             arg("module") = modname,
-                                             arg("qualname") = qualname);
+        object factory =
+            str_getattr(p, enum_mod, str_fallback ? "Enum" : factory_name);
+        nanobind::tuple empty;
+        object call_args =
+            steal(raise_if_null(PyTuple_Pack(2, name.ptr(), empty.ptr())));
+        object call_kwargs = steal(raise_if_null(PyDict_New()));
+        PyObject *kw = call_kwargs.ptr();
+        if (PyDict_SetItemString(kw, "module", modname.ptr()) ||
+            PyDict_SetItemString(kw, "qualname", qualname.ptr()) ||
+            (str_fallback &&
+             PyDict_SetItemString(kw, "type", (PyObject *) &PyUnicode_Type)))
+            raise_python_error();
+        result = steal(raise_if_null(
+            PyObject_Call(factory.ptr(), call_args.ptr(), kw)));
     }
 
-    scope.attr(name) = result;
-    result.attr("__doc__") = ed->docstr ? (object) str(ed->docstr) : (object) none();
+    setattr(scope, name, result);
+    str_setattr(p, result, "__doc__",
+                ed->docstr ? (object) str(ed->docstr) : (object) none());
 
-    result.attr("__str__") = enum_mod.attr(is_flag ? factory_name : "Enum").attr("__str__");
-    result.attr("__repr__") = result.attr("__str__");
+    object enum_str = str_getattr(
+        p, str_getattr(p, enum_mod, is_flag ? factory_name : "Enum"),
+        "__str__");
+    str_setattr(p, result, "__str__", enum_str);
+    str_setattr(p, result, "__repr__", enum_str);
 
     enum_type_data *t = new enum_type_data{};
+    t->internals = p;
     t->name = strdup_check(ed->name);
     t->type = ed->type;
     t->type_py = (PyTypeObject *) result.ptr();
@@ -114,30 +132,33 @@ PyObject *enum_create(const enum_data_init *ed) noexcept {
     t->scope = ed->scope;
 
     {
-        lock_internals guard(internals_);
-        internals_->type_c2p_slow[ed->type] = t;
+        lock_internals guard(p);
+        p->type_c2p_slow[ed->type] = t;
 
         #if !defined(NB_FREE_THREADED)
-            internals_->type_c2p_fast[(void *) ed->type] = t;
+            p->type_c2p_fast[(void *) ed->type] = t;
         #endif
     }
 
     make_immortal(result.ptr());
 
-    result.attr("__nb_enum__") = capsule(t, [](void *p) noexcept {
-        enum_type_data *t = (enum_type_data *) p;
-        delete (enum_map *) t->enum_tbl.fwd;
-        delete (enum_map *) t->enum_tbl.rev;
-        nb_type_unregister(t);
-        free((char*) t->name);
-        delete t;
-    });
+    str_setattr(p, result, "__nb_enum__",
+                capsule(t, [](void *td) noexcept {
+                    enum_type_data *t = (enum_type_data *) td;
+                    delete (enum_map *) t->enum_tbl.fwd;
+                    delete (enum_map *) t->enum_tbl.rev;
+                    nb_type_unregister(t);
+                    free((char*) t->name);
+                    delete t;
+                }));
 
     return result.release().ptr();
 }
 
 static enum_type_data *enum_get_type_data(handle tp) {
-    return (enum_type_data *) (borrow<capsule>(handle(tp).attr("__nb_enum__"))).data();
+    object c = steal(raise_if_null(
+        PyObject_GetAttrString(tp.ptr(), "__nb_enum__")));
+    return (enum_type_data *) (borrow<capsule>(c)).data();
 }
 
 void enum_append(PyObject *tp_, const char *name_, int64_t value_,
@@ -148,6 +169,7 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
            obj_tp((PyObject *) &PyBaseObject_Type);
 
     type_data *t = enum_get_type_data(tp);
+    nb_internals *p = t->internals;
     bool is_str = (t->flags & (uint32_t) enum_flags::is_str);
 
     if (is_str && !str_value_)
@@ -171,9 +193,9 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
         val = steal(PyLong_FromUnsignedLongLong((unsigned long long) value_));
     }
 
-    dict value_map = tp.attr("_value2member_map_"),
-         member_map = tp.attr("_member_map_");
-    list member_names = tp.attr("_member_names_");
+    dict value_map = borrow<dict>(str_getattr(p, tp, "_value2member_map_")),
+         member_map = borrow<dict>(str_getattr(p, tp, "_member_map_"));
+    list member_names = borrow<list>(str_getattr(p, tp, "_member_names_"));
     str name(name_);
 
     if (member_map.contains(name))
@@ -184,34 +206,45 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     // In Python 3.11+, update the flag and bit masks by hand,
     // since enum._proto_member.__set_name__ is not called in this code path.
     if (t->flags & (uint32_t) enum_flags::is_flag) {
-        tp.attr("_flag_mask_") |= val;
+        object flag_mask = str_getattr(p, tp, "_flag_mask_");
+        flag_mask = steal(
+            raise_if_null(PyNumber_InPlaceOr(flag_mask.ptr(), val.ptr())));
+        str_setattr(p, tp, "_flag_mask_", flag_mask);
 
         bool is_single_bit = (value_ != 0) && (value_ & (value_ - 1)) == 0;
-        if (is_single_bit && hasattr(tp, "_singles_mask_"))
-            tp.attr("_singles_mask_") |= val;
+        if (is_single_bit && hasattr_str(p, tp.ptr(), "_singles_mask_",
+                                         sizeof("_singles_mask_"))) {
+            object singles_mask = str_getattr(p, tp, "_singles_mask_");
+            singles_mask = steal(raise_if_null(
+                PyNumber_InPlaceOr(singles_mask.ptr(), val.ptr())));
+            str_setattr(p, tp, "_singles_mask_", singles_mask);
+        }
 
-        int_ bit_length = int_(tp.attr("_flag_mask_").attr("bit_length")());
-        setattr(tp, "_all_bits_", (int_(2) << bit_length) - int_(1));
+        int_ bit_length =
+            int_(obj_call(p, str_getattr(p, flag_mask, "bit_length")));
+        str_setattr(p, tp, "_all_bits_", (int_(2) << bit_length) - int_(1));
     }
     #endif
 
     object el;
     if (issubclass(tp, str_tp))
-        el = str_tp.attr(NB_INTERNED(__new__))(tp, val);
+        el = obj_call(p, getattr(str_tp, NB_INTERNED(p, __new__)), tp, val);
     else if (issubclass(tp, val_tp))
-        el = val_tp.attr(NB_INTERNED(__new__))(tp, val);
+        el = obj_call(p, getattr(val_tp, NB_INTERNED(p, __new__)), tp, val);
     else
-        el = obj_tp.attr(NB_INTERNED(__new__))(tp);
+        el = obj_call(p, getattr(obj_tp, NB_INTERNED(p, __new__)), tp);
 
-    el.attr("_name_") = name;
-    el.attr("__objclass__") = tp;
-    el.attr(NB_INTERNED(__init__))(val);
-    el.attr("_sort_order_") = len(member_names);
-    el.attr("_value_") = val;
-    el.attr("__doc__") = doc ? (object) str(doc) : (object) none();
+    str_setattr(p, el, "_name_", name);
+    str_setattr(p, el, "__objclass__", tp);
+    obj_call(p, getattr(el, NB_INTERNED(p, __init__)), val);
+    str_setattr(p, el, "_sort_order_",
+                steal(raise_if_null(
+                    PyLong_FromSize_t(len(member_names)))));
+    str_setattr(p, el, "_value_", val);
+    str_setattr(p, el, "__doc__", doc ? (object) str(doc) : (object) none());
 
     // Compatibility with nanobind 1.x
-    el.attr("__name__") = name;
+    str_setattr(p, el, "__name__", name);
 
     setattr(tp, name, el);
 
@@ -229,14 +262,15 @@ void enum_append(PyObject *tp_, const char *name_, int64_t value_,
     rev->emplace((int64_t) (uintptr_t) el.ptr(), value_);
 }
 
-bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint32_t flags) noexcept {
-    type_data *t = nb_type_c2p(internals, tp);
+bool enum_from_python(nb_internals *p, const std::type_info *tp, PyObject *o,
+                      int64_t *out, uint32_t flags) noexcept {
+    type_data *t = nb_type_c2p(p, tp);
     if (!t)
         return false;
 
     if ((t->flags & (uint32_t) enum_flags::is_flag) != 0 && Py_TYPE(o) == t->type_py) {
         PyObject *value_o =
-                PyObject_GetAttr(o, NB_INTERNED(value));
+                PyObject_GetAttr(o, NB_INTERNED(p, value));
         if (value_o == nullptr) {
             PyErr_Clear();
             return false;
@@ -331,8 +365,9 @@ bool enum_from_python(const std::type_info *tp, PyObject *o, int64_t *out, uint3
     return false;
 }
 
-PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
-    type_data *t = nb_type_c2p(internals, tp);
+PyObject *enum_from_cpp(nb_internals *p, const std::type_info *tp,
+                        int64_t key) noexcept {
+    type_data *t = nb_type_c2p(p, tp);
     if (!t)
         return nullptr;
 
@@ -358,7 +393,7 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
             return nullptr;
 
         object new_fn = steal(PyObject_GetAttr(
-            enum_tp, NB_INTERNED(__new__)));
+            enum_tp, NB_INTERNED(p, __new__)));
         if (!new_fn.is_valid())
             return nullptr;
 
@@ -379,10 +414,11 @@ PyObject *enum_from_cpp(const std::type_info *tp, int64_t key) noexcept {
 
 void enum_export(PyObject *tp) {
     enum_type_data *t = enum_get_type_data(tp);
+    nb_internals *p = t->internals;
 
     handle scope = t->scope;
     for (handle item: handle(tp))
-        scope.attr(item.attr("name")) = item;
+        setattr(scope, str_getattr(p, item, "name"), item);
 }
 
 NAMESPACE_END(detail)

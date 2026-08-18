@@ -24,7 +24,7 @@
 #define NB_VERSION_MAJOR 3
 #define NB_VERSION_MINOR 0
 #define NB_VERSION_PATCH 0
-#define NB_VERSION_DEV   1 // A value > 0 indicates a development release
+#define NB_VERSION_DEV   2 // A value > 0 indicates a development release
 
 // nb_python.h includes Python.h, which according to
 // https://docs.python.org/3/c-api/intro.html#include-files, must be included

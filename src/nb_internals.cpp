@@ -167,11 +167,25 @@ void default_exception_translator(const std::exception_ptr &p, void *) {
     }
 }
 
-// Initialized once when the module is loaded, no locking needed
-nb_internals *internals = nullptr;
+/* Backend state instances created by this binary, tracked for the exit-time
+   sweep in internals_cleanup(). Instances that were created by another
+   binary and merely joined here are cleaned up by their creator. */
+static std::vector<nb_internals *> internals_created;
+static bool internals_cleanup_registered = false;
+#if defined(NB_FREE_THREADED)
+static PyMutex internals_created_mutex { };
+#endif
 
-// Domain served by this backend image
-const char *nb_backend_domain = "";
+#if defined(Py_LIMITED_API)
+// Interpreter constants declared in nb_internals.h
+freefunc PyType_Type_tp_free = nullptr;
+initproc PyType_Type_tp_init = nullptr;
+destructor PyType_Type_tp_dealloc = nullptr;
+setattrofunc PyType_Type_tp_setattro = nullptr;
+descrgetfunc PyProperty_Type_tp_descr_get = nullptr;
+descrsetfunc PyProperty_Type_tp_descr_set = nullptr;
+ptrdiff_t nb_type_data_offset = 0;
+#endif
 
 #if defined(NB_FREE_THREADED)
 NB_THREAD_LOCAL nb_thread_state *nb_thread_state_tls = nullptr;
@@ -185,7 +199,7 @@ static void nb_thread_state_destroy(void *p) noexcept {
     // Reclaim this thread's instance pools if the runtime is still alive.
     // Both steps need a thread state, so a shutdown that beats this callback
     // leaves the pools to the operating system.
-    if (internals && ts->pools) {
+    if (ts->pools) {
         if (cleanup_guard guard{}) {
             for (uint32_t i = 0; i < ts->pools_size; ++i)
                 nb_pool_drain(&ts->pools[i], /* can_free = */ true);
@@ -193,24 +207,28 @@ static void nb_thread_state_destroy(void *p) noexcept {
         }
     }
 
-    nb_thread_state_tls = nullptr;
+    if (nb_thread_state_tls == ts)
+        nb_thread_state_tls = nullptr;
     delete ts;
 }
 
-// Slow path for nb_thread_state_get(): allocate the per-thread state with a cleanup callback
-nb_thread_state *nb_thread_state_alloc() noexcept {
+// Slow path for nb_thread_state_get(): fetch the state associated with the
+// given domain, allocating it with a cleanup callback if needed
+nb_thread_state *nb_thread_state_alloc(nb_internals *p) noexcept {
 #if defined(_WIN32)
-    DWORD key = internals->thread_state_key;
+    DWORD key = p->thread_state_key;
     nb_thread_state *ts = (nb_thread_state *) FlsGetValue(key);
     if (!ts) {
         ts = new nb_thread_state();
+        ts->internals = p;
         check(FlsSetValue(key, ts), "nanobind: FlsSetValue() failed!");
     }
 #else
-    pthread_key_t key = internals->thread_state_key;
+    pthread_key_t key = p->thread_state_key;
     nb_thread_state *ts = (nb_thread_state *) pthread_getspecific(key);
     if (!ts) {
         ts = new nb_thread_state();
+        ts->internals = p;
         check(pthread_setspecific(key, ts) == 0,
               "nanobind: pthread_setspecific() failed!");
     }
@@ -227,31 +245,22 @@ static const char* interned_c_strs[pyobj_name::string_count] {
     #undef NB_INTERNED_ENTRY
 };
 
-PyObject *static_pyobjects[pyobj_name::total_count] = {};
-
 static void new_constant(nb_internals *p, int index, PyObject *o) {
-    static_pyobjects[index] = o;
+    p->pyobjects[index] = o;
     new_object(p, o);
 }
 
-/// Lifeline generation against which this library's static_pyobjects[] was
-/// populated; a mismatch indicates stale entries from a destroyed lifeline.
-static uint32_t static_pyobjects_generation = 0;
-
-/// Populate this library's static_pyobjects[]
+/// Populate the PyObject cache of the given backend state
 static void init_pyobjects(nb_internals *p) {
-    if (static_pyobjects[0] &&
-        static_pyobjects_generation == p->lifeline_generation)
+    if (p->pyobjects[0])
         return;
-
-    static_pyobjects_generation = p->lifeline_generation;
 
     NB_NOUNROLL
     for (int i = 0; i < pyobj_name::string_count; ++i)
         new_constant(p, i, PyUnicode_InternFromString(interned_c_strs[i]));
 
     new_constant(p, pyobj_name::interned_max_version_tpl,
-                 PyTuple_Pack(1, NB_INTERNED(max_version)));
+                 PyTuple_Pack(1, NB_INTERNED(p, max_version)));
 
     PyObject *one = PyLong_FromLong(1), *zero = PyLong_FromLong(0);
     new_constant(p, pyobj_name::interned_dl_cpu_tpl, PyTuple_Pack(2, one, zero));
@@ -274,10 +283,54 @@ static void init_pyobjects(nb_internals *p) {
 #endif
 }
 
+#if defined(Py_LIMITED_API)
+/// Fill this binary's interpreter constants: cached PyType_Type and
+/// PyProperty_Type slots plus the offset of the type_data record within a
+/// type object (identical for every nb_internals of one interpreter)
+static void init_limited_api_constants(PyTypeObject *nb_meta, PyObject *mod) {
+    if (nb_type_data_offset)
+        return;
+
+    PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
+    PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
+    PyType_Type_tp_dealloc =
+        (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
+    PyType_Type_tp_setattro =
+        (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
+    PyProperty_Type_tp_descr_get =
+        (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
+    PyProperty_Type_tp_descr_set =
+        (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
+
+    PyType_Slot dummy_slots[] = {
+        { Py_tp_base, &PyType_Type },
+        { 0, nullptr }
+    };
+
+    PyType_Spec dummy_spec = {
+        /* .name = */ "nanobind.dummy",
+        /* .basicsize = */ - (int) sizeof(void*),
+        /* .itemsize = */ 0,
+        /* .flags = */ Py_TPFLAGS_DEFAULT,
+        /* .slots = */ dummy_slots
+    };
+
+    PyObject *dummy = PyType_FromMetaclass(nb_meta, mod, &dummy_spec, nullptr);
+    nb_type_data_offset =
+        ((uint8_t *) PyObject_GetTypeData(dummy, nb_meta) - (uint8_t *) dummy);
+    Py_DECREF(dummy);
+}
+#endif
+
 /// Create lifeline + internal types if needed
 static void init_internals(nb_internals *p) {
-    if (p->lifeline)
+    if (p->lifeline) {
+#if defined(Py_LIMITED_API)
+        init_limited_api_constants(Py_TYPE((PyObject *) p->nb_type),
+                                   p->nb_module);
+#endif
         return;
+    }
 
     p->lifeline = PyList_New(0);
     check(p->lifeline, "nanobind::detail::nb_module_init(): "
@@ -300,45 +353,17 @@ static void init_internals(nb_internals *p) {
           "nanobind::detail::nb_module_init(): initialization failed!");
 
 #if defined(Py_LIMITED_API)
-    p->PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
-    p->PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
-    p->PyType_Type_tp_dealloc =
-        (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
-    p->PyType_Type_tp_setattro =
-        (setattrofunc) PyType_GetSlot(&PyType_Type, Py_tp_setattro);
-    p->PyProperty_Type_tp_descr_get =
-        (descrgetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_get);
-    p->PyProperty_Type_tp_descr_set =
-        (descrsetfunc) PyType_GetSlot(&PyProperty_Type, Py_tp_descr_set);
-
-    PyType_Slot dummy_slots[] = {
-        { Py_tp_base, &PyType_Type },
-        { 0, nullptr }
-    };
-
-    PyType_Spec dummy_spec = {
-        /* .name = */ "nanobind.dummy",
-        /* .basicsize = */ - (int) sizeof(void*),
-        /* .itemsize = */ 0,
-        /* .flags = */ Py_TPFLAGS_DEFAULT,
-        /* .slots = */ dummy_slots
-    };
-
-    PyObject *dummy = PyType_FromMetaclass(
-        nb_meta, p->nb_module, &dummy_spec, nullptr);
-    p->type_data_offset =
-        ((uint8_t *) PyObject_GetTypeData(dummy, nb_meta) - (uint8_t *) dummy);
-    Py_DECREF(dummy);
+    init_limited_api_constants(nb_meta, p->nb_module);
 #endif
 
     // Create the single metaclass shared by all bound types. This may
-    // access 'type_data_offset' defined just above.
+    // access 'nb_type_data_offset' defined just above.
     p->nb_type = nb_type_create_metaclass(p, nb_meta);
     check(p->nb_type, "nanobind::detail::nb_module_init(): "
                       "nb_type metaclass creation failed!");
 }
 
-PyObject *import_cached(import_cache *c) noexcept {
+PyObject *import_cached(nb_internals *p, import_cache *c) noexcept {
     // Resolve outside of the lock since the import may need to re-enter nanobind.
     PyObject *mod = PyImport_ImportModule(c->module);
     if (!mod)
@@ -348,7 +373,6 @@ PyObject *import_cached(import_cache *c) noexcept {
     if (!o)
         return nullptr;
 
-    nb_internals *p = internals;
     lock_internals guard(p);
 
     if (PyObject *cur = c->load()) { // lost the race
@@ -391,10 +415,10 @@ static bool name_cache_match(const nb_internals::name_cache_entry &e,
 
 /// Miss path of cached_string() below; 'slot' and 'vacancy' carry over what
 /// the fast path already determined about the key's two-slot set
-NB_NOINLINE static PyObject *cached_string_slow(const char *str, size_t bound,
+NB_NOINLINE static PyObject *cached_string_slow(nb_internals *p,
+                                                const char *str, size_t bound,
                                                 bool *owned, size_t slot,
                                                 bool vacancy) noexcept {
-    nb_internals *p = internals;
     uintptr_t key = (uintptr_t) str;
 
     // On FT threads, interned strings are immortal. To avoid leaks with
@@ -452,9 +476,9 @@ NB_NOINLINE static PyObject *cached_string_slow(const char *str, size_t bound,
 
 /// Fast path of the 'cached_string' slot, inlined into the string-keyed
 /// object protocol operations below
-static NB_INLINE PyObject *cached_string_fast(const char *str, size_t bound,
+static NB_INLINE PyObject *cached_string_fast(nb_internals *p,
+                                              const char *str, size_t bound,
                                               bool *owned) noexcept {
-    nb_internals *p = internals;
     uintptr_t key = (uintptr_t) str;
 
     // Related string addresses differ mostly in their low bits. Apply a
@@ -473,11 +497,12 @@ static NB_INLINE PyObject *cached_string_fast(const char *str, size_t bound,
         vacancy |= !v;
     }
 
-    return cached_string_slow(str, bound, owned, slot, vacancy);
+    return cached_string_slow(p, str, bound, owned, slot, vacancy);
 }
 
-PyObject *cached_string(const char *str, size_t bound, bool *owned) noexcept {
-    return cached_string_fast(str, bound, owned);
+PyObject *cached_string(nb_internals *p, const char *str, size_t bound,
+                        bool *owned) noexcept {
+    return cached_string_fast(p, str, bound, owned);
 }
 
 /// Python string key of the string-keyed object protocol operations below
@@ -486,8 +511,8 @@ struct py_key {
     PyObject *value;
     bool owned;
 
-    py_key(const char *str, size_t bound)
-        : value(cached_string_fast(str, bound, &owned)) {
+    py_key(nb_internals *p, const char *str, size_t bound)
+        : value(cached_string_fast(p, str, bound, &owned)) {
         if (NB_UNLIKELY(!value))
             raise_python_error();
     }
@@ -498,15 +523,16 @@ struct py_key {
     }
 };
 
-PyObject *getattr_str(PyObject *obj, const char *str, size_t bound) {
-    py_key key(str, bound);
+PyObject *getattr_str(nb_internals *p, PyObject *obj, const char *str,
+                      size_t bound) {
+    py_key key(p, str, bound);
     return getattr(obj, key.value);
 }
 
-PyObject *getattr_str_def(PyObject *obj, const char *str, size_t bound,
-                          PyObject *def) noexcept {
+PyObject *getattr_str_def(nb_internals *p, PyObject *obj, const char *str,
+                          size_t bound, PyObject *def) noexcept {
     bool owned;
-    PyObject *key = cached_string_fast(str, bound, &owned);
+    PyObject *key = cached_string_fast(p, str, bound, &owned);
     if (NB_UNLIKELY(!key)) {
         PyErr_Clear();
         Py_XINCREF(def);
@@ -518,19 +544,21 @@ PyObject *getattr_str_def(PyObject *obj, const char *str, size_t bound,
     return res;
 }
 
-void setattr_str(PyObject *obj, const char *str, size_t bound,
-                 PyObject *value) {
-    py_key key(str, bound);
+void setattr_str(nb_internals *p, PyObject *obj, const char *str,
+                 size_t bound, PyObject *value) {
+    py_key key(p, str, bound);
     setattr(obj, key.value, value);
 }
 
-void delattr_str(PyObject *obj, const char *str, size_t bound) {
-    py_key key(str, bound);
+void delattr_str(nb_internals *p, PyObject *obj, const char *str,
+                 size_t bound) {
+    py_key key(p, str, bound);
     delattr(obj, key.value);
 }
 
-PyObject *dict_getitem_str(PyObject *obj, const char *str, size_t bound) {
-    py_key key(str, bound);
+PyObject *dict_getitem_str(nb_internals *p, PyObject *obj, const char *str,
+                           size_t bound) {
+    py_key key(p, str, bound);
     bool error;
     PyObject *value = dict_getitem_ref(obj, key.value, &error);
     if (NB_UNLIKELY(!value))
@@ -538,14 +566,15 @@ PyObject *dict_getitem_str(PyObject *obj, const char *str, size_t bound) {
     return value;
 }
 
-void dict_setitem_str(PyObject *obj, const char *str, size_t bound,
-                      PyObject *value) {
-    py_key key(str, bound);
+void dict_setitem_str(nb_internals *p, PyObject *obj, const char *str,
+                      size_t bound, PyObject *value) {
+    py_key key(p, str, bound);
     raise_if_nonzero(PyDict_SetItem(obj, key.value, value));
 }
 
-void dict_delitem_str(PyObject *obj, const char *str, size_t bound) {
-    py_key key(str, bound);
+void dict_delitem_str(nb_internals *p, PyObject *obj, const char *str,
+                      size_t bound) {
+    py_key key(p, str, bound);
     raise_if_nonzero(PyDict_DelItem(obj, key.value));
 }
 
@@ -554,30 +583,33 @@ void dict_delitem_str(PyObject *obj, const char *str, size_t bound) {
 // object protocol, where an overridden '__getitem__' and the '__missing__'
 // hook remain visible.
 
-PyObject *getitem_str(PyObject *obj, const char *str, size_t bound) {
+PyObject *getitem_str(nb_internals *p, PyObject *obj, const char *str,
+                      size_t bound) {
     if (PyDict_CheckExact(obj))
-        return dict_getitem_str(obj, str, bound);
-    py_key key(str, bound);
+        return dict_getitem_str(p, obj, str, bound);
+    py_key key(p, str, bound);
     return raise_if_null(PyObject_GetItem(obj, key.value));
 }
 
-void setitem_str(PyObject *obj, const char *str, size_t bound,
-                 PyObject *value) {
+void setitem_str(nb_internals *p, PyObject *obj, const char *str,
+                 size_t bound, PyObject *value) {
     if (PyDict_CheckExact(obj))
-        return dict_setitem_str(obj, str, bound, value);
-    py_key key(str, bound);
+        return dict_setitem_str(p, obj, str, bound, value);
+    py_key key(p, str, bound);
     setitem(obj, key.value, value);
 }
 
-void delitem_str(PyObject *obj, const char *str, size_t bound) {
+void delitem_str(nb_internals *p, PyObject *obj, const char *str,
+                 size_t bound) {
     if (PyDict_CheckExact(obj))
-        return dict_delitem_str(obj, str, bound);
-    py_key key(str, bound);
+        return dict_delitem_str(p, obj, str, bound);
+    py_key key(p, str, bound);
     delitem(obj, key.value);
 }
 
-bool contains_str(PyObject *obj, const char *str, size_t bound) {
-    py_key key(str, bound);
+bool contains_str(nb_internals *p, PyObject *obj, const char *str,
+                  size_t bound) {
+    py_key key(p, str, bound);
     int rv;
     if (PyDict_CheckExact(obj))
         rv = PyDict_Contains(obj, key.value);
@@ -588,9 +620,10 @@ bool contains_str(PyObject *obj, const char *str, size_t bound) {
     return rv == 1;
 }
 
-bool hasattr_str(PyObject *obj, const char *str, size_t bound) noexcept {
+bool hasattr_str(nb_internals *p, PyObject *obj, const char *str,
+                 size_t bound) noexcept {
     bool owned;
-    PyObject *key = cached_string_fast(str, bound, &owned);
+    PyObject *key = cached_string_fast(p, str, bound, &owned);
     if (NB_UNLIKELY(!key)) {
         PyErr_Clear();
         return false;
@@ -601,19 +634,14 @@ bool hasattr_str(PyObject *obj, const char *str, size_t bound) noexcept {
     return rv;
 }
 
-void internals_inc_ref() {
-    internals->shared_ref_count.value++;
+void internals_inc_ref(nb_internals *p) {
+    p->shared_ref_count.value++;
 }
 
-void internals_dec_ref() {
-    nb_internals *p = internals;
+void internals_dec_ref(nb_internals *p) {
     auto value = --p->shared_ref_count.value;
     if (value != 0)
         return;
-
-    // Invalidate every library's cached 'static_pyobjects' array: destroying
-    // the lifeline frees the objects that these arrays reference.
-    p->lifeline_generation++;
 
     Py_CLEAR(p->lifeline);
 
@@ -628,7 +656,7 @@ void internals_dec_ref() {
         entry.store_release(nullptr);
 
     for (int i = 0; i < pyobj_name::total_count; ++i)
-        static_pyobjects[i] = nullptr;
+        p->pyobjects[i] = nullptr;
 
     for (import_cache *c : p->import_slots)
         c->store(nullptr);
@@ -639,8 +667,13 @@ void internals_dec_ref() {
         e.value.store_release(nullptr);
 }
 
-static void nb_module_free(void *) {
-    internals_dec_ref();
+static void nb_module_free(void *m) {
+    // The state holds the domain registered by nb_module_init(); it is
+    // still zero when the module was created but never executed.
+    void *state = PyModule_GetState((PyObject *) m);
+    nb_internals *p = state ? *(nb_internals **) state : nullptr;
+    if (p)
+        internals_dec_ref(p);
 }
 
 PyObject *module_new(const char *name, const char *doc, void *exec,
@@ -678,6 +711,8 @@ PyObject *module_new(const char *name, const char *doc, void *exec,
     d->m_name = name;
     d->m_doc = doc;
     d->m_slots = s;
+    // Per-module state recording the domain, filled in by nb_module_init()
+    d->m_size = (Py_ssize_t) sizeof(nb_internals *);
     d->m_free = nb_module_free;
     return PyModuleDef_Init(d);
 }
@@ -713,13 +748,7 @@ void tstate_release(void *token) noexcept {
 }
 
 
-static void internals_cleanup() {
-    nb_internals *p = internals;
-    if (!p)
-        return;
-
-    *is_alive_ptr = false;
-
+NB_NOINLINE static void internals_cleanup_one([[maybe_unused]] nb_internals *p) {
 #if !defined(PYPY_VERSION) && !defined(NB_FREE_THREADED)
     // The memory leak checker is unsupported on PyPy, see
     // see https://foss.heptapod.net/pypy/pypy/-/issues/3855.
@@ -845,13 +874,10 @@ static void internals_cleanup() {
         // This code won't run for now but is kept here for a time when
         // immortalization isn't needed anymore.
 
-        PyThread_tss_delete(p->nb_static_property_disabled);
-        PyThread_tss_free(p->nb_static_property_disabled);
         delete[] p->shards;
 #endif
 
         delete p;
-        internals = nullptr;
     } else {
         if (print_leak_warnings) {
             fprintf(stderr, "nanobind: this is likely caused by a reference "
@@ -866,7 +892,64 @@ static void internals_cleanup() {
 #endif
 }
 
-static int nb_module_init_impl(const char *domain, PyObject *) {
+static void internals_cleanup() {
+    is_alive_value = false;
+    *is_alive_ptr = false;
+
+    for (nb_internals *p : internals_created)
+        internals_cleanup_one(p);
+    internals_created.clear();
+}
+
+/// Adopt the record referenced by 'capsule' (consumed) and register the
+/// module as one of its users
+static nb_internals *internals_join(PyObject *capsule,
+                                    nb_internals **mod_state) {
+    nb_internals *p =
+        (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
+    Py_DECREF(capsule);
+    if (!p)
+        return nullptr;
+
+    is_alive_ptr = p->is_alive_ptr;
+
+    init_internals(p);
+    init_pyobjects(p);
+
+    // A module that is executed more than once (importlib.reload) counts once
+    if (*mod_state != p) {
+        *mod_state = p;
+        internals_inc_ref(p);
+    }
+    return p;
+}
+
+/// Discard a freshly created record whose publication failed or that lost the
+/// race against a concurrent import of another extension of the same domain
+static void internals_discard(nb_internals *p) noexcept {
+    // Release the record's Python objects via the refcounted teardown path
+    internals_inc_ref(p);
+    internals_dec_ref(p);
+
+    nb_translator_seq *t = p->translators.load_relaxed();
+    while (t) {
+        nb_translator_seq *next = t->next;
+        delete t;
+        t = next;
+    }
+
+#if defined(NB_FREE_THREADED)
+    delete[] p->shards;
+#  if defined(_WIN32)
+    FlsFree(p->thread_state_key);
+#  else
+    pthread_key_delete(p->thread_state_key);
+#  endif
+#endif
+    delete p;
+}
+
+static nb_internals *nb_module_init_impl(const char *domain, PyObject *m) {
 #if defined(NB_HAVE_INTERP_VIEW)
     // Needed by every later attach_tstate() call, including those of
     // extensions that reuse an already initialized 'nb_internals'
@@ -874,16 +957,19 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
         nb_interp_view = PyInterpreterView_FromMain();
         if (!nb_interp_view) {
             PyErr_NoMemory();
-            return -1;
+            return nullptr;
         }
     }
 #endif
 
-    if (internals) {
-        init_internals(internals);
-        init_pyobjects(internals);
-        internals_inc_ref();
-        return 0;
+    // Per-module state created by module_new(), records the module's domain
+    nb_internals **mod_state =
+        m ? (nb_internals **) PyModule_GetState(m) : nullptr;
+    if (!mod_state) {
+        PyErr_SetString(PyExc_SystemError,
+                        "nanobind::detail::nb_module_init(): the module "
+                        "object does not carry nanobind state!");
+        return nullptr;
     }
 
 #if defined(PYPY_VERSION)
@@ -894,34 +980,20 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
     if (!dict) {
         PyErr_SetString(PyExc_SystemError,
                         "nanobind: could not access the internals dictionary!");
-        return -1;
+        return nullptr;
     }
 
-    // The key combines the domain served by this backend image (nonempty for
-    // a backend module built with NB_DOMAIN) with the one passed by a
-    // linked-mode extension; at most one of the two is a nonempty string.
-    PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s%s__",
-                                         NB_INTERNALS_KEY, nb_backend_domain,
-                                         domain);
+    // Backend binaries in one process share the state of a domain exactly
+    // when their keys match
+    PyObject *key = PyUnicode_FromFormat("__nb_internals_%s_%s__",
+                                         NB_INTERNALS_KEY, domain);
     if (!key)
-        return -1;
+        return nullptr;
 
     PyObject *capsule = dict_getitem_or_default(dict, key, nullptr);
     if (capsule) {
         Py_DECREF(key);
-        internals = (nb_internals *) PyCapsule_GetPointer(capsule, "nb_internals");
-        if (!internals) {
-            Py_DECREF(capsule);
-            return -1;
-        }
-        is_alive_ptr = internals->is_alive_ptr;
-
-        init_internals(internals);
-        init_pyobjects(internals);
-        internals_inc_ref();
-
-        Py_DECREF(capsule);
-        return 0;
+        return internals_join(capsule, mod_state);
     }
 
     nb_internals *p = new nb_internals();
@@ -946,15 +1018,8 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
 #endif
     p->shard_count = shard_count;
 
-    internals = p;
-
     init_internals(p);
     init_pyobjects(p);
-
-#if defined(NB_FREE_THREADED)
-    p->nb_static_property_disabled = PyThread_tss_alloc();
-    PyThread_tss_create(p->nb_static_property_disabled);
-#endif
 
     p->translators.store_release(
         new nb_translator_seq{ default_exception_translator, nullptr, nullptr });
@@ -962,8 +1027,6 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
     is_alive_value = true;
     is_alive_ptr = &is_alive_value;
     p->is_alive_ptr = is_alive_ptr;
-
-    internals_inc_ref();
 
 #if !defined(PYPY_VERSION)
     // typing.py on CPython introduces spurious reference leaks that upset
@@ -1006,26 +1069,67 @@ static int nb_module_init_impl(const char *domain, PyObject *) {
     }
 #endif
 
-    if (Py_AtExit(internals_cleanup))
-        fprintf(stderr,
-                "Warning: could not install the nanobind cleanup handler! This "
-                "is needed to check for reference leaks and release remaining "
-                "resources at interpreter shutdown (e.g., to avoid leaks being "
-                "reported by tools like 'valgrind'). If you are a user of a "
-                "python extension library, you can ignore this warning.");
-
     capsule = PyCapsule_New(p, "nb_internals", nullptr);
     if (!capsule) {
         Py_DECREF(key);
-        return -1;
+        internals_discard(p);
+        return nullptr;
     }
-    int rv = PyDict_SetItem(dict, key, capsule);
+
+    /* Publish the record unless a concurrent import of another extension of
+       this domain published one in the meantime: the initialization above
+       runs Python code, and free-threaded builds do not serialize the
+       execution of distinct modules at all. */
+    PyObject *found;
+    int rv;
+#if PY_VERSION_HEX >= 0x030D0000 && !defined(Py_LIMITED_API) && \
+    !defined(PYPY_VERSION)
+    found = nullptr;
+    rv = PyDict_SetDefaultRef(dict, key, capsule, &found);
+    if (rv == 0)
+        Py_CLEAR(found); // references our own capsule
+#else
+    // The GIL prevents interleaving between the recheck and the insertion
+    found = dict_getitem_or_default(dict, key, nullptr);
+    rv = found ? 1 : PyDict_SetItem(dict, key, capsule);
+#endif
     Py_DECREF(capsule);
     Py_DECREF(key);
-    return rv;
+
+    if (NB_UNLIKELY(rv != 0)) {
+        internals_discard(p);
+        if (rv < 0)
+            return nullptr;
+        return internals_join(found, mod_state); // lost the race, adopt
+    }
+
+    // Track the published record for the exit-time sweep
+    {
+#if defined(NB_FREE_THREADED)
+        PyMutex_Lock(&internals_created_mutex);
+#endif
+        internals_created.push_back(p);
+        bool need_atexit = !internals_cleanup_registered;
+        internals_cleanup_registered = true;
+#if defined(NB_FREE_THREADED)
+        PyMutex_Unlock(&internals_created_mutex);
+#endif
+        if (need_atexit && Py_AtExit(internals_cleanup))
+            fprintf(stderr,
+                    "Warning: could not install the nanobind cleanup handler! This "
+                    "is needed to check for reference leaks and release remaining "
+                    "resources at interpreter shutdown (e.g., to avoid leaks being "
+                    "reported by tools like 'valgrind'). If you are a user of a "
+                    "python extension library, you can ignore this warning.");
+    }
+
+    *mod_state = p;
+    internals_inc_ref(p);
+    return p;
 }
 
-NB_NOINLINE int nb_module_init(const char *domain, PyObject *m) noexcept {
+NB_NOINLINE nb_internals *nb_module_init(const char *domain,
+                                         PyObject *m) noexcept {
     try {
         return nb_module_init_impl(domain, m);
     } catch (python_error &e) {
@@ -1038,7 +1142,7 @@ NB_NOINLINE int nb_module_init(const char *domain, PyObject *m) noexcept {
         PyErr_SetString(PyExc_RuntimeError,
                         "nanobind: unknown initialization failure!");
     }
-    return -1;
+    return nullptr;
 }
 
 #if defined(NB_COMPACT_ASSERTIONS)

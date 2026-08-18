@@ -56,7 +56,7 @@ nanobind specifically. There are two solutions:
 
    Depending on the flags provided to :cmake:command:`nanobind_add_module()`,
    the shared library component may have a different name following the pattern
-   ``nanobind[-static][-abi3][-ft][-ps][-<domain>]``.
+   ``nanobind[-static][-abi3][-ft][-ps]``.
 
    The following CMake commands may be useful to adjust the build and install
    `rpath <https://en.wikipedia.org/wiki/Rpath>`_ of the extension:

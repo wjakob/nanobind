@@ -445,7 +445,7 @@ public:
         args.order = order;
         args.ro = ReadOnly;
 
-        m_handle = NB_CALL(ndarray_create)(&args, sizeof(args));
+        m_handle = NB_CALL(ndarray_create)(NB_CTX, &args, sizeof(args));
         m_dltensor = *NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
@@ -493,7 +493,7 @@ public:
         args.order = order;
         args.ro = ReadOnly;
 
-        m_handle = NB_CALL(ndarray_create)(&args, sizeof(args));
+        m_handle = NB_CALL(ndarray_create)(NB_CTX, &args, sizeof(args));
         m_dltensor = *NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
@@ -624,7 +624,7 @@ private:
     dlpack::dltensor m_dltensor;
 };
 
-inline bool ndarray_check(handle h) { return NB_CALL(ndarray_check)(h.ptr()); }
+inline bool ndarray_check(handle h) { return NB_CALL(ndarray_check)(NB_CTX, h.ptr()); }
 
 NAMESPACE_BEGIN(detail)
 
@@ -669,7 +669,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
             (void) shape_buf;
         }
 
-        detail::ndarray_handle *h = NB_CALL(ndarray_import)(
+        detail::ndarray_handle *h = NB_CALL(ndarray_import)(NB_CTX, 
             src.ptr(), &config, sizeof(config), flags & cast_flags::convert,
             cleanup);
 
@@ -683,7 +683,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
 
     static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return NB_CALL(ndarray_export)(tensor.handle(), Config::Framework::value, policy, cleanup);
+        return NB_CALL(ndarray_export)(NB_CTX, tensor.handle(), Config::Framework::value, policy, cleanup);
     }
 };
 

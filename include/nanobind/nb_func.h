@@ -394,7 +394,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
 
     (void) arg_index;
 
-    return NB_CALL(nb_func_new)(&f);
+    return NB_CALL(nb_func_new)(NB_CTX, &f);
 }
 
 NAMESPACE_END(detail)

@@ -56,3 +56,18 @@ def test04_subclass(clean):
     del o
     collect()
     assert t.stats() == (1, 1)
+
+def test05_inner_BREAKS(clean):
+    o = t.Outter()
+    assert o.get_inner().get_name() == "Inner"
+    assert o.get_inner().get_name() == "Inner"
+
+def test06_inner_ref(clean):
+    o = t.Outter()
+    assert o.get_inner_ref().get_name() == "Inner"
+    assert o.get_inner_ref().get_name() == "Inner"
+
+def test07_inner_ptr_BREAKS(clean):
+    o = t.Outter()
+    assert o.get_inner_ref().get_name() == "Inner"
+    assert o.get_inner_ref().get_name() == "Inner"

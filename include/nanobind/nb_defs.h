@@ -100,10 +100,11 @@
 #  if Py_LIMITED_API < 0x030A0000 || defined(PYPY_VERSION)
 #    error "nanobind can target Python's limited API, but this requires CPython >= 3.10"
 #  endif
-#  define NB_TUPLE_GET_SIZE PyTuple_Size
+// Prefer 'Py_SIZE' for tuples/lists since it stays inline in the stable ABI
+#  define NB_TUPLE_GET_SIZE Py_SIZE
 #  define NB_TUPLE_GET_ITEM PyTuple_GetItem
 #  define NB_TUPLE_SET_ITEM PyTuple_SetItem
-#  define NB_LIST_GET_SIZE PyList_Size
+#  define NB_LIST_GET_SIZE Py_SIZE
 #  define NB_LIST_GET_ITEM PyList_GetItem
 #  define NB_LIST_SET_ITEM PyList_SetItem
 #  define NB_DICT_GET_SIZE PyDict_Size

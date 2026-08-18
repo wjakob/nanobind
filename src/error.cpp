@@ -96,10 +96,18 @@ const char *error_what(PyObject *value, char **what) noexcept {
 #if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
     char *tmp;
     try {
-        object mod = module_::import_("traceback"),
-               result = mod.attr("format_exception")(exc_type, exc_value, exc_traceback);
-        str s = borrow<str>(str("\n").attr("join")(result));
-        const char *cstr = s.c_str();
+        object mod = module_::import_("traceback");
+        object fn = steal(raise_if_null(
+            PyObject_GetAttrString(mod.ptr(), "format_exception")));
+        handle tb = exc_traceback.is_valid() ? exc_traceback.ptr() : Py_None;
+        PyObject *args[4] = { nullptr, exc_type.ptr(), exc_value.ptr(),
+                              tb.ptr() };
+        object result = steal(raise_if_null(PyObject_Vectorcall(
+            fn.ptr(), args + 1, 3 | PY_VECTORCALL_ARGUMENTS_OFFSET, nullptr)));
+        str sep("\n");
+        str joined = steal<str>(raise_if_null(
+            PyObject_CallMethod(sep.ptr(), "join", "O", result.ptr())));
+        const char *cstr = joined.c_str();
         if (!cstr) // e.g. lone surrogates from an unencodable file name
             raise_python_error();
         tmp = strdup_check(cstr);
@@ -154,7 +162,8 @@ const char *error_what(PyObject *value, char **what) noexcept {
 
     if (exc_type.is_valid()) {
         try {
-            object name = exc_type.attr(NB_INTERNED(__name__));
+            object name = steal(raise_if_null(
+                PyObject_GetAttrString(exc_type.ptr(), "__name__")));
             exc_buf.put_dstr(borrow<str>(name).c_str());
             exc_buf.put(": ");
         } catch (...) { PyErr_Clear(); }
@@ -189,19 +198,20 @@ const char *error_what(PyObject *value, char **what) noexcept {
     return expected;
 }
 
-void register_exception_translator(exception_translator t, void *payload) {
-    nb_translator_seq *head = new nb_translator_seq{ t, payload,
-                                                     internals->translators.load_acquire() };
-    internals->translators.store_release(head);
+void register_exception_translator(nb_internals *p, exception_translator t,
+                                   void *payload) {
+    nb_translator_seq *head =
+        new nb_translator_seq{ t, payload, p->translators.load_acquire() };
+    p->translators.store_release(head);
 }
 
-NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
-                                PyObject *base) {
+NB_CORE PyObject *exception_new(nb_internals *p, PyObject *scope,
+                                const char *name, PyObject *base) {
     object modname;
     if (PyModule_Check(scope))
-        modname = getattr(scope, "__name__", handle());
+        modname = str_getattr_def(p, scope, "__name__");
     else
-        modname = getattr(scope, NB_INTERNED(__module__), handle());
+        modname = getattr(scope, NB_INTERNED(p, __module__), handle());
 
     if (!modname.is_valid())
         raise("nanobind::detail::exception_new(): could not determine module "
@@ -213,11 +223,11 @@ NB_CORE PyObject *exception_new(PyObject *scope, const char *name,
     object result = steal(PyErr_NewException(combined.c_str(), base, nullptr));
     check(result, "nanobind::detail::exception_new(): creation failed!");
 
-    if (hasattr(scope, name))
+    if (str_hasattr(p, scope, name))
         raise("nanobind::detail::exception_new(): an object of the same name "
               "already exists!");
 
-    setattr(scope, name, result);
+    str_setattr(p, scope, name, result);
     return result.release().ptr();
 }
 

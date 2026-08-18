@@ -153,7 +153,7 @@ jobs:
           -DPython_EXECUTABLE="${{ steps.py310.outputs.python-path }}"
         # Everything else (the abi3 extensions) comes from the 3.14 build
         cmake --build build310 -j 2 --target nanobind_backend_test \
-          nanobind_backend_test_mydomain test_abi_missing_ext copy-tests
+          test_abi_missing_ext copy-tests
 
     - name: Replace the 3.10 extensions with the 3.14-built ones
       run: |

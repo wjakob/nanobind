@@ -31,7 +31,7 @@ struct trampoline {
 #else
     NB_INLINE trampoline(void *ptr) : self(nullptr) {
 #endif
-        self = NB_CALL(trampoline_new)(ptr);
+        self = NB_CALL(trampoline_new)(NB_CTX, ptr);
     }
     NB_INLINE handle base() const { return self; }
 };

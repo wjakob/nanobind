@@ -59,10 +59,22 @@ void fail(const char *fmt, ...) noexcept {
     abort();
 }
 
+/// Called by the 'noexcept' routines that declare bindings: an operation that
+/// raises there means that the extension itself is fundamentally broken
+void fail_exception(const char *context, const char *name) noexcept {
+    try {
+        throw;
+    } catch (const std::exception &e) {
+        fail("%s(\"%s\"): %s", context, name, e.what());
+    } catch (...) {
+        fail("%s(\"%s\"): an unknown exception occurred!", context, name);
+    }
+}
+
 // ========================================================================
 
-PyObject *submodule_new(PyObject *base, const char *name,
-                               const char *doc) noexcept {
+PyObject *submodule_new(nb_internals *, PyObject *base, const char *name,
+                        const char *doc) noexcept {
     const char *base_name, *tmp_str;
     Py_ssize_t tmp_size = 0;
     object tmp, res;
@@ -107,7 +119,8 @@ fail:
 
 // ========================================================================
 
-size_t len_hint(PyObject *o) noexcept {
+size_t len_hint(nb_internals *p, PyObject *o) noexcept {
+    (void) p;
 #if !defined(Py_LIMITED_API)
     Py_ssize_t res = PyObject_LengthHint(o, 0);
     if (res < 0) {
@@ -131,16 +144,21 @@ size_t len_hint(PyObject *o) noexcept {
     }
 
     try {
-        return cast<size_t>(handle(o).attr(NB_INTERNED(__length_hint__))());
-    } catch (...) {
-        return 0;
-    }
+        object fn = steal(getattr(o, NB_INTERNED(p, __length_hint__)));
+        object hint = obj_call(p, fn);
+        uint64_t result = 0;
+        if (load_u64(p, hint.ptr(), 0, &result) &&
+            result <= (uint64_t) SIZE_MAX)
+            return (size_t) result;
+    } catch (...) { }
+    return 0;
 #endif
 }
 
 // ========================================================================
 
-PyObject *obj_vectorcall(PyObject *base, PyObject *const *args, size_t nargsf,
+PyObject *obj_vectorcall(nb_internals *, PyObject *base,
+                         PyObject *const *args, size_t nargsf,
                          uint64_t owned, uint32_t flags) {
     size_t nargs = (size_t) PyVectorcall_NARGS(nargsf);
     PyObject *res = nullptr;
@@ -188,8 +206,8 @@ static PyObject *kwargs_dict(PyObject *value) {
     return dict;
 }
 
-PyObject *obj_vectorcall_ex(PyObject *base, call_arg *args, size_t n,
-                            uint32_t flags) {
+PyObject *obj_vectorcall_ex(nb_internals *, PyObject *base, call_arg *args,
+                            size_t n, uint32_t flags) {
     PyObject *res = nullptr, *kwnames = nullptr, **stack, **pos, **kw;
     size_t nargs = 0, nkwargs = 0, nkw = 0;
     bool cast_error = !base;
@@ -497,31 +515,42 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
 // ========================================================================
 
-void property_install(PyObject *scope, const char *name, PyObject *getter,
-                      PyObject *setter, bool is_static) noexcept {
-    PyTypeObject *tp = is_static ? nb_static_property_tp() : &PyProperty_Type;
+static void property_install_impl(nb_internals *p, PyObject *scope,
+                                  const char *name, PyObject *getter,
+                                  PyObject *setter, bool is_static) {
+    PyTypeObject *tp = is_static ? nb_static_property_tp(p) : &PyProperty_Type;
     PyObject *m = getter ? getter : setter;
     object doc = none();
 
     PyTypeObject *mt = m ? Py_TYPE(m) : nullptr;
-    if (m && (mt == internals->nb_func || mt == internals->nb_method)) {
+    if (m && (mt == p->nb_func || mt == p->nb_method)) {
         func_data *f = nb_func_data(m);
         if (f->flags & (uint32_t) func_flags::has_doc)
             doc = str(f->doc);
     }
 
-    handle(scope).attr(name) = handle(tp)(
-        getter ? handle(getter) : handle(Py_None),
-        setter ? handle(setter) : handle(Py_None),
-        handle(Py_None), // deleter
-        doc
-    );
+    object prop = obj_call(p, handle((PyObject *) tp),
+                           handle(getter ? getter : Py_None),
+                           handle(setter ? setter : Py_None),
+                           handle(Py_None) /* deleter */, doc);
+    str_setattr(p, scope, name, prop);
+}
+
+void property_install(nb_internals *p, PyObject *scope, const char *name,
+                      PyObject *getter, PyObject *setter,
+                      bool is_static) noexcept {
+    try {
+        property_install_impl(p, scope, name, getter, setter, is_static);
+    } catch (...) {
+        fail_exception("nanobind::detail::property_install", name);
+    }
 }
 
 // ========================================================================
 
-bool load_cmplx(PyObject *ob, uint32_t flags,
-                 double *out) noexcept {
+bool load_cmplx(nb_internals *p, PyObject *ob, uint32_t flags,
+                double *out) noexcept {
+    (void) p;
     bool is_complex = PyComplex_CheckExact(ob),
          convert = (flags & cast_flags::convert);
 #if !defined(Py_LIMITED_API)
@@ -540,7 +569,7 @@ bool load_cmplx(PyObject *ob, uint32_t flags,
     // functions PyComplex_{Real,Imag}AsDouble(), so we do so ourselves.
     if (!is_complex && convert
             && !PyType_IsSubtype(Py_TYPE(ob), &PyComplex_Type)
-            && PyObject_HasAttr(ob, NB_INTERNED(__complex__))) {
+            && PyObject_HasAttr(ob, NB_INTERNED(p, __complex__))) {
         PyObject* tmp = PyObject_CallFunctionObjArgs(
                 (PyObject*) &PyComplex_Type, ob, NULL);
         if (tmp) {
@@ -571,7 +600,8 @@ bool load_cmplx(PyObject *ob, uint32_t flags,
     return false;
 }
 
-bool load_f64(PyObject *o, uint32_t flags, double *out) noexcept {
+bool load_f64(nb_internals *, PyObject *o, uint32_t flags,
+              double *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
 
 #if !defined(Py_LIMITED_API)
@@ -597,7 +627,8 @@ bool load_f64(PyObject *o, uint32_t flags, double *out) noexcept {
     return false;
 }
 
-bool load_f32(PyObject *o, uint32_t flags, float *out) noexcept {
+bool load_f32(nb_internals *, PyObject *o, uint32_t flags,
+              float *out) noexcept {
     bool is_float = PyFloat_CheckExact(o);
     bool convert = flags & cast_flags::convert;
 
@@ -657,7 +688,7 @@ NB_INLINE int_repr int_repr_get(PyObject *o) noexcept {
 
 /// Convert an object that is already known to be an 'int'. Never raises.
 template <typename T>
-NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
+NB_INLINE bool load_int_exact(nb_internals *, PyObject *o, T *out) noexcept {
     constexpr size_t bits = sizeof(T) * 8;
 
     // Number of digits of the largest value of type 'T'
@@ -699,7 +730,7 @@ NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
 
 /// Convert an object that is already known to be an 'int'. Never raises.
 template <typename T>
-NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
+NB_INLINE bool load_int_exact(nb_internals *p, PyObject *o, T *out) noexcept {
     int overflow;
     long long value = PyLong_AsLongLongAndOverflow(o, &overflow);
 
@@ -720,7 +751,8 @@ NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
         if (overflow > 0) {
             // Guard against out of range values using a comparison instead of
             // letting PyLong_AsUnsignedLongLong fail, which would be much more expensive.
-            if (PyObject_RichCompareBool(o, NB_INTERNED(u64_limit), Py_LT) == 1) {
+            if (PyObject_RichCompareBool(o, NB_INTERNED(p, u64_limit),
+                                         Py_LT) == 1) {
                 *out = (T) PyLong_AsUnsignedLongLongMask(o);
                 return true;
             }
@@ -733,16 +765,17 @@ NB_INLINE bool load_int_exact(PyObject *o, T *out) noexcept {
 #endif
 
 template <typename T>
-NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
+NB_INLINE bool load_int(nb_internals *p, PyObject *o, uint32_t flags,
+                        T *out) noexcept {
     if (NB_LIKELY(PyLong_CheckExact(o)))
-        return load_int_exact(o, out);
+        return load_int_exact(p, o, out);
 
     if (!(flags & cast_flags::convert))
         return false;
 
     // Handle subclasses of 'int' via the _exact() caster
     if (PyLong_Check(o))
-        return load_int_exact(o, out);
+        return load_int_exact(p, o, out);
 
     // Give up if we reach this point and __index__() does not exist
 #if !defined(Py_LIMITED_API)
@@ -760,41 +793,49 @@ NB_INLINE bool load_int(PyObject *o, uint32_t flags, T *out) noexcept {
         return false;
     }
 
-    bool result = load_int_exact(temp, out);
+    bool result = load_int_exact(p, temp, out);
     Py_DECREF(temp);
     return result;
 }
 
-bool load_u8(PyObject *o, uint32_t flags, uint8_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_u8(nb_internals *p, PyObject *o, uint32_t flags,
+             uint8_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_i8(PyObject *o, uint32_t flags, int8_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_i8(nb_internals *p, PyObject *o, uint32_t flags,
+             int8_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_u16(PyObject *o, uint32_t flags, uint16_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_u16(nb_internals *p, PyObject *o, uint32_t flags,
+             uint16_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_i16(PyObject *o, uint32_t flags, int16_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_i16(nb_internals *p, PyObject *o, uint32_t flags,
+             int16_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_u32(PyObject *o, uint32_t flags, uint32_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_u32(nb_internals *p, PyObject *o, uint32_t flags,
+             uint32_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_i32(PyObject *o, uint32_t flags, int32_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_i32(nb_internals *p, PyObject *o, uint32_t flags,
+             int32_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_u64(PyObject *o, uint32_t flags, uint64_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_u64(nb_internals *p, PyObject *o, uint32_t flags,
+             uint64_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
-bool load_i64(PyObject *o, uint32_t flags, int64_t *out) noexcept {
-    return load_int(o, flags, out);
+bool load_i64(nb_internals *p, PyObject *o, uint32_t flags,
+             int64_t *out) noexcept {
+    return load_int(p, o, flags, out);
 }
 
 // ========================================================================
@@ -834,24 +875,24 @@ void ft_mutex_unlock(void *m) noexcept {
 
 // ========================================================================
 
-uint32_t read_flag(nb_flag f) noexcept {
+uint32_t read_flag(nb_internals *p, nb_flag f) noexcept {
     switch (f) {
         case nb_flag::leak_warnings:
-            return internals->print_leak_warnings;
+            return p->print_leak_warnings;
         case nb_flag::implicit_cast_warnings:
-            return internals->print_implicit_cast_warnings;
+            return p->print_implicit_cast_warnings;
         default:
             fail("nanobind::detail::read_flag(): unknown flag!");
     }
 }
 
-void write_flag(nb_flag f, uint32_t value) {
+void write_flag(nb_internals *p, nb_flag f, uint32_t value) {
     switch (f) {
         case nb_flag::leak_warnings:
-            internals->print_leak_warnings = value != 0;
+            p->print_leak_warnings = value != 0;
             break;
         case nb_flag::implicit_cast_warnings:
-            internals->print_implicit_cast_warnings = value != 0;
+            p->print_implicit_cast_warnings = value != 0;
             break;
         default:
             raise("nanobind::detail::write_flag(): unknown flag!");

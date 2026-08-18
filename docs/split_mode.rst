@@ -108,6 +108,9 @@ To use split mode, pass the ``BACKEND_MODULE`` parameter to
 
    nanobind_add_module(my_ext my_ext.cpp BACKEND_MODULE nanobind_backend)
 
+As with regular build, you may specify ``NB_DOMAIN`` to :ref:`isolate
+<type-visibility>` your extension from others even when using a shared backend.
+
 Next, declare the backend package as a runtime dependency in
 ``pyproject.toml``.
 
@@ -155,9 +158,6 @@ Projects using a different toolchain or standard library cannot use the
 ``nanobind-backend`` package. They can usually still use split mode but must
 ship their own :ref:`custom backend module <custom-backend>`.
 
-Another limitation is that the ``NB_DOMAIN`` parameter cannot be used with
-split mode. The extension will join the domain of the specified backend module.
-
 Finally, statically linking the C++ library into an extension or a backend
 module is unsupported in split mode, as the C++ runtime must be shared to
 correctly propagate exceptions. The same goes for a private copy bundled into
@@ -188,14 +188,12 @@ documentation <highlevel-cmake>` provides more details.
 
 .. code-block:: cmake
 
-   nanobind_add_backend(
-     my_backend
-     NB_DOMAIN my_backend
-   )
+   nanobind_add_backend(my_backend)
 
-In the above example, the optional ``NB_DOMAIN`` parameter isolates bindings
-served by this backend from other nanobind instances in the same process.
-Extensions automatically join the domain of their backend module.
+A backend module serves any number of extensions and :ref:`type visibility
+domains <type-visibility>` at once; the ``NB_DOMAIN`` parameter of
+:cmake:command:`nanobind_add_module` works in split mode exactly as it does
+in the linked modes.
 
 Backend modules are always compiled with nanobind's detailed assertion
 messages. In a linked build, an internal check that fails in an optimized build

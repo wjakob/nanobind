@@ -400,9 +400,6 @@ function(nanobind_add_module name)
 
   if (IS_SPLIT AND (ARG_NB_SHARED OR ARG_NB_STATIC))
     message(FATAL_ERROR "split mode cannot be combined with NB_STATIC or NB_SHARED!")
-  elseif (IS_SPLIT AND ARG_NB_DOMAIN)
-    message(FATAL_ERROR "split mode cannot be combined with NB_DOMAIN: the "
-      "extension joins the domain of its backend module (see nanobind_add_backend())!")
   elseif (ARG_NB_SHARED AND ARG_NB_STATIC)
     message(FATAL_ERROR "NB_SHARED and NB_STATIC cannot be specified at the same time!")
   elseif (NOT IS_SPLIT AND NOT ARG_NB_SHARED)
@@ -491,10 +488,6 @@ function(nanobind_add_module name)
     # variant needs its own library (like -abi3 / -ft).
     if (ARG_PROTECT_STACK)
       set(libname "${libname}-ps")
-    endif()
-
-    if (ARG_NB_DOMAIN AND ARG_NB_SHARED)
-      set(libname ${libname}-${ARG_NB_DOMAIN})
     endif()
 
     if (ARG_NB_SUPPRESS_WARNINGS)
@@ -599,7 +592,7 @@ endfunction()
 
 function(nanobind_add_backend name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
-    "PROTECT_STACK;NOMINSIZE;NOSTRIP;NB_SUPPRESS_WARNINGS" "NB_DOMAIN" "")
+    "PROTECT_STACK;NOMINSIZE;NOSTRIP;NB_SUPPRESS_WARNINGS" "" "")
 
   add_library(${name} MODULE ${NB_DIR}/src/nb_backend.cpp)
 
@@ -629,10 +622,6 @@ function(nanobind_add_backend name)
 
   target_compile_definitions(${name} PRIVATE
     NB_BUILD "NB_BACKEND_NAME=${name}")
-
-  if (ARG_NB_DOMAIN)
-    target_compile_definitions(${name} PRIVATE NB_DOMAIN=${ARG_NB_DOMAIN})
-  endif()
 
   nanobind_extension(${name})
   nanobind_set_visibility(${name})

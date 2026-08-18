@@ -165,9 +165,9 @@ struct cached_name {
     bool owned;
 
     NB_INLINE cached_name(const char *key)
-        : value(NB_CALL(cached_string)(key, strlen(key) + 1, &owned)) { }
+        : value(NB_CALL(cached_string)(NB_CTX, key, strlen(key) + 1, &owned)) { }
     NB_INLINE cached_name(str_key key)
-        : value(NB_CALL(cached_string)(key.str, key.bound, &owned)) { }
+        : value(NB_CALL(cached_string)(NB_CTX, key.str, key.bound, &owned)) { }
     cached_name(const cached_name &) = delete;
     cached_name(cached_name &&) = delete;
     NB_INLINE ~cached_name() {
@@ -598,7 +598,7 @@ template <typename T> NB_INLINE T steal(handle h) {
 }
 
 inline bool hasattr(handle h, detail::str_key key) noexcept {
-    return NB_CALL(hasattr_str)(h.ptr(), key.str, key.bound);
+    return NB_CALL(hasattr_str)(NB_CTX, h.ptr(), key.str, key.bound);
 }
 
 inline bool hasattr(handle h, handle key) noexcept {
@@ -606,7 +606,7 @@ inline bool hasattr(handle h, handle key) noexcept {
 }
 
 inline object getattr(handle h, detail::str_key key) {
-    return steal(NB_CALL(getattr_str)(h.ptr(), key.str, key.bound));
+    return steal(NB_CALL(getattr_str)(NB_CTX, h.ptr(), key.str, key.bound));
 }
 
 inline object getattr(handle h, handle key) {
@@ -615,7 +615,7 @@ inline object getattr(handle h, handle key) {
 
 inline object getattr(handle h, detail::str_key key, handle def) noexcept {
     return steal(
-        NB_CALL(getattr_str_def)(h.ptr(), key.str, key.bound, def.ptr()));
+        NB_CALL(getattr_str_def)(NB_CTX, h.ptr(), key.str, key.bound, def.ptr()));
 }
 
 inline object getattr(handle h, handle key, handle value) noexcept {
@@ -623,7 +623,7 @@ inline object getattr(handle h, handle key, handle value) noexcept {
 }
 
 inline void setattr(handle h, detail::str_key key, handle value) {
-    NB_CALL(setattr_str)(h.ptr(), key.str, key.bound, value.ptr());
+    NB_CALL(setattr_str)(NB_CTX, h.ptr(), key.str, key.bound, value.ptr());
 }
 
 inline void setattr(handle h, handle key, handle value) {
@@ -631,7 +631,7 @@ inline void setattr(handle h, handle key, handle value) {
 }
 
 inline void delattr(handle h, detail::str_key key) {
-    NB_CALL(delattr_str)(h.ptr(), key.str, key.bound);
+    NB_CALL(delattr_str)(NB_CTX, h.ptr(), key.str, key.bound);
 }
 
 inline void delattr(handle h, handle key) {
@@ -655,7 +655,7 @@ public:
 
     NB_INLINE module_ def_submodule(const char *name,
                                     const char *doc = nullptr) {
-        return steal<module_>(NB_CALL(submodule_new)(m_ptr, name, doc));
+        return steal<module_>(NB_CALL(submodule_new)(NB_CTX, m_ptr, name, doc));
     }
 };
 
@@ -1048,7 +1048,7 @@ public:
 
 /// Retrieve the Python type object associated with a C++ class
 template <typename T> handle type() noexcept {
-    return NB_CALL(nb_type_lookup)(&typeid(detail::intrinsic_t<T>));
+    return NB_CALL(nb_type_lookup)(NB_CTX, &typeid(detail::intrinsic_t<T>));
 }
 
 template <typename T>
@@ -1056,7 +1056,7 @@ NB_INLINE bool isinstance(handle h) noexcept {
     if constexpr (std::is_base_of_v<handle, T>)
         return T::check_(h);
     else if constexpr (detail::is_base_caster_v<detail::make_caster<T>>)
-        return NB_CALL(nb_type_isinstance)(h.ptr(), &typeid(detail::intrinsic_t<T>));
+        return NB_CALL(nb_type_isinstance)(NB_CTX, h.ptr(), &typeid(detail::intrinsic_t<T>));
     else
         return detail::make_caster<T>().from_python(h, 0, nullptr);
 }
@@ -1074,7 +1074,7 @@ NB_INLINE size_t len(handle h) {
         detail::raise_python_error();
     return (size_t) res;
 }
-NB_INLINE size_t len_hint(handle h) { return NB_CALL(len_hint)(h.ptr()); }
+NB_INLINE size_t len_hint(handle h) { return NB_CALL(len_hint)(NB_CTX, h.ptr()); }
 NB_INLINE size_t len(const tuple &t) { return (size_t) NB_TUPLE_GET_SIZE(t.ptr()); }
 NB_INLINE size_t len(const list &l) { return (size_t) NB_LIST_GET_SIZE(l.ptr()); }
 NB_INLINE size_t len(const dict &d) { return (size_t) NB_DICT_GET_SIZE(d.ptr()); }
@@ -1248,7 +1248,7 @@ struct import_cache {
     handle get() {
         PyObject *v = load();
         if (NB_UNLIKELY(!v))
-            v = raise_if_null(NB_CALL(import_cached)(this));
+            v = raise_if_null(NB_CALL(import_cached)(NB_CTX, this));
         return v;
     }
 

@@ -111,6 +111,21 @@ struct ndarray_create_args;
 struct ticket;
 struct import_cache;
 
+/// Opaque record holding the backend state of one domain
+struct nb_internals;
+
+#if !defined(NB_BUILD)
+/// This extension's backend state, set during module initialization
+NB_HIDDEN inline nb_internals *internals = nullptr;
+#  define NB_CTX ::nanobind::detail::internals
+#else
+/// Backend code threads its state explicitly and must not use API entry
+/// points that inject the extension-side pointer. This function is never
+/// defined; any use fails at link time.
+extern nb_internals *nb_ctx_unavailable() noexcept;
+#  define NB_CTX ::nanobind::detail::nb_ctx_unavailable()
+#endif
+
 /// Backend configuration flags accessed via read_flag/write_flag.
 enum class nb_flag : uint32_t {
     leak_warnings = 0,

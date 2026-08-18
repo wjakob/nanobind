@@ -337,7 +337,7 @@ process_postcall(PyObject **args, std::integral_constant<size_t, NArgs>,
     static_assert(Nurse <= NArgs && Patient <= NArgs,
                   "keep_alive template parameters must be in the range "
                   "[0, number of C++ function arguments]");
-    NB_CALL(keep_alive_py)(Nurse   == 0 ? result : args[Nurse - 1],
+    NB_CALL(keep_alive_py)(NB_CTX, Nurse   == 0 ? result : args[Nurse - 1],
                            Patient == 0 ? result : args[Patient - 1]);
 }
 

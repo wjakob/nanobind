@@ -20,10 +20,6 @@ if (NB_TEST_FREE_THREADED)
   set(NB_FLAVOR_ARGS FREE_THREADED)
 endif()
 
-# NB_EXTRA_ARGS for test extensions in the 'mydomain' domain; split mode
-# instead points them at a backend module serving that domain below
-set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS} NB_DOMAIN mydomain)
-
 # NB_TEST_SPLIT_MODE runs the test suite in split mode: every test extension
 # resolves the compiled backend from a backend module at import time.
 # NB_TEST_SPLIT_WHEEL routes the suite through the installed
@@ -36,24 +32,24 @@ if (NB_TEST_SPLIT_MODE)
       "only free-threaded extensions)")
   endif()
 
-  # Build local backend modules and route every test extension through them.
-  # A domain is a property of the backend module, hence the 'mydomain' twin.
+  # Build a local backend module and route every test extension through it
   nanobind_add_backend(nanobind_backend_test)
-  nanobind_add_backend(nanobind_backend_test_mydomain NB_DOMAIN mydomain)
 
   # Stub generation imports the extensions, which need their backend
-  set(NB_BACKEND_DEPENDS nanobind_backend_test nanobind_backend_test_mydomain)
+  set(NB_BACKEND_DEPENDS nanobind_backend_test)
 
-  set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS}
-      BACKEND_MODULE nanobind_backend_test_mydomain)
   if (NB_TEST_SPLIT_WHEEL)
-    # The local twins above still serve the fill() handshake tests and
-    # the 'mydomain' extensions
+    # The local backend above still serves the fill() handshake tests
     set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} BACKEND_MODULE nanobind_backend)
   else()
     set(NB_EXTRA_ARGS ${NB_EXTRA_ARGS} BACKEND_MODULE nanobind_backend_test)
   endif()
 endif()
+
+# NB_EXTRA_ARGS for test extensions in the 'mydomain' domain. In split mode,
+# these share the backend module with everything else; the domain isolates
+# their type universe regardless.
+set(NB_EXTRA_ARGS_MYDOMAIN ${NB_EXTRA_ARGS} NB_DOMAIN mydomain)
 
 # ---------------------------------------------------------------------------
 # Compile with a few more compiler warnings turned on

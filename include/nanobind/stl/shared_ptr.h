@@ -51,7 +51,7 @@ shared_from_python(T *ptr, handle h) noexcept {
 
 inline NB_NOINLINE void shared_from_cpp(std::shared_ptr<void> &&ptr,
                                         PyObject *o) noexcept {
-    NB_CALL(keep_alive_ptr)(o, new std::shared_ptr<void>(std::move(ptr)),
+    NB_CALL(keep_alive_ptr)(NB_CTX, o, new std::shared_ptr<void>(std::move(ptr)),
                [](void *p) noexcept { delete (std::shared_ptr<void> *) p; });
 }
 
@@ -118,7 +118,7 @@ template <typename T> struct type_caster<std::shared_ptr<T>> {
         if constexpr (std::is_polymorphic_v<Td>)
             type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-        result = NB_CALL(nb_type_put)(type, type_p, ptr, rv_policy::reference,
+        result = NB_CALL(nb_type_put)(NB_CTX, type, type_p, ptr, rv_policy::reference,
                                       cleanup, &is_new);
 
         if (is_new) {

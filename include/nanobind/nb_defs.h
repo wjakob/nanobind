@@ -127,10 +127,6 @@
 #    error "nanobind's split mode requires CPython"
 #endif
 
-#if defined(NB_BACKEND_MODULE) && defined(NB_DOMAIN)
-#    error "split mode cannot be combined with NB_DOMAIN: the extension joins the domain of its backend module"
-#endif
-
 /* python_error is unusable with libc++ on ELF platforms, where typeinfo is
    compared by pointer. Python imports extensions with RTLD_LOCAL, so the
    weak symbols of the extensions are not correctly merged. */
@@ -185,7 +181,7 @@
 #  define NB_UNREACHABLE() __builtin_unreachable()
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #  define NB_HIDDEN
 #else
 #  define NB_HIDDEN __attribute__((visibility("hidden")))
@@ -202,7 +198,9 @@
 #define NB_MODULE_IMPL2(name, variable)                                        \
     static void nanobind_##name##_exec_impl(nanobind::module_);                \
     static int nanobind_##name##_exec(PyObject *m) {                           \
-        if (NB_CALL(nb_module_init)(NB_DOMAIN_STR, m) != 0)                    \
+        nanobind::detail::internals =                                          \
+            NB_CALL(nb_module_init)(NB_DOMAIN_STR, m);                         \
+        if (!nanobind::detail::internals)                                      \
             return -1;                                                         \
         try {                                                                  \
             nanobind_##name##_exec_impl(                                       \

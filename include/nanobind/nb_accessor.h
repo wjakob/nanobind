@@ -96,15 +96,15 @@ struct str_attr {
     using key_type = str_key;
 
     NB_INLINE static PyObject *get(PyObject *obj, str_key k) {
-        return NB_CALL(getattr_str)(obj, k.str, k.bound);
+        return NB_CALL(getattr_str)(NB_CTX, obj, k.str, k.bound);
     }
 
     NB_INLINE static void set(PyObject *obj, str_key k, PyObject *v) {
-        NB_CALL(setattr_str)(obj, k.str, k.bound, v);
+        NB_CALL(setattr_str)(NB_CTX, obj, k.str, k.bound, v);
     }
 
     NB_INLINE static PyObject *key(str_key k, bool &owned) {
-        return NB_CALL(cached_string)(k.str, k.bound, &owned);
+        return NB_CALL(cached_string)(NB_CTX, k.str, k.bound, &owned);
     }
 };
 
@@ -131,15 +131,15 @@ struct str_item {
     using key_type = str_key;
 
     NB_INLINE static PyObject *get(PyObject *obj, str_key k) {
-        return NB_CALL(getitem_str)(obj, k.str, k.bound);
+        return NB_CALL(getitem_str)(NB_CTX, obj, k.str, k.bound);
     }
 
     NB_INLINE static void set(PyObject *obj, str_key k, PyObject *v) {
-        NB_CALL(setitem_str)(obj, k.str, k.bound, v);
+        NB_CALL(setitem_str)(NB_CTX, obj, k.str, k.bound, v);
     }
 
     NB_INLINE static void del(PyObject *obj, str_key k) {
-        NB_CALL(delitem_str)(obj, k.str, k.bound);
+        NB_CALL(delitem_str)(NB_CTX, obj, k.str, k.bound);
     }
 };
 
@@ -188,15 +188,15 @@ struct dict_str_item {
     using key_type = str_key;
 
     NB_INLINE static PyObject *get(PyObject *obj, str_key k) {
-        return NB_CALL(dict_getitem_str)(obj, k.str, k.bound);
+        return NB_CALL(dict_getitem_str)(NB_CTX, obj, k.str, k.bound);
     }
 
     NB_INLINE static void set(PyObject *obj, str_key k, PyObject *v) {
-        NB_CALL(dict_setitem_str)(obj, k.str, k.bound, v);
+        NB_CALL(dict_setitem_str)(NB_CTX, obj, k.str, k.bound, v);
     }
 
     NB_INLINE static void del(PyObject *obj, str_key k) {
-        NB_CALL(dict_delitem_str)(obj, k.str, k.bound);
+        NB_CALL(dict_delitem_str)(NB_CTX, obj, k.str, k.bound);
     }
 };
 

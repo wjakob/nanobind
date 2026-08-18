@@ -150,9 +150,9 @@ Bindings also became more robust at interpreter shutdown:
   reports success. Split-mode extensions pick up the improved handling from a
   backend upgrade without recompiling.
 
-  The rewrite also removed a cost that this code paid needlessly. A thread that
-  already holds a Python thread state now proceeds with it instead of going
-  through an acquire/release pair, which reduces the cost of a :ref:`trampoline
+  The rewrite also removed an inefficiency of the former implementatoin. On Python
+  3.12+, a thread that already holds a thread state can now proceed directly, which
+  saves a acquire/release pair and reduces the cost of a :ref:`trampoline
   <trampolines>` dispatch from **8.7ns** to **5.7ns** on my machine.
 
 The release makes several further API-breaking changes that unlock internal

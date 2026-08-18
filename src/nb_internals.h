@@ -929,12 +929,14 @@ extern void *attach_tstate_early() noexcept;
    Hot paths like trampoline dispatch call these directly to skip the
    indirection through the exported functions. */
 
-/// Does the calling thread have a Python thread state attached? The limited
-/// API cannot answer this and conservatively reports 'false'. PyPy does the
-/// same because it hands out the thread state of a thread that released the
-/// GIL, which would send such a thread down the fast path below.
+/// Does the calling thread have a Python thread state attached? Configurations
+/// that cannot answer this report 'false' and take the slow path below. The
+/// limited API lacks the query. PyPy and Python below 3.12 report a thread
+/// state that the caller may not use (one released by this thread, or the one
+/// of whichever thread holds the GIL), which would wrongly convince an
+/// unattached thread that it can enter Python.
 NB_INLINE bool tstate_attached() noexcept {
-#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION) || PY_VERSION_HEX < 0x030C0000
     return false;
 #elif PY_VERSION_HEX < 0x030D0000
     return _PyThreadState_UncheckedGet() != nullptr;

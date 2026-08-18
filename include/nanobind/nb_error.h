@@ -164,10 +164,10 @@ class exception : public object {
     }
 };
 
+// The two functions below format through PyErr_FormatV(), whose format string
+// language is not covered by the 'printf' __attribute__.
+
 /// Chain a new error of type 'type' onto the currently pending one
-#if defined(__GNUC__)
-    __attribute__((__format__ (__printf__, 2, 3)))
-#endif
 inline void chain_error(handle type, const char *fmt, ...) noexcept {
     va_list args;
     va_start(args, fmt);
@@ -176,11 +176,7 @@ inline void chain_error(handle type, const char *fmt, ...) noexcept {
 }
 
 /// Restore 'e', chain a new error of type 'type' onto it, and re-raise
-#if defined(__GNUC__)
-    __attribute__((noreturn, noinline, __format__ (__printf__, 3, 4)))
-#else
-    [[noreturn]] NB_NOINLINE
-#endif
+[[noreturn]] NB_NOINLINE
 inline void raise_from(python_error &e, handle type, const char *fmt, ...) {
     e.restore();
     va_list args;

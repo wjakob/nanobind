@@ -30,6 +30,12 @@ elseif(DEFINED Python_SOSABI)
   set(NB_SOSABI "${Python_SOSABI}")
 endif()
 
+# Strip platform-tagged stable ABI suffixes (introduced by 3.15) to ensure
+# older Python versions that don't handle these suffixes still work
+if(DEFINED NB_SOSABI AND NB_SOSABI MATCHES "^(abi[0-9]+t?)-")
+  set(NB_SOSABI "${CMAKE_MATCH_1}")
+endif()
+
 # PyPy sets an invalid SOABI (platform missing), causing older FindPythons to
 # report an incorrect value. Only use it if it looks correct (X-X-X form).
 if(DEFINED NB_SOABI AND "${NB_SOABI}" MATCHES ".+-.+-.+")

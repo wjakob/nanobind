@@ -431,7 +431,7 @@ NB_SLOT(bool, gil_check, () noexcept)
 NB_SLOT(uint32_t, read_flag, (nb_flag f) noexcept)
 
 /// Write a backend configuration flag
-NB_SLOT(void, write_flag, (nb_flag f, uint32_t value) noexcept)
+NB_SLOT(void, write_flag, (nb_flag f, uint32_t value))
 
 /// Check whether the Python interpreter is still running (nb::is_alive)
 NB_SLOT(bool, is_alive, () noexcept)

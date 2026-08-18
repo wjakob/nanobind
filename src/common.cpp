@@ -845,7 +845,7 @@ uint32_t read_flag(nb_flag f) noexcept {
     }
 }
 
-void write_flag(nb_flag f, uint32_t value) noexcept {
+void write_flag(nb_flag f, uint32_t value) {
     switch (f) {
         case nb_flag::leak_warnings:
             internals->print_leak_warnings = value != 0;
@@ -854,7 +854,7 @@ void write_flag(nb_flag f, uint32_t value) noexcept {
             internals->print_implicit_cast_warnings = value != 0;
             break;
         default:
-            fail("nanobind::detail::write_flag(): unknown flag!");
+            raise("nanobind::detail::write_flag(): unknown flag!");
     }
 }
 

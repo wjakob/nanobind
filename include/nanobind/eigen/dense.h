@@ -261,29 +261,32 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         if (!caster.from_python(src, flags & ~cast_flags::accepts_none, cleanup))
             return false;
 
-        // Check for memory layout compatibility of non-contiguous 'Map' types
-        if constexpr (!is_contiguous_v<Map>)  {
-            // Dynamic inner strides support any input, check the fixed case
-            if constexpr (StrideType::InnerStrideAtCompileTime != Eigen::Dynamic) {
-                // A compile-time stride of 0 implies "contiguous" ..
-                int64_t is_expected = StrideType::InnerStrideAtCompileTime == 0
-                                      ? 1 // .. and equals 1 for the inner stride
-                                      : StrideType::InnerStrideAtCompileTime,
-                        is_actual = caster.value.stride(
-                            (ndim_v<T> != 1 && T::IsRowMajor) ? 1 : 0);
-
-                if (is_expected != is_actual)
+        // The `caster` already validated the shape, and for is_contiguous_v it
+        // also validated the memory layout, but if not then we need to validate
+        // against StrideType. Dynamic strides are compatible with any input, so
+        // only compile-time strides need checking (and can be ignored when the
+        // size in their dimension is <= 1).
+        if constexpr (!is_contiguous_v<Map>) {
+            constexpr size_t inner_dim = (ndim_v<T> == 2 && T::IsRowMajor) ? 1 : 0;
+            constexpr size_t outer_dim = 1 - inner_dim;
+            constexpr int64_t IS = StrideType::InnerStrideAtCompileTime;
+            if constexpr (IS != Eigen::Dynamic) {
+                int64_t actual_stride = caster.value.stride(inner_dim);
+                // A compile-time stride of 0 implies "contiguous".
+                constexpr int64_t expected_stride = IS == 0 ? 1 : IS;
+                if (actual_stride != expected_stride &&
+                        caster.value.shape(inner_dim) > 1)
                     return false;
             }
-
-            // Analogous check for the outer strides
-            if constexpr (ndim_v<T> == 2 && StrideType::OuterStrideAtCompileTime != Eigen::Dynamic) {
-                int64_t os_expected = StrideType::OuterStrideAtCompileTime == 0
-                                        ? caster.value.shape(T::IsRowMajor ? 1 : 0)
-                                        : StrideType::OuterStrideAtCompileTime,
-                        os_actual   = caster.value.stride(T::IsRowMajor ? 0 : 1);
-
-                if (os_expected != os_actual)
+            constexpr int64_t OS = StrideType::OuterStrideAtCompileTime;
+            if constexpr (ndim_v<T> == 2 && OS != Eigen::Dynamic) {
+                int64_t actual_stride = caster.value.stride(outer_dim);
+                // A compile-time stride of 0 implies "contiguous".
+                int64_t expected_stride = OS == 0
+                                            ? (int64_t) caster.value.shape(inner_dim)
+                                            : OS;
+                if (actual_stride != expected_stride &&
+                        caster.value.shape(outer_dim) > 1)
                     return false;
             }
         }
@@ -316,42 +319,12 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
     StrideType strides() const {
         constexpr int IS = StrideType::InnerStrideAtCompileTime,
                       OS = StrideType::OuterStrideAtCompileTime;
-
-        int64_t inner = caster.value.stride(0),
-                outer;
-
-        if constexpr (ndim_v<T> == 1)
-            outer = (int64_t) caster.value.shape(0);
-        else
-            outer = caster.value.stride(1);
-
-        (void) inner; (void) outer;
-        if constexpr (ndim_v<T> == 2 && T::IsRowMajor)
-            std::swap(inner, outer);
-
-        // Eigen may expect a stride of 0 to avoid an assertion failure
-        if constexpr (IS == 0)
-            inner = 0;
-
-        // Starting from numpy 2.4, dl_tensors' stride field is *always* set (for ndim > 0).
-        // This also includes when shape=(0,0), when numpy reports the stride to be zero.
-        // This creates an incompatibility with Eigen compile-time vectors, which expect
-        // runtime and compile-time strides to be identical (e.g. for Eigen::VectorXi, equal to 1).
-        // For dynamic strides (IS == Eigen::Dynamic), substitute a unit inner stride
-        if constexpr (ndim_v<T> == 1) {
-            if (caster.value.shape(0) == 0)
-                inner = IS == Eigen::Dynamic ? 1 : IS;
-        }
-
-        if constexpr (OS == 0)
-            outer = 0;
-
         if constexpr (std::is_same_v<StrideType, Eigen::InnerStride<IS>>)
-            return StrideType(inner);
+            return StrideType(inner_stride());
         else if constexpr (std::is_same_v<StrideType, Eigen::OuterStride<OS>>)
-            return StrideType(outer);
+            return StrideType(outer_stride());
         else
-            return StrideType(outer, inner);
+            return StrideType(outer_stride(), inner_stride());
     }
 
     operator Map() {
@@ -361,6 +334,31 @@ struct type_caster<Eigen::Map<T, Options, StrideType>,
         else
             return Map(t.data(), (Eigen::Index) t.shape(0),
                        (Eigen::Index) t.shape(1), strides());
+    }
+
+private:
+    Eigen::Index inner_stride() const {
+        if constexpr (StrideType::InnerStrideAtCompileTime == Eigen::Dynamic)
+            if constexpr (ndim_v<T> == 1)
+                return caster.value.stride(0);
+            else if constexpr (T::IsRowMajor)
+                return caster.value.stride(1);
+            else
+                return caster.value.stride(0);
+        else
+            return StrideType::InnerStrideAtCompileTime;
+    }
+
+    Eigen::Index outer_stride() const {
+        if constexpr (StrideType::OuterStrideAtCompileTime == Eigen::Dynamic)
+            if constexpr (ndim_v<T> == 1)
+                return (Eigen::Index) caster.value.shape(0);
+            else if constexpr (T::IsRowMajor)
+                return caster.value.stride(0);
+            else
+                return caster.value.stride(1);
+        else
+            return StrideType::OuterStrideAtCompileTime;
     }
 };
 

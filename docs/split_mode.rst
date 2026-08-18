@@ -139,12 +139,16 @@ platform:
    :header-rows: 1
 
    * - Platform
+     - Architectures
      - Toolchain
    * - Windows
+     - ``x86_64``, ``arm64`` (Python 3.11 and newer)
      - MSVC with the ``/MD`` runtime (release, shared CRT)
    * - Linux
+     - ``x86_64``, ``aarch64``, ``riscv64``
      - GCC or Clang with libstdc++ as provided by manylinux
    * - macOS
+     - ``x86_64``, ``arm64``
      - AppleClang with libc++
 
 Projects using a different toolchain or standard library cannot use the

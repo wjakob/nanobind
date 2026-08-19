@@ -295,7 +295,7 @@ template <> struct type_caster<char> {
     using Cast = std::conditional_t<is_pointer_v<T_>, const char *, char>;
 
     bool from_python(handle src, uint32_t, cleanup_list *) noexcept {
-        if (!PyUnicode_Check(src.ptr()))
+        if (!str_check(src.ptr()))
             return false;
         value = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
         if (!value) {

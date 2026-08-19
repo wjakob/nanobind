@@ -19,7 +19,7 @@ template <> struct type_caster<std::string> {
     NB_TYPE_CASTER(std::string, const_name("str"))
 
     bool from_python(handle src, uint32_t, cleanup_list *) noexcept {
-        if (!PyUnicode_Check(src.ptr()))
+        if (!str_check(src.ptr()))
             return false;
         Py_ssize_t size;
         const char *str = PyUnicode_AsUTF8AndSize(src.ptr(), &size);

@@ -330,6 +330,29 @@ inline PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def
     return value;
 }
 
+// The limited API routes the type tests below through a PyType_GetFlags()
+// call. Testing for the exact type first avoids it in the common case.
+#if defined(Py_LIMITED_API)
+#  define NB_TYPE_CHECK(name, check, type, flag)                               \
+      NB_INLINE bool name(PyObject *o) noexcept {                              \
+          PyTypeObject *tp = Py_TYPE(o);                                       \
+          return tp == &type || PyType_HasFeature(tp, flag);                   \
+      }
+#else
+#  define NB_TYPE_CHECK(name, check, type, flag)                               \
+      NB_INLINE bool name(PyObject *o) noexcept { return check(o); }
+#endif
+
+NB_TYPE_CHECK(int_check,     PyLong_Check,    PyLong_Type,    Py_TPFLAGS_LONG_SUBCLASS)
+NB_TYPE_CHECK(str_check,     PyUnicode_Check, PyUnicode_Type, Py_TPFLAGS_UNICODE_SUBCLASS)
+NB_TYPE_CHECK(bytes_check,   PyBytes_Check,   PyBytes_Type,   Py_TPFLAGS_BYTES_SUBCLASS)
+NB_TYPE_CHECK(tuple_check,   PyTuple_Check,   PyTuple_Type,   Py_TPFLAGS_TUPLE_SUBCLASS)
+NB_TYPE_CHECK(list_check,    PyList_Check,    PyList_Type,    Py_TPFLAGS_LIST_SUBCLASS)
+NB_TYPE_CHECK(dict_check,    PyDict_Check,    PyDict_Type,    Py_TPFLAGS_DICT_SUBCLASS)
+NB_TYPE_CHECK(py_type_check, PyType_Check,    PyType_Type,    Py_TPFLAGS_TYPE_SUBCLASS)
+
+#undef NB_TYPE_CHECK
+
 /// Check whether the object can be iterated over (see nb::iterable)
 inline bool iterable_check(PyObject *o) noexcept {
     PyTypeObject *tp = Py_TYPE(o);
@@ -404,7 +427,7 @@ public:
 
     NB_INLINE bool is(handle value) const;
     NB_INLINE bool is_none() const { return derived().ptr() == Py_None; }
-    NB_INLINE bool is_type() const { return PyType_Check(derived().ptr()); }
+    NB_INLINE bool is_type() const { return py_type_check(derived().ptr()); }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
     NB_INLINE handle inc_ref() const &;
     NB_INLINE handle dec_ref() const &;
@@ -746,7 +769,7 @@ class bool_ : public object {
 };
 
 class int_ : public object {
-    NB_OBJECT_DEFAULT(int_, object, "int", PyLong_Check)
+    NB_OBJECT_DEFAULT(int_, object, "int", detail::int_check)
 
     explicit int_(handle h)
         : object(detail::raise_if_null(PyNumber_Long(h.ptr())), detail::steal_t{}) { }
@@ -795,7 +818,7 @@ class float_ : public object {
 };
 
 class str : public object {
-    NB_OBJECT_DEFAULT(str, object, "str", PyUnicode_Check)
+    NB_OBJECT_DEFAULT(str, object, "str", detail::str_check)
 
     explicit str(handle h)
         : object(detail::raise_if_null(PyObject_Str(h.ptr())), detail::steal_t{}) { }
@@ -818,7 +841,7 @@ class str : public object {
 };
 
 class bytes : public object {
-    NB_OBJECT_DEFAULT(bytes, object, "bytes", PyBytes_Check)
+    NB_OBJECT_DEFAULT(bytes, object, "bytes", detail::bytes_check)
 
     explicit bytes(handle h)
         : object(detail::raise_if_null(PyBytes_FromObject(h.ptr())), detail::steal_t{}) { }
@@ -870,7 +893,7 @@ class bytearray : public object {
 };
 
 class tuple : public object {
-    NB_OBJECT(tuple, object, "tuple", PyTuple_Check)
+    NB_OBJECT(tuple, object, "tuple", detail::tuple_check)
     tuple() : object(PyTuple_New(0), detail::steal_t()) { }
     explicit tuple(handle h)
         : object(detail::raise_if_null(PySequence_Tuple(h.ptr())), detail::steal_t{}) { }
@@ -884,11 +907,11 @@ class tuple : public object {
 };
 
 class type_object : public object {
-    NB_OBJECT_DEFAULT(type_object, object, "type", PyType_Check)
+    NB_OBJECT_DEFAULT(type_object, object, "type", detail::py_type_check)
 };
 
 class list : public object {
-    NB_OBJECT(list, object, "list", PyList_Check)
+    NB_OBJECT(list, object, "list", detail::list_check)
     list() : object(PyList_New(0), detail::steal_t()) { }
     explicit list(handle h)
         : object(detail::raise_if_null(PySequence_List(h.ptr())), detail::steal_t{}) { }
@@ -936,7 +959,7 @@ class list : public object {
 };
 
 class dict : public object {
-    NB_OBJECT(dict, object, "dict", PyDict_Check)
+    NB_OBJECT(dict, object, "dict", detail::dict_check)
     dict() : object(PyDict_New(), detail::steal_t()) { }
     size_t size() const { return (size_t) NB_DICT_GET_SIZE(m_ptr); }
     detail::dict_iterator begin() const;
@@ -1013,11 +1036,11 @@ class mapping : public object {
 };
 
 class args : public tuple {
-    NB_OBJECT_DEFAULT(args, tuple, "tuple", PyTuple_Check)
+    NB_OBJECT_DEFAULT(args, tuple, "tuple", detail::tuple_check)
 };
 
 class kwargs : public dict {
-    NB_OBJECT_DEFAULT(kwargs, dict, "dict", PyDict_Check)
+    NB_OBJECT_DEFAULT(kwargs, dict, "dict", detail::dict_check)
 };
 
 class iterator : public object {
@@ -1233,7 +1256,7 @@ public:
     using type_object::operator=;
 
     static bool check_(handle h) {
-        return PyType_Check(h.ptr()) &&
+        return detail::py_type_check(h.ptr()) &&
                PyType_IsSubtype((PyTypeObject *) h.ptr(),
                                 (PyTypeObject *) nanobind::type<T>().ptr());
     }

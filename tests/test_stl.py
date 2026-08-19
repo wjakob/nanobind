@@ -931,3 +931,43 @@ def test74_variant_implicit_conversions():
 def test75_weird_nones():
     assert t.takes_nullptr(None) == "nullptr"
     assert t.takes_monostate(None) == "monostate"
+
+def test76_map_from_other_mappings():
+    import collections.abc
+
+    assert t.map_str_int_in({}) == ""
+    assert t.map_str_int_in({"a": 1, "b": 2}) == "a=1;b=2;"
+
+    # A dict subclass is read through its (potentially overridden) items()
+    class Shouty(dict):
+        def items(self):
+            return [(k.upper(), v) for k, v in super().items()]
+
+    assert t.map_str_int_in(Shouty(a=1)) == "A=1;"
+
+    # A mapping that does not derive from dict
+    class Mapping(collections.abc.Mapping):
+        def __init__(self, d):
+            self.d = d
+        def __getitem__(self, k):
+            return self.d[k]
+        def __iter__(self):
+            return iter(self.d)
+        def __len__(self):
+            return len(self.d)
+
+    assert t.map_str_int_in(Mapping({})) == ""
+    assert t.map_str_int_in(Mapping({"a": 1, "b": 2})) == "a=1;b=2;"
+
+    # Rejected: items() that yields something other than 2-tuples
+    class Weird(dict):
+        def items(self):
+            return [1, 2, 3]
+
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        t.map_str_int_in(Weird(a=1))
+
+    # Rejected: not a mapping, and a mapping without items()
+    for arg in (None, 5, [("a", 1)]):
+        with pytest.raises(TypeError, match="incompatible function arguments"):
+            t.map_str_int_in(arg)

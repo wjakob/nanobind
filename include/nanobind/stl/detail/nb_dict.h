@@ -24,45 +24,26 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
     using ValCaster = make_caster<Val>;
 
     bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
+        size_t size;
+        PyObject *temp;
+
+        // The snapshot is unique to this thread. All return values and return
+        // parameters are zero/NULL in the case of a failure.
+        PyObject **o = NB_CALL(mapping_get)(src.ptr(), &size, &temp);
+
         value.clear();
-
-        if (!PyDict_CheckExact(src.ptr()) && !PyMapping_Check(src.ptr()))
-            return false;
-
-        PyObject *items = PyMapping_Items(src.ptr());
-        if (items == nullptr) {
-            PyErr_Clear();
-            return false;
-        }
-
-        // 'items' is safe to access without locking and reference counting, it
-        // is unique to this thread
-        Py_ssize_t size = NB_LIST_GET_SIZE(items);
-        bool success = true;
 
         uint32_t flags_key = flags_for_local_caster<Key>(flags),
                  flags_val = flags_for_local_caster<Val>(flags);
 
         KeyCaster key_caster;
         ValCaster val_caster;
-        for (Py_ssize_t i = 0; i < size; ++i) {
-            PyObject *item = NB_LIST_GET_ITEM(items, i);
+        bool success = o != nullptr;
 
-            if (!tuple_check(item) || NB_TUPLE_GET_SIZE(item) != 2) {
-                success = false;
-                break;
-            }
-
-            PyObject *key = NB_TUPLE_GET_ITEM(item, 0);
-            PyObject *val = NB_TUPLE_GET_ITEM(item, 1);
-
-            if (!key_caster.from_python(key, flags_key, cleanup) ||
-                !key_caster.template can_cast<Key>()) {
-                success = false;
-                break;
-            }
-
-            if (!val_caster.from_python(val, flags_val, cleanup) ||
+        for (size_t i = 0; i < size; ++i) {
+            if (!key_caster.from_python(o[2 * i], flags_key, cleanup) ||
+                !key_caster.template can_cast<Key>() ||
+                !val_caster.from_python(o[2 * i + 1], flags_val, cleanup) ||
                 !val_caster.template can_cast<Val>()) {
                 success = false;
                 break;
@@ -72,7 +53,7 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
                           val_caster.operator cast_t<Val>());
         }
 
-        Py_DECREF(items);
+        Py_XDECREF(temp);
 
         return success;
     }

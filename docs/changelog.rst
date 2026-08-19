@@ -137,9 +137,6 @@ wrapper API (i.e., the bindings of Python within C++):
   unstable ABI and stable/split mode builds. (Previously, there was a ~2.5x
   overhead when traversing large sequences in stable ABI extensions)
 
-The STL container bindings became safer to use, especially in free-threaded
-Python:
-
 - **Thread-safe container bindings**: the :cpp:func:`nb::bind_vector()
   <bind_vector>` and :cpp:func:`nb::bind_map() <bind_map>` container bindings
   now lock the container in free-threaded builds, which makes their concurrent

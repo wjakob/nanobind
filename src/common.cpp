@@ -446,6 +446,16 @@ PyObject *seq_commit(void *builder, size_t n_valid) noexcept {
 #endif
 }
 
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
+/// Capsule destructor of a null-terminated array of strong references
+static void array_capsule_free(PyObject *o) noexcept {
+    PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
+    for (size_t i = 0; ptr[i] != nullptr; ++i)
+        Py_DECREF(ptr[i]);
+    PyMem_Free(ptr);
+}
+#endif
+
 
 PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcept {
     PyObject *temp = nullptr;
@@ -517,12 +527,7 @@ PyObject **seq_get(PyObject *seq, size_t *size_out, PyObject **temp_out) noexcep
             }
 
             if (result) {
-                temp = PyCapsule_New(result, nullptr, [](PyObject *o) {
-                    PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
-                    for (size_t i = 0; ptr[i] != nullptr; ++i)
-                        Py_DECREF(ptr[i]);
-                    PyMem_Free(ptr);
-                });
+                temp = PyCapsule_New(result, nullptr, array_capsule_free);
 
                 if (temp) {
                     size = (size_t) size_seq;
@@ -620,12 +625,7 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
             }
 
             if (result) {
-                temp = PyCapsule_New(result, nullptr, [](PyObject *o) {
-                    PyObject **ptr = (PyObject **) PyCapsule_GetPointer(o, nullptr);
-                    for (size_t i = 0; ptr[i] != nullptr; ++i)
-                        Py_DECREF(ptr[i]);
-                    PyMem_Free(ptr);
-                });
+                temp = PyCapsule_New(result, nullptr, array_capsule_free);
 
                 if (!temp) {
                     PyErr_Clear();
@@ -644,6 +644,132 @@ PyObject **seq_get_with_size(PyObject *seq, size_t size,
 
     *temp_out = temp;
     return result;
+}
+
+// ========================================================================
+
+/// Snapshot buffer of 'mapping_get()' below. It holds strong references in a
+/// tuple, or in a capsule-owned array where the limited API cannot reach one.
+struct mapping_snapshot {
+    PyObject *temp = nullptr;
+    PyObject **items = nullptr;
+    size_t index = 0;
+
+    /// Reserve room for 'n' entries. Returns false when out of memory.
+    bool alloc(size_t n) noexcept {
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
+        temp = PyTuple_New((Py_ssize_t) n);
+        if (temp)
+            items = ((PyTupleObject *) temp)->ob_item;
+#else
+        if (NB_LIKELY(n < PY_SSIZE_T_MAX / sizeof(PyObject *)))
+            items = (PyObject **) PyMem_Malloc(sizeof(PyObject *) * (n + 1));
+#endif
+        if (NB_UNLIKELY(!items))
+            PyErr_Clear();
+        return items != nullptr;
+    }
+
+    /// Store a strong reference to 'o' in the next entry
+    void put(PyObject *o) noexcept { items[index++] = Py_NewRef(o); }
+
+    /// Release the buffer along with everything stored in it
+    void release() noexcept {
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
+        Py_CLEAR(temp);
+#else
+        for (size_t i = 0; i < index; ++i)
+            Py_DECREF(items[i]);
+        PyMem_Free(items);
+#endif
+        items = nullptr;
+    }
+
+    /// Hand the buffer to the caller, or return null when that is not possible
+    PyObject **commit(PyObject **temp_out) noexcept {
+        // A nonzero dummy pointer separates an empty mapping from a failure
+        if (!items)
+            return (PyObject **) 1;
+
+#if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
+        items[index] = nullptr;
+        temp = PyCapsule_New(items, nullptr, array_capsule_free);
+        if (NB_UNLIKELY(!temp)) {
+            PyErr_Clear();
+            release();
+            return nullptr;
+        }
+#endif
+        *temp_out = temp;
+        return items;
+    }
+};
+
+PyObject **mapping_get(PyObject *o, size_t *size_out, PyObject **temp_out) noexcept {
+    // Failures are silent so that overload resolution can try other candidates
+    mapping_snapshot s;
+
+    *size_out = 0;
+    *temp_out = nullptr;
+
+    if (PyDict_CheckExact(o)) {
+        // Direct traversal avoids the per-entry tuples of PyMapping_Items()
+        ft_object_guard guard(o);
+
+        size_t size = (size_t) NB_DICT_GET_SIZE(o);
+        if (size && !s.alloc(2 * size))
+            return nullptr;
+
+        Py_ssize_t pos = 0;
+        PyObject *key, *value;
+
+        // The allocation above can run Python code that resizes 'o'
+        for (size_t i = 0; i < size && PyDict_Next(o, &pos, &key, &value); ++i) {
+            s.put(key);
+            s.put(value);
+        }
+    } else {
+        if (!PyMapping_Check(o))
+            return nullptr;
+
+        PyObject *items = PyMapping_Items(o);
+        if (!items) {
+            PyErr_Clear();
+            return nullptr;
+        }
+
+        // The buffer size derives from 'items', hence this check
+        if (!list_check(items)) {
+            Py_DECREF(items);
+            return nullptr;
+        }
+
+        // 'items' is unique to this thread, no locking or ref. counting needed
+        size_t size = (size_t) NB_LIST_GET_SIZE(items);
+
+        if (size && !s.alloc(2 * size)) {
+            Py_DECREF(items);
+            return nullptr;
+        }
+
+        for (Py_ssize_t i = 0; i < (Py_ssize_t) size; ++i) {
+            PyObject *item = NB_LIST_GET_ITEM(items, i);
+
+            if (!tuple_check(item) || NB_TUPLE_GET_SIZE(item) != 2) {
+                Py_DECREF(items);
+                s.release();
+                return nullptr;
+            }
+
+            s.put(NB_TUPLE_GET_ITEM(item, 0));
+            s.put(NB_TUPLE_GET_ITEM(item, 1));
+        }
+
+        Py_DECREF(items);
+    }
+
+    *size_out = s.index / 2;
+    return s.commit(temp_out);
 }
 
 // ========================================================================

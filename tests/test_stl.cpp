@@ -578,4 +578,12 @@ NB_MODULE(test_stl_ext, m) {
     // Test some esoteric "None"-ish types
     m.def("takes_nullptr", [](std::nullptr_t) { return "nullptr"; });
     m.def("takes_monostate", [](std::monostate) { return "monostate"; });
+
+    // test76: mapping arguments that are not plain dictionaries
+    m.def("map_str_int_in", [](std::map<std::string, int> x) {
+        std::string result;
+        for (const auto &[k, v] : x)
+            result += k + "=" + std::to_string(v) + ";";
+        return result;
+    });
 }

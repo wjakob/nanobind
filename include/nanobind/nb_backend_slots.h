@@ -232,6 +232,15 @@ NB_SLOT(PyObject **, seq_get,
         (PyObject *seq, size_t *size, PyObject **temp) noexcept)
 
 // --------------------------------------------------------------------------
+// Mapping helpers
+// --------------------------------------------------------------------------
+
+/// Snapshot a mapping into 2*'size' pointers alternating between keys and
+/// values, owned by 'temp'. Null when the entries cannot be retrieved.
+NB_SLOT(PyObject **, mapping_get,
+        (PyObject *o, size_t *size, PyObject **temp) noexcept)
+
+// --------------------------------------------------------------------------
 // Function objects
 // --------------------------------------------------------------------------
 

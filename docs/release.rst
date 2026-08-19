@@ -8,7 +8,7 @@ Releasing nanobind X.Y.Z
    and follow the instructions below to release ``nanobind-backend`` first.
 
 1. Ensure that the full version of nanobind is checked out (including the
-   ``robin_map`` submodule).
+   ``robin_map`` submodule) and that the working tree is clean.
 
 2. Run ``python src/version.py -w X.Y.Z``.
 
@@ -24,11 +24,14 @@ Releasing nanobind X.Y.Z
 
 7. Push: ``git push`` and ``git push --tags``
 
-9. Run ``pipx run build``
+8. Remove stale artifacts from a previous release (``rm -rf dist``) and build
+   the source distribution and wheel with ``uv build``. This first creates the
+   sdist and then builds the wheel from it, which also checks that the sdist is
+   complete.
 
-10. Upload: ``twine upload --repository nanobind <filename>``
+9. Upload: ``twine upload --repository nanobind dist/*``
 
-11. Run ``python src/version.py -w X.Y.Z-dev1``
+10. Run ``python src/version.py -w X.Y.Z-dev1``
 
 Releasing nanobind-backend
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -45,10 +48,10 @@ from the release commit.
 
 3. Tag: ``git tag -a backend-vX.Y.Z -m "vX.Y.Z backend release"``
 
-2. On the *Actions* tab of the GitHub project, run the ``backend-wheels``
+4. On the *Actions* tab of the GitHub project, run the ``backend-wheels``
    workflow on the release tag. It builds the wheel matrix with
    ``cibuildwheel``, runs the test suite against the wheels, and attaches them
    as a build artifact.
 
-3. Download the artifact and upload the wheels (no sdist!) via:
+5. Download the artifact and upload the wheels (no sdist!) via:
    ``twine upload --repository nanobind-backend dist/*.whl``.

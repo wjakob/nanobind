@@ -335,6 +335,11 @@ improvements:
     :cpp:func:`nb::inst_replace_move() <inst_replace_move>`, which are now
     aliases.
 
+  - The ``nb::ndarray_traits<T>`` interface was removed following its
+    deprecation in nanobind 2.2.0. The alternative
+    ``nb::detail::dtype_traits<T>`` is documented in the section on
+    :ref:`nonstandard arithmetic types <ndarray-nonstandard>`.
+
 - Internal ABI version 22.
 
 Version 2.15.0 (Aug 15, 2026)

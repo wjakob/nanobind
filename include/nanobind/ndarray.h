@@ -110,39 +110,34 @@ NAMESPACE_END(device)
 #undef NB_DEVICE
 #undef NB_ORDER
 
-template <typename T> struct ndarray_traits {
-    static constexpr bool is_complex = detail::is_complex_v<T>;
+NAMESPACE_BEGIN(detail)
+
+template <typename T, typename /* SFINAE */ = int> struct dtype_traits {
+    static constexpr bool is_complex = is_complex_v<T>;
     static constexpr bool is_float   = std::is_floating_point_v<T>;
     static constexpr bool is_bool    = std::is_same_v<std::remove_cv_t<T>, bool>;
     static constexpr bool is_int     = std::is_integral_v<T> && !is_bool;
     static constexpr bool is_signed  = std::is_signed_v<T>;
-};
 
-NAMESPACE_BEGIN(detail)
-
-template <typename T, typename /* SFINAE */ = int> struct dtype_traits {
-    using traits = ndarray_traits<T>;
-
-    static constexpr int matches = traits::is_bool + traits::is_complex +
-                                   traits::is_float + traits::is_int;
+    static constexpr int matches = is_bool + is_complex + is_float + is_int;
     static_assert(matches <= 1, "dtype matches multiple type categories!");
 
     static constexpr dlpack::dtype value{
-        (uint8_t) ((traits::is_bool ? (int) dlpack::dtype_code::Bool : 0) +
-                   (traits::is_complex ? (int) dlpack::dtype_code::Complex : 0) +
-                   (traits::is_float ? (int) dlpack::dtype_code::Float : 0) +
-                   (traits::is_int &&  traits::is_signed ? (int) dlpack::dtype_code::Int : 0) +
-                   (traits::is_int && !traits::is_signed ? (int) dlpack::dtype_code::UInt : 0)),
+        (uint8_t) ((is_bool ? (int) dlpack::dtype_code::Bool : 0) +
+                   (is_complex ? (int) dlpack::dtype_code::Complex : 0) +
+                   (is_float ? (int) dlpack::dtype_code::Float : 0) +
+                   (is_int &&  is_signed ? (int) dlpack::dtype_code::Int : 0) +
+                   (is_int && !is_signed ? (int) dlpack::dtype_code::UInt : 0)),
         (uint8_t) matches ? sizeof(T) * 8 : 0,
         matches ? 1 : 0
     };
 
     static constexpr auto name =
-        const_name<traits::is_complex>("complex", "") +
-        const_name<traits::is_int &&  traits::is_signed>("int", "") +
-        const_name<traits::is_int && !traits::is_signed>("uint", "") +
-        const_name<traits::is_float>("float", "") +
-        const_name<traits::is_bool>(const_name("bool"), const_name<sizeof(T) * 8>());
+        const_name<is_complex>("complex", "") +
+        const_name<is_int &&  is_signed>("int", "") +
+        const_name<is_int && !is_signed>("uint", "") +
+        const_name<is_float>("float", "") +
+        const_name<is_bool>(const_name("bool"), const_name<sizeof(T) * 8>());
 };
 
 template <> struct dtype_traits<void> {

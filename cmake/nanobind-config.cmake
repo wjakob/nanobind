@@ -152,6 +152,7 @@ function (nanobind_build_library TARGET_NAME)
 
   add_library(${TARGET_NAME} ${TARGET_TYPE}
     EXCLUDE_FROM_ALL
+    ${NB_DIR}/include/nanobind/eval.h
     ${NB_DIR}/include/nanobind/make_iterator.h
     ${NB_DIR}/include/nanobind/nanobind.h
     ${NB_DIR}/include/nanobind/nb_backend.h
@@ -178,10 +179,12 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/stl/array.h
     ${NB_DIR}/include/nanobind/stl/bind_map.h
     ${NB_DIR}/include/nanobind/stl/bind_vector.h
-    ${NB_DIR}/include/nanobind/stl/detail
+    ${NB_DIR}/include/nanobind/stl/chrono.h
+    ${NB_DIR}/include/nanobind/stl/complex.h
     ${NB_DIR}/include/nanobind/stl/detail/nb_array.h
     ${NB_DIR}/include/nanobind/stl/detail/nb_dict.h
     ${NB_DIR}/include/nanobind/stl/detail/nb_list.h
+    ${NB_DIR}/include/nanobind/stl/detail/nb_optional.h
     ${NB_DIR}/include/nanobind/stl/detail/nb_set.h
     ${NB_DIR}/include/nanobind/stl/detail/traits.h
     ${NB_DIR}/include/nanobind/stl/filesystem.h
@@ -200,6 +203,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/include/nanobind/stl/unordered_set.h
     ${NB_DIR}/include/nanobind/stl/variant.h
     ${NB_DIR}/include/nanobind/stl/vector.h
+    ${NB_DIR}/include/nanobind/stl/wstring.h
     ${NB_DIR}/include/nanobind/eigen/dense.h
     ${NB_DIR}/include/nanobind/eigen/sparse.h
     ${NB_DIR}/include/nanobind/eigen/tensor.h

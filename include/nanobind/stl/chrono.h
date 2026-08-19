@@ -30,11 +30,12 @@ NAMESPACE_BEGIN(detail)
 // Unpack a datetime.timedelta object into integer days, seconds, and
 // microseconds. Returns 1 if successful, 0 if `o` is not a timedelta, or
 // -1 with a Python error set if something else went wrong.
-NB_NOINLINE inline int unpack_timedelta(PyObject *o, int *days,
-                                        int *secs, int *usecs) noexcept {
+NB_NOINLINE inline int unpack_timedelta(PyObject *o, int *days, int *secs,
+                                        int *usecs,
+                                        cleanup_list *cleanup = nullptr) noexcept {
     int32_t parts[3];
     int kind = NB_CALL(datetime_unpack)(
-        NB_CTX, o, (uint32_t) datetime_kind::timedelta, parts);
+        NB_CTX_C(cleanup), o, (uint32_t) datetime_kind::timedelta, parts);
     if (kind <= 0)
         return kind;
     *days = parts[0];
@@ -52,10 +53,11 @@ NB_NOINLINE inline int unpack_timedelta(PyObject *o, int *days,
 NB_NOINLINE inline int unpack_datetime(PyObject *o,
                                        int *year, int *month, int *day,
                                        int *hour, int *minute, int *second,
-                                       int *usec) noexcept {
+                                       int *usec,
+                                       cleanup_list *cleanup = nullptr) noexcept {
     int32_t parts[8];
     int kind = NB_CALL(datetime_unpack)(
-        NB_CTX, o,
+        NB_CTX_C(cleanup), o,
         (uint32_t) datetime_kind::datetime | (uint32_t) datetime_kind::date |
         (uint32_t) datetime_kind::time, parts);
 
@@ -89,10 +91,11 @@ NB_NOINLINE inline int unpack_datetime(PyObject *o,
 // Create a datetime.timedelta object from integer days, seconds, and
 // microseconds.  Returns a new reference, or nullptr and sets the
 // Python error indicator on error.
-inline PyObject* pack_timedelta(int days, int secs, int usecs) noexcept {
+inline PyObject* pack_timedelta(int days, int secs, int usecs,
+                                cleanup_list *cleanup = nullptr) noexcept {
     const int32_t parts[3] = { days, secs, usecs };
     return NB_CALL(datetime_pack)(
-        NB_CTX, (uint32_t) datetime_kind::timedelta, parts);
+        NB_CTX_C(cleanup), (uint32_t) datetime_kind::timedelta, parts);
 }
 
 // Create a timezone-naive datetime.datetime object from its components.
@@ -100,11 +103,12 @@ inline PyObject* pack_timedelta(int days, int secs, int usecs) noexcept {
 // on error.
 inline PyObject* pack_datetime(int year, int month, int day,
                                int hour, int minute, int second,
-                               int usec) noexcept {
+                               int usec,
+                               cleanup_list *cleanup = nullptr) noexcept {
     const int32_t parts[8] = { year, month, day, hour,
                                minute, second, usec, 0 };
     return NB_CALL(datetime_pack)(
-        NB_CTX, (uint32_t) datetime_kind::datetime, parts);
+        NB_CTX_C(cleanup), (uint32_t) datetime_kind::datetime, parts);
 }
 
 // Casts a std::chrono type (either a duration or a time_point) to/from
@@ -115,7 +119,8 @@ public:
     using period = typename type::period;
     using duration_t = std::chrono::duration<rep, period>;
 
-    bool from_python(handle src, uint32_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle src, uint32_t /*flags*/,
+                     cleanup_list *cleanup) noexcept {
         namespace ch = std::chrono;
 
         if (!src) return false;
@@ -125,7 +130,7 @@ public:
 
         // If invoked with datetime.delta object, unpack it
         int dd, ss, uu;
-        int rv = unpack_timedelta(src.ptr(), &dd, &ss, &uu);
+        int rv = unpack_timedelta(src.ptr(), &dd, &ss, &uu, cleanup);
         if (rv < 0) {
             PyErr_Clear();
             return false;
@@ -157,7 +162,8 @@ public:
         return src.time_since_epoch();
     }
 
-    static handle from_cpp(const type& src, rv_policy, cleanup_list*) noexcept {
+    static handle from_cpp(const type& src, rv_policy,
+                           cleanup_list *cleanup) noexcept {
         namespace ch = std::chrono;
 
         // Use overloaded function to get our duration from our source
@@ -173,7 +179,7 @@ public:
         auto subd = d - dd;
         auto ss = ch::duration_cast<ss_t>(subd);
         auto us = ch::duration_cast<us_t>(subd - ss);
-        return pack_timedelta(dd.count(), ss.count(), us.count());
+        return pack_timedelta(dd.count(), ss.count(), us.count(), cleanup);
     }
 
     NB_TYPE_CASTER(type, io_name("datetime.timedelta | float",
@@ -215,7 +221,8 @@ template <typename Duration>
 class type_caster<std::chrono::time_point<std::chrono::system_clock, Duration>> {
 public:
     using type = std::chrono::time_point<std::chrono::system_clock, Duration>;
-    bool from_python(handle src, uint32_t /*flags*/, cleanup_list*) noexcept {
+    bool from_python(handle src, uint32_t /*flags*/,
+                     cleanup_list *cleanup) noexcept {
         namespace ch = std::chrono;
 
         if (!src)
@@ -225,7 +232,7 @@ public:
         ch::microseconds msecs;
         int yy, mon, dd, hh, min, ss, uu;
         int rv = unpack_datetime(src.ptr(), &yy, &mon, &dd,
-                                 &hh, &min, &ss, &uu);
+                                 &hh, &min, &ss, &uu, cleanup);
         if (rv <= 0) {
             if (rv < 0)
                 PyErr_Clear();
@@ -244,7 +251,8 @@ public:
         return true;
     }
 
-    static handle from_cpp(const type& src, rv_policy, cleanup_list*) noexcept {
+    static handle from_cpp(const type& src, rv_policy,
+                           cleanup_list *cleanup) noexcept {
         namespace ch = std::chrono;
 
         // Get out microseconds, and make sure they are positive, to
@@ -282,7 +290,7 @@ public:
                              localtime.tm_hour,
                              localtime.tm_min,
                              localtime.tm_sec,
-                             (int) us.count());
+                             (int) us.count(), cleanup);
     }
     NB_TYPE_CASTER(type, io_name("datetime.datetime | datetime.date | datetime.time",
                                  "datetime.datetime"))

@@ -133,15 +133,15 @@ NB_INLINE uint32_t flags_for_local_caster(uint32_t flags) noexcept {
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>> {
-    NB_INLINE bool from_python(handle src, uint32_t flags, cleanup_list *) noexcept {
+    NB_INLINE bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         if constexpr (std::is_floating_point_v<T>) {
             if constexpr (std::is_same_v<T, double>) {
-                return NB_CALL(load_f64)(NB_CTX, src.ptr(), flags, &value);
+                return NB_CALL(load_f64)(NB_CTX_C(cleanup), src.ptr(), flags, &value);
             } else if constexpr (std::is_same_v<T, float>) {
-                return NB_CALL(load_f32)(NB_CTX, src.ptr(), flags, &value);
+                return NB_CALL(load_f32)(NB_CTX_C(cleanup), src.ptr(), flags, &value);
             } else {
                 double d;
-                if (!NB_CALL(load_f64)(NB_CTX, src.ptr(), flags, &d))
+                if (!NB_CALL(load_f64)(NB_CTX_C(cleanup), src.ptr(), flags, &d))
                     return false;
                 T result = (T) d;
                 if ((flags & cast_flags::convert)
@@ -155,22 +155,22 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
         } else {
             if constexpr (std::is_signed_v<T>) {
                 if constexpr (sizeof(T) == 8)
-                    return NB_CALL(load_i64)(NB_CTX, src.ptr(), flags, (int64_t *) &value);
+                    return NB_CALL(load_i64)(NB_CTX_C(cleanup), src.ptr(), flags, (int64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    return NB_CALL(load_i32)(NB_CTX, src.ptr(), flags, (int32_t *) &value);
+                    return NB_CALL(load_i32)(NB_CTX_C(cleanup), src.ptr(), flags, (int32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    return NB_CALL(load_i16)(NB_CTX, src.ptr(), flags, (int16_t *) &value);
+                    return NB_CALL(load_i16)(NB_CTX_C(cleanup), src.ptr(), flags, (int16_t *) &value);
                 else
-                    return NB_CALL(load_i8)(NB_CTX, src.ptr(), flags, (int8_t *) &value);
+                    return NB_CALL(load_i8)(NB_CTX_C(cleanup), src.ptr(), flags, (int8_t *) &value);
             } else {
                 if constexpr (sizeof(T) == 8)
-                    return NB_CALL(load_u64)(NB_CTX, src.ptr(), flags, (uint64_t *) &value);
+                    return NB_CALL(load_u64)(NB_CTX_C(cleanup), src.ptr(), flags, (uint64_t *) &value);
                 else if constexpr (sizeof(T) == 4)
-                    return NB_CALL(load_u32)(NB_CTX, src.ptr(), flags, (uint32_t *) &value);
+                    return NB_CALL(load_u32)(NB_CTX_C(cleanup), src.ptr(), flags, (uint32_t *) &value);
                 else if constexpr (sizeof(T) == 2)
-                    return NB_CALL(load_u16)(NB_CTX, src.ptr(), flags, (uint16_t *) &value);
+                    return NB_CALL(load_u16)(NB_CTX_C(cleanup), src.ptr(), flags, (uint16_t *) &value);
                 else
-                    return NB_CALL(load_u8)(NB_CTX, src.ptr(), flags, (uint8_t *) &value);
+                    return NB_CALL(load_u8)(NB_CTX_C(cleanup), src.ptr(), flags, (uint8_t *) &value);
             }
         }
     }
@@ -198,16 +198,16 @@ struct type_caster<T, enable_if_t<std::is_arithmetic_v<T> && !is_std_char_v<T>>>
 
 template <typename T>
 struct type_caster<T, enable_if_t<std::is_enum_v<T>>> {
-    NB_INLINE bool from_python(handle src, uint32_t flags, cleanup_list *) noexcept {
+    NB_INLINE bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         int64_t result;
-        bool rv = NB_CALL(enum_from_python)(NB_CTX, &typeid(T), src.ptr(), &result, flags);
+        bool rv = NB_CALL(enum_from_python)(NB_CTX_C(cleanup), &typeid(T), src.ptr(), &result, flags);
         if (rv)
             value = (T) result;
         return rv;
     }
 
-    NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *) noexcept {
-        return NB_CALL(enum_from_cpp)(NB_CTX, &typeid(T), (int64_t) src);
+    NB_INLINE static handle from_cpp(T src, rv_policy, cleanup_list *cleanup) noexcept {
+        return NB_CALL(enum_from_cpp)(NB_CTX_C(cleanup), &typeid(T), (int64_t) src);
     }
 
     NB_TYPE_CASTER(T, const_name<T>())
@@ -502,8 +502,8 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         // only one that is ever trusted) and, as a fallback, in nb_type_get.
         // The generic base caster therefore need not test for it here, which
         // would only add a never-taken branch to every bound-type argument.
-        return NB_CALL(nb_type_get)(NB_CTX, &typeid(Type), src.ptr(), flags, cleanup,
-                           (void **) &value);
+        return NB_CALL(nb_type_get)(NB_CTX_C(cleanup), &typeid(Type), src.ptr(),
+                                    flags, cleanup, (void **) &value);
     }
 
     template <typename T>
@@ -527,8 +527,8 @@ template <typename Type_> struct type_caster_base : type_caster_base_tag {
         if constexpr (std::is_polymorphic_v<Type>)
             type_p = (!has_type_hook && ptr) ? &typeid(*ptr) : nullptr;
 
-        return NB_CALL(nb_type_put)(NB_CTX, type, type_p, ptr, policy, cleanup,
-                                    nullptr);
+        return NB_CALL(nb_type_put)(NB_CTX_C(cleanup), type, type_p, ptr, policy,
+                                    cleanup, nullptr);
     }
 
     template <typename T_>
@@ -581,7 +581,7 @@ T cast_impl(handle h) {
         // initialize the return object, since the initialization
         // might access those temporaries.
         struct raii_cleanup {
-            cleanup_list list{nullptr};
+            cleanup_list list{nullptr, NB_CTX};
             ~raii_cleanup() { list.release(); }
         } cleanup;
         rv = caster.from_python(h.ptr(),
@@ -615,7 +615,7 @@ bool try_cast_impl(handle h, T &out) noexcept {
     Caster caster;
     bool rv;
     if constexpr (Convert && !is_ref) {
-        cleanup_list cleanup(nullptr);
+        cleanup_list cleanup(nullptr, NB_CTX);
         rv = caster.from_python(h.ptr(),
                                 cast_flags::convert | cast_flags::manual,
                                 &cleanup) &&
@@ -670,7 +670,7 @@ object cast(T &&value, rv_policy policy = rv_policy::automatic_reference) {
 
 template <typename T>
 object cast(T &&value, rv_policy policy, handle parent) {
-    detail::cleanup_list cleanup(parent.ptr());
+    detail::cleanup_list cleanup(parent.ptr(), NB_CTX);
     handle h = detail::make_caster<T>::from_cpp((detail::forward_t<T>) value,
                                                 policy, &cleanup);
 

@@ -700,7 +700,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                                PyObject *) noexcept = nullptr;
 
     // Small array holding temporaries (implicit conversion/*args/**kwargs)
-    cleanup_list cleanup(self_arg);
+    cleanup_list cleanup(self_arg, nb_func_internals(self));
 
     // Preallocate stack memory for function dispatch
     size_t max_nargs = ((nb_func *) self)->max_nargs;
@@ -966,7 +966,7 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
                                PyObject *) noexcept = nullptr;
 
     // Small array holding temporaries (implicit conversion etc.)
-    cleanup_list cleanup(self_arg);
+    cleanup_list cleanup(self_arg, nb_func_internals(self));
 
     PyObject *args[NB_MAXARGS_SIMPLE];
 
@@ -1101,7 +1101,7 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
              *self_arg = (is_method && nargs_in > 0) ? args_in[0] : nullptr;
 
     // Small array holding temporaries (implicit conversion/*args/**kwargs)
-    cleanup_list cleanup(self_arg);
+    cleanup_list cleanup(self_arg, nb_func_internals(self));
 
     // Handler routine that will be invoked in case of an error condition
     PyObject *(*error_handler)(PyObject *, PyObject *const *, size_t,
@@ -1231,7 +1231,8 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
 
     if (kwargs_in == nullptr && nargs_in == 1 && args_in[0] != Py_None) {
         PyObject *arg = args_in[0];
-        cleanup_list cleanup(is_method ? arg : nullptr);
+        cleanup_list cleanup(is_method ? arg : nullptr,
+                             nb_func_internals(self));
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,
@@ -1290,7 +1291,8 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
 
     if (kwargs_in == nullptr && nargs_in == 2 &&
         args_in[0] != Py_None && args_in[1] != Py_None) {
-        cleanup_list cleanup(is_method ? args_in[0] : nullptr);
+        cleanup_list cleanup(is_method ? args_in[0] : nullptr,
+                             nb_func_internals(self));
 
         try {
             result = fr->impl((void *) fr->capture, (PyObject **) args_in,

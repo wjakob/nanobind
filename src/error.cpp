@@ -19,12 +19,14 @@
 NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
-PyObject *error_fetch() noexcept {
+void error_fetch(error_payload *p) noexcept {
+    *p = error_payload { };
+
     #if PY_VERSION_HEX >= 0x030C0000
         PyObject *value = PyErr_GetRaisedException();
         check(value,
               "nanobind::python_error::python_error(): error indicator unset!");
-        return value;
+        p->value = value;
     #else
         PyObject *t, *v, *tb;
         PyErr_Fetch(&t, &v, &tb);
@@ -38,7 +40,7 @@ PyObject *error_fetch() noexcept {
             Py_DECREF(tb);
         }
         Py_DECREF(t);
-        return v;
+        p->value = v;
     #endif
 }
 
@@ -52,34 +54,34 @@ void error_restore(PyObject *value) noexcept {
     #endif
 }
 
-void error_release(PyObject *value, char *what) noexcept {
+void error_release(error_payload *p) noexcept {
     // A python_error can be destroyed on any thread, including while the
     // interpreter shuts down. Its reference is then no longer releasable.
-    if (value) {
+    if (p->value) {
         if (cleanup_guard guard{}) {
             // Clear error status in case the following executes Python code
             error_scope scope;
-            Py_DECREF(value);
+            Py_DECREF(p->value);
         }
     }
 
-    free(what);
+    free(p->internal[0]);
 }
 
-PyObject *error_copy(PyObject *value, char **what) noexcept {
-    if (*what)
-        *what = strdup_check(*what);
-    if (value) {
+void error_copy(const error_payload *src, error_payload *dst) noexcept {
+    *dst = *src;
+    if (dst->internal[0])
+        dst->internal[0] = strdup_check((const char *) dst->internal[0]);
+    if (dst->value) {
         if (cleanup_guard guard{})
-            Py_INCREF(value);
+            Py_INCREF(dst->value);
     }
-    return value;
 }
 
-const char *error_what(PyObject *value, char **what) noexcept {
+const char *error_what(error_payload *p) noexcept {
     // Return the existing error message if already computed once
-    if (*what)
-        return *what;
+    if (p->internal[0])
+        return (const char *) p->internal[0];
 
     cleanup_guard guard;
     if (!guard)
@@ -87,11 +89,11 @@ const char *error_what(PyObject *value, char **what) noexcept {
                "shutting down>";
 
     // Try again with a thread state attached
-    if (*what)
-        return *what;
+    if (p->internal[0])
+        return (const char *) p->internal[0];
 
-    handle exc_value = value, exc_type = exc_value.type();
-    object exc_traceback = steal(PyException_GetTraceback(value));
+    handle exc_value = p->value, exc_type = exc_value.type();
+    object exc_traceback = steal(PyException_GetTraceback(p->value));
 
 #if defined(Py_LIMITED_API) || defined(PYPY_VERSION)
     char *tmp;
@@ -183,19 +185,19 @@ const char *error_what(PyObject *value, char **what) noexcept {
 
     // Publish the message with a CAS; if a concurrent call raced us to it,
     // free our copy and return the winner's message instead.
-    char *expected = nullptr;
+    void *expected = nullptr;
 #if defined(_MSC_VER)
-    expected = (char *) _InterlockedCompareExchangePointer(
-        (void *volatile *) what, tmp, nullptr);
+    expected = _InterlockedCompareExchangePointer(
+        (void *volatile *) &p->internal[0], tmp, nullptr);
     if (!expected)
         return tmp;
 #else
-    if (__atomic_compare_exchange_n(what, &expected, tmp, false,
-                                    __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
+    if (__atomic_compare_exchange_n(&p->internal[0], &expected, (void *) tmp,
+                                    false, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
         return tmp;
 #endif
     free(tmp);
-    return expected;
+    return (const char *) expected;
 }
 
 void register_exception_translator(nb_internals *p, exception_translator t,

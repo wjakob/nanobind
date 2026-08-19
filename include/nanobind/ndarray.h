@@ -664,7 +664,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
             (void) shape_buf;
         }
 
-        detail::ndarray_handle *h = NB_CALL(ndarray_import)(NB_CTX,
+        detail::ndarray_handle *h = NB_CALL(ndarray_import)(NB_CTX_C(cleanup),
             src.ptr(), &config, sizeof(config), flags & cast_flags::convert,
             cleanup);
 
@@ -678,7 +678,9 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
 
     static handle from_cpp(const ndarray<Args...> &tensor, rv_policy policy,
                            cleanup_list *cleanup) noexcept {
-        return NB_CALL(ndarray_export)(NB_CTX, tensor.handle(), Config::Framework::value, policy, cleanup);
+        return NB_CALL(ndarray_export)(NB_CTX_C(cleanup), tensor.handle(),
+                                       Config::Framework::value, policy,
+                                       cleanup);
     }
 };
 

@@ -19,11 +19,12 @@ NAMESPACE_BEGIN(detail)
 template <typename T> struct type_caster<std::complex<T>> {
     NB_TYPE_CASTER(std::complex<T>, const_name("complex"))
 
-    bool from_python(handle src, uint32_t flags, cleanup_list*) noexcept {
+    bool from_python(handle src, uint32_t flags, cleanup_list *cleanup) noexcept {
         // The boundary function writes (real, imaginary) to two doubles;
         // std::complex<double> is layout-compatible
         std::complex<double> cmplx;
-        if (!NB_CALL(load_cmplx)(NB_CTX, src.ptr(), flags, (double *) &cmplx))
+        if (!NB_CALL(load_cmplx)(NB_CTX_C(cleanup), src.ptr(), flags,
+                                 (double *) &cmplx))
             return false;
         if constexpr (std::is_same_v<T, double>) {
             value = cmplx;

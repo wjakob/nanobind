@@ -52,21 +52,22 @@ NB_SLOT(void, chain_v, (PyObject *type, const char *fmt, va_list args) noexcept)
 // Backend implementation of the 'python_error' exception class
 // --------------------------------------------------------------------------
 
-/// Fetch the pending Python error as a normalized exception object
-NB_SLOT(PyObject *, error_fetch, () noexcept)
+/// Fetch the pending Python error as a normalized exception object and
+/// initialize 'p' with it
+NB_SLOT(void, error_fetch, (error_payload *p) noexcept)
 
-/// Copy the exception state of another python_error instance
-NB_SLOT(PyObject *, error_copy, (PyObject *value, char **what) noexcept)
+/// Initialize 'dst' with a copy of the exception state held by 'src'
+NB_SLOT(void, error_copy,
+        (const error_payload *src, error_payload *dst) noexcept)
 
 /// Release a python_error's owned reference and what() buffer
-NB_SLOT(void, error_release, (PyObject *value, char *what) noexcept)
+NB_SLOT(void, error_release, (error_payload *p) noexcept)
 
 /// Restore the exception as the pending Python error
 NB_SLOT(void, error_restore, (PyObject *value) noexcept)
 
 /// Render and cache a human-readable description incl. the traceback
-NB_SLOT(const char *, error_what,
-        (PyObject *value, char **what) noexcept)
+NB_SLOT(const char *, error_what, (error_payload *p) noexcept)
 
 // --------------------------------------------------------------------------
 // Custom exception types and translators
@@ -92,8 +93,9 @@ NB_SLOT(nb_internals *, nb_module_init,
 
 /// Build a module definition and slot array on the backend's heap and return
 /// the result of PyModuleDef_Init(). 'exec' is a 'int (*)(PyObject *)'
-/// callback; the last parameter is reserved and must be zero. The module
-/// carries state that a later 'nb_module_init' call fills in.
+/// callback; 'reserved' is a flags word reserved for future use that must
+/// currently be zero. The module carries state that a later
+/// 'nb_module_init' call fills in.
 NB_SLOT(PyObject *, module_new,
         (const char *name, const char *doc, void *exec,
          uint32_t reserved) noexcept)

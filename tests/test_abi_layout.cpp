@@ -21,7 +21,7 @@ using namespace nanobind::detail;
     static_assert(sizeof(void *) != 8 || offsetof(S, F) == (V),                \
                   "frozen ABI layout of " #S "::" #F " changed")
 
-static_assert(cleanup_list::Small == 6 &&
+static_assert(cleanup_list::Small == 5 &&
               (sizeof(void *) != 8 || sizeof(cleanup_list) == 64),
               "frozen ABI layout of cleanup_list changed");
 
@@ -82,8 +82,13 @@ NB_FROZEN_OFF(enum_data_init, name, 16);
 NB_FROZEN_OFF(enum_data_init, docstr, 24);
 NB_FROZEN_OFF(enum_data_init, flags, 32);
 
+static_assert(sizeof(void *) != 8 || sizeof(error_payload) == 24,
+              "frozen ABI layout of error_payload changed");
+NB_FROZEN_OFF(error_payload, value, 0);
+NB_FROZEN_OFF(error_payload, internal, 8);
+
 static_assert(sizeof(python_error) ==
-                  sizeof(std::exception) + 2 * sizeof(void *),
+                  sizeof(std::exception) + sizeof(error_payload),
               "frozen layout of python_error changed");
 
 static_assert(sizeof(void *) != 8 || sizeof(ndarray_config) == 32,

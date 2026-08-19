@@ -118,12 +118,16 @@ struct nb_internals;
 /// This extension's backend state, set during module initialization
 NB_HIDDEN inline nb_internals *internals = nullptr;
 #  define NB_CTX ::nanobind::detail::internals
+/// Variant for callers that hold a cleanup_list (which is still unused atm.)
+#  define NB_CTX_C(cleanup) ((void) (cleanup), ::nanobind::detail::internals)
 #else
 /// Backend code threads its state explicitly and must not use API entry
 /// points that inject the extension-side pointer. This function is never
 /// defined; any use fails at link time.
 extern nb_internals *nb_ctx_unavailable() noexcept;
 #  define NB_CTX ::nanobind::detail::nb_ctx_unavailable()
+#  define NB_CTX_C(cleanup)                                                    \
+    ((void) (cleanup), ::nanobind::detail::nb_ctx_unavailable())
 #endif
 
 /// Backend configuration flags accessed via read_flag/write_flag.
@@ -314,12 +318,13 @@ enum class enum_flags : uint32_t {
  */
 struct cleanup_list {
 public:
-    static constexpr uint32_t Small = 6;
+    static constexpr uint32_t Small = 5;
 
-    cleanup_list(PyObject *self) :
+    cleanup_list(PyObject *self, nb_internals *ctx = nullptr) :
         m_size{1},
         m_capacity{Small},
-        m_data{m_local} {
+        m_data{m_local},
+        m_ctx{ctx} {
         m_local[0] = self;
     }
 
@@ -335,6 +340,10 @@ public:
     NB_INLINE PyObject *self() const {
         return m_local[0];
     }
+
+    /// Backend state of the domain that owns the dispatched function, or
+    /// nullptr when the creator of the list had no such context
+    NB_INLINE nb_internals *ctx() const { return m_ctx; }
 
     /// Decrease the reference count of all appended objects
     void release() noexcept;
@@ -356,6 +365,7 @@ protected:
     uint32_t m_size;
     uint32_t m_capacity;
     PyObject **m_data;
+    nb_internals *m_ctx;
     PyObject *m_local[Small];
 };
 
@@ -571,6 +581,20 @@ struct enum_data_init {
 /// Callback that converts a caught C++ exception into a Python error state.
 /// The second parameter forwards the payload registered alongside it.
 typedef void (*exception_translator)(const std::exception_ptr &, void *);
+
+/**
+ * Storage of the ``python_error`` exception class (see ``nb_error.h``). The
+ * backend constructs and throws these objects while extensions catch them,
+ * sometimes by value, hence every binary in a process must agree on the
+ * layout. It is frozen within a major version.
+ */
+struct error_payload {
+    /// Normalized exception object owned by the payload
+    PyObject *value;
+
+    /// Backend-private state
+    void *internal[2];
+};
 
 /// ``nb_backend_slots.h`` specifies the ABI function interface and is potentially
 /// included several times here depending on compilation mode.

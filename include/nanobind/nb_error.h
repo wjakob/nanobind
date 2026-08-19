@@ -34,29 +34,30 @@ inline namespace NB_BACKEND_ABI_NS {
 // Wraps a Python error state as a C++ exception.
 class NB_EXPORT python_error : public std::exception {
 public:
-    python_error() { m_value = NB_CALL(error_fetch)(); }
-    python_error(const python_error &e)
-        : std::exception(e), m_what(e.m_what) {
-        m_value = NB_CALL(error_copy)(e.m_value, &m_what);
+    /// Storage of this class, see 'detail::error_payload'
+    using payload = detail::error_payload;
+
+    python_error() { NB_CALL(error_fetch)(&m_payload); }
+    python_error(const python_error &e) : std::exception(e) {
+        NB_CALL(error_copy)(&e.m_payload, &m_payload);
     }
     python_error(python_error &&e) noexcept
-        : std::exception(e), m_value(e.m_value), m_what(e.m_what) {
-        e.m_value = nullptr;
-        e.m_what = nullptr;
+        : std::exception(e), m_payload(e.m_payload) {
+        e.m_payload = payload { };
     }
     // The destructor is deliberately inline so that the vtable & typeinfo are
     // weak definitions in every binary that the dynamic linker can then unify.
-    ~python_error() override { NB_CALL(error_release)(m_value, m_what); }
+    ~python_error() override { NB_CALL(error_release)(&m_payload); }
 
     bool matches(handle exc) const noexcept {
-        return PyErr_GivenExceptionMatches(m_value, exc.ptr()) != 0;
+        return PyErr_GivenExceptionMatches(m_payload.value, exc.ptr()) != 0;
     }
 
     /// Move the error back into the Python domain. This may only be called
     /// once, and you should not reraise the exception in C++ afterward.
     void restore() noexcept {
-        NB_CALL(error_restore)(m_value);
-        m_value = nullptr;
+        NB_CALL(error_restore)(m_payload.value);
+        m_payload.value = nullptr;
     }
 
     /// Pass the error to Python's `sys.unraisablehook`, which prints
@@ -74,21 +75,20 @@ public:
         discard_as_unraisable(context_s);
     }
 
-    handle value() const { return m_value; }
+    handle value() const { return m_payload.value; }
 
     handle type() const { return value().type(); }
 
     object traceback() const {
-        return steal(PyException_GetTraceback(m_value));
+        return steal(PyException_GetTraceback(m_payload.value));
     }
 
     const char *what() const noexcept override {
-        return NB_CALL(error_what)(m_value, &m_what);
+        return NB_CALL(error_what)(&m_payload);
     }
 
 private:
-    mutable PyObject *m_value = nullptr;
-    mutable char *m_what = nullptr;
+    mutable payload m_payload { };
 };
 
 /// Thrown by nanobind::cast when casting fails

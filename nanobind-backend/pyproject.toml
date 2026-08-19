@@ -8,7 +8,7 @@ name = "nanobind-backend"
 # covers all non-contractual change (see docs/split_mode.rst). This value
 # mirrors the macros in include/nanobind/nb_backend.h; set both via
 # 'src/version.py -b'.
-version = "1.0.0.dev2"
+version = "1.0.0.dev3"
 description = "Compiled nanobind backend for extensions built in split mode"
 readme = "README.md"
 requires-python = ">=3.10"

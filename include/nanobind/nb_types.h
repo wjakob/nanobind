@@ -661,8 +661,8 @@ inline object getattr(handle h, detail::str_key key, handle def) noexcept {
         NB_CALL(getattr_str_def)(NB_CTX, h.ptr(), key.str, key.bound, def.ptr()));
 }
 
-inline object getattr(handle h, handle key, handle value) noexcept {
-    return steal(detail::getattr(h.ptr(), key.ptr(), value.ptr()));
+inline object getattr(handle h, handle key, handle def) noexcept {
+    return steal(NB_CALL(getattr_def)(h.ptr(), key.ptr(), def.ptr()));
 }
 
 inline void setattr(handle h, detail::str_key key, handle value) {

@@ -118,3 +118,21 @@ def test_11_failing_accessor_conversion():
 
     with pytest.raises(KeyError, match="k"):
         t.test_return_dict_accessor({})
+
+
+def test_12_getattr_object_key_default():
+    """
+    nb::getattr() with an object key returns the default for a missing
+    attribute and swallows errors raised by a custom __getattr__.
+    """
+    o = types.SimpleNamespace()
+    o.present = 1
+    assert t.getattr_obj_def(o, "present", None) == 1
+    assert t.getattr_obj_def(o, "absent", 5) == 5
+    assert t.getattr_obj_def(o, "absent", None) is None
+
+    class Raising:
+        def __getattr__(self, name):
+            raise ValueError("nope")
+
+    assert t.getattr_obj_def(Raising(), "absent", 7) == 7

@@ -526,6 +526,10 @@ PyObject *getattr_str(nb_internals *p, PyObject *obj, const char *str,
     return getattr(obj, key.value);
 }
 
+PyObject *getattr_def(PyObject *obj, PyObject *key, PyObject *def) noexcept {
+    return getattr(obj, key, def);
+}
+
 PyObject *getattr_str_def(nb_internals *p, PyObject *obj, const char *str,
                           size_t bound, PyObject *def) noexcept {
     bool owned;

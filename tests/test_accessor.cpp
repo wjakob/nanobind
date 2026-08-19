@@ -107,6 +107,11 @@ NB_MODULE(test_accessor_ext, m) {
         return nb::hasattr(o, name);
     });
 
+    // Attribute access with a default, keyed by a Python object
+    m.def("getattr_obj_def", [](nb::handle o, nb::handle key, nb::handle def) {
+        return nb::getattr(o, key, def);
+    }, nb::arg(), nb::arg(), nb::arg().none());
+
     m.def("test_accessor_conversion_refcount", []() {
         nb::dict d;
         nb::object value = nb::make_tuple(nb::int_(1), nb::int_(2));

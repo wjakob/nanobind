@@ -117,6 +117,11 @@ NB_SLOT(size_t, len_hint, (nb_internals *p, PyObject *o) noexcept)
 NB_SLOT(PyObject *, cached_string,
         (nb_internals *p, const char *str, size_t bound, bool *owned) noexcept)
 
+/// PyObject_GetAttr() returning a new reference to 'def' instead of raising.
+/// The limited API only has a single-lookup entry point from Python 3.13 on.
+NB_SLOT(PyObject *, getattr_def,
+        (PyObject *obj, PyObject *key, PyObject *def) noexcept)
+
 // The operations below resolve their key via cached_string() ('str' and
 // 'bound' follow its contract) and raise an exception when the underlying
 // Python operation fails, except where noted.
@@ -174,9 +179,6 @@ NB_SLOT(void, setitem_str,
 /// PyObject_DelItem() with a C string key
 NB_SLOT(void, delitem_str,
         (nb_internals *p, PyObject *obj, const char *str, size_t bound))
-
-// The three operations below serve the 'nb::dict' accessor and expect a
-// dictionary (or a subclass of one), which they access with the PyDict_* API.
 
 /// Dictionary lookup with a C string key, raises KeyError when it is absent
 NB_SLOT(PyObject *, dict_getitem_str,

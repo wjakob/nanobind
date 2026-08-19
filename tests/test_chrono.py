@@ -286,12 +286,11 @@ def test_chrono_invalid(test_type, roundtrip_name):
         else:
             roundtrip(datetime.datetime.now())
 
-    # On the limited API we access timedelta/datetime objects via
-    # regular attribute access; test that invalid results are handled
-    # reasonably. On the full API we use Python's <datetime.h> header
-    # so we'll always access the true C-level datetime slot and can't
-    # be fooled by tricks like this. PyPy uses normal attribute access
-    # and works like the limited API in this respect.
+    # Linked limited API builds and PyPy access timedelta/datetime
+    # objects via regular attribute access; test that invalid results
+    # are handled reasonably. Other configurations (full API, and split
+    # mode via the backend) read the C-level fields of the objects
+    # directly and can't be fooled by tricks like this.
 
     class fake_type(test_type):
         @property
@@ -331,14 +330,24 @@ def test_chrono_invalid(test_type, roundtrip_name):
             # attribute accesses.
             pass
         else:
-            try:
-                from test.support import catch_unraisable_exception
-            except ImportError:
-                # Some Python distributions omit the 'test' package
-                pytest.skip("test.support is unavailable")
+            # An error while unpacking the fields rejects the overload
+            with pytest.raises(TypeError, match="incompatible function arguments"):
+                roundtrip(fake_val)
 
-            with catch_unraisable_exception() as cm:
-                with pytest.raises(TypeError, match="incompatible function arguments"):
-                    roundtrip(fake_val)
-                assert cm.unraisable is not None
-                assert errtype in repr(cm.unraisable.exc_value)
+
+def test_datetime_fields():
+    # Exercise the backend slots underlying the casters, which transport
+    # all fields (including 'fold') of every datetime type
+    for v in (
+        datetime.datetime(2020, 3, 8, 2, 30, 0, 123456, fold=1),
+        datetime.datetime(1969, 12, 31, 23, 59, 59),
+        datetime.date(1999, 12, 31),
+        datetime.time(23, 59, 59, 999999, fold=1),
+        datetime.timedelta(days=-1, seconds=86399, microseconds=1),
+    ):
+        r = m.test_datetime_fields(v)
+        assert type(r) is type(v) and r == v
+        assert getattr(r, "fold", 0) == getattr(v, "fold", 0)
+
+    with pytest.raises(TypeError, match="expected a datetime type"):
+        m.test_datetime_fields(1)

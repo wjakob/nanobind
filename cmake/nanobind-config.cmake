@@ -213,6 +213,7 @@ function (nanobind_build_library TARGET_NAME)
     ${NB_DIR}/src/nb_enum.cpp
     ${NB_DIR}/src/nb_ndarray.cpp
     ${NB_DIR}/src/nb_static_property.cpp
+    ${NB_DIR}/src/nb_datetime.cpp
     ${NB_DIR}/src/nb_ft.h
     ${NB_DIR}/src/common.cpp
     ${NB_DIR}/src/error.cpp

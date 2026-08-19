@@ -132,6 +132,17 @@ enum class nb_flag : uint32_t {
     implicit_cast_warnings = 1
 };
 
+/// Types of the Python 'datetime' module handled by the 'datetime_unpack'
+/// and 'datetime_pack' slots, along with their integer field layouts.
+/// 'datetime_unpack' accepts bitwise combinations.
+enum class datetime_kind : uint32_t {
+    none      = 0,
+    datetime  = 1, // year, month, day, hour, minute, second, microsecond, fold
+    date      = 2, // year, month, day
+    time      = 4, // hour, minute, second, microsecond, fold
+    timedelta = 8  // days, seconds, microseconds
+};
+
 /// Flags that can be passed to type casters
 enum cast_flags : uint32_t {
     // Enable implicit conversions

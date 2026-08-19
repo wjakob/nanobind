@@ -81,6 +81,7 @@
 #include "nb_enum.cpp"
 #include "nb_ndarray.cpp"
 #include "nb_static_property.cpp"
+#include "nb_datetime.cpp"
 #if defined(Py_GIL_DISABLED)
 #  include "nb_ft.cpp"
 #endif

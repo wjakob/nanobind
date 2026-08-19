@@ -20,9 +20,92 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
-#include <limits>
 
-#include <nanobind/stl/detail/chrono.h>
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+
+// The helpers below wrap the 'datetime_unpack' and 'datetime_pack' functions
+// of the nanobind library.
+
+// Unpack a datetime.timedelta object into integer days, seconds, and
+// microseconds. Returns 1 if successful, 0 if `o` is not a timedelta, or
+// -1 with a Python error set if something else went wrong.
+NB_NOINLINE inline int unpack_timedelta(PyObject *o, int *days,
+                                        int *secs, int *usecs) noexcept {
+    int32_t parts[3];
+    int kind = NB_CALL(datetime_unpack)(
+        NB_CTX, o, (uint32_t) datetime_kind::timedelta, parts);
+    if (kind <= 0)
+        return kind;
+    *days = parts[0];
+    *secs = parts[1];
+    *usecs = parts[2];
+    return 1;
+}
+
+// Unpack a datetime.date, datetime.time, or datetime.datetime object into
+// integer year, month, day, hour, minute, second, and microsecond fields.
+// Time objects will be considered to represent that time on Jan 1, 1970.
+// Date objects will be considered to represent midnight on that date.
+// Returns 1 if successful, 0 if `o` is not a date, time, or datetime, or
+// -1 with a Python error set if something else went wrong.
+NB_NOINLINE inline int unpack_datetime(PyObject *o,
+                                       int *year, int *month, int *day,
+                                       int *hour, int *minute, int *second,
+                                       int *usec) noexcept {
+    int32_t parts[8];
+    int kind = NB_CALL(datetime_unpack)(
+        NB_CTX, o,
+        (uint32_t) datetime_kind::datetime | (uint32_t) datetime_kind::date |
+        (uint32_t) datetime_kind::time, parts);
+
+    if (kind == (int) datetime_kind::datetime) {
+        *year = parts[0];
+        *month = parts[1];
+        *day = parts[2];
+        *hour = parts[3];
+        *minute = parts[4];
+        *second = parts[5];
+        *usec = parts[6];
+    } else if (kind == (int) datetime_kind::date) {
+        *year = parts[0];
+        *month = parts[1];
+        *day = parts[2];
+        *usec = *second = *minute = *hour = 0;
+    } else if (kind == (int) datetime_kind::time) {
+        *year = 1970;
+        *month = 1;
+        *day = 1;
+        *hour = parts[0];
+        *minute = parts[1];
+        *second = parts[2];
+        *usec = parts[3];
+    } else {
+        return kind;
+    }
+    return 1;
+}
+
+// Create a datetime.timedelta object from integer days, seconds, and
+// microseconds.  Returns a new reference, or nullptr and sets the
+// Python error indicator on error.
+inline PyObject* pack_timedelta(int days, int secs, int usecs) noexcept {
+    const int32_t parts[3] = { days, secs, usecs };
+    return NB_CALL(datetime_pack)(
+        NB_CTX, (uint32_t) datetime_kind::timedelta, parts);
+}
+
+// Create a timezone-naive datetime.datetime object from its components.
+// Returns a new reference, or nullptr and sets the Python error indicator
+// on error.
+inline PyObject* pack_datetime(int year, int month, int day,
+                               int hour, int minute, int second,
+                               int usec) noexcept {
+    const int32_t parts[8] = { year, month, day, hour,
+                               minute, second, usec, 0 };
+    return NB_CALL(datetime_pack)(
+        NB_CTX, (uint32_t) datetime_kind::datetime, parts);
+}
 
 // Casts a std::chrono type (either a duration or a time_point) to/from
 // Python timedelta objects, or from a Python float representing seconds.
@@ -42,15 +125,15 @@ public:
 
         // If invoked with datetime.delta object, unpack it
         int dd, ss, uu;
-        try {
-            if (unpack_timedelta(src.ptr(), &dd, &ss, &uu)) {
-                value = type(ch::duration_cast<duration_t>(
-                                 days(dd) + ch::seconds(ss) + ch::microseconds(uu)));
-                return true;
-            }
-        } catch (python_error& e) {
-            e.discard_as_unraisable(src.ptr());
+        int rv = unpack_timedelta(src.ptr(), &dd, &ss, &uu);
+        if (rv < 0) {
+            PyErr_Clear();
             return false;
+        }
+        if (rv) {
+            value = type(ch::duration_cast<duration_t>(
+                             days(dd) + ch::seconds(ss) + ch::microseconds(uu)));
+            return true;
         }
 
         // If invoked with a float we assume it is seconds and convert
@@ -141,13 +224,11 @@ public:
         std::tm cal;
         ch::microseconds msecs;
         int yy, mon, dd, hh, min, ss, uu;
-        try {
-            if (!unpack_datetime(src.ptr(), &yy, &mon, &dd,
-                                 &hh, &min, &ss, &uu)) {
-                return false;
-            }
-        } catch (python_error& e) {
-            e.discard_as_unraisable(src.ptr());
+        int rv = unpack_datetime(src.ptr(), &yy, &mon, &dd,
+                                 &hh, &min, &ss, &uu);
+        if (rv <= 0) {
+            if (rv < 0)
+                PyErr_Clear();
             return false;
         }
         cal.tm_sec = ss;

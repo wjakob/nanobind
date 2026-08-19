@@ -489,6 +489,27 @@ NB_SLOT(bool, load_cmplx,
         (nb_internals *p, PyObject *o, uint32_t flags, double *out) noexcept)
 
 // --------------------------------------------------------------------------
+// Datetime conversions
+// --------------------------------------------------------------------------
+
+// The two slots below transport the fields of Python datetime objects using
+// the per-kind layouts documented in the 'datetime_kind' enumeration.
+
+/// Unpack the fields of 'o' into 'parts' and return its type's entry in the
+/// 'accept' bit mask. Subtype checks follow ascending kind order, and
+/// 'parts' must fit the largest accepted layout. Returns 0 when nothing
+/// matches, or -1 with a Python error set on failure.
+NB_SLOT(int, datetime_unpack,
+        (nb_internals *p, PyObject *o, uint32_t accept,
+         int32_t *parts) noexcept)
+
+/// Construct an instance of the datetime module type named by 'kind' from
+/// 'parts'. Returns a new reference, or nullptr with a Python error set on
+/// failure.
+NB_SLOT(PyObject *, datetime_pack,
+        (nb_internals *p, uint32_t kind, const int32_t *parts) noexcept)
+
+// --------------------------------------------------------------------------
 // Free-threading
 // --------------------------------------------------------------------------
 

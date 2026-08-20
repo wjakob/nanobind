@@ -1669,10 +1669,10 @@ static PyObject *nb_type_new_impl(nb_internals *p, const type_data_init *t) {
     if (to->flags & (uint32_t) type_flags::pooled) {
 #if defined(PYPY_VERSION)
         // PyPy's cpyext object model is incompatible with park/revive step
-        to->flags &= (~(uint32_t) type_flags::pooled) & 0xFFFFFF;
+        to->flags &= ~(uint32_t) type_flags::pooled;
 #else
         if (t->pool_capacity == 0) {
-            to->flags &= (~(uint32_t) type_flags::pooled) & 0xFFFFFF;
+            to->flags &= ~(uint32_t) type_flags::pooled;
         } else {
             bool eligible =
                 !(to->flags & (uint32_t) type_flags::intrusive_ptr);

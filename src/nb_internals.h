@@ -177,7 +177,7 @@ struct arg_data {
     PyObject *value;
 
     /// Argument-specific cast flags (see the 'cast_flags' enumeration)
-    uint16_t flag;
+    uint32_t flag;
 };
 
 /// Internal version of a function binding record (see func_data_init_base in
@@ -436,10 +436,10 @@ struct nb_func {
     PyObject* (*vectorcall)(PyObject *, PyObject * const*, size_t, PyObject *);
     uint32_t max_nargs; // maximum value of func_data::nargs for any overload
     call_complexity complexity;
+    bool doc_uniform;
     nb_internals *internals; // backend state of the domain that owns this function
     PyObject *scope; // borrowed; the scope owns this function
     PyObject *module_name; // '__module__' captured at definition time
-    bool doc_uniform;
 };
 
 /// Python object representing a `nb_ndarray` (which wraps a DLPack ndarray)

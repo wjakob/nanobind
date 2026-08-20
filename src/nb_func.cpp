@@ -166,7 +166,7 @@ static const arg_data method_self_arg = { "self", nullptr, nullptr, nullptr, 0 }
 
 /// Translate a public argument record into the private runtime form
 static arg_data arg_from_init(const arg_data_init &a) {
-    return { a.name, a.signature, nullptr, a.value, (uint16_t) a.flag };
+    return { a.name, a.signature, nullptr, a.value, a.flag };
 }
 
 static bool set_builtin_exception_status(builtin_exception &e) {

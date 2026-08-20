@@ -157,7 +157,8 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         (std::is_same_v<is_method, Extra> + ... + 0) != 0;
     constexpr bool is_getter_det =
         (std::is_same_v<is_getter, Extra> + ... + 0) != 0;
-    static constexpr bool has_arg_annotations = has_arg_defaults || (nargs_provided > 0 && !is_getter_det);
+    static constexpr bool has_arg_annotations = has_arg_defaults ||
+        (nargs_provided > 0 && !is_getter_det);
 
     // Determine the number of potentially-locked function arguments
     static constexpr bool lock_self_det =
@@ -371,11 +372,11 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
                       explicit_kw_only ? nargs_before_kw_only :
                   kwargs_pos_1 < nargs ? kwargs_pos_1 : nargs;
 
-    // Store information (flags, defaults) about annotated parameters.
-    // When 'has_arg_defaults' is set (e.g. due to the presence of
+    // Store information (flags, defaults) about annotated parameters. Skips
+    // getters. When 'has_arg_defaults' is set (e.g. due to the presence of
     // ``std::optional<T>``), we provide an implicit annotation for every
     // parameter, which is initialized by the loop below.
-    if constexpr (has_arg_defaults || nargs_provided > 0) {
+    if constexpr (has_arg_annotations) {
         constexpr auto arg_flags =
             arg_flags_static<is_method_det, has_arg_annotations, Extra...>(
                 (Return (*)(Args...)) nullptr);

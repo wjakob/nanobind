@@ -166,7 +166,7 @@ static const arg_data method_self_arg = { "self", nullptr, nullptr, nullptr, 0 }
 
 /// Translate a public argument record into the private runtime form
 static arg_data arg_from_init(const arg_data_init &a) {
-    return { a.name, a.signature, a.name_py, a.value, a.flag };
+    return { a.name, a.signature, a.name_py, a.value, (uint16_t) a.flag };
 }
 
 static bool set_builtin_exception_status(builtin_exception &e) {
@@ -234,16 +234,9 @@ PyObject *nb_func_new(nb_internals *p, const func_data_init_base *f) noexcept {
          is_new          = false,
          is_setstate     = false;
 
-    // Locate the argument array through the 'base_size' / 'arg_stride'
-    // fields rather than sizeof(): the record may come from an extension
-    // compiled against headers whose version of these structures differs
-    arg_data_init *args_in = nullptr;
-    if (has_args)
-        args_in = (arg_data_init *) ((char *) f + f->base_size);
-    const size_t arg_stride = f->arg_stride;
-    auto arg_in = [args_in, arg_stride](size_t i) -> arg_data_init & {
-        return *(arg_data_init *) ((char *) args_in + i * arg_stride);
-    };
+    // The argument array of func_data_init<N> follows the base record
+    const arg_data_init *args_in =
+        has_args ? (const arg_data_init *) (f + 1) : nullptr;
 
     PyObject *name = nullptr;
     PyObject *func_prev = nullptr;
@@ -324,7 +317,7 @@ PyObject *nb_func_new(nb_internals *p, const func_data_init_base *f) noexcept {
 
         if (has_args) {
             for (size_t i = is_method; i < f->nargs; ++i) {
-                arg_data_init &a = arg_in(i - is_method);
+                const arg_data_init &a = args_in[i - is_method];
                 uint32_t dispatch_flags =
                     a.flag & cast_flags::accepts_none;
                 medium_call |= a.name != nullptr || a.value != nullptr ||
@@ -409,7 +402,7 @@ PyObject *nb_func_new(nb_internals *p, const func_data_init_base *f) noexcept {
     fc->impl = f->impl;
     fc->descr = f->descr;
     fc->descr_types = f->descr_types;
-    fc->flags = f->flags;
+    fc->flags = NB_ABI_FLAGS(f->flags);
     fc->nargs = f->nargs;
     fc->nargs_pos = f->nargs_pos;
     fc->name = f->name;
@@ -482,7 +475,7 @@ PyObject *nb_func_new(nb_internals *p, const func_data_init_base *f) noexcept {
         if (is_method) // add implicit 'self' argument annotation
             fc->args[0] = method_self_arg;
         for (size_t i = is_method; i < fc->nargs; ++i)
-            fc->args[i] = arg_from_init(arg_in(i - is_method));
+            fc->args[i] = arg_from_init(args_in[i - is_method]);
 
         for (size_t i = 0; i < fc->nargs; ++i) {
             arg_data &a = fc->args[i];

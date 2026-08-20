@@ -121,7 +121,7 @@ static PyObject *enum_create_impl(nb_internals *p, const enum_data_init *ed) {
     t->name = strdup_check(ed->name);
     t->type = ed->type;
     t->type_py = (PyTypeObject *) result.ptr();
-    t->flags = ed->flags;
+    t->flags = NB_ABI_FLAGS(ed->flags);
     t->enum_tbl.fwd = new enum_map();
     t->enum_tbl.rev = new enum_map();
     t->scope = ed->scope;

@@ -214,8 +214,8 @@ struct unused {
  * The layout of this data structure is part of the backend ABI contract.
  */
 struct ndarray_config {
-    /// Announces optional constraints (see above); currently always zero
-    uint32_t flags = 0;
+    /// Optional constraints (none yet) and the ABI tag in the top 8 bits
+    uint32_t flags = NB_ABI_TAG;
 
     /// Requested DLPack device type (0: any)
     int32_t device_type = 0;
@@ -232,9 +232,9 @@ struct ndarray_config {
     /// Does the binding access the array through a const pointer?
     bool ro = false;
 
-    /// Reserved, must be zero
-    uint16_t reserved_0 = 0;
-    uint32_t reserved_1 = 0;
+    /// Unused, claimable by a later ABI minor
+    uint16_t unused_0;
+    uint32_t unused_1;
 
     /// Requested extents ('ndim' entries, -1 marks a free dimension)
     const int64_t *shape = nullptr;
@@ -264,14 +264,14 @@ struct ndarray_create_args {
     /// Python object owning the data, if any
     PyObject *owner = nullptr;
 
-    /// Number of dimensions
-    size_t ndim = 0;
-
     /// Offset of the first element in bytes
     uint64_t byte_offset = 0;
 
-    /// Announces optional fields (see above); currently always zero
-    uint32_t flags = 0;
+    /// Number of dimensions
+    uint32_t ndim = 0;
+
+    /// Optional fields (none yet) and the ABI tag in the top 8 bits
+    uint32_t flags = NB_ABI_TAG;
 
     /// DLPack device type (0: the CPU device)
     int32_t device_type = 0;
@@ -288,9 +288,8 @@ struct ndarray_create_args {
     /// Is the array read-only?
     bool ro = false;
 
-    /// Reserved, must be zero
-    uint16_t reserved_0 = 0;
-    uint32_t reserved_1 = 0;
+    /// Unused, claimable by a later ABI minor
+    uint16_t unused;
 };
 
 /// ndarray_config_t collects nd-array template parameters in a structured way.
@@ -432,7 +431,7 @@ public:
         args.shape = shape;
         args.strides = strides;
         args.owner = owner.ptr();
-        args.ndim = ndim;
+        args.ndim = (uint32_t) ndim;
         args.byte_offset = byte_offset;
         args.device_type = device_type;
         args.device_id = device_id;
@@ -440,7 +439,7 @@ public:
         args.order = order;
         args.ro = ReadOnly;
 
-        m_handle = NB_CALL(ndarray_create)(NB_CTX, &args, sizeof(args));
+        m_handle = NB_CALL(ndarray_create)(NB_CTX, &args);
         m_dltensor = *NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
@@ -480,7 +479,7 @@ public:
         args.shape = shape_ptr;
         args.strides = (strides.size() == 0) ? nullptr : strides.begin();
         args.owner = owner.ptr();
-        args.ndim = shape_size;
+        args.ndim = (uint32_t) shape_size;
         args.byte_offset = byte_offset;
         args.device_type = device_type;
         args.device_id = device_id;
@@ -488,7 +487,7 @@ public:
         args.order = order;
         args.ro = ReadOnly;
 
-        m_handle = NB_CALL(ndarray_create)(NB_CTX, &args, sizeof(args));
+        m_handle = NB_CALL(ndarray_create)(NB_CTX, &args);
         m_dltensor = *NB_CALL(ndarray_inc_ref)(m_handle);
     }
 
@@ -665,7 +664,7 @@ template <typename... Args> struct type_caster<ndarray<Args...>> {
         }
 
         detail::ndarray_handle *h = NB_CALL(ndarray_import)(NB_CTX_C(cleanup),
-            src.ptr(), &config, sizeof(config), flags & cast_flags::convert,
+            src.ptr(), &config, flags & cast_flags::convert,
             cleanup);
 
         if (NB_UNLIKELY(value.m_handle))

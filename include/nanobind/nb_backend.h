@@ -17,6 +17,10 @@
       *backend*. A test ``tests/test_abi_layout.cpp`` asserts the memory
       layout of the data structures declared here.
 
+      Records with flag fields pack the ``NB_BACKEND_ABI_MINOR`` into
+      the top 8 bits, which allows a single backend to service requests
+      by callers with different ABI minor versions.
+
     - The *internals ABI* (NB_INTERNALS_VERSION in src/nb_internals.h) governs
       whether two *backends* may share a state. Packages with an
       incompatible internals ABI are isolated from each other.
@@ -104,6 +108,9 @@ struct dtype;
 NAMESPACE_END(dlpack)
 
 NAMESPACE_BEGIN(detail)
+
+/// The caller's NB_BACKEND_ABI_MINOR moved shifted to the top 8 bits
+#define NB_ABI_TAG ((uint32_t) NB_BACKEND_ABI_MINOR << 24)
 
 struct ndarray_handle;
 struct ndarray_config;
@@ -224,14 +231,9 @@ enum class func_flags : uint32_t {
     is_copy_constructor = (1 << 14)
 };
 
-/* Public flags about a type. These are construction inputs written by an
-   extension and read by the backend, so their values are frozen: adding a
-   value is a minor version bump, while changing what an existing value means
-   is a major bump. Bits 14..18 are free; bits 19..23 belong to
-   type_init_flags below; runtime-only flags used by the backend occupy
-   bits 24+ of the backend's private flags word and never appear here.
-   Once bits 14..18 are exhausted, additional flags continue in the
-   'reserved' field of type_data_init. */
+/// Public flags characterizing type objects. Their values are frozen by the
+/// ABI contract. Bits 14..18 are free, bits 19..23 belong to ``type_init_flags``
+/// below, and bits 24..31 hold the ABI tag.
 enum class type_flags : uint32_t {
     /// Does the type provide a C++ destructor?
     is_destructible          = (1 << 0),
@@ -409,7 +411,10 @@ struct arg_data_init {
     PyObject *value;
 
     /// Argument-specific cast flags (see the 'cast_flags' enumeration)
-    uint16_t flag;
+    uint32_t flag;
+
+    /// Unused, claimable by a future minor ABI revision
+    uint32_t unused;
 };
 
 /// Flags of the 'obj_vectorcall' and 'obj_vectorcall_ex' backend slots
@@ -441,6 +446,9 @@ struct call_arg {
     PyObject *name;
 
     call_arg_kind kind;
+
+    /// Unused, claimable by a future minor ABI revision
+    uint32_t unused;
 };
 
 /// Describes a function binding
@@ -478,14 +486,6 @@ struct func_data_init_base {
     /// nargs_pos is always <= nargs.
     uint16_t nargs_pos;
 
-    /// sizeof(func_data_init_base) at the extension's compile time; the
-    /// argument array of func_data_init<N> begins at this offset
-    uint16_t base_size;
-
-    /// sizeof(arg_data_init) at the extension's compile time; the stride of
-    /// the argument array
-    uint16_t arg_stride;
-
     /// Function name
     const char *name;
 
@@ -505,14 +505,11 @@ template<> struct func_data_init<0> : func_data_init_base {};
 
 /// Describes a type binding
 struct type_data_init {
-    /// Size of a C++ instance in bytes
-    uint32_t size;
+    /// Packed size and alignment of a C++ instance (see \ref type_size_align())
+    uint32_t size_align;
 
-    /// log2 of the C++ instance alignment
-    uint32_t align_log2 : 8;
-
-    /// Combination of 'type_flags' and 'type_init_flags' values
-    uint32_t flags : 24;
+    /// Combination of ``type_flags``, ``type_init_flags``, and the ABI tag.
+    uint32_t flags;
 
     /// Type name (or a custom signature, see nb::sig)
     const char *name;
@@ -535,12 +532,6 @@ struct type_data_init {
     /// Keep-alive callback of types deriving from enable_shared_from_this
     bool (*keep_shared_from_this_alive)(PyObject *) noexcept;
 
-    /// Instance pool capacity (see nb::pooled)
-    uint32_t pool_capacity;
-
-    /// Room for future 'type_flags' growth, must be zero
-    uint32_t reserved = 0;
-
     /// Scope (e.g. module) in which the type will be installed
     PyObject *scope;
 
@@ -556,9 +547,20 @@ struct type_data_init {
     /// Custom PyType_Slot entries to install
     const PyType_Slot *type_slots;
 
+    /// Instance pool capacity (see nb::pooled)
+    uint32_t pool_capacity;
+
     /// Size of the nb::supplement<T> storage region
-    size_t supplement_size;
+    uint32_t supplement_size;
 };
+
+/// Encode the size and alignment of a type into a packed 32-bit word
+constexpr uint32_t type_size_align(size_t size, size_t align) {
+    uint32_t align_log2 = 0;
+    while (((size_t) 1 << align_log2) < align)
+        align_log2++;
+    return ((uint32_t) (size / align) << 5) | align_log2;
+}
 
 /// Describes an enumeration binding
 struct enum_data_init {
@@ -576,6 +578,9 @@ struct enum_data_init {
 
     /// Enumeration flags (see the 'enum_flags' enumeration)
     uint32_t flags;
+
+    /// Unused, claimable by a future minor ABI revision
+    uint32_t unused;
 };
 
 /// Callback that converts a caught C++ exception into a Python error state.

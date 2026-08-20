@@ -68,7 +68,7 @@ NB_INLINE void type_extra_apply(type_data_init &t, supplement<T>) {
     static_assert(alignof(T) <= alignof(void *),
                   "The alignment requirement of the supplement is too high.");
     t.flags |= (uint32_t) type_init_flags::has_supplement | (uint32_t) type_flags::is_final;
-    t.supplement_size = sizeof(T);
+    t.supplement_size = (uint32_t) sizeof(T);
 }
 
 NB_INLINE void enum_extra_apply(enum_data_init &e, is_arithmetic) {
@@ -432,15 +432,12 @@ public:
 
     template <typename... Extra>
     NB_INLINE class_(handle scope, const char *name, const Extra &... extra) {
-        detail::type_data_init d {};
+        detail::type_data_init d;
 
-        constexpr size_t alias_align = alignof(Alias);
-        uint8_t align_log2 = 0;
-        while (((size_t) 1 << align_log2) != alias_align)
-            align_log2++;
-
-        d.align_log2 = align_log2;
-        d.size = (uint32_t) sizeof(Alias);
+        static_assert(sizeof(Alias) / alignof(Alias) < ((size_t) 1 << 27),
+                      "nanobind: instance size is too large");
+        d.size_align = detail::type_size_align(sizeof(Alias), alignof(Alias));
+        d.flags = NB_ABI_TAG;
         d.name = name;
         d.scope = scope.ptr();
         d.type = &typeid(T);
@@ -654,13 +651,14 @@ public:
 
     template <typename... Extra>
     NB_INLINE enum_(handle scope, const char *name, const Extra &... extra) {
-        detail::enum_data_init ed { };
+        detail::enum_data_init ed;
         ed.type = &typeid(T);
         ed.scope = scope.ptr();
         ed.name = name;
-        ed.flags = std::is_signed_v<Underlying>
+        ed.docstr = nullptr;
+        ed.flags = NB_ABI_TAG | (std::is_signed_v<Underlying>
                        ? (uint32_t) detail::enum_flags::is_signed
-                       : 0;
+                       : 0);
         (detail::enum_extra_apply(ed, extra), ...);
         m_ptr = NB_CALL(enum_create)(NB_CTX, &ed);
     }

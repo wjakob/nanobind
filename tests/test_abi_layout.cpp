@@ -21,6 +21,9 @@ using namespace nanobind::detail;
     static_assert(sizeof(void *) != 8 || offsetof(S, F) == (V),                \
                   "frozen ABI layout of " #S "::" #F " changed")
 
+static_assert(NB_BACKEND_ABI_MINOR < 256,
+              "the ABI tag reserves 8 bits for the minor version");
+
 static_assert(cleanup_list::Small == 5 &&
               (sizeof(void *) != 8 || sizeof(cleanup_list) == 64),
               "frozen ABI layout of cleanup_list changed");
@@ -32,14 +35,16 @@ NB_FROZEN_OFF(arg_data_init, signature, 8);
 NB_FROZEN_OFF(arg_data_init, name_py, 16);
 NB_FROZEN_OFF(arg_data_init, value, 24);
 NB_FROZEN_OFF(arg_data_init, flag, 32);
+NB_FROZEN_OFF(arg_data_init, unused, 36);
 
 static_assert(sizeof(void *) != 8 || sizeof(call_arg) == 24,
               "frozen ABI layout of call_arg changed");
 NB_FROZEN_OFF(call_arg, value, 0);
 NB_FROZEN_OFF(call_arg, name, 8);
 NB_FROZEN_OFF(call_arg, kind, 16);
+NB_FROZEN_OFF(call_arg, unused, 20);
 
-static_assert(sizeof(void *) != 8 || sizeof(func_data_init_base) == 96,
+static_assert(sizeof(void *) != 8 || sizeof(func_data_init_base) == 88,
               "frozen ABI layout of func_data_init_base changed");
 NB_FROZEN_OFF(func_data_init_base, capture, 0);
 NB_FROZEN_OFF(func_data_init_base, free_capture, 24);
@@ -49,15 +54,14 @@ NB_FROZEN_OFF(func_data_init_base, descr_types, 48);
 NB_FROZEN_OFF(func_data_init_base, flags, 56);
 NB_FROZEN_OFF(func_data_init_base, nargs, 60);
 NB_FROZEN_OFF(func_data_init_base, nargs_pos, 62);
-NB_FROZEN_OFF(func_data_init_base, base_size, 64);
-NB_FROZEN_OFF(func_data_init_base, arg_stride, 66);
-NB_FROZEN_OFF(func_data_init_base, name, 72);
-NB_FROZEN_OFF(func_data_init_base, doc, 80);
-NB_FROZEN_OFF(func_data_init_base, scope, 88);
+NB_FROZEN_OFF(func_data_init_base, name, 64);
+NB_FROZEN_OFF(func_data_init_base, doc, 72);
+NB_FROZEN_OFF(func_data_init_base, scope, 80);
 
-static_assert(sizeof(void *) != 8 || sizeof(type_data_init) == 120,
+static_assert(sizeof(void *) != 8 || sizeof(type_data_init) == 112,
               "frozen ABI layout of type_data_init changed");
-NB_FROZEN_OFF(type_data_init, size, 0);
+NB_FROZEN_OFF(type_data_init, size_align, 0);
+NB_FROZEN_OFF(type_data_init, flags, 4);
 NB_FROZEN_OFF(type_data_init, name, 8);
 NB_FROZEN_OFF(type_data_init, type, 16);
 NB_FROZEN_OFF(type_data_init, destruct, 24);
@@ -65,14 +69,13 @@ NB_FROZEN_OFF(type_data_init, copy, 32);
 NB_FROZEN_OFF(type_data_init, move, 40);
 NB_FROZEN_OFF(type_data_init, set_self_py, 48);
 NB_FROZEN_OFF(type_data_init, keep_shared_from_this_alive, 56);
-NB_FROZEN_OFF(type_data_init, pool_capacity, 64);
-NB_FROZEN_OFF(type_data_init, reserved, 68);
-NB_FROZEN_OFF(type_data_init, scope, 72);
-NB_FROZEN_OFF(type_data_init, base, 80);
-NB_FROZEN_OFF(type_data_init, base_py, 88);
-NB_FROZEN_OFF(type_data_init, doc, 96);
-NB_FROZEN_OFF(type_data_init, type_slots, 104);
-NB_FROZEN_OFF(type_data_init, supplement_size, 112);
+NB_FROZEN_OFF(type_data_init, scope, 64);
+NB_FROZEN_OFF(type_data_init, base, 72);
+NB_FROZEN_OFF(type_data_init, base_py, 80);
+NB_FROZEN_OFF(type_data_init, doc, 88);
+NB_FROZEN_OFF(type_data_init, type_slots, 96);
+NB_FROZEN_OFF(type_data_init, pool_capacity, 104);
+NB_FROZEN_OFF(type_data_init, supplement_size, 108);
 
 static_assert(sizeof(void *) != 8 || sizeof(enum_data_init) == 40,
               "frozen ABI layout of enum_data_init changed");
@@ -81,6 +84,7 @@ NB_FROZEN_OFF(enum_data_init, scope, 8);
 NB_FROZEN_OFF(enum_data_init, name, 16);
 NB_FROZEN_OFF(enum_data_init, docstr, 24);
 NB_FROZEN_OFF(enum_data_init, flags, 32);
+NB_FROZEN_OFF(enum_data_init, unused, 36);
 
 static_assert(sizeof(void *) != 8 || sizeof(error_payload) == 24,
               "frozen ABI layout of error_payload changed");
@@ -99,26 +103,25 @@ NB_FROZEN_OFF(ndarray_config, ndim, 8);
 NB_FROZEN_OFF(ndarray_config, dtype, 12);
 NB_FROZEN_OFF(ndarray_config, order, 16);
 NB_FROZEN_OFF(ndarray_config, ro, 17);
-NB_FROZEN_OFF(ndarray_config, reserved_0, 18);
-NB_FROZEN_OFF(ndarray_config, reserved_1, 20);
+NB_FROZEN_OFF(ndarray_config, unused_0, 18);
+NB_FROZEN_OFF(ndarray_config, unused_1, 20);
 NB_FROZEN_OFF(ndarray_config, shape, 24);
 
-static_assert(sizeof(void *) != 8 || sizeof(ndarray_create_args) == 72,
+static_assert(sizeof(void *) != 8 || sizeof(ndarray_create_args) == 64,
               "frozen ABI layout of ndarray_create_args changed");
 NB_FROZEN_OFF(ndarray_create_args, data, 0);
 NB_FROZEN_OFF(ndarray_create_args, shape, 8);
 NB_FROZEN_OFF(ndarray_create_args, strides, 16);
 NB_FROZEN_OFF(ndarray_create_args, owner, 24);
-NB_FROZEN_OFF(ndarray_create_args, ndim, 32);
-NB_FROZEN_OFF(ndarray_create_args, byte_offset, 40);
-NB_FROZEN_OFF(ndarray_create_args, flags, 48);
-NB_FROZEN_OFF(ndarray_create_args, device_type, 52);
-NB_FROZEN_OFF(ndarray_create_args, device_id, 56);
-NB_FROZEN_OFF(ndarray_create_args, dtype, 60);
-NB_FROZEN_OFF(ndarray_create_args, order, 64);
-NB_FROZEN_OFF(ndarray_create_args, ro, 65);
-NB_FROZEN_OFF(ndarray_create_args, reserved_0, 66);
-NB_FROZEN_OFF(ndarray_create_args, reserved_1, 68);
+NB_FROZEN_OFF(ndarray_create_args, byte_offset, 32);
+NB_FROZEN_OFF(ndarray_create_args, ndim, 40);
+NB_FROZEN_OFF(ndarray_create_args, flags, 44);
+NB_FROZEN_OFF(ndarray_create_args, device_type, 48);
+NB_FROZEN_OFF(ndarray_create_args, device_id, 52);
+NB_FROZEN_OFF(ndarray_create_args, dtype, 56);
+NB_FROZEN_OFF(ndarray_create_args, order, 60);
+NB_FROZEN_OFF(ndarray_create_args, ro, 61);
+NB_FROZEN_OFF(ndarray_create_args, unused, 62);
 
 static_assert(sizeof(dlpack::dtype) == 4,
               "frozen ABI layout of dlpack::dtype changed");

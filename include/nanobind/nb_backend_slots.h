@@ -93,12 +93,10 @@ NB_SLOT(nb_internals *, nb_module_init,
 
 /// Build a module definition and slot array on the backend's heap and return
 /// the result of PyModuleDef_Init(). 'exec' is a 'int (*)(PyObject *)'
-/// callback; 'reserved' is a flags word reserved for future use that must
-/// currently be zero. The module carries state that a later
-/// 'nb_module_init' call fills in.
+/// callback. 'flags' holds the ABI tag and is otherwise zero.
 NB_SLOT(PyObject *, module_new,
         (const char *name, const char *doc, void *exec,
-         uint32_t reserved) noexcept)
+         uint32_t flags) noexcept)
 
 /// Create a submodule of an existing module
 NB_SLOT(PyObject *, submodule_new,
@@ -437,11 +435,11 @@ NB_SLOT(void, enum_export, (PyObject *tp))
 /// Try to import a reference-counted ndarray object via DLPack.
 NB_SLOT(ndarray_handle *, ndarray_import,
         (nb_internals *p, PyObject *o, const ndarray_config *c,
-         size_t config_size, bool convert, cleanup_list *cleanup) noexcept)
+         bool convert, cleanup_list *cleanup) noexcept)
 
 /// Describe a local ndarray object using a DLPack capsule.
 NB_SLOT(ndarray_handle *, ndarray_create,
-        (nb_internals *p, const ndarray_create_args *a, size_t args_size))
+        (nb_internals *p, const ndarray_create_args *a))
 
 /// Increase the reference count of the given ndarray object
 NB_SLOT(dlpack::dltensor *, ndarray_inc_ref, (ndarray_handle *h) noexcept)

@@ -64,7 +64,8 @@ static PyObject *nb_backend_fill(PyObject *, PyObject *args) noexcept {
     if (!table)
         return nullptr;
 
-    // Gate on backend minor version incompatibilities
+    // Reject callers newer than this backend. A rejected extension never
+    // loads, which lets the slot implementations trust the ABI tag.
     if (table->abi_minor > NB_BACKEND_ABI_MINOR) {
         PyErr_Format(PyExc_ImportError,
                      "nanobind: this extension requires backend ABI version "

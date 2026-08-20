@@ -69,6 +69,9 @@
 #define NB_VECTORCALL_NARGS_EXT(n)                                              \
     (NB_VECTORCALL_NARGS(n) & ~(Py_ssize_t) NB_VECTORCALL_TRUSTED_SELF)
 
+/// Strip the ABI tag (see NB_ABI_TAG) from a flags word
+#define NB_ABI_FLAGS(flags) ((uint32_t) (flags) & 0xFFFFFF)
+
 /// Version of nanobind's internal data structures. A mismatch isolates
 /// backends from each other instead of breaking them: their type universes
 /// simply become disjoint.
@@ -270,8 +273,8 @@ struct type_data {
     /// flags stripped during translation) plus type_flags_internal (24+)
     uint32_t flags;
 
-    /// log2 of the type's alignment (see type_data_init::align_log2)
-    uint32_t align_log2;
+    /// Alignment of a C++ instance in bytes
+    uint32_t align;
 
     /// Instance pool capacity
     uint32_t pool_capacity;
@@ -340,9 +343,6 @@ struct type_data {
     /// Per-type instance pool for non-FT builds
     nb_inst_pool pool;
 #endif
-
-    /// Recover the alignment in bytes from its stored logarithm
-    uint32_t align() const { return (uint32_t) 1 << align_log2; }
 };
 
 /// Runtime record for enumeration bindings; extends the private type record

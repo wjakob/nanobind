@@ -676,16 +676,9 @@ static void nb_module_free(void *m) {
         internals_dec_ref(p);
 }
 
+// 'flags' holds the ABI tag, which nothing reads yet
 PyObject *module_new(const char *name, const char *doc, void *exec,
-                     uint32_t reserved) noexcept {
-    if (reserved != 0) {
-        PyErr_SetString(PyExc_SystemError,
-                        "nanobind::detail::module_new(): the reserved "
-                        "parameter must be zero (this extension was built "
-                        "against incompatible nanobind headers)");
-        return nullptr;
-    }
-
+                     uint32_t) noexcept {
     PyModuleDef_Slot *s =
         (PyModuleDef_Slot *) PyMem_Calloc(4, sizeof(PyModuleDef_Slot));
     PyModuleDef *d = (PyModuleDef *) PyMem_Calloc(1, sizeof(PyModuleDef));

@@ -1019,25 +1019,11 @@ static ndarray_handle *ndarray_import_impl(nb_internals *p, PyObject *src,
     return result.release();
 }
 
-// Copy a construction record written by an extension into a full-size record
-// owned by the backend. Keeps the default for fields not provided by the extension.
-template <typename T> static T normalize_record(const void *src, size_t size) {
-    T dst{};
-    memcpy(&dst, src, size < sizeof(T) ? size : sizeof(T));
-    return dst;
-}
-
 ndarray_handle *ndarray_import(nb_internals *p, PyObject *src,
                                const ndarray_config *c,
-                               size_t config_size, bool convert,
+                               bool convert,
                                cleanup_list *cleanup) noexcept {
-    ndarray_config cfg = normalize_record<ndarray_config>(c, config_size);
-
-    check(cfg.flags == 0,
-          "ndarray_import(): the extension requested an array constraint that "
-          "this version of nanobind does not implement!");
-
-    return ndarray_import_impl(p, src, cfg, convert, cleanup);
+    return ndarray_import_impl(p, src, *c, convert, cleanup);
 }
 
 dlpack::dltensor *ndarray_inc_ref(ndarray_handle *th) noexcept {
@@ -1090,14 +1076,8 @@ void ndarray_dec_ref(ndarray_handle *th) noexcept {
     }
 }
 
-ndarray_handle *ndarray_create(nb_internals *, const ndarray_create_args *a,
-                               size_t args_size) {
-    ndarray_create_args args =
-        normalize_record<ndarray_create_args>(a, args_size);
-
-    check(args.flags == 0,
-          "ndarray_create(): the extension set an array property that this "
-          "version of nanobind does not implement!");
+ndarray_handle *ndarray_create(nb_internals *, const ndarray_create_args *a) {
+    ndarray_create_args args = *a;
 
     check(args.ndim <= (size_t) max_ndim,
           "ndarray_create(): ndim is too large!");

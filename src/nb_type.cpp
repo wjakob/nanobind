@@ -123,7 +123,7 @@ PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
         self = (nb_inst *) PyType_GenericAlloc(tp, 0);
 
     if (NB_LIKELY(self)) {
-        uint32_t align = t->align();
+        uint32_t align = t->align;
         bool intrusive = flags & (uint32_t) type_flags::intrusive_ptr;
 
         uintptr_t payload = (uintptr_t) (self + 1);
@@ -444,10 +444,10 @@ static void inst_dealloc(PyObject *self) {
     }
 
     if (inst->state.cpp_delete) {
-        if (NB_LIKELY(t->align() <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
+        if (NB_LIKELY(t->align <= (uint32_t) __STDCPP_DEFAULT_NEW_ALIGNMENT__))
             operator delete(p);
         else
-            operator delete(p, std::align_val_t(t->align()));
+            operator delete(p, std::align_val_t(t->align));
     }
 
     nb_weakref_seq *wr_seq = nullptr;
@@ -1369,8 +1369,10 @@ static PyObject *nb_type_new_impl(nb_internals *p, const type_data_init *t) {
             PyUnicode_FromFormat("%U.%U", modname.ptr(), name.ptr()));
 
     constexpr size_t ptr_size = sizeof(void *);
-    size_t basicsize = sizeof(nb_inst) + t->size;
-    uint32_t t_align = 1u << t->align_log2;
+    // Decode 'size_align' (see type_size_align() in nb_backend.h)
+    uint32_t t_align = 1u << (t->size_align & 0x1f),
+             t_size = (t->size_align >> 5) * t_align;
+    size_t basicsize = sizeof(nb_inst) + t_size;
     if (t_align > ptr_size)
         basicsize += t_align - ptr_size;
 
@@ -1425,8 +1427,8 @@ static PyObject *nb_type_new_impl(nb_internals *p, const type_data_init *t) {
 
         do {
             size_t base_basicsize = sizeof(nb_inst) + tb_2->size;
-            if (tb_2->align() > ptr_size)
-                base_basicsize += tb_2->align() - ptr_size;
+            if (tb_2->align > ptr_size)
+                base_basicsize += tb_2->align - ptr_size;
             if (base_basicsize > basicsize)
                 basicsize = base_basicsize;
 
@@ -1585,17 +1587,21 @@ static PyObject *nb_type_new_impl(nb_internals *p, const type_data_init *t) {
 
     memset((void *) to, 0, sizeof(type_data));
     to->internals = p;
-    to->size = t->size;
-    to->flags = t->flags & ~(uint32_t) type_init_flags::all_init_flags;
-    to->align_log2 = t->align_log2;
+    to->size = t_size;
+    to->flags = NB_ABI_FLAGS(t->flags) & ~(uint32_t) type_init_flags::all_init_flags;
+    to->align = t_align;
     to->name = t->name;
     to->type = t->type;
-    to->destruct = t->destruct;
-    to->copy = t->copy;
-    to->move = t->move;
-    to->set_self_py = t->set_self_py;
-    to->keep_shared_from_this_alive = t->keep_shared_from_this_alive;
-    to->pool_capacity = t->pool_capacity;
+    if (t->flags & (uint32_t) type_flags::has_destruct)
+        to->destruct = t->destruct;
+    if (t->flags & (uint32_t) type_flags::has_copy)
+        to->copy = t->copy;
+    if (t->flags & (uint32_t) type_flags::has_move)
+        to->move = t->move;
+    if (intrusive_ptr)
+        to->set_self_py = t->set_self_py;
+    if (has_shared_from_this)
+        to->keep_shared_from_this_alive = t->keep_shared_from_this_alive;
 
     if (!intrusive_ptr && base_intrusive_ptr) {
         to->flags |= (uint32_t) type_flags::intrusive_ptr;
@@ -2320,7 +2326,7 @@ size_t nb_type_size(PyObject *t) noexcept {
 }
 
 size_t nb_type_align(PyObject *t) noexcept {
-    return nb_type_data((PyTypeObject *) t)->align();
+    return nb_type_data((PyTypeObject *) t)->align;
 }
 
 const std::type_info *nb_type_info(PyObject *t) noexcept {

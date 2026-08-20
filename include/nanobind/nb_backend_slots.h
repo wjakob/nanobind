@@ -249,6 +249,21 @@ NB_SLOT(PyObject *, nb_func_new,
         (nb_internals *p, const func_data_init_base *f) noexcept)
 
 // --------------------------------------------------------------------------
+// Type namespaces
+// --------------------------------------------------------------------------
+
+/// Return a strong reference to ``t.__dict__``, where ``t`` is a heap type
+NB_SLOT(PyObject *, type_dict, (PyObject *t) noexcept)
+
+/// Raw MRO lookup of the key 'key'. (wraps or emulates ``_PyType_LookupRef()``)
+NB_SLOT(PyObject *, type_lookup,
+        (nb_internals *p, PyObject *t, PyObject *key) noexcept)
+
+/// Variant of the above taking a C string, which it memoizes.
+NB_SLOT(PyObject *, type_lookup_str,
+        (nb_internals *p, PyObject *t, const char *str, size_t bound) noexcept)
+
+// --------------------------------------------------------------------------
 // Type objects and instances
 // --------------------------------------------------------------------------
 

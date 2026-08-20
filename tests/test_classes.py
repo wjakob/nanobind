@@ -1232,3 +1232,36 @@ def test61_pooled_custom_traverse():
     gc.collect()
     c, d = t.pooled_tr_stats()
     assert c == 1 and d == 1
+
+
+def test62_type_namespace():
+    # 'type_dict' returns the writable namespace of a type
+    d = t.type_dict(t.Struct)
+    assert isinstance(d, dict) and "value_plus" in d
+    assert t.type_dict(t.Struct) is d
+
+    class Sub(t.Struct):
+        pass
+
+    t.type_dict_insert(Sub, "injected", 5)
+    assert Sub.injected == 5
+
+    # Inherited entries are not part of the namespace, but visible to a lookup
+    assert "value" in t.type_dict(t.StaticProperties)
+    assert "value" not in t.type_dict(t.StaticProperties2)
+    assert t.type_lookup(t.StaticProperties2, "value") is \
+           t.type_dict(t.StaticProperties)["value"]
+
+    # The lookup returns raw entries without invoking the descriptor protocol
+    assert t.Struct.static_ro == 42
+    assert type(t.type_lookup(t.Struct, "static_ro")).__name__ == \
+           "nb_static_property"
+
+    # It also does not fall back to the metaclass
+    assert t.Struct.__name__ == "Struct"
+    assert t.type_lookup(t.Struct, "__name__") is None
+    assert t.type_lookup(t.Struct, "does_not_exist") is None
+
+    # Python string keys produce the same results
+    for name in ("static_ro", "__name__", "does_not_exist"):
+        assert t.type_lookup_key(t.Struct, name) is t.type_lookup(t.Struct, name)

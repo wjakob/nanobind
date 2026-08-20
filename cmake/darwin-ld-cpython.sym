@@ -723,6 +723,7 @@
 -U _PyType_GenericAlloc
 -U _PyType_GenericNew
 -U _PyType_GetBaseByToken
+-U _PyType_GetDict
 -U _PyType_GetFlags
 -U _PyType_GetFullyQualifiedName
 -U _PyType_GetModule

@@ -1018,4 +1018,31 @@ NB_MODULE(test_classes_ext, m) {
         .def_static("make_ref", &NeverDestruct::make, nb::rv_policy::reference)
         .def("var", &NeverDestruct::var)
         .def("set_var", &NeverDestruct::set_var);
+
+    // test62_type_namespace
+    m.def("type_dict", [](nb::handle t) -> nb::object {
+        nb::dict d = nb::type_dict(t);
+        if (!d.is_valid())
+            return nb::none();
+        return d;
+    });
+
+    m.def("type_dict_insert", [](nb::handle t, const char *name, nb::handle value) {
+        nb::type_dict(t)[name] = value;
+        PyType_Modified((PyTypeObject *) t.ptr());
+    });
+
+    m.def("type_lookup", [](nb::handle t, const char *name) -> nb::object {
+        nb::object o = nb::type_lookup(t, name);
+        if (!o.is_valid())
+            return nb::none();
+        return o;
+    });
+
+    m.def("type_lookup_key", [](nb::handle t, nb::handle name) -> nb::object {
+        nb::object o = nb::type_lookup(t, name);
+        if (!o.is_valid())
+            return nb::none();
+        return o;
+    });
 }

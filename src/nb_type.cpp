@@ -732,21 +732,101 @@ static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
     return 0;
 }
 
+#if defined(Py_LIMITED_API)
+/// Dictionary lookup returning a new reference, does not raise.
+static NB_INLINE PyObject *dict_lookup(PyObject *d, PyObject *key) noexcept {
+#  if NB_PYTHON_VERSION >= 0x030D0000
+    PyObject *value = nullptr;
+    PyDict_GetItemRef(d, key, &value);
+    return value;
+#  else
+    return Py_XNewRef(PyDict_GetItem(d, key));
+#  endif
+}
+
+/// Substitute for _PyType_LookupRef() in limited-API builds: walk the MRO of
+/// the type 't' by hand and return the first match as a new reference
+static PyObject *type_lookup_portable(nb_internals *p, PyObject *t,
+                                      PyObject *key) noexcept {
+    PyObject *mro = PyObject_GetAttr(t, NB_INTERNED(p, __mro__)),
+             *result = nullptr;
+
+    if (!mro || !PyTuple_Check(mro)) {
+        Py_XDECREF(mro);
+        PyErr_Clear();
+        return nullptr;
+    }
+
+    Py_ssize_t n = PyTuple_Size(mro);
+    for (Py_ssize_t i = 0; i < n && !result; ++i) {
+        PyObject *base = PyTuple_GetItem(mro, i); // borrowed
+        if (!base)
+            break;
+
+        // Heap types hand out their namespace directly, while static types
+        // are only reachable through a read-only proxy
+        PyObject *dict = type_dict(base);
+        if (NB_LIKELY(dict != nullptr)) {
+            result = dict_lookup(dict, key);
+        } else {
+            dict = PyObject_GetAttr(base, NB_INTERNED(p, __dict__));
+            if (!dict)
+                break;
+            result = PyObject_GetItem(dict, key);
+        }
+
+        Py_DECREF(dict);
+    }
+
+    PyErr_Clear();
+    Py_DECREF(mro);
+    return result;
+}
+#endif
+
+PyObject *type_lookup(nb_internals *p, PyObject *t, PyObject *key) noexcept {
+#if !defined(Py_LIMITED_API)
+    (void) p;
+    PyTypeObject *tp = (PyTypeObject *) t;
+#  if PY_VERSION_HEX >= 0x030D0000 && !defined(PYPY_VERSION)
+    return _PyType_LookupRef(tp, key);
+#  else
+    return Py_XNewRef(_PyType_Lookup(tp, key));
+#  endif
+#else
+    return type_lookup_portable(p, t, key);
+#endif
+}
+
+PyObject *type_dict(PyObject *t) noexcept {
+#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030C0000 && \
+    !defined(PYPY_VERSION)
+    return PyType_GetDict((PyTypeObject *) t);
+#elif !defined(Py_LIMITED_API)
+    return Py_XNewRef(((PyTypeObject *) t)->tp_dict);
+#else
+    // PyType_GetDict() is not part of the limited API. Heap types store their
+    // namespace where 'type' declares the instance dictionary of its
+    // instances, which PyObject_GenericGetDict() reaches. Static types keep it
+    // elsewhere (in the interpreter state since Python 3.12) and are out of
+    // reach.
+    if (!(PyType_GetFlags((PyTypeObject *) t) & Py_TPFLAGS_HEAPTYPE))
+        return nullptr;
+
+    PyObject *dict = PyObject_GenericGetDict(t, nullptr);
+    if (!dict)
+        PyErr_Clear();
+    return dict;
+#endif
+}
+
 /// Special case to handle 'Class.property = value' assignments
 int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     nb_internals *int_p = nb_type_data((PyTypeObject *) obj)->internals;
 
     /* Fetch the raw MRO entry for 'name'. The lookup must not engage the
        descriptor protocol so that a static property is seen as-is below. */
-    PyObject *cur;
-#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030D0000 && \
-    !defined(PYPY_VERSION)
-    cur = _PyType_LookupRef((PyTypeObject *) obj, name);
-#elif !defined(Py_LIMITED_API)
-    cur = Py_XNewRef(_PyType_Lookup((PyTypeObject *) obj, name));
-#else
-    cur = type_lookup_portable((PyTypeObject *) obj, name);
-#endif
+    PyObject *cur = type_lookup(int_p, obj, name);
 
     if (cur) {
         PyTypeObject *tp = int_p->nb_static_property.load_acquire();

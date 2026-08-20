@@ -3157,6 +3157,38 @@ Type objects
 
    Return the full (module-qualified) name of a type object as a Python string.
 
+.. cpp:function:: dict type_dict(handle h)
+
+   This function returns the namespace dictionary of the type object ``h``. it
+   resembles the Python expression ``h.__dict__``, except that Python only
+   exposes a read-only dictionary proxy, while this function returns a writable
+   dictionary. If your code modifies it, you *must* subsequently notify Python
+   of this via the CPython API call ``PyType_Modified(h.ptr())``.
+
+   The input ``h`` must be a Python *heap type*. It is not restricted to
+   nanobind types bound via :cpp:class:`class_`.
+   The function never raises and may return an invalid object
+   (``!o.is_valid()``).
+
+.. cpp:function:: object type_lookup(handle h, handle name)
+
+   Search the method resolution order of the type object ``h`` for an entry
+   named ``name`` and return it. This function wraps emulates the CPython API
+   function ``_PyType_LookupRef()``.
+
+   In contrast to :cpp:func:`getattr`, the lookup returns the raw entry without
+   engaging the descriptor protocol, and it does not fall back to the metaclass
+   of ``h``.
+
+   The input ``h`` must be a Python type object. It is not restricted to
+   nanobind types bound via :cpp:class:`class_`. The function never raises and
+   may return an invalid object (``!o.is_valid()``) when there is no such
+   entry.
+
+.. cpp:function:: object type_lookup(handle h, const char * name)
+
+   Version of the above function taking a C string as key.
+
 .. cpp:function:: void * type_get_slot(handle h, int slot_id)
 
    On CPython, this function is a simple wrapper around the Python C API

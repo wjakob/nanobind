@@ -268,6 +268,54 @@ name that begins with the symbol ``@``, then nanobind will prevent Python
 code from rebinding or deleting the attribute after it has been set, making
 the borrowed reference reasonably safe.
 
+.. _type_namespaces:
+
+Type namespaces
+---------------
+
+Python exposes the namespace of a type object through the read-only proxy
+``cls.__dict__``. The function :cpp:func:`nb::type_dict() <type_dict>` returns
+the underlying dictionary, which is useful to inspect or modify the attributes
+that a type declares itself.
+
+.. code-block:: cpp
+
+   nb::dict d = nb::type_dict(cls);
+
+   // Does 'cls' declare 'my_method', or does it inherit the attribute?
+   bool local = d.contains("my_method");
+
+Modifications of this dictionary bypass the ``__setattr__`` protocol, in which
+case the attribute caches of the interpreter must be flushed manually.
+
+.. code-block:: cpp
+
+   d["my_attribute"] = value;
+
+   // Announce the change to the interpreter
+   PyType_Modified((PyTypeObject *) cls.ptr());
+
+When Python evaluates an attribute access like ``inst.my_property``, it first
+searches the type of ``inst`` and its base classes for an entry of that name.
+This search visits the bases in `method resolution order
+<https://docs.python.org/3/glossary.html#term-method-resolution-order>`__
+(MRO). The instance dictionary and the descriptor protocol then determine the
+final result, e.g., by replacing a property by its current value.
+
+The function :cpp:func:`nb::type_lookup() <type_lookup>` performs only this
+first step and returns the raw entry, which reveals what a type provides
+without involving an instance or running any of the associated machinery.
+
+.. code-block:: cpp
+
+   // Fetch the descriptor of a static property without invoking its getter
+   nb::object o = nb::type_lookup(cls, "my_property");
+
+The search skips the metaclass, hence attributes like ``__name__`` that a type
+object inherits from ``type`` are not found. It returns an invalid object
+(checked via ``o.is_valid()``) when there is no matching entry, and it never
+raises an exception.
+
 .. _typeslots:
 
 Customizing type creation

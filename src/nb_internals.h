@@ -656,10 +656,12 @@ enum ndarray_export_slot {
 // Use NB_INTERNED(p, name) below to access an entry.
 #define NB_INTERNED_STRINGS(X)                                                 \
     X(__complex__)                                                             \
+    X(__dict__)                                                                \
     X(__dlpack__)                                                              \
     X(__init__)                                                                \
     X(__length_hint__)                                                         \
     X(__module__)                                                              \
+    X(__mro__)                                                                 \
     X(__name__)                                                                \
     X(__new__)                                                                 \
     X(__qualname__)                                                            \
@@ -981,9 +983,10 @@ extern PyObject *inst_new_ext(PyTypeObject *tp, void *value);
 extern PyObject *inst_new_int(PyTypeObject *tp, PyObject *args, PyObject *kwds);
 extern PyTypeObject *nb_static_property_tp(nb_internals *p) noexcept;
 
-#if defined(Py_LIMITED_API)
-extern PyObject *type_lookup_portable(PyTypeObject *tp, PyObject *key) noexcept;
-#endif
+/// Fetch the raw MRO entry 'key' of 't'. Wraps or emulates _PyType_LookupRef()
+extern PyObject *type_lookup(nb_internals *p, PyObject *t,
+                             PyObject *key) noexcept;
+
 extern type_data *nb_type_c2p(nb_internals *internals,
                               const std::type_info *type);
 extern void nb_type_unregister(type_data *t) noexcept;

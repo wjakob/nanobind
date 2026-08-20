@@ -152,6 +152,19 @@ template <typename T>
 inline T &type_supplement(handle h) { return *(T *) NB_CALL(nb_type_supplement)(h.ptr()); }
 inline str type_name(handle h) { return steal<str>(NB_CALL(nb_type_name)(h.ptr())); }
 
+// Low level access to arbitrary Python type objects
+inline dict type_dict(handle h) noexcept {
+    return steal<dict>(NB_CALL(type_dict)(h.ptr()));
+}
+
+inline object type_lookup(handle h, detail::str_key key) noexcept {
+    return steal(NB_CALL(type_lookup_str)(NB_CTX, h.ptr(), key.str, key.bound));
+}
+
+inline object type_lookup(handle h, handle key) noexcept {
+    return steal(NB_CALL(type_lookup)(NB_CTX, h.ptr(), key.ptr()));
+}
+
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) {

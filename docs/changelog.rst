@@ -332,6 +332,11 @@ improvements:
     :cpp:func:`nb::inst_replace_move() <inst_replace_move>`, which are now
     aliases.
 
+  - Added the low-level functions :cpp:func:`nb::type_dict() <type_dict>` and
+    :cpp:func:`nb::type_lookup() <type_lookup>`, which expose the namespace
+    dictionary of a type object and perform a raw lookup along its method
+    resolution order.
+
   - The ``nb::ndarray_traits<T>`` interface was removed following its
     deprecation in nanobind 2.2.0. The alternative
     ``nb::detail::dtype_traits<T>`` is documented in the section on

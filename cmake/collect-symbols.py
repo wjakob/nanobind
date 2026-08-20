@@ -30,6 +30,7 @@ funcs |= {
     'PyGILState_Check',
     'PyObject_LengthHint',
     'PyThreadState_GetUnchecked',
+    'PyType_GetDict',
     'Py_CompileStringExFlags',
     '_PyInterpreterState_Get',
     '_PyThreadState_UncheckedGet',

@@ -634,6 +634,20 @@ bool hasattr_str(nb_internals *p, PyObject *obj, const char *str,
     return rv;
 }
 
+PyObject *type_lookup_str(nb_internals *p, PyObject *t, const char *str,
+                          size_t bound) noexcept {
+    bool owned;
+    PyObject *key = cached_string_fast(p, str, bound, &owned);
+    if (NB_UNLIKELY(!key)) {
+        PyErr_Clear();
+        return nullptr;
+    }
+    PyObject *rv = type_lookup(p, t, key);
+    if (NB_UNLIKELY(owned))
+        Py_DECREF(key);
+    return rv;
+}
+
 void internals_inc_ref(nb_internals *p) {
     p->shared_ref_count.value++;
 }

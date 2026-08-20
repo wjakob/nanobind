@@ -206,38 +206,6 @@ static void *trampoline_probe(type_data *td, const char *name, uint64_t hash) {
     return nullptr;
 }
 
-/// Portable substitute for _PyType_Lookup() in limited-API backends:
-/// return the raw MRO entry for 'key' as a new reference, or null
-#if defined(Py_LIMITED_API)
-PyObject *type_lookup_portable(PyTypeObject *tp, PyObject *key) noexcept {
-    PyObject *mro = PyObject_GetAttrString((PyObject *) tp, "__mro__"),
-             *result = nullptr;
-    if (!mro) {
-        PyErr_Clear();
-        return nullptr;
-    }
-
-    Py_ssize_t n = PySequence_Length(mro);
-    for (Py_ssize_t i = 0; i < n && !result; ++i) {
-        PyObject *base = PySequence_GetItem(mro, i);
-        if (!base)
-            break;
-        PyObject *dict = PyObject_GetAttrString(base, "__dict__");
-        Py_DECREF(base);
-        if (!dict)
-            break;
-        result = PyObject_GetItem(dict, key);
-        Py_DECREF(dict);
-        if (!result)
-            PyErr_Clear();
-    }
-
-    PyErr_Clear();
-    Py_DECREF(mro);
-    return result;
-}
-#endif
-
 /// Determine whether 'tp' overrides the method 'name'. The function looks up
 /// the raw MRO entry without descriptor binding and treats one of nanobind's
 /// own function types as "not overridden". Returns NB_TRAMPOLINE_NO_OVERRIDE,
@@ -252,16 +220,8 @@ static void *trampoline_resolve(PyTypeObject *tp, const char *name,
         return nullptr;
     }
 
-    PyObject *raw;
-
-#if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030D0000 && \
-    !defined(PYPY_VERSION)
-    raw = _PyType_LookupRef(tp, key);
-#elif !defined(Py_LIMITED_API)
-    raw = Py_XNewRef(_PyType_Lookup(tp, key));
-#else
-    raw = type_lookup_portable(tp, key);
-#endif
+    nb_internals *int_p = nb_type_data(tp)->internals;
+    PyObject *raw = type_lookup(int_p, (PyObject *) tp, key);
 
     if (!raw) {
         Py_DECREF(key);
@@ -272,7 +232,6 @@ static void *trampoline_resolve(PyTypeObject *tp, const char *name,
     PyTypeObject *raw_tp = Py_TYPE(raw);
     Py_DECREF(raw);
 
-    nb_internals *int_p = nb_type_data(tp)->internals;
     if (raw_tp == int_p->nb_func || raw_tp == int_p->nb_method ||
         raw_tp == int_p->nb_bound_method) {
         Py_DECREF(key);

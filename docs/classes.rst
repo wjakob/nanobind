@@ -401,6 +401,46 @@ due to the need to store a weak reference list.
 
    nb::class_<Pet>(m, "Pet", nb::is_weak_referenceable());
 
+.. _frozen_types:
+
+Frozen types
+------------
+
+Python code can normally patch a bound type by adding, replacing, or deleting
+its attributes:
+
+.. code-block:: pycon
+
+   >>> my_ext.Pet.speak = lambda self: print("Woof")
+
+Conclude the binding declarations with :cpp:func:`.freeze() <class_::freeze>`
+to prevent this:
+
+.. code-block:: cpp
+
+   nb::class_<Pet>(m, "Pet")
+       .def(nb::init<>())
+       .def_rw("name", &Pet::name)
+       .freeze();
+
+The type then behaves like a builtin type such as ``int`` or ``str``:
+
+.. code-block:: pycon
+
+   >>> my_ext.Pet.speak = lambda self: print("Woof")
+   TypeError: cannot set 'speak' attribute of immutable type 'my_ext.Pet'
+
+Base classes must be frozen before their subclasses, and violations of this
+rule raise a ``TypeError``. Instances of the type remain writable, and Python
+subclasses of it are still possible. Only the type object itself becomes
+read-only.
+
+Freezing is also an optimization. Python's adaptive specializing interpreter
+can generate faster opcodes for immutable types, which reduces the overhead of
+dispatching a constructor call by 7-10%.
+
+The feature is only enabled on Python 3.15+ and ignored on older versions.
+
 .. _inheriting_in_python:
 
 Extending C++ classes in Python

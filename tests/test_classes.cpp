@@ -1045,4 +1045,19 @@ NB_MODULE(test_classes_ext, m) {
             return nb::none();
         return o;
     });
+
+    // test63_freeze
+    struct Frozen { int value = 3; };
+    nb::class_<Frozen>(m, "Frozen")
+        .def(nb::init<>())
+        .def_rw("value", &Frozen::value)
+        .freeze();
+
+    // The same via the low-level interface, which also reports whether the
+    // current build and interpreter can freeze types at all
+    struct Frozen2 { };
+    auto frozen2 = nb::class_<Frozen2>(m, "Frozen2").def(nb::init<>());
+    bool frozen2_ok = nb::type_freeze(frozen2);
+    m.def("freeze_supported", [frozen2_ok] { return frozen2_ok; });
+    m.def("freeze_type", [](nb::handle t) { return nb::type_freeze(t); });
 }

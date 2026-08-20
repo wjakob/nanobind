@@ -165,6 +165,8 @@ inline object type_lookup(handle h, handle key) noexcept {
     return steal(NB_CALL(type_lookup)(NB_CTX, h.ptr(), key.ptr()));
 }
 
+inline bool type_freeze(handle h) { return NB_CALL(type_freeze)(h.ptr()); }
+
 // Low level access to nanobind instance objects
 inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) {
@@ -651,6 +653,12 @@ public:
     template <detail::op_id id, detail::op_type ot, typename L, typename R, typename... Extra>
     class_ & def_cast(const detail::op_<id, ot, L, R> &op, const Extra&... extra) {
         op.execute_cast(*this, extra...);
+        return *this;
+    }
+
+    /// Make the type immutable. Must be the last step of a binding chain
+    NB_INLINE class_ &freeze() {
+        NB_CALL(type_freeze)(m_ptr);
         return *this;
     }
 };

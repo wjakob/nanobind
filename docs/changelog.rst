@@ -145,6 +145,27 @@ wrapper API (i.e., the bindings of Python within C++):
   raise an ``RuntimeError`` when they detect concurrent modification during
   iteration.
 
+- Bindings can now conclude with :cpp:func:`.freeze() <class_::freeze>` to
+  make the type immutable on Python 3.15 and newer:
+
+  .. code-box:: cpp
+
+      nb::class_<A>(m, "A")
+          .def(...)
+          .freeze();
+
+  This renders the type object immutable, and subsequent attempts to modify
+  it from Python or C++ raise an exception. A neat side effect of freezing a
+  type is that it accelerates constructor dispatch by 7-10% on Python 3.15,
+  since it allows Python's adaptive specializing interpreter to generate
+  faster byte code.
+
+  The ability to freeze types was already introduced in CPython 3.14, but it
+  is disadvantageous there due to a `bug
+  <https://github.com/python/cpython/issues/143361>`__ that actually
+  _reduces_ performance. Therefore, nanobind only honors the ``.freeze()``
+  request on CPython 3.15+.
+
 Bindings also became more robust at interpreter shutdown:
 
 - **Interpreter finalization**: code that enters Python from a non-Python
@@ -336,6 +357,7 @@ improvements:
     :cpp:func:`nb::type_lookup() <type_lookup>`, which expose the namespace
     dictionary of a type object and perform a raw lookup along its method
     resolution order.
+
 
   - The ``nb::ndarray_traits<T>`` interface was removed following its
     deprecation in nanobind 2.2.0. The alternative

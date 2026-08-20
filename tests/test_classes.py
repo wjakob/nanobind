@@ -1265,3 +1265,29 @@ def test62_type_namespace():
     # Python string keys produce the same results
     for name in ("static_ro", "__name__", "does_not_exist"):
         assert t.type_lookup_key(t.Struct, name) is t.type_lookup(t.Struct, name)
+
+
+def test63_freeze():
+    if t.freeze_supported():
+        with pytest.raises(TypeError):
+            t.Frozen.extra = 1
+        with pytest.raises(TypeError):
+            t.Frozen2.extra = 1
+
+        # Freezing requires that all base classes are immutable
+        with pytest.raises(TypeError, match="mutable base"):
+            t.freeze_type(t.StaticProperties2)
+    else:
+        assert not t.freeze_type(t.StaticProperties2)
+        t.Frozen.extra = 1
+        del t.Frozen.extra
+
+    # Instances and subclasses remain usable either way
+    v = t.Frozen()
+    v.value = 5
+    assert v.value == 5
+
+    class Sub(t.Frozen):
+        pass
+
+    assert Sub().value == 3

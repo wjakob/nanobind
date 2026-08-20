@@ -2777,6 +2777,28 @@ Class binding
 
       Like the above ``.def()`` variant, but furthermore cast the result of the operation back to `T`.
 
+   .. cpp:function:: class_ &freeze()
+
+      Make the type immutable so that Python code can no longer add, replace,
+      or delete its attributes. The call must be the last step of a binding
+      chain, since the earlier steps assign to the type. The section on
+      :ref:`frozen types <frozen_types>` provides further details.
+
+      **Example**:
+
+      .. code-block:: cpp
+
+         nb::class_<A>(m, "A")
+             .def(nb::init<>())
+             .def("f", &A::f)
+             .freeze();
+
+      Base classes must be frozen before their subclasses, and violations of
+      this rule raise a ``TypeError``. This operation is implemented on Python
+      3.15+ and is a no-op on other versions and stable ABI builds that do not
+      use :ref:`split mode <split-mode>`. Use :cpp:func:`type_freeze` to
+      directly freeze a type object and receive a confirmation on whether the
+      operation had any effect.
 
 .. cpp:class:: template <typename T> enum_ : public class_<T>
 
@@ -3188,6 +3210,12 @@ Type objects
 .. cpp:function:: object type_lookup(handle h, const char * name)
 
    Version of the above function taking a C string as key.
+
+.. cpp:function:: bool type_freeze(handle h)
+
+   Make the type object ``h`` immutable, which is the low-level equivalent of
+   :cpp:func:`class_::freeze` and has the same benefits (see the section on
+   :ref:`frozen types <frozen_types>`).
 
 .. cpp:function:: void * type_get_slot(handle h, int slot_id)
 

@@ -820,6 +820,19 @@ PyObject *type_dict(PyObject *t) noexcept {
 #endif
 }
 
+bool type_freeze(PyObject *t) {
+    // While Python 3.14 already has PyType_Freeze(), we ignore it there because
+    // of this performance bug: https://github.com/python/cpython/issues/143361
+#if NB_PYTHON_VERSION >= 0x030F0000 && !defined(PYPY_VERSION)
+    if (PyType_Freeze((PyTypeObject *) t))
+        raise_python_error();
+    return true;
+#else
+    (void) t;
+    return false;
+#endif
+}
+
 /// Special case to handle 'Class.property = value' assignments
 int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     nb_internals *int_p = nb_type_data((PyTypeObject *) obj)->internals;

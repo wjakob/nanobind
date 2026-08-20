@@ -249,7 +249,7 @@ NB_SLOT(PyObject *, nb_func_new,
         (nb_internals *p, const func_data_init_base *f) noexcept)
 
 // --------------------------------------------------------------------------
-// Type namespaces
+// Generic type objects
 // --------------------------------------------------------------------------
 
 /// Return a strong reference to ``t.__dict__``, where ``t`` is a heap type
@@ -262,6 +262,10 @@ NB_SLOT(PyObject *, type_lookup,
 /// Variant of the above taking a C string, which it memoizes.
 NB_SLOT(PyObject *, type_lookup_str,
         (nb_internals *p, PyObject *t, const char *str, size_t bound) noexcept)
+
+/// Make the type 't' immutable (PyType_Freeze, Python 3.15 and newer).
+/// Returns false when the backend does not implement this operation.
+NB_SLOT(bool, type_freeze, (PyObject *t))
 
 // --------------------------------------------------------------------------
 // Type objects and instances

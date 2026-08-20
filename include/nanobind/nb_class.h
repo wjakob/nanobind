@@ -437,7 +437,7 @@ public:
         static_assert(sizeof(Alias) / alignof(Alias) < ((size_t) 1 << 27),
                       "nanobind: instance size is too large");
         d.size_align = detail::type_size_align(sizeof(Alias), alignof(Alias));
-        d.flags = NB_ABI_TAG;
+        d.flags = NB_ABI_MINOR_TAG;
         d.name = name;
         d.scope = scope.ptr();
         d.type = &typeid(T);
@@ -656,7 +656,7 @@ public:
         ed.scope = scope.ptr();
         ed.name = name;
         ed.docstr = nullptr;
-        ed.flags = NB_ABI_TAG | (std::is_signed_v<Underlying>
+        ed.flags = NB_ABI_MINOR_TAG | (std::is_signed_v<Underlying>
                        ? (uint32_t) detail::enum_flags::is_signed
                        : 0);
         (detail::enum_extra_apply(ed, extra), ...);

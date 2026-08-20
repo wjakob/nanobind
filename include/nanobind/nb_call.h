@@ -115,7 +115,7 @@ object api<Derived>::operator()(Args &&...args_) const {
         (call_arg_init<policy>(args[i++], (forward_t<Args>) args_), ...);
 
         return steal(NB_CALL(obj_vectorcall_ex)(NB_CTX, base, args, i,
-                                                NB_ABI_TAG | flags));
+                                                NB_ABI_MINOR_TAG | flags));
     } else {
         // Call with only positional arguments. 'args[0]' is the writable slot
         // required by PEP 590, followed by 'self' (for method calls) and the

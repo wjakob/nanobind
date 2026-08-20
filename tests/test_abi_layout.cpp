@@ -28,14 +28,13 @@ static_assert(cleanup_list::Small == 5 &&
               (sizeof(void *) != 8 || sizeof(cleanup_list) == 64),
               "frozen ABI layout of cleanup_list changed");
 
-static_assert(sizeof(void *) != 8 || sizeof(arg_data_init) == 40,
+static_assert(sizeof(void *) != 8 || sizeof(arg_data_init) == 32,
               "frozen ABI layout of arg_data_init changed");
 NB_FROZEN_OFF(arg_data_init, name, 0);
 NB_FROZEN_OFF(arg_data_init, signature, 8);
-NB_FROZEN_OFF(arg_data_init, name_py, 16);
-NB_FROZEN_OFF(arg_data_init, value, 24);
-NB_FROZEN_OFF(arg_data_init, flag, 32);
-NB_FROZEN_OFF(arg_data_init, unused, 36);
+NB_FROZEN_OFF(arg_data_init, value, 16);
+NB_FROZEN_OFF(arg_data_init, flag, 24);
+NB_FROZEN_OFF(arg_data_init, unused, 28);
 
 static_assert(sizeof(void *) != 8 || sizeof(call_arg) == 24,
               "frozen ABI layout of call_arg changed");

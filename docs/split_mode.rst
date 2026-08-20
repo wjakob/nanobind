@@ -108,7 +108,7 @@ To use split mode, pass the ``BACKEND_MODULE`` parameter to
 
    nanobind_add_module(my_ext my_ext.cpp BACKEND_MODULE nanobind_backend)
 
-As with regular build, you may specify ``NB_DOMAIN`` to :ref:`isolate
+As with regular builds, you may specify ``NB_DOMAIN`` to :ref:`isolate
 <type-visibility>` your extension from others even when using a shared backend.
 
 Next, declare the backend package as a runtime dependency in
@@ -125,7 +125,7 @@ prints it when configuring a split-mode extension.
 
 .. warning::
 
-   Do **not** specify an upper bound (``<=``), and do not pin a specific
+   Do **not** specify an upper bound (``<``), and do not pin a specific
    version (``==``). Newer backends can always serve older extensions. If two
    hypothetical projects using nanobind were to pin different versions of
    ``nanobind-backend``, they could not be installed at the same time.
@@ -167,10 +167,10 @@ therefore no ``musllinux`` backend wheels.
 Free-threading
 --------------
 
-Split mode supports Python 3.15 and newer via the provisional `abi3t` stable
-ABI (see `PEP 803 <https://peps.python.org/pep-0803/>`__). To do so, specify
-both ``FREE_THREADED`` and ``BACKEND_MODULE``. Older Python versions lack a
-stable ABI for free-threading and are unsupported.
+Split mode supports free-threaded Python 3.15 and newer via the provisional
+``abi3t`` stable ABI (see `PEP 803 <https://peps.python.org/pep-0803/>`__). To
+do so, specify both ``FREE_THREADED`` and ``BACKEND_MODULE``. Older Python
+versions lack a stable ABI for free-threading and are unsupported.
 
 Free-threaded Python cannot load classic ``abi3`` stable ABI modules.
 Therefore, to support both regular and free-threaded Python, you must build
@@ -229,9 +229,11 @@ the following interpretation:
 - ``MAJOR.MINOR`` encodes the newest supported backend ABI contract. The minor
   version advances whenever the package adds a new feature to the ABI
   (e.g., a function slot, bit flag, etc.) without breaking the ABI itself. The
-  major version advances when the ABI changes in a fundamental way. The
-  ``nanobind-backend`` package must continue to serve existing extensions
-  following both minor and major version changes.
+  major version advances when the ABI changes in a fundamental way, in which
+  case the package ships a separate backend module per major version. Since
+  only one version of ``nanobind-backend`` can be installed at a time, the
+  package can never drop support for an older major version. This is very
+  painful, which is why such changes are avoided at all costs.
 
 - ``REVISION`` covers non-contractual changes like backend bug fixes,
   performance improvements, and support for newly released CPython versions.

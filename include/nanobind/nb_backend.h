@@ -109,8 +109,14 @@ NAMESPACE_END(dlpack)
 
 NAMESPACE_BEGIN(detail)
 
-/// The caller's NB_BACKEND_ABI_MINOR moved shifted to the top 8 bits
-#define NB_ABI_TAG ((uint32_t) NB_BACKEND_ABI_MINOR << 24)
+/// The caller's NB_BACKEND_ABI_MINOR shifted to the top 8 bits. The frontend
+/// ORs it into the following flags words. The backend never sees a tag newer
+/// than its own, since nb_backend_fill() rejects such callers:
+///
+/// - func_data_init_base::flags, type_data_init::flags, enum_data_init::flags
+/// - ndarray_config::flags, ndarray_create_args::flags
+/// - the 'flags' arguments of the obj_vectorcall_ex and module_new slots
+#define NB_ABI_MINOR_TAG ((uint32_t) NB_BACKEND_ABI_MINOR << 24)
 
 struct ndarray_handle;
 struct ndarray_config;
@@ -300,6 +306,7 @@ enum class type_init_flags : uint32_t {
     all_init_flags           = (0x1f << 19)
 };
 
+/// Flags characterizing enumeration bindings. Bits 24..31 hold the ABI tag.
 enum class enum_flags : uint32_t {
     /// Is this an arithmetic enumeration?
     is_arithmetic            = (1 << 1),
@@ -404,9 +411,6 @@ struct arg_data_init {
     /// Overrides the argument type in docstrings and stubs (or nullptr)
     const char *signature;
 
-    /// Interned Python version of 'name', filled by the backend
-    PyObject *name_py;
-
     /// Default argument value (or nullptr)
     PyObject *value;
 
@@ -417,7 +421,8 @@ struct arg_data_init {
     uint32_t unused;
 };
 
-/// Flags of the 'obj_vectorcall' and 'obj_vectorcall_ex' backend slots
+/// Flags of the 'obj_vectorcall' and 'obj_vectorcall_ex' backend slots. The
+/// latter also carries the ABI tag in bits 24..31.
 enum class call_flags : uint32_t {
     /// 'base' is a method name to be looked up on the first argument
     method = (1 << 0),

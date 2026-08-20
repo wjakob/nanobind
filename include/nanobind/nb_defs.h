@@ -246,7 +246,8 @@
             return nullptr;                                                    \
         if (!nanobind_##name##_def)                                            \
             nanobind_##name##_def = NB_CALL(module_new)(                       \
-                #name, nullptr, (void *) nanobind_##name##_exec, NB_ABI_TAG);  \
+                #name, nullptr, (void *) nanobind_##name##_exec,               \
+                NB_ABI_MINOR_TAG);                                             \
         return nanobind_##name##_def;                                          \
     }                                                                          \
     void nanobind_##name##_exec_impl(nanobind::module_ variable)

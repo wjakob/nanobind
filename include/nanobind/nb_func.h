@@ -245,7 +245,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // The following temporary record will describe the function in detail
     func_data_init<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
 
-    f.flags = NB_ABI_TAG |
+    f.flags = NB_ABI_MINOR_TAG |
               (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
               (kwargs_pos_1 < nargs ? (uint32_t) func_flags::has_var_kwargs : 0) |
               (ReturnRef            ? (uint32_t) func_flags::return_ref     : 0) |
@@ -385,7 +385,6 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
             arg_data_init &a = f.args[i];
             a.name = nullptr;
             a.signature = nullptr;
-            a.name_py = nullptr;
             a.value = nullptr;
             a.flag = (uint32_t) (arg_flags.v[i + is_method_det] &
                                  cast_flags::accepts_none);

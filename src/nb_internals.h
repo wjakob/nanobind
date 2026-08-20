@@ -69,7 +69,7 @@
 #define NB_VECTORCALL_NARGS_EXT(n)                                              \
     (NB_VECTORCALL_NARGS(n) & ~(Py_ssize_t) NB_VECTORCALL_TRUSTED_SELF)
 
-/// Strip the ABI tag (see NB_ABI_TAG) from a flags word
+/// Strip the ABI tag (see NB_ABI_MINOR_TAG) from a flags word
 #define NB_ABI_FLAGS(flags) ((uint32_t) (flags) & 0xFFFFFF)
 
 /// Version of nanobind's internal data structures. A mismatch isolates

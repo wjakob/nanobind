@@ -7,7 +7,7 @@
     stores verbatim. Consumers may leave NB_SLOT_ALIAS undefined to get NB_SLOT.
 
     The entries in this file are frozen and part of the versioned backend ABI.
-    Any modifications to function order/signatures requires bumping the major
+    Any modifications to function order/signatures require bumping the major
     version, which is generally not acceptable. Appending entries is possible
     but requires careful planning/discussion and a minor ABI bump.
 
@@ -162,7 +162,7 @@ NB_SLOT(PyObject *, obj_vectorcall,
 
 /// Perform a call with keyword arguments and/or '*'/'**' expansions,
 /// described by 'nargs' entries of 'args'. With 'call_flags::method', the
-/// first entry is the 'self' object.
+/// first entry is the 'self' object. 'flags' also carries the ABI tag.
 NB_SLOT(PyObject *, obj_vectorcall_ex,
         (nb_internals *p, PyObject *base, call_arg *args, size_t nargs,
          uint32_t flags))

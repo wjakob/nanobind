@@ -215,78 +215,77 @@ struct unused {
  */
 struct ndarray_config {
     /// Optional constraints (none yet) and the ABI tag in the top 8 bits
-    uint32_t flags = NB_ABI_TAG;
+    uint32_t flags;
 
     /// Requested DLPack device type (0: any)
-    int32_t device_type = 0;
+    int32_t device_type;
 
     /// Requested dimension count (-1: any)
-    int32_t ndim = -1;
+    int32_t ndim;
 
     /// Requested element type (a zero 'bits' field means any)
-    dlpack::dtype dtype { };
+    dlpack::dtype dtype;
 
     /// Requested memory order ('C', 'F', 'A', or '\0' for any)
-    char order = '\0';
+    char order;
 
     /// Does the binding access the array through a const pointer?
-    bool ro = false;
+    bool ro;
 
     /// Unused, claimable by a later ABI minor
     uint16_t unused_0;
     uint32_t unused_1;
 
     /// Requested extents ('ndim' entries, -1 marks a free dimension)
-    const int64_t *shape = nullptr;
+    const int64_t *shape;
 
-    ndarray_config() = default;
     template <typename T> ndarray_config(T)
-        : device_type(T::DeviceType::value),
-          ndim(T::N),
+        : flags(NB_ABI_MINOR_TAG),
+          device_type(T::DeviceType::value), ndim(T::N),
           dtype(nanobind::dtype<typename T::Scalar>()),
           order((char) T::Order::value),
-          ro(std::is_const_v<typename T::Scalar>) { }
+          ro(std::is_const_v<typename T::Scalar>), shape(nullptr) { }
 };
 
 /// ndarray_create_args describes an array that a binding hands to Python,
 /// which the backend reads through ndarray_create()
 struct ndarray_create_args {
     /// Pointer to the array contents
-    void *data = nullptr;
+    void *data;
 
     /// Extents of the array ('ndim' entries)
-    const size_t *shape = nullptr;
+    const size_t *shape;
 
     /// Strides in units of elements ('ndim' entries). When null, they are
     /// derived from 'shape' and 'order'.
-    const int64_t *strides = nullptr;
+    const int64_t *strides;
 
     /// Python object owning the data, if any
-    PyObject *owner = nullptr;
+    PyObject *owner;
 
     /// Offset of the first element in bytes
-    uint64_t byte_offset = 0;
+    uint64_t byte_offset;
 
     /// Number of dimensions
-    uint32_t ndim = 0;
+    uint32_t ndim;
 
     /// Optional fields (none yet) and the ABI tag in the top 8 bits
-    uint32_t flags = NB_ABI_TAG;
+    uint32_t flags;
 
     /// DLPack device type (0: the CPU device)
-    int32_t device_type = 0;
+    int32_t device_type;
 
     /// Index of the device within its device type
-    int32_t device_id = 0;
+    int32_t device_id;
 
     /// Element type
-    dlpack::dtype dtype { };
+    dlpack::dtype dtype;
 
     /// Memory order used to derive missing strides ('C', 'F', 'A', or '\0')
-    char order = '\0';
+    char order;
 
     /// Is the array read-only?
-    bool ro = false;
+    bool ro;
 
     /// Unused, claimable by a later ABI minor
     uint16_t unused;
@@ -427,6 +426,7 @@ public:
             uint64_t byte_offset = 0) {
 
         detail::ndarray_create_args args;
+        args.flags = NB_ABI_MINOR_TAG;
         args.data = (void *) data;
         args.shape = shape;
         args.strides = strides;
@@ -475,6 +475,7 @@ public:
         }
 
         detail::ndarray_create_args args;
+        args.flags = NB_ABI_MINOR_TAG;
         args.data = (void *) data;
         args.shape = shape_ptr;
         args.strides = (strides.size() == 0) ? nullptr : strides.begin();

@@ -844,7 +844,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
                     arg_flag = ad.flag;
                 }
 
-                if (!arg || (arg == Py_None && (arg_flag & cast_flags::accepts_none) == 0))
+                if (!arg || (arg == none_ptr() && (arg_flag & cast_flags::accepts_none) == 0))
                     break;
 
                 args[i] = arg;
@@ -992,7 +992,7 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
                 for (; i < nargs; ++i) {
                     PyObject *arg = args_in[i];
 
-                    if (NB_UNLIKELY(arg == Py_None) &&
+                    if (NB_UNLIKELY(arg == none_ptr()) &&
                         (!has_args ||
                          (f->args[i].flag & cast_flags::accepts_none) == 0))
                         break;
@@ -1010,7 +1010,7 @@ nb_func_vectorcall_medium_pos(PyObject *self, PyObject *const *args_in,
                     arg_flag = ad.flag;
                 }
 
-                if (!arg || (arg == Py_None &&
+                if (!arg || (arg == none_ptr() &&
                              (arg_flag & cast_flags::accepts_none) == 0))
                     break;
 
@@ -1108,9 +1108,9 @@ static PyObject *nb_func_vectorcall_simple(PyObject *self,
                                PyObject *) noexcept = nullptr;
 
     bool fail = kwargs_in != nullptr;
-    PyObject *none_ptr = Py_None;
+    PyObject *none = none_ptr();
     for (size_t i = 0; i < nargs_in; ++i)
-        fail |= args_in[i] == none_ptr;
+        fail |= args_in[i] == none;
 
     if (fail) { // keyword/None arguments unsupported in simple vectorcall
         error_handler = nb_func_error_overload;
@@ -1229,7 +1229,7 @@ static PyObject *nb_func_vectorcall_simple_1(PyObject *self,
 
     PyObject *result = nullptr;
 
-    if (kwargs_in == nullptr && nargs_in == 1 && args_in[0] != Py_None) {
+    if (kwargs_in == nullptr && nargs_in == 1 && args_in[0] != none_ptr()) {
         PyObject *arg = args_in[0];
         cleanup_list cleanup(is_method ? arg : nullptr,
                              nb_func_internals(self));
@@ -1290,7 +1290,7 @@ static PyObject *nb_func_vectorcall_simple_2(PyObject *self,
     PyObject *result = nullptr;
 
     if (kwargs_in == nullptr && nargs_in == 2 &&
-        args_in[0] != Py_None && args_in[1] != Py_None) {
+        args_in[0] != none_ptr() && args_in[1] != none_ptr()) {
         cleanup_list cleanup(is_method ? args_in[0] : nullptr,
                              nb_func_internals(self));
 
@@ -1690,8 +1690,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         if (fi->flags & (uint32_t) func_flags::has_doc) {
             docstr = PyUnicode_FromString(fi->doc);
         } else {
-            docstr = Py_None;
-            Py_INCREF(docstr);
+            docstr = none_ref();
         }
 
         buf.clear();
@@ -1703,8 +1702,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         if (n_default_args) {
             defaults = PyTuple_New(n_default_args);
         } else {
-            defaults = Py_None;
-            Py_INCREF(defaults);
+            defaults = none_ref();
         }
 
         if (!docstr || !sigstr || !item || !defaults)

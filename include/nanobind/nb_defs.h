@@ -96,6 +96,13 @@
 #  define NB_IMMORTAL_SINGLETONS 0
 #endif
 
+// Cache immortal singletons to avoid PLT calls to Py_GetConstantBorrowed in 3.13+.
+#if defined(Py_LIMITED_API) && NB_PYTHON_VERSION >= 0x030D0000
+#  define NB_CACHE_SINGLETONS 1
+#else
+#  define NB_CACHE_SINGLETONS 0
+#endif
+
 #if defined(Py_LIMITED_API)
 #  if Py_LIMITED_API < 0x030A0000 || defined(PYPY_VERSION)
 #    error "nanobind can target Python's limited API, but this requires CPython >= 3.10"
@@ -234,6 +241,7 @@
     static PyObject *nanobind_##name##_def = nullptr;                          \
     extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_##name(void);       \
     extern "C" PyObject *PyInit_##name(void) {                                 \
+        nanobind::detail::init_singletons();                                   \
         if (!nanobind::detail::nb_backend_init(#name))                         \
             return nullptr;                                                    \
         if (!nanobind_##name##_def)                                            \

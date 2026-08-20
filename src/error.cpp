@@ -101,7 +101,7 @@ const char *error_what(error_payload *p) noexcept {
         object mod = module_::import_("traceback");
         object fn = steal(raise_if_null(
             PyObject_GetAttrString(mod.ptr(), "format_exception")));
-        handle tb = exc_traceback.is_valid() ? exc_traceback.ptr() : Py_None;
+        handle tb = exc_traceback.is_valid() ? exc_traceback.ptr() : none_ptr();
         PyObject *args[4] = { nullptr, exc_type.ptr(), exc_value.ptr(),
                               tb.ptr() };
         object result = steal(raise_if_null(PyObject_Vectorcall(

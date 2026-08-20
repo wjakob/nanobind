@@ -266,19 +266,49 @@ inline PyObject *obj_op_2(PyObject *a, PyObject *b,
     return raise_if_null(op(a, b));
 }
 
-// The Py_RETURN_* macros are broken on CPython 3.12.
-// Py_RETURN_NOTIMPLEMENTED is broken until CPython 3.14.
-#if NB_IMMORTAL_SINGLETONS
-NB_INLINE PyObject *none_ref() noexcept { return Py_None; }
-NB_INLINE PyObject *true_ref() noexcept { return Py_True; }
-NB_INLINE PyObject *false_ref() noexcept { return Py_False; }
-NB_INLINE PyObject *not_implemented_ref() noexcept { return Py_NotImplemented; }
+// Borrowed references to Python's singletons. The functions below are the only
+// place in nanobind that may mention 'Py_None' and friends.
+#if NB_CACHE_SINGLETONS
+struct singleton_cache {
+    PyObject *none, *true_, *false_, *not_implemented, *ellipsis;
+};
+
+/// Hidden and inline, so that each DSO fills and uses a private copy
+NB_HIDDEN inline singleton_cache singletons { };
+
+inline void init_singletons() noexcept {
+    singletons = { Py_None, Py_True, Py_False, Py_NotImplemented, Py_Ellipsis };
+}
+
+NB_INLINE PyObject *none_ptr() noexcept { return singletons.none; }
+NB_INLINE PyObject *true_ptr() noexcept { return singletons.true_; }
+NB_INLINE PyObject *false_ptr() noexcept { return singletons.false_; }
+NB_INLINE PyObject *not_implemented_ptr() noexcept { return singletons.not_implemented; }
+NB_INLINE PyObject *ellipsis_ptr() noexcept { return singletons.ellipsis; }
 #else
-NB_INLINE PyObject *none_ref() noexcept { Py_INCREF(Py_None); return Py_None; }
-NB_INLINE PyObject *true_ref() noexcept { Py_INCREF(Py_True); return Py_True; }
-NB_INLINE PyObject *false_ref() noexcept { Py_INCREF(Py_False); return Py_False; }
-NB_INLINE PyObject *not_implemented_ref() noexcept { Py_INCREF(Py_NotImplemented); return Py_NotImplemented; }
+NB_INLINE void init_singletons() noexcept { }
+
+NB_INLINE PyObject *none_ptr() noexcept { return Py_None; }
+NB_INLINE PyObject *true_ptr() noexcept { return Py_True; }
+NB_INLINE PyObject *false_ptr() noexcept { return Py_False; }
+NB_INLINE PyObject *not_implemented_ptr() noexcept { return Py_NotImplemented; }
+NB_INLINE PyObject *ellipsis_ptr() noexcept { return Py_Ellipsis; }
 #endif
+
+// Strong references to the same objects. The Py_RETURN_* macros are broken on
+// CPython 3.12, Py_RETURN_NOTIMPLEMENTED is broken until CPython 3.14.
+NB_INLINE PyObject *singleton_ref(PyObject *o) noexcept {
+#if !NB_IMMORTAL_SINGLETONS
+    Py_INCREF(o);
+#endif
+    return o;
+}
+
+NB_INLINE PyObject *none_ref() noexcept { return singleton_ref(none_ptr()); }
+NB_INLINE PyObject *true_ref() noexcept { return singleton_ref(true_ptr()); }
+NB_INLINE PyObject *false_ref() noexcept { return singleton_ref(false_ptr()); }
+NB_INLINE PyObject *not_implemented_ref() noexcept { return singleton_ref(not_implemented_ptr()); }
+NB_INLINE PyObject *ellipsis_ref() noexcept { return singleton_ref(ellipsis_ptr()); }
 
 /// Cold path of the GIL assertions in debug builds (reference counting, calls)
 [[noreturn]] NB_NOINLINE inline void fail_gil() noexcept {
@@ -436,7 +466,7 @@ public:
     const Derived &derived() const { return static_cast<const Derived &>(*this); }
 
     NB_INLINE bool is(handle value) const;
-    NB_INLINE bool is_none() const { return derived().ptr() == Py_None; }
+    NB_INLINE bool is_none() const { return derived().ptr() == detail::none_ptr(); }
     NB_INLINE bool is_type() const { return py_type_check(derived().ptr()); }
     NB_INLINE bool is_valid() const { return derived().ptr() != nullptr; }
     NB_INLINE handle inc_ref() const &;
@@ -739,14 +769,14 @@ class capsule : public object {
     }
 
     const char *name() const {
-        return (m_ptr != Py_None) ? PyCapsule_GetName(m_ptr) : nullptr;
+        return (m_ptr != detail::none_ptr()) ? PyCapsule_GetName(m_ptr) : nullptr;
     }
 
     void *data() const {
-        return (m_ptr != Py_None) ? PyCapsule_GetPointer(m_ptr, name()) : nullptr;
+        return (m_ptr != detail::none_ptr()) ? PyCapsule_GetPointer(m_ptr, name()) : nullptr;
     }
     void *data(const char *name) const {
-        if (m_ptr == Py_None) return nullptr;
+        if (m_ptr == detail::none_ptr()) return nullptr;
         void *p = PyCapsule_GetPointer(m_ptr, name);
         if (!p && PyErr_Occurred())
             detail::raise_python_error();
@@ -760,7 +790,7 @@ public:
     NB_INLINE none() : object(detail::none_ref(), detail::steal_t{}) { }
     NB_INLINE none(handle h, detail::borrow_t) : object(h, detail::borrow_t{}) { }
     NB_INLINE none(handle h, detail::steal_t) : object(h, detail::steal_t{}) { }
-    NB_INLINE static bool check_(handle h) { return h.ptr() == Py_None; }
+    NB_INLINE static bool check_(handle h) { return h.ptr() == detail::none_ptr(); }
 };
 
 class bool_ : public object {
@@ -774,7 +804,7 @@ class bool_ : public object {
                  detail::steal_t{}) { }
 
     explicit operator bool() const {
-        return m_ptr == Py_True;
+        return m_ptr == detail::true_ptr();
     }
 };
 
@@ -1175,9 +1205,11 @@ public:
     }
 
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
-    explicit slice(T stop) : slice(Py_None, int_(stop), Py_None) {}
+    explicit slice(T stop)
+        : slice(detail::none_ptr(), int_(stop), detail::none_ptr()) {}
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
-    slice(T start, T stop) : slice(int_(start), int_(stop), Py_None) {}
+    slice(T start, T stop)
+        : slice(int_(start), int_(stop), detail::none_ptr()) {}
     template <typename T, detail::enable_if_t<std::is_arithmetic_v<T>> = 0>
     slice(T start, T stop, T step) : slice(int_(start), int_(stop), int_(step)) {}
 
@@ -1197,15 +1229,17 @@ class memoryview : public object {
 };
 
 class ellipsis : public object {
-    static bool is_ellipsis(PyObject *obj) { return obj == Py_Ellipsis; }
+    static bool is_ellipsis(PyObject *obj) { return obj == detail::ellipsis_ptr(); }
 
 public:
     NB_OBJECT(ellipsis, object, "types.EllipsisType", is_ellipsis)
-    ellipsis() : object(Py_Ellipsis, detail::borrow_t()) {}
+    ellipsis() : object(detail::ellipsis_ref(), detail::steal_t{}) {}
 };
 
 class not_implemented : public object {
-    static bool is_not_implemented(PyObject *obj) { return obj == Py_NotImplemented; }
+    static bool is_not_implemented(PyObject *obj) {
+        return obj == detail::not_implemented_ptr();
+    }
 
 public:
     NB_OBJECT(not_implemented, object, "types.NotImplementedType", is_not_implemented)

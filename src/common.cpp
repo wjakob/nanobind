@@ -789,9 +789,9 @@ static void property_install_impl(nb_internals *p, PyObject *scope,
     }
 
     object prop = obj_call(p, handle((PyObject *) tp),
-                           handle(getter ? getter : Py_None),
-                           handle(setter ? setter : Py_None),
-                           handle(Py_None) /* deleter */, doc);
+                           handle(getter ? getter : none_ptr()),
+                           handle(setter ? setter : none_ptr()),
+                           handle(none_ptr()) /* deleter */, doc);
     str_setattr(p, scope, name, prop);
 }
 

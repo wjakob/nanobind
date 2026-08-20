@@ -1830,7 +1830,7 @@ bool nb_type_get(nb_internals *p, const std::type_info *cpp_type,
 
     // Convert None -> nullptr, unless the target binds by value/reference and
     // therefore has no valid mapping for None (then reject -> next overload).
-    if (NB_UNLIKELY(src == Py_None)) {
+    if (NB_UNLIKELY(src == none_ptr())) {
         if (flags & cast_flags::none_disallowed)
             return false;
         *out = nullptr;
@@ -1917,7 +1917,8 @@ static PyMethodDef keep_alive_callback_def = {
 };
 
 void keep_alive_py(nb_internals *p, PyObject *nurse, PyObject *patient) {
-    if (!patient || !nurse || nurse == Py_None || patient == Py_None)
+    PyObject *none = none_ptr();
+    if (!patient || !nurse || nurse == none || patient == none)
         return;
 
     if (nb_type_check(p, (PyObject *) Py_TYPE(nurse))) {

@@ -324,14 +324,14 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
             long a, b;
             if (compare(key, NB_INTERNED(p, copy))) {
                 // The capsule aliases C++-owned storage; a copy cannot be made
-                if (value == Py_True) {
+                if (value == true_ptr()) {
                     PyErr_SetString(PyExc_BufferError,
                             "__dlpack__(): copy=True is not supported.");
                     return -1;
                 }
             } else if (compare(key, NB_INTERNED(p, dl_device))) {
                 // Reject requests for a device other than the array's own
-                if (value != Py_None &&
+                if (value != none_ptr() &&
                         (!get_int_pair(value, &a, &b) ||
                          a != (long) t.device.device_type ||
                          b != (long) t.device.device_id)) {
@@ -340,7 +340,7 @@ static PyObject *nb_ndarray_dlpack(PyObject *self, PyObject *const *args,
                     return -1;
                 }
             } else if (compare(key, NB_INTERNED(p, max_version))) {
-                if (value != Py_None) {
+                if (value != none_ptr()) {
                     if (!get_int_pair(value, &a, &b)) {
                         PyErr_SetString(PyExc_TypeError,
                                 "max_version must be None or tuple[int, int]");

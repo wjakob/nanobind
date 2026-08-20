@@ -268,10 +268,10 @@ template <> struct has_arg_defaults<std::nullptr_t> : std::true_type {};
 
 template <> struct type_caster<bool> {
     bool from_python(handle src, uint32_t, cleanup_list *) noexcept {
-        if (src.ptr() == Py_True) {
+        if (src.ptr() == true_ptr()) {
             value = true;
             return true;
-        } else if (src.ptr() == Py_False) {
+        } else if (src.ptr() == false_ptr()) {
             value = false;
             return true;
         } else {

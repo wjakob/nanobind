@@ -83,7 +83,7 @@ static PyObject *nb_backend_fill(PyObject *, PyObject *args) noexcept {
     memcpy((char *) table + slot_offset,
            (const char *) &nb_backend_export + slot_offset, n * sizeof(void *));
 
-    Py_RETURN_NONE;
+    return none_ref();
 }
 
 static PyMethodDef nb_backend_methods[] = {

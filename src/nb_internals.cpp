@@ -1131,6 +1131,9 @@ static nb_internals *nb_module_init_impl(const char *domain, PyObject *m) {
 
 NB_NOINLINE nb_internals *nb_module_init(const char *domain,
                                          PyObject *m) noexcept {
+    // Fill libnanobind's copy of the cache. Extensions fill their own in PyInit_.
+    init_singletons();
+
     try {
         return nb_module_init_impl(domain, m);
     } catch (python_error &e) {

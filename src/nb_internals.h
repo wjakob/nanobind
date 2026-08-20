@@ -895,6 +895,7 @@ inline PyTypeObject *new_type(nb_internals *p, PyType_Spec *spec) {
    of the running interpreter, filled in during initialization. */
 extern freefunc PyType_Type_tp_free;
 extern initproc PyType_Type_tp_init;
+extern inquiry PyType_Type_tp_clear;
 extern destructor PyType_Type_tp_dealloc;
 extern setattrofunc PyType_Type_tp_setattro;
 extern descrgetfunc PyProperty_Type_tp_descr_get;

@@ -177,6 +177,7 @@ static PyMutex internals_created_mutex { };
 // Interpreter constants declared in nb_internals.h
 freefunc PyType_Type_tp_free = nullptr;
 initproc PyType_Type_tp_init = nullptr;
+inquiry PyType_Type_tp_clear = nullptr;
 destructor PyType_Type_tp_dealloc = nullptr;
 setattrofunc PyType_Type_tp_setattro = nullptr;
 descrgetfunc PyProperty_Type_tp_descr_get = nullptr;
@@ -290,6 +291,7 @@ static void init_limited_api_constants(PyTypeObject *nb_meta, PyObject *mod) {
 
     PyType_Type_tp_free = (freefunc) PyType_GetSlot(&PyType_Type, Py_tp_free);
     PyType_Type_tp_init = (initproc) PyType_GetSlot(&PyType_Type, Py_tp_init);
+    PyType_Type_tp_clear = (inquiry) PyType_GetSlot(&PyType_Type, Py_tp_clear);
     PyType_Type_tp_dealloc =
         (destructor) PyType_GetSlot(&PyType_Type, Py_tp_dealloc);
     PyType_Type_tp_setattro =
@@ -652,12 +654,46 @@ void internals_inc_ref(nb_internals *p) {
     p->shared_ref_count.value++;
 }
 
+/// This function clears and internal nanobind types and the lifeline list
+/// during interpreter shutdown. It aggressively calls ``tp_clear`` on the
+/// types. CPython does not run enough GC passes to collect all reference cycles
+/// involving these objects at shutdown. This helps achieve a leak-free
+/// shutdown.
+static void internals_release_types(nb_internals *p) {
+    inquiry clear = NB_TYPE_SLOT(PyType_Type, tp_clear);
+    if (!clear || !p->nb_type) {
+        Py_CLEAR(p->lifeline);
+        return;
+    }
+
+    PyObject *types[] = {
+        (PyObject *) p->nb_type,
+        (PyObject *) Py_TYPE((PyObject *) p->nb_type), // nb_meta
+        (PyObject *) p->nb_func,
+        (PyObject *) p->nb_method,
+        (PyObject *) p->nb_bound_method,
+        (PyObject *) p->nb_static_property.load_relaxed(),
+        (PyObject *) p->nb_ndarray.load_relaxed()
+    };
+
+    // Keep every type alive while the lifeline and the cycles go away
+    for (PyObject *t : types)
+        Py_XINCREF(t);
+    Py_CLEAR(p->lifeline);
+    for (PyObject *t : types) {
+        if (t)
+            clear(t);
+    }
+    for (PyObject *t : types)
+        Py_XDECREF(t);
+}
+
 void internals_dec_ref(nb_internals *p) {
     auto value = --p->shared_ref_count.value;
     if (value != 0)
         return;
 
-    Py_CLEAR(p->lifeline);
+    internals_release_types(p);
 
     p->nb_module = nullptr;
     p->nb_type = nullptr;

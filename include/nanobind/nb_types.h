@@ -266,9 +266,19 @@ inline PyObject *obj_op_2(PyObject *a, PyObject *b,
     return raise_if_null(op(a, b));
 }
 
-NB_INLINE PyObject *none_ref() noexcept { Py_RETURN_NONE; }
-NB_INLINE PyObject *true_ref() noexcept { Py_RETURN_TRUE; }
-NB_INLINE PyObject *false_ref() noexcept { Py_RETURN_FALSE; }
+// The Py_RETURN_* macros are broken on CPython 3.12.
+// Py_RETURN_NOTIMPLEMENTED is broken until CPython 3.14.
+#if NB_IMMORTAL_SINGLETONS
+NB_INLINE PyObject *none_ref() noexcept { return Py_None; }
+NB_INLINE PyObject *true_ref() noexcept { return Py_True; }
+NB_INLINE PyObject *false_ref() noexcept { return Py_False; }
+NB_INLINE PyObject *not_implemented_ref() noexcept { return Py_NotImplemented; }
+#else
+NB_INLINE PyObject *none_ref() noexcept { Py_INCREF(Py_None); return Py_None; }
+NB_INLINE PyObject *true_ref() noexcept { Py_INCREF(Py_True); return Py_True; }
+NB_INLINE PyObject *false_ref() noexcept { Py_INCREF(Py_False); return Py_False; }
+NB_INLINE PyObject *not_implemented_ref() noexcept { Py_INCREF(Py_NotImplemented); return Py_NotImplemented; }
+#endif
 
 /// Cold path of the GIL assertions in debug builds (reference counting, calls)
 [[noreturn]] NB_NOINLINE inline void fail_gil() noexcept {
@@ -1199,7 +1209,8 @@ class not_implemented : public object {
 
 public:
     NB_OBJECT(not_implemented, object, "types.NotImplementedType", is_not_implemented)
-    not_implemented() : object(Py_NotImplemented, detail::borrow_t()) {}
+    not_implemented()
+        : object(detail::not_implemented_ref(), detail::steal_t{}) { }
 };
 
 class callable : public object {

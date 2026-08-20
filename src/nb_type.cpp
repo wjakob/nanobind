@@ -743,8 +743,7 @@ int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
     !defined(PYPY_VERSION)
     cur = _PyType_LookupRef((PyTypeObject *) obj, name);
 #elif !defined(Py_LIMITED_API)
-    cur = _PyType_Lookup((PyTypeObject *) obj, name);
-    Py_XINCREF(cur);
+    cur = Py_XNewRef(_PyType_Lookup((PyTypeObject *) obj, name));
 #else
     cur = type_lookup_portable((PyTypeObject *) obj, name);
 #endif
@@ -976,13 +975,8 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
     }
 
     ht->ht_name = name_o;
-    ht->ht_qualname = name_o;
-    Py_INCREF(name_o);
-
-    if (mod) {
-        Py_INCREF(mod);
-        ht->ht_module = mod;
-    }
+    ht->ht_qualname = Py_NewRef(name_o);
+    ht->ht_module = Py_XNewRef(mod);
 
     PyTypeObject *tp = &ht->ht_type;
     tp->tp_name = name_cstr;

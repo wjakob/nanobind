@@ -536,8 +536,7 @@ PyObject *getattr_str_def(nb_internals *p, PyObject *obj, const char *str,
     PyObject *key = cached_string_fast(p, str, bound, &owned);
     if (NB_UNLIKELY(!key)) {
         PyErr_Clear();
-        Py_XINCREF(def);
-        return def;
+        return Py_XNewRef(def);
     }
     PyObject *res = getattr(obj, key, def);
     if (NB_UNLIKELY(owned))

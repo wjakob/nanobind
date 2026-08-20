@@ -258,8 +258,7 @@ static void *trampoline_resolve(PyTypeObject *tp, const char *name,
     !defined(PYPY_VERSION)
     raw = _PyType_LookupRef(tp, key);
 #elif !defined(Py_LIMITED_API)
-    raw = _PyType_Lookup(tp, key);
-    Py_XINCREF(raw);
+    raw = Py_XNewRef(_PyType_Lookup(tp, key));
 #else
     raw = type_lookup_portable(tp, key);
 #endif

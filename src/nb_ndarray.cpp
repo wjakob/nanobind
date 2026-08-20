@@ -252,8 +252,7 @@ static int nb_ndarray_getbuffer(PyObject *self, Py_buffer *view, int flags) {
     }
 
     view->buf = (void *) ((uintptr_t) t.data + t.byte_offset);
-    view->obj = self;
-    Py_INCREF(self);
+    view->obj = Py_NewRef(self);
     view->len = len;
     view->itemsize = itemsize;
     view->readonly = th->ro;
@@ -388,8 +387,7 @@ static PyObject *nb_ndarray_dlpack_device(PyObject *self, PyObject *) {
     dlpack::dltensor& t = th->tensor();
     PyObject *r;
     if (t.device.device_type == 1 && t.device.device_id == 0) {
-        r = NB_INTERNED(((nb_ndarray *) self)->internals, dl_cpu_tpl);
-        Py_INCREF(r);
+        r = Py_NewRef(NB_INTERNED(((nb_ndarray *) self)->internals, dl_cpu_tpl));
     } else {
         r = PyTuple_New(2);
         PyObject *r0 = PyLong_FromLong(t.device.device_type);
@@ -981,8 +979,7 @@ static ndarray_handle *ndarray_import_impl(nb_internals *p, PyObject *src,
     if (src_is_pycapsule) {
         result->self = nullptr;
     } else {
-        result->self = src;
-        Py_INCREF(src);
+        result->self = Py_NewRef(src);
     }
 
     // If ndim > 0, ensure that the strides member is initialized.
@@ -1169,13 +1166,12 @@ ndarray_handle *ndarray_create(nb_internals *, const ndarray_create_args *a,
     mt->dltensor.byte_offset = args.byte_offset;
     result->mt_versioned = mt.release();
     result->refcount = 0;
-    result->owner = args.owner;
+    result->owner = Py_XNewRef(args.owner);
     result->self = nullptr;
     result->versioned = true;
     result->free_strides = false;
     result->call_deleter = false;
     result->ro = args.ro;
-    Py_XINCREF(args.owner);
     return result.release();
 }
 
@@ -1231,8 +1227,7 @@ PyObject *ndarray_export(nb_internals *p, ndarray_handle *th, int framework,
                                     "applied (ndarray already has an owner)");
                     return nullptr;
                 } else {
-                    th->owner = cleanup->self();
-                    Py_INCREF(th->owner);
+                    th->owner = Py_NewRef(cleanup->self());
                 }
             }
             [[fallthrough]];
@@ -1254,8 +1249,7 @@ PyObject *ndarray_export(nb_internals *p, ndarray_handle *th, int framework,
 
     if (!copy) {
         if (th->self) {
-            Py_INCREF(th->self);
-            return th->self;
+            return Py_NewRef(th->self);
         } else if (policy == rv_policy::none) {
             return nullptr;
         }

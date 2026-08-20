@@ -385,11 +385,8 @@ PyObject *enum_from_cpp(nb_internals *p, const std::type_info *tp,
     enum_map *fwd = (enum_map *) t->enum_tbl.fwd;
 
     enum_map::iterator it = fwd->find(key);
-    if (it != fwd->end()) {
-        PyObject *value = (PyObject *) it->second;
-        Py_INCREF(value);
-        return value;
-    }
+    if (it != fwd->end())
+        return Py_NewRef((PyObject *) it->second);
 
     uint32_t flags = t->flags;
     if ((flags & (uint32_t) enum_flags::is_flag) != 0) {

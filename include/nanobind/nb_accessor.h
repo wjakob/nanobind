@@ -238,12 +238,10 @@ struct num_item_list {
 
     NB_INLINE static void set(PyObject *obj, Py_ssize_t index, PyObject *v) {
 #if defined(Py_LIMITED_API) || defined(NB_FREE_THREADED)
-        Py_INCREF(v);
-        PyList_SetItem(obj, index, v);
+        PyList_SetItem(obj, index, Py_NewRef(v));
 #else
         PyObject *old = NB_LIST_GET_ITEM(obj, index);
-        Py_INCREF(v);
-        NB_LIST_SET_ITEM(obj, index, v);
+        NB_LIST_SET_ITEM(obj, index, Py_NewRef(v));
         Py_DECREF(old);
 #endif
     }

@@ -177,8 +177,8 @@ struct cached_name {
 
     /// Transfer ownership to the caller, adding a reference if needed
     NB_INLINE PyObject *release() {
-        if (value && !owned)
-            Py_INCREF(value);
+        if (!owned)
+            Py_XINCREF(value);
         owned = false;
         return value;
     }
@@ -222,8 +222,7 @@ inline PyObject *getattr(PyObject *obj, PyObject *key, PyObject *def) noexcept {
     else if (rv < 0)
         PyErr_Clear();
 #endif
-    Py_XINCREF(def);
-    return def;
+    return Py_XNewRef(def);
 }
 
 /// Set an object attribute or raise an exception
@@ -349,9 +348,7 @@ inline PyObject *dict_getitem_ref(PyObject *d, PyObject *k, bool *error) noexcep
 #else
     // GIL-protected borrowed-reference pattern; free-threaded builds never
     // land here (NB_FREE_THREADED implies 3.13+ headers)
-    value = PyDict_GetItemWithError(d, k);
-    if (value)
-        Py_INCREF(value);
+    value = Py_XNewRef(PyDict_GetItemWithError(d, k));
     *error = !value && PyErr_Occurred() != nullptr;
 #endif
     return value;
@@ -363,10 +360,8 @@ inline PyObject *dict_getitem_or_default(PyObject *d, PyObject *k, PyObject *def
     PyObject *value = dict_getitem_ref(d, k, &error);
     if (NB_UNLIKELY(error))
         raise_python_error();
-    if (!value) {
-        Py_XINCREF(def);
-        value = def;
-    }
+    if (!value)
+        value = Py_XNewRef(def);
     return value;
 }
 

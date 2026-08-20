@@ -277,8 +277,7 @@ PyObject *obj_vectorcall_ex(nb_internals *, PyObject *base, call_arg *args,
                         PyErr_SetString(PyExc_TypeError, "keywords must be strings");
                         goto cleanup;
                     }
-                    Py_INCREF(key);
-                    NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkw++, key);
+                    NB_TUPLE_SET_ITEM(kwnames, (Py_ssize_t) nkw++, Py_NewRef(key));
                     *kw++ = value;
                 }
                 break;

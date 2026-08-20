@@ -728,9 +728,7 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
     kwnames = (PyObject **) alloca(nkwargs_in * sizeof(PyObject *));
     for (size_t i = 0; i < nkwargs_in; ++i) {
         PyObject *key = NB_TUPLE_GET_ITEM(kwargs_in, (Py_ssize_t) i);
-        Py_INCREF(key);
-
-        kwnames[i] = key;
+        kwnames[i] = Py_NewRef(key);
         PyUnicode_InternInPlace(&kwnames[i]);
         PyObject *key_interned = kwnames[i];
 
@@ -861,8 +859,8 @@ static PyObject *nb_func_vectorcall_complex(PyObject *self,
 
                 for (size_t j = nargs_pos; j < nargs_in; ++j) {
                     PyObject *o = args_in[j];
-                    Py_INCREF(o);
-                    NB_TUPLE_SET_ITEM(tuple, (Py_ssize_t) (j - nargs_pos), o);
+                    NB_TUPLE_SET_ITEM(tuple, (Py_ssize_t) (j - nargs_pos),
+                                      Py_NewRef(o));
                 }
 
                 args[nargs_pos] = tuple;
@@ -1666,8 +1664,7 @@ static PyObject *nb_func_get_module(PyObject *self) {
     PyObject *name = ((nb_func *) self)->module_name;
     if (!name)
         return none_ref();
-    Py_INCREF(name);
-    return name;
+    return Py_NewRef(name);
 }
 
 PyObject *nb_func_get_nb_signature(PyObject *self, void *) {

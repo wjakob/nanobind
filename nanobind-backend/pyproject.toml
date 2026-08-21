@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "nanobind-backend"
-version = "1.0.0.dev5"
+version = "1.0.0.dev6"
 description = "Compiled nanobind backend for extensions built in split mode"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -3046,6 +3046,12 @@ worthwhile, since the same binary may later run on a newer interpreter.
 
       Reacquire the GIL
 
+If you use nanobind in a multi-threaded program, you **must** ensure that
+all threads have terminated **before** the interpreter exits. Otherwise any
+code that re-acquires the GIL (e.g. for running destructors) will throw a
+cancellation exception. This will result in a hard crash because C++ does
+not support exceptions in destructors, nor ignoring a cancellation.
+
 Free-threading
 --------------
 

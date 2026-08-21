@@ -1,5 +1,5 @@
-/* This extension does not use NB_MODULE(). It builds a module definition by
-   hand, the way another binding framework would, and prepares nanobind via
+/* This extension does not use NB_MODULE(). It sets up the module by hand, the
+   way another binding framework would, and prepares nanobind via
    nb::register_module(). */
 
 #include <nanobind/nanobind.h>
@@ -32,6 +32,28 @@ static int exec(PyObject *m) {
     return 0;
 }
 
+#if defined(Py_TARGET_ABI3T)
+
+// abi3t-style module definition
+
+PyABIInfo_VAR(abi_info);
+
+static PySlot slots[] = {
+    PySlot_PTR(Py_mod_exec, exec),
+    PySlot_PTR(Py_mod_abi, &abi_info),
+    PySlot_PTR(Py_mod_gil, Py_MOD_GIL_NOT_USED),
+    // PySlot_END, spelled out to avoid -Wmissing-field-initializers
+    { Py_slot_end, 0, { 0 }, { nullptr } }
+};
+
+PyMODEXPORT_FUNC PyModExport_test_foreign_ext(void) {
+    return slots;
+}
+
+#else
+
+// classic module definition
+
 static PyModuleDef_Slot slots[] = {
     { Py_mod_exec, (void *) exec },
 #if defined(NB_FREE_THREADED)
@@ -56,3 +78,5 @@ extern "C" [[maybe_unused]] NB_EXPORT PyObject *PyInit_test_foreign_ext(void);
 extern "C" PyObject *PyInit_test_foreign_ext(void) {
     return PyModuleDef_Init(&def);
 }
+
+#endif

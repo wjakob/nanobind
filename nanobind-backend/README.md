@@ -7,7 +7,7 @@ delegates to an externally hosted backend instead of shipping its own.
 
 End users receive this package as a transitive dependency of such an extension
 and do not interact with it directly. There is no user-facing API. Please see
-[split mode
+the [split mode
 documentation](https://nanobind.readthedocs.io/en/latest/split_mode.html) for
-more details. This package only provides binary wheels; its source code is
-part of the nanobind parent project.
+more details. This package only provides binary wheels; its source code is part
+of the nanobind parent project.

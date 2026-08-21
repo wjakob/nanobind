@@ -1,7 +1,7 @@
 import sys
 import test_classes_ext as t
 import pytest
-from common import skip_on_pypy, collect, parallelize
+from common import is_pypy, skip_on_pypy, collect, parallelize
 
 
 
@@ -1291,3 +1291,42 @@ def test63_freeze():
         pass
 
     assert Sub().value == 3
+
+
+def test64_inst_dict():
+    s = t.StructWithAttr(5)
+    d = t.inst_dict(s)
+    assert d == {} and s.__dict__ is d
+
+    s.attr = 10
+    assert d["attr"] == 10
+    t.inst_dict_insert(s, "attr_2", 11)
+    assert s.attr_2 == 11
+
+    # A Python subclass holds attributes even when the base type does not
+    # declare 'nb::dynamic_attr'
+    class Sub(t.Struct):
+        pass
+
+    x = Sub(2)
+    t.inst_dict_insert(x, "attr", 12)
+    assert x.attr == 12 and x.__dict__ == {"attr": 12}
+
+    # The function also accepts objects unrelated to nanobind. Such instances
+    # may keep their attributes in a managed dictionary that only materializes
+    # when it is requested.
+    class Plain:
+        def __init__(self):
+            self.attr = 13
+
+    y = Plain()
+    d = t.inst_dict(y)
+    assert d == {"attr": 13} and y.__dict__ is d
+    t.inst_dict_insert(y, "attr_2", 14)
+    assert y.attr_2 == 14
+
+    # Objects that cannot store attributes report an invalid dictionary
+    # (PyPy equips every instance with one)
+    if not is_pypy:
+        assert t.inst_dict(t.Struct(1)) is None
+        assert t.inst_dict(object()) is None and t.inst_dict(1) is None

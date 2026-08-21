@@ -358,6 +358,9 @@ improvements:
     dictionary of a type object and perform a raw lookup along its method
     resolution order.
 
+  - Added :cpp:func:`nb::inst_dict(h) <inst_dict>`, which returns the
+    :ref:`instance dictionary <instance_dicts>` and provides a more efficient
+    alternative to the expression ``h.attr("__dict__")``.
 
   - The ``nb::ndarray_traits<T>`` interface was removed following its
     deprecation in nanobind 2.2.0. The alternative

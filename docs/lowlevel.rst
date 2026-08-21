@@ -316,6 +316,29 @@ object inherits from ``type`` are not found. It returns an invalid object
 (checked via ``o.is_valid()``) when there is no matching entry, and it never
 raises an exception.
 
+.. _instance_dicts:
+
+Instance dictionaries
+---------------------
+
+The function :cpp:func:`nb::inst_dict() <inst_dict>` provides access to the
+instance dictionary of an arbitrary Python object. This is more efficient than
+the equivalent expression ``isnt.attr("__dict__")``. The function never raises
+but may return an object ``o`` with ``!o.is_valid()`` when of `h` lacks an
+attribute dictionary.
+
+.. code-block:: cpp
+
+   nb::dict d = nb::inst_dict(inst);
+   if (d.is_valid())
+       d["my_attribute"] = value;
+
+
+A type bound via :cpp:class:`nb::class_ <class_>` must declare
+:cpp:class:`nb::dynamic_attr <dynamic_attr>` to equip its instances with such a
+dictionary. Python subclasses including :ref:`trampolines <trampolines>` always
+have one.
+
 .. _typeslots:
 
 Customizing type creation

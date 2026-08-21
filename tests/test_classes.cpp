@@ -1060,4 +1060,16 @@ NB_MODULE(test_classes_ext, m) {
     bool frozen2_ok = nb::type_freeze(frozen2);
     m.def("freeze_supported", [frozen2_ok] { return frozen2_ok; });
     m.def("freeze_type", [](nb::handle t) { return nb::type_freeze(t); });
+
+    // test64_inst_dict
+    m.def("inst_dict", [](nb::handle h) -> nb::object {
+        nb::dict d = nb::inst_dict(h);
+        if (!d.is_valid())
+            return nb::none();
+        return d;
+    });
+
+    m.def("inst_dict_insert", [](nb::handle h, const char *name, nb::handle value) {
+        nb::inst_dict(h)[name] = value;
+    });
 }

@@ -820,6 +820,29 @@ PyObject *type_dict(PyObject *t) noexcept {
 #endif
 }
 
+PyObject *inst_dict(PyObject *o) noexcept {
+    // Do some checks before calling PyObject_GenericGetDict() since raising and
+    // then clearning exceptions is costly.
+#if !defined(Py_LIMITED_API) && !defined(PYPY_VERSION)
+    PyTypeObject *tp = Py_TYPE(o);
+    bool has_dict = tp->tp_dictoffset != 0;
+
+#if PY_VERSION_HEX >= 0x030B0000 && PY_VERSION_HEX < 0x030C0000
+    // Types with a managed dictionary report the offset -1 from Python 3.12+
+    has_dict |= (tp->tp_flags & Py_TPFLAGS_MANAGED_DICT) != 0;
+#endif
+
+    if (!has_dict)
+        return nullptr;
+#endif
+
+    PyObject *dict = PyObject_GenericGetDict(o, nullptr);
+    if (NB_UNLIKELY(!dict))
+        PyErr_Clear();
+
+    return dict;
+}
+
 bool type_freeze(PyObject *t) {
     // While Python 3.14 already has PyType_Freeze(), we ignore it there because
     // of this performance bug: https://github.com/python/cpython/issues/143361

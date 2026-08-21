@@ -3249,6 +3249,17 @@ The documentation below refers to two per-instance flags with the following mean
    The function *does not check* that `h` actually contains an instance with
    C++ type `T`.
 
+.. cpp:function:: dict inst_dict(handle h)
+
+   This function returns ``h.__dict__`` more efficiently than going through the
+   attribute protocol. The function never raises but may return an object ``o``
+   with ``!o.is_valid()`` when of `h` lacks an attribute dictionary.
+
+   The function accepts any Python object. When providing instances o types
+   bound via :cpp:class:`class_`, the function only returns a dictionary when
+   the type declares :cpp:class:`nb::dynamic_attr` or was subclassed in Python.
+
+
 .. cpp:function:: object inst_alloc(handle h)
 
    Assuming that `h` represents a type object that was previously created via

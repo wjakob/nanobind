@@ -249,11 +249,15 @@ NB_SLOT(PyObject *, nb_func_new,
         (nb_internals *p, const func_data_init_base *f) noexcept)
 
 // --------------------------------------------------------------------------
-// Generic type objects
+// Generic type objects and instances
 // --------------------------------------------------------------------------
 
 /// Return a strong reference to ``t.__dict__``, where ``t`` is a heap type
 NB_SLOT(PyObject *, type_dict, (PyObject *t) noexcept)
+
+/// Return a strong reference to the attribute dictionary of the object 'o',
+/// creating it if needed. Returns NULL when 'o' has no such dictionary.
+NB_SLOT(PyObject *, inst_dict, (PyObject *o) noexcept)
 
 /// Raw MRO lookup of the key 'key'. (wraps or emulates ``_PyType_LookupRef()``)
 NB_SLOT(PyObject *, type_lookup,

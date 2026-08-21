@@ -726,6 +726,76 @@ static void nb_module_free(void *m) {
         internals_dec_ref(p);
 }
 
+/// Dictionary key of the capsule anchoring a foreign module's domain
+static const char *nb_anchor_name = "__nanobind_internals__";
+
+static void nb_anchor_free(PyObject *capsule) {
+    nb_internals **state =
+        (nb_internals **) PyCapsule_GetPointer(capsule, nb_anchor_name);
+    if (!state) {
+        PyErr_Clear();
+        return;
+    }
+    if (*state)
+        internals_dec_ref(*state);
+    delete state;
+}
+
+/* Modules created by module_new() record their domain in the per-module state.
+   Foreign modules registered via nanobind::register_module() have no such
+   state, and the equivalent storage is anchored in a capsule owned by the
+   module dictionary. */
+static nb_internals **nb_module_anchor(PyObject *m) {
+    PyObject *dict = PyModule_GetDict(m);
+    if (!dict) {
+        PyErr_SetString(PyExc_SystemError,
+                        "nanobind::detail::nb_module_init(): could not access "
+                        "the module dictionary!");
+        return nullptr;
+    }
+
+    PyObject *key = PyUnicode_FromString(nb_anchor_name);
+    if (!key)
+        return nullptr;
+
+    PyObject *capsule = dict_getitem_or_default(dict, key, nullptr);
+    if (!capsule) {
+        nb_internals **state = new nb_internals *(nullptr);
+        capsule = PyCapsule_New(state, nb_anchor_name, nb_anchor_free);
+        if (!capsule) {
+            delete state;
+            Py_DECREF(key);
+            return nullptr;
+        }
+
+        // A concurrent registration of the same module could have won the race
+        PyObject *found;
+#if PY_VERSION_HEX >= 0x030D0000 && !defined(Py_LIMITED_API) && \
+    !defined(PYPY_VERSION)
+        found = nullptr;
+        int rv = PyDict_SetDefaultRef(dict, key, capsule, &found);
+        if (rv < 0)
+            Py_CLEAR(found);
+#else
+        // The GIL prevents interleaving between the recheck and the insertion
+        found = dict_getitem_or_default(dict, key, nullptr);
+        if (!found && PyDict_SetItem(dict, key, capsule) == 0)
+            found = Py_NewRef(capsule);
+#endif
+        Py_DECREF(capsule);
+        capsule = found;
+    }
+
+    Py_DECREF(key);
+    if (!capsule)
+        return nullptr;
+
+    nb_internals **state =
+        (nb_internals **) PyCapsule_GetPointer(capsule, nb_anchor_name);
+    Py_DECREF(capsule);
+    return state;
+}
+
 // 'flags' holds the ABI tag, which nothing reads yet
 PyObject *module_new(const char *name, const char *doc, void *exec,
                      uint32_t) noexcept {
@@ -1006,14 +1076,32 @@ static nb_internals *nb_module_init_impl(const char *domain, PyObject *m) {
     }
 #endif
 
-    // Per-module state created by module_new(), records the module's domain
-    nb_internals **mod_state =
-        m ? (nb_internals **) PyModule_GetState(m) : nullptr;
-    if (!mod_state) {
+    if (!m || !PyModule_Check(m)) {
         PyErr_SetString(PyExc_SystemError,
-                        "nanobind::detail::nb_module_init(): the module "
-                        "object does not carry nanobind state!");
+                        "nanobind::detail::nb_module_init(): expected a "
+                        "module object!");
         return nullptr;
+    }
+
+    // Storage recording the module's domain. The 'm_free' handler identifies
+    // modules created by module_new(), which reserve per-module state for it.
+    PyModuleDef *def = PyModule_GetDef(m);
+    if (!def)
+        PyErr_Clear(); // PyModule_New() creates modules without a definition
+
+    nb_internals **mod_state;
+    if (def && def->m_free == nb_module_free) {
+        mod_state = (nb_internals **) PyModule_GetState(m);
+        if (!mod_state) {
+            PyErr_SetString(PyExc_SystemError,
+                            "nanobind::detail::nb_module_init(): the module "
+                            "object does not carry nanobind state!");
+            return nullptr;
+        }
+    } else {
+        mod_state = nb_module_anchor(m);
+        if (!mod_state)
+            return nullptr;
     }
 
 #if defined(PYPY_VERSION)

@@ -394,7 +394,7 @@ endfunction()
 function(nanobind_add_module name)
   cmake_parse_arguments(PARSE_ARGV 1 ARG
     "STABLE_ABI;FREE_THREADED;NB_STATIC;NB_SHARED;PROTECT_STACK;LTO;NOMINSIZE;NOSTRIP;MUSL_DYNAMIC_LIBCPP;NB_SUPPRESS_WARNINGS"
-    "NB_DOMAIN;BACKEND_MODULE;BACKEND_PYPI" "")
+    "NB_DOMAIN;BACKEND_MODULE;BACKEND_PYPI;STABLE_ABI_VERSION" "")
 
   add_library(${name} MODULE ${ARG_UNPARSED_ARGUMENTS})
 
@@ -419,7 +419,7 @@ function(nanobind_add_module name)
 
   set(NB_ABI3T FALSE)
   if (IS_SPLIT)
-    # Split mode extensions always targets a stable ABI: 'abi3' with a Python
+    # Split mode extensions always target a stable ABI: 'abi3' with a Python
     # 3.10 floor, or 'abi3t' (PEP 803) on free-threaded Python 3.15+.
     set(ARG_STABLE_ABI TRUE)
 
@@ -453,7 +453,39 @@ function(nanobind_add_module name)
         "Split mode requires the Development.SABIModule component of "
         "find_package(Python) on Windows.")
     endif()
+
+    # Pick the stable ABI floor
+    if (NB_ABI3T)
+      set(NB_SABI_MIN "3.15")
+    else()
+      set(NB_SABI_MIN "3.10")
+    endif()
+
+    if (ARG_STABLE_ABI_VERSION)
+      set(NB_SABI "${ARG_STABLE_ABI_VERSION}")
+    elseif (SKBUILD_SABI_VERSION)
+      set(NB_SABI "${SKBUILD_SABI_VERSION}") # 'tool.scikit-build.wheel.py-api'
+    else()
+      set(NB_SABI "${NB_SABI_MIN}")
+    endif()
+
+    if (NOT NB_SABI MATCHES "^([0-9]+)\\.([0-9]+)$")
+      message(FATAL_ERROR "nanobind: '${NB_SABI}' is not a valid stable ABI "
+        "target, expected a 'MAJOR.MINOR' version such as '3.12'.")
+    elseif (NB_SABI VERSION_LESS NB_SABI_MIN OR NB_SABI VERSION_GREATER Python_VERSION)
+      message(FATAL_ERROR "nanobind: split mode can target the stable ABI of "
+        "Python ${NB_SABI_MIN} up to ${Python_VERSION} here, which excludes "
+        "the requested '${NB_SABI}'.")
+    endif()
+
+    math(EXPR NB_SABI_HEX "(${CMAKE_MATCH_1} << 24) | (${CMAKE_MATCH_2} << 16)"
+         OUTPUT_FORMAT HEXADECIMAL)
   else()
+    if (ARG_STABLE_ABI_VERSION)
+      message(FATAL_ERROR "nanobind: STABLE_ABI_VERSION requires split mode "
+        "(BACKEND_MODULE); linked builds always target Python 3.12.")
+    endif()
+
     # Linked-mode stable ABI builds require CPython >= 3.12 (the backend
     # itself then compiles under Py_LIMITED_API)
     if (DEFINED SKBUILD_SABI_VERSION AND
@@ -547,12 +579,13 @@ function(nanobind_add_module name)
   endif()
 
   if (ARG_STABLE_ABI)
-    if (NB_ABI3T)
-      target_compile_definitions(${name} PRIVATE -DPy_LIMITED_API=0x030F0000)
-      nanobind_extension_abi3t(${name})
-    elseif (IS_SPLIT)
-      target_compile_definitions(${name} PRIVATE -DPy_LIMITED_API=0x030A0000)
-      nanobind_extension_abi3(${name})
+    if (IS_SPLIT)
+      target_compile_definitions(${name} PRIVATE -DPy_LIMITED_API=${NB_SABI_HEX})
+      if (NB_ABI3T)
+        nanobind_extension_abi3t(${name})
+      else()
+        nanobind_extension_abi3(${name})
+      endif()
     else()
       target_compile_definitions(${libname} PUBLIC -DPy_LIMITED_API=0x030C0000)
       nanobind_extension_abi3(${name})

@@ -148,7 +148,7 @@ wrapper API (i.e., the bindings of Python within C++):
 - Bindings can now conclude with :cpp:func:`.freeze() <class_::freeze>` to
   make the type immutable on Python 3.15 and newer:
 
-  .. code-box:: cpp
+  .. code-block:: cpp
 
       nb::class_<A>(m, "A")
           .def(...)

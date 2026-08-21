@@ -68,6 +68,32 @@ The following macros, types, and functions were renamed:
     - :cpp:class:`exception\<T\> <exception>`
 
 
+Porting one binding at a time
+-----------------------------
+
+A large project can move over gradually, with pybind11 and nanobind bindings
+living side by side in the same extension. In that case ``PYBIND11_MODULE``
+still provides the entry point, and the setup work that :c:macro:`NB_MODULE`
+normally performs must happen explicitly through
+:cpp:func:`register_module`:
+
+.. code-block:: cpp
+
+   PYBIND11_MODULE(my_ext, m) {
+       if (!nb::register_module(m.ptr()))
+           throw py::error_already_set();
+
+       nb::module_ nb_m = nb::borrow<nb::module_>(m.ptr());
+       nb::class_<MyType>(nb_m, "MyType");
+
+       // ... remaining pybind11 bindings ...
+   }
+
+Call this before any other part of the nanobind API. Note that the two
+frameworks do not know about each other's types: a function bound with
+nanobind cannot accept a type bound with pybind11, and vice versa. Types that
+cross this boundary must move together.
+
 None/null arguments
 -------------------
 

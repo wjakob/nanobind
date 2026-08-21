@@ -196,6 +196,9 @@ target_compile_definitions(inter_module PRIVATE -DSHARED_BUILD)
 target_compile_features(inter_module PRIVATE cxx_std_17)
 target_include_directories(inter_module PRIVATE ${NB_DIR}/include)
 
+# An extension that sets up nanobind via nb::register_module() instead of NB_MODULE()
+nanobind_add_module(test_foreign_ext test_foreign.cpp ${NB_EXTRA_ARGS})
+
 nanobind_add_module(test_inter_module_1_ext test_inter_module_1.cpp ${NB_EXTRA_ARGS_MYDOMAIN})
 nanobind_add_module(test_inter_module_2_ext test_inter_module_2.cpp ${NB_EXTRA_ARGS_MYDOMAIN})
 target_link_libraries(test_inter_module_1_ext PRIVATE inter_module)
@@ -230,6 +233,7 @@ set(TEST_FILES
   test_enum.py
   test_eval.py
   test_exception.py
+  test_foreign.py
   test_functions.py
   test_holders.py
   test_inter_module.py

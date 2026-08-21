@@ -176,6 +176,50 @@ Free-threaded Python cannot load classic ``abi3`` stable ABI modules.
 Therefore, to support both regular and free-threaded Python, you must build
 your extension once for ``abi3`` and once for ``abi3t``.
 
+Extensions without ``NB_MODULE``
+--------------------------------
+
+In split-mode extensions, the macro :c:macro:`NB_MODULE` imports the backend
+and connects the extension to it. The nanobind API cannot be safely used before
+these steps have completed.
+
+Certain unusual workflows may not be compatible with this (an example would be
+a piecemeal conversion of a pybind11 module to nanobind). In this case, you
+must call :cpp:func:`register_module` before using the nanobind API. Please
+refer to the documentation of this function for an example.
+
+Choosing the stable ABI floor
+-----------------------------
+
+Split mode targets the Python 3.10 stable ABI by default, which is the oldest
+version supported by nanobind. Developers who directly use the "raw" CPython
+API and require access to functionality not available in Python 3.10 can raise
+the floor to a higher version. The downside is that such extensions no longer
+load on older interpreters.
+
+When using ``scikit-build-core``, the floor follows the declared wheel tag.
+
+.. code-block:: toml
+
+   [tool.scikit-build]
+   wheel.py-api = "cp313"     # extension targets the Python 3.13 stable ABI
+
+To override the wheel tag for a specific extension, pass ``STABLE_ABI_VERSION``
+to :cmake:command:`nanobind_add_module`:
+
+.. code-block:: cmake
+
+   nanobind_add_module(
+     my_ext
+     my_ext.cpp
+     BACKEND_MODULE nanobind_backend
+     STABLE_ABI_VERSION 3.13
+   )
+
+The backend is unaffected by this choice. It ships as a separate wheel per
+Python version and does not use the limited API at all.
+
+
 .. _custom-backend:
 
 Compiling a custom backend

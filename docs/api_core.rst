@@ -31,6 +31,9 @@ Macros
            });
        }
 
+   Extensions that cannot use this macro because their entry point is provided
+   by other means should call :cpp:func:`register_module` instead.
+
 .. c:macro:: NB_MAKE_OPAQUE(T)
 
    The macro registers a partial template specialization pattern for the type
@@ -3402,6 +3405,42 @@ Global flags
 
 Miscellaneous
 -------------
+
+.. cpp:function:: bool register_module(handle m) noexcept
+
+   In split mode builds, macro :c:macro:`NB_MODULE` has two roles beyond
+   creating the module: it imports the backend and connects the extension to
+   it. The nanobind API cannot be safely used before these steps have
+   completed.
+
+   In certain advanced use cases, users may choose to *not* use
+   :c:macro:`NB_MODULE` and instead create modules another way. In this case,
+   they must call this function to register the module and perform these
+   necessary initialization steps before using further nanobind API calls.
+
+   Pass the module that will hold the bindings; it may be an object of another
+   binding framework such as pybind11. Repeated calls are harmless. Extensions
+   consisting of several modules that share a :ref:`domain <type-visibility>`
+   may register each of them.
+
+   The function returns ``false`` with a Python error set when the setup fails,
+   which mainly happens in :ref:`split mode <split-mode>` when the backend
+   module cannot be imported. It reports failures this way rather than by
+   raising a C++ exception because nanobind's exception machinery may itself be
+   unavailable at this point.
+
+   The following example shows how this feature enables the use of nanobind
+   within a pybind11 module.
+
+   .. code-block:: cpp
+
+      PYBIND11_MODULE(my_ext, m) {
+          if (!nb::register_module(m.ptr()))
+              throw py::error_already_set();
+
+          nb::module_ nb_m = nb::borrow<nb::module_>(m.ptr());
+          nb::class_<MyType>(nb_m, "MyType");
+      }
 
 .. cpp:function:: str repr(handle h)
 

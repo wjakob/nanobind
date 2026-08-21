@@ -73,6 +73,13 @@ The high-level interface consists of just one CMake command:
           unsupported Python versions. :ref:`Split mode <split-mode>`
           (``BACKEND_MODULE``) always targets the stable ABI with a Python
           3.10 floor, and this flag is then redundant.
+      * - ``STABLE_ABI_VERSION <version>``
+        - Raise the stable ABI floor of a :ref:`split mode <split-mode>`
+          extension to the given ``MAJOR.MINOR`` Python version (e.g.
+          ``3.13``). The default floor is 3.10, or 3.15 in ``abi3t`` builds.
+          When ``scikit-build-core`` is used, the floor tracks
+          ``tool.scikit-build.wheel.py-api`` and this parameter is usually
+          unnecessary.
       * - ``FREE_THREADED``
         - Compile an Python extension that opts into free-threaded (i.e.,
           GIL-less) Python behavior, which requires a special free-threaded
@@ -165,12 +172,13 @@ The high-level interface consists of just one CMake command:
 
      Once compiled, a stable ABI extension can be reused across Python minor
      versions. In contrast, ordinary builds are only compatible across patch
-     versions. In linked builds, this feature requires Python >= 3.12 and is
-     ignored on older versions; :ref:`split mode <split-mode>` builds always
-     target the stable ABI with a Python 3.10 floor. Note that use of the stable ABI come at a small performance cost
-     since nanobind can no longer access the internals of various data
-     structures directly. If in doubt, benchmark your code to see if the cost
-     is acceptable.
+     versions. In non-split builds, this feature requires Python >= 3.12 and is
+     ignored on older versions. :ref:`Split mode <split-mode>` builds always
+     target the stable ABI, with a Python 3.10 floor that can be raised via
+     ``STABLE_ABI_VERSION``. Note that use of the stable ABI without split mode
+     comes at performance cost, since key parts of nanobind can no longer
+     access the internals of various data structures directly. If in doubt,
+     benchmark your code to see if the cost is acceptable.
 
    - In non-debug modes, it compiles with *size optimizations* (i.e.,
      ``-Os``). This is generally the mode that you will want to use for

@@ -331,6 +331,11 @@ is a ZIP file containing all the individual wheel files for each platform.
       [tool.cibuildwheel]
       build = "cp310-*"
 
+   The ``py-api`` setting determines which stable ABI the extension is
+   compiled against. Raising it to ``cp312`` (and the ``cibuildwheel``
+   entry along with it) trades support for Python 3.10 and 3.11 against
+   access to newer limited API functions.
+
 By default, ``cibuildwheel`` will launch a very large build matrix, and it is
 possible that your extension is not compatible with every single configuration.
 For example, suppose that the project depends on Python 3.10+ and a 64 bit

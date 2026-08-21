@@ -177,4 +177,20 @@ inline bool is_alive() noexcept {
     return NB_CALL(is_alive)();
 }
 
+#if !defined(NB_BUILD)
+// Do the work of NB_MODULE() on a module created by other means. Returns
+// false with a Python error set, since nanobind's exception machinery may
+// not be available yet.
+inline bool register_module(handle m) noexcept {
+    detail::init_singletons();
+
+    const char *name = PyModule_GetName(m.ptr());
+    if (!name || !detail::nb_backend_init(name))
+        return false;
+
+    detail::internals = NB_CALL(nb_module_init)(NB_DOMAIN_STR, m.ptr());
+    return detail::internals != nullptr;
+}
+#endif
+
 NAMESPACE_END(NB_NAMESPACE)

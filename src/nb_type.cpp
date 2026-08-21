@@ -71,10 +71,43 @@ static NB_INLINE bool nb_type_has_gc(PyTypeObject *tp, uint32_t flags) {
 #endif
 }
 
+static int nb_type_init_py(PyTypeObject *self);
+
+/// 'type_data::internals' doubles as the marker of an initialized record.
+/// Free-threaded builds publish it with release/acquire semantics so that a
+/// thread observing the marker also observes the rest of the record.
+static NB_INLINE nb_internals *internals_load(type_data *t) {
+#if defined(NB_FREE_THREADED)
+    return ((std::atomic<nb_internals *> *) &t->internals)
+        ->load(std::memory_order_acquire);
+#else
+    return t->internals;
+#endif
+}
+
+static NB_INLINE void internals_store(type_data *t, nb_internals *p) {
+#if defined(NB_FREE_THREADED)
+    ((std::atomic<nb_internals *> *) &t->internals)
+        ->store(p, std::memory_order_release);
+#else
+    t->internals = p;
+#endif
+}
+
+/// Python subclasses of bindings are normally initialized by nb_type_init(),
+/// but there are ways to create uninitialized ones (e.g., via type.__new__()).
+/// This function detects and fixes it. Returns false upon failure.
+static NB_INLINE bool nb_type_ensure(PyTypeObject *tp) {
+    return NB_LIKELY(internals_load(nb_type_data(tp)) != nullptr) ||
+           nb_type_init_py(tp) == 0;
+}
+
 /// Allocate memory for a nb_type instance with internal storage
 PyObject *inst_new_int(PyTypeObject *tp, PyObject * /* args */,
                        PyObject * /*kwd */) {
     const type_data *t = nb_type_data(tp);
+    if (NB_UNLIKELY(!nb_type_ensure(tp)))
+        return nullptr;
     uint32_t flags = t->flags;
 
     // Instance pool fast path
@@ -657,79 +690,105 @@ static void nb_type_dealloc(PyObject *o) {
         internals_dec_ref(p);
 }
 
-/// Called when a C++ type is extended from within Python
-static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
-    if (NB_TUPLE_GET_SIZE(args) != 3) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "nb_type_init(): invalid number of arguments!");
+/// Initialize the type record of a Python subclass of a nanobind type
+static NB_NOINLINE int nb_type_init_py(PyTypeObject *self) {
+#if defined(Py_LIMITED_API)
+    PyObject *bases = (PyObject *) PyType_GetSlot(self, Py_tp_bases);
+    PyTypeObject *base = (PyTypeObject *) PyType_GetSlot(self, Py_tp_base);
+#else
+    PyObject *bases = self->tp_bases;
+    PyTypeObject *base = self->tp_base;
+#endif
+
+    if (!bases || NB_TUPLE_GET_SIZE(bases) != 1) {
+        PyErr_SetString(PyExc_TypeError,
+                        "nanobind types do not support multiple inheritance!");
         return -1;
     }
 
-    PyObject *bases = NB_TUPLE_GET_ITEM(args, 1);
-    if (!PyTuple_CheckExact(bases) || NB_TUPLE_GET_SIZE(bases) != 1) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "nb_type_init(): invalid number of bases!");
+    // The base is a nanobind type exactly if its metaclass is also an
+    // instance of the meta-metaclass 'nb_meta'
+    PyObject *meta_base = (PyObject *) Py_TYPE((PyObject *) base),
+             *meta_self = (PyObject *) Py_TYPE((PyObject *) self);
+    if (Py_TYPE(meta_base) != Py_TYPE(meta_self)) {
+        PyErr_SetString(PyExc_TypeError, "nanobind: the 'nb_type' metaclass "
+                                         "requires a nanobind base type!");
         return -1;
     }
 
-    PyObject *base = NB_TUPLE_GET_ITEM(bases, 0);
-    if (!PyType_Check(base)) {
-        PyErr_SetString(PyExc_RuntimeError, "nb_type_init(): expected a base type object!");
+    // The base may itself still await initialization
+    if (!nb_type_ensure(base))
         return -1;
-    }
 
-    type_data *t_b = nb_type_data((PyTypeObject *) base);
+    type_data *t_b = nb_type_data(base), *t = nb_type_data(self);
     if (t_b->flags & (uint32_t) type_flags::is_final) {
         PyErr_Format(PyExc_TypeError, "The type '%s' prohibits subclassing!",
                      t_b->name);
         return -1;
     }
 
-    int rv = NB_TYPE_SLOT(PyType_Type, tp_init)(self, args, kwds);
-    if (rv)
-        return rv;
+    PyObject *name_o = nb_type_name((PyObject *) self);
+    char *name = strdup_check(PyUnicode_AsUTF8AndSize(name_o, nullptr));
+    Py_DECREF(name_o);
 
-    type_data *t = nb_type_data((PyTypeObject *) self);
-
-    *t = *t_b;
+    // Assemble the record locally, it is published as a whole below
+    type_data tmp = *t_b;
+    tmp.internals = nullptr;
+    tmp.name = name;
+    tmp.type_py = self;
 
     // Subclasses resolve their own overrides
-    t->trampoline_table_pub = nullptr;
-    t->trampoline_allocs = nullptr;
+    tmp.trampoline_table_pub = nullptr;
+    tmp.trampoline_allocs = nullptr;
 
-    t->flags |=  (uint32_t) type_flags_internal::is_python_type;
-    t->flags &= ~(uint32_t) type_flags_internal::has_implicit_conversions;
+    tmp.flags |=  (uint32_t) type_flags_internal::is_python_type;
+    tmp.flags &= ~(uint32_t) type_flags_internal::has_implicit_conversions;
 
     // A Python subclass is always a GC heap type
-    t->flags |= (uint32_t) type_flags_internal::has_gc;
+    tmp.flags |= (uint32_t) type_flags_internal::has_gc;
 
     // Sublclasses do not inherit the pooling feature as a consequence
-    t->flags &= ~(uint32_t) type_flags::pooled;
-    t->pool_capacity = 0;
+    tmp.flags &= ~(uint32_t) type_flags::pooled;
+    tmp.pool_capacity = 0;
 #if defined(NB_FREE_THREADED)
-    t->pool_index = 0;
+    tmp.pool_index = 0;
 #else
-    t->pool = nb_inst_pool{};
+    tmp.pool = nb_inst_pool{};
 #endif
 
-    PyObject *name = nb_type_name(self);
-    t->name = strdup_check(PyUnicode_AsUTF8AndSize(name, nullptr));
-    Py_DECREF(name);
-    t->type_py = (PyTypeObject *) self;
-    t->implicit.cpp = nullptr;
-    t->implicit.py = nullptr;
-    t->alias_chain = nullptr;
-    t->supplement = nullptr;
+    tmp.implicit.cpp = nullptr;
+    tmp.implicit.py = nullptr;
+    tmp.alias_chain = nullptr;
+    tmp.supplement = nullptr;
 
 #if defined(Py_LIMITED_API)
-    t->vectorcall = nullptr;
+    tmp.vectorcall = nullptr;
 #else
-    ((PyTypeObject *) self)->tp_vectorcall = nullptr;
+    self->tp_vectorcall = nullptr;
 #endif
 
-    internals_inc_ref(t->internals);
+    nb_internals *p = t_b->internals;
+    lock_internals guard(p);
+
+    // Another thread may have initialized the record in the meantime
+    if (t->internals) {
+        free(name);
+        return 0;
+    }
+
+    *t = tmp;
+    internals_inc_ref(p);
+    internals_store(t, p);
 
     return 0;
+}
+
+/// Called when a C++ type is extended from within Python
+static int nb_type_init(PyObject *self, PyObject *args, PyObject *kwds) {
+    int rv = NB_TYPE_SLOT(PyType_Type, tp_init)(self, args, kwds);
+    if (rv == 0 && !nb_type_ensure((PyTypeObject *) self))
+        rv = -1;
+    return rv;
 }
 
 #if defined(Py_LIMITED_API)
@@ -858,6 +917,9 @@ bool type_freeze(PyObject *t) {
 
 /// Special case to handle 'Class.property = value' assignments
 int nb_type_setattro(PyObject* obj, PyObject* name, PyObject* value) {
+    if (NB_UNLIKELY(!nb_type_ensure((PyTypeObject *) obj)))
+        return -1;
+
     nb_internals *int_p = nb_type_data((PyTypeObject *) obj)->internals;
 
     /* Fetch the raw MRO entry for 'name'. The lookup must not engage the

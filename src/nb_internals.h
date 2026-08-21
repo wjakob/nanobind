@@ -279,7 +279,8 @@ struct type_data {
     /// Instance pool capacity
     uint32_t pool_capacity;
 
-    /// Backend state of the domain that owns this type
+    /// Backend state of the domain that owns this type. A null pointer
+    /// identifies the record of a Python subclass that is not yet initialized.
     nb_internals *internals;
 
     /// Type name

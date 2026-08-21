@@ -188,8 +188,9 @@ Bindings also became more robust at interpreter shutdown:
   virtual.
 
   **API break**: :cpp:struct:`nb::gil_scoped_acquire <gil_scoped_acquire>` can
-  fail and grows an :ref:`is_valid() <gil-shutdown>` query that foreign-thread
-  code should consult.
+  now fail when the interpreter is no longer usable. Code that may run in
+  this situation must guard subsequent use of the Python API using the
+  :ref:`.is_valid() <gil-shutdown>` method.
 
   .. code-block:: cpp
 

@@ -1330,3 +1330,94 @@ def test64_inst_dict():
     if not is_pypy:
         assert t.inst_dict(t.Struct(1)) is None
         assert t.inst_dict(object()) is None and t.inst_dict(1) is None
+
+
+def test65_init_subclass_setattr():
+    # '__init_subclass__' and '__set_name__' observe the new class before the
+    # metaclass 'tp_init' slot runs. The nanobind type record must already be
+    # complete at this point.
+    class BaseWithInitSubclass(t.Animal):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+            cls.foo = 123
+
+    class Derived(BaseWithInitSubclass):
+        pass
+
+    assert Derived.foo == 123
+
+    class Descriptor:
+        def __set_name__(self, owner, name):
+            owner.bar = name
+
+    class Derived2(t.Animal):
+        descr = Descriptor()
+
+    assert Derived2.bar == "descr"
+
+    class Mixin:
+        pass
+
+    with pytest.raises(TypeError, match="multiple inheritance"):
+        class Derived3(Mixin, t.Animal):
+            pass
+
+    with pytest.raises(TypeError, match="requires a nanobind base type"):
+        class Derived4(metaclass=type(t.Animal)):
+            pass
+
+
+def test66_uninitialized_type_use():
+    # Instantiation from '__init_subclass__' / '__set_name__', and types
+    # created via 'type.__new__()', which skips the metaclass 'tp_init' slot
+    class BaseWithInitSubclass(t.Animal):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+            cls.inst = cls()
+
+    class Derived(BaseWithInitSubclass):
+        pass
+
+    assert isinstance(Derived.inst, Derived)
+    assert Derived.inst.name() == "Animal"
+
+    class Descriptor:
+        def __set_name__(self, owner, name):
+            owner.inst = owner()
+
+    class Derived2(t.Animal):
+        descr = Descriptor()
+
+    assert isinstance(Derived2.inst, Derived2)
+
+    meta = type(t.Animal)
+    Derived3 = type.__new__(meta, "Derived3", (t.Animal,), {})
+    Derived3.baz = 1
+    assert Derived3.baz == 1 and isinstance(Derived3(), t.Animal)
+
+    # 'type.__new__()' cannot be intercepted, the error surfaces on first use
+    Derived4 = type.__new__(meta, "Derived4", (t.FinalType,), {})
+    with pytest.raises(TypeError, match="prohibits subclassing"):
+        Derived4()
+    with pytest.raises(TypeError, match="prohibits subclassing"):
+        Derived4.foo = 1
+
+    # Chains of types whose first use happens via a subclass
+    Derived5 = type.__new__(meta, "Derived5", (t.Animal,), {})
+
+    class Derived6(Derived5):
+        pass
+
+    assert isinstance(Derived6(), Derived5)
+
+    class BaseWithCompanion(t.Animal):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+            if cls.__name__ != "Companion":
+                cls.companion = type("Companion", (cls,), {})()
+
+    class Derived7(BaseWithCompanion):
+        pass
+
+    assert isinstance(Derived7.companion, Derived7)
+    assert Derived7.companion.name() == "Animal"

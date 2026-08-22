@@ -11,8 +11,8 @@ versioning. Please review the :ref:`ABI compatibility <abi_compatibility>`
 documentation for details.
 
 
-Version 3.0.0 (unreleased)
---------------------------
+Version 3.0.0 (Aug 22, 2026)
+----------------------------
 
 This major release of nanobind introduces **split mode** to address a
 frustration shared by many extension developers. It also includes minor API
@@ -63,10 +63,6 @@ adaptations.
          BACKEND_MODULE nanobind_backend
      )
 
-It will still take some time to stabilize split mode before a regular 3.0.0
-release. For now, please try your projects with the development release of
-nanobind (``3.0.0.dev1``) and ``nanobind-backend`` (``1.0.0.dev1``) on PyPI.
-
 This release also brings a set of performance improvements, mainly to the
 wrapper API (i.e., the bindings of Python within C++):
 
@@ -74,8 +70,8 @@ wrapper API (i.e., the bindings of Python within C++):
 
   .. code-block:: cpp
 
-     nb::object obj = obj.attr("name");
-     dict["name"] = obj;
+     nb::object value = obj.attr("name");
+     dict["name"] = value;
 
   used to generate many temporary ``str`` objects, whose construction is
   surprisingly expensive. nanobind now constructs and memoizes *interned*
@@ -84,11 +80,16 @@ wrapper API (i.e., the bindings of Python within C++):
   and dictionary lookup.
 
   With this change, a keyword attribute lookup (``obj.attr("name")``) reduces
-  from **30ns** to **9ns** on my machine. The change affects ``nb::getattr()``,
-  ``nb::setattr()``, ``nb::delattr()``, ``nb::hasattr()``, the ``attr()`` and
-  ``operator[]`` accessors, ``nb::dict::get()``, the ``contains()`` methods of
-  ``nb::dict``, ``nb::set``, ``nb::frozenset``, and ``nb::mapping``, and the
-  keyword argument names of ``nb::arg()``.
+  from **30ns** to **9ns** on my machine. The change affects
+  :cpp:func:`nb::getattr() <getattr>`, :cpp:func:`nb::setattr() <setattr>`,
+  :cpp:func:`nb::delattr() <delattr>`, :cpp:func:`nb::hasattr() <hasattr>`, the
+  :cpp:func:`attr() <detail::api::attr>` and :cpp:func:`operator[]()
+  <detail::api::operator[]>` accessors, :cpp:func:`nb::dict::get()
+  <dict::get>`, the ``contains()`` methods of :cpp:func:`nb::dict
+  <dict::contains>`, :cpp:func:`nb::set <set::contains>`,
+  :cpp:func:`nb::frozenset <frozenset::contains>`, and :cpp:func:`nb::mapping
+  <mapping::contains>`, and the keyword argument names of
+  :cpp:class:`nb::arg() <arg>`.
 
 - **Unnecessary reference counting**: the C++ wrappers performed many
   unnecessary calls to ``Py_INCREF()`` and ``Py_DECREF()`` that have a
@@ -135,14 +136,14 @@ wrapper API (i.e., the bindings of Python within C++):
 - **Faster sequence traversal**: The ``nb::{tuple,list}::{begin,end}()``
   iterators were redesigned and now have nearly the same performance in
   unstable ABI and stable/split mode builds. (Previously, there was a ~2.5x
-  overhead when traversing large sequences in stable ABI extensions)
+  overhead when traversing large sequences in stable ABI extensions.)
 
 - **Thread-safe container bindings**: the :cpp:func:`nb::bind_vector()
   <bind_vector>` and :cpp:func:`nb::bind_map() <bind_map>` container bindings
   now lock the container in free-threaded builds, which makes their concurrent
   use safe. This safety guarantee also extends to list iterators, and
   key/value/item views of maps. Similarly to the Python ``dict``, map bindings
-  raise an ``RuntimeError`` when they detect concurrent modification during
+  raise a ``RuntimeError`` when they detect concurrent modification during
   iteration.
 
 - Bindings can now conclude with :cpp:func:`.freeze() <class_::freeze>` to
@@ -158,12 +159,12 @@ wrapper API (i.e., the bindings of Python within C++):
   it from Python or C++ raise an exception. A neat side effect of freezing a
   type is that it accelerates constructor dispatch by 7-10% on Python 3.15,
   since it allows Python's adaptive specializing interpreter to generate
-  faster byte code.
+  faster bytecode.
 
   The ability to freeze types was already introduced in CPython 3.14, but it
   is disadvantageous there due to a `bug
   <https://github.com/python/cpython/issues/143361>`__ that actually
-  _reduces_ performance. Therefore, nanobind only honors the ``.freeze()``
+  *reduces* performance. Therefore, nanobind only honors the ``.freeze()``
   request on CPython 3.15+.
 
 Bindings also became more robust at interpreter shutdown:
@@ -176,16 +177,17 @@ Bindings also became more robust at interpreter shutdown:
 
   `PEP 788 <https://peps.python.org/pep-0788/>`__ adopts an official API where
   code can request a kind of critical section that either fails or keeps the
-  interpreter alive until release. API like :cpp:struct:`nb::gil_scoped_acquire
-  <gil_scoped_acquire>` now builds on it when running on Python 3.15 or newer.
+  interpreter alive until release. The :cpp:struct:`nb::gil_scoped_acquire
+  <gil_scoped_acquire>` API now builds on this feature when running on Python
+  3.15 or newer.
 
   Many existing internal uses of this pattern moved to the new API, including
   the deleters of ``std::shared_ptr`` and ``std::unique_ptr``, the wrapper
   around a Python callable held in a ``std::function``, ndarray deallocation
-  and ``nb::python_error``. They skip their work instead of hanging when Python
-  can no longer be used. A :ref:`trampoline <trampolines>` in this situation
-  defers to the C++ base implementation, or raises when the method is pure
-  virtual.
+  and ``nb::python_error``. They simply skip their work instead of hanging when
+  Python can no longer be used. Function calls to :ref:`trampoline
+  <trampolines>` also detect this situation and defer to the C++ base instead
+  of the Python override, or raise when the method is pure virtual.
 
   **API break**: :cpp:struct:`nb::gil_scoped_acquire <gil_scoped_acquire>` can
   now fail when the interpreter is no longer usable. Code that may run in
@@ -202,17 +204,18 @@ Bindings also became more robust at interpreter shutdown:
   reports success. Split-mode extensions pick up the improved handling from a
   backend upgrade without recompiling.
 
-  The rewrite also removed an inefficiency of the former implementatoin. On Python
-  3.12+, a thread that already holds a thread state can now proceed directly, which
-  saves a acquire/release pair and reduces the cost of a :ref:`trampoline
-  <trampolines>` dispatch from **8.7ns** to **5.7ns** on my machine.
+  The rewrite also removed an inefficiency of the former implementation. On
+  Python 3.12+, a thread that already holds a thread state can now proceed
+  directly, which saves an acquire/release pair and reduces the cost of a
+  :ref:`trampoline <trampolines>` dispatch from **8.7ns** to **5.7ns** on my
+  machine.
 
 The release makes several further API-breaking changes that unlock internal
 improvements:
 
 - **Trampolines**: nanobind 3 switches to a new :ref:`trampoline <trampolines>`
   mechanism to override C++ methods in Python. Instead of caching data about
-  such overrides within instances (which cost 16 bytes per overload), the
+  such overrides within instances (which costs 16 bytes per overload), the
   cache is now located within type objects. Trampoline dispatch became
   faster, and its cost no longer grows with the number of overridable
   methods. Monkey-patching methods into an existing type object now works
@@ -236,29 +239,29 @@ improvements:
          NB_TRAMPOLINE(Dog); // OK
          ...
 
-  In the past, it was possible to monkey-patch methods into *instances*
+  In the past, it was possible to monkey-patch methods into *instances*:
 
   .. code-block:: python
 
      inst = Dog()
-     inst.bark = ... // Ignored since nanobind 3.0.0
+     inst.bark = ...  # Ignored since nanobind 3.0.0
 
   Such assignments are now ignored by the trampoline. Methods can only be
   overridden in the *type*, either at creation time, or by patching it later:
 
   .. code-block:: python
 
-     # Override in the instance
+     # Override in a subclass
      class MyDog(Dog):
-        def bark(self): ...
+         def bark(self): ...
 
      # .. or monkey-patch
      inst = Dog()
      Dog.bark = ...
 
 - **Return value policies**: policies like :cpp:member:`nb::rv_policy::move
-  <rv_policy::move>` used to be ``enum`` values and now became compile-time tags. As a consequence, function
-  bindings like
+  <rv_policy::move>` used to be ``enum`` values and now became compile-time
+  tags. As a consequence, function bindings like
 
   .. code-block:: cpp
 
@@ -319,7 +322,7 @@ improvements:
      // OK
      nb::object doc = cond ? (nb::object) nb::str(value) : (nb::object) nb::none();
 
-- **Type caster interface**: the ``flags`` parameter of ``from_python()``
+- **Type caster interface**: the ``flags`` parameter of the ``from_python()``
   function in type casters widened from ``uint8_t`` to ``uint32_t``:
 
   .. code-block:: cpp
@@ -330,7 +333,6 @@ improvements:
   Type casters written for nanobind 2.x still compile and behave correctly
   because the value converts implicitly, though this may cause compiler
   warnings. It is advisable that you widen the parameter in your casters.
-
 
 - **Miscellaneous**:
 

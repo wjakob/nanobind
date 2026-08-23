@@ -1325,14 +1325,17 @@ converting to Python.
 - ``float`` → ``std::chrono::duration``
     A floating-point value can be converted into a duration. The input is
     treated as a number of seconds, and fractional seconds are supported
-    to the extent representable.
+    to the extent representable. This is an :ref:`implicit conversion
+    <noconvert>`: it does not take place in the first pass of overload
+    resolution, nor when an argument is marked ``noconvert``.
 
 - ``float`` → ``std::chrono::[other_clock]::time_point``
     A floating-point value can be converted into a timepoint on a
     clock other than the system clock. The input is treated as a
     number of seconds, and fractional seconds are supported to the
     extent representable. The resulting timepoint will be that many
-    seconds after the target clock's epoch time.
+    seconds after the target clock's epoch time. This is an :ref:`implicit
+    conversion <noconvert>`, as above.
 
 
 Evaluating Python expressions from strings

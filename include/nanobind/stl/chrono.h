@@ -113,13 +113,14 @@ inline PyObject* pack_datetime(int year, int month, int day,
 
 // Casts a std::chrono type (either a duration or a time_point) to/from
 // Python timedelta objects, or from a Python float representing seconds.
+// The latter is an implicit conversion and requires 'cast_flags::convert'.
 template <typename type> class duration_caster {
 public:
     using rep = typename type::rep;
     using period = typename type::period;
     using duration_t = std::chrono::duration<rep, period>;
 
-    bool from_python(handle src, uint32_t /*flags*/,
+    bool from_python(handle src, uint32_t flags,
                      cleanup_list *cleanup) noexcept {
         namespace ch = std::chrono;
 
@@ -141,8 +142,10 @@ public:
             return true;
         }
 
-        // If invoked with a float we assume it is seconds and convert
-        if (PyFloat_Check(src.ptr())) {
+        // If invoked with a float we assume it is seconds and convert. This is
+        // an implicit conversion, so it must not run in the first pass of
+        // overload resolution.
+        if (PyFloat_Check(src.ptr()) && (flags & (uint32_t) cast_flags::convert)) {
             value = type(ch::duration_cast<duration_t>(
                              ch::duration<double>(PyFloat_AsDouble(src.ptr()))));
             return true;
@@ -182,8 +185,7 @@ public:
         return pack_timedelta(dd.count(), ss.count(), us.count(), cleanup);
     }
 
-    NB_TYPE_CASTER(type, io_name("datetime.timedelta | float",
-                                 "datetime.timedelta"))
+    NB_TYPE_CASTER(type, const_name("datetime.timedelta"))
 };
 
 template <class... Args>

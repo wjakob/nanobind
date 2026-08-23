@@ -351,3 +351,17 @@ def test_datetime_fields():
 
     with pytest.raises(TypeError, match="expected a datetime type"):
         m.test_datetime_fields(1)
+
+
+def test_duration_noconvert():
+    # nb::arg().noconvert() must reject the float-to-seconds rule
+    assert m.test_duration_noconvert(datetime.timedelta(seconds=2)) == 2000
+    with pytest.raises(TypeError, match="incompatible function arguments"):
+        m.test_duration_noconvert(2.0)
+
+
+def test_duration_overload():
+    # 'double' matches a float in the first pass, so it wins over the duration
+    # overload that was declared first
+    assert m.test_duration_overload(2.0) == 2
+    assert m.test_duration_overload(datetime.timedelta(seconds=2)) == 1

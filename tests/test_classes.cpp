@@ -316,7 +316,12 @@ NB_MODULE(test_classes_ext, m) {
     nb::class_<OptionalNoneTest>(m, "OptionalNoneTest")
         .def(nb::init<>())
         .def("compute", &OptionalNoneTest::compute,
-             "i"_a, "j"_a = nb::none(), "k"_a = 0);
+             "i"_a, "j"_a = nb::none(), "k"_a = 0)
+        // A method whose only parameter is a 'self' that carries an implicit
+        // annotation, which leaves the function record without any records
+        .def("optional_self", [](std::optional<OptionalNoneTest> self) {
+            return self.has_value();
+        });
 
     m.def("stats", []{
         nb::dict d;

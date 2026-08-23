@@ -592,6 +592,16 @@ NB_MODULE(test_functions_ext, m) {
     // kw_only specified twice:
     //m.def("bad_args5", [](int, int) {}, nb::kw_only(), "i"_a, nb::kw_only(), "j"_a);
 
+    // Wrong number of nb::arg annotations. A parameter that supplies an
+    // implicit annotation (here 'std::nullptr_t') does not relax the count,
+    // which must be zero or one per parameter:
+    //m.def("bad_args6", [](std::nullptr_t) {}, "i"_a, "j"_a);
+    //m.def("bad_args7", [](std::nullptr_t, int, int) {}, "i"_a);
+
+    // No nb::arg annotations, as in 'bad_args1'. An implicit annotation has no
+    // name and cannot make the keyword-only parameter usable:
+    //m.def("bad_args8", [](nb::args, std::nullptr_t) {});
+
     m.def("test_args_kwonly",
           [](int i, double j, nb::args args, int z) {
               return nb::make_tuple(i, j, args, z);

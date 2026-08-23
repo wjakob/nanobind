@@ -148,6 +148,13 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         kwargs_pos_n = index_n_v<std::is_same_v<intrinsic_t<Args>, kwargs>...>,
         nargs = sizeof...(Args);
 
+    // Detect location of nb::kw_only, if supplied. As with args/kwargs we find
+    // the first and last location and later verify they match. Note this is an
+    // index in Extra... while args/kwargs_pos_* are indices in Args...
+    constexpr size_t
+        kwonly_pos_1 = index_1_v<std::is_same_v<kw_only, Extra>...>,
+        kwonly_pos_n = index_n_v<std::is_same_v<kw_only, Extra>...>;
+
     constexpr bool has_arg_defaults = (detail::has_arg_defaults_v<Args> || ... || false);
 
     // Determine the number of nb::arg/nb::arg_v annotations
@@ -160,6 +167,12 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     static constexpr bool has_arg_annotations = has_arg_defaults ||
         (nargs_provided > 0 && !is_getter_det);
 
+    // Number of 'arg_data_init' records in the function record below. This can
+    // be zero even when 'has_arg_annotations' is set, e.g. for a method whose
+    // only parameter is a 'self' of type 'std::optional<T>'.
+    constexpr size_t nrec =
+        has_arg_defaults ? (nargs - is_method_det) : nargs_provided;
+
     // Determine the number of potentially-locked function arguments
     static constexpr bool lock_self_det =
         (std::is_same_v<lock_self, Extra> + ... + 0) != 0;
@@ -167,14 +180,6 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
         "At most two function arguments can be locked");
     static_assert(!(lock_self_det && !is_method_det),
         "The nb::lock_self() annotation only applies to methods");
-
-    // Detect location of nb::kw_only annotation, if supplied. As with args/kwargs
-    // we find the first and last location and later verify they match each other.
-    // Note this is an index in Extra... while args/kwargs_pos_* are indices in
-    // Args... .
-    constexpr size_t
-        kwonly_pos_1 = index_1_v<std::is_same_v<kw_only, Extra>...>,
-        kwonly_pos_n = index_n_v<std::is_same_v<kw_only, Extra>...>;
 
     // Arguments after nb::args are implicitly keyword-only even if there is no
     // nb::kw_only annotation
@@ -184,13 +189,17 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // A few compile-time consistency checks
     static_assert(args_pos_1 == args_pos_n && kwargs_pos_1 == kwargs_pos_n,
         "Repeated use of nb::kwargs or nb::args in the function signature!");
-    static_assert(!has_arg_annotations || has_arg_defaults || nargs_provided + is_method_det == nargs,
+
+    // If annotations are provided, they must exactly match the parameter count
+    static_assert(!has_arg_annotations || nargs_provided == 0 ||
+                  nargs_provided + is_method_det == nargs,
         "The number of nb::arg annotations must match the argument count!");
     static_assert(kwargs_pos_1 == nargs || kwargs_pos_1 + 1 == nargs,
         "nb::kwargs must be the last element of the function signature!");
     static_assert(args_pos_1 == nargs || args_pos_1 < kwargs_pos_1,
         "nb::args must precede nb::kwargs if both are present!");
-    static_assert(has_arg_annotations || (!implicit_kw_only && !explicit_kw_only),
+    // Implicit annotations carry no name and cannot satisfy this requirement
+    static_assert(nargs_provided > 0 || (!implicit_kw_only && !explicit_kw_only),
         "Keyword-only arguments must have names!");
 
     // Find the index in Args... of the first keyword-only parameter. Since
@@ -244,7 +253,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_init<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
+    func_data_init<nrec> f;
 
     f.flags = NB_ABI_MINOR_TAG |
               (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
@@ -376,12 +385,10 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // getters. When 'has_arg_defaults' is set (e.g. due to the presence of
     // ``std::optional<T>``), we provide an implicit annotation for every
     // parameter, which is initialized by the loop below.
-    if constexpr (has_arg_annotations) {
+    if constexpr (has_arg_annotations && nrec > 0) {
         constexpr auto arg_flags =
             arg_flags_static<is_method_det, has_arg_annotations, Extra...>(
                 (Return (*)(Args...)) nullptr);
-        constexpr size_t nrec =
-            has_arg_defaults ? (nargs - is_method_det) : nargs_provided;
         for (size_t i = 0; i < nrec; ++i) {
             arg_data_init &a = f.args[i];
             a.name = nullptr;

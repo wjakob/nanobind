@@ -1421,3 +1421,9 @@ def test66_uninitialized_type_use():
 
     assert isinstance(Derived7.companion, Derived7)
     assert Derived7.companion.name() == "Animal"
+
+
+def test67_implicit_self_annotation():
+    # 'self' is the only parameter, and it carries an implicit annotation, so
+    # the function record ends up without any argument records
+    assert t.OptionalNoneTest().optional_self() is True

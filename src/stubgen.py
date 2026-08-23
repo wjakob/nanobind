@@ -841,14 +841,6 @@ class StubGen:
             mod_prefix = self.module.__name__ + "."
             if full_name.startswith(mod_prefix) and \
                     (result := full_name[len(mod_prefix) :]).split(".")[0] in self.module.__dict__:
-                # Inside a class body, also strip the immediate enclosing class
-                # prefix (e.g. "ErrorEnum.Value" -> "Value"). Only that scope
-                # is stripped: class scopes don't nest, so an outer class's
-                # members aren't visible by short name in a nested class body.
-                scope = self.prefix[len(mod_prefix) :]
-                enclosing = scope.rpartition(".")[0]
-                if enclosing and result.startswith(enclosing + "."):
-                    result = result[len(enclosing) + 1 :]
                 return result
             elif mod_name in ("typing", "typing_extensions", "collections.abc"):
                 # Import frequently-occurring typing classes and ABCs directly

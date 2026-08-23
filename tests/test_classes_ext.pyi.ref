@@ -270,6 +270,11 @@ class MyClass:
 
     def f(self) -> None: ...
 
+    def g(self, arg: MyClass.Sibling, /) -> None: ...
+
+class Sibling:
+    pass
+
 class StaticProperties:
     value: ClassVar[int] = ...
     """Static property docstring"""

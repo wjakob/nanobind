@@ -299,3 +299,46 @@ jobs:
         source /opt/intel/oneapi/setvars.sh
         cd build
         python -m pytest
+
+  clang-cl:
+    runs-on: windows-2022
+    name: "Python ${{ matrix.python }} / clang-cl"
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Python ${{ matrix.python }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        cache: 'pip'
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Install test dependencies
+      run: |
+        python -m pip install pytest pytest-github-actions-annotate-failures typing_extensions
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -G "Visual Studio 17 2022" -T ClangCL
+
+    - name: Build C++
+      run: cmake --build build -j 2
+
+    - name: Check ABI tag
+      run: >
+        cd build/tests/Debug;
+        python -c 'import test_functions_ext as t; print(f"ABI tag is \"{ t.abi_tag() }\"")'
+
+    - name: Run tests
+      run: >
+        cd build;
+        python -m pytest

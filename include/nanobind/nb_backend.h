@@ -611,9 +611,11 @@ struct error_payload {
 #if !defined(NB_BACKEND_MODULE) || defined(NB_BUILD)
 #define NB_SLOT(ret, name, args) NB_CORE ret name args;
 // NB_SLOT_ALIAS resolves to the CPython function itself, which every mode
-// that reaches this branch has access to.
+// that reaches this branch has access to. The pointer is 'const' but not
+// 'constexpr': Windows declares a CPython function '__declspec(dllimport)',
+// and its address is then not a constant expression.
 #define NB_SLOT_ALIAS(ret, name, args, target)                                 \
-    inline constexpr ret (*name) args = &target;
+    inline ret (*const name) args = &target;
 #include "nb_backend_slots.h"
 #endif
 

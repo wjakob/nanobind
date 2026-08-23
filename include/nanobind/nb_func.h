@@ -160,6 +160,12 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     static constexpr bool has_arg_annotations = has_arg_defaults ||
         (nargs_provided > 0 && !is_getter_det);
 
+    // Number of 'arg_data_init' records in the function record below. Note
+    // that this can be zero even when 'has_arg_annotations' is set, e.g. for a
+    // method whose only parameter is a 'self' of type 'std::optional<T>'.
+    constexpr size_t nrec =
+        has_arg_defaults ? (nargs - is_method_det) : nargs_provided;
+
     // Determine the number of potentially-locked function arguments
     static constexpr bool lock_self_det =
         (std::is_same_v<lock_self, Extra> + ... + 0) != 0;
@@ -244,7 +250,7 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     };
 
     // The following temporary record will describe the function in detail
-    func_data_init<has_arg_defaults ? (nargs - is_method_det) : nargs_provided> f;
+    func_data_init<nrec> f;
 
     f.flags = NB_ABI_MINOR_TAG |
               (args_pos_1   < nargs ? (uint32_t) func_flags::has_var_args   : 0) |
@@ -375,13 +381,12 @@ NB_INLINE PyObject *func_create(Func &&func, Return (*)(Args...),
     // Store information (flags, defaults) about annotated parameters. Skips
     // getters. When 'has_arg_defaults' is set (e.g. due to the presence of
     // ``std::optional<T>``), we provide an implicit annotation for every
-    // parameter, which is initialized by the loop below.
-    if constexpr (has_arg_annotations) {
+    // parameter, which is initialized by the loop below. Note that 'f' has no
+    // 'args' member when 'nrec' is zero.
+    if constexpr (has_arg_annotations && nrec > 0) {
         constexpr auto arg_flags =
             arg_flags_static<is_method_det, has_arg_annotations, Extra...>(
                 (Return (*)(Args...)) nullptr);
-        constexpr size_t nrec =
-            has_arg_defaults ? (nargs - is_method_det) : nargs_provided;
         for (size_t i = 0; i < nrec; ++i) {
             arg_data_init &a = f.args[i];
             a.name = nullptr;

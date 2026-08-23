@@ -79,6 +79,15 @@ NB_MODULE(test_typing_ext, m) {
                 nb::for_getter("docstring for getter"),
                 nb::for_setter("docstring for setter"));
 
+    // An overload that only exists in the stub. A 'self' of type
+    // 'std::nullptr_t' never matches an instance, so the call falls through to
+    // the implementation, whose signature is less precise.
+    struct StubOnlyOverload { };
+    nb::class_<StubOnlyOverload>(m, "StubOnlyOverload")
+        .def(nb::init<>())
+        .def("value", [](std::nullptr_t) { return nb::none(); }, nb::sig("def value(self) -> int"))
+        .def("value", [](StubOnlyOverload&) { return nb::cast(42); });
+
     // Stubification of simple constants
     nb::dict d;
     nb::list l;

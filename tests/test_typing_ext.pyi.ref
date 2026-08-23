@@ -61,6 +61,15 @@ class CustomSignature(Iterable[int]):
     def value(self, value: Optional[int], /) -> None:
         """docstring for setter"""
 
+class StubOnlyOverload:
+    def __init__(self) -> None: ...
+
+    @overload
+    def value(self) -> int: ...
+
+    @overload
+    def value(self) -> object: ...
+
 pytree: dict = ...
 
 T = TypeVar("T", contravariant=True)

@@ -131,7 +131,7 @@ class Item(enum.Enum):
 def item_to_int(item: Item = Item.name) -> int: ...
 
 class EnumWrapper:
-    def __init__(self, arg: Value, /) -> None: ...
+    def __init__(self, arg: EnumWrapper.Value, /) -> None: ...
 
     class Value(enum.Enum):
         Alpha = 0
@@ -140,15 +140,15 @@ class EnumWrapper:
 
         Gamma = 2
 
-    Alpha: Value = Value.Alpha
+    Alpha: EnumWrapper.Value = EnumWrapper.Value.Alpha
 
-    Beta: Value = Value.Beta
+    Beta: EnumWrapper.Value = EnumWrapper.Value.Beta
 
-    Gamma: Value = Value.Gamma
+    Gamma: EnumWrapper.Value = EnumWrapper.Value.Gamma
 
-    def __eq__(self, arg: Value, /) -> bool: ...
+    def __eq__(self, arg: EnumWrapper.Value, /) -> bool: ...
 
-    def get_value(self) -> Value: ...
+    def get_value(self) -> EnumWrapper.Value: ...
 
 class Color(enum.StrEnum):
     """string-valued enum"""

@@ -114,8 +114,8 @@ NB_MODULE(test_enum_ext, m) {
 
     m.def("item_to_int", [](Item i) { return (int) i; }, nb::arg("item") = Item::name);
 
-    // Wrapper class with nested enum — tests that stubgen uses short names
-    // (e.g. "Value" not "EnumWrapper.Value") inside the class body.
+    // Wrapper class with nested enum — tests that stubgen keeps the qualified
+    // name (e.g. "EnumWrapper.Value") inside the class body.
     nb::class_<EnumWrapper> ew(m, "EnumWrapper");
 
     nb::enum_<EnumWrapper::Value> ew_enum(ew, "Value");

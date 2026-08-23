@@ -105,6 +105,17 @@ NB_MODULE(test_chrono_ext, m) {
         return nanobind::steal(result);
     });
 
+    // Reading a float as a number of seconds is an implicit conversion, so a
+    // caller that forbids one must not receive a duration
+    m.def("test_duration_noconvert",
+          [](std::chrono::milliseconds d) { return d.count(); },
+          nanobind::arg().noconvert());
+
+    // The duration overload comes first, but a float matches 'double' without
+    // a conversion, so the second overload must win
+    m.def("test_duration_overload", [](std::chrono::milliseconds) { return 1; });
+    m.def("test_duration_overload", [](double) { return 2; });
+
 #if !defined(NB_BACKEND_MODULE) && (defined(Py_LIMITED_API) || defined(PYPY_VERSION))
     m.attr("access_via_python") = true;
 #else

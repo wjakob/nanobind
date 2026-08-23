@@ -610,10 +610,9 @@ struct error_payload {
 /// included several times here depending on compilation mode.
 #if !defined(NB_BACKEND_MODULE) || defined(NB_BUILD)
 #define NB_SLOT(ret, name, args) NB_CORE ret name args;
-// NB_SLOT_ALIAS resolves to the CPython function itself, which every mode
-// that reaches this branch has access to.
+// NB_SLOT_ALIAS resolves to the CPython function itself
 #define NB_SLOT_ALIAS(ret, name, args, target)                                 \
-    inline constexpr ret (*name) args = &target;
+    inline ret (*const name) args = &target;
 #include "nb_backend_slots.h"
 #endif
 

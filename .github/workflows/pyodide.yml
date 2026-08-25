@@ -1,0 +1,73 @@
+name: pyodide
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+      - stable
+      - v*
+
+concurrency:
+  group: pyodide-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # See tests/wasm/README.md.
+  wasm32-emscripten:
+    name: "wasm32-emscripten (Pyodide) smoke test"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup host Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install pyodide-build
+      run: |
+        # wheel>=0.46 dropped 'wheel.cli', which auditwheel_emscripten needs.
+        python -m pip install pyodide-build "wheel<0.46"
+
+    - name: Install the Pyodide cross-build environment
+      run: |
+        pyodide xbuildenv install
+        pyodide config list
+
+    - name: Install the matching (Pyodide-patched) Emscripten SDK
+      run: |
+        pyodide xbuildenv install-emscripten
+
+    - name: Install the latest CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Cross-compile the smoke test extension for wasm32-emscripten
+      run: |
+        source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
+        # -O0 avoids a wasm-opt/binaryen SIDE_MODULE bug ("Imported mutable
+        # global requires mutable-globals") unrelated to nanobind's code.
+        CFLAGS=-O0 CXXFLAGS=-O0 LDFLAGS=-O0 \
+          pyodide build tests/wasm --outdir tests/wasm/dist
+
+    - name: Create a Pyodide virtual environment
+      run: |
+        # Pyodide's python/pip run through Node.js, so emsdk needs to be on
+        # PATH in every step that uses them, not just the one above.
+        source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
+        pyodide venv .venv-pyodide
+
+    - name: Install the smoke test wheel and pytest
+      run: |
+        source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
+        .venv-pyodide/bin/pip install tests/wasm/dist/*.whl pytest
+
+    - name: Run the extension under Pyodide (pytest)
+      run: |
+        source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
+        .venv-pyodide/bin/python -m pytest tests/wasm/test_smoke.py -v

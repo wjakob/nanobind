@@ -1,5 +1,6 @@
 #include <nanobind/ndarray.h>
 #include <atomic>
+#include <cstdio>
 #include <memory>
 #include "nb_internals.h"
 

@@ -1,0 +1,14 @@
+[build-system]
+requires = ["scikit-build-core >=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "nanobind-wasm-smoke"
+version = "0.0.0"
+description = "wasm32-emscripten (Pyodide) build smoke test, not published"
+requires-python = ">=3.10"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = []

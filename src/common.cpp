@@ -9,6 +9,7 @@
 
 #include <nanobind/nanobind.h>
 #include <memory>
+#include <cstdio>
 #include "nb_internals.h"
 
 #if defined(_MSC_VER)

@@ -7,6 +7,8 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+#include <cstdio>
+
 NAMESPACE_BEGIN(NB_NAMESPACE)
 
 inline namespace NB_BACKEND_ABI_NS { class NB_EXPORT python_error; }

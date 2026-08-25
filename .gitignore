@@ -43,3 +43,7 @@ py\.typed
 .mypy_cache
 nanobind-backend/build/
 nanobind-backend/dist/
+tests/wasm/build/
+tests/wasm/dist/
+/.pyodide-xbuildenv
+/.venv-pyodide

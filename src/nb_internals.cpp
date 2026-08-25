@@ -10,6 +10,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include "nb_internals.h"
+#include <cstdio>
 #include <thread>
 
 #if defined(NB_FREE_THREADED)

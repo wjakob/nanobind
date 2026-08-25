@@ -14,6 +14,7 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
+#include <cstdio>
 #include <initializer_list>
 
 NAMESPACE_BEGIN(NB_NAMESPACE)

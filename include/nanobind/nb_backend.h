@@ -38,6 +38,8 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+#include <cstdio>
+
 /// Major version of the backend ABI. Advances after ABI-breaking backend
 /// changes. Such changes are to be avoided at all costs.
 #define NB_BACKEND_ABI_MAJOR 1

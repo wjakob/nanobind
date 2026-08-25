@@ -137,7 +137,18 @@
 
 /* python_error is unusable with libc++ on ELF platforms, where typeinfo is
    compared by pointer. Python imports extensions with RTLD_LOCAL, so the
-   weak symbols of the extensions are not correctly merged. */
+   weak symbols of the extensions are not correctly merged.
+
+   wasm32-emscripten is not ELF, but do not exempt it here without fixing
+   the underlying problem first: verified experimentally that a C++
+   exception thrown in the backend module and caught in an extension
+   module (both dlopen()'d with RTLD_LOCAL, like Python's own extension
+   loading) is not caught at all -- not even by `catch (...)` -- and
+   crashes the Pyodide runtime. A minimal reproduction (two side modules
+   wired via dlsym() function pointers, one throwing a plain exception
+   type and the other catching it by exact type) works fine, so this is
+   specific to nanobind's actual split-mode call path, not a blanket
+   Emscripten limitation. */
 #if defined(NB_BACKEND_MODULE) && defined(_LIBCPP_VERSION) && !defined(__APPLE__)
 #    error "nanobind's split mode requires libstdc++ on ELF platforms"
 #endif

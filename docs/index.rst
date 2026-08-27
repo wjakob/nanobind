@@ -57,9 +57,9 @@ nanobinds depends on
 - **Python 3.10+** or **PyPy 7.3.12+** (the *3.10* and *3.11* PyPy flavors are
   supported, though there are :ref:`some limitations <pypy_issues>`).
 - **CMake 3.15+**.
-- **A C++17 compiler**: Clang 8+, GCC 8+, MSVC2019+, MinGW-w64, Intel ICX
-  (the modern Clang-based Intel compiler), and the CUDA NVCC compiler are
-  officially supported. Others (Cygwin, older Intel compilers, ..) may work
+- **A C++17 compiler**: Clang 8+, GCC 8+, MSVC2019+, ``clang-cl``, MinGW-w64,
+  Intel ICX (the modern Clang-based Intel compiler), and the CUDA NVCC compiler
+  are officially supported. Others (Cygwin, older Intel compilers, ..) may work
   as well but will not receive support.
 
 .. only:: not latex

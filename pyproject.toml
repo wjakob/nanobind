@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "nanobind"
-version = "3.0.0"
+version = "3.0.1"
 description = "nanobind: tiny and efficient C++/Python bindings"
 requires-python = ">=3.10"
 readme.content-type = "text/markdown"

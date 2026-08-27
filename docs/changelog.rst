@@ -11,6 +11,34 @@ versioning. Please review the :ref:`ABI compatibility <abi_compatibility>`
 documentation for details.
 
 
+Version 3.0.1 (Aug 28, 2026)
+----------------------------
+
+- Fixed an issue where the ``std::chrono::duration`` caster interpreted a
+  Python float even when implicit conversion was not desired.
+  (PR `#1420 <https://github.com/wjakob/nanobind/pull/1420>`__).
+
+- Minor tweak to the ``NB_SLOT_ALIAS`` macro so that ``clang-cl`` can compile
+  nanobind 3.0.0 code on Windows. This compiler is now also tested by the CI.
+  (PR `#1421 <https://github.com/wjakob/nanobind/pull/1421>`__).
+
+- Fixed two problems in the ``constexpr`` logic that processes function
+  annotations. Bindings could cause OOB writes by declaring an incorrect number
+  of ``nb::arg`` annotations. A nullary method with an implicit ``self``
+  annotation failed to compile. (PR `#1419
+  <https://github.com/wjakob/nanobind/pull/1419>`__).
+
+- Reverted a change from version 2.13.0 (PR `#1334
+  <https://github.com/wjakob/nanobind/pull/1334>`__), where the stub generator
+  stripped the prefix of the enclosing class and wrote the short name of a
+  nested class. PyRight/mypy handle the qualified form, and need it to avoid
+  ambiguities. (PR `#1422 <https://github.com/wjakob/nanobind/pull/1422>`__).
+
+- The package metadata now declares ``requires-python = ">=3.10"`` so that
+  installers do not pick up an incompatible version. (Issue `#1424
+  <https://github.com/wjakob/nanobind/issues/1424>`__, PR `#1425
+  <https://github.com/wjakob/nanobind/pull/1425>`__).
+
 Version 3.0.0 (Aug 22, 2026)
 ----------------------------
 
@@ -375,6 +403,10 @@ improvements:
     on :ref:`per-member signature overrides <stubgen_member_sig>` for details.
 
 - Internal ABI version 22.
+
+**Note**: The 3.0.0 release was yanked since it mistakenly still declared
+Python 3.9 compatibility. It is supserseded by the 3.0.1 patch release, which
+also includes several bugfixes.
 
 Version 2.15.0 (Aug 15, 2026)
 -----------------------------

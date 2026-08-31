@@ -1,6 +1,15 @@
 include_guard(GLOBAL)
 
-if (NOT TARGET Python::Interpreter OR NOT TARGET Python::Module)
+if (NOT TARGET Python::Module)
+  message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
+endif()
+
+# A runnable interpreter is not required to configure nanobind: the ABI/SOABI
+# information used below comes from 'python-config' (a text script that runs
+# fine even for a foreign-architecture Python) rather than from executing the
+# target interpreter, so this is only enforced for non-cross builds, where its
+# purpose is catching an incomplete find_package(Python) call (see #1350).
+if (NOT TARGET Python::Interpreter AND NOT CMAKE_CROSSCOMPILING)
   message(FATAL_ERROR "You must invoke 'find_package(Python COMPONENTS Interpreter Development REQUIRED)' prior to including nanobind.")
 endif()
 
@@ -63,6 +72,15 @@ endif()
 
 # If either suffix is missing, call Python to compute it
 if(NOT DEFINED NB_SUFFIX OR NOT DEFINED NB_SUFFIX_S)
+  if(NOT TARGET Python::Interpreter OR NOT Python_EXECUTABLE)
+    message(FATAL_ERROR "nanobind: could not determine the extension module "
+      "suffix because no runnable Python interpreter is available (this can "
+      "happen when cross-compiling). Either arrange for 'Python_SOABI' (or "
+      "'SKBUILD_SOABI', if using scikit-build-core) to be set before "
+      "including nanobind, or provide a working 'Python::Interpreter' target "
+      "(with a valid 'Python_EXECUTABLE').")
+  endif()
+
   # Query Python directly to get the right suffix.
   execute_process(
     COMMAND "${Python_EXECUTABLE}" "-c"
@@ -942,6 +960,16 @@ function (nanobind_add_stub name)
     endif()
     list(APPEND NB_STUBGEN_OUTPUTS "${OUTPUT}")
   endforeach()
+
+  if (NOT TARGET Python::Interpreter OR NOT Python_EXECUTABLE)
+    message(FATAL_ERROR "nanobind_add_stub(): generating stubs requires "
+      "running the Python interpreter, but no runnable 'Python::Interpreter' "
+      "target (with a valid 'Python_EXECUTABLE') is available (this can "
+      "happen when cross-compiling). Re-run find_package(Python COMPONENTS "
+      "Interpreter ...) with an interpreter that can execute on the build "
+      "machine, e.g. via 'CMAKE_CROSSCOMPILING_EMULATOR', before calling "
+      "nanobind_add_stub().")
+  endif()
 
   file(TO_CMAKE_PATH ${Python_EXECUTABLE} NB_Python_EXECUTABLE)
 

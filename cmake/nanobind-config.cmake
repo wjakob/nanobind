@@ -573,6 +573,11 @@ function(nanobind_add_module name)
       ${Python_INCLUDE_DIRS} ${NB_DIR}/include)
     target_compile_features(${name} PRIVATE cxx_std_17)
 
+    if (NOT WIN32 AND NOT APPLE AND NOT AIX)
+      target_compile_options(${name} PRIVATE $<${NB_OPT_SIZE}:-ffunction-sections -fdata-sections>)
+      target_link_options(${name} PRIVATE $<${NB_OPT_SIZE}:-Wl,--gc-sections>)
+    endif()
+
     if (WIN32)
       target_link_libraries(${name} PRIVATE Python::SABIModule)
     endif()

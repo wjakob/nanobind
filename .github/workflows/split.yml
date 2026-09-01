@@ -173,8 +173,12 @@ jobs:
   # abi3t extensions (PEP 803) served by a free-threaded backend module.
   # Python 3.15 is only available as a prerelease at the moment
   abi3t:
-    name: "split mode / Python 3.15t (abi3t) / ubuntu-latest"
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: ['ubuntu-latest', 'windows-latest']
+
+    name: "split mode / Python 3.15t (abi3t) / ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
@@ -198,6 +202,7 @@ jobs:
       run: >
         cmake -S . -B build -DNB_TEST_SPLIT_MODE=ON
         -DNB_TEST_FREE_THREADED=ON
+        -DPy_TARGET_ABI3T=1
         -DPython_EXECUTABLE="$(python -c 'import sys; print(sys.executable)')"
 
     - name: Build C++

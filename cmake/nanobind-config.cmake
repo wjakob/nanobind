@@ -53,6 +53,11 @@ endif()
 # Extract Python version and extensions (e.g. free-threaded build)
 string(REGEX REPLACE "[^-]*-([^-]*)-.*" "\\1" NB_ABI "${NB_SOABI}")
 
+# Windows has no ABI-tagged extension suffix; scikit-build-core sets this instead
+if(Py_TARGET_ABI3T)
+  set(NB_ABI "${Python_VERSION_MAJOR}${Python_VERSION_MINOR}t")
+endif()
+
 # Determine whether the interpreter was built without the GIL using the ABI tag
 # (free-threaded builds encode this using a trailing 't').
 set(NB_FREE_THREADED 0)

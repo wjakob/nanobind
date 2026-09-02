@@ -589,5 +589,19 @@ NB_SLOT_ALIAS(PyObject *, vectorcall_method,
                PyObject *kwnames),
               PyObject_VectorcallMethod)
 
+// --------------------------------------------------------------------------
+// Slots added in backend ABI version 1.1
+// --------------------------------------------------------------------------
+
+/// Visit the instance dictionary that nanobind allocates for types declaring
+/// nb::dynamic_attr (for use in a custom 'tp_traverse' slot). Returns the
+/// nonzero result of 'visit' to stop the traversal, and zero otherwise.
+NB_SLOT(int, nb_inst_visit_dict,
+        (PyObject *o, visitproc visit, void *arg) noexcept)
+
+/// Release the instance dictionary allocated by nanobind (for use in a
+/// custom 'tp_clear' slot)
+NB_SLOT(void, nb_inst_clear_dict, (PyObject *o) noexcept)
+
 #undef NB_SLOT
 #undef NB_SLOT_ALIAS

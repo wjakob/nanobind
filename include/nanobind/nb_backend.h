@@ -44,7 +44,7 @@
 
 /// Minor version of the backend ABI. Advances after ABI-compatible changes
 /// (appending flag-gated fields, adding enum bits, etc.).
-#define NB_BACKEND_ABI_MINOR 0
+#define NB_BACKEND_ABI_MINOR 1
 
 /// Patch revision signaling internal improvements without effect on the ABI
 /// contract. Together with the ABI macros above, it forms the version of the

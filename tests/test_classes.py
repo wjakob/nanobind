@@ -1234,6 +1234,45 @@ def test61_pooled_custom_traverse():
     assert c == 1 and d == 1
 
 
+@skip_on_pypy
+def test61b_dynamic_attr_custom_traverse():
+    import gc
+
+    # The custom tp_traverse reports the instance dictionary
+    base = t.dict_tr_destructed()
+    a = t.DictTraverse()
+    a.self = a
+    assert any(r is a.__dict__ for r in gc.get_referents(a))
+    del a
+    gc.collect()
+    assert t.dict_tr_destructed() == base + 1
+
+    # A cycle through both the dictionary and the C++ payload is collected
+    box = []
+    b = t.DictTraverse(box)
+    box.append(b)
+    b.me = b
+    del b, box
+    gc.collect()
+    assert t.dict_tr_destructed() == base + 2
+
+    # Python subclasses inherit the dictionary slot and the traversal
+    class Sub(t.DictTraverse):
+        pass
+
+    c = Sub()
+    c.self = c
+    del c
+    gc.collect()
+    assert t.dict_tr_destructed() == base + 3
+
+    # Instances without a dictionary are unaffected
+    d = t.DictTraverse()
+    assert not any(isinstance(r, dict) for r in gc.get_referents(d))
+    del d
+    assert t.dict_tr_destructed() == base + 4
+
+
 def test62_type_namespace():
     # 'type_dict' returns the writable namespace of a type
     d = t.type_dict(t.Struct)

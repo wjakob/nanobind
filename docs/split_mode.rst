@@ -117,10 +117,10 @@ Next, declare the backend package as a runtime dependency in
 .. code-block:: toml
 
    [project]
-   dependencies = ["nanobind-backend>=1.0"]
+   dependencies = ["nanobind-backend>=1.1"]
 
 The ``>=`` constraint names the backend ABI version of the nanobind release
-used for building (``nanobind-backend>=1.0`` for this release). CMake also
+used for building (``nanobind-backend>=1.1`` for this release). CMake also
 prints it when configuring a split-mode extension.
 
 .. warning::

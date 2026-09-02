@@ -37,20 +37,29 @@ static PyGetSetDef inst_getset[] = {
     { nullptr, nullptr, nullptr, nullptr, nullptr }
 };
 
-static int inst_clear(PyObject *self) {
-    PyTypeObject *tp = Py_TYPE(self);
-    PyObject **dict = nb_dict_ptr(self, tp);
+int nb_inst_visit_dict(PyObject *self, visitproc visit, void *arg) noexcept {
+    PyObject **dict = nb_dict_ptr(self, Py_TYPE(self));
+    if (dict && *dict)
+        return visit(*dict, arg);
+    return 0;
+}
+
+void nb_inst_clear_dict(PyObject *self) noexcept {
+    PyObject **dict = nb_dict_ptr(self, Py_TYPE(self));
     if (dict)
         Py_CLEAR(*dict);
+}
+
+static int inst_clear(PyObject *self) {
+    nb_inst_clear_dict(self);
     return 0;
 }
 
 static int inst_traverse(PyObject *self, visitproc visit, void *arg) {
-    PyTypeObject *tp = Py_TYPE(self);
-    PyObject **dict = nb_dict_ptr(self, tp);
-    if (dict)
-        Py_VISIT(*dict);
-    Py_VISIT(tp);
+    int rv = nb_inst_visit_dict(self, visit, arg);
+    if (rv)
+        return rv;
+    Py_VISIT(Py_TYPE(self));
     return 0;
 }
 

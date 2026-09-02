@@ -11,6 +11,22 @@ versioning. Please review the :ref:`ABI compatibility <abi_compatibility>`
 documentation for details.
 
 
+Version 3.1.0 (TBA)
+-------------------
+
+- New functions :cpp:func:`nb::inst_visit_dict() <inst_visit_dict>` and
+  :cpp:func:`nb::inst_clear_dict() <inst_clear_dict>` let custom
+  ``tp_traverse`` and ``tp_clear`` type slots account for the instance
+  dictionary of types declaring :cpp:class:`nb::dynamic_attr <dynamic_attr>`.
+  They resemble the CPython functions ``PyObject_VisitManagedDict()`` and
+  ``PyObject_ClearManagedDict()``. Previously, such slots replaced nanobind's
+  defaults without a way to reach the dictionary, which made reference cycles
+  through dynamic attributes uncollectable.
+
+  This addition extends the backend ABI to version 1.1. :ref:`Split mode
+  <split-mode>` extensions built with this release require
+  ``nanobind-backend>=1.1``.
+
 Version 3.0.1 (Aug 28, 2026)
 ----------------------------
 

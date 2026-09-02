@@ -314,7 +314,7 @@ is a ZIP file containing all the individual wheel files for each platform.
    :ref:`split mode <split-mode>`: one wheel per platform then covers every
    supported Python version starting at 3.10 (linked-mode stable ABI builds
    start at 3.12). Pass ``BACKEND_MODULE nanobind_backend`` to
-   :cmake:command:`nanobind_add_module` and add ``nanobind-backend>=1.0``
+   :cmake:command:`nanobind_add_module` and add ``nanobind-backend>=1.1``
    to ``[project] dependencies``.
 
    Two further ``pyproject.toml`` changes then reduce the build matrix to a

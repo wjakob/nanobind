@@ -204,6 +204,10 @@ inline void inst_move(handle dst, handle src) { NB_CALL(nb_inst_move)(dst.ptr(),
 inline void inst_replace_copy(handle dst, handle src) { NB_CALL(nb_inst_copy)(dst.ptr(), src.ptr()); }
 inline void inst_replace_move(handle dst, handle src) { NB_CALL(nb_inst_move)(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) NB_CALL(nb_inst_ptr)(h.ptr()); }
+inline int inst_visit_dict(handle h, visitproc visit, void *arg) noexcept {
+    return NB_CALL(nb_inst_visit_dict)(h.ptr(), visit, arg);
+}
+inline void inst_clear_dict(handle h) noexcept { NB_CALL(nb_inst_clear_dict)(h.ptr()); }
 
 #if NB_TYPE_GET_SLOT_IMPL
 NAMESPACE_BEGIN(detail)

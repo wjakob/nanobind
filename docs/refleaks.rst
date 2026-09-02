@@ -405,6 +405,38 @@ these extra type slots via :cpp:class:`nb::type_slots <type_slots>`:
 With this change, the cycle can be garbage-collected, and the leak warnings
 disappear.
 
+If the type additionally declares :cpp:class:`nb::dynamic_attr
+<dynamic_attr>`, the custom slots replace the ``tp_traverse`` and ``tp_clear``
+implementations that nanobind would otherwise install to manage the instance
+dictionary. In this case, they must also visit and clear the dictionary via
+:cpp:func:`nb::inst_visit_dict() <inst_visit_dict>` and
+:cpp:func:`nb::inst_clear_dict() <inst_clear_dict>`, which resemble the CPython
+functions ``PyObject_VisitManagedDict()`` and ``PyObject_ClearManagedDict()``.
+
+.. code-block:: cpp
+
+   int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
+       Py_VISIT(Py_TYPE(self));
+
+       // Report the instance dictionary (a no-op if it doesn't exist yet)
+       int rv = nb::inst_visit_dict(self, visit, arg);
+       if (rv)
+           return rv;
+
+       if (!nb::inst_ready(self))
+          return 0;
+
+       // .. visit the C++ state as before ..
+       return 0;
+   }
+
+   int wrapper_tp_clear(PyObject *self) {
+       nb::inst_clear_dict(self);
+
+       // .. clear the C++ state as before ..
+       return 0;
+   }
+
 .. note::
 
    When targeting free-threaded Python, it is important that the ``tp_traverse``

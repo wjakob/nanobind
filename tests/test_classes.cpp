@@ -157,6 +157,41 @@ PyType_Slot pooled_tr_slots[] = {
     { 0, nullptr }
 };
 
+// A type with nb::dynamic_attr and a custom tp_traverse/tp_clear, which must
+// account for the instance dictionary via nb::inst_visit_dict/inst_clear_dict
+static std::atomic<int> dict_tr_destructed{0};
+
+struct DictTraverse {
+    PyObject *ref;
+    DictTraverse(nb::object o) : ref(o.release().ptr()) { }
+    ~DictTraverse() { Py_XDECREF(ref); dict_tr_destructed++; }
+    nb::object get() const { return nb::borrow(ref); }
+};
+
+int dict_tr_traverse(PyObject *self, visitproc visit, void *arg) {
+    Py_VISIT(Py_TYPE(self));
+    int rv = nb::inst_visit_dict(self, visit, arg);
+    if (rv)
+        return rv;
+    if (!nb::inst_ready(self))
+        return 0;
+    Py_VISIT(nb::inst_ptr<DictTraverse>(self)->ref);
+    return 0;
+}
+
+int dict_tr_clear(PyObject *self) {
+    nb::inst_clear_dict(self);
+    if (nb::inst_ready(self))
+        Py_CLEAR(nb::inst_ptr<DictTraverse>(self)->ref);
+    return 0;
+}
+
+PyType_Slot dict_tr_slots[] = {
+    { Py_tp_traverse, (void *) dict_tr_traverse },
+    { Py_tp_clear, (void *) dict_tr_clear },
+    { 0, nullptr }
+};
+
 // Benchmark types: identical, minimal shape; the only difference is whether the
 // binding opts into nb::pooled. Kept free of side effects (no counters) so
 // the measurement isolates allocation / registration cost.
@@ -386,6 +421,13 @@ NB_MODULE(test_classes_ext, m) {
                                nb::type_slots(pooled_tr_slots))
         .def(nb::init<nb::object>(), nb::arg("obj") = nb::none())
         .def("get", &PooledTraverse::get);
+
+    nb::class_<DictTraverse>(m, "DictTraverse", nb::dynamic_attr(),
+                             nb::type_slots(dict_tr_slots))
+        .def(nb::init<nb::object>(), nb::arg("obj") = nb::none())
+        .def("get", &DictTraverse::get);
+
+    m.def("dict_tr_destructed", [] { return dict_tr_destructed.load(); });
 
     m.def("pooled_tr_stats", [] {
         return std::make_pair(pooled_tr_constructed.load(),

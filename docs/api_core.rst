@@ -3262,6 +3262,34 @@ The documentation below refers to two per-instance flags with the following mean
    bound via :cpp:class:`class_`, the function only returns a dictionary when
    the type declares :cpp:class:`nb::dynamic_attr` or was subclassed in Python.
 
+.. cpp:function:: int inst_visit_dict(handle h, visitproc visit, void * arg) noexcept
+
+   Report the instance dictionary of `h` to Python's cyclic garbage collector.
+   The function is meant to be called from a custom ``tp_traverse`` type slot
+   installed via :cpp:class:`nb::type_slots <type_slots>`, and it is the
+   nanobind analog of ``PyObject_VisitManagedDict()`` from the CPython API.
+
+   Assuming that `h` represents an instance of a type that was previously bound
+   via :cpp:class:`class_`, the function passes the dictionary that nanobind
+   allocates for types declaring :cpp:class:`nb::dynamic_attr <dynamic_attr>`
+   to `visit` and returns the result, which is nonzero when the traversal must
+   stop. It returns zero when the type has no such dictionary or the dictionary
+   has not been created yet. Dictionaries added by Python subclasses are
+   handled by CPython and do not require any action.
+
+   A custom ``tp_traverse`` implementation replaces the one that nanobind would
+   otherwise install for types with dynamic attributes, and it must call this
+   function to keep reference cycles through the instance dictionary
+   collectable. See the section on :ref:`reference leaks <refleaks>` for an
+   example.
+
+.. cpp:function:: void inst_clear_dict(handle h) noexcept
+
+   Release the instance dictionary of `h` allocated by nanobind, if present.
+   The function is meant to be called from a custom ``tp_clear`` type slot
+   and is the nanobind analog of ``PyObject_ClearManagedDict()``. The same
+   considerations as for :cpp:func:`inst_visit_dict` apply.
+
 
 .. cpp:function:: object inst_alloc(handle h)
 

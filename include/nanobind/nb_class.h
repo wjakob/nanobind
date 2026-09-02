@@ -208,6 +208,15 @@ inline void inst_replace_copy(handle dst, handle src) { NB_CALL(nb_inst_copy)(ds
 inline void inst_replace_move(handle dst, handle src) { NB_CALL(nb_inst_move)(dst.ptr(), src.ptr()); }
 template <typename T> T *inst_ptr(handle h) { return (T *) NB_CALL(nb_inst_ptr)(h.ptr()); }
 
+// Lifetime dependencies between objects (the mechanism behind nb::keep_alive)
+inline void keep_alive_obj(handle nurse, handle patient) {
+    NB_CALL(keep_alive_py)(NB_CTX, nurse.ptr(), patient.ptr());
+}
+inline void keep_alive_cb(handle nurse, void *payload,
+                          void (*deleter)(void *) noexcept) noexcept {
+    NB_CALL(keep_alive_ptr)(NB_CTX, nurse.ptr(), payload, deleter);
+}
+
 #if NB_TYPE_GET_SLOT_IMPL
 NAMESPACE_BEGIN(detail)
 // PyPy-only replacement for PyType_GetSlot(); not part of the dispatch

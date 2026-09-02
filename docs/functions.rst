@@ -430,6 +430,12 @@ would avoid the problem altogether).
 See the definition of :cpp:class:`nb::keep_alive <keep_alive>` for further
 discussion and limitations of this method.
 
+The annotation is a thin layer over the functions :cpp:func:`nb::keep_alive_obj()
+<keep_alive_obj>` and :cpp:func:`nb::keep_alive_cb() <keep_alive_cb>`, which
+establish the same kind of dependency from arbitrary C++ code. The latter
+variant invokes a callback with a user-provided pointer when the nurse
+expires, which is useful to tie a C++ allocation to a Python object.
+
 .. _call_guards:
 
 Call guards

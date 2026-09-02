@@ -429,6 +429,57 @@ def test16b_inst_python_derived():
     assert not t.inst_python_derived(t.Struct())
 
 
+def test16c_keep_alive_functions(clean):
+    # nb::keep_alive_obj() with a nanobind nurse
+    t.reset()
+    nurse = t.Dog("Rufus")
+    patient = t.Struct()
+    t.keep_alive_obj(nurse, patient)
+    t.keep_alive_obj(nurse, patient)  # repeated registration is a no-op
+    del patient
+    assert_stats(default_constructed=1)
+    del nurse
+    assert_stats(default_constructed=1, destructed=1)
+
+    # .. and with an arbitrary weak-referenceable nurse
+    t.reset()
+
+    class Nurse:
+        pass
+
+    nurse = Nurse()
+    patient = t.Struct()
+    t.keep_alive_obj(nurse, patient)
+    del patient
+    assert_stats(default_constructed=1)
+    del nurse
+    collect()
+    assert_stats(default_constructed=1, destructed=1)
+
+    # None as nurse or patient does nothing
+    t.keep_alive_obj(None, t.Struct())
+    t.keep_alive_obj(t.Struct(), None)
+
+    with pytest.raises(RuntimeError, match="could not create a weak reference"):
+        t.keep_alive_obj(5, t.Struct())
+
+    # nb::keep_alive_cb() releases the payload when the nurse expires
+    base = t.keep_alive_cb_deleted()
+    nurse = t.Dog("Rufus")
+    t.keep_alive_cb(nurse)
+    t.keep_alive_cb(nurse)
+    assert t.keep_alive_cb_deleted() == base
+    del nurse
+    assert t.keep_alive_cb_deleted() == base + 2
+
+    nurse = Nurse()
+    t.keep_alive_cb(nurse)
+    assert t.keep_alive_cb_deleted() == base + 2
+    del nurse
+    collect()
+    assert t.keep_alive_cb_deleted() == base + 3
+
+
 def f():
     pass
 

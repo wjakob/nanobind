@@ -2225,7 +2225,7 @@ parameter of :cpp:func:`module_::def`, :cpp:func:`class_::def`,
                   throw std::runtime_error("return value should be a sequence");
               }
               for (nb::handle nurse : ret) {
-                  nb::detail::keep_alive(nurse.ptr(), args[I - 1]);
+                  nb::keep_alive_obj(nurse, args[I - 1]);
               }
           }
       };
@@ -3377,6 +3377,37 @@ The documentation below refers to two per-instance flags with the following mean
 
    Return the full (module-qualified) name of the instance's type object as a
    Python string.
+
+Lifetime dependencies
+^^^^^^^^^^^^^^^^^^^^^
+
+The :cpp:class:`nb::keep_alive\<Nurse, Patient\>() <keep_alive>` function
+binding annotation builds on the following two functions, which are also
+available for direct use, e.g., in a :cpp:struct:`nb::call_policy
+<call_policy>` or in code that constructs Python objects by hand.
+
+.. cpp:function:: void keep_alive_obj(handle nurse, handle patient)
+
+   Keep the Python object `patient` alive at least until the Python object
+   `nurse` is garbage collected.
+
+   The function does nothing when either argument is ``None`` or an invalid
+   handle. When `nurse` is an instance of a type bound via
+   :cpp:class:`class_`, nanobind records the dependency in a table that it
+   consults when `nurse` expires. Otherwise, `nurse` must be weak-referenceable,
+   and the function registers a weak reference callback that releases
+   `patient`. A ``RuntimeError`` exception is raised when neither strategy is
+   applicable.
+
+.. cpp:function:: void keep_alive_cb(handle nurse, void * payload, void (*deleter)(void *) noexcept) noexcept
+
+   Invoke ``deleter(payload)`` when the Python object `nurse` is garbage
+   collected. This is useful to tie the lifetime of a C++ allocation to that of
+   a Python object.
+
+   The same restrictions on `nurse` apply as in :cpp:func:`keep_alive_obj`,
+   except that `nurse` must not be ``None`` or an invalid handle. Failure to
+   create the record is fatal, since the function cannot raise an exception.
 
 Global flags
 ------------

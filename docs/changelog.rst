@@ -19,6 +19,13 @@ Version 3.1.0 (TBA)
   a Python subclass of the bound type. Previous versions provided this function
   under an internal name.
 
+- The functions :cpp:func:`nb::keep_alive_obj() <keep_alive_obj>` and
+  :cpp:func:`nb::keep_alive_cb() <keep_alive_cb>` expose the mechanism
+  behind the :cpp:class:`nb::keep_alive <keep_alive>` annotation. The first
+  keeps a Python object alive until another one expires, and the second invokes
+  a callback at that point. Both were previously only reachable through
+  internal interfaces.
+
 Version 3.0.1 (Aug 28, 2026)
 ----------------------------
 

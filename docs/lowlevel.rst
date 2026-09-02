@@ -154,6 +154,10 @@ Two further functions :cpp:func:`nb::type_name() <type_name>` and
 :cpp:func:`nb::inst_name() <inst_name>` determine the type name associated with
 a type or instance thereof. These also accept non-nanobind types and instances.
 
+The function :cpp:func:`nb::inst_python_derived() <inst_python_derived>`
+reports whether a nanobind instance belongs to a Python subclass of the bound
+type rather than to the bound type itself.
+
 Even lower-level interface
 --------------------------
 

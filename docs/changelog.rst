@@ -11,6 +11,14 @@ versioning. Please review the :ref:`ABI compatibility <abi_compatibility>`
 documentation for details.
 
 
+Version 3.1.0 (TBA)
+-------------------
+
+- The low-level instance API gained :cpp:func:`nb::inst_python_derived()
+  <inst_python_derived>`, which reports whether a nanobind instance belongs to
+  a Python subclass of the bound type. Previous versions provided this function
+  under an internal name.
+
 Version 3.0.1 (Aug 28, 2026)
 ----------------------------
 

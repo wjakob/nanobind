@@ -3244,6 +3244,13 @@ The documentation below refers to two per-instance flags with the following mean
    Returns ``true`` if `h` represents an instance of a type that was
    previously bound via :cpp:class:`class_`.
 
+.. cpp:function:: bool inst_python_derived(handle h)
+
+   Assuming that `h` represents an instance of a type that was previously bound
+   via :cpp:class:`class_`, return ``true`` if the type of `h` is a Python
+   subclass of the bound type, and ``false`` if `h` is a direct instance of the
+   bound type.
+
 .. cpp:function:: template <typename T> T * inst_ptr(handle h)
 
    Assuming that `h` represents an instance of a type that was previously bound

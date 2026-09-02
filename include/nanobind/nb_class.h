@@ -176,6 +176,9 @@ inline bool inst_check(handle h) { return type_check(h.type()); }
 inline str inst_name(handle h) {
     return steal<str>(NB_CALL(nb_inst_name)(h.ptr()));
 }
+inline bool inst_python_derived(handle h) {
+    return NB_CALL(nb_inst_python_derived)(h.ptr());
+}
 inline object inst_alloc(handle h) {
     return steal(NB_CALL(nb_inst_alloc)((PyTypeObject *) h.ptr()));
 }
@@ -245,7 +248,7 @@ private:
             [](pointer_and_handle<Type> v, Args... args) {
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Args...>) {
-                    if (!NB_CALL(nb_inst_python_derived)(v.h.ptr())) {
+                    if (!inst_python_derived(v.h)) {
                         new (v.p) Type((detail::forward_t<Args>) args...);
                         return;
                     }
@@ -275,7 +278,7 @@ private:
             [](pointer_and_handle<Type> v, Arg arg) {
                 if constexpr (!std::is_same_v<Type, Alias> &&
                               std::is_constructible_v<Type, Arg>) {
-                    if (!NB_CALL(nb_inst_python_derived)(v.h.ptr())) {
+                    if (!inst_python_derived(v.h)) {
                         new ((Type *) v.p) Type((detail::forward_t<Arg>) arg);
                         return;
                     }

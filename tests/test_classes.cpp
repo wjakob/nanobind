@@ -612,6 +612,10 @@ NB_MODULE(test_classes_ext, m) {
         "keep_alive_ret", [](nb::handle, nb::handle ret) { return ret; },
         nb::keep_alive<1, 0>());
 
+    // test16b_inst_python_derived
+    m.def("inst_python_derived",
+          [](nb::handle h) { return nb::inst_python_derived(h); });
+
     // test17_name_qualname_module()
     m.def("f", []{});
     struct MyClass { struct NestedClass { }; struct Sibling { }; };

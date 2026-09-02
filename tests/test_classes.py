@@ -420,6 +420,15 @@ def test16_keep_alive_custom(clean):
     )
 
 
+def test16b_inst_python_derived():
+    class Dachshund(t.Dog):
+        pass
+
+    assert not t.inst_python_derived(t.Dog("Rufus"))
+    assert t.inst_python_derived(Dachshund("Rufus"))
+    assert not t.inst_python_derived(t.Struct())
+
+
 def f():
     pass
 

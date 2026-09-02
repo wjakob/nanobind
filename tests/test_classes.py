@@ -470,6 +470,7 @@ def test16c_keep_alive_functions(clean):
     t.keep_alive_cb(nurse)
     assert t.keep_alive_cb_deleted() == base
     del nurse
+    collect()
     assert t.keep_alive_cb_deleted() == base + 2
 
     nurse = Nurse()

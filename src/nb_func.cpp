@@ -1798,6 +1798,10 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
         return PyObject_GenericGetAttr(self, name_);
 }
 
+PyObject *nb_bound_method_get_doc(PyObject *self, void *) {
+    return nb_func_get_doc((PyObject *) ((nb_bound_method *) self)->func, nullptr);
+}
+
 PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name_) {
     bool passthrough = false;
     if (const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr)) {

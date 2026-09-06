@@ -31,6 +31,7 @@ extern PyObject *nb_func_getattro(PyObject *, PyObject *);
 extern PyObject *nb_func_get_doc(PyObject *, void *);
 extern PyObject *nb_func_get_nb_signature(PyObject *, void *);
 extern PyObject *nb_bound_method_getattro(PyObject *, PyObject *);
+extern PyObject *nb_bound_method_get_doc(PyObject *, void *);
 extern int nb_func_traverse(PyObject *, visitproc, void *);
 extern int nb_func_clear(PyObject *);
 extern void nb_func_dealloc(PyObject *);
@@ -124,8 +125,14 @@ static PyMemberDef nb_bound_method_members[] = {
     { nullptr, 0, 0, 0, nullptr }
 };
 
+static PyGetSetDef nb_bound_method_getset[] = {
+    { "__doc__", nb_bound_method_get_doc, nullptr, nullptr, nullptr },
+    { nullptr, nullptr, nullptr, nullptr, nullptr }
+};
+
 static PyType_Slot nb_bound_method_slots[] = {
     { Py_tp_members, (void *) nb_bound_method_members },
+    { Py_tp_getset, (void *) nb_bound_method_getset },
     { Py_tp_getattro, (void *) nb_bound_method_getattro },
     { Py_tp_traverse, (void *) nb_bound_method_traverse },
     { Py_tp_clear, (void *) nb_bound_method_clear },

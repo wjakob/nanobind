@@ -698,6 +698,11 @@ def test29_pydoc():
 
     assert "Some documentation" in pydoc.render_doc(t)
 
+    # pydoc bypasses tp_getattro when looking up docstrings (see issue #1431)
+    m = t.Dog("Rufus").what
+    assert object.__getattribute__(m, "__doc__") == "what(self) -> str"
+    assert "what(self) -> str" in pydoc.render_doc(m)
+
 
 def test30_property_assignment_instance():
     s = t.PairStruct()

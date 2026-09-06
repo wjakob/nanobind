@@ -26,6 +26,10 @@ Version 3.1.0 (TBA)
   a callback at that point. Both were previously only reachable through
   internal interfaces.
 
+- Bound methods now expose their docstring through a ``__doc__`` descriptor,
+  which enables ``help()`` on instance methods such as ``help(obj.method)``.
+  (issue `#1431 <https://github.com/wjakob/nanobind/issues/1431>`__)
+
 Version 3.0.1 (Aug 28, 2026)
 ----------------------------
 

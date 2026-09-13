@@ -64,7 +64,7 @@ template <typename Dict, typename Key, typename Val> struct dict_caster {
         dict ret;
 
         if (ret.is_valid()) {
-            for (auto &item : src) {
+            for (auto &&item : src) {
                 object k = steal(KeyCaster::from_cpp(
                     forward_like_<T>(item.first), policy, cleanup));
                 object e = steal(ValCaster::from_cpp(

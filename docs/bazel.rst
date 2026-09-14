@@ -3,195 +3,195 @@
 Building extensions using Bazel
 ===============================
 
-If you prefer the Bazel build system to CMake, you can build extensions using
-the `nanobind-bazel <https://github.com/nicholasjng/nanobind-bazel>`__ project.
-
-.. note::
-
-    This project is a community contribution maintained by
-    `Nicholas Junge <https://github.com/nicholasjng>`__, please report issues
-    directly in the nanobind-bazel repository linked above.
+nanobind can be used directly with Bazel's C++ and Python rules. The Bazel
+Central Registry (BCR) provides a convenient packaged setup, including stubgen.
+A module extension makes sense when a project needs a specific nanobind
+revision, or a custom BUILD file.
 
 .. _bazel-setup:
 
-Adding nanobind-bazel to your Bazel project
--------------------------------------------
+Adding nanobind from the BCR
+----------------------------
 
-To use nanobind-bazel in your project, you need to add it to your project's
-dependency graph. Using bzlmod, the de-facto dependency management system
-in Bazel starting with version 7.0, you can simply specify it as a ``bazel_dep``
-in your MODULE.bazel file:
+In your MODULE.bazel, add the BCR release of nanobind:
 
 .. code-block:: python
 
-    # Place this in your MODULE.bazel file.
-    # The major version of nanobind-bazel is equal to the version
-    # of the internally used nanobind.
-    # In this case, we are building bindings with nanobind v3.0.1.
-    bazel_dep(name = "nanobind_bazel", version = "3.0.1")
+    bazel_dep(name = "nanobind", version = "3.0.1")
+    bazel_dep(name = "rules_cc", version = "0.2.17")
+    bazel_dep(name = "rules_python", version = "1.7.0")
 
-To instead use a development version from GitHub, you can declare the
-dependency as a ``git_override()`` in your MODULE.bazel:
+Choose a version suitable for your project from the `nanobind BCR page
+<https://registry.bazel.build/modules/nanobind>`__.
+
+Adding nanobind with a module extension
+----------------------------------------
+
+For a development checkout, an unreleased revision, or a project-specific BUILD
+definition, fetch nanobind with a module extension instead. This is the pattern
+used by larger Bazel projects like `OpenXLA <https://github.com/openxla/xla>`__.
+For example, you can place the following in ``third_party/nanobind/extension.bzl``:
 
 .. code-block:: python
 
-    # MODULE.bazel
-    bazel_dep(name = "nanobind_bazel", version = "")
-    git_override(
-        module_name = "nanobind_bazel",
-        commit = COMMIT_SHA, # replace this with the actual commit you want.
-        remote = "https://github.com/nicholasjng/nanobind-bazel",
+    load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+    def _nanobind_impl(_):
+        http_archive(
+            name = "nanobind",
+            urls = ["https://github.com/wjakob/nanobind/archive/<revision>.tar.gz"],
+            strip_prefix = "nanobind-<revision>",
+            sha256 = "<sha256>",
+            build_file = "//third_party/nanobind:nanobind.BUILD.bazel",
+        )
+
+    nanobind = module_extension(implementation = _nanobind_impl)
+
+``nanobind.BUILD.bazel`` contains the BUILD targets for the fetched source.
+The BCR's `BUILD overlay
+<https://github.com/bazelbuild/bazel-central-registry/tree/main/modules/nanobind/3.0.1/overlay>`__
+is a useful starting point for customizing your build.
+Activate the extension from ``MODULE.bazel``:
+
+.. code-block:: python
+
+    bazel_dep(name = "bazel_skylib", version = "1.8.2")
+    bazel_dep(name = "platforms", version = "1.0.0")
+    bazel_dep(name = "robin-map", version = "1.4.1")
+    bazel_dep(name = "rules_cc", version = "0.2.17")
+    bazel_dep(name = "rules_python", version = "1.7.0")
+
+    nanobind = use_extension(
+        "//third_party/nanobind:extension.bzl", "nanobind"
     )
-
-In local development scenarios, you can clone nanobind-bazel to your machine,
-and then declare it as a ``local_path_override()`` dependency:
-
-.. code-block:: python
-
-    # MODULE.bazel
-    bazel_dep(name = "nanobind_bazel", version = "")
-    local_path_override(
-        module_name = "nanobind_bazel",
-        path = "/path/to/nanobind-bazel/", # replace this with the actual path.
-    )
-
-.. note::
-
-    At minimum, Bazel version 7.0.0 is required to use nanobind-bazel.
-
+    use_repo(nanobind, "nanobind")
 
 .. _bazel-build:
 
 Declaring and building nanobind extension targets
 -------------------------------------------------
 
-The main tool to build nanobind C++ extensions for your Python bindings is the
-:py:func:`nanobind_extension` rule.
-
-Like all public nanobind-bazel APIs, it resides in the ``build_defs`` submodule.
-To import it into a BUILD file, use the builtin ``load`` command:
-
-.. code-block:: python
-
-    # In a BUILD file, e.g. my_project/BUILD
-    load("@nanobind_bazel//:build_defs.bzl", "nanobind_extension")
-
-    nanobind_extension(
-        name = "my_ext",
-        srcs = ["my_ext.cpp"],
-    )
-
-In this short snippet, a nanobind Python module called ``my_ext`` is declared,
-with its contents coming from the C++ source file of the same name.
-Conveniently, only the actual module name must be declared - its place in your
-Python project hierarchy is automatically determined by the location of your
-build file.
-
-For a comprehensive list of all available build rules in nanobind-bazel, refer
-to the rules section in the :ref:`nanobind-bazel API reference <rules-bazel>`.
-
-.. _bazel-stable-abi:
-
-Building against the stable ABI
--------------------------------
-
-As in nanobind's CMake config, you can build bindings targeting Python's
-stable ABI, starting from version 3.12. To do this, specify the target
-version using the ``@nanobind_bazel//:py-limited-api`` flag. For example,
-to build extensions against the CPython 3.12 stable ABI, pass the option
-``@nanobind_bazel//:py-limited-api="cp312"`` to your ``bazel build`` command.
-
-For more information about available flags, refer to the flags section in the
-:ref:`nanobind-bazel API reference <flags-bazel>`.
-
-Generating stubs for built extensions
--------------------------------------
-
-You can also use Bazel to generate stubs for an extension directly at build
-time with the ``nanobind_stubgen`` macro. Here is an example of a nanobind
-extension with a stub file generation target declared directly alongside it:
+The BCR overlay exposes nanobind as the ``@nanobind//:nanobind`` C++ library.
+Use it with ordinary Bazel C++ rules. Splitting the implementation library from
+the shared library lets you give the resulting Python extension its required
+name.
 
 .. code-block:: python
 
-    # Same as before in a BUILD file
-    load(
-        "@nanobind_bazel//:build_defs.bzl",
-        "nanobind_extension",
-        "nanobind_stubgen",
-    )
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+    load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 
-    nanobind_extension(
-        name = "my_ext",
+    cc_library(
+        name = "my_ext_impl",
         srcs = ["my_ext.cpp"],
+        deps = ["@nanobind//:nanobind"],
     )
 
-    nanobind_stubgen(
+    cc_shared_library(
+        name = "my_ext",
+        deps = [":my_ext_impl"],
+        shared_lib_name = select({
+            "@platforms//os:windows": "my_ext.pyd",
+            "//conditions:default": "my_ext.so",
+        }),
+    )
+
+The library must be named exactly like the module declared by ``NB_MODULE``.
+Package it or add it as ``data`` to a Python target so it is importable at runtime.
+``shared_lib_name`` uses the ``.pyd`` suffix required by Python on Windows.
+
+Building for the stable ABI (ABI3)
+----------------------------------
+
+The current BCR overlay provides a regular CPython build. To build an ABI3
+extension, use the module-extension setup above and customize the copied
+``nanobind.BUILD.bazel`` overlay. Add the following build setting:
+
+.. code-block:: python
+
+    load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+    bool_flag(
+        name = "abi3",
+        build_setting_default = False,
+        visibility = ["//visibility:public"],
+    )
+
+Then change the existing ``nanobind`` library's ``defines`` and ``deps``,
+so that both nanobind and its consumers compile against the stable ABI:
+
+.. code-block:: python
+
+    defines = ["NB_SHARED"] + select({
+        ":abi3": ["Py_LIMITED_API=0x030C0000"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":abi3": ["@rules_python//python/cc:current_py_cc_headers_abi3"],
+        "//conditions:default": [
+            "@rules_python//python/cc:current_py_cc_headers",
+        ],
+    }),
+
+The ``defines`` attribute propagates ``Py_LIMITED_API`` to the extension's
+sources. Name the extension using the ABI3 suffix as well:
+
+.. code-block:: python
+
+    cc_shared_library(
+        name = "my_ext",
+        deps = [":my_ext_impl"],
+        shared_lib_name = select({
+            "@platforms//os:windows": "my_ext.pyd",
+            "@nanobind//:abi3": "my_ext.abi3.so",
+            "//conditions:default": "my_ext.so",
+        }),
+    )
+
+Build the ABI3 configuration with ``bazel build //my_project:my_ext
+--@nanobind//:abi3``. Stable ABI builds require CPython 3.12 or newer;
+see :ref:`the stable ABI documentation <stable-abi>` for its compatibility
+and performance implications.
+
+Generating stubs
+----------------
+
+Recent BCR releases also expose ``@nanobind//:stubgen`` as a ``py_binary`` and
+``@nanobind//:stubgen_lib`` as its importable library. A project can use the
+former directly, or define its own ``py_binary`` when it needs to arrange an
+extension's runfiles or select an output location.
+
+For example, a stub generation executable can depend on the extension as data
+and on the nanobind stubgen library:
+
+.. code-block:: python
+
+    load("@rules_python//python:py_binary.bzl", "py_binary")
+
+    py_binary(
         name = "my_ext_stubgen",
-        module = ":my_ext",
+        srcs = ["stubgen.py"],
+        data = [":my_ext"],
+        deps = [
+            "@nanobind//:stubgen_lib",
+            "@rules_python//python/runfiles",
+        ],
     )
 
-You can then generate stubs on an extension by invoking
-``bazel run //my_project:my_ext_stubgen``. Note that this requires actually
-running the target instead of only building it via ``bazel build``, since a
-Python script needs to be executed for stub generation.
+Here, ``stubgen.py`` is a small wrapper around ``nanobind.stubgen`` that uses
+the Bazel runfiles library to find ``my_ext``, makes its containing directory
+importable, and invokes ``nanobind.stubgen.main(["-m", "my_ext"])``.
+Run it with ``bazel run //my_project:my_ext_stubgen``.
+See :ref:`stub generation <stubs>` for a list of available command-line options.
 
-Naturally, since stub generation relies on the given shared object files, the
-actual extensions are built in the process before invocation of the stub
-generation script.
-
-Controlling shared vs. static library production
-------------------------------------------------
-
-You can control how nanobind is linked to your extensions and libraries with the
-``nanobind_link_mode`` attribute of the ``nanobind_extension``, ``nanobind_library``,
-and ``nanobind_test`` macros.
-
-Setting ``nanobind_link_mode = "static"`` will link nanobind statically, while
-``nanobind_link_mode = "shared"`` will request linkage against a shared ``libnanobind.so``.
-The default, ``nanobind_link_mode = "auto"`` , will set the linkage for nanobind automatically
-based on the value of the given ``linkstatic`` attribute (where ``True`` requests static linkage,
-while ``False`` requests dynamic linkage).
-
-.. note::
-
-    Linking ``nanobind_extension`` s dynamically on macOS can fail because of undefined libpython
-    symbols referenced in the extension's object files. In that case, you can supply a linker
-    response file by using the ``nb_library_linkopts`` function from ``@nanobind_bazel//:helpers.bzl``
-    when setting your extension's ``linkopts``.
-
-Building extensions for free-threaded Python
---------------------------------------------
-
-Starting from CPython 3.13, bindings extensions can be built for a free-threaded
-CPython interpreter. This requires two things: First, an eligible toolchain must
-be defined in your MODULE.bazel file, e.g. like so:
-
-.. code-block:: python
-
-    bazel_dep(name = "rules_python", version = "1.0.0")
-
-    python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-    python.toolchain(python_version = "3.13")
-
-And secondly, the ``@rules_python//python/config_settings:py_freethreaded`` flag must
-be set to "yes" when building your nanobind extension target, e.g. as
-``bazel build //path/to:my_ext --@rules_python//python/config_settings:py_freethreaded=yes``.
-
-Then, ``rules_python`` will bootstrap a free-threaded version of your target interpreter,
-and ``nanobind_bazel`` will define the ``NB_FREE_THREADED`` macro for the libnanobind
-build, indicating that nanobind should be built with free-threading support.
-For a comprehensive overview on nanobind with free-threaded Python, refer to the
-:ref:`free-threading documentation <free-threaded>`.
-
-nanobind-bazel and Python packaging
------------------------------------
+Python packaging
+----------------
 
 Unlike CMake, which has a variety of projects supporting PEP517-style
 Python package builds, Bazel does not currently have a fully featured
 PEP517-compliant packaging backend available.
 
-To produce Python wheels containing bindings built with nanobind-bazel,
-you have various options, with two of the most prominent strategies being
+To create Python wheels with nanobind bindings, two common strategies are
 
 1. Using a wheel builder script with the facilities provided by a Bazel
 support package for Python, such as ``py_binary`` or ``py_wheel`` from

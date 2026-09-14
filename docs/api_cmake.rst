@@ -10,9 +10,7 @@ different set of compilation and linker flags depending on the target platform.
 
 If you prefer another build system, then you have the following options:
 
-- `Nicholas Junge <https://github.com/nicholasjng>`__ has created a `Bazel
-  interface <https://github.com/nicholasjng/nanobind-Bazel>`__ to nanobind.
-  Please report Bazel-specific issues there.
+- See the :ref:`Bazel documentation <bazel>` for the Bazel integration.
 
 - `Will Ayd <https://github.com/WillAyd/>`__ has created a `Meson WrapDB
   package <https://mesonbuild.com/Wrapdb-projects.html>`__ for nanobind. Please

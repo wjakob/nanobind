@@ -119,6 +119,11 @@ bool intrusive_counter::dec_ref() const noexcept {
     }
 }
 
+size_t intrusive_counter::ref_count() const noexcept {
+    uintptr_t v = NB_ATOMIC_LOAD(&m_state);
+    return (v & 1) ? (size_t) (v >> 1) : 0;
+}
+
 void intrusive_counter::set_self_py(PyObject *o) noexcept {
     uintptr_t v = NB_ATOMIC_LOAD(&m_state);
 

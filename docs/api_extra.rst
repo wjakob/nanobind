@@ -1470,6 +1470,11 @@ functions:
 
       Return the Python object associated with this instance (or ``nullptr``).
 
+   .. cpp:function:: size_t ref_count() const noexcept
+
+      Return the reference count of the instance while it is owned by C++.
+      The function returns zero once ownership has been transferred to Python.
+
 .. cpp:class:: intrusive_base
 
    Simple polymorphic base class for a intrusively reference-counted object
@@ -1491,6 +1496,10 @@ functions:
    .. cpp:function:: PyObject * self_py()
 
       See :cpp:func:`intrusive_counter::self_py()`.
+
+   .. cpp:function:: size_t ref_count() const noexcept
+
+      See :cpp:func:`intrusive_counter::ref_count()`.
 
 .. cpp:function:: void intrusive_init(void (* intrusive_inc_ref_py)(PyObject * ) noexcept, void (* intrusive_dec_ref_py)(PyObject * ) noexcept)
 

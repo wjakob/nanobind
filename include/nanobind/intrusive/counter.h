@@ -28,6 +28,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 
 // Override this definition to specify DLL export/import declarations
 #if !defined(NB_INTRUSIVE_EXPORT)
@@ -193,6 +194,12 @@ public:
     /// Set the Python object associated with this instance
     void set_self_py(PyObject *self) noexcept;
 
+    /**
+     * \brief Return the reference count of the object while owned by C++.
+     * When ownership has transferred to Python, this function returns 0.
+     */
+    size_t ref_count() const noexcept;
+
 protected:
     /**
      * \brief Mutable counter. Note that the value ``1`` actually encodes
@@ -219,6 +226,9 @@ public:
 
     /// Return the Python object associated with this instance (or NULL)
     PyObject *self_py() const noexcept { return m_ref_count.self_py(); }
+
+    /// Return the reference count while owned by C++ (0 once ownership has transferred to Python)
+    size_t ref_count() const noexcept { return m_ref_count.ref_count(); }
 
     /// Virtual destructor
     virtual ~intrusive_base() = default;

@@ -343,9 +343,9 @@ uses the following symbols:
 
 Removed features include:
 
-- ○ **Multiple inheritance**: this feature was a persistent source of
-  complexity in pybind11 and it is one of the main casualties in creating
-  nanobind.
+- ○ **C++ multiple inheritance**: binding multiple C++ bases is unsupported
+  to keep nanobind's implementation simple. Python subclasses can combine one
+  nanobind base with additional :ref:`Python mixins <python_mixins>`.
 - ○ **Holders**: nanobind instances co-locate instance data with a Python
   object instead of accessing it via a holder type. This is a major difference
   compared to pybind11 and will require changes to binding code that used

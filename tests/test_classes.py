@@ -1,4 +1,5 @@
 import sys
+from itertools import permutations
 import test_classes_ext as t
 import pytest
 from common import is_pypy, skip_on_pypy, collect, parallelize
@@ -1421,15 +1422,8 @@ def test65_init_subclass_setattr():
 
     assert Derived2.bar == "descr"
 
-    class Mixin:
-        pass
-
-    with pytest.raises(TypeError, match="multiple inheritance"):
-        class Derived3(Mixin, t.Animal):
-            pass
-
     with pytest.raises(TypeError, match="requires a nanobind base type"):
-        class Derived4(metaclass=type(t.Animal)):
+        class Derived3(metaclass=type(t.Animal)):
             pass
 
 
@@ -1510,3 +1504,224 @@ def test68_trampoline_invalidate_subclasses():
     assert t.go(obj) == "patched says hello"
     del Base.name
     assert t.go(obj) == "Dog says hello"
+
+
+@pytest.mark.parametrize("order", list(permutations(range(3))))
+def test69_multiple_inheritance(order):
+    """Combine two mixins with a bound class in every order, preserving its MRO
+    and conversion to C++ base classes, including after further subclassing."""
+    class MixinA:
+        def __init__(self, value):
+            self.a = value
+
+        def extra(self):
+            return self.a + self.b
+
+    class MixinB:
+        def __init__(self, value):
+            self.b = value
+
+    bases = (MixinA, MixinB, t.Dog)
+    bases = tuple(bases[i] for i in order)
+
+    class Mixed(*bases):
+        def __init__(self):
+            t.Dog.__init__(self, "hello")
+            MixinA.__init__(self, 10)
+            MixinB.__init__(self, 20)
+
+    expected_mro = list(bases)
+    expected_mro.insert(expected_mro.index(t.Dog) + 1, t.Animal)
+    assert Mixed.__mro__ == (Mixed, *expected_mro, object)
+    assert Mixed.__base__ is t.Dog
+
+    obj = Mixed()
+    assert obj.extra() == 30
+    assert all(isinstance(obj, b) for b in (*bases, t.Animal))
+    assert t.animal_passthrough(obj) is obj
+    assert t.dog_passthrough(obj) is obj
+    assert t.go(obj) == "Dog says hello"
+
+    class EmptyMixin:
+        __slots__ = ()
+
+    class Further(EmptyMixin, Mixed):
+        pass
+
+    obj = Further()
+    assert obj.extra() == 30 and t.animal_passthrough(obj) is obj
+
+
+def test70_multiple_inheritance_super():
+    """Follow cooperative mixin initializers and virtual overrides through super();
+    a bound constructor terminates the initializer chain."""
+    class MixinA:
+        def __init__(self, *args, **kwargs):
+            self.a = 10
+            super().__init__(*args, **kwargs)
+
+        def name(self):
+            return "A " + super().name()
+
+        def extra(self):
+            return self.a + super().extra()
+
+    class MixinB:
+        def __init__(self, *args, **kwargs):
+            self.b = 20
+            super().__init__(*args, **kwargs)
+
+        def name(self):
+            return "B " + super().name()
+
+        def extra(self):
+            return self.b
+
+    class Mixed(MixinA, MixinB, t.Dog):
+        pass
+
+    obj = Mixed("hello")
+    assert (obj.a, obj.b) == (10, 20)
+    assert obj.extra() == 30
+    assert t.go(obj) == "A B Dog says hello"
+
+    class BoundFirst(t.Dog, MixinA, MixinB):
+        pass
+
+    obj = BoundFirst("hello")
+    assert not hasattr(obj, "a") and not hasattr(obj, "b")
+    assert t.go(obj) == "Dog says hello"
+
+
+@pytest.mark.parametrize("base", [t.Struct, t.StructWithAttr,
+                                  t.StructWithWeakrefs,
+                                  t.StructWithWeakrefsAndDynamicAttrs])
+def test71_multiple_inheritance_gc(clean, base):
+    """Collect cycles in mixin dictionaries and subclass slots, releasing weak
+    references and destroying the C++ instance exactly once."""
+    import weakref
+
+    class Mixin:
+        pass
+
+    class Mixed(Mixin, base):
+        __slots__ = ("peer",)
+
+    obj = Mixed(42)
+    assert obj.value() == 42
+    obj.peer = obj
+    obj.cycle = obj
+    ref = weakref.ref(obj)
+    del obj
+    collect()
+    assert ref() is None
+    assert_stats(value_constructed=1, destructed=1)
+
+
+def test72_multiple_inheritance_errors():
+    """Reject multiple nanobind bases, conflicting native layouts, and mixins
+    combined with a bound class that prohibits subclassing."""
+    class Left(t.Struct):
+        pass
+
+    class Right(t.Struct):
+        pass
+
+    # Python accepts these compatible layouts, nanobind rejects them
+    for bases in ((t.Dog, t.Animal), (Left, Right)):
+        with pytest.raises(TypeError, match="multiple nanobind bases"):
+            type("MultipleBases", bases, {})
+
+    class SlottedMixin:
+        __slots__ = ("state",)
+
+    for bases in ((t.Struct, t.Dog), (list, t.Struct),
+                  (SlottedMixin, t.Struct), (t.Struct, SlottedMixin)):
+        with pytest.raises(TypeError):
+            type("ConflictingLayout", bases, {})
+
+    class Mixin:
+        pass
+
+    with pytest.raises(TypeError, match="prohibits subclassing"):
+        class Final(Mixin, t.FinalType):
+            pass
+
+
+def test73_multiple_inheritance_early_init():
+    """Allow mixin instances in class hooks and initialize deferred type records,
+    while still rejecting invalid bases when the metaclass initializer is skipped."""
+    class Mixin:
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+            cls.inst = cls("hello")
+
+    class Mixed(Mixin, t.Dog):
+        pass
+
+    assert t.go(Mixed.inst) == "Dog says hello"
+    del Mixed.inst
+
+    class Descriptor:
+        def __set_name__(self, owner, name):
+            owner.inst = owner("hello")
+
+    class PlainMixin:
+        pass
+
+    bases = (PlainMixin, t.Dog)
+
+    class WithDescriptor(*bases):
+        descr = Descriptor()
+
+    assert t.go(WithDescriptor.inst) == "Dog says hello"
+    del WithDescriptor.inst
+
+    # Bypass the metaclass initializer, including for the nanobind base.
+    meta = type(t.Dog)
+    Deferred = type.__new__(meta, "Deferred", bases, {})
+
+    Deferred2 = type.__new__(meta, "Deferred2", (Deferred,), {})
+    assert t.go(Deferred2("hello")) == "Dog says hello"
+
+    Invalid = type.__new__(meta, "Invalid", (t.Dog, t.Animal), {})
+    with pytest.raises(TypeError, match="multiple nanobind bases"):
+        Invalid("hello")
+    with pytest.raises(TypeError, match="multiple nanobind bases"):
+        Invalid.attr = 1
+
+
+def test74_multiple_inheritance_monkeypatch():
+    """Observe replaced and deleted mixin overrides, along with changes made
+    through the nanobind subclass, on a mixed class and its descendants."""
+    class Mixin:
+        def name(self):
+            return "mixin"
+
+    class Named:
+        def name(self):
+            return "named"
+
+    class Mixed(Mixin, t.Dog):
+        pass
+
+    class Further(Mixed):
+        pass
+
+    objects = [Mixed("hello"), Further("hello")]
+
+    def check(name):
+        for obj in objects:
+            assert t.go(obj) == name + " says hello"
+
+    check("mixin")
+    Mixin.name = lambda self: "replaced"
+    check("replaced")
+    del Mixin.name
+    check("Dog")
+    Mixed.name = lambda self: "mixed"
+    check("mixed")
+    del Mixed.name
+    check("Dog")
+    Mixed.__bases__ = (Named, t.Dog)
+    check("named")

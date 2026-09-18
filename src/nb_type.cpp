@@ -700,19 +700,33 @@ static NB_NOINLINE int nb_type_init_py(PyTypeObject *self) {
     PyTypeObject *base = self->tp_base;
 #endif
 
-    if (!bases || NB_TUPLE_GET_SIZE(bases) != 1) {
-        PyErr_SetString(PyExc_TypeError,
-                        "nanobind types do not support multiple inheritance!");
+    // Permit Python mixins alongside exactly one nanobind base. A nanobind
+    // base's metaclass is an instance of the same meta-metaclass 'nb_meta'.
+    PyTypeObject *nb_meta = Py_TYPE((PyObject *) Py_TYPE((PyObject *) self)),
+                 *nb_base = nullptr;
+    Py_ssize_t n_bases = bases ? NB_TUPLE_GET_SIZE(bases) : 0;
+    for (Py_ssize_t i = 0; i < n_bases; ++i) {
+        PyTypeObject *b = (PyTypeObject *) NB_TUPLE_GET_ITEM(bases, i);
+        if (Py_TYPE((PyObject *) Py_TYPE((PyObject *) b)) != nb_meta)
+            continue;
+        if (nb_base) {
+            PyErr_SetString(PyExc_TypeError,
+                            "nanobind: multiple nanobind bases are not supported!");
+            return -1;
+        }
+        nb_base = b;
+    }
+
+    if (!nb_base) {
+        PyErr_SetString(PyExc_TypeError, "nanobind: the 'nb_type' metaclass "
+                                         "requires a nanobind base type!");
         return -1;
     }
 
-    // The base is a nanobind type exactly if its metaclass is also an
-    // instance of the meta-metaclass 'nb_meta'
-    PyObject *meta_base = (PyObject *) Py_TYPE((PyObject *) base),
-             *meta_self = (PyObject *) Py_TYPE((PyObject *) self);
-    if (Py_TYPE(meta_base) != Py_TYPE(meta_self)) {
-        PyErr_SetString(PyExc_TypeError, "nanobind: the 'nb_type' metaclass "
-                                         "requires a nanobind base type!");
+    // Python selects 'tp_base', which provides the instance layout
+    if (base != nb_base) {
+        PyErr_SetString(PyExc_TypeError,
+                        "nanobind: instance layout must come from the nanobind base!");
         return -1;
     }
 
@@ -1232,15 +1246,30 @@ static PyObject *nb_type_from_metaclass(PyTypeObject *meta, PyObject *mod,
         }
     }
 
-    if (modname_o && !fail) {
+    if (!fail) {
         tp->tp_dict = PyDict_New();
         // Can't use the interned '__module__' string here: this code runs
         // during the creation of the internals, before init_pyobjects()
         if (!tp->tp_dict ||
-            PyDict_SetItemString(tp->tp_dict, "__module__", modname_o) < 0)
+            (modname_o &&
+             PyDict_SetItemString(tp->tp_dict, "__module__", modname_o) < 0))
             fail = true;
     }
     Py_XDECREF(modname_o);
+
+#if defined(PYPY_VERSION)
+    // PyPy may consider small bound classes to be layout-compatible with
+    // 'object' and then select a preceding Python mixin as 'tp_base'. A
+    // private slot gives root bound classes a distinct layout. PyPy omits
+    // the instance dictionary unless '__dict__' is listed as well.
+    if (!fail && (spec->flags & Py_TPFLAGS_BASETYPE) && !tp->tp_base) {
+        PyObject *slots = Py_BuildValue("(ss)", "__nb_layout", "__dict__");
+        if (!slots ||
+            PyDict_SetItemString(tp->tp_dict, "__slots__", slots) < 0)
+            fail = true;
+        Py_XDECREF(slots);
+    }
+#endif
 
     if (fail || PyType_Ready(tp) != 0) {
         Py_DECREF(tp);

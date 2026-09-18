@@ -527,6 +527,49 @@ example, updating the code as follows fixes the problem:
    Max: woof!
    Max: woof!
 
+.. _python_mixins:
+
+Python mixins
+-------------
+
+A Python subclass can combine one nanobind-bound class with any number of
+Python mixins. For example, the ``Dog`` binding above can share helper methods
+and initialization logic with other Python classes:
+
+.. code-block:: python
+
+   class AlarmMixin:
+       def __init__(self, *args, alarm_count=3, **kwargs):
+           self.alarm_count = alarm_count
+           super().__init__(*args, **kwargs)
+
+       def alarm(self):
+           for _ in range(self.alarm_count):
+               print(self.bark())
+
+   class GuardDog(AlarmMixin, my_ext.Dog):
+       pass
+
+   gd = GuardDog("Max", alarm_count=2)
+   gd.alarm()  # Prints "Max: woof!" twice
+
+The usual Python method resolution order (MRO), ``super()``, and ``isinstance()``
+checks apply. The instance can still be passed to C++ functions accepting the
+bound class or its bound C++ base classes. Mixins can also :ref:`override C++
+virtual functions <trampolines>`, with a :ref:`caveat <mixin_override_caveat>`
+for overrides added after class creation.
+
+Mixins may appear before or after the bound class. For cooperative
+initialization, place them before it, as above, and have each mixin forward
+remaining arguments through ``super().__init__()``. The bound constructor ends
+this chain: it does not initialize mixins that follow it in the MRO. Such mixins
+need explicit initialization in the subclass.
+
+Exactly one *direct* base must be a nanobind-bound class or a Python subclass
+of one. Inheriting from two such bases is unsupported, even if they ultimately
+derive from the same bound class. Other bases must have compatible instance
+layouts.
+
 .. _trampolines:
 
 Overriding virtual functions in Python
@@ -690,6 +733,31 @@ expired. There isn't a good solution to this problem, and nanobind therefore
 simply refuses to do it. You will need to change your approach by either using
 :ref:`bindings <bindings>` instead of :ref:`type casters <type_casters>` or
 changing your virtual method interfaces to return by value.
+
+.. _mixin_override_caveat:
+
+A second special case concerns :ref:`Python mixins <python_mixins>`. nanobind
+caches whether a class overrides a virtual function, and it only refreshes this
+cache when a nanobind class is modified. An override that is monkey-patched
+into a mixin after C++ has already called the function goes unnoticed.
+Overrides that are part of the mixin's class body do not have this problem.
+
+.. code-block:: python
+
+   class LoudMixin:
+       pass
+
+   class LoudDog(LoudMixin, my_ext.Dog):
+       pass
+
+   d = LoudDog("Max")
+   my_ext.alarm(d)  # Calls Dog::bark(), caches that LoudDog has no override
+
+   LoudMixin.bark = lambda self: "WOOF!"
+   my_ext.alarm(d)  # Not supported: still calls Dog::bark()
+
+   LoudDog.bark = lambda self: "WOOF!"
+   my_ext.alarm(d)  # OK: assigning to the nanobind subclass refreshes the cache
 
 .. _operator_overloading:
 

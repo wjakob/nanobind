@@ -14,6 +14,12 @@ documentation for details.
 Version 3.1.0 (TBA)
 -------------------
 
+- Python subclasses can now combine one nanobind base with additional
+  :ref:`Python mixins <python_mixins>`, including cooperative ``super()`` calls
+  on CPython and PyPy. Inheriting from multiple nanobind bases remains
+  unsupported.
+  (discussion `#1436 <https://github.com/wjakob/nanobind/discussions/1436>`__)
+
 - The low-level instance API gained :cpp:func:`nb::inst_python_derived()
   <inst_python_derived>`, which reports whether a nanobind instance belongs to
   a Python subclass of the bound type. Previous versions provided this function

@@ -79,7 +79,7 @@ boxing/unboxing arguments and return values, etc.
 The difference to pybind11 is **significant**: a ~\ **3× improvement**
 for simple functions, and an **~10× improvement** when classes are being
 passed around. Complexities in pybind11 related to overload
-resolution, multiple inheritance, and holders are the main reasons for
+resolution, C++ multiple inheritance, and holders are the main reasons for
 this difference. Those features were either simplified or completely
 removed in nanobind.
 

@@ -424,9 +424,10 @@ static void trampoline_invalidate_rec(nb_internals *int_p, PyObject *tp,
         table_cell(td).store(nullptr, std::memory_order_release);
     }
 
-#if !defined(Py_LIMITED_API) && !defined(NB_FREE_THREADED)
+#if !defined(Py_LIMITED_API) && !defined(NB_FREE_THREADED) && !defined(PYPY_VERSION)
     // The GIL orders subclass registration against this walk, so an
-    // empty tp_subclasses field proves that there is nothing to visit
+    // empty tp_subclasses field proves that there is nothing to visit.
+    // PyPy does not maintain this field; use __subclasses__ there instead.
     if (!((PyTypeObject *) tp)->tp_subclasses)
         return;
 #endif

@@ -1493,3 +1493,20 @@ def test67_implicit_self_annotation():
     # 'self' is the only parameter, and it carries an implicit annotation, so
     # the function record ends up without any argument records
     assert t.OptionalNoneTest().optional_self() is True
+
+
+def test68_trampoline_invalidate_subclasses():
+    """Invalidate cached missing overrides in ordinary nanobind descendants
+    when a Python base class is patched, including on PyPy."""
+    class Base(t.Dog):
+        pass
+
+    class Sub(Base):
+        pass
+
+    obj = Sub("hello")
+    assert t.go(obj) == "Dog says hello"
+    Base.name = lambda self: "patched"
+    assert t.go(obj) == "patched says hello"
+    del Base.name
+    assert t.go(obj) == "Dog says hello"

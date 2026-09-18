@@ -11,8 +11,8 @@ versioning. Please review the :ref:`ABI compatibility <abi_compatibility>`
 documentation for details.
 
 
-Version 3.1.0 (TBA)
--------------------
+Version 3.1.0 (Sep 28, 2026)
+----------------------------
 
 - Python subclasses can now combine one nanobind base with additional
   :ref:`Python mixins <python_mixins>`, including cooperative ``super()`` calls
@@ -22,19 +22,35 @@ Version 3.1.0 (TBA)
 
 - The low-level instance API gained :cpp:func:`nb::inst_python_derived()
   <inst_python_derived>`, which reports whether a nanobind instance belongs to
-  a Python subclass of the bound type. Previous versions provided this function
-  under an internal name.
+  a Python subclass of the bound type.
+  (commit `c442d7 <https://github.com/wjakob/nanobind/commit/c442d7577f50c01b64b6204e2f55e0f84f60e635>`__).
 
-- The functions :cpp:func:`nb::keep_alive_obj() <keep_alive_obj>` and
-  :cpp:func:`nb::keep_alive_cb() <keep_alive_cb>` expose the mechanism
-  behind the :cpp:class:`nb::keep_alive <keep_alive>` annotation. The first
-  keeps a Python object alive until another one expires, and the second invokes
-  a callback at that point. Both were previously only reachable through
-  internal interfaces.
+- Added new low-level functions :cpp:func:`nb::keep_alive_obj() <keep_alive_obj>` and
+  :cpp:func:`nb::keep_alive_cb() <keep_alive_cb>`, which expose the mechanism behind
+  the :cpp:class:`nb::keep_alive <keep_alive>` annotation.
+  (commit `25192f <https://github.com/wjakob/nanobind/commit/25192f432f7d4dec4d24227c972226e075274621>`__).
 
-- Bound methods now expose their docstring through a ``__doc__`` descriptor,
-  which enables ``help()`` on instance methods such as ``help(obj.method)``.
-  (issue `#1431 <https://github.com/wjakob/nanobind/issues/1431>`__)
+- The new function :cpp:func:`intrusive_counter::ref_count()` returns the
+  reference count of an intrusively reference-counted object while it is owned by C++.
+  (commit `1f26fb <https://github.com/wjakob/nanobind/commit/1f26fb363752decf0cf825039f213fbd1708ee09>`__).
+
+- Fixed stale trampoline override caches on PyPy. Changing an attribute of a
+  nanobind type now correctly invalidates the caches of its Python subclasses.
+  (commit `701c89 <https://github.com/wjakob/nanobind/commit/701c896751defe26e9a216e81f0e133339ed3251>`__).
+
+- The ``std::map``/``std::unordered_map`` and ``std::set`` type casters can
+  now also handle containers like ``std::flat_map`` whose iterators return
+  temporary values. (PR `#1434 <https://github.com/wjakob/nanobind/pull/1434>`__).
+
+- The :ref:`Bazel documentation <bazel>` was rewritten and now presents an
+  approach based on the Bazel Central Registry. (PR `#1435
+  <https://github.com/wjakob/nanobind/pull/1435>`__).
+
+- Miscellaneous minor improvements.
+  (PRs `#1429 <https://github.com/wjakob/nanobind/pull/1429>`__,
+  `#1428 <https://github.com/wjakob/nanobind/pull/1428>`__,
+  `#1414 <https://github.com/wjakob/nanobind/pull/1414>`__,
+  `#1431 <https://github.com/wjakob/nanobind/issues/1431>`__)
 
 Version 3.0.1 (Aug 28, 2026)
 ----------------------------

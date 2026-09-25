@@ -220,10 +220,12 @@
 #define NB_MODULE_IMPL2(name, variable)                                        \
     static void nanobind_##name##_exec_impl(nanobind::module_);                \
     static int nanobind_##name##_exec(PyObject *m) {                           \
-        nanobind::detail::internals =                                          \
+        nanobind::detail::nb_internals *p =                                    \
             NB_CALL(nb_module_init)(NB_DOMAIN_STR, m);                         \
-        if (!nanobind::detail::internals)                                      \
+        if (!p)                                                                \
             return -1;                                                         \
+        if (nanobind::detail::internals != p)                                  \
+            nanobind::detail::internals = p;                                   \
         try {                                                                  \
             nanobind_##name##_exec_impl(                                       \
                 nanobind::borrow<nanobind::module_>(m));                       \

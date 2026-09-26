@@ -228,29 +228,33 @@ static void enum_append_impl(PyObject *tp_, const char *name_, int64_t value_,
     }
     #endif
 
-    object el;
-    if (issubclass(tp, str_tp))
-        el = obj_call(p, getattr(str_tp, NB_INTERNED(p, __new__)), tp, val);
-    else if (issubclass(tp, val_tp))
-        el = obj_call(p, getattr(val_tp, NB_INTERNED(p, __new__)), tp, val);
-    else
-        el = obj_call(p, getattr(obj_tp, NB_INTERNED(p, __new__)), tp);
+    object el = value_map.get(val, handle());
+    bool is_new = !el.is_valid();
+    if (is_new) {
+        if (issubclass(tp, str_tp))
+            el = obj_call(p, getattr(str_tp, NB_INTERNED(p, __new__)), tp, val);
+        else if (issubclass(tp, val_tp))
+            el = obj_call(p, getattr(val_tp, NB_INTERNED(p, __new__)), tp, val);
+        else
+            el = obj_call(p, getattr(obj_tp, NB_INTERNED(p, __new__)), tp);
 
-    str_setattr(p, el, "_name_", name);
-    str_setattr(p, el, "__objclass__", tp);
-    obj_call(p, getattr(el, NB_INTERNED(p, __init__)), val);
-    str_setattr(p, el, "_sort_order_",
-                steal(raise_if_null(
-                    PyLong_FromSize_t(len(member_names)))));
-    str_setattr(p, el, "_value_", val);
-    str_setattr(p, el, "__doc__", doc ? (object) str(doc) : (object) none());
+        str_setattr(p, el, "_name_", name);
+        str_setattr(p, el, "__objclass__", tp);
+        obj_call(p, getattr(el, NB_INTERNED(p, __init__)), val);
+        str_setattr(p, el, "_sort_order_",
+                    steal(raise_if_null(
+                        PyLong_FromSize_t(len(member_names)))));
+        str_setattr(p, el, "_value_", val);
+        str_setattr(p, el, "__doc__",
+                    doc ? (object) str(doc) : (object) none());
 
-    // Compatibility with nanobind 1.x
-    str_setattr(p, el, "__name__", name);
+        // Compatibility with nanobind 1.x
+        str_setattr(p, el, "__name__", name);
+    }
 
     setattr(tp, name, el);
 
-    if (!value_map.contains(val)) {
+    if (is_new) {
         member_names.append(name);
         value_map[val] = el;
     }

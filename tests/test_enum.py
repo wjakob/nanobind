@@ -76,6 +76,12 @@ def test02_signed_enum():
     assert t.to_enum(t.SEnum.B) is t.Enum.B
 
 
+def test14_enum_alias():
+    assert t.Enum.BAlias is t.Enum.B
+    assert t.Enum.BAlias.name == "B"
+    assert list(t.Enum) == [t.Enum.A, t.Enum.B, t.Enum.C]
+
+
 def test03_enum_arithmetic():
     assert t.SEnum.B + 2 == 3
     assert t.SEnum.B + 2.5 == 3.5

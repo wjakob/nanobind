@@ -4,7 +4,7 @@
 
 namespace nb = nanobind;
 
-enum class Enum  : uint32_t { A, B, C = (uint32_t) -1 };
+enum class Enum  : uint32_t { A, B, BAlias = B, C = (uint32_t) -1 };
 enum class Flag  : uint32_t { A = 1, B = 2, C = 4};
 enum class UnsignedFlag : uint64_t {
      A = 1 << 0,
@@ -43,6 +43,7 @@ NB_MODULE(test_enum_ext, m) {
     nb::enum_<Enum>(m, "Enum", "enum-level docstring")
         .value("A", Enum::A, "Value A")
         .value("B", Enum::B, "Value B")
+        .value("BAlias", Enum::BAlias)
         .value("C", Enum::C, "Value C");
 
     nb::enum_<Flag>(m, "Flag", "enum-level docstring", nb::is_flag())

@@ -11,6 +11,9 @@ class Enum(enum.Enum):
     B = 1
     """Value B"""
 
+    BAlias = 1
+    """Value B"""
+
     C = 4294967295
     """Value C"""
 

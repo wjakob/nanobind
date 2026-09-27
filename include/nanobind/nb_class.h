@@ -339,6 +339,10 @@ namespace detail {
         }
     }
 
+    // Strip ``sig`` annotations and let everything else pass through
+    template <typename T> NB_INLINE const T &strip_sig(const T &v) { return v; }
+    NB_INLINE std::nullptr_t strip_sig(const sig &) { return nullptr; }
+
     // Call policy that ensures __new__ returns an instance of the correct
     // Python type, even when deriving from the C++ class in Python
     struct new_returntype_fixup_policy {
@@ -410,7 +414,8 @@ struct new_<Func, Return(Args...)> : def_visitor<new_<Func, Return(Args...)>> {
         } else {
             cl.def_static("__new__", std::move(wrapper), extra..., policy);
         }
-        cl.def("__init__", [](handle, Args...) {}, extra...);
+        cl.def("__init__", [](handle, Args...) {},
+               detail::strip_sig(extra)...);
     }
 };
 template <typename Func> new_(Func&& f) -> new_<Func>;

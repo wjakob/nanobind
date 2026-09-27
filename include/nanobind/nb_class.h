@@ -315,6 +315,9 @@ private:
 };
 
 namespace detail {
+    template <typename T> auto filter_new_init(const T &v) { return v; }
+    inline std::nullptr_t filter_new_init(const sig &) { return nullptr; }
+
     // This is 'inline' so we can define it in a header and not pay
     // for it if unused, and also 'noinline' so we don't generate
     // multiple copies and produce code bloat.
@@ -410,7 +413,7 @@ struct new_<Func, Return(Args...)> : def_visitor<new_<Func, Return(Args...)>> {
         } else {
             cl.def_static("__new__", std::move(wrapper), extra..., policy);
         }
-        cl.def("__init__", [](handle, Args...) {}, extra...);
+        cl.def("__init__", [](handle, Args...) {}, detail::filter_new_init(extra)...);
     }
 };
 template <typename Func> new_(Func&& f) -> new_<Func>;

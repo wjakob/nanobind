@@ -961,6 +961,16 @@ def test45_hidden_base():
 def test46_custom_new():
     import gc
 
+    assert t.UniqueInt.__new__.__doc__ == (
+        "__new__(arg: object, /) -> object\n"
+        "__new__(cls, value: int, /) -> UniqueInt\n"
+        "__new__(cls, s: str) -> UniqueInt"
+    )
+    assert t.UniqueInt.__init__.__doc__ == (
+        "__init__(self, arg: int, /) -> None\n"
+        "__init__(self, s: str) -> None"
+    )
+
     u1 = t.UniqueInt(10)
     assert u1.value() == 10 and u1.lookups() == 1
 

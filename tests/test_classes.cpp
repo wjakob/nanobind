@@ -930,10 +930,11 @@ NB_MODULE(test_classes_ext, m) {
         .def("polymorphic", &BoundDerived::polymorphic);
 
     nb::class_<UniqueInt>(m, "UniqueInt")
-        .def(nb::new_(&UniqueInt::make))
+        .def(nb::new_(&UniqueInt::make),
+             nb::sig("def __new__(cls, value: int, /) -> UniqueInt"))
         .def(nb::new_([](std::string s) {
             return UniqueInt::make(std::atoi(s.c_str()));
-        }), "s"_a)
+        }), "s"_a, nb::sig("def __new__(cls, s: str) -> UniqueInt"))
         .def("value", &UniqueInt::value)
         .def("lookups", &UniqueInt::lookups);
 

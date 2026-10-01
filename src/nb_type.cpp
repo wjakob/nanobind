@@ -583,7 +583,7 @@ type_data *nb_type_c2p(nb_internals *internals_,
     lock_internals guard(internals_);
     nb_type_map_slow &type_c2p_slow = internals_->type_c2p_slow;
     nb_type_map_slow::iterator it_slow = type_c2p_slow.find(type);
-    if (it_slow != type_c2p_slow.end()) {
+    if (it_slow != type_c2p_slow.end() && it_slow->second) {
         type_data *d = it_slow->second;
 
 #if !defined(NB_FREE_THREADED)

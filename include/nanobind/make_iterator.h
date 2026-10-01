@@ -11,7 +11,9 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
+#include <atomic>
 #include <iterator>
+#include <mutex>
 #include <new>
 #include <optional>
 
@@ -99,6 +101,59 @@ template <typename T> struct type_caster<iter_result<T>> {
     }
 };
 
+struct register_once_state {
+    std::recursive_mutex mu;
+    std::atomic<bool> in_progress { false };
+};
+
+template <typename State> register_once_state &get_register_once_state() {
+    static register_once_state state;
+    return state;
+}
+
+/* Register a Python type ``State`` on first use in a thread-safe manner.
+
+   We check ``type<State>().is_valid()`` rather than a sticky ``static bool`` so
+   that registration runs again if the type is later unregistered (e.g., when
+   reloading an embedded interpreter) or accessed from a different
+   subinterpreter.
+
+   Note on double-checked locking: ``reg()`` typically executes
+   ``class_<State>(...).def("__iter__", ...).def("__next__", ...)``. The
+   ``class_<State>`` constructor publishes the type in ``type_c2p_slow``, which
+   makes ``type<State>().is_valid()`` return ``true`` *before* the chained
+   ``.def(...)`` calls have attached methods to the type. Checking
+   ``!s.in_progress`` on the unlocked fast path ensures that another thread
+   cannot bypass ``s.mu`` and observe a half-registered type while ``reg()`` is
+   still running. */
+template <typename State, typename Func> void register_once(Func &&reg) {
+    register_once_state &s = get_register_once_state<State>();
+    if (type<State>().is_valid() &&
+        !s.in_progress.load(std::memory_order_acquire))
+        return;
+
+    // Release the GIL (or detach the thread state in free-threaded builds)
+    // while acquiring ``s.mu``: the thread holding ``s.mu`` inside ``reg()``
+    // may trigger a Python audit hook or GC finalizer that needs the GIL or a
+    // stop-the-world pause to complete.
+    {
+        gil_scoped_release release;
+        s.mu.lock();
+    }
+    std::lock_guard<std::recursive_mutex> guard(s.mu, std::adopt_lock);
+
+    if (!type<State>().is_valid()) {
+        s.in_progress.store(true, std::memory_order_relaxed);
+        try {
+            reg();
+        } catch (...) {
+            s.in_progress.store(false, std::memory_order_release);
+            throw;
+        }
+        s.in_progress.store(false, std::memory_order_release);
+    }
+}
+
 template <typename Access, rv_policy::value Policy, typename Iterator,
           typename Sentinel, typename ValueType, typename... Extra>
 typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
@@ -114,32 +169,27 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
         "make_iterator_impl(): the generated __next__ would copy elements, so the "
         "element type must be copy-constructible");
 
-    {
-#if defined(NB_FREE_THREADED)
-        static ft_mutex mu;
-        ft_lock_guard lock(mu);
-#endif
-        if (!type<State>().is_valid()) {
-            class_<State>(scope, name)
-                .def("__iter__", [](handle h) { return h; })
-                .def("__next__",
-                    [](State &s) -> iter_result<ValueType> {
-                        if (!s.first_or_done)
-                            ++s.it;
-                        else
-                            s.first_or_done = false;
+    register_once<State>([&] {
+        class_<State>(scope, name)
+            .def("__iter__", [](handle h) { return h; })
+            .def("__next__",
+                [](State &s) -> iter_result<ValueType> {
+                    if (!s.first_or_done)
+                        ++s.it;
+                    else
+                        s.first_or_done = false;
 
-                        if (s.it == s.end) {
-                            s.first_or_done = true;
-                            return { };
-                        }
+                    if (s.it == s.end) {
+                        s.first_or_done = true;
+                        return { };
+                    }
 
-                        return Access()(s.it);
-                    },
-                    std::forward<Extra>(extra)...,
-                    rv_policy::policy_tag<Policy>());
-        }
-    }
+                    return Access()(s.it);
+                },
+                std::forward<Extra>(extra)...,
+                rv_policy::policy_tag<Policy>());
+    });
+
     return borrow<typed<iterator, ValueType>>(cast(State{
         std::forward<Iterator>(first), std::forward<Sentinel>(last), true }));
 }
@@ -159,17 +209,13 @@ template <typename State> struct next_step { State *state; };
 /// Register the Python iterator type ``State`` on first use
 template <typename State, rv_policy::value Policy>
 void register_step_iterator(handle scope, const char *name) {
-#if defined(NB_FREE_THREADED)
-    static ft_mutex mu;
-    ft_lock_guard lock(mu);
-#endif
-    if (!type<State>().is_valid()) {
+    register_once<State>([&] {
         class_<State>(scope, name)
             .def("__iter__", [](handle h) { return h; })
             .def("__next__",
                  [](State &s) -> next_step<State> { return { &s }; },
                  rv_policy::policy_tag<Policy>());
-    }
+    });
 }
 
 template <rv_policy::value Policy, typename Seq>

@@ -1,3 +1,5 @@
+import sys
+import time
 import test_make_iterator_ext as t
 from common import parallelize
 
@@ -46,3 +48,21 @@ def test05_iterator_returning_temporary():
     assert list(im.values()) == list(range(10))
     assert list(im.items()) == list(zip(range(10), range(10)))
     assert list(im.items_l()) == list(zip(range(10), range(10)))
+
+
+def test06_audithook_multithreaded(n_threads=8):
+    enabled = True
+
+    def audit_hook(event, args):
+        if enabled and event == "object.__setattr__":
+            time.sleep(0.001)
+
+    sys.addaudithook(audit_hook)
+    try:
+        def worker():
+            return list(t.make_audit_iterator())
+
+        results = parallelize(worker, n_threads=n_threads)
+        assert results == [list(range(10))] * n_threads
+    finally:
+        enabled = False

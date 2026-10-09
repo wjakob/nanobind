@@ -514,6 +514,11 @@ Here is an example:
          my_ext/submodule_2/nested.pyi
    )
 
+For a top-level build module installed inside a package, add ``INSTALLED_NAME mylib.cppext`` to ``nanobind_add_stub(MODULE cppext ...)``.
+Generated imports use the installed name, with aliases preserving existing type references.
+The build-time import, signatures, and output paths are unchanged.
+Omitting the option preserves existing behavior.
+
 Command line interface
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -521,6 +526,7 @@ Alternatively, you can invoke ``stubgen`` on the command line. The nanobind
 package must be installed for this to work, e.g., via ``pip install nanobind``.
 The command line interface is also able to generate multiple stubs at once
 (simply specify ``-m MODULE`` several times).
+The equivalent ``--installed-name MODULE`` option requires a single top-level build-time module.
 
 .. code-block:: bash
 
@@ -540,7 +546,8 @@ The program has the following command line options:
 .. code-block:: text
 
    usage: python -m nanobind.stubgen [-h] [-o FILE] [-O PATH] [-i PATH]
-                                     [-m MODULE] [-r] [-M FILE] [-p FILE] [-P]
+                                     [-m MODULE] [--installed-name MODULE] [-r]
+                                     [-M FILE] [-p FILE] [-P]
                                      [-D] [--exclude-values] [-q]
 
    Generate stubs for nanobind-based extensions.
@@ -553,6 +560,7 @@ The program has the following command line options:
                                    specify multiple times)
      -m MODULE, --module MODULE    generate a stub for the specified module (can
                                    specify multiple times)
+     --installed-name MODULE      use this module name in generated imports
      -r, --recursive               recursively process submodules
      -M FILE, --marker-file FILE   generate a marker file (usually named 'py.typed')
      -p FILE, --pattern-file FILE  apply the given patterns to the generated stub

@@ -535,6 +535,12 @@ Nanobind's CMake tooling includes a convenience command to interface with the
         - Specifies the name of the module that should be imported. Only
           a single module can be specified. Mandatory.
 
+      * - ``INSTALLED_NAME``
+        - Installed name of a top-level build-time ``MODULE``, such as ``mylib.cppext`` for ``MODULE cppext``.
+          Generated imports use this name, while aliases preserve existing type references.
+          The module imported by stubgen and the output paths are unchanged.
+          Optional; omitting it preserves existing behavior.
+
       * - ``OUTPUT``
         - Specifies the name of the stub (``.pyi``) file to be written. The path
           is relative to ``CMAKE_CURRENT_BINARY_DIR`` for build-time stub

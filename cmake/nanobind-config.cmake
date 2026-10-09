@@ -854,7 +854,7 @@ function (nanobind_add_stub name)
     # Options
     "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;EXCLUDE_VALUES;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL"
     # Single-value arguments
-    "MODULE;COMPONENT;OUTPUT_PATH"
+    "MODULE;INSTALLED_NAME;COMPONENT;OUTPUT_PATH"
     # Multi-value arguments
     "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT;PATTERN_FILE")
 
@@ -907,6 +907,13 @@ function (nanobind_add_stub name)
     message(FATAL_ERROR "nanobind_add_stub(): a 'MODULE' argument must be specified!")
   else()
     list(APPEND NB_STUBGEN_ARGS -m "${ARG_MODULE}")
+  endif()
+
+  if ("INSTALLED_NAME" IN_LIST ARGN)
+    if (NOT DEFINED ARG_INSTALLED_NAME OR "${ARG_INSTALLED_NAME}" STREQUAL "")
+      message(FATAL_ERROR "nanobind_add_stub(): 'INSTALLED_NAME' requires a module name.")
+    endif()
+    list(APPEND NB_STUBGEN_ARGS --installed-name "${ARG_INSTALLED_NAME}")
   endif()
 
   list(LENGTH ARG_OUTPUT OUTPUT_LEN)

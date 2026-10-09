@@ -58,6 +58,7 @@ import builtins
 import enum
 from inspect import Signature, Parameter, signature, ismodule
 import io
+import keyword
 import os
 import textwrap
 import importlib
@@ -199,6 +200,11 @@ def create_subdirectory_for_module(module: types.ModuleType) -> bool:
         and module.__file__.endswith('__init__.py')
 
 
+def is_module_name(name: str) -> bool:
+    return all(part.isidentifier() and not keyword.iskeyword(part)
+               for part in name.split("."))
+
+
 class StubGen:
     def __init__(
         self,
@@ -211,10 +217,20 @@ class StubGen:
         max_expr_length: int = 50,
         patterns: Optional[List[ReplacePattern]] = None,
         quiet: bool = True,
-        output_file: Optional[Path] = None
+        output_file: Optional[Path] = None,
+        installed_name: Optional[str] = None
     ) -> None:
+        if installed_name is not None and not is_module_name(installed_name):
+            raise ValueError("installed_name must be a dotted Python module name")
+
         # Module to check for name conflicts when adding helper imports
         self.module = module
+
+        self._module_name_map: Dict[str, str] = {}
+        if installed_name is not None and installed_name != module.__name__:
+            if "." in module.__name__:
+                raise ValueError("installed_name requires a top-level build-time module")
+            self._module_name_map[module.__name__] = installed_name
 
         # Include docstrings in the generated stub?
         self.include_docstrings = include_docstrings
@@ -1089,6 +1105,7 @@ class StubGen:
                             output_file=output_file,
                             quiet=self.quiet
                         )
+                        sg._module_name_map = self._module_name_map
 
                         sg.put(value)
                         output_file = output_file.resolve()
@@ -1159,7 +1176,15 @@ class StubGen:
             return member
 
         if member is None and name is None:
-            self.module_refs.add(module)
+            source = module.partition(".")[0]
+            if source in self._module_name_map:
+                # Keep qualified references unchanged, using the runtime root
+                # as an alias for the installed module. Import the child too.
+                self.bind(source, name=source)
+                if module != source:
+                    self.module_refs.add(module)
+            else:
+                self.module_refs.add(module)
             return module
 
         local = name
@@ -1426,6 +1451,8 @@ class StubGen:
         from_imports: Dict[str, List[str]] = {}
 
         for local, (module, member, export) in self.bindings.items():
+            source, sep, tail = module.partition(".")
+            module = self._module_name_map.get(source, source) + sep + tail
             if member is None:
                 source, _, symbol = module.rpartition(".")
                 if not source:
@@ -1437,7 +1464,20 @@ class StubGen:
             item = symbol if local == symbol and not export else f"{symbol} as {local}"
             from_imports.setdefault(source, []).append(item)
 
-        for ref in self.module_refs:
+        reserved = set(self.bindings) | set(vars(self.module)) | {
+            ref.partition(".")[0] for ref in self.module_refs
+        }
+        for ref in sorted(self.module_refs):
+            source, sep, tail = ref.partition(".")
+            if source in self._module_name_map:
+                # Load children without shadowing names used by the stub.
+                local = "_" + ref.replace(".", "_")
+                while local in reserved:
+                    local = "_" + local
+                reserved.add(local)
+                module = self._module_name_map[source] + sep + tail
+                import_lines.setdefault(module, []).append(f"import {module} as {local}")
+                continue
             # A binding of the same top-level module already provides the name
             b = self.bindings.get(ref, None)
             if b is None or b[:2] != (ref, None):
@@ -1519,6 +1559,12 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--installed-name",
+        metavar="MODULE",
+        help="use this module name in generated imports",
+    )
+
+    parser.add_argument(
         "-r",
         "--recursive",
         default=False,
@@ -1585,6 +1631,13 @@ def parse_options(args: List[str]) -> argparse.Namespace:
     opt = parser.parse_args(args)
     if len(opt.modules) == 0:
         parser.error("At least one module must be specified.")
+    if opt.installed_name is not None:
+        if len(opt.modules) != 1:
+            parser.error("--installed-name requires a single module.")
+        if not is_module_name(opt.installed_name):
+            parser.error("--installed-name must be a dotted Python module name.")
+        if opt.installed_name != opt.modules[0] and "." in opt.modules[0]:
+            parser.error("--installed-name requires a top-level build-time module.")
     if len(opt.modules) > 1 and opt.output_file:
         parser.error(
             "The -o option can only be specified when a single module is being processed."
@@ -1719,7 +1772,8 @@ def main(args: Optional[List[str]] = None) -> None:
             include_private=opt.include_private,
             max_expr_length=0 if opt.exclude_values else 50,
             patterns=patterns,
-            output_file=file
+            output_file=file,
+            installed_name=opt.installed_name
         )
 
         if not opt.quiet:

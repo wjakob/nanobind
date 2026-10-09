@@ -155,3 +155,95 @@ def test09_flat_stub_reexports_submodule(stubgen, fresh_module):
         assert f"from {fresh_module.__name__} import child as child" in sg.get()
     finally:
         del sys.modules[child.__name__]
+
+
+def test10_installed_name_imports(stubgen, fresh_module, monkeypatch):
+    root = fresh_module.__name__
+    child = types.ModuleType(root + ".types")
+    monkeypatch.setitem(sys.modules, child.__name__, child)
+    value = root + ".types.Widget"
+    sig = (f'@deco.identity("a\u2028b")\n'
+           f'def f(cb: object = lambda a, b: "{value}", '
+           f'x: "{value}" = None) -> {value}', None, None)
+    baseline = stubgen.StubGen(module=fresh_module)
+    mapped = stubgen.StubGen(module=fresh_module, installed_name="installed.ext")
+    for sg in (baseline, mapped):
+        sg.put_nb_overload(None, sig)
+        sg.bind(root, "Widget", name="Renamed", export=True)
+        sg.bind(root + "_other")
+    # Only imports change, including for quoted annotations and runtime values.
+    assert mapped.output == baseline.output
+    out = mapped.get()
+    assert f"from installed import ext as {root}" in out
+    assert "from installed.ext import Widget as Renamed" in out
+    assert f"import installed.ext.types as _{root}_types" in out
+    assert f"import {root}_other\n" in out
+    assert "import " + root + ".types\n" not in out
+    assert mapped.get() == out
+
+
+@pytest.mark.parametrize("installed_name", [None, "py_recursive_stub_test", "installed.ext"])
+def test11_installed_name_recursive_cli(stubgen, tmp_path, monkeypatch, installed_name):
+    here = pathlib.Path(__file__).parent
+    monkeypatch.syspath_prepend(str(here))
+    monkeypatch.setenv("NB_STUBGEN", "1")
+    args = ["-m", "py_recursive_stub_test", "-r", "-O", str(tmp_path), "-q",
+            "-p", str(here / "pattern_file_recursive.nb")]
+    if installed_name is not None:
+        args += ["--installed-name", installed_name]
+    stubgen.main(args)
+    root = (tmp_path / "__init__.pyi").read_text()
+    nested = (tmp_path / "sub/mod.pyi").read_text()
+    if installed_name == "installed.ext":
+        assert "from installed import ext as py_recursive_stub_test" in root
+        assert "from installed.ext import" in root
+        assert "from installed.ext import alias as nickname, bar as bar" in nested
+        assert "py_recursive_stub_test.sub.mod" not in root
+    else:
+        for ref in (here / "py_recursive_stub_test").rglob("*.pyi.ref"):
+            generated = tmp_path / ref.relative_to(here / "py_recursive_stub_test").with_suffix("")
+            assert generated.read_bytes() == ref.read_bytes()
+
+
+@pytest.mark.parametrize("args", [
+    ["-m", "ext", "--installed-name", ""],
+    ["-m", "ext", "--installed-name", "pkg..ext"],
+    ["-m", "ext", "--installed-name", "pkg.class"],
+    ["-m", "one", "-m", "two", "--installed-name", "pkg.ext"],
+    ["-m", "pkg.ext", "--installed-name", "installed.ext"],
+])
+def test12_installed_name_invalid_cli(stubgen, args, capsys):
+    with pytest.raises(SystemExit) as exc:
+        stubgen.parse_options(args)
+    assert exc.value.code == 2
+    error = capsys.readouterr().err
+    assert "installed-name" in error
+    assert "unrecognized arguments" not in error
+
+
+@pytest.mark.parametrize("module_name,installed_name", [
+    ("ext", "pkg..ext"),
+    ("pkg.ext", "installed.ext"),
+])
+def test13_installed_name_invalid_constructor(stubgen, module_name, installed_name):
+    with pytest.raises(ValueError, match="installed_name"):
+        stubgen.StubGen(module=types.ModuleType(module_name), installed_name=installed_name)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test14_installed_name_child_import_collision(stubgen, fresh_module, reverse):
+    root = fresh_module.__name__
+    sg = stubgen.StubGen(module=fresh_module, installed_name="installed.ext")
+    alias = "_" + root + "_types"
+    setattr(fresh_module, alias, None)
+    sg.bind("external", "Widget", name="_" + alias)
+    refs = [root + ".types", "types", "__" + alias]
+    for ref in reversed(refs) if reverse else refs:
+        sg.bind(ref)
+    sg.write_ln(f"def f(x: {root}.types.Widget) -> types.ModuleType: ...")
+    out = sg.get()
+    assert f"import installed.ext.types as ___{alias}\n" in out
+    assert "import types\n" in out
+    assert "from installed.ext import types" not in out
+    assert out.endswith(f"def f(x: {root}.types.Widget) -> types.ModuleType: ...\n")
+    assert sg.get() == out

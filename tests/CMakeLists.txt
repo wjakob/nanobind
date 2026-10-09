@@ -265,6 +265,12 @@ set(TEST_FILES
   test_typing_ext.pyi.ref
   py_stub_test.py
   py_stub_test.pyi.ref
+  pattern_file_recursive.nb
+  py_recursive_stub_test/__init__.py
+  py_recursive_stub_test/alias.py
+  py_recursive_stub_test/bar.py
+  py_recursive_stub_test/sub/__init__.py
+  py_recursive_stub_test/sub/mod.py
   py_recursive_stub_test/__init__.pyi.ref
   py_recursive_stub_test/alias.pyi.ref
   py_recursive_stub_test/bar.pyi.ref

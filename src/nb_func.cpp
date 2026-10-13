@@ -1665,14 +1665,14 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
              *defaults = nullptr;
 
     func_data *f = nb_func_data(self);
-    uint32_t count = (uint32_t) Py_SIZE(self);
+    Py_ssize_t count = Py_SIZE(self);
     PyObject *result = PyTuple_New(count);
     if (!result)
         return nullptr;
 
     Buffer buf(128);
 
-    for (uint32_t i = 0; i < count; ++i) {
+    for (Py_ssize_t i = 0; i < count; ++i) {
         docstr = item = sigstr = defaults = nullptr;
 
         const func_data *fi = f + i;
@@ -1690,7 +1690,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         item = PyTuple_New(3);
         sigstr = PyUnicode_FromString(buf.get());
         if (n_default_args) {
-            defaults = PyTuple_New(n_default_args);
+            defaults = PyTuple_New((Py_ssize_t) n_default_args);
         } else {
             defaults = none_ref();
         }
@@ -1723,7 +1723,7 @@ PyObject *nb_func_get_nb_signature(PyObject *self, void *) {
         NB_TUPLE_SET_ITEM(item, 0, sigstr);
         NB_TUPLE_SET_ITEM(item, 1, docstr);
         NB_TUPLE_SET_ITEM(item, 2, defaults);
-        NB_TUPLE_SET_ITEM(result, (Py_ssize_t) i, item);
+        NB_TUPLE_SET_ITEM(result, i, item);
     }
 
     return result;

@@ -23,12 +23,12 @@ NAMESPACE_BEGIN(NB_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
 static PyObject **nb_dict_ptr(PyObject *self, PyTypeObject *tp) {
-    Py_ssize_t dictoffset = nb_type_data(tp)->dictoffset;
+    Py_ssize_t dictoffset = (Py_ssize_t) nb_type_data(tp)->dictoffset;
     return dictoffset ? (PyObject **) ((uint8_t *) self + dictoffset) : nullptr;
 }
 
 static PyObject **nb_weaklist_ptr(PyObject *self, PyTypeObject *tp) {
-    Py_ssize_t weaklistoffset = nb_type_data(tp)->weaklistoffset;
+    Py_ssize_t weaklistoffset = (Py_ssize_t) nb_type_data(tp)->weaklistoffset;
     return weaklistoffset ? (PyObject **) ((uint8_t *) self + weaklistoffset) : nullptr;
 }
 

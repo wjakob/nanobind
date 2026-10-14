@@ -2717,8 +2717,14 @@ PyObject *nb_type_name(PyObject *t) noexcept {
 #else
         PyObject *mod = PyObject_GetAttrString(t, "__module__");
 #endif
-        // Tolerate a missing or non-string '__module__' attribute
-        if (NB_LIKELY(mod && PyUnicode_Check(mod))) {
+        // Tolerate a missing or non-string '__module__' attribute, and one
+        // that cannot be encoded as UTF-8 (e.g. a lone surrogate), since
+        // callers convert the resulting name with PyUnicode_AsUTF8()
+        bool mod_ok = mod && PyUnicode_Check(mod) &&
+                      PyUnicode_AsUTF8AndSize(mod, nullptr);
+        if (!mod_ok)
+            PyErr_Clear();
+        if (NB_LIKELY(mod_ok)) {
             PyObject *combined = PyUnicode_FromFormat("%U.%U", mod, result);
             Py_DECREF(result);
             result = combined;

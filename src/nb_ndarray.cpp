@@ -550,14 +550,23 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     mt->dltensor.byte_offset = 0UL;
 
     const int64_t itemsize = (int64_t) view->itemsize;
-    for (int32_t i = 0; i < ndim; ++i) {
-        int64_t stride = view->strides[i] / itemsize;
-        if (stride * itemsize != view->strides[i]) {
-            PyBuffer_Release(view.get());
-            return mt_unique_ptr;
-        }
-        strides[i] = stride;
+    // An exporter may leave 'strides' NULL even though PyBUF_STRIDES was
+    // requested (e.g. ctypes arrays, NumPy scalars). The buffer is then
+    // C-contiguous.
+    int64_t contig_stride = 1;
+    for (int32_t i = ndim - 1; i >= 0; --i) {
         shape[i] = (int64_t) view->shape[i];
+        if (view->strides) {
+            int64_t stride = view->strides[i] / itemsize;
+            if (stride * itemsize != view->strides[i]) {
+                PyBuffer_Release(view.get());
+                return mt_unique_ptr;
+            }
+            strides[i] = stride;
+        } else {
+            strides[i] = contig_stride;
+            contig_stride *= shape[i];
+        }
     }
 
     mt->version = {dlpack::major_version, dlpack::minor_version};

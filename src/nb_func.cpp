@@ -542,6 +542,27 @@ PyObject *nb_func_new(nb_internals *p, const func_data_init_base *f) noexcept {
     }
 }
 
+/// Append the type name of 'o' to 'buf'. The name may hold a lone surrogate
+/// (from a hostile '__module__'), which UTF-8 cannot encode; escape it then.
+static void put_inst_name(Buffer &buf, PyObject *o) {
+    str name = steal<str>(nb_inst_name(o));
+    const char *s = PyUnicode_AsUTF8AndSize(name.ptr(), nullptr);
+    if (s) {
+        buf.put_dstr(s);
+        return;
+    }
+    PyErr_Clear();
+    PyObject *b = PyUnicode_AsEncodedString(name.ptr(), "utf-8",
+                                            "backslashreplace");
+    if (b) {
+        buf.put_dstr(PyBytes_AsString(b));
+        Py_DECREF(b);
+    } else {
+        PyErr_Clear();
+        buf.put('?');
+    }
+}
+
 /// Used by nb_func_vectorcall: generate an error when overload resolution fails
 static NB_NOINLINE PyObject *
 nb_func_error_overload(PyObject *self, PyObject *const *args_in,
@@ -573,8 +594,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
 
     buf.put("\nInvoked with types: ");
     for (size_t i = 0; i < nargs_in; ++i) {
-        str name = steal<str>(nb_inst_name(args_in[i]));
-        buf.put_dstr(name.c_str());
+        put_inst_name(buf, args_in[i]);
         if (i + 1 < nargs_in)
             buf.put(", ");
     }
@@ -596,8 +616,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             }
             buf.put_dstr(key_cstr);
             buf.put(": ");
-            str name = steal<str>(nb_inst_name(value));
-            buf.put_dstr(name.c_str());
+            put_inst_name(buf, value);
             buf.put(", ");
         }
         buf.rewind(2);

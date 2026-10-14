@@ -1019,6 +1019,16 @@ def test_56_unusual_module_in_overload_error():
     with pytest.raises(TypeError):
         t.test_05(BadRaise())
 
+    class BadSurrogate:
+        __module__ = "\udc80"  # a str that cannot be encoded as UTF-8
+
+    with pytest.raises(TypeError, match="BadSurrogate"):
+        t.test_05(BadSurrogate())
+
+    # ... also as a keyword argument
+    with pytest.raises(TypeError, match="x: .*BadSurrogate"):
+        t.test_05(1, x=BadSurrogate())
+
 
 @pytest.mark.skipif(not hasattr(sys, "getrefcount"),
                     reason="No reference counting")

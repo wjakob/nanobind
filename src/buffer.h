@@ -47,6 +47,26 @@ public:
     /// Append a dynamic string
     void put_dstr(const char *str) { put(str, strlen(str)); }
 
+    /// Append a Python 'str'. One that UTF-8 cannot encode (e.g. holding a
+    /// lone surrogate) is appended with backslash escapes instead.
+    void put_pystr(PyObject *o) {
+        Py_ssize_t size;
+        const char *s = PyUnicode_AsUTF8AndSize(o, &size);
+        if (s) {
+            put(s, (size_t) size);
+            return;
+        }
+        PyErr_Clear();
+        PyObject *b = PyUnicode_AsEncodedString(o, "utf-8", "backslashreplace");
+        if (b) {
+            put_dstr(PyBytes_AsString(b));
+            Py_DECREF(b);
+        } else {
+            PyErr_Clear();
+            put("<unencodable str>");
+        }
+    }
+
     /// Append a single character to the buffer
     void put(char c) {
         if (m_cur + 1 >= m_end)

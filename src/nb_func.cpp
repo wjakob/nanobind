@@ -574,7 +574,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
     buf.put("\nInvoked with types: ");
     for (size_t i = 0; i < nargs_in; ++i) {
         str name = steal<str>(nb_inst_name(args_in[i]));
-        buf.put_dstr(name.c_str());
+        buf.put_pystr(name.ptr());
         if (i + 1 < nargs_in)
             buf.put(", ");
     }
@@ -597,7 +597,7 @@ nb_func_error_overload(PyObject *self, PyObject *const *args_in,
             buf.put_dstr(key_cstr);
             buf.put(": ");
             str name = steal<str>(nb_inst_name(value));
-            buf.put_dstr(name.c_str());
+            buf.put_pystr(name.ptr());
             buf.put(", ");
         }
         buf.rewind(2);

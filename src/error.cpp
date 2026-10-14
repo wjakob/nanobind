@@ -166,14 +166,14 @@ const char *error_what(error_payload *p) noexcept {
         try {
             object name = steal(raise_if_null(
                 PyObject_GetAttrString(exc_type.ptr(), "__name__")));
-            exc_buf.put_dstr(borrow<str>(name).c_str());
+            exc_buf.put_pystr(borrow<str>(name).ptr());
             exc_buf.put(": ");
         } catch (...) { PyErr_Clear(); }
     }
 
     if (exc_value.is_valid()) {
         try {
-            exc_buf.put_dstr(str(exc_value).c_str());
+            exc_buf.put_pystr(str(exc_value).ptr());
         } catch (...) {
             PyErr_Clear();
             exc_buf.put("<exception str() failed>");

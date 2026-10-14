@@ -1022,8 +1022,12 @@ def test_56_unusual_module_in_overload_error():
     class BadSurrogate:
         __module__ = "\udc80"  # a str that cannot be encoded as UTF-8
 
-    with pytest.raises(TypeError, match="BadSurrogate"):
+    with pytest.raises(TypeError, match=r"\\udc80\.BadSurrogate"):
         t.test_05(BadSurrogate())
+
+    # ... also as a keyword argument
+    with pytest.raises(TypeError, match=r"x: \\udc80\.BadSurrogate"):
+        t.test_05(1, x=BadSurrogate())
 
 
 @pytest.mark.skipif(not hasattr(sys, "getrefcount"),

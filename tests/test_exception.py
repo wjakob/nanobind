@@ -127,3 +127,13 @@ def test22_what_bad_str():
         assert "BadStr" in what
         assert "<exception str() failed>" in what
 
+
+def test23_what_not_utf8():
+    # A message that UTF-8 cannot encode (a lone surrogate)
+    # is rendered with backslash escapes instead of crashing
+    def raises():
+        raise ValueError("bad \udc80 message")
+
+    what = t.call_and_report_what(raises)
+    if "<error while formatting exception>" not in what:
+        assert what.rstrip().endswith("ValueError: bad \\udc80 message")

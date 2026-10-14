@@ -553,7 +553,7 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
     // An exporter may leave 'strides' NULL even though PyBUF_STRIDES was
     // requested (e.g. ctypes arrays, NumPy scalars). The buffer is then
     // C-contiguous.
-    int64_t contig = 1;
+    int64_t contig_stride = 1;
     for (int32_t i = ndim - 1; i >= 0; --i) {
         shape[i] = (int64_t) view->shape[i];
         if (view->strides) {
@@ -564,9 +564,9 @@ static mt_unique_ptr_t make_mt_from_buffer_protocol(PyObject *o, bool ro) {
             }
             strides[i] = stride;
         } else {
-            strides[i] = contig;
+            strides[i] = contig_stride;
+            contig_stride *= shape[i];
         }
-        contig *= shape[i];
     }
 
     mt->version = {dlpack::major_version, dlpack::minor_version};

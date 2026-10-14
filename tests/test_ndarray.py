@@ -1263,3 +1263,23 @@ def test55_empty_ndarray():
     arr = t.ret_ndarray_empty()
     assert arr.shape == (0,)
     assert arr.dtype == np.float32
+
+
+def test56_buffer_without_strides():
+    # ctypes arrays export a buffer whose 'strides' field is NULL even when
+    # PyBUF_STRIDES is requested; the buffer is then C-contiguous
+    import ctypes
+    a = (ctypes.c_double * 3)(1, 2, 3)
+    assert t.get_shape(a) == [3]
+    assert t.get_stride(a, 0) == 1
+    b = ((ctypes.c_int32 * 3) * 2)()
+    assert t.get_shape(b) == [2, 3]
+    assert t.get_stride(b, 0) == 3
+    assert t.get_stride(b, 1) == 1
+
+
+@needs_numpy
+def test57_numpy_scalar_without_strides():
+    # A NumPy datetime64 scalar exports a 0-d buffer with NULL 'strides'
+    with pytest.raises(TypeError):
+        t.check_ro_by_value_const_float64(np.datetime64(1, "ns"))

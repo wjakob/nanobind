@@ -166,7 +166,7 @@ const char *error_what(error_payload *p) noexcept {
         try {
             object name = steal(raise_if_null(
                 PyObject_GetAttrString(exc_type.ptr(), "__name__")));
-            exc_buf.put_pystr(borrow<str>(name).ptr());
+            exc_buf.put_pystr(name.ptr());
             exc_buf.put(": ");
         } catch (...) { PyErr_Clear(); }
     }

@@ -94,8 +94,23 @@ NB_MODULE(test_make_iterator_ext, m) {
                                            map.end());
         }, nb::keep_alive<0, 1>());
 
+    struct AuditIter {
+        int val;
+        int operator*() const { return val; }
+        AuditIter &operator++() { ++val; return *this; }
+        bool operator==(const AuditIter &other) const {
+            return val == other.val;
+        }
+    };
+
+    m.def("make_audit_iterator", []() {
+        return nb::make_iterator(nb::type<IdentityMap>(), "audit_iterator",
+                                 AuditIter{0}, AuditIter{10});
+    });
+
     nb::list all;
     all.append("iterator_passthrough");
+    all.append("make_audit_iterator");
     all.append("StringMap");
     all.append("IdentityMap");
     m.attr("__all__") = all;

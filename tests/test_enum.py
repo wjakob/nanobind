@@ -1,4 +1,5 @@
 import test_enum_ext as t
+import enum
 import pytest
 
 def test01_unsigned_enum():
@@ -190,9 +191,13 @@ def test06_enum_flag():
     assert t.to_flag(5) == (t.Flag.A | t.Flag.C)
 
     # Returning a flag value with bits outside the registered mask must raise
-    # a catchable Python exception rather than aborting the process.
-    with pytest.raises(ValueError):
-        t.to_flag(8)
+    # a catchable Python exception rather than aborting the process. Python
+    # 3.11.0-3.11.3 use a CONFORM boundary by default, which drops such bits.
+    if hasattr(enum, 'CONFORM') and t.Flag._boundary_ is enum.CONFORM:
+        assert t.to_flag(8) == t.Flag(0)
+    else:
+        with pytest.raises(ValueError):
+            t.to_flag(8)
 
 def test09_enum_methods():
     assert t.Item1.my_value == 0 and t.Item2.my_value == 1

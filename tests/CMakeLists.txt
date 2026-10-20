@@ -105,6 +105,7 @@ endif()
 
 set(TEST_NAMES
   accessor
+  introspection
   functions
   callbacks
   classes
@@ -235,6 +236,7 @@ set(TEST_FILES
   test_exception.py
   test_foreign.py
   test_functions.py
+  test_introspection.py
   test_holders.py
   test_inter_module.py
   test_intrusive.py

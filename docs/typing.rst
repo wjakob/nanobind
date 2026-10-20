@@ -16,6 +16,42 @@ This section covers three broad typing-related topics:
 3. How to write :ref:`pattern files <pattern_files>` to handle advanced use
    cases requiring significant stub customization.
 
+Runtime introspection
+---------------------
+
+Nanobind functions support ``inspect.signature()`` and
+``inspect.get_annotations()`` through ``__signature__`` and ``__annotations__``.
+Signatures preserve parameter kinds and actual default objects; annotations are
+unevaluated strings. Bound methods omit a fixed positional receiver and retain
+a leading ``*args``, following Python's rules. Empty signatures or a leading
+keyword-only parameter or ``**kwargs`` raise ``ValueError`` on bound access.
+Results are created on access; changing an annotation dictionary does not
+affect later reads. Consumers may retain a signature to avoid repeated work.
+
+Overloaded functions have no standard signature: ``inspect.signature()`` raises
+``ValueError``, and ``__annotations__`` returns an empty dictionary. Individual
+overloads remain available through ``__nb_signature__`` and generated stubs.
+Parameter layouts that Python cannot represent also raise ``ValueError``,
+while their annotations remain available.
+
+Unnamed parameters use synthetic names such as ``arg`` or ``arg0`` in
+``__annotations__``. These names do not enable keyword arguments and may collide
+with explicit parameter names; later annotations overwrite earlier ones.
+Use ``__signature__`` parameter kinds to determine keyword support: generated
+docstrings may omit ``/`` for mixed named and unnamed positional parameters.
+
+For a :cpp:class:`nb::sig <sig>` override, Python's ``ast`` module parses the
+advertised signature without executing decorators, annotations, or defaults,
+or changing argument dispatch. Invalid syntax, including syntax unsupported by
+the running Python version, blocks both attributes. Defaults use the binding's
+object at the corresponding parameter position when present; otherwise they
+must be Python literals. An unrecoverable default blocks only the signature:
+``__annotations__`` does not recover defaults.
+
+Extensions sharing a nanobind runtime use the first loaded runtime's function
+type. If that runtime predates this feature, these attributes are unavailable
+until it is upgraded.
+
 Signature customization
 -----------------------
 

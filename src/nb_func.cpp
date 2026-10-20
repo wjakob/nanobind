@@ -10,6 +10,8 @@
 #include "nb_internals.h"
 #include "buffer.h"
 #include "nb_ft.h"
+#include <string>
+#include <vector>
 
 /// Maximum number of arguments supported by 'nb_vectorcall_simple'
 #define NB_MAXARGS_SIMPLE 8
@@ -39,9 +41,11 @@ static PyObject *nb_func_vectorcall_medium(PyObject *, PyObject *const *,
                                            size_t, PyObject *) noexcept;
 static PyObject *nb_func_vectorcall_complex(PyObject *, PyObject *const *,
                                             size_t, PyObject *) noexcept;
+struct func_signature;
 static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                                          const func_data *f,
-                                         bool nb_signature_mode = false) noexcept;
+                                         bool nb_signature_mode = false,
+                                         func_signature *signature = nullptr);
 
 int nb_func_traverse(PyObject *self, visitproc visit, void *arg) {
     size_t size = (size_t) Py_SIZE(self);
@@ -1390,10 +1394,38 @@ PyObject *nb_method_descr_get(PyObject *self, PyObject *inst, PyObject *) {
     }
 }
 
-/// Render the function signature of a single function
+// Temporary introspection data, never stored in the function's ABI records.
+struct func_parameter {
+    std::string name;
+    object annotation, default_value;
+    int kind; // inspect.Parameter's five public parameter kinds
+};
+
+struct func_signature {
+    std::vector<func_parameter> parameters;
+    object return_annotation;
+};
+
+// Only expose a keyword receiver with a keyword-capable dispatcher and
+// named positional parameters, preserving Python's parameter-kind ordering.
+static int nb_func_self_kind(PyObject *self) {
+    const func_data *f = nb_func_data(self);
+    if (f->nargs_pos == 0)
+        return -1; // receiver belongs to *args, or there is none
+    if (((nb_func *) self)->complexity == call_complexity::simple ||
+        !(f->flags & (uint32_t) func_flags::has_args))
+        return 0;
+    for (size_t i = 1; i < f->nargs_pos; ++i)
+        if (!f->args[i].name)
+            return 0;
+    return 1;
+}
+
+/// Render a signature, optionally collecting metadata in the same traversal.
 static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                                          const func_data *f,
-                                         bool nb_signature_mode) noexcept {
+                                         bool nb_signature_mode,
+                                         func_signature *signature) {
     const bool is_method      = f->flags & (uint32_t) func_flags::is_method,
                has_args       = f->flags & (uint32_t) func_flags::has_args,
                has_var_args   = f->flags & (uint32_t) func_flags::has_var_args,
@@ -1422,6 +1454,7 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
     bool rv = false;
 
     uint32_t arg_index = 0, n_default_args = 0;
+    size_t name_start = 0, name_end = 0, annotation_start = 0;
     buf.put_dstr(f->name);
 
     for (const char *pc = f->descr; *pc != '\0'; ++pc) {
@@ -1456,7 +1489,9 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                     // Argument name
                     if (has_var_kwargs && arg_index + 1 == f->nargs) {
                         buf.put("**");
+                        name_start = buf.size();
                         buf.put_dstr(arg_name ? arg_name : "kwargs");
+                        name_end = annotation_start = buf.size();
                         // Skip the type name without rendering it.
                         while (pc[1] != '}') {
                             if (pc[1] == '%')
@@ -1469,7 +1504,9 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                     if (arg_index == f->nargs_pos) {
                         buf.put("*");
                         if (has_var_args) {
+                            name_start = buf.size();
                             buf.put_dstr(arg_name ? arg_name : "args");
+                            name_end = annotation_start = buf.size();
                             // Skip the type name without rendering it.
                             while (pc[1] != '}') {
                                 if (pc[1] == '%')
@@ -1483,8 +1520,11 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                         }
                     }
 
+                    name_start = buf.size();
                     if (is_method && arg_index == 0) {
                         buf.put("self");
+                        if (signature)
+                            signature->parameters.push_back({ "self", {}, {}, 0 });
 
                         // Skip over type
                         while (*pc != '}') {
@@ -1502,7 +1542,9 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                             buf.put_uint32(arg_index - is_method);
                     }
 
+                    name_end = buf.size();
                     buf.put(": ");
+                    annotation_start = buf.size();
                 }
                 break;
 
@@ -1512,7 +1554,7 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                     if (f->args[arg_index].flag & cast_flags::accepts_none)
                         buf.put(" | None");
 
-                    if (f->args[arg_index].value) {
+                    if (!signature && f->args[arg_index].value) {
                         const arg_data &arg = f->args[arg_index];
                         if (nb_signature_mode) {
                             buf.put(" = \\");
@@ -1544,6 +1586,24 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                     }
                 }
 
+                if (signature) {
+                    // The name's presence, not has_args, determines whether a
+                    // parameter can be supplied by keyword. Keep real defaults
+                    // alive without invoking their repr or display override.
+                    int kind = has_var_kwargs && arg_index + 1 == f->nargs ? 4 :
+                               has_var_args && arg_index == f->nargs_pos ? 2 :
+                               arg_index >= f->nargs_pos ? 3 :
+                               has_args && f->args[arg_index].name ? 1 : 0;
+                    signature->parameters.push_back({
+                        std::string(buf.get() + name_start, name_end - name_start),
+                        name_end == annotation_start ? object() :
+                            steal(raise_if_null(PyUnicode_FromStringAndSize(
+                                buf.get() + annotation_start,
+                                (Py_ssize_t) (buf.size() - annotation_start)))),
+                        has_args ? borrow(f->args[arg_index].value) : object(), kind
+                    });
+                }
+
                 arg_index++;
 
                 if (arg_index == f->nargs_pos) {
@@ -1567,9 +1627,12 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                     type_data *td = nb_type_c2p(internals_, *descr_type);
 
                     if (td) {
-                        // Non-throwing lookups: this function is noexcept, and
-                        // the attributes may be missing or have a non-str type
+                        // Attributes may be missing or have a non-str type.
+                        // Keep docstrings and error rendering non-throwing.
                         PyObject *tp = (PyObject *) td->type_py;
+                        // Attribute lookup can rebind the function and release
+                        // its type; keep it alive throughout introspection.
+                        object type_owner = signature ? borrow(tp) : object();
                         object mod = steal(getattr(
                                    tp, NB_INTERNED(internals_, __module__),
                                    nullptr)),
@@ -1606,9 +1669,18 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
                 break;
 
             case '-':
-                if (pc[1] == '>')
-                    rv = true;
                 buf.put(c);
+                // Only the first arrow after the arguments separates the
+                // return type. Type-caster names can contain arrows, too.
+                if (pc[1] == '>' && arg_index == f->nargs && !rv) {
+                    rv = true;
+                    if (signature) {
+                        buf.put(*++pc);
+                        annotation_start = buf.size();
+                        if (pc[1] == ' ')
+                            annotation_start++;
+                    }
+                }
                 break;
 
 
@@ -1622,7 +1694,230 @@ static uint32_t nb_func_render_signature(Buffer &buf, nb_internals *internals_,
           "nanobind::detail::nb_func_render_signature(%s): arguments inconsistent.",
           f->name);
 
+    if (signature && rv)
+        signature->return_annotation = steal(raise_if_null(
+            PyUnicode_FromStringAndSize(buf.get() + annotation_start,
+                                       (Py_ssize_t) (buf.size() - annotation_start))));
+
     return n_default_args;
+}
+
+// Python callbacks can register overloads and transfer or release the original
+// record. Own the metadata before rendering, and form its view only when used.
+struct func_snapshot {
+    func_snapshot(const func_data &f, bool for_signature)
+        : data(f), name(f.name), descr(f.descr),
+          source(f.signature ? f.signature : "") {
+        for (const std::type_info **t = f.descr_types;; ++t) {
+            types.push_back(*t);
+            if (!*t)
+                break;
+        }
+        if (f.flags & (uint32_t) func_flags::has_args) {
+            args.assign(f.args, f.args + f.nargs);
+            owners.reserve((for_signature ? 2 : 1) * f.nargs);
+            for (arg_data &arg : args) {
+                owners.push_back(borrow(arg.name_py));
+                if (for_signature)
+                    owners.push_back(borrow(arg.value));
+                else
+                    arg.value = nullptr;
+            }
+        }
+    }
+
+    func_data view() {
+        func_data result = data;
+        result.name = name.c_str();
+        result.descr = descr.c_str();
+        result.signature = source.data();
+        result.descr_types = types.data();
+        result.args = args.data();
+        return result;
+    }
+
+private:
+    func_data data;
+    std::string name, descr, source;
+    std::vector<const std::type_info *> types;
+    std::vector<arg_data> args;
+    std::vector<object> owners;
+};
+
+static func_signature nb_func_parse_signature(nb_internals *p,
+                                              const func_data *f,
+                                              bool for_signature) {
+    func_signature result;
+    // nb::sig is an explicit introspection override. Delegate its syntax
+    // to Python's public AST API: parsing never executes decorators, type
+    // annotations, or default expressions. No Python parser is duplicated.
+    std::string source = std::string(f->signature) + ": pass";
+    object ast = steal(raise_if_null(PyImport_ImportModule("ast")));
+    object tree = obj_call(p, str_getattr(p, ast, "parse"),
+                          str(source.c_str()));
+    object body = str_getattr(p, tree, "body");
+    object fn = steal(raise_if_null(PySequence_GetItem(body.ptr(), 0)));
+    object args = str_getattr(p, fn, "args"),
+           unparse = str_getattr(p, ast, "unparse"),
+           literal_eval = str_getattr(p, ast, "literal_eval");
+    auto utf8 = [](handle value) -> std::string {
+        const char *text = PyUnicode_AsUTF8AndSize(value.ptr(), nullptr);
+        if (!text)
+            raise_python_error();
+        return text;
+    };
+    auto annotation = [&](handle node) -> object {
+        if (node.is_none())
+            return {};
+        // An explicitly quoted forward reference is already a string.
+        object value = str_getattr_def(p, node, "value");
+        return value.is_valid() && PyUnicode_Check(value.ptr())
+            ? std::move(value) : obj_call(p, unparse, node);
+    };
+    auto add = [&](handle node, int kind, handle default_node) {
+        object name = str_getattr(p, node, "arg");
+        object value;
+        if (for_signature && !default_node.is_none()) {
+            size_t i = result.parameters.size();
+            handle actual((f->flags & (uint32_t) func_flags::has_args) && i < f->nargs
+                ? f->args[i].value : nullptr);
+            // Prefer the binding's object, even when its presentation is
+            // customized. Otherwise only literal defaults can be recovered.
+            value = actual.is_valid() ? borrow(actual)
+                                     : obj_call(p, literal_eval, default_node);
+        }
+        result.parameters.push_back({
+            utf8(name),
+            annotation(str_getattr(p, node, "annotation")),
+            std::move(value), kind
+        });
+    };
+
+    list posonly = borrow<list>(str_getattr(p, args, "posonlyargs")),
+         positional = steal<list>(raise_if_null(PySequence_Concat(
+             posonly.ptr(), str_getattr(p, args, "args").ptr()))),
+         positional_defaults = borrow<list>(str_getattr(p, args, "defaults"));
+    size_t required = positional.size() - positional_defaults.size();
+    for (size_t i = 0; i < positional.size(); ++i)
+        add(positional[i], i < posonly.size() ? 0 : 1,
+            i < required ? handle(Py_None) : handle(positional_defaults[i - required]));
+    object vararg = str_getattr(p, args, "vararg");
+    if (!vararg.is_none())
+        add(vararg, 2, handle(Py_None));
+    list kwonly = borrow<list>(str_getattr(p, args, "kwonlyargs")),
+         kwdefaults = borrow<list>(str_getattr(p, args, "kw_defaults"));
+    for (size_t i = 0; i < kwonly.size(); ++i)
+        add(kwonly[i], 3, kwdefaults[i]);
+    object kwarg = str_getattr(p, args, "kwarg");
+    if (!kwarg.is_none())
+        add(kwarg, 4, handle(Py_None));
+    result.return_annotation = annotation(str_getattr(p, fn, "returns"));
+    return result;
+}
+
+static func_signature nb_func_collect_signature(PyObject *self,
+                                                bool for_signature) {
+    Py_ssize_t count = Py_SIZE(self);
+    // Overloads only expose __nb_signature__ for now. Superseded
+    // callables have no records after nb_func_new() transfers them away.
+    if (count != 1) {
+        if (!for_signature)
+            return {};
+        PyErr_SetString(PyExc_ValueError, count ?
+                        "overloaded functions have no signature" :
+                        "function has no overloads");
+        raise_python_error();
+    }
+    nb_internals *p = nb_func_internals(self);
+    const func_data *f = nb_func_data(self);
+    int self_kind = (f->flags & (uint32_t) func_flags::is_method)
+        ? nb_func_self_kind(self) : -1;
+    func_snapshot snapshot(*f, for_signature);
+    func_data record = snapshot.view();
+    if (record.flags & (uint32_t) func_flags::has_signature)
+        return nb_func_parse_signature(p, &record, for_signature);
+
+    func_signature result;
+    Buffer buf(128);
+    nb_func_render_signature(buf, p, &record, false, &result);
+    if ((record.flags & (uint32_t) func_flags::is_method) && self_kind >= 0)
+        result.parameters.front().kind = self_kind;
+    return result;
+}
+
+static object nb_func_make_signature(nb_internals *p,
+                                     const func_signature &data, bool bound) {
+    dict kwargs = steal<dict>(raise_if_null(PyDict_New()));
+    auto set = [&](const char *name, handle value) {
+        if (value.is_valid())
+            raise_if_nonzero(PyDict_SetItemString(kwargs.ptr(), name, value.ptr()));
+    };
+    object inspect = steal(raise_if_null(PyImport_ImportModule("inspect")));
+    object parameter_type = str_getattr(p, inspect, "Parameter");
+    list parameters = steal<list>(raise_if_null(PyList_New(0)));
+    const char *kinds[] = { "POSITIONAL_ONLY", "POSITIONAL_OR_KEYWORD",
+                           "VAR_POSITIONAL", "KEYWORD_ONLY", "VAR_KEYWORD" };
+    for (const auto &arg : data.parameters) {
+        kwargs.clear();
+        set("annotation", arg.annotation);
+        set("default", arg.default_value);
+        str name(arg.name.c_str());
+        object kind = str_getattr(p, parameter_type, kinds[arg.kind]);
+        object args = steal(raise_if_null(PyTuple_Pack(2, name.ptr(), kind.ptr())));
+        object parameter = steal(raise_if_null(
+            PyObject_Call(parameter_type.ptr(), args.ptr(), kwargs.ptr())));
+        parameters.append(parameter);
+    }
+
+    kwargs.clear();
+    set("return_annotation", data.return_annotation);
+    object args = steal(raise_if_null(PyTuple_Pack(1, parameters.ptr())));
+    object signature_type = str_getattr(p, inspect, "Signature");
+    object result = steal(raise_if_null(
+        PyObject_Call(signature_type.ptr(), args.ptr(), kwargs.ptr())));
+
+    // Validate the full signature before applying Python's bound-method rules.
+    if (!bound)
+        return result;
+    if (data.parameters.empty() || data.parameters.front().kind >= 3) {
+        PyErr_SetString(PyExc_ValueError, "invalid method signature");
+        raise_python_error();
+    }
+    if (data.parameters.front().kind == 2)
+        return result; // A leading *args remains in the bound signature.
+
+    parameters = steal<list>(raise_if_null(PyList_GetSlice(
+        parameters.ptr(), 1, (Py_ssize_t) data.parameters.size())));
+    kwargs.clear();
+    set("parameters", parameters);
+    args = steal(raise_if_null(PyTuple_New(0)));
+    object replace = str_getattr(p, result, "replace");
+    return steal(raise_if_null(PyObject_Call(replace.ptr(), args.ptr(), kwargs.ptr())));
+}
+
+static PyObject *nb_func_get_introspection(PyObject *self, bool for_signature,
+                                           bool bound = false) {
+    try {
+        func_signature data = nb_func_collect_signature(self, for_signature);
+        if (for_signature)
+            return nb_func_make_signature(nb_func_internals(self), data, bound)
+                .release().ptr();
+
+        dict annotations = steal<dict>(raise_if_null(PyDict_New()));
+        for (const auto &arg : data.parameters)
+            if (arg.annotation.is_valid())
+                raise_if_nonzero(PyDict_SetItemString(
+                    annotations.ptr(), arg.name.c_str(), arg.annotation.ptr()));
+        if (data.return_annotation.is_valid())
+            raise_if_nonzero(PyDict_SetItemString(
+                annotations.ptr(), "return", data.return_annotation.ptr()));
+        return annotations.release().ptr();
+    } catch (python_error &e) {
+        e.restore();
+    } catch (const std::bad_alloc &) {
+        PyErr_NoMemory();
+    }
+    return nullptr;
 }
 
 static PyObject *nb_func_get_name(PyObject *self) {
@@ -1794,6 +2089,10 @@ PyObject *nb_func_getattro(PyObject *self, PyObject *name_) {
         return nb_func_get_qualname(self);
     else if (strcmp(name, "__doc__") == 0)
         return nb_func_get_doc(self, nullptr);
+    else if (strcmp(name, "__annotations__") == 0)
+        return nb_func_get_introspection(self, false);
+    else if (strcmp(name, "__signature__") == 0)
+        return nb_func_get_introspection(self, true);
     else
         return PyObject_GenericGetAttr(self, name_);
 }
@@ -1805,6 +2104,9 @@ PyObject *nb_bound_method_get_doc(PyObject *self, void *) {
 PyObject *nb_bound_method_getattro(PyObject *self, PyObject *name_) {
     bool passthrough = false;
     if (const char *name = PyUnicode_AsUTF8AndSize(name_, nullptr)) {
+        if (strcmp(name, "__signature__") == 0)
+            return nb_func_get_introspection(
+                (PyObject *) ((nb_bound_method *) self)->func, true, true);
         // These attributes do exist on nb_bound_method (because they
         // exist on every type) but we want to take their special handling
         // from nb_func_getattro instead.

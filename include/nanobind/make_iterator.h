@@ -11,6 +11,7 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/pair.h>
+#include <atomic>
 #include <iterator>
 #include <new>
 #include <optional>
@@ -114,31 +115,35 @@ typed<iterator, ValueType> make_iterator_impl(handle scope, const char *name,
         "make_iterator_impl(): the generated __next__ would copy elements, so the "
         "element type must be copy-constructible");
 
-    {
-#if defined(NB_FREE_THREADED)
-        static ft_mutex mu;
-        ft_lock_guard lock(mu);
-#endif
-        if (!type<State>().is_valid()) {
-            class_<State>(scope, name)
-                .def("__iter__", [](handle h) { return h; })
-                .def("__next__",
-                    [](State &s) -> iter_result<ValueType> {
-                        if (!s.first_or_done)
-                            ++s.it;
-                        else
-                            s.first_or_done = false;
+    static std::atomic<bool> initialized { false };
+    if (!initialized.load(std::memory_order_acquire)) {
+        gil_scoped_release release;
+        static bool init = [&]() {
+            gil_scoped_acquire acquire;
+            if (!type<State>().is_valid()) {
+                class_<State>(scope, name)
+                    .def("__iter__", [](handle h) { return h; })
+                    .def("__next__",
+                        [](State &s) -> iter_result<ValueType> {
+                            if (!s.first_or_done)
+                                ++s.it;
+                            else
+                                s.first_or_done = false;
 
-                        if (s.it == s.end) {
-                            s.first_or_done = true;
-                            return { };
-                        }
+                            if (s.it == s.end) {
+                                s.first_or_done = true;
+                                return { };
+                            }
 
-                        return Access()(s.it);
-                    },
-                    std::forward<Extra>(extra)...,
-                    rv_policy::policy_tag<Policy>());
-        }
+                            return Access()(s.it);
+                        },
+                        std::forward<Extra>(extra)...,
+                        rv_policy::policy_tag<Policy>());
+            }
+            initialized.store(true, std::memory_order_release);
+            return true;
+        }();
+        (void) init;
     }
     return borrow<typed<iterator, ValueType>>(cast(State{
         std::forward<Iterator>(first), std::forward<Sentinel>(last), true }));
@@ -159,16 +164,22 @@ template <typename State> struct next_step { State *state; };
 /// Register the Python iterator type ``State`` on first use
 template <typename State, rv_policy::value Policy>
 void register_step_iterator(handle scope, const char *name) {
-#if defined(NB_FREE_THREADED)
-    static ft_mutex mu;
-    ft_lock_guard lock(mu);
-#endif
-    if (!type<State>().is_valid()) {
-        class_<State>(scope, name)
-            .def("__iter__", [](handle h) { return h; })
-            .def("__next__",
-                 [](State &s) -> next_step<State> { return { &s }; },
-                 rv_policy::policy_tag<Policy>());
+    static std::atomic<bool> initialized { false };
+    if (!initialized.load(std::memory_order_acquire)) {
+        gil_scoped_release release;
+        static bool init = [&]() {
+            gil_scoped_acquire acquire;
+            if (!type<State>().is_valid()) {
+                class_<State>(scope, name)
+                    .def("__iter__", [](handle h) { return h; })
+                    .def("__next__",
+                         [](State &s) -> next_step<State> { return { &s }; },
+                         rv_policy::policy_tag<Policy>());
+            }
+            initialized.store(true, std::memory_order_release);
+            return true;
+        }();
+        (void) init;
     }
 }
 

@@ -340,6 +340,23 @@ constraints. In split mode, nanobind internals are packaged into a separate
 backend package (the official one is called ``nanobind-backend``). All extensions
 sharing a backend have full mutual visibility of type bindings.
 
+What is nanobind's threat model?
+--------------------------------
+
+nanobind connects trusted C++ code to a Python interpreter. Code running in the
+process is assumed to be trusted. This includes the extension and Python code
+that imports it. Python does not provide a security boundary between such code
+(consider, e..g, that ``ctypes`` can read and write arbitrary memory). For this
+reason, nanobind makes no attempt to protect itself from deliberately
+adversarial Python or C++ code.
+
+In contrast, arguments passed in function calls are considered untrusted.
+Passing them through nanobind should either succeed or cleanly fail. If you can
+cause a crash or other kind of undefined behavior by passing invalid arguments
+for a function, then this would be considered a high-priority bug. Please
+report such problems to the maintainer. However, note that there is no bug
+bounty program as nanobind is an open source project without financial backing.
+
 Policy on Clang-Tidy, ``-Wpedantic``, etc.
 ------------------------------------------
 

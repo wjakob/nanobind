@@ -24,7 +24,7 @@ template <typename... Ts> struct type_caster<std::tuple<Ts...>> {
 
     static constexpr auto Name =
         const_name("tuple[") +
-        const_name<N == 0>(const_name("()"), concat(make_caster<Ts>::Name...)) +
+        const_name<N == 0>(const_name("()"), (concat)(make_caster<Ts>::Name...)) +
         const_name("]");
 
     /// This caster constructs instances on the fly (otherwise it would not be

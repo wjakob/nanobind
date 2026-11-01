@@ -113,7 +113,7 @@ set(NB_OPT_SIZE $<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>,$<CONFIG:RelWithDebI
 # Probe for the faster TLSDESC thread-local storage ABI (Linux/x86_64)
 # ---------------------------------------------------------------------------
 
-if (NOT (MSVC OR WIN32 OR APPLE))
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag(-mtls-dialect=gnu2 NB_HAS_MTLS_GNU2)
 endif()

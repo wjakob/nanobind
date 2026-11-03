@@ -37,6 +37,20 @@ conditional check.
 
     find_package(Python 3.10 COMPONENTS Interpreter ${DEV_MODULE} REQUIRED)
 
+.. note::
+
+    Cross-compilation is not officially supported, but nanobind does not
+    require a *runnable* ``Interpreter`` component when
+    ``CMAKE_CROSSCOMPILING`` is set: querying the extension module suffix
+    only relies on information that CMake's ``FindPython`` module can obtain
+    without executing the target Python (e.g. via a ``python-config``
+    script), so it is enough to request the ``Development.Module`` component
+    for the target Python. If that information cannot be determined this way,
+    set ``Python_SOABI`` (or ``SKBUILD_SOABI`` when using scikit-build-core)
+    manually before including nanobind. Generating stubs with
+    :cmake:command:`nanobind_add_stub` still requires an interpreter that can
+    run on the build machine.
+
 Add the following lines below. They configure CMake to perform an optimized
 *release* build by default unless another build type is specified. Without this
 addition, binding code may run slowly and produce large binaries.

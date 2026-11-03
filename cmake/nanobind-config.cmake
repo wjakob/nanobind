@@ -854,7 +854,7 @@ function (nanobind_add_stub name)
     # Options
     "VERBOSE;INCLUDE_PRIVATE;EXCLUDE_DOCSTRINGS;EXCLUDE_VALUES;INSTALL_TIME;RECURSIVE;EXCLUDE_FROM_ALL"
     # Single-value arguments
-    "MODULE;COMPONENT;OUTPUT_PATH"
+    "MODULE;COMPONENT;OUTPUT_PATH;MIN_PYTHON_VERSION"
     # Multi-value arguments
     "PYTHON_PATH;DEPENDS;MARKER_FILE;OUTPUT;PATTERN_FILE")
 
@@ -895,6 +895,10 @@ function (nanobind_add_stub name)
   foreach (PATTERN_FILE IN LISTS ARG_PATTERN_FILE)
     list(APPEND NB_STUBGEN_ARGS -p "${PATTERN_FILE}")
   endforeach()
+
+  if (ARG_MIN_PYTHON_VERSION)
+    list(APPEND NB_STUBGEN_ARGS --min-python-version "${ARG_MIN_PYTHON_VERSION}")
+  endif()
 
   if (ARG_MARKER_FILE)
     foreach (MARKER_FILE IN LISTS ARG_MARKER_FILE)

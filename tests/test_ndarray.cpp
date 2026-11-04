@@ -630,14 +630,18 @@ NB_MODULE(test_ndarray_ext, m) {
         nb::ndarray<float> value;
 
         static int tp_traverse(PyObject* self, visitproc visit, void* arg) {
+            Py_VISIT(Py_TYPE(self));
+            if (!nb::inst_ready(self))
+                return 0;
             Wrapper* w = nb::inst_ptr<Wrapper>(self);
             nb::handle value = nb::find(w->value);
             Py_VISIT(value.ptr());
-            Py_VISIT(Py_TYPE(self));
             return 0;
         }
 
         static int tp_clear(PyObject* self) {
+            if (!nb::inst_ready(self))
+                return 0;
             Wrapper* w = nb::inst_ptr<Wrapper>(self);
             w->value = {};
             return 0;

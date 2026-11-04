@@ -362,6 +362,12 @@ Here is an example of the required code for a ``Wrapper`` type:
    }
 
    int wrapper_tp_clear(PyObject *self) {
+       // As in tp_traverse, the C++ constructor may not have run yet (e.g., if
+       // an instance allocated via __new__ is part of a reference cycle).
+       if (!nb::inst_ready(self)) {
+           return 0;
+       }
+
        // Get the C++ object associated with 'self' (this always succeeds)
        Wrapper *w = nb::inst_ptr<Wrapper>(self);
 

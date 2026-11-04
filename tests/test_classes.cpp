@@ -149,6 +149,8 @@ int pooled_tr_traverse(PyObject *self, visitproc visit, void *arg) {
 }
 
 int pooled_tr_clear(PyObject *self) {
+    if (!nb::inst_ready(self))
+        return 0;
     PyObject *&ref = nb::inst_ptr<PooledTraverse>(self)->ref;
     Py_CLEAR(ref);
     return 0;
@@ -248,6 +250,9 @@ int wrapper_tp_traverse(PyObject *self, visitproc visit, void *arg) {
 }
 
 int wrapper_tp_clear(PyObject *self) {
+    if (!nb::inst_ready(self)) {
+        return 0;
+    }
     Wrapper *w = nb::inst_ptr<Wrapper>(self);
     w->value.reset();
     return 0;

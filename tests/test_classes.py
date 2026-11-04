@@ -735,6 +735,14 @@ def test31_cycle():
     del a
     collect()
 
+    # Uninitialized instance (__new__ without __init__) in a cycle must not
+    # touch C++ state in tp_traverse or tp_clear.
+    obj = t.Wrapper.__new__(t.Wrapper)
+    cycle = [obj]
+    cycle.append(cycle)
+    del obj, cycle
+    collect()
+
 
 def test32_type_checks():
     v1 = 5
@@ -1309,6 +1317,20 @@ def test61_pooled_custom_traverse():
     gc.collect()
     c, d = t.pooled_tr_stats()
     assert c == 1 and d == 1
+
+    # An uninitialized revived pooled instance still holds stale payload bytes
+    # from its previous occupant; tp_clear must not Py_CLEAR that dangling pointer.
+    t.pooled_tr_reset()
+    sentinel = ["payload"]
+    a = t.PooledTraverse(sentinel)
+    del a
+    b = t.PooledTraverse.__new__(t.PooledTraverse)
+    cycle = [b]
+    cycle.append(cycle)
+    del b, cycle
+    gc.collect()
+    assert sentinel == ["payload"]
+    assert t.pooled_tr_stats() == (1, 1)
 
 
 def test62_type_namespace():

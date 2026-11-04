@@ -1234,6 +1234,12 @@ def test53_issue_930():
     wrapper = t.Wrapper(np.ones(3, dtype=np.float32))
     assert wrapper.value[0] == 1
 
+    obj = t.Wrapper.__new__(t.Wrapper)
+    cycle = [obj]
+    cycle.append(cycle)
+    del obj, cycle
+    collect()
+
 
 @needs_numpy
 def test54_docs_example():

@@ -30,4 +30,6 @@ class IdentityMap:
 
     def values(self) -> Iterator[int]: ...
 
-__all__: list = ['iterator_passthrough', 'StringMap', 'IdentityMap']
+def make_audit_iterator() -> Iterator[int]: ...
+
+__all__: list = ['iterator_passthrough', 'make_audit_iterator', 'StringMap', 'IdentityMap']

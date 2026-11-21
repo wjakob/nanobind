@@ -184,9 +184,12 @@ NB_MODULE(test_ndarray_ext, m) {
               return check_ro</*expect_ro=*/true, /*is_shaped=*/true>(a);
           });
 
-    m.def("check_order", [](nb::ndarray<nb::c_contig>) -> char { return 'C'; });
-    m.def("check_order", [](nb::ndarray<nb::f_contig>) -> char { return 'F'; });
-    m.def("check_order", [](nb::ndarray<>) -> char { return '?'; });
+    m.def("check_order", [](nb::ndarray<nb::ro, nb::c_contig>) -> char {
+                             return 'C'; });
+    m.def("check_order", [](nb::ndarray<nb::ro, nb::f_contig>) -> char {
+                             return 'F'; });
+    m.def("check_order", [](nb::ndarray<nb::ro>) -> char {
+                             return '?'; });
 
     m.def("make_contig", [](nb::ndarray<nb::c_contig> a) { return a; });
 
@@ -249,15 +252,15 @@ NB_MODULE(test_ndarray_ext, m) {
                       t(i, j) = (float) k++;
           });
 
-    m.def(
-        "noimplicit",
-        [](nb::ndarray<float, nb::c_contig, nb::shape<2, 2>>) { return 0; },
-        "array"_a.noconvert());
+    m.def("noimplicit",
+          [](nb::ndarray<float, nb::ro, nb::c_contig, nb::shape<2, 2>>) {
+              return 0;
+          }, "array"_a.noconvert());
 
-    m.def(
-        "implicit",
-        [](nb::ndarray<float, nb::c_contig, nb::shape<2, 2>>) { return 0; },
-        "array"_a);
+    m.def("implicit",
+          [](nb::ndarray<float, nb::ro, nb::c_contig, nb::shape<2, 2>>) {
+              return 0;
+          }, "array"_a);
 
     m.def("inspect_ndarray", [](const nb::ndarray<>& ndarray) {
         printf("Tensor data pointer : %p\n", ndarray.data());
@@ -327,10 +330,10 @@ NB_MODULE(test_ndarray_ext, m) {
             f, 2, shape, deleter, strides);
     });
 
-    m.def("passthrough", [](nb::ndarray<> a) { return a; }, nb::rv_policy::none);
+    m.def("passthrough", [](nb::ndarray<nb::ro> a) { return a; }, nb::rv_policy::none);
     m.def("passthrough_copy", [](nb::ndarray<> a) { return a; }, nb::rv_policy::copy);
 
-    m.def("passthrough_arg_none", [](nb::ndarray<> a) { return a; },
+    m.def("passthrough_arg_none", [](nb::ndarray<nb::ro> a) { return a; },
           nb::arg().none(), nb::rv_policy::none);
 
     m.def("ret_numpy", []() {

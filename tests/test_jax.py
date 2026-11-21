@@ -85,13 +85,10 @@ def test05_passthrough():
 @needs_jax
 def test06_ro_array():
     if (not hasattr(jnp, '__array_api_version__')
-        or jnp.__array_api_version__ < '2024'):
+        or jnp.__array_api_version__ < '2025'):
         pytest.skip('jax version is too old')
     a = jnp.array([1, 2], dtype=jnp.float32)  # JAX arrays are immutable.
     assert t.accept_ro(a) == 1
-    # If the next line fails, delete it, update the array_api_version above,
-    # and uncomment the three lines below.
-    assert t.accept_rw(a) == 1
-    # with pytest.raises(TypeError) as excinfo:
-    #     t.accept_rw(a)
-    # assert 'incompatible function arguments' in str(excinfo.value)
+    with pytest.raises(TypeError) as excinfo:
+        t.accept_rw(a)
+    assert 'incompatible function arguments' in str(excinfo.value)

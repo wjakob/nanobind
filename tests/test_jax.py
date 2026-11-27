@@ -95,3 +95,23 @@ def test06_ro_array():
     # with pytest.raises(TypeError) as excinfo:
     #     t.accept_rw(a)
     # assert 'incompatible function arguments' in str(excinfo.value)
+
+
+@needs_jax
+def test07_reference_does_not_copy():
+    import numpy as np
+
+    storage = np.arange(32, dtype=np.float32)
+    start = (-storage.ctypes.data % 64) // storage.itemsize
+    aligned = storage[start:start + 4]
+    assert np.shares_memory(np.asarray(tj.reference_jax(aligned)), aligned)
+    assert tj.reference_jax(aligned[:0]).shape == (0,)
+
+    # Some JAX versions can share an unaligned CPU buffer; others must refuse it.
+    unaligned = storage[start + 1:start + 5]
+    try:
+        result = tj.reference_jax(unaligned)
+    except ValueError as exc:
+        assert "copy" in str(exc).lower()
+    else:
+        assert np.shares_memory(np.asarray(result), unaligned)

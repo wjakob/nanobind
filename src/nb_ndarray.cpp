@@ -1200,6 +1200,26 @@ static PyObject *ndarray_export_fn(nb_internals *internals_,
     return fn;
 }
 
+// Older JAX releases can copy a misaligned CPU buffer even with copy=False.
+// Check the DLPack view itself: the Python buffer protocol excludes some JAX dtypes.
+static bool jax_shares_cpu_buffer(nb_internals *p, PyObject *array,
+                                  const dlpack::dltensor &source) {
+    for (int i = 0; i < source.ndim; ++i)
+        if (source.shape[i] == 0)
+            return true;
+
+    ndarray_config cfg{ndarray_config_t<int, ro>()};
+    ndarray_handle *view = ndarray_import_impl(p, array, cfg, false, nullptr);
+    if (!view)
+        return false;
+    const dlpack::dltensor &result = *ndarray_inc_ref(view);
+    bool shares = result.device.device_type == source.device.device_type &&
+                  (uintptr_t) result.data + result.byte_offset ==
+                  (uintptr_t) source.data + source.byte_offset;
+    ndarray_dec_ref(view);
+    return shares;
+}
+
 PyObject *ndarray_export(nb_internals *p, ndarray_handle *th, int framework,
                          rv_policy policy, cleanup_list *cleanup) noexcept {
     if (!th)
@@ -1311,11 +1331,35 @@ PyObject *ndarray_export(nb_internals *p, ndarray_handle *th, int framework,
 
         if (slot != nd_export_count) {
             PyObject *export_fn = ndarray_export_fn(internals_, slot);
-            PyObject *stack[] = {nullptr, o.ptr()};
+            object kwnames;
+            bool jax_cpu_reference =
+                slot == nd_export_jax &&
+                th->tensor().device.device_type == device::cpu::value &&
+                (policy == rv_policy::reference || policy == rv_policy::reference_internal);
+            if (jax_cpu_reference) {
+                // JAX 0.4.27 added copy=False. Without it, JAX may silently
+                // copy CPU arrays whose buffer does not meet its alignment requirement.
+                object version = str_getattr(p, steal(module_import("jax")),
+                                             "__version_info__");
+                object min_version = steal(raise_if_null(Py_BuildValue("(iii)", 0, 4, 27)));
+                int supports_copy = PyObject_RichCompareBool(
+                    version.ptr(), min_version.ptr(), Py_GE);
+                if (supports_copy < 0)
+                    return nullptr;
+                if (supports_copy)
+                    kwnames = steal(raise_if_null(
+                        PyTuple_Pack(1, NB_INTERNED(p, copy))));
+            }
+            PyObject *stack[] = {nullptr, o.ptr(), Py_False};
             size_t nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
-            o = steal(PyObject_Vectorcall(export_fn, stack + 1, nargsf, nullptr));
+            o = steal(PyObject_Vectorcall(export_fn, stack + 1, nargsf, kwnames.ptr()));
             if (!o.is_valid())
                 return nullptr;
+            if (jax_cpu_reference && !jax_shares_cpu_buffer(p, o.ptr(), th->tensor())) {
+                PyErr_SetString(PyExc_ValueError,
+                                "JAX cannot reference this CPU buffer without a copy.");
+                return nullptr;
+            }
         }
     } catch (const std::exception &e) {
         PyErr_Format(PyExc_TypeError,

@@ -286,9 +286,11 @@ class StubGen:
             + sep_after
         )
 
-        # Precompile RE to extract nanobind nd-arrays
+        # Precompile RE to extract nanobind nd-arrays. The brackets of an
+        # nb::ndarray annotation are empty or hold 'key=value' entries, which
+        # leaves type expressions like 'numpy.ndarray[tuple[int], ...]' alone
         NDARRAY_PAT = (
-            "(" + "|".join(re.escape(fw) for fw in _FRAMEWORK_STUB_TYPES) + ")" + r"\[([^\]]*)\]"
+            "(" + "|".join(re.escape(fw) for fw in _FRAMEWORK_STUB_TYPES) + ")" + r"\[((?:\w+=[^\]]*)?)\]"
         )
         self.ndarray_re = re.compile(sep_before + NDARRAY_PAT)
 

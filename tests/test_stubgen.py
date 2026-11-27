@@ -155,3 +155,24 @@ def test09_flat_stub_reexports_submodule(stubgen, fresh_module):
         assert f"from {fresh_module.__name__} import child as child" in sg.get()
     finally:
         del sys.modules[child.__name__]
+
+
+# ---------------------------------------------------------------------------
+# nd-array annotations
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("tp, expected", [
+    # nb::ndarray annotations are rewritten
+    ("numpy.ndarray[]", "NDArray"),
+    ("numpy.ndarray[dtype=float32, shape=(*, 3)]",
+     "Annotated[NDArray[numpy.float32], dict(shape=(None, 3))]"),
+    # Type expressions (e.g., from nb::sig) are kept
+    ("numpy.ndarray[tuple[int, int], numpy.dtype[numpy.int32]]",
+     "numpy.ndarray[tuple[int, int], numpy.dtype[numpy.int32]]"),
+    ("numpy.ndarray[typing.Any, numpy.dtype[numpy.float64]]",
+     "numpy.ndarray[Any, numpy.dtype[numpy.float64]]"),
+    ("cupy.ndarray[tuple[int], numpy.dtype[numpy.float32]]",
+     "cupy.ndarray[tuple[int], numpy.dtype[numpy.float32]]"),
+])
+def test10_ndarray_annotation(sg, tp, expected):
+    assert sg.simplify_types(tp) == expected

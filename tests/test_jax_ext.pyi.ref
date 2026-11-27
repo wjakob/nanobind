@@ -1,8 +1,12 @@
 from typing import Annotated
 
 import jax
+import numpy
+from numpy.typing import NDArray
 
 
 def destruct_count() -> int: ...
+
+def reference_jax(arg: Annotated[NDArray[numpy.float32], dict(shape=(None,), order='C', device='cpu', writable=False)], /) -> Annotated[jax.Array, dict(dtype='float32', writable=False)]: ...
 
 def ret_jax() -> Annotated[jax.Array, dict(dtype='float32', shape=(2, 4))]: ...
